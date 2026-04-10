@@ -1,0 +1,1782 @@
+
+> common-house-app@0.1.0 dev
+> next dev
+
+▲ Next.js 16.2.3 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.86.28:3000
+- Environments: .env.local
+✓ Ready in 343ms
+⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+
+[browser] ./node_modules/google-auth-library/build/src/auth/googleauth.js:17:25
+Module not found: Can't resolve 'child_process'
+  15 | Object.defineProperty(exports, "__esModule", { value: true });
+  16 | exports.GoogleAuth = exports.GoogleAuthExceptionMessages = void 0;
+> 17 | const child_process_1 = require("child_process");
+     |                         ^^^^^^^^^^^^^^^^^^^^^^^^
+  18 | const fs = require("fs");
+  19 | const gaxios_1 = require("gaxios");
+  20 | const gcpMetadata = require("gcp-metadata");
+
+Import traces:
+  Client Component Browser:
+    ./node_modules/google-auth-library/build/src/auth/googleauth.js [Client Component Browser]
+    ./node_modules/google-auth-library/build/src/index.js [Client Component Browser]
+    ./node_modules/googleapis/build/src/index.js [Client Component Browser]
+    ./src/lib/drive.ts [Client Component Browser]
+    ./src/components/UploadZone.tsx [Client Component Browser]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./node_modules/google-auth-library/build/src/auth/googleauth.js [Client Component SSR]
+    ./node_modules/google-auth-library/build/src/index.js [Client Component SSR]
+    ./node_modules/googleapis/build/src/index.js [Client Component SSR]
+    ./src/lib/drive.ts [Client Component SSR]
+    ./src/components/UploadZone.tsx [Client Component SSR]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found 
+[browser] ./node_modules/google-auth-library/build/src/auth/pluggable-auth-handler.js:18:22
+Module not found: Can't resolve 'child_process'
+  16 | exports.PluggableAuthHandler = exports.ExecutableError = void 0;
+  17 | const executable_response_1 = require("./executable-response");
+> 18 | const childProcess = require("child_process");
+     |                      ^^^^^^^^^^^^^^^^^^^^^^^^
+  19 | const fs = require("fs");
+  20 | /**
+  21 |  * Error thrown from the executable run by PluggableAuthClient.
+
+Import traces:
+  Client Component Browser:
+    ./node_modules/google-auth-library/build/src/auth/pluggable-auth-handler.js [Client Component Browser]
+    ./node_modules/google-auth-library/build/src/auth/pluggable-auth-client.js [Client Component Browser]
+    ./node_modules/google-auth-library/build/src/index.js [Client Component Browser]
+    ./node_modules/googleapis/build/src/index.js [Client Component Browser]
+    ./src/lib/drive.ts [Client Component Browser]
+    ./src/components/UploadZone.tsx [Client Component Browser]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./node_modules/google-auth-library/build/src/auth/pluggable-auth-handler.js [Client Component SSR]
+    ./node_modules/google-auth-library/build/src/auth/pluggable-auth-client.js [Client Component SSR]
+    ./node_modules/google-auth-library/build/src/index.js [Client Component SSR]
+    ./node_modules/googleapis/build/src/index.js [Client Component SSR]
+    ./src/lib/drive.ts [Client Component SSR]
+    ./src/components/UploadZone.tsx [Client Component SSR]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found 
+[browser] ./node_modules/gcp-metadata/build/src/gcp-residency.js:24:14
+Module not found: Can't resolve 'fs'
+  22 | exports.isGoogleComputeEngine = isGoogleComputeEngine;
+  23 | exports.detectGCPResidency = detectGCPResidency;
+> 24 | const fs_1 = require("fs");
+     |              ^^^^^^^^^^^^^
+  25 | const os_1 = require("os");
+  26 | /**
+  27 |  * Known paths unique to Google Compute Engine Linux instances
+
+Import traces:
+  Client Component Browser:
+    ./node_modules/gcp-metadata/build/src/gcp-residency.js [Client Component Browser]
+    ./node_modules/gcp-metadata/build/src/index.js [Client Component Browser]
+    ./node_modules/google-auth-library/build/src/index.js [Client Component Browser]
+    ./node_modules/googleapis/build/src/index.js [Client Component Browser]
+    ./src/lib/drive.ts [Client Component Browser]
+    ./src/components/UploadZone.tsx [Client Component Browser]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./node_modules/gcp-metadata/build/src/gcp-residency.js [Client Component SSR]
+    ./node_modules/gcp-metadata/build/src/index.js [Client Component SSR]
+    ./node_modules/google-auth-library/build/src/index.js [Client Component SSR]
+    ./node_modules/googleapis/build/src/index.js [Client Component SSR]
+    ./src/lib/drive.ts [Client Component SSR]
+    ./src/components/UploadZone.tsx [Client Component SSR]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found 
+[browser] ./node_modules/google-auth-library/build/src/auth/certificatesubjecttokensupplier.js:18:12
+Module not found: Can't resolve 'fs'
+  16 | exports.CertificateSubjectTokenSupplier = exports.InvalidConfigurationError = exports.Cert...
+  17 | const util_1 = require("../util");
+> 18 | const fs = require("fs");
+     |            ^^^^^^^^^^^^^
+  19 | const crypto_1 = require("crypto");
+  20 | const https = require("https");
+  21 | exports.CERTIFICATE_CONFIGURATION_ENV_VARIABLE = 'GOOGLE_API_CERTIFICATE_CONFIG';
+
+Import traces:
+  Client Component Browser:
+    ./node_modules/google-auth-library/build/src/auth/certificatesubjecttokensupplier.js [Client Component Browser]
+    ./node_modules/google-auth-library/build/src/auth/identitypoolclient.js [Client Component Browser]
+    ./node_modules/google-auth-library/build/src/index.js [Client Component Browser]
+    ./node_modules/googleapis/build/src/index.js [Client Component Browser]
+    ./src/lib/drive.ts [Client Component Browser]
+    ./src/components/UploadZone.tsx [Client Component Browser]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./node_modules/google-auth-library/build/src/auth/certificatesubjecttokensupplier.js [Client Component SSR]
+    ./node_modules/google-auth-library/build/src/auth/identitypoolclient.js [Client Component SSR]
+    ./node_modules/google-auth-library/build/src/index.js [Client Component SSR]
+    ./node_modules/googleapis/build/src/index.js [Client Component SSR]
+    ./src/lib/drive.ts [Client Component SSR]
+    ./src/components/UploadZone.tsx [Client Component SSR]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found 
+[browser] ./node_modules/google-auth-library/build/src/auth/filesubjecttokensupplier.js:18:12
+Module not found: Can't resolve 'fs'
+  16 | exports.FileSubjectTokenSupplier = void 0;
+  17 | const util_1 = require("util");
+> 18 | const fs = require("fs");
+     |            ^^^^^^^^^^^^^
+  19 | // fs.readfile is undefined in browser karma tests causing
+  20 | // `npm run browser-test` to fail as test.oauth2.ts imports this file via
+  21 | // src/index.ts.
+
+Import traces:
+  Client Component Browser:
+    ./node_modules/google-auth-library/build/src/auth/filesubjecttokensupplier.js [Client Component Browser]
+    ./node_modules/google-auth-library/build/src/auth/identitypoolclient.js [Client Component Browser]
+    ./node_modules/google-auth-library/build/src/index.js [Client Component Browser]
+    ./node_modules/googleapis/build/src/index.js [Client Component Browser]
+    ./src/lib/drive.ts [Client Component Browser]
+    ./src/components/UploadZone.tsx [Client Component Browser]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./node_modules/google-auth-library/build/src/auth/filesubjecttokensupplier.js [Client Component SSR]
+    ./node_modules/google-auth-library/build/src/auth/identitypoolclient.js [Client Component SSR]
+    ./node_modules/google-auth-library/build/src/index.js [Client Component SSR]
+    ./node_modules/googleapis/build/src/index.js [Client Component SSR]
+    ./src/lib/drive.ts [Client Component SSR]
+    ./src/components/UploadZone.tsx [Client Component SSR]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found 
+[browser] ./node_modules/google-auth-library/build/src/auth/googleauth.js:18:12
+Module not found: Can't resolve 'fs'
+  16 | exports.GoogleAuth = exports.GoogleAuthExceptionMessages = void 0;
+  17 | const child_process_1 = require("child_process");
+> 18 | const fs = require("fs");
+     |            ^^^^^^^^^^^^^
+  19 | const gaxios_1 = require("gaxios");
+  20 | const gcpMetadata = require("gcp-metadata");
+  21 | const os = require("os");
+
+Import traces:
+  Client Component Browser:
+    ./node_modules/google-auth-library/build/src/auth/googleauth.js [Client Component Browser]
+    ./node_modules/google-auth-library/build/src/index.js [Client Component Browser]
+    ./node_modules/googleapis/build/src/index.js [Client Component Browser]
+    ./src/lib/drive.ts [Client Component Browser]
+    ./src/components/UploadZone.tsx [Client Component Browser]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./node_modules/google-auth-library/build/src/auth/googleauth.js [Client Component SSR]
+    ./node_modules/google-auth-library/build/src/index.js [Client Component SSR]
+    ./node_modules/googleapis/build/src/index.js [Client Component SSR]
+    ./src/lib/drive.ts [Client Component SSR]
+    ./src/components/UploadZone.tsx [Client Component SSR]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found 
+[browser] ./node_modules/google-auth-library/build/src/auth/pluggable-auth-handler.js:19:12
+Module not found: Can't resolve 'fs'
+  17 | const executable_response_1 = require("./executable-response");
+  18 | const childProcess = require("child_process");
+> 19 | const fs = require("fs");
+     |            ^^^^^^^^^^^^^
+  20 | /**
+  21 |  * Error thrown from the executable run by PluggableAuthClient.
+  22 |  */
+
+Import traces:
+  Client Component Browser:
+    ./node_modules/google-auth-library/build/src/auth/pluggable-auth-handler.js [Client Component Browser]
+    ./node_modules/google-auth-library/build/src/auth/pluggable-auth-client.js [Client Component Browser]
+    ./node_modules/google-auth-library/build/src/index.js [Client Component Browser]
+    ./node_modules/googleapis/build/src/index.js [Client Component Browser]
+    ./src/lib/drive.ts [Client Component Browser]
+    ./src/components/UploadZone.tsx [Client Component Browser]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./node_modules/google-auth-library/build/src/auth/pluggable-auth-handler.js [Client Component SSR]
+    ./node_modules/google-auth-library/build/src/auth/pluggable-auth-client.js [Client Component SSR]
+    ./node_modules/google-auth-library/build/src/index.js [Client Component SSR]
+    ./node_modules/googleapis/build/src/index.js [Client Component SSR]
+    ./src/lib/drive.ts [Client Component SSR]
+    ./src/components/UploadZone.tsx [Client Component SSR]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found 
+[browser] ./node_modules/google-auth-library/build/src/gtoken/getCredentials.js:18:12
+Module not found: Can't resolve 'fs'
+  16 | exports.getCredentials = getCredentials;
+  17 | const path = require("path");
+> 18 | const fs = require("fs");
+     |            ^^^^^^^^^^^^^
+  19 | const util_1 = require("util");
+  20 | const errorWithCode_1 = require("./errorWithCode");
+  21 | const readFile = fs.readFile
+
+Import traces:
+  Client Component Browser:
+    ./node_modules/google-auth-library/build/src/gtoken/getCredentials.js [Client Component Browser]
+    ./node_modules/google-auth-library/build/src/auth/jwtclient.js [Client Component Browser]
+    ./node_modules/google-auth-library/build/src/index.js [Client Component Browser]
+    ./node_modules/googleapis/build/src/index.js [Client Component Browser]
+    ./src/lib/drive.ts [Client Component Browser]
+    ./src/components/UploadZone.tsx [Client Component Browser]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./node_modules/google-auth-library/build/src/gtoken/getCredentials.js [Client Component SSR]
+    ./node_modules/google-auth-library/build/src/auth/jwtclient.js [Client Component SSR]
+    ./node_modules/google-auth-library/build/src/index.js [Client Component SSR]
+    ./node_modules/googleapis/build/src/index.js [Client Component SSR]
+    ./src/lib/drive.ts [Client Component SSR]
+    ./src/components/UploadZone.tsx [Client Component SSR]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found 
+[browser] ./node_modules/google-auth-library/build/src/util.js:22:12
+Module not found: Can't resolve 'fs'
+  20 | exports.isValidFile = isValidFile;
+  21 | exports.getWellKnownCertificateConfigFileLocation = getWellKnownCertificateConfigFileLocat...
+> 22 | const fs = require("fs");
+     |            ^^^^^^^^^^^^^
+  23 | const os = require("os");
+  24 | const path = require("path");
+  25 | const WELL_KNOWN_CERTIFICATE_CONFIG_FILE = 'certificate_config.json';
+
+Import traces:
+  Client Component Browser:
+    ./node_modules/google-auth-library/build/src/util.js [Client Component Browser]
+    ./node_modules/google-auth-library/build/src/auth/baseexternalclient.js [Client Component Browser]
+    ./node_modules/google-auth-library/build/src/index.js [Client Component Browser]
+    ./node_modules/googleapis/build/src/index.js [Client Component Browser]
+    ./src/lib/drive.ts [Client Component Browser]
+    ./src/components/UploadZone.tsx [Client Component Browser]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./node_modules/google-auth-library/build/src/util.js [Client Component SSR]
+    ./node_modules/google-auth-library/build/src/auth/baseexternalclient.js [Client Component SSR]
+    ./node_modules/google-auth-library/build/src/index.js [Client Component SSR]
+    ./node_modules/googleapis/build/src/index.js [Client Component SSR]
+    ./src/lib/drive.ts [Client Component SSR]
+    ./src/components/UploadZone.tsx [Client Component SSR]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found 
+[browser] ./node_modules/googleapis-common/build/src/discovery.js:16:12
+Module not found: Can't resolve 'fs'
+  14 | Object.defineProperty(exports, "__esModule", { value: true });
+  15 | exports.Discovery = void 0;
+> 16 | const fs = require("fs");
+     |            ^^^^^^^^^^^^^
+  17 | const gaxios_1 = require("gaxios");
+  18 | const resolve = require("url");
+  19 | const util = require("util");
+
+Import traces:
+  Client Component Browser:
+    ./node_modules/googleapis-common/build/src/discovery.js [Client Component Browser]
+    ./node_modules/googleapis-common/build/src/index.js [Client Component Browser]
+    ./node_modules/googleapis/build/src/index.js [Client Component Browser]
+    ./src/lib/drive.ts [Client Component Browser]
+    ./src/components/UploadZone.tsx [Client Component Browser]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./node_modules/googleapis-common/build/src/discovery.js [Client Component SSR]
+    ./node_modules/googleapis-common/build/src/index.js [Client Component SSR]
+    ./node_modules/googleapis/build/src/index.js [Client Component SSR]
+    ./src/lib/drive.ts [Client Component SSR]
+    ./src/components/UploadZone.tsx [Client Component SSR]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found 
+[browser] ./node_modules/googleapis-common/build/src/http2.js:18:15
+Module not found: Can't resolve 'http2'
+  16 | exports.request = request;
+  17 | exports.closeSession = closeSession;
+> 18 | const http2 = require("http2");
+     |               ^^^^^^^^^^^^^^^^
+  19 | const zlib = require("zlib");
+  20 | const url_1 = require("url");
+  21 | const qs = require("qs");
+
+Import traces:
+  Client Component Browser:
+    ./node_modules/googleapis-common/build/src/http2.js [Client Component Browser]
+    ./node_modules/googleapis-common/build/src/apirequest.js [Client Component Browser]
+    ./node_modules/googleapis-common/build/src/index.js [Client Component Browser]
+    ./node_modules/googleapis/build/src/index.js [Client Component Browser]
+    ./src/lib/drive.ts [Client Component Browser]
+    ./src/components/UploadZone.tsx [Client Component Browser]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./node_modules/googleapis-common/build/src/http2.js [Client Component SSR]
+    ./node_modules/googleapis-common/build/src/apirequest.js [Client Component SSR]
+    ./node_modules/googleapis-common/build/src/index.js [Client Component SSR]
+    ./node_modules/googleapis/build/src/index.js [Client Component SSR]
+    ./src/lib/drive.ts [Client Component SSR]
+    ./src/components/UploadZone.tsx [Client Component SSR]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found 
+[browser] ./node_modules/agent-base/dist/index.js:30:26
+Module not found: Can't resolve 'net'
+  28 | Object.defineProperty(exports, "__esModule", { value: true });
+  29 | exports.Agent = void 0;
+> 30 | const net = __importStar(require("net"));
+     |                          ^^^^^^^^^^^^^^
+  31 | const http = __importStar(require("http"));
+  32 | const https_1 = require("https");
+  33 | __exportStar(require("./helpers"), exports);
+
+Import traces:
+  Client Component Browser:
+    ./node_modules/agent-base/dist/index.js [Client Component Browser]
+    ./node_modules/https-proxy-agent/dist/index.js [Client Component Browser]
+    ./node_modules/gaxios/build/cjs/src/gaxios.js [Client Component Browser]
+    ./node_modules/gaxios/build/cjs/src/index.js [Client Component Browser]
+    ./node_modules/googleapis-common/build/src/index.js [Client Component Browser]
+    ./node_modules/googleapis/build/src/index.js [Client Component Browser]
+    ./src/lib/drive.ts [Client Component Browser]
+    ./src/components/UploadZone.tsx [Client Component Browser]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./node_modules/agent-base/dist/index.js [Client Component SSR]
+    ./node_modules/https-proxy-agent/dist/index.js [Client Component SSR]
+    ./node_modules/gaxios/build/cjs/src/gaxios.js [Client Component SSR]
+    ./node_modules/gaxios/build/cjs/src/index.js [Client Component SSR]
+    ./node_modules/googleapis-common/build/src/index.js [Client Component SSR]
+    ./node_modules/googleapis/build/src/index.js [Client Component SSR]
+    ./src/lib/drive.ts [Client Component SSR]
+    ./src/components/UploadZone.tsx [Client Component SSR]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found 
+[browser] ./node_modules/https-proxy-agent/dist/index.js:30:26
+Module not found: Can't resolve 'net'
+  28 | Object.defineProperty(exports, "__esModule", { value: true });
+  29 | exports.HttpsProxyAgent = void 0;
+> 30 | const net = __importStar(require("net"));
+     |                          ^^^^^^^^^^^^^^
+  31 | const tls = __importStar(require("tls"));
+  32 | const assert_1 = __importDefault(require("assert"));
+  33 | const debug_1 = __importDefault(require("debug"));
+
+Import traces:
+  Client Component Browser:
+    ./node_modules/https-proxy-agent/dist/index.js [Client Component Browser]
+    ./node_modules/gaxios/build/cjs/src/gaxios.js [Client Component Browser]
+    ./node_modules/gaxios/build/cjs/src/index.js [Client Component Browser]
+    ./node_modules/googleapis-common/build/src/index.js [Client Component Browser]
+    ./node_modules/googleapis/build/src/index.js [Client Component Browser]
+    ./src/lib/drive.ts [Client Component Browser]
+    ./src/components/UploadZone.tsx [Client Component Browser]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./node_modules/https-proxy-agent/dist/index.js [Client Component SSR]
+    ./node_modules/gaxios/build/cjs/src/gaxios.js [Client Component SSR]
+    ./node_modules/gaxios/build/cjs/src/index.js [Client Component SSR]
+    ./node_modules/googleapis-common/build/src/index.js [Client Component SSR]
+    ./node_modules/googleapis/build/src/index.js [Client Component SSR]
+    ./src/lib/drive.ts [Client Component SSR]
+    ./src/components/UploadZone.tsx [Client Component SSR]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found 
+[browser] ./node_modules/https-proxy-agent/dist/index.js:31:26
+Module not found: Can't resolve 'tls'
+  29 | exports.HttpsProxyAgent = void 0;
+  30 | const net = __importStar(require("net"));
+> 31 | const tls = __importStar(require("tls"));
+     |                          ^^^^^^^^^^^^^^
+  32 | const assert_1 = __importDefault(require("assert"));
+  33 | const debug_1 = __importDefault(require("debug"));
+  34 | const agent_base_1 = require("agent-base");
+
+Import traces:
+  Client Component Browser:
+    ./node_modules/https-proxy-agent/dist/index.js [Client Component Browser]
+    ./node_modules/gaxios/build/cjs/src/gaxios.js [Client Component Browser]
+    ./node_modules/gaxios/build/cjs/src/index.js [Client Component Browser]
+    ./node_modules/googleapis-common/build/src/index.js [Client Component Browser]
+    ./node_modules/googleapis/build/src/index.js [Client Component Browser]
+    ./src/lib/drive.ts [Client Component Browser]
+    ./src/components/UploadZone.tsx [Client Component Browser]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./node_modules/https-proxy-agent/dist/index.js [Client Component SSR]
+    ./node_modules/gaxios/build/cjs/src/gaxios.js [Client Component SSR]
+    ./node_modules/gaxios/build/cjs/src/index.js [Client Component SSR]
+    ./node_modules/googleapis-common/build/src/index.js [Client Component SSR]
+    ./node_modules/googleapis/build/src/index.js [Client Component SSR]
+    ./src/lib/drive.ts [Client Component SSR]
+    ./src/components/UploadZone.tsx [Client Component SSR]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found 
+[browser] ./node_modules/google-auth-library/build/src/auth/googleauth.js:17:25
+Module not found: Can't resolve 'child_process'
+  15 | Object.defineProperty(exports, "__esModule", { value: true });
+  16 | exports.GoogleAuth = exports.GoogleAuthExceptionMessages = void 0;
+> 17 | const child_process_1 = require("child_process");
+     |                         ^^^^^^^^^^^^^^^^^^^^^^^^
+  18 | const fs = require("fs");
+  19 | const gaxios_1 = require("gaxios");
+  20 | const gcpMetadata = require("gcp-metadata");
+
+Import traces:
+  Client Component Browser:
+    ./node_modules/google-auth-library/build/src/auth/googleauth.js [Client Component Browser]
+    ./node_modules/google-auth-library/build/src/index.js [Client Component Browser]
+    ./node_modules/googleapis/build/src/index.js [Client Component Browser]
+    ./src/lib/drive.ts [Client Component Browser]
+    ./src/components/UploadZone.tsx [Client Component Browser]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./node_modules/google-auth-library/build/src/auth/googleauth.js [Client Component SSR]
+    ./node_modules/google-auth-library/build/src/index.js [Client Component SSR]
+    ./node_modules/googleapis/build/src/index.js [Client Component SSR]
+    ./src/lib/drive.ts [Client Component SSR]
+    ./src/components/UploadZone.tsx [Client Component SSR]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found 
+[browser] ./node_modules/google-auth-library/build/src/auth/pluggable-auth-handler.js:18:22
+Module not found: Can't resolve 'child_process'
+  16 | exports.PluggableAuthHandler = exports.ExecutableError = void 0;
+  17 | const executable_response_1 = require("./executable-response");
+> 18 | const childProcess = require("child_process");
+     |                      ^^^^^^^^^^^^^^^^^^^^^^^^
+  19 | const fs = require("fs");
+  20 | /**
+  21 |  * Error thrown from the executable run by PluggableAuthClient.
+
+Import traces:
+  Client Component Browser:
+    ./node_modules/google-auth-library/build/src/auth/pluggable-auth-handler.js [Client Component Browser]
+    ./node_modules/google-auth-library/build/src/auth/pluggable-auth-client.js [Client Component Browser]
+    ./node_modules/google-auth-library/build/src/index.js [Client Component Browser]
+    ./node_modules/googleapis/build/src/index.js [Client Component Browser]
+    ./src/lib/drive.ts [Client Component Browser]
+    ./src/components/UploadZone.tsx [Client Component Browser]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./node_modules/google-auth-library/build/src/auth/pluggable-auth-handler.js [Client Component SSR]
+    ./node_modules/google-auth-library/build/src/auth/pluggable-auth-client.js [Client Component SSR]
+    ./node_modules/google-auth-library/build/src/index.js [Client Component SSR]
+    ./node_modules/googleapis/build/src/index.js [Client Component SSR]
+    ./src/lib/drive.ts [Client Component SSR]
+    ./src/components/UploadZone.tsx [Client Component SSR]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found 
+[browser] ./node_modules/gcp-metadata/build/src/gcp-residency.js:24:14
+Module not found: Can't resolve 'fs'
+  22 | exports.isGoogleComputeEngine = isGoogleComputeEngine;
+  23 | exports.detectGCPResidency = detectGCPResidency;
+> 24 | const fs_1 = require("fs");
+     |              ^^^^^^^^^^^^^
+  25 | const os_1 = require("os");
+  26 | /**
+  27 |  * Known paths unique to Google Compute Engine Linux instances
+
+Import traces:
+  Client Component Browser:
+    ./node_modules/gcp-metadata/build/src/gcp-residency.js [Client Component Browser]
+    ./node_modules/gcp-metadata/build/src/index.js [Client Component Browser]
+    ./node_modules/google-auth-library/build/src/index.js [Client Component Browser]
+    ./node_modules/googleapis/build/src/index.js [Client Component Browser]
+    ./src/lib/drive.ts [Client Component Browser]
+    ./src/components/UploadZone.tsx [Client Component Browser]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./node_modules/gcp-metadata/build/src/gcp-residency.js [Client Component SSR]
+    ./node_modules/gcp-metadata/build/src/index.js [Client Component SSR]
+    ./node_modules/google-auth-library/build/src/index.js [Client Component SSR]
+    ./node_modules/googleapis/build/src/index.js [Client Component SSR]
+    ./src/lib/drive.ts [Client Component SSR]
+    ./src/components/UploadZone.tsx [Client Component SSR]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found 
+[browser] ./node_modules/google-auth-library/build/src/auth/certificatesubjecttokensupplier.js:18:12
+Module not found: Can't resolve 'fs'
+  16 | exports.CertificateSubjectTokenSupplier = exports.InvalidConfigurationError = exports.Cert...
+  17 | const util_1 = require("../util");
+> 18 | const fs = require("fs");
+     |            ^^^^^^^^^^^^^
+  19 | const crypto_1 = require("crypto");
+  20 | const https = require("https");
+  21 | exports.CERTIFICATE_CONFIGURATION_ENV_VARIABLE = 'GOOGLE_API_CERTIFICATE_CONFIG';
+
+Import traces:
+  Client Component Browser:
+    ./node_modules/google-auth-library/build/src/auth/certificatesubjecttokensupplier.js [Client Component Browser]
+    ./node_modules/google-auth-library/build/src/auth/identitypoolclient.js [Client Component Browser]
+    ./node_modules/google-auth-library/build/src/index.js [Client Component Browser]
+    ./node_modules/googleapis/build/src/index.js [Client Component Browser]
+    ./src/lib/drive.ts [Client Component Browser]
+    ./src/components/UploadZone.tsx [Client Component Browser]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./node_modules/google-auth-library/build/src/auth/certificatesubjecttokensupplier.js [Client Component SSR]
+    ./node_modules/google-auth-library/build/src/auth/identitypoolclient.js [Client Component SSR]
+    ./node_modules/google-auth-library/build/src/index.js [Client Component SSR]
+    ./node_modules/googleapis/build/src/index.js [Client Component SSR]
+    ./src/lib/drive.ts [Client Component SSR]
+    ./src/components/UploadZone.tsx [Client Component SSR]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found 
+[browser] ./node_modules/google-auth-library/build/src/auth/filesubjecttokensupplier.js:18:12
+Module not found: Can't resolve 'fs'
+  16 | exports.FileSubjectTokenSupplier = void 0;
+  17 | const util_1 = require("util");
+> 18 | const fs = require("fs");
+     |            ^^^^^^^^^^^^^
+  19 | // fs.readfile is undefined in browser karma tests causing
+  20 | // `npm run browser-test` to fail as test.oauth2.ts imports this file via
+  21 | // src/index.ts.
+
+Import traces:
+  Client Component Browser:
+    ./node_modules/google-auth-library/build/src/auth/filesubjecttokensupplier.js [Client Component Browser]
+    ./node_modules/google-auth-library/build/src/auth/identitypoolclient.js [Client Component Browser]
+    ./node_modules/google-auth-library/build/src/index.js [Client Component Browser]
+    ./node_modules/googleapis/build/src/index.js [Client Component Browser]
+    ./src/lib/drive.ts [Client Component Browser]
+    ./src/components/UploadZone.tsx [Client Component Browser]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./node_modules/google-auth-library/build/src/auth/filesubjecttokensupplier.js [Client Component SSR]
+    ./node_modules/google-auth-library/build/src/auth/identitypoolclient.js [Client Component SSR]
+    ./node_modules/google-auth-library/build/src/index.js [Client Component SSR]
+    ./node_modules/googleapis/build/src/index.js [Client Component SSR]
+    ./src/lib/drive.ts [Client Component SSR]
+    ./src/components/UploadZone.tsx [Client Component SSR]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found 
+[browser] ./node_modules/google-auth-library/build/src/auth/googleauth.js:18:12
+Module not found: Can't resolve 'fs'
+  16 | exports.GoogleAuth = exports.GoogleAuthExceptionMessages = void 0;
+  17 | const child_process_1 = require("child_process");
+> 18 | const fs = require("fs");
+     |            ^^^^^^^^^^^^^
+  19 | const gaxios_1 = require("gaxios");
+  20 | const gcpMetadata = require("gcp-metadata");
+  21 | const os = require("os");
+
+Import traces:
+  Client Component Browser:
+    ./node_modules/google-auth-library/build/src/auth/googleauth.js [Client Component Browser]
+    ./node_modules/google-auth-library/build/src/index.js [Client Component Browser]
+    ./node_modules/googleapis/build/src/index.js [Client Component Browser]
+    ./src/lib/drive.ts [Client Component Browser]
+    ./src/components/UploadZone.tsx [Client Component Browser]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./node_modules/google-auth-library/build/src/auth/googleauth.js [Client Component SSR]
+    ./node_modules/google-auth-library/build/src/index.js [Client Component SSR]
+    ./node_modules/googleapis/build/src/index.js [Client Component SSR]
+    ./src/lib/drive.ts [Client Component SSR]
+    ./src/components/UploadZone.tsx [Client Component SSR]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found 
+[browser] ./node_modules/google-auth-library/build/src/auth/pluggable-auth-handler.js:19:12
+Module not found: Can't resolve 'fs'
+  17 | const executable_response_1 = require("./executable-response");
+  18 | const childProcess = require("child_process");
+> 19 | const fs = require("fs");
+     |            ^^^^^^^^^^^^^
+  20 | /**
+  21 |  * Error thrown from the executable run by PluggableAuthClient.
+  22 |  */
+
+Import traces:
+  Client Component Browser:
+    ./node_modules/google-auth-library/build/src/auth/pluggable-auth-handler.js [Client Component Browser]
+    ./node_modules/google-auth-library/build/src/auth/pluggable-auth-client.js [Client Component Browser]
+    ./node_modules/google-auth-library/build/src/index.js [Client Component Browser]
+    ./node_modules/googleapis/build/src/index.js [Client Component Browser]
+    ./src/lib/drive.ts [Client Component Browser]
+    ./src/components/UploadZone.tsx [Client Component Browser]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./node_modules/google-auth-library/build/src/auth/pluggable-auth-handler.js [Client Component SSR]
+    ./node_modules/google-auth-library/build/src/auth/pluggable-auth-client.js [Client Component SSR]
+    ./node_modules/google-auth-library/build/src/index.js [Client Component SSR]
+    ./node_modules/googleapis/build/src/index.js [Client Component SSR]
+    ./src/lib/drive.ts [Client Component SSR]
+    ./src/components/UploadZone.tsx [Client Component SSR]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found 
+[browser] ./node_modules/google-auth-library/build/src/gtoken/getCredentials.js:18:12
+Module not found: Can't resolve 'fs'
+  16 | exports.getCredentials = getCredentials;
+  17 | const path = require("path");
+> 18 | const fs = require("fs");
+     |            ^^^^^^^^^^^^^
+  19 | const util_1 = require("util");
+  20 | const errorWithCode_1 = require("./errorWithCode");
+  21 | const readFile = fs.readFile
+
+Import traces:
+  Client Component Browser:
+    ./node_modules/google-auth-library/build/src/gtoken/getCredentials.js [Client Component Browser]
+    ./node_modules/google-auth-library/build/src/auth/jwtclient.js [Client Component Browser]
+    ./node_modules/google-auth-library/build/src/index.js [Client Component Browser]
+    ./node_modules/googleapis/build/src/index.js [Client Component Browser]
+    ./src/lib/drive.ts [Client Component Browser]
+    ./src/components/UploadZone.tsx [Client Component Browser]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./node_modules/google-auth-library/build/src/gtoken/getCredentials.js [Client Component SSR]
+    ./node_modules/google-auth-library/build/src/auth/jwtclient.js [Client Component SSR]
+    ./node_modules/google-auth-library/build/src/index.js [Client Component SSR]
+    ./node_modules/googleapis/build/src/index.js [Client Component SSR]
+    ./src/lib/drive.ts [Client Component SSR]
+    ./src/components/UploadZone.tsx [Client Component SSR]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found 
+[browser] ./node_modules/google-auth-library/build/src/util.js:22:12
+Module not found: Can't resolve 'fs'
+  20 | exports.isValidFile = isValidFile;
+  21 | exports.getWellKnownCertificateConfigFileLocation = getWellKnownCertificateConfigFileLocat...
+> 22 | const fs = require("fs");
+     |            ^^^^^^^^^^^^^
+  23 | const os = require("os");
+  24 | const path = require("path");
+  25 | const WELL_KNOWN_CERTIFICATE_CONFIG_FILE = 'certificate_config.json';
+
+Import traces:
+  Client Component Browser:
+    ./node_modules/google-auth-library/build/src/util.js [Client Component Browser]
+    ./node_modules/google-auth-library/build/src/auth/baseexternalclient.js [Client Component Browser]
+    ./node_modules/google-auth-library/build/src/index.js [Client Component Browser]
+    ./node_modules/googleapis/build/src/index.js [Client Component Browser]
+    ./src/lib/drive.ts [Client Component Browser]
+    ./src/components/UploadZone.tsx [Client Component Browser]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./node_modules/google-auth-library/build/src/util.js [Client Component SSR]
+    ./node_modules/google-auth-library/build/src/auth/baseexternalclient.js [Client Component SSR]
+    ./node_modules/google-auth-library/build/src/index.js [Client Component SSR]
+    ./node_modules/googleapis/build/src/index.js [Client Component SSR]
+    ./src/lib/drive.ts [Client Component SSR]
+    ./src/components/UploadZone.tsx [Client Component SSR]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found 
+[browser] ./node_modules/googleapis-common/build/src/discovery.js:16:12
+Module not found: Can't resolve 'fs'
+  14 | Object.defineProperty(exports, "__esModule", { value: true });
+  15 | exports.Discovery = void 0;
+> 16 | const fs = require("fs");
+     |            ^^^^^^^^^^^^^
+  17 | const gaxios_1 = require("gaxios");
+  18 | const resolve = require("url");
+  19 | const util = require("util");
+
+Import traces:
+  Client Component Browser:
+    ./node_modules/googleapis-common/build/src/discovery.js [Client Component Browser]
+    ./node_modules/googleapis-common/build/src/index.js [Client Component Browser]
+    ./node_modules/googleapis/build/src/index.js [Client Component Browser]
+    ./src/lib/drive.ts [Client Component Browser]
+    ./src/components/UploadZone.tsx [Client Component Browser]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./node_modules/googleapis-common/build/src/discovery.js [Client Component SSR]
+    ./node_modules/googleapis-common/build/src/index.js [Client Component SSR]
+    ./node_modules/googleapis/build/src/index.js [Client Component SSR]
+    ./src/lib/drive.ts [Client Component SSR]
+    ./src/components/UploadZone.tsx [Client Component SSR]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found 
+[browser] ./node_modules/googleapis-common/build/src/http2.js:18:15
+Module not found: Can't resolve 'http2'
+  16 | exports.request = request;
+  17 | exports.closeSession = closeSession;
+> 18 | const http2 = require("http2");
+     |               ^^^^^^^^^^^^^^^^
+  19 | const zlib = require("zlib");
+  20 | const url_1 = require("url");
+  21 | const qs = require("qs");
+
+Import traces:
+  Client Component Browser:
+    ./node_modules/googleapis-common/build/src/http2.js [Client Component Browser]
+    ./node_modules/googleapis-common/build/src/apirequest.js [Client Component Browser]
+    ./node_modules/googleapis-common/build/src/index.js [Client Component Browser]
+    ./node_modules/googleapis/build/src/index.js [Client Component Browser]
+    ./src/lib/drive.ts [Client Component Browser]
+    ./src/components/UploadZone.tsx [Client Component Browser]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./node_modules/googleapis-common/build/src/http2.js [Client Component SSR]
+    ./node_modules/googleapis-common/build/src/apirequest.js [Client Component SSR]
+    ./node_modules/googleapis-common/build/src/index.js [Client Component SSR]
+    ./node_modules/googleapis/build/src/index.js [Client Component SSR]
+    ./src/lib/drive.ts [Client Component SSR]
+    ./src/components/UploadZone.tsx [Client Component SSR]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found 
+[browser] ./node_modules/agent-base/dist/index.js:30:26
+Module not found: Can't resolve 'net'
+  28 | Object.defineProperty(exports, "__esModule", { value: true });
+  29 | exports.Agent = void 0;
+> 30 | const net = __importStar(require("net"));
+     |                          ^^^^^^^^^^^^^^
+  31 | const http = __importStar(require("http"));
+  32 | const https_1 = require("https");
+  33 | __exportStar(require("./helpers"), exports);
+
+Import traces:
+  Client Component Browser:
+    ./node_modules/agent-base/dist/index.js [Client Component Browser]
+    ./node_modules/https-proxy-agent/dist/index.js [Client Component Browser]
+    ./node_modules/gaxios/build/cjs/src/gaxios.js [Client Component Browser]
+    ./node_modules/gaxios/build/cjs/src/index.js [Client Component Browser]
+    ./node_modules/googleapis-common/build/src/index.js [Client Component Browser]
+    ./node_modules/googleapis/build/src/index.js [Client Component Browser]
+    ./src/lib/drive.ts [Client Component Browser]
+    ./src/components/UploadZone.tsx [Client Component Browser]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./node_modules/agent-base/dist/index.js [Client Component SSR]
+    ./node_modules/https-proxy-agent/dist/index.js [Client Component SSR]
+    ./node_modules/gaxios/build/cjs/src/gaxios.js [Client Component SSR]
+    ./node_modules/gaxios/build/cjs/src/index.js [Client Component SSR]
+    ./node_modules/googleapis-common/build/src/index.js [Client Component SSR]
+    ./node_modules/googleapis/build/src/index.js [Client Component SSR]
+    ./src/lib/drive.ts [Client Component SSR]
+    ./src/components/UploadZone.tsx [Client Component SSR]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found 
+[browser] ./node_modules/https-proxy-agent/dist/index.js:30:26
+Module not found: Can't resolve 'net'
+  28 | Object.defineProperty(exports, "__esModule", { value: true });
+  29 | exports.HttpsProxyAgent = void 0;
+> 30 | const net = __importStar(require("net"));
+     |                          ^^^^^^^^^^^^^^
+  31 | const tls = __importStar(require("tls"));
+  32 | const assert_1 = __importDefault(require("assert"));
+  33 | const debug_1 = __importDefault(require("debug"));
+
+Import traces:
+  Client Component Browser:
+    ./node_modules/https-proxy-agent/dist/index.js [Client Component Browser]
+    ./node_modules/gaxios/build/cjs/src/gaxios.js [Client Component Browser]
+    ./node_modules/gaxios/build/cjs/src/index.js [Client Component Browser]
+    ./node_modules/googleapis-common/build/src/index.js [Client Component Browser]
+    ./node_modules/googleapis/build/src/index.js [Client Component Browser]
+    ./src/lib/drive.ts [Client Component Browser]
+    ./src/components/UploadZone.tsx [Client Component Browser]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./node_modules/https-proxy-agent/dist/index.js [Client Component SSR]
+    ./node_modules/gaxios/build/cjs/src/gaxios.js [Client Component SSR]
+    ./node_modules/gaxios/build/cjs/src/index.js [Client Component SSR]
+    ./node_modules/googleapis-common/build/src/index.js [Client Component SSR]
+    ./node_modules/googleapis/build/src/index.js [Client Component SSR]
+    ./src/lib/drive.ts [Client Component SSR]
+    ./src/components/UploadZone.tsx [Client Component SSR]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found 
+[browser] ./node_modules/https-proxy-agent/dist/index.js:31:26
+Module not found: Can't resolve 'tls'
+  29 | exports.HttpsProxyAgent = void 0;
+  30 | const net = __importStar(require("net"));
+> 31 | const tls = __importStar(require("tls"));
+     |                          ^^^^^^^^^^^^^^
+  32 | const assert_1 = __importDefault(require("assert"));
+  33 | const debug_1 = __importDefault(require("debug"));
+  34 | const agent_base_1 = require("agent-base");
+
+Import traces:
+  Client Component Browser:
+    ./node_modules/https-proxy-agent/dist/index.js [Client Component Browser]
+    ./node_modules/gaxios/build/cjs/src/gaxios.js [Client Component Browser]
+    ./node_modules/gaxios/build/cjs/src/index.js [Client Component Browser]
+    ./node_modules/googleapis-common/build/src/index.js [Client Component Browser]
+    ./node_modules/googleapis/build/src/index.js [Client Component Browser]
+    ./src/lib/drive.ts [Client Component Browser]
+    ./src/components/UploadZone.tsx [Client Component Browser]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./node_modules/https-proxy-agent/dist/index.js [Client Component SSR]
+    ./node_modules/gaxios/build/cjs/src/gaxios.js [Client Component SSR]
+    ./node_modules/gaxios/build/cjs/src/index.js [Client Component SSR]
+    ./node_modules/googleapis-common/build/src/index.js [Client Component SSR]
+    ./node_modules/googleapis/build/src/index.js [Client Component SSR]
+    ./src/lib/drive.ts [Client Component SSR]
+    ./src/components/UploadZone.tsx [Client Component SSR]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found 
+[browser] ./node_modules/google-auth-library/build/src/auth/googleauth.js:17:25
+Module not found: Can't resolve 'child_process'
+  15 | Object.defineProperty(exports, "__esModule", { value: true });
+  16 | exports.GoogleAuth = exports.GoogleAuthExceptionMessages = void 0;
+> 17 | const child_process_1 = require("child_process");
+     |                         ^^^^^^^^^^^^^^^^^^^^^^^^
+  18 | const fs = require("fs");
+  19 | const gaxios_1 = require("gaxios");
+  20 | const gcpMetadata = require("gcp-metadata");
+
+Import traces:
+  Client Component Browser:
+    ./node_modules/google-auth-library/build/src/auth/googleauth.js [Client Component Browser]
+    ./node_modules/google-auth-library/build/src/index.js [Client Component Browser]
+    ./node_modules/googleapis/build/src/index.js [Client Component Browser]
+    ./src/lib/drive.ts [Client Component Browser]
+    ./src/components/UploadZone.tsx [Client Component Browser]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./node_modules/google-auth-library/build/src/auth/googleauth.js [Client Component SSR]
+    ./node_modules/google-auth-library/build/src/index.js [Client Component SSR]
+    ./node_modules/googleapis/build/src/index.js [Client Component SSR]
+    ./src/lib/drive.ts [Client Component SSR]
+    ./src/components/UploadZone.tsx [Client Component SSR]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found 
+[browser] ./node_modules/google-auth-library/build/src/auth/pluggable-auth-handler.js:18:22
+Module not found: Can't resolve 'child_process'
+  16 | exports.PluggableAuthHandler = exports.ExecutableError = void 0;
+  17 | const executable_response_1 = require("./executable-response");
+> 18 | const childProcess = require("child_process");
+     |                      ^^^^^^^^^^^^^^^^^^^^^^^^
+  19 | const fs = require("fs");
+  20 | /**
+  21 |  * Error thrown from the executable run by PluggableAuthClient.
+
+Import traces:
+  Client Component Browser:
+    ./node_modules/google-auth-library/build/src/auth/pluggable-auth-handler.js [Client Component Browser]
+    ./node_modules/google-auth-library/build/src/auth/pluggable-auth-client.js [Client Component Browser]
+    ./node_modules/google-auth-library/build/src/index.js [Client Component Browser]
+    ./node_modules/googleapis/build/src/index.js [Client Component Browser]
+    ./src/lib/drive.ts [Client Component Browser]
+    ./src/components/UploadZone.tsx [Client Component Browser]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./node_modules/google-auth-library/build/src/auth/pluggable-auth-handler.js [Client Component SSR]
+    ./node_modules/google-auth-library/build/src/auth/pluggable-auth-client.js [Client Component SSR]
+    ./node_modules/google-auth-library/build/src/index.js [Client Component SSR]
+    ./node_modules/googleapis/build/src/index.js [Client Component SSR]
+    ./src/lib/drive.ts [Client Component SSR]
+    ./src/components/UploadZone.tsx [Client Component SSR]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found 
+[browser] ./node_modules/gcp-metadata/build/src/gcp-residency.js:24:14
+Module not found: Can't resolve 'fs'
+  22 | exports.isGoogleComputeEngine = isGoogleComputeEngine;
+  23 | exports.detectGCPResidency = detectGCPResidency;
+> 24 | const fs_1 = require("fs");
+     |              ^^^^^^^^^^^^^
+  25 | const os_1 = require("os");
+  26 | /**
+  27 |  * Known paths unique to Google Compute Engine Linux instances
+
+Import traces:
+  Client Component Browser:
+    ./node_modules/gcp-metadata/build/src/gcp-residency.js [Client Component Browser]
+    ./node_modules/gcp-metadata/build/src/index.js [Client Component Browser]
+    ./node_modules/google-auth-library/build/src/index.js [Client Component Browser]
+    ./node_modules/googleapis/build/src/index.js [Client Component Browser]
+    ./src/lib/drive.ts [Client Component Browser]
+    ./src/components/UploadZone.tsx [Client Component Browser]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./node_modules/gcp-metadata/build/src/gcp-residency.js [Client Component SSR]
+    ./node_modules/gcp-metadata/build/src/index.js [Client Component SSR]
+    ./node_modules/google-auth-library/build/src/index.js [Client Component SSR]
+    ./node_modules/googleapis/build/src/index.js [Client Component SSR]
+    ./src/lib/drive.ts [Client Component SSR]
+    ./src/components/UploadZone.tsx [Client Component SSR]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found 
+[browser] ./node_modules/google-auth-library/build/src/auth/certificatesubjecttokensupplier.js:18:12
+Module not found: Can't resolve 'fs'
+  16 | exports.CertificateSubjectTokenSupplier = exports.InvalidConfigurationError = exports.Cert...
+  17 | const util_1 = require("../util");
+> 18 | const fs = require("fs");
+     |            ^^^^^^^^^^^^^
+  19 | const crypto_1 = require("crypto");
+  20 | const https = require("https");
+  21 | exports.CERTIFICATE_CONFIGURATION_ENV_VARIABLE = 'GOOGLE_API_CERTIFICATE_CONFIG';
+
+Import traces:
+  Client Component Browser:
+    ./node_modules/google-auth-library/build/src/auth/certificatesubjecttokensupplier.js [Client Component Browser]
+    ./node_modules/google-auth-library/build/src/auth/identitypoolclient.js [Client Component Browser]
+    ./node_modules/google-auth-library/build/src/index.js [Client Component Browser]
+    ./node_modules/googleapis/build/src/index.js [Client Component Browser]
+    ./src/lib/drive.ts [Client Component Browser]
+    ./src/components/UploadZone.tsx [Client Component Browser]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./node_modules/google-auth-library/build/src/auth/certificatesubjecttokensupplier.js [Client Component SSR]
+    ./node_modules/google-auth-library/build/src/auth/identitypoolclient.js [Client Component SSR]
+    ./node_modules/google-auth-library/build/src/index.js [Client Component SSR]
+    ./node_modules/googleapis/build/src/index.js [Client Component SSR]
+    ./src/lib/drive.ts [Client Component SSR]
+    ./src/components/UploadZone.tsx [Client Component SSR]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found 
+[browser] ./node_modules/google-auth-library/build/src/auth/filesubjecttokensupplier.js:18:12
+Module not found: Can't resolve 'fs'
+  16 | exports.FileSubjectTokenSupplier = void 0;
+  17 | const util_1 = require("util");
+> 18 | const fs = require("fs");
+     |            ^^^^^^^^^^^^^
+  19 | // fs.readfile is undefined in browser karma tests causing
+  20 | // `npm run browser-test` to fail as test.oauth2.ts imports this file via
+  21 | // src/index.ts.
+
+Import traces:
+  Client Component Browser:
+    ./node_modules/google-auth-library/build/src/auth/filesubjecttokensupplier.js [Client Component Browser]
+    ./node_modules/google-auth-library/build/src/auth/identitypoolclient.js [Client Component Browser]
+    ./node_modules/google-auth-library/build/src/index.js [Client Component Browser]
+    ./node_modules/googleapis/build/src/index.js [Client Component Browser]
+    ./src/lib/drive.ts [Client Component Browser]
+    ./src/components/UploadZone.tsx [Client Component Browser]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./node_modules/google-auth-library/build/src/auth/filesubjecttokensupplier.js [Client Component SSR]
+    ./node_modules/google-auth-library/build/src/auth/identitypoolclient.js [Client Component SSR]
+    ./node_modules/google-auth-library/build/src/index.js [Client Component SSR]
+    ./node_modules/googleapis/build/src/index.js [Client Component SSR]
+    ./src/lib/drive.ts [Client Component SSR]
+    ./src/components/UploadZone.tsx [Client Component SSR]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found 
+[browser] ./node_modules/google-auth-library/build/src/auth/googleauth.js:18:12
+Module not found: Can't resolve 'fs'
+  16 | exports.GoogleAuth = exports.GoogleAuthExceptionMessages = void 0;
+  17 | const child_process_1 = require("child_process");
+> 18 | const fs = require("fs");
+     |            ^^^^^^^^^^^^^
+  19 | const gaxios_1 = require("gaxios");
+  20 | const gcpMetadata = require("gcp-metadata");
+  21 | const os = require("os");
+
+Import traces:
+  Client Component Browser:
+    ./node_modules/google-auth-library/build/src/auth/googleauth.js [Client Component Browser]
+    ./node_modules/google-auth-library/build/src/index.js [Client Component Browser]
+    ./node_modules/googleapis/build/src/index.js [Client Component Browser]
+    ./src/lib/drive.ts [Client Component Browser]
+    ./src/components/UploadZone.tsx [Client Component Browser]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./node_modules/google-auth-library/build/src/auth/googleauth.js [Client Component SSR]
+    ./node_modules/google-auth-library/build/src/index.js [Client Component SSR]
+    ./node_modules/googleapis/build/src/index.js [Client Component SSR]
+    ./src/lib/drive.ts [Client Component SSR]
+    ./src/components/UploadZone.tsx [Client Component SSR]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found 
+[browser] ./node_modules/google-auth-library/build/src/auth/pluggable-auth-handler.js:19:12
+Module not found: Can't resolve 'fs'
+  17 | const executable_response_1 = require("./executable-response");
+  18 | const childProcess = require("child_process");
+> 19 | const fs = require("fs");
+     |            ^^^^^^^^^^^^^
+  20 | /**
+  21 |  * Error thrown from the executable run by PluggableAuthClient.
+  22 |  */
+
+Import traces:
+  Client Component Browser:
+    ./node_modules/google-auth-library/build/src/auth/pluggable-auth-handler.js [Client Component Browser]
+    ./node_modules/google-auth-library/build/src/auth/pluggable-auth-client.js [Client Component Browser]
+    ./node_modules/google-auth-library/build/src/index.js [Client Component Browser]
+    ./node_modules/googleapis/build/src/index.js [Client Component Browser]
+    ./src/lib/drive.ts [Client Component Browser]
+    ./src/components/UploadZone.tsx [Client Component Browser]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./node_modules/google-auth-library/build/src/auth/pluggable-auth-handler.js [Client Component SSR]
+    ./node_modules/google-auth-library/build/src/auth/pluggable-auth-client.js [Client Component SSR]
+    ./node_modules/google-auth-library/build/src/index.js [Client Component SSR]
+    ./node_modules/googleapis/build/src/index.js [Client Component SSR]
+    ./src/lib/drive.ts [Client Component SSR]
+    ./src/components/UploadZone.tsx [Client Component SSR]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found 
+[browser] ./node_modules/google-auth-library/build/src/gtoken/getCredentials.js:18:12
+Module not found: Can't resolve 'fs'
+  16 | exports.getCredentials = getCredentials;
+  17 | const path = require("path");
+> 18 | const fs = require("fs");
+     |            ^^^^^^^^^^^^^
+  19 | const util_1 = require("util");
+  20 | const errorWithCode_1 = require("./errorWithCode");
+  21 | const readFile = fs.readFile
+
+Import traces:
+  Client Component Browser:
+    ./node_modules/google-auth-library/build/src/gtoken/getCredentials.js [Client Component Browser]
+    ./node_modules/google-auth-library/build/src/auth/jwtclient.js [Client Component Browser]
+    ./node_modules/google-auth-library/build/src/index.js [Client Component Browser]
+    ./node_modules/googleapis/build/src/index.js [Client Component Browser]
+    ./src/lib/drive.ts [Client Component Browser]
+    ./src/components/UploadZone.tsx [Client Component Browser]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./node_modules/google-auth-library/build/src/gtoken/getCredentials.js [Client Component SSR]
+    ./node_modules/google-auth-library/build/src/auth/jwtclient.js [Client Component SSR]
+    ./node_modules/google-auth-library/build/src/index.js [Client Component SSR]
+    ./node_modules/googleapis/build/src/index.js [Client Component SSR]
+    ./src/lib/drive.ts [Client Component SSR]
+    ./src/components/UploadZone.tsx [Client Component SSR]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found 
+[browser] ./node_modules/google-auth-library/build/src/util.js:22:12
+Module not found: Can't resolve 'fs'
+  20 | exports.isValidFile = isValidFile;
+  21 | exports.getWellKnownCertificateConfigFileLocation = getWellKnownCertificateConfigFileLocat...
+> 22 | const fs = require("fs");
+     |            ^^^^^^^^^^^^^
+  23 | const os = require("os");
+  24 | const path = require("path");
+  25 | const WELL_KNOWN_CERTIFICATE_CONFIG_FILE = 'certificate_config.json';
+
+Import traces:
+  Client Component Browser:
+    ./node_modules/google-auth-library/build/src/util.js [Client Component Browser]
+    ./node_modules/google-auth-library/build/src/auth/baseexternalclient.js [Client Component Browser]
+    ./node_modules/google-auth-library/build/src/index.js [Client Component Browser]
+    ./node_modules/googleapis/build/src/index.js [Client Component Browser]
+    ./src/lib/drive.ts [Client Component Browser]
+    ./src/components/UploadZone.tsx [Client Component Browser]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./node_modules/google-auth-library/build/src/util.js [Client Component SSR]
+    ./node_modules/google-auth-library/build/src/auth/baseexternalclient.js [Client Component SSR]
+    ./node_modules/google-auth-library/build/src/index.js [Client Component SSR]
+    ./node_modules/googleapis/build/src/index.js [Client Component SSR]
+    ./src/lib/drive.ts [Client Component SSR]
+    ./src/components/UploadZone.tsx [Client Component SSR]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found 
+[browser] ./node_modules/googleapis-common/build/src/discovery.js:16:12
+Module not found: Can't resolve 'fs'
+  14 | Object.defineProperty(exports, "__esModule", { value: true });
+  15 | exports.Discovery = void 0;
+> 16 | const fs = require("fs");
+     |            ^^^^^^^^^^^^^
+  17 | const gaxios_1 = require("gaxios");
+  18 | const resolve = require("url");
+  19 | const util = require("util");
+
+Import traces:
+  Client Component Browser:
+    ./node_modules/googleapis-common/build/src/discovery.js [Client Component Browser]
+    ./node_modules/googleapis-common/build/src/index.js [Client Component Browser]
+    ./node_modules/googleapis/build/src/index.js [Client Component Browser]
+    ./src/lib/drive.ts [Client Component Browser]
+    ./src/components/UploadZone.tsx [Client Component Browser]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./node_modules/googleapis-common/build/src/discovery.js [Client Component SSR]
+    ./node_modules/googleapis-common/build/src/index.js [Client Component SSR]
+    ./node_modules/googleapis/build/src/index.js [Client Component SSR]
+    ./src/lib/drive.ts [Client Component SSR]
+    ./src/components/UploadZone.tsx [Client Component SSR]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found 
+[browser] ./node_modules/googleapis-common/build/src/http2.js:18:15
+Module not found: Can't resolve 'http2'
+  16 | exports.request = request;
+  17 | exports.closeSession = closeSession;
+> 18 | const http2 = require("http2");
+     |               ^^^^^^^^^^^^^^^^
+  19 | const zlib = require("zlib");
+  20 | const url_1 = require("url");
+  21 | const qs = require("qs");
+
+Import traces:
+  Client Component Browser:
+    ./node_modules/googleapis-common/build/src/http2.js [Client Component Browser]
+    ./node_modules/googleapis-common/build/src/apirequest.js [Client Component Browser]
+    ./node_modules/googleapis-common/build/src/index.js [Client Component Browser]
+    ./node_modules/googleapis/build/src/index.js [Client Component Browser]
+    ./src/lib/drive.ts [Client Component Browser]
+    ./src/components/UploadZone.tsx [Client Component Browser]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./node_modules/googleapis-common/build/src/http2.js [Client Component SSR]
+    ./node_modules/googleapis-common/build/src/apirequest.js [Client Component SSR]
+    ./node_modules/googleapis-common/build/src/index.js [Client Component SSR]
+    ./node_modules/googleapis/build/src/index.js [Client Component SSR]
+    ./src/lib/drive.ts [Client Component SSR]
+    ./src/components/UploadZone.tsx [Client Component SSR]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found 
+[browser] ./node_modules/agent-base/dist/index.js:30:26
+Module not found: Can't resolve 'net'
+  28 | Object.defineProperty(exports, "__esModule", { value: true });
+  29 | exports.Agent = void 0;
+> 30 | const net = __importStar(require("net"));
+     |                          ^^^^^^^^^^^^^^
+  31 | const http = __importStar(require("http"));
+  32 | const https_1 = require("https");
+  33 | __exportStar(require("./helpers"), exports);
+
+Import traces:
+  Client Component Browser:
+    ./node_modules/agent-base/dist/index.js [Client Component Browser]
+    ./node_modules/https-proxy-agent/dist/index.js [Client Component Browser]
+    ./node_modules/gaxios/build/cjs/src/gaxios.js [Client Component Browser]
+    ./node_modules/gaxios/build/cjs/src/index.js [Client Component Browser]
+    ./node_modules/googleapis-common/build/src/index.js [Client Component Browser]
+    ./node_modules/googleapis/build/src/index.js [Client Component Browser]
+    ./src/lib/drive.ts [Client Component Browser]
+    ./src/components/UploadZone.tsx [Client Component Browser]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./node_modules/agent-base/dist/index.js [Client Component SSR]
+    ./node_modules/https-proxy-agent/dist/index.js [Client Component SSR]
+    ./node_modules/gaxios/build/cjs/src/gaxios.js [Client Component SSR]
+    ./node_modules/gaxios/build/cjs/src/index.js [Client Component SSR]
+    ./node_modules/googleapis-common/build/src/index.js [Client Component SSR]
+    ./node_modules/googleapis/build/src/index.js [Client Component SSR]
+    ./src/lib/drive.ts [Client Component SSR]
+    ./src/components/UploadZone.tsx [Client Component SSR]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found 
+[browser] ./node_modules/https-proxy-agent/dist/index.js:30:26
+Module not found: Can't resolve 'net'
+  28 | Object.defineProperty(exports, "__esModule", { value: true });
+  29 | exports.HttpsProxyAgent = void 0;
+> 30 | const net = __importStar(require("net"));
+     |                          ^^^^^^^^^^^^^^
+  31 | const tls = __importStar(require("tls"));
+  32 | const assert_1 = __importDefault(require("assert"));
+  33 | const debug_1 = __importDefault(require("debug"));
+
+Import traces:
+  Client Component Browser:
+    ./node_modules/https-proxy-agent/dist/index.js [Client Component Browser]
+    ./node_modules/gaxios/build/cjs/src/gaxios.js [Client Component Browser]
+    ./node_modules/gaxios/build/cjs/src/index.js [Client Component Browser]
+    ./node_modules/googleapis-common/build/src/index.js [Client Component Browser]
+    ./node_modules/googleapis/build/src/index.js [Client Component Browser]
+    ./src/lib/drive.ts [Client Component Browser]
+    ./src/components/UploadZone.tsx [Client Component Browser]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./node_modules/https-proxy-agent/dist/index.js [Client Component SSR]
+    ./node_modules/gaxios/build/cjs/src/gaxios.js [Client Component SSR]
+    ./node_modules/gaxios/build/cjs/src/index.js [Client Component SSR]
+    ./node_modules/googleapis-common/build/src/index.js [Client Component SSR]
+    ./node_modules/googleapis/build/src/index.js [Client Component SSR]
+    ./src/lib/drive.ts [Client Component SSR]
+    ./src/components/UploadZone.tsx [Client Component SSR]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found 
+[browser] ./node_modules/https-proxy-agent/dist/index.js:31:26
+Module not found: Can't resolve 'tls'
+  29 | exports.HttpsProxyAgent = void 0;
+  30 | const net = __importStar(require("net"));
+> 31 | const tls = __importStar(require("tls"));
+     |                          ^^^^^^^^^^^^^^
+  32 | const assert_1 = __importDefault(require("assert"));
+  33 | const debug_1 = __importDefault(require("debug"));
+  34 | const agent_base_1 = require("agent-base");
+
+Import traces:
+  Client Component Browser:
+    ./node_modules/https-proxy-agent/dist/index.js [Client Component Browser]
+    ./node_modules/gaxios/build/cjs/src/gaxios.js [Client Component Browser]
+    ./node_modules/gaxios/build/cjs/src/index.js [Client Component Browser]
+    ./node_modules/googleapis-common/build/src/index.js [Client Component Browser]
+    ./node_modules/googleapis/build/src/index.js [Client Component Browser]
+    ./src/lib/drive.ts [Client Component Browser]
+    ./src/components/UploadZone.tsx [Client Component Browser]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./node_modules/https-proxy-agent/dist/index.js [Client Component SSR]
+    ./node_modules/gaxios/build/cjs/src/gaxios.js [Client Component SSR]
+    ./node_modules/gaxios/build/cjs/src/index.js [Client Component SSR]
+    ./node_modules/googleapis-common/build/src/index.js [Client Component SSR]
+    ./node_modules/googleapis/build/src/index.js [Client Component SSR]
+    ./src/lib/drive.ts [Client Component SSR]
+    ./src/components/UploadZone.tsx [Client Component SSR]
+    ./src/components/UploadZone.tsx [Server Component]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+https://nextjs.org/docs/messages/module-not-found 
+ GET /admin/projects/33d45e5b-6633-81b5-9119-e98c11b7b4c2 404 in 637ms (next.js: 157ms, proxy.ts: 265ms, application-code: 214ms)
+ GET / 307 in 84ms (next.js: 24ms, proxy.ts: 14ms, application-code: 45ms)
+ POST /api/setup-all-drives 404 in 54ms (next.js: 6ms, proxy.ts: 14ms, application-code: 34ms)
+ POST /api/setup-all-drives 404 in 39ms (next.js: 5ms, proxy.ts: 9ms, application-code: 25ms)
+✓ Compiled in 284ms
+ GET /admin/projects/33d45e5b-6633-81b5-9119-e98c11b7b4c2 404 in 303ms (next.js: 80ms, proxy.ts: 130ms, application-code: 93ms)
+ GET /admin/projects/33d45e5b-6633-81b5-9119-e98c11b7b4c2 404 in 173ms (next.js: 11ms, proxy.ts: 14ms, application-code: 147ms)
+ GET /admin/projects/33d45e5b-6633-81b5-9119-e98c11b7b4c2 404 in 168ms (next.js: 32ms, proxy.ts: 15ms, application-code: 120ms)
+ GET /admin/projects/33d45e5b-6633-81b5-9119-e98c11b7b4c2 404 in 184ms (next.js: 61ms, proxy.ts: 81ms, application-code: 42ms)
+ GET /admin/projects/33d45e5b-6633-81b5-9119-e98c11b7b4c2 404 in 128ms (next.js: 9ms, proxy.ts: 13ms, application-code: 106ms)
+ GET /admin/projects/33d45e5b-6633-81b5-9119-e98c11b7b4c2 404 in 126ms (next.js: 23ms, proxy.ts: 10ms, application-code: 93ms)
+ GET /admin/projects/33d45e5b-6633-81b5-9119-e98c11b7b4c2 404 in 326ms (next.js: 65ms, proxy.ts: 212ms, application-code: 49ms)
+ GET /admin/projects/33d45e5b-6633-81b5-9119-e98c11b7b4c2 404 in 143ms (next.js: 12ms, proxy.ts: 15ms, application-code: 116ms)
+ GET /admin/projects/33d45e5b-6633-81b5-9119-e98c11b7b4c2 404 in 134ms (next.js: 10ms, proxy.ts: 93ms, application-code: 30ms)
+ GET /admin/projects/33d45e5b-6633-81b5-9119-e98c11b7b4c2 404 in 181ms (next.js: 24ms, proxy.ts: 15ms, application-code: 142ms)
+ POST /api/setup-all-drives 404 in 37ms (next.js: 5ms, proxy.ts: 10ms, application-code: 21ms)
+ POST /api/create-project-folders 404 in 45ms (next.js: 5ms, proxy.ts: 15ms, application-code: 25ms)
+ POST /api/upload 404 in 35ms (next.js: 5ms, proxy.ts: 9ms, application-code: 21ms)
+✓ Compiled in 39ms
+(node:13400) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ GET /admin/projects/33d45e5b-6633-81b5-9119-e98c11b7b4c2 200 in 1454ms (next.js: 446ms, proxy.ts: 159ms, application-code: 848ms)
+⨯ ./src/lib/drive.ts:2:1
+Export FolderName doesn't exist in target module
+  [90m1 |[0m [36mimport[0m { google } [36mfrom[0m [32m"googleapis"[0m;
+[31m[1m>[0m [90m2 |[0m [36mimport[0m { [33mDEFAULT_FOLDERS[0m, [33mFolderName[0m } [36mfrom[0m [32m"./drive-constants"[0m;
+  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m3 |[0m
+  [90m4 |[0m [36mexport[0m { [33mDEFAULT_FOLDERS[0m, [33mFolderName[0m };
+  [90m5 |[0m
+
+The export FolderName was not found in module [project]/src/lib/drive-constants.ts [app-route] (ecmascript).
+Did you mean to import DEFAULT_FOLDERS?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+Import trace:
+  App Route:
+    ./src/lib/drive.ts
+    ./src/app/api/setup-all-drives/route.ts
+
+
+ POST /api/setup-all-drives 500 in 2.2s (next.js: 2.1s, proxy.ts: 16ms, application-code: 89ms)
+⨯ ./src/lib/drive.ts:2:1
+Export FolderName doesn't exist in target module
+  [90m1 |[0m [36mimport[0m { google } [36mfrom[0m [32m"googleapis"[0m;
+[31m[1m>[0m [90m2 |[0m [36mimport[0m { [33mDEFAULT_FOLDERS[0m, [33mFolderName[0m } [36mfrom[0m [32m"./drive-constants"[0m;
+  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m3 |[0m
+  [90m4 |[0m [36mexport[0m { [33mDEFAULT_FOLDERS[0m, [33mFolderName[0m };
+  [90m5 |[0m
+
+The export FolderName was not found in module [project]/src/lib/drive-constants.ts [app-route] (ecmascript).
+Did you mean to import DEFAULT_FOLDERS?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+Import trace:
+  App Route:
+    ./src/lib/drive.ts
+    ./src/app/api/setup-all-drives/route.ts
+
+
+ POST /api/setup-all-drives 500 in 26ms (next.js: 8ms, proxy.ts: 10ms, application-code: 8ms)
+⨯ ./src/lib/drive.ts:2:1
+Export FolderName doesn't exist in target module
+  [90m1 |[0m [36mimport[0m { google } [36mfrom[0m [32m"googleapis"[0m;
+[31m[1m>[0m [90m2 |[0m [36mimport[0m { [33mDEFAULT_FOLDERS[0m, [33mFolderName[0m } [36mfrom[0m [32m"./drive-constants"[0m;
+  [90m  |[0m [31m[1m^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^[0m
+  [90m3 |[0m
+  [90m4 |[0m [36mexport[0m { [33mDEFAULT_FOLDERS[0m, [33mFolderName[0m };
+  [90m5 |[0m
+
+The export FolderName was not found in module [project]/src/lib/drive-constants.ts [app-route] (ecmascript).
+Did you mean to import DEFAULT_FOLDERS?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+Import trace:
+  App Route:
+    ./src/lib/drive.ts
+    ./src/app/api/setup-all-drives/route.ts
+
+
+ POST /api/setup-all-drives 500 in 19ms (next.js: 6ms, proxy.ts: 8ms, application-code: 5ms)
+ POST /api/setup-all-drives 401 in 596ms (next.js: 566ms, proxy.ts: 12ms, application-code: 18ms)
+ POST /api/setup-all-drives 401 in 25ms (next.js: 3ms, proxy.ts: 9ms, application-code: 14ms)
+ GET /admin 200 in 1698ms (next.js: 34ms, proxy.ts: 13ms, application-code: 1651ms)
+ POST /api/setup-all-drives 200 in 14.6s (next.js: 3ms, proxy.ts: 9ms, application-code: 14.6s)
+[browser] Clerk: Clerk has been loaded with development keys. Development instances have strict usage limits and should not be used when deploying your application to production. Learn more: https://clerk.com/docs/deployments/overview (https://major-glowworm-16.clerk.accounts.dev/npm/@clerk/clerk-js@6/dist/clerk.browser.js:12:3217)
+[browser] ./src/lib/drive.ts:2:1
+Export FolderName doesn't exist in target module
+  1 | import { google } from "googleapis";
+> 2 | import { DEFAULT_FOLDERS, FolderName } from "./drive-constants";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  3 |
+  4 | export { DEFAULT_FOLDERS, FolderName };
+  5 |
+
+The export FolderName was not found in module [project]/src/lib/drive-constants.ts [app-route] (ecmascript).
+Did you mean to import DEFAULT_FOLDERS?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+Import trace:
+  App Route:
+    ./src/lib/drive.ts
+    ./src/app/api/setup-all-drives/route.ts 
+[browser] ./src/lib/drive.ts:2:1
+Export FolderName doesn't exist in target module
+  1 | import { google } from "googleapis";
+> 2 | import { DEFAULT_FOLDERS, FolderName } from "./drive-constants";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  3 |
+  4 | export { DEFAULT_FOLDERS, FolderName };
+  5 |
+
+The export FolderName was not found in module [project]/src/lib/drive-constants.ts [app-route] (ecmascript).
+Did you mean to import DEFAULT_FOLDERS?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+Import trace:
+  App Route:
+    ./src/lib/drive.ts
+    ./src/app/api/setup-all-drives/route.ts 
+[browser] ./src/lib/drive.ts:2:1
+Export FolderName doesn't exist in target module
+  1 | import { google } from "googleapis";
+> 2 | import { DEFAULT_FOLDERS, FolderName } from "./drive-constants";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  3 |
+  4 | export { DEFAULT_FOLDERS, FolderName };
+  5 |
+
+The export FolderName was not found in module [project]/src/lib/drive-constants.ts [app-route] (ecmascript).
+Did you mean to import DEFAULT_FOLDERS?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+Import trace:
+  App Route:
+    ./src/lib/drive.ts
+    ./src/app/api/setup-all-drives/route.ts 
+[browser] ./src/lib/drive.ts:2:1
+Export FolderName doesn't exist in target module
+  1 | import { google } from "googleapis";
+> 2 | import { DEFAULT_FOLDERS, FolderName } from "./drive-constants";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  3 |
+  4 | export { DEFAULT_FOLDERS, FolderName };
+  5 |
+
+The export FolderName was not found in module [project]/src/lib/drive-constants.ts [app-route] (ecmascript).
+Did you mean to import DEFAULT_FOLDERS?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+Import trace:
+  App Route:
+    ./src/lib/drive.ts
+    ./src/app/api/setup-all-drives/route.ts 
+[browser] ./src/lib/drive.ts:2:1
+Export FolderName doesn't exist in target module
+  1 | import { google } from "googleapis";
+> 2 | import { DEFAULT_FOLDERS, FolderName } from "./drive-constants";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  3 |
+  4 | export { DEFAULT_FOLDERS, FolderName };
+  5 |
+
+The export FolderName was not found in module [project]/src/lib/drive-constants.ts [app-route] (ecmascript).
+Did you mean to import DEFAULT_FOLDERS?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+Import trace:
+  App Route:
+    ./src/lib/drive.ts
+    ./src/app/api/setup-all-drives/route.ts 
+[browser] ./src/lib/drive.ts:2:1
+Export FolderName doesn't exist in target module
+  1 | import { google } from "googleapis";
+> 2 | import { DEFAULT_FOLDERS, FolderName } from "./drive-constants";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  3 |
+  4 | export { DEFAULT_FOLDERS, FolderName };
+  5 |
+
+The export FolderName was not found in module [project]/src/lib/drive-constants.ts [app-route] (ecmascript).
+Did you mean to import DEFAULT_FOLDERS?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+Import trace:
+  App Route:
+    ./src/lib/drive.ts
+    ./src/app/api/setup-all-drives/route.ts 
+[browser] ./src/lib/drive.ts:2:1
+Export FolderName doesn't exist in target module
+  1 | import { google } from "googleapis";
+> 2 | import { DEFAULT_FOLDERS, FolderName } from "./drive-constants";
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  3 |
+  4 | export { DEFAULT_FOLDERS, FolderName };
+  5 |
+
+The export FolderName was not found in module [project]/src/lib/drive-constants.ts [app-route] (ecmascript).
+Did you mean to import DEFAULT_FOLDERS?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+Import trace:
+  App Route:
+    ./src/lib/drive.ts
+    ./src/app/api/setup-all-drives/route.ts 
+ GET /admin/projects/33d45e5b-6633-81b5-9119-e98c11b7b4c2 200 in 1023ms (next.js: 19ms, proxy.ts: 11ms, application-code: 993ms)
+[browser] Clerk: Clerk has been loaded with development keys. Development instances have strict usage limits and should not be used when deploying your application to production. Learn more: https://clerk.com/docs/deployments/overview (https://major-glowworm-16.clerk.accounts.dev/npm/@clerk/clerk-js@6/dist/clerk.browser.js:12:3217)
+✓ Compiled in 39ms
+ GET /admin/projects/33d45e5b-6633-81b5-9119-e98c11b7b4c2 200 in 1542ms (next.js: 152ms, proxy.ts: 382ms, application-code: 1008ms)
+ GET /admin 200 in 966ms (next.js: 33ms, proxy.ts: 25ms, application-code: 908ms)
+ GET /admin 200 in 1128ms (next.js: 13ms, proxy.ts: 23ms, application-code: 1093ms)
+ GET /admin 200 in 1457ms (next.js: 231ms, proxy.ts: 9ms, application-code: 1218ms)
+ GET /admin/projects/33d45e5b-6633-81b5-9119-e98c11b7b4c2 200 in 1294ms (next.js: 78ms, proxy.ts: 34ms, application-code: 1182ms)
+ GET /admin 200 in 2.4s (next.js: 96ms, proxy.ts: 215ms, application-code: 2.1s)
+ GET /admin 200 in 1009ms (next.js: 3ms, proxy.ts: 17ms, application-code: 990ms)
+ GET /admin 200 in 1215ms (next.js: 3ms, proxy.ts: 10ms, application-code: 1201ms)
+ GET /admin 200 in 1175ms (next.js: 6ms, proxy.ts: 65ms, application-code: 1104ms)
+ GET /admin/projects/33d45e5b-6633-81b5-9119-e98c11b7b4c2 200 in 1080ms (next.js: 12ms, proxy.ts: 15ms, application-code: 1053ms)
+ GET /admin 200 in 1665ms (next.js: 4ms, proxy.ts: 6ms, application-code: 1655ms)
+ GET /admin/projects/33d45e5b-6633-81b5-9119-e98c11b7b4c2 200 in 1047ms (next.js: 8ms, proxy.ts: 7ms, application-code: 1032ms)
+ GET /admin/projects/33d45e5b-6633-81b5-9119-e98c11b7b4c2 200 in 1046ms (next.js: 21ms, proxy.ts: 13ms, application-code: 1012ms)
+ GET /admin/projects/33d45e5b-6633-81b5-9119-e98c11b7b4c2 200 in 957ms (next.js: 5ms, proxy.ts: 11ms, application-code: 941ms)
+ GET /admin/projects/33d45e5b-6633-81b5-9119-e98c11b7b4c2 200 in 1012ms (next.js: 23ms, proxy.ts: 12ms, application-code: 977ms)
+ GET /admin/projects/33d45e5b-6633-81b5-9119-e98c11b7b4c2 200 in 1719ms (next.js: 53ms, proxy.ts: 12ms, application-code: 1654ms)
+✓ Compiled in 56ms
+ GET /admin 200 in 919ms (next.js: 3ms, proxy.ts: 16ms, application-code: 900ms)
+ GET /admin/projects/33d45e5b-6633-81ba-8784-ea132f0a57ca 200 in 1378ms (next.js: 26ms, proxy.ts: 36ms, application-code: 1316ms)
+✓ Compiled in 75ms
+ GET /admin 200 in 1286ms (next.js: 73ms, proxy.ts: 91ms, application-code: 1122ms)
+ GET /admin/projects/33d45e5b-6633-81ba-8784-ea132f0a57ca 200 in 1382ms (next.js: 27ms, proxy.ts: 215ms, application-code: 1139ms)
+ GET /admin/projects/33d45e5b-6633-81ba-8784-ea132f0a57ca 200 in 1125ms (next.js: 201ms, proxy.ts: 73ms, application-code: 850ms)
+ GET /admin 200 in 1749ms (next.js: 92ms, proxy.ts: 74ms, application-code: 1583ms)
+ GET /admin/projects/33d45e5b-6633-81ba-8784-ea132f0a57ca 200 in 1024ms (next.js: 69ms, proxy.ts: 222ms, application-code: 733ms)
+ GET /admin 200 in 919ms (next.js: 5ms, proxy.ts: 8ms, application-code: 906ms)
+ GET /admin/projects/33d45e5b-6633-81ba-8784-ea132f0a57ca 200 in 1020ms (next.js: 5ms, proxy.ts: 12ms, application-code: 1004ms)
+ GET /admin 200 in 1361ms (next.js: 73ms, proxy.ts: 91ms, application-code: 1197ms)
+ GET /admin 200 in 1244ms (next.js: 93ms, proxy.ts: 95ms, application-code: 1057ms)
+ GET /admin/projects/33d45e5b-6633-81ba-8784-ea132f0a57ca 200 in 1077ms (next.js: 7ms, proxy.ts: 36ms, application-code: 1034ms)
+ GET /admin/projects/33d45e5b-6633-81ba-8784-ea132f0a57ca 200 in 1449ms (next.js: 172ms, proxy.ts: 95ms, application-code: 1182ms)
+ GET /admin 200 in 2.2s (next.js: 7ms, proxy.ts: 68ms, application-code: 2.2s)
+ GET /admin 200 in 966ms (next.js: 11ms, proxy.ts: 26ms, application-code: 930ms)
+ GET /admin/projects/33d45e5b-6633-81ba-8784-ea132f0a57ca 200 in 1371ms (next.js: 28ms, proxy.ts: 197ms, application-code: 1146ms)
+ GET /admin 200 in 1122ms (next.js: 28ms, proxy.ts: 24ms, application-code: 1071ms)
+ GET /admin/projects/33d45e5b-6633-81ba-8784-ea132f0a57ca 200 in 1317ms (next.js: 79ms, proxy.ts: 54ms, application-code: 1184ms)
+ GET /admin 200 in 1449ms (next.js: 62ms, proxy.ts: 8ms, application-code: 1379ms)
+ GET /admin/projects/33d45e5b-6633-81ba-8784-ea132f0a57ca 200 in 757ms (next.js: 61ms, proxy.ts: 14ms, application-code: 682ms)
+ GET /admin/projects/33d45e5b-6633-81ba-8784-ea132f0a57ca 200 in 842ms (next.js: 7ms, proxy.ts: 6ms, application-code: 829ms)
+ GET /admin 200 in 2.2s (next.js: 65ms, proxy.ts: 86ms, application-code: 2.1s)
+✓ Compiled in 27ms
+ GET /admin 200 in 915ms (next.js: 65ms, proxy.ts: 81ms, application-code: 769ms)
+ GET /admin/projects/33d45e5b-6633-81ba-8784-ea132f0a57ca 200 in 902ms (next.js: 19ms, proxy.ts: 9ms, application-code: 874ms)
+ GET /admin/projects/33d45e5b-6633-81ba-8784-ea132f0a57ca 200 in 1283ms (next.js: 92ms, proxy.ts: 190ms, application-code: 1001ms)
+ GET /admin 200 in 1911ms (next.js: 143ms, proxy.ts: 8ms, application-code: 1760ms)
+✓ Compiled in 37ms
+ GET /admin 200 in 1031ms (next.js: 71ms, proxy.ts: 62ms, application-code: 898ms)
+ GET /admin/projects/33d45e5b-6633-81ba-8784-ea132f0a57ca 200 in 1213ms (next.js: 222ms, proxy.ts: 63ms, application-code: 928ms)
+ GET /admin/projects/33d45e5b-6633-81ba-8784-ea132f0a57ca 200 in 922ms (next.js: 8ms, proxy.ts: 36ms, application-code: 878ms)
+ GET /admin 200 in 1277ms (next.js: 163ms, proxy.ts: 10ms, application-code: 1103ms)
+✓ Compiled in 54ms
+ GET /admin/projects/33d45e5b-6633-81ba-8784-ea132f0a57ca 200 in 804ms (next.js: 5ms, proxy.ts: 8ms, application-code: 791ms)
+ GET /admin 200 in 1061ms (next.js: 155ms, proxy.ts: 9ms, application-code: 897ms)
+ GET /admin 200 in 1455ms (next.js: 61ms, proxy.ts: 126ms, application-code: 1267ms)
+ GET /admin/projects/33d45e5b-6633-81ba-8784-ea132f0a57ca 200 in 1615ms (next.js: 112ms, proxy.ts: 229ms, application-code: 1275ms)
+ GET /admin 200 in 1188ms (next.js: 5ms, proxy.ts: 9ms, application-code: 1174ms)
+ GET /admin/projects/33d45e5b-6633-81ba-8784-ea132f0a57ca 200 in 1666ms (next.js: 28ms, proxy.ts: 37ms, application-code: 1601ms)
+✓ Compiled in 63ms
+ GET /admin/projects/33d45e5b-6633-81ba-8784-ea132f0a57ca 200 in 804ms (next.js: 53ms, proxy.ts: 29ms, application-code: 722ms)
+ GET /admin 200 in 1431ms (next.js: 15ms, proxy.ts: 337ms, application-code: 1079ms)
+ GET /admin/projects/33d45e5b-6633-81ba-8784-ea132f0a57ca 200 in 1013ms (next.js: 14ms, proxy.ts: 28ms, application-code: 971ms)
+ GET /admin/projects/33d45e5b-6633-81ba-8784-ea132f0a57ca 200 in 1556ms (next.js: 90ms, proxy.ts: 67ms, application-code: 1398ms)
+ GET /admin/projects/33d45e5b-6633-81ba-8784-ea132f0a57ca 200 in 1882ms (next.js: 54ms, proxy.ts: 8ms, application-code: 1819ms)
+ GET /admin 200 in 1116ms (next.js: 4ms, proxy.ts: 6ms, application-code: 1106ms)
+ GET /admin 200 in 1986ms (next.js: 9ms, proxy.ts: 34ms, application-code: 1943ms)
+ GET /admin 200 in 1996ms (next.js: 5ms, proxy.ts: 8ms, application-code: 1984ms)
+✓ Compiled in 58ms
+ GET /admin/projects/33d45e5b-6633-81ba-8784-ea132f0a57ca 200 in 975ms (next.js: 190ms, proxy.ts: 59ms, application-code: 727ms)
+ GET /admin 200 in 1038ms (next.js: 62ms, proxy.ts: 61ms, application-code: 914ms)
+ GET /admin 200 in 1028ms (next.js: 14ms, proxy.ts: 154ms, application-code: 861ms)
+ GET /admin/projects/33d45e5b-6633-81ba-8784-ea132f0a57ca 200 in 922ms (next.js: 5ms, proxy.ts: 31ms, application-code: 885ms)
+ GET /admin 200 in 1516ms (next.js: 73ms, proxy.ts: 14ms, application-code: 1430ms)
+ GET /admin/projects/33d45e5b-6633-81ba-8784-ea132f0a57ca 200 in 1884ms (next.js: 54ms, proxy.ts: 28ms, application-code: 1802ms)
+ GET /admin 200 in 1083ms (next.js: 5ms, proxy.ts: 13ms, application-code: 1066ms)
+ GET /admin/projects/33d45e5b-6633-81b5-9119-e98c11b7b4c2 200 in 4.0s (next.js: 11ms, proxy.ts: 18ms, application-code: 4.0s)
+ GET /admin/projects/33d45e5b-6633-81b5-9119-e98c11b7b4c2 200 in 1402ms (next.js: 11ms, proxy.ts: 15ms, application-code: 1376ms)
+ GET /admin 200 in 1298ms (next.js: 3ms, proxy.ts: 10ms, application-code: 1285ms)
+ GET /admin 200 in 808ms (next.js: 16ms, proxy.ts: 11ms, application-code: 780ms)
+ GET /admin/os 200 in 1005ms (next.js: 48ms, proxy.ts: 12ms, application-code: 946ms)
+ GET /admin 200 in 848ms (next.js: 4ms, proxy.ts: 6ms, application-code: 838ms)
+✓ Compiled in 57ms
+✓ Compiled in 36ms
+ GET /admin 200 in 949ms (next.js: 4ms, proxy.ts: 10ms, application-code: 935ms)
+ GET /admin 200 in 987ms (next.js: 73ms, proxy.ts: 59ms, application-code: 855ms)
+ GET /admin 200 in 1040ms (next.js: 41ms, proxy.ts: 33ms, application-code: 967ms)
+ GET /admin 200 in 1090ms (next.js: 37ms, proxy.ts: 61ms, application-code: 991ms)
+ GET /admin 200 in 1586ms (next.js: 111ms, proxy.ts: 187ms, application-code: 1287ms)
+ GET /admin 200 in 929ms (next.js: 4ms, proxy.ts: 15ms, application-code: 910ms)
+ GET /admin 200 in 1889ms (next.js: 54ms, proxy.ts: 60ms, application-code: 1775ms)
+ GET /admin 200 in 864ms (next.js: 3ms, proxy.ts: 9ms, application-code: 852ms)
+ GET /admin 200 in 1022ms (next.js: 2ms, proxy.ts: 7ms, application-code: 1012ms)
+ GET /admin 200 in 850ms (next.js: 3ms, proxy.ts: 14ms, application-code: 832ms)
+ GET /admin 200 in 833ms (next.js: 2ms, proxy.ts: 7ms, application-code: 823ms)
+ GET /admin 200 in 827ms (next.js: 5ms, proxy.ts: 15ms, application-code: 806ms)
+ GET /admin 200 in 1026ms (next.js: 5ms, proxy.ts: 39ms, application-code: 982ms)
+ GET /admin 200 in 1905ms (next.js: 4ms, proxy.ts: 25ms, application-code: 1877ms)
+✓ Compiled in 807ms
+ GET /admin 200 in 764ms (next.js: 24ms, proxy.ts: 16ms, application-code: 723ms)
+ GET /admin 200 in 832ms (next.js: 10ms, proxy.ts: 15ms, application-code: 807ms)
+ GET /admin 200 in 1103ms (next.js: 66ms, proxy.ts: 105ms, application-code: 932ms)
+ GET /admin 200 in 926ms (next.js: 44ms, proxy.ts: 17ms, application-code: 865ms)
+ GET /admin 200 in 1527ms (next.js: 58ms, proxy.ts: 17ms, application-code: 1452ms)
+ GET /admin 200 in 773ms (next.js: 3ms, proxy.ts: 8ms, application-code: 762ms)
+ GET /admin 200 in 3.0s (next.js: 649ms, proxy.ts: 14ms, application-code: 2.3s)
+ GET /admin 200 in 808ms (next.js: 3ms, proxy.ts: 18ms, application-code: 787ms)
+ GET /admin 200 in 937ms (next.js: 3ms, proxy.ts: 7ms, application-code: 926ms)
+ GET /admin 200 in 1588ms (next.js: 4ms, proxy.ts: 9ms, application-code: 1576ms)
+ GET /admin 200 in 784ms (next.js: 4ms, proxy.ts: 11ms, application-code: 769ms)
+ GET /admin 200 in 1102ms (next.js: 20ms, proxy.ts: 6ms, application-code: 1076ms)
+✓ Compiled in 32ms
+ GET /admin 200 in 1401ms (next.js: 31ms, proxy.ts: 18ms, application-code: 1352ms)
+ GET /admin 200 in 1609ms (next.js: 3ms, proxy.ts: 18ms, application-code: 1587ms)
+ GET /admin 200 in 927ms (next.js: 3ms, proxy.ts: 11ms, application-code: 912ms)
+ GET /admin 200 in 834ms (next.js: 11ms, proxy.ts: 33ms, application-code: 790ms)
+ GET /admin 200 in 1751ms (next.js: 4ms, proxy.ts: 7ms, application-code: 1741ms)
+ GET /admin 200 in 936ms (next.js: 6ms, proxy.ts: 68ms, application-code: 862ms)
+ GET /admin 200 in 1167ms (next.js: 146ms, proxy.ts: 12ms, application-code: 1009ms)
+ GET /admin 200 in 880ms (next.js: 3ms, proxy.ts: 10ms, application-code: 867ms)
+ GET /admin 200 in 769ms (next.js: 3ms, proxy.ts: 7ms, application-code: 759ms)
+ GET /admin 200 in 891ms (next.js: 4ms, proxy.ts: 16ms, application-code: 871ms)
+ GET /admin 200 in 849ms (next.js: 5ms, proxy.ts: 7ms, application-code: 837ms)
+ GET /admin 200 in 1321ms (next.js: 4ms, proxy.ts: 28ms, application-code: 1288ms)
+ GET /admin 200 in 882ms (next.js: 4ms, proxy.ts: 10ms, application-code: 867ms)
+ GET /admin 200 in 952ms (next.js: 5ms, proxy.ts: 37ms, application-code: 910ms)
+ GET /admin 200 in 936ms (next.js: 2ms, proxy.ts: 9ms, application-code: 924ms)
+ GET /admin 200 in 895ms (next.js: 7ms, proxy.ts: 28ms, application-code: 860ms)
+ GET /admin 200 in 739ms (next.js: 3ms, proxy.ts: 17ms, application-code: 719ms)
+ GET /admin 200 in 1198ms (next.js: 31ms, proxy.ts: 41ms, application-code: 1126ms)
+ GET /admin 200 in 1338ms (next.js: 5ms, proxy.ts: 44ms, application-code: 1289ms)
+ GET /admin 200 in 1275ms (next.js: 6ms, proxy.ts: 9ms, application-code: 1260ms)
+ GET /admin 200 in 1340ms (next.js: 4ms, proxy.ts: 38ms, application-code: 1297ms)
+ GET /admin 200 in 924ms (next.js: 3ms, proxy.ts: 15ms, application-code: 906ms)
+ GET /admin 200 in 1949ms (next.js: 9ms, proxy.ts: 12ms, application-code: 1928ms)
+ GET /admin 200 in 1049ms (next.js: 3ms, proxy.ts: 9ms, application-code: 1037ms)
+ GET /admin 200 in 942ms (next.js: 9ms, proxy.ts: 8ms, application-code: 925ms)
+ GET /admin 200 in 1017ms (next.js: 5ms, proxy.ts: 6ms, application-code: 1005ms)
+ GET /admin 200 in 1352ms (next.js: 5ms, proxy.ts: 30ms, application-code: 1317ms)
+ GET /admin 200 in 891ms (next.js: 5ms, proxy.ts: 18ms, application-code: 868ms)
+ GET /admin 200 in 1049ms (next.js: 2ms, proxy.ts: 8ms, application-code: 1039ms)
+ GET /admin 200 in 2.0s (next.js: 3ms, proxy.ts: 21ms, application-code: 1997ms)
+ GET /admin/projects/33d45e5b-6633-81ba-8784-ea132f0a57ca 200 in 1224ms (next.js: 128ms, proxy.ts: 20ms, application-code: 1076ms)
+ GET /admin 200 in 1311ms (next.js: 86ms, proxy.ts: 143ms, application-code: 1082ms)
+ GET /admin 200 in 1091ms (next.js: 35ms, proxy.ts: 105ms, application-code: 951ms)
+ GET /admin 200 in 974ms (next.js: 40ms, proxy.ts: 14ms, application-code: 920ms)
+ GET /admin/projects/33d45e5b-6633-81ba-8784-ea132f0a57ca 200 in 1723ms (next.js: 178ms, proxy.ts: 145ms, application-code: 1400ms)
+ GET /admin 200 in 1732ms (next.js: 62ms, proxy.ts: 14ms, application-code: 1656ms)
+ GET /admin 200 in 1277ms (next.js: 4ms, proxy.ts: 27ms, application-code: 1246ms)
+ GET /admin 200 in 1268ms (next.js: 3ms, proxy.ts: 9ms, application-code: 1256ms)
+ GET /admin 200 in 1407ms (next.js: 5ms, proxy.ts: 24ms, application-code: 1378ms)
+ GET /admin 200 in 1801ms (next.js: 3ms, proxy.ts: 21ms, application-code: 1777ms)
+ GET /admin 200 in 921ms (next.js: 5ms, proxy.ts: 11ms, application-code: 905ms)
+ GET /admin 200 in 1376ms (next.js: 3ms, proxy.ts: 10ms, application-code: 1363ms)
+ GET /admin 200 in 1080ms (next.js: 3ms, proxy.ts: 6ms, application-code: 1071ms)
+ GET /admin 200 in 1045ms (next.js: 3ms, proxy.ts: 18ms, application-code: 1024ms)
+ GET /admin 200 in 769ms (next.js: 4ms, proxy.ts: 17ms, application-code: 749ms)
+ GET /admin/projects/33d45e5b-6633-81ba-8784-ea132f0a57ca 200 in 4.4s (next.js: 17ms, proxy.ts: 75ms, application-code: 4.3s)
+ GET /admin 200 in 920ms (next.js: 4ms, proxy.ts: 14ms, application-code: 902ms)
+ GET /admin 200 in 952ms (next.js: 3ms, proxy.ts: 19ms, application-code: 929ms)
+ GET /admin 200 in 941ms (next.js: 3ms, proxy.ts: 11ms, application-code: 927ms)
+ GET /admin 200 in 1040ms (next.js: 4ms, proxy.ts: 10ms, application-code: 1025ms)
+ GET /admin 200 in 3.5s (next.js: 3ms, proxy.ts: 12ms, application-code: 3.5s)
+ GET /admin 200 in 1147ms (next.js: 5ms, proxy.ts: 10ms, application-code: 1133ms)
+ GET /admin 200 in 1278ms (next.js: 4ms, proxy.ts: 23ms, application-code: 1251ms)
+ GET /admin 200 in 788ms (next.js: 3ms, proxy.ts: 6ms, application-code: 779ms)
+ GET /admin 200 in 952ms (next.js: 3ms, proxy.ts: 6ms, application-code: 943ms)
+ GET /admin 200 in 952ms (next.js: 6ms, proxy.ts: 17ms, application-code: 929ms)
+ GET /admin 200 in 859ms (next.js: 10ms, proxy.ts: 10ms, application-code: 839ms)
+ GET /admin 200 in 1844ms (next.js: 10ms, proxy.ts: 7ms, application-code: 1827ms)
+ GET /admin 200 in 1143ms (next.js: 4ms, proxy.ts: 6ms, application-code: 1133ms)
+ GET /admin/projects/33d45e5b-6633-81ba-8784-ea132f0a57ca 200 in 1466ms (next.js: 64ms, proxy.ts: 11ms, application-code: 1392ms)
+ GET /admin/projects/33d45e5b-6633-81ba-8784-ea132f0a57ca 200 in 1257ms (next.js: 13ms, proxy.ts: 9ms, application-code: 1235ms)
+ GET /admin/projects/33d45e5b-6633-81ba-8784-ea132f0a57ca 200 in 1012ms (next.js: 20ms, proxy.ts: 26ms, application-code: 966ms)
+ GET /admin/projects/33d45e5b-6633-81ba-8784-ea132f0a57ca 200 in 915ms (next.js: 5ms, proxy.ts: 8ms, application-code: 902ms)
+ GET /admin/projects/33d45e5b-6633-81ba-8784-ea132f0a57ca 200 in 968ms (next.js: 12ms, proxy.ts: 9ms, application-code: 947ms)
+ GET /admin/projects/33d45e5b-6633-81ba-8784-ea132f0a57ca 200 in 786ms (next.js: 129ms, proxy.ts: 9ms, application-code: 648ms)
+ GET /admin/projects/33d45e5b-6633-81ba-8784-ea132f0a57ca 200 in 799ms (next.js: 43ms, proxy.ts: 11ms, application-code: 745ms)
+ GET /admin/projects/33d45e5b-6633-81ba-8784-ea132f0a57ca 200 in 686ms (next.js: 9ms, proxy.ts: 8ms, application-code: 669ms)
+ GET /admin/projects/33d45e5b-6633-81ba-8784-ea132f0a57ca 200 in 1255ms (next.js: 10ms, proxy.ts: 9ms, application-code: 1236ms)
+ GET /admin/projects/33d45e5b-6633-81ba-8784-ea132f0a57ca 200 in 3.0s (next.js: 16ms, proxy.ts: 9ms, application-code: 3.0s)
+ GET /admin/projects/33d45e5b-6633-81ba-8784-ea132f0a57ca 200 in 801ms (next.js: 9ms, proxy.ts: 22ms, application-code: 771ms)
+ GET /admin/projects/33d45e5b-6633-81ba-8784-ea132f0a57ca 200 in 792ms (next.js: 9ms, proxy.ts: 7ms, application-code: 776ms)
+ GET /admin/projects/33d45e5b-6633-81ba-8784-ea132f0a57ca 200 in 1584ms (next.js: 6ms, proxy.ts: 70ms, application-code: 1508ms)
+ GET /admin/projects/33d45e5b-6633-81ba-8784-ea132f0a57ca 200 in 848ms (next.js: 9ms, proxy.ts: 43ms, application-code: 796ms)
+ GET /admin/projects/33d45e5b-6633-81ba-8784-ea132f0a57ca 200 in 907ms (next.js: 51ms, proxy.ts: 15ms, application-code: 841ms)
+ GET /admin/projects/33d45e5b-6633-81ba-8784-ea132f0a57ca 200 in 1288ms (next.js: 23ms, proxy.ts: 12ms, application-code: 1252ms)
+ GET /admin/projects/33d45e5b-6633-81ba-8784-ea132f0a57ca 200 in 964ms (next.js: 8ms, proxy.ts: 5ms, application-code: 951ms)
+ GET /admin/projects/33d45e5b-6633-81ba-8784-ea132f0a57ca 200 in 959ms (next.js: 6ms, proxy.ts: 38ms, application-code: 916ms)
+ GET /admin/projects/33d45e5b-6633-81ba-8784-ea132f0a57ca 200 in 1617ms (next.js: 6ms, proxy.ts: 7ms, application-code: 1604ms)
+ GET /admin/projects/33d45e5b-6633-81ba-8784-ea132f0a57ca 200 in 884ms (next.js: 94ms, proxy.ts: 29ms, application-code: 761ms)
+ GET /admin/projects/33d45e5b-6633-81ba-8784-ea132f0a57ca 200 in 890ms (next.js: 80ms, proxy.ts: 12ms, application-code: 797ms)
+ GET /admin/projects/33d45e5b-6633-81ba-8784-ea132f0a57ca 200 in 786ms (next.js: 18ms, proxy.ts: 9ms, application-code: 759ms)
+ GET /admin/projects/33d45e5b-6633-81ba-8784-ea132f0a57ca 200 in 981ms (next.js: 17ms, proxy.ts: 49ms, application-code: 914ms)
+ GET /admin/projects/33d45e5b-6633-81ba-8784-ea132f0a57ca 200 in 1425ms (next.js: 55ms, proxy.ts: 51ms, application-code: 1320ms)
+✓ Compiled in 59ms
+✓ Compiled in 111ms
+ GET /admin/projects/33d45e5b-6633-81ba-8784-ea132f0a57ca 200 in 793ms (next.js: 53ms, proxy.ts: 22ms, application-code: 718ms)
+ GET /admin/projects/33d45e5b-6633-81ba-8784-ea132f0a57ca 200 in 1031ms (next.js: 7ms, proxy.ts: 7ms, application-code: 1017ms)
+ GET /admin/projects/33d45e5b-6633-81ba-8784-ea132f0a57ca 200 in 1408ms (next.js: 15ms, proxy.ts: 20ms, application-code: 1373ms)
+ GET /admin/projects/33d45e5b-6633-81ba-8784-ea132f0a57ca 200 in 812ms (next.js: 10ms, proxy.ts: 7ms, application-code: 795ms)
+ GET /admin/projects/33d45e5b-6633-81ba-8784-ea132f0a57ca 200 in 2.2s (next.js: 277ms, proxy.ts: 143ms, application-code: 1829ms)
+ GET /admin/projects/33d45e5b-6633-81ba-8784-ea132f0a57ca 200 in 780ms (next.js: 6ms, proxy.ts: 9ms, application-code: 765ms)
+ GET /admin 200 in 2.3s (next.js: 118ms, proxy.ts: 142ms, application-code: 2.1s)
+ GET /admin/projects/33d45e5b-6633-81ba-8784-ea132f0a57ca 200 in 802ms (next.js: 10ms, proxy.ts: 6ms, application-code: 786ms)
+ GET /admin/projects/33d45e5b-6633-81ba-8784-ea132f0a57ca 200 in 732ms (next.js: 6ms, proxy.ts: 6ms, application-code: 719ms)
+ GET /admin/projects/33d45e5b-6633-81ba-8784-ea132f0a57ca 200 in 764ms (next.js: 6ms, proxy.ts: 8ms, application-code: 750ms)
+ GET /admin 200 in 778ms (next.js: 3ms, proxy.ts: 14ms, application-code: 762ms)
+ GET /admin 200 in 1043ms (next.js: 3ms, proxy.ts: 8ms, application-code: 1032ms)
+ GET /admin 200 in 1009ms (next.js: 4ms, proxy.ts: 6ms, application-code: 999ms)
+ GET /admin 200 in 1534ms (next.js: 4ms, proxy.ts: 10ms, application-code: 1520ms)
+ GET /admin 200 in 720ms (next.js: 3ms, proxy.ts: 7ms, application-code: 710ms)
+ GET /admin 200 in 1065ms (next.js: 4ms, proxy.ts: 7ms, application-code: 1054ms)
+ GET /admin 200 in 1846ms (next.js: 4ms, proxy.ts: 7ms, application-code: 1834ms)
