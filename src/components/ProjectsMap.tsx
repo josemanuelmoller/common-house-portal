@@ -5,10 +5,10 @@ import { ComposableMap, Geographies, Geography, Marker, ZoomableGroup } from "re
 const GEO_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
 
 // Map geography tags → coordinates
+// Only country/city level — regional tags (LATAM, Global, etc.) are intentionally excluded
+// to avoid imprecise map pins. Update geography in Notion to use specific countries.
 const GEO_COORDS: Record<string, [number, number]> = {
-  "Global":        [0, 20],
-  "LATAM":         [-65, -15],
-  "Latin America": [-65, -15],
+  // Latin America
   "Chile":         [-70.6, -33.4],
   "Costa Rica":    [-84.1, 9.9],
   "México":        [-99.1, 19.4],
@@ -19,17 +19,27 @@ const GEO_COORDS: Record<string, [number, number]> = {
   "Argentina":     [-64.2, -31.4],
   "Peru":          [-77.0, -12.0],
   "Perú":          [-77.0, -12.0],
-  "Europe":        [10, 51],
-  "Europa":        [10, 51],
+  "Ecuador":       [-78.5, -1.8],
+  "Panama":        [-79.5, 9.0],
+  "Panamá":        [-79.5, 9.0],
+  // Europe
   "Spain":         [-3.7, 40.4],
   "España":        [-3.7, 40.4],
   "UK":            [-0.1, 51.5],
   "France":        [2.3, 48.9],
   "Germany":       [13.4, 52.5],
+  "Netherlands":   [4.9, 52.4],
+  "Portugal":      [-9.1, 38.7],
+  // North America
   "USA":           [-95, 37],
+  "United States": [-95, 37],
+  "Canada":        [-96, 56],
+  // Rest of world
   "Australia":     [134, -25],
-  "Asia":          [100, 30],
-  "Africa":        [20, 5],
+  "Japan":         [138.3, 36.2],
+  "Kenya":         [37.9, -1.3],
+  "South Africa":  [22.9, -30.6],
+  "India":         [78.9, 20.6],
 };
 
 type ProjectPin = {

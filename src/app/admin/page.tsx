@@ -70,7 +70,9 @@ export default async function AdminPage() {
 
         {/* Map */}
         <div className="px-8 pt-6">
-          <ProjectsMap projects={projects.map(p => ({ id: p.id, name: p.name, geography: p.geography }))} />
+          <div className="grid grid-cols-2 gap-6">
+            <ProjectsMap projects={projects.map(p => ({ id: p.id, name: p.name, geography: p.geography }))} />
+          </div>
         </div>
 
         {/* Projects list */}
