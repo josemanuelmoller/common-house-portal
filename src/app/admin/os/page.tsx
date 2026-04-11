@@ -23,14 +23,21 @@ export default async function OSPage() {
   const projectNames: Record<string, string> = {};
   for (const p of projects) projectNames[p.id] = p.name;
 
-  const pendingEvidence  = allEvidence.filter(e => e.validationStatus === "New");
-  const reviewEvidence   = allEvidence.filter(e => e.validationStatus === "Auto-Review" || e.validationStatus === "Reviewed");
+  const newEvidence       = allEvidence.filter(e => e.validationStatus === "New");
+  const reviewEvidence    = allEvidence.filter(e => e.validationStatus === "Reviewed");
   const validatedEvidence = allEvidence.filter(e => e.validationStatus === "Validated");
-  const blockers         = allEvidence.filter(e => e.type === "Blocker" && e.validationStatus === "Validated");
+  const blockers          = allEvidence.filter(e => e.type === "Blocker" && e.validationStatus === "Validated");
+  const totalPending      = newEvidence.length + reviewEvidence.length;
 
   const validationRate = allEvidence.length > 0
     ? Math.round((validatedEvidence.length / allEvidence.length) * 100)
     : 0;
+
+  // Source pipeline status breakdown
+  const ingestedSources    = sources.filter(s => s.status === "Ingested").length;
+  const processedSources   = sources.filter(s => s.status === "Processed").length;
+  const needsReviewSources = sources.filter(s => s.status === "Needs Review").length;
+  const unlinkedSources    = sources.filter(s => !s.projectId).length;
 
   // Evidence per project
   const evidenceByProject: Record<string, { total: number; validated: number; pending: number }> = {};
@@ -40,6 +47,12 @@ export default async function OSPage() {
     evidenceByProject[pid].total++;
     if (e.validationStatus === "Validated") evidenceByProject[pid].validated++;
     if (e.validationStatus === "New") evidenceByProject[pid].pending++;
+  }
+
+  function sourceIcon(type: string): string {
+    if (type.includes("Email") || type.includes("Gmail")) return "✉";
+    if (type.includes("Meeting") || type.includes("Fireflies")) return "◷";
+    return "▤";
   }
 
   return (
@@ -52,14 +65,18 @@ export default async function OSPage() {
           <div className="flex items-end justify-between">
             <div>
               <p className="text-[10px] font-bold text-[#B2FF59] bg-[#131218] px-2.5 py-1 rounded-full uppercase tracking-widest inline-block mb-3">
-                Operations
+                Intake
               </p>
-              <h1 className="text-3xl font-bold text-[#131218] tracking-tight">Operation System</h1>
-              <p className="text-sm text-[#131218]/40 mt-1">Pipeline de procesamiento · Sources → Evidence → Validation</p>
+              <h1 className="text-3xl font-bold text-[#131218] tracking-tight">Intake / Exceptions</h1>
+              <p className="text-sm text-[#131218]/40 mt-1">Sources → Evidence → Validation · Review queue and pending items</p>
             </div>
-            <p className="text-xs text-[#131218]/30 font-medium pb-1">
-              {allEvidence.length} total evidence records
-            </p>
+            <div className="text-right pb-1">
+              {totalPending > 0 ? (
+                <p className="text-sm font-bold text-amber-500">{totalPending} pending review</p>
+              ) : (
+                <p className="text-xs text-[#131218]/25 font-medium">Queue clear ✓</p>
+              )}
+            </div>
           </div>
         </div>
 
@@ -67,75 +84,26 @@ export default async function OSPage() {
 
           {/* Pipeline metrics */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-            <MetricCard label="Sources"    value={sources.length}           />
-            <MetricCard label="Evidence"   value={allEvidence.length}       />
+            <MetricCard label="Sources"    value={sources.length}           sub={ingestedSources > 0 ? `${ingestedSources} ingested` : undefined} />
+            <MetricCard label="New"        value={newEvidence.length}       color={newEvidence.length > 0 ? "yellow" : "default"} sub="needs human review" />
+            <MetricCard label="Reviewed"   value={reviewEvidence.length}    color={reviewEvidence.length > 0 ? "yellow" : "default"} sub="awaiting engine" />
             <MetricCard label="Validated"  value={validatedEvidence.length} color="green" />
-            <MetricCard label="Pending"    value={pendingEvidence.length}   color={pendingEvidence.length > 0 ? "yellow" : "default"} />
             <MetricCard label="Blockers"   value={blockers.length}          color={blockers.length > 0 ? "red" : "default"} />
             <MetricCard label="Val. Rate"  value={`${validationRate}%`}     color="green" />
           </div>
 
-          {/* Evidence per project breakdown */}
-          <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-            <div className="h-1 bg-[#B2FF59]" />
-            <div className="px-6 py-4 border-b border-[#EFEFEA]">
-              <h2 className="text-sm font-bold text-[#131218] tracking-tight">Evidence by Project</h2>
-              <p className="text-xs text-[#131218]/40 mt-0.5">Cuánta evidence se ha procesado y validado por proyecto</p>
-            </div>
-            <div className="divide-y divide-[#EFEFEA]">
-              {projects.map(p => {
-                const stats = evidenceByProject[p.id] ?? { total: 0, validated: 0, pending: 0 };
-                const rate  = stats.total > 0 ? Math.round((stats.validated / stats.total) * 100) : 0;
-                return (
-                  <div key={p.id} className="px-6 py-4 flex items-center gap-4">
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-[#131218] text-sm tracking-tight truncate">{p.name}</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <StatusBadge value={p.stage} />
-                        {p.geography.map(g => (
-                          <span key={g} className="text-[9px] font-bold text-[#131218]/25 uppercase tracking-widest">{g}</span>
-                        ))}
-                      </div>
-                    </div>
-                    {/* Progress bar */}
-                    <div className="w-32 shrink-0">
-                      <div className="flex justify-between text-[9px] font-bold text-[#131218]/40 uppercase tracking-widest mb-1">
-                        <span>{stats.validated} validated</span>
-                        <span>{rate}%</span>
-                      </div>
-                      <div className="h-1.5 bg-[#EFEFEA] rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-[#B2FF59] rounded-full transition-all"
-                          style={{ width: `${rate}%` }}
-                        />
-                      </div>
-                    </div>
-                    {/* Stats */}
-                    <div className="flex gap-4 shrink-0">
-                      <div className="text-center">
-                        <p className="text-lg font-bold text-[#131218]">{stats.total}</p>
-                        <p className="text-[9px] font-bold text-[#131218]/30 uppercase tracking-widest">Total</p>
-                      </div>
-                      <div className="text-center">
-                        <p className={`text-lg font-bold ${stats.pending > 0 ? "text-amber-500" : "text-[#131218]/20"}`}>
-                          {stats.pending}
-                        </p>
-                        <p className="text-[9px] font-bold text-[#131218]/30 uppercase tracking-widest">Pending</p>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Active blockers */}
+          {/* Active blockers — shown prominently if any */}
           {blockers.length > 0 && (
             <div className="bg-white rounded-2xl border border-red-200 overflow-hidden">
               <div className="h-1 bg-red-400" />
-              <div className="px-6 py-4 border-b border-[#EFEFEA]">
-                <h2 className="text-sm font-bold text-[#131218] tracking-tight">Active Blockers</h2>
-                <p className="text-xs text-[#131218]/40 mt-0.5">Blockers validados que requieren atención</p>
+              <div className="px-6 py-4 border-b border-[#EFEFEA] flex items-center justify-between">
+                <div>
+                  <h2 className="text-sm font-bold text-[#131218] tracking-tight">Active Blockers</h2>
+                  <p className="text-xs text-[#131218]/40 mt-0.5">Validated blockers requiring immediate attention</p>
+                </div>
+                <span className="text-[10px] font-bold bg-red-100 text-red-600 px-2.5 py-1 rounded-full uppercase tracking-widest">
+                  {blockers.length} blocker{blockers.length !== 1 ? "s" : ""}
+                </span>
               </div>
               <table className="w-full text-sm">
                 <thead>
@@ -169,68 +137,203 @@ export default async function OSPage() {
             </div>
           )}
 
-          {/* Evidence Queue */}
+          {/* Review Queue — primary action area */}
           <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
             <div className="h-1 bg-amber-400" />
-            <div className="px-6 py-4 border-b border-[#EFEFEA]">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-sm font-bold text-[#131218] tracking-tight">Evidence Queue</h2>
-                  <p className="text-xs text-[#131218]/40 mt-0.5">Items pendientes de validación</p>
-                </div>
-                <span className="text-[10px] font-bold bg-amber-100 text-amber-700 px-2.5 py-1 rounded-full uppercase tracking-widest">
-                  {pendingEvidence.length + reviewEvidence.length} pending
-                </span>
+            <div className="px-6 py-4 border-b border-[#EFEFEA] flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-bold text-[#131218] tracking-tight">Review Queue</h2>
+                <p className="text-xs text-[#131218]/40 mt-0.5">Evidence pending validation — approve or reject each item</p>
               </div>
+              {totalPending > 0 ? (
+                <span className="text-[10px] font-bold bg-amber-100 text-amber-700 px-2.5 py-1 rounded-full uppercase tracking-widest">
+                  {totalPending} to review
+                </span>
+              ) : (
+                <span className="text-[10px] font-bold bg-[#EFEFEA] text-[#131218]/30 px-2.5 py-1 rounded-full uppercase tracking-widest">
+                  Queue empty
+                </span>
+              )}
             </div>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-[#EFEFEA]">
-                  <th className="text-left px-6 py-3 text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Evidence</th>
-                  <th className="text-left px-4 py-3 text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Project</th>
-                  <th className="text-left px-4 py-3 text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Type</th>
-                  <th className="text-left px-4 py-3 text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Status</th>
-                  <th className="text-left px-4 py-3 text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Captured</th>
-                  <th className="px-4 py-3" />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#EFEFEA]">
-                {[...pendingEvidence, ...reviewEvidence].slice(0, 20).map(e => (
-                  <EvidenceQueueRow
-                    key={e.id}
-                    id={e.id}
-                    title={e.title}
-                    excerpt={e.excerpt}
-                    projectName={e.projectId ? (projectNames[e.projectId] ?? "—") : "—"}
-                    type={e.type}
-                    validationStatus={e.validationStatus}
-                    dateCaptured={e.dateCaptured}
-                  />
-                ))}
-                {pendingEvidence.length === 0 && reviewEvidence.length === 0 && (
-                  <tr>
-                    <td colSpan={5} className="px-6 py-8 text-center text-sm text-[#131218]/30">
-                      No pending evidence. All caught up ✓
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-            {(pendingEvidence.length + reviewEvidence.length) > 0 && (
+
+            {/* New — action required first */}
+            {newEvidence.length > 0 && (
+              <>
+                <div className="px-6 py-2 bg-amber-50/60 border-b border-amber-100">
+                  <p className="text-[9px] font-bold text-amber-600 uppercase tracking-widest">
+                    New · {newEvidence.length} item{newEvidence.length !== 1 ? "s" : ""}
+                  </p>
+                </div>
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-[#EFEFEA]">
+                      <th className="text-left px-6 py-3 text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Evidence</th>
+                      <th className="text-left px-4 py-3 text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Project</th>
+                      <th className="text-left px-4 py-3 text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Type</th>
+                      <th className="text-left px-4 py-3 text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Status</th>
+                      <th className="text-left px-4 py-3 text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Captured</th>
+                      <th className="px-4 py-3" />
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#EFEFEA]">
+                    {newEvidence.slice(0, 15).map(e => (
+                      <EvidenceQueueRow
+                        key={e.id}
+                        id={e.id}
+                        title={e.title}
+                        excerpt={e.excerpt}
+                        projectName={e.projectId ? (projectNames[e.projectId] ?? "—") : "—"}
+                        type={e.type}
+                        validationStatus={e.validationStatus}
+                        dateCaptured={e.dateCaptured}
+                      />
+                    ))}
+                  </tbody>
+                </table>
+              </>
+            )}
+
+            {/* In Review — secondary */}
+            {reviewEvidence.length > 0 && (
+              <>
+                <div className="px-6 py-2 bg-[#EFEFEA]/60 border-y border-[#EFEFEA]">
+                  <p className="text-[9px] font-bold text-[#131218]/40 uppercase tracking-widest">
+                    In Review · {reviewEvidence.length} item{reviewEvidence.length !== 1 ? "s" : ""}
+                  </p>
+                </div>
+                <table className="w-full text-sm">
+                  {newEvidence.length === 0 && (
+                    <thead>
+                      <tr className="border-b border-[#EFEFEA]">
+                        <th className="text-left px-6 py-3 text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Evidence</th>
+                        <th className="text-left px-4 py-3 text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Project</th>
+                        <th className="text-left px-4 py-3 text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Type</th>
+                        <th className="text-left px-4 py-3 text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Status</th>
+                        <th className="text-left px-4 py-3 text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Captured</th>
+                        <th className="px-4 py-3" />
+                      </tr>
+                    </thead>
+                  )}
+                  <tbody className="divide-y divide-[#EFEFEA]">
+                    {reviewEvidence.slice(0, 10).map(e => (
+                      <EvidenceQueueRow
+                        key={e.id}
+                        id={e.id}
+                        title={e.title}
+                        excerpt={e.excerpt}
+                        projectName={e.projectId ? (projectNames[e.projectId] ?? "—") : "—"}
+                        type={e.type}
+                        validationStatus={e.validationStatus}
+                        dateCaptured={e.dateCaptured}
+                      />
+                    ))}
+                  </tbody>
+                </table>
+              </>
+            )}
+
+            {totalPending === 0 && (
+              <div className="px-6 py-10 text-center">
+                <p className="text-sm font-medium text-[#131218]/30">Queue is clear — all evidence reviewed ✓</p>
+              </div>
+            )}
+
+            {totalPending > 0 && (
               <div className="px-6 py-3 border-t border-[#EFEFEA]">
                 <p className="text-[10px] text-[#131218]/25 font-bold uppercase tracking-widest">
-                  COUNT {pendingEvidence.length + reviewEvidence.length}
+                  {totalPending} pending · {validatedEvidence.length} validated · {validationRate}% rate
                 </p>
               </div>
             )}
           </div>
 
-          {/* Recent sources */}
+          {/* Evidence per project breakdown */}
           <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
             <div className="h-1 bg-[#B2FF59]" />
             <div className="px-6 py-4 border-b border-[#EFEFEA]">
-              <h2 className="text-sm font-bold text-[#131218] tracking-tight">Recent Sources</h2>
-              <p className="text-xs text-[#131218]/40 mt-0.5">Últimos emails y documentos procesados</p>
+              <h2 className="text-sm font-bold text-[#131218] tracking-tight">Evidence by Project</h2>
+              <p className="text-xs text-[#131218]/40 mt-0.5">Processing and validation progress per project</p>
+            </div>
+            <div className="divide-y divide-[#EFEFEA]">
+              {projects.map(p => {
+                const stats = evidenceByProject[p.id] ?? { total: 0, validated: 0, pending: 0 };
+                const rate  = stats.total > 0 ? Math.round((stats.validated / stats.total) * 100) : 0;
+                return (
+                  <div key={p.id} className="px-6 py-4 flex items-center gap-4">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-[#131218] text-sm tracking-tight truncate">{p.name}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <StatusBadge value={p.stage} />
+                        {p.geography.map(g => (
+                          <span key={g} className="text-[9px] font-bold text-[#131218]/25 uppercase tracking-widest">{g}</span>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="w-32 shrink-0">
+                      <div className="flex justify-between text-[9px] font-bold text-[#131218]/40 uppercase tracking-widest mb-1">
+                        <span>{stats.validated} validated</span>
+                        <span>{rate}%</span>
+                      </div>
+                      <div className="h-1.5 bg-[#EFEFEA] rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-[#B2FF59] rounded-full transition-all"
+                          style={{ width: `${rate}%` }}
+                        />
+                      </div>
+                    </div>
+                    <div className="flex gap-4 shrink-0">
+                      <div className="text-center">
+                        <p className="text-lg font-bold text-[#131218]">{stats.total}</p>
+                        <p className="text-[9px] font-bold text-[#131218]/30 uppercase tracking-widest">Total</p>
+                      </div>
+                      <div className="text-center">
+                        <p className={`text-lg font-bold ${stats.pending > 0 ? "text-amber-500" : "text-[#131218]/20"}`}>
+                          {stats.pending}
+                        </p>
+                        <p className="text-[9px] font-bold text-[#131218]/30 uppercase tracking-widest">Pending</p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+              {projects.length === 0 && (
+                <div className="px-6 py-8 text-center text-sm text-[#131218]/30">
+                  No projects found.
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Source Log */}
+          <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
+            <div className="h-1 bg-[#B2FF59]" />
+            <div className="px-6 py-4 border-b border-[#EFEFEA]">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h2 className="text-sm font-bold text-[#131218] tracking-tight">Source Pipeline</h2>
+                  <p className="text-xs text-[#131218]/40 mt-0.5">Ingested → Processed by the engine · emails, meetings, and documents</p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0 mt-0.5">
+                  <span className="text-[9px] font-bold bg-[#EFEFEA] text-[#131218]/40 px-2 py-1 rounded-full uppercase tracking-widest">
+                    {processedSources} processed
+                  </span>
+                  {ingestedSources > 0 && (
+                    <span className="text-[9px] font-bold bg-amber-50 text-amber-600 border border-amber-200 px-2 py-1 rounded-full uppercase tracking-widest">
+                      {ingestedSources} ingested
+                    </span>
+                  )}
+                  {needsReviewSources > 0 && (
+                    <span className="text-[9px] font-bold bg-red-50 text-red-500 border border-red-200 px-2 py-1 rounded-full uppercase tracking-widest">
+                      {needsReviewSources} needs review
+                    </span>
+                  )}
+                  {unlinkedSources > 0 && (
+                    <span className="text-[9px] font-bold bg-gray-50 text-gray-400 border border-gray-200 px-2 py-1 rounded-full uppercase tracking-widest">
+                      {unlinkedSources} unlinked
+                    </span>
+                  )}
+                </div>
+              </div>
             </div>
             <table className="w-full text-sm">
               <thead>
@@ -246,7 +349,10 @@ export default async function OSPage() {
                 {sources.slice(0, 15).map(s => (
                   <tr key={s.id} className="hover:bg-[#EFEFEA]/60 transition-colors">
                     <td className="px-6 py-3 font-semibold text-[#131218] text-sm max-w-xs">
-                      <p className="truncate">{s.title || "—"}</p>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-[11px] text-[#131218]/30 shrink-0">{sourceIcon(s.sourceType)}</span>
+                        <p className="truncate">{s.title || "—"}</p>
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-xs font-medium text-[#131218]/50">
                       {s.projectId ? (projectNames[s.projectId] ?? "—") : "—"}
@@ -269,9 +375,13 @@ export default async function OSPage() {
                 )}
               </tbody>
             </table>
-            <div className="px-6 py-3 border-t border-[#EFEFEA]">
-              <p className="text-[10px] text-[#131218]/25 font-bold uppercase tracking-widest">COUNT {sources.length}</p>
-            </div>
+            {sources.length > 0 && (
+              <div className="px-6 py-3 border-t border-[#EFEFEA]">
+                <p className="text-[10px] text-[#131218]/25 font-bold uppercase tracking-widest">
+                  Showing {Math.min(15, sources.length)} of {sources.length}
+                </p>
+              </div>
+            )}
           </div>
 
         </div>

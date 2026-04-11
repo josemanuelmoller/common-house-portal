@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { auth, currentUser } from "@clerk/nextjs/server";
 import { notion } from "@/lib/notion";
+import { getProjectIdForUser, isAdminUser } from "@/lib/clients";
 
 /**
  * GET /api/meeting-detail/[id]
@@ -19,6 +20,29 @@ export async function GET(
     // Get page properties
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const page: any = await notion.pages.retrieve({ page_id: id });
+
+    // Project ownership check — non-admin users may only read meetings linked to their project.
+    // Without this check, any authenticated client could request any meeting by Notion page ID,
+    // leaking content from other projects.
+    if (!isAdminUser(userId)) {
+      const user = await currentUser();
+      const email = user?.emailAddresses?.[0]?.emailAddress ?? "";
+      const userProjectId = getProjectIdForUser(email);
+
+      if (!userProjectId) {
+        return NextResponse.json({ error: "No project access" }, { status: 403 });
+      }
+
+      // Notion relation IDs may be returned with or without dashes — normalise before comparing.
+      const strip = (s: string) => s.replace(/-/g, "");
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const linkedIds: string[] = (page.properties["Linked Projects"]?.relation ?? []).map((r: any) => strip(r.id));
+
+      if (!linkedIds.includes(strip(userProjectId))) {
+        return NextResponse.json({ error: "Access denied" }, { status: 403 });
+      }
+    }
+
     const props = page.properties;
 
     const title       = props["Source Title"]?.title?.[0]?.plain_text ?? "Untitled";
@@ -58,12 +82,15 @@ export async function GET(
       }
     }
 
-    // If no block content, fall back to rich_text properties (Fireflies sources store content in props)
+    // If no block content, fall back to rich_text properties.
+    // Canonical property order (per OS engine source-intake output):
+    //   1. "Processed Summary" — written by source-intake and finalize-source-processing
+    //   2. "Sanitized Notes"   — curated content layer, populated by evidence-review
+    // No other fallbacks: adding guessed property names silently reads wrong fields.
     if (sections.length === 0) {
       const textPropNames = [
-        "Processed Summary", "Sanitized Notes", "Attachment Notes",
-        "Source Excerpt", "Excerpt", "Summary", "Meeting Summary",
-        "Notes", "Meeting Notes", "Transcript", "Content", "Description",
+        "Processed Summary",
+        "Sanitized Notes",
       ];
       for (const propName of textPropNames) {
         const propVal = props[propName];

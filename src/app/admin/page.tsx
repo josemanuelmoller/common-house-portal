@@ -23,6 +23,23 @@ function sourceIcon(type: string): string {
   return "▤";
 }
 
+function daysSince(dateStr: string | null): number {
+  if (!dateStr) return 999;
+  return Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000);
+}
+
+function staleColor(days: number): string {
+  if (days > 30) return "text-red-500";
+  if (days > 14) return "text-amber-500";
+  return "text-[#131218]/35";
+}
+
+function staleDotColor(days: number): string {
+  if (days > 30) return "bg-red-400";
+  if (days > 14) return "bg-amber-400";
+  return "bg-[#131218]/15";
+}
+
 const STAGE_COLORS: Record<string, string> = {
   "Discovery":  "bg-blue-50 text-blue-600 border border-blue-200",
   "Validation": "bg-amber-50 text-amber-600 border border-amber-200",
@@ -33,9 +50,10 @@ const STAGE_COLORS: Record<string, string> = {
 };
 
 export const NAV = [
-  { label: "Home",               href: "/admin",            icon: "◈" },
-  { label: "Operation System",   href: "/admin/os",         icon: "⬡" },
-  { label: "Knowledge System",   href: "/admin/knowledge",  icon: "◉" },
+  { label: "PMO / Delivery",       href: "/admin",            icon: "◈" },
+  { label: "Intake / Exceptions",  href: "/admin/os",         icon: "⬡" },
+  { label: "Knowledge Assets",     href: "/admin/knowledge",  icon: "◉" },
+  { label: "System Health",        href: "/admin/health",     icon: "◎" },
 ];
 
 export default async function AdminPage() {
@@ -67,6 +85,8 @@ export default async function AdminPage() {
 
   const needsUpdate  = projects.filter(p => p.updateNeeded);
   const withBlockers = projects.filter(p => p.blockerCount > 0);
+  // Stale = no update in >30 days AND updateNeeded flag not already set (avoids double-counting)
+  const staleProjects = projects.filter(p => !p.updateNeeded && daysSince(p.lastUpdate) > 30);
 
   // Stage distribution
   const stageCounts = projects.reduce((acc, p) => {
@@ -96,10 +116,10 @@ export default async function AdminPage() {
               <div className="flex items-center gap-3 mb-3">
                 <CHIsotipo size={16} className="text-[#131218]" />
                 <p className="text-[10px] font-bold text-[#B2FF59] bg-[#131218] px-2.5 py-1 rounded-full uppercase tracking-widest">
-                  Admin
+                  PMO / Delivery
                 </p>
               </div>
-              <h1 className="text-3xl font-bold text-[#131218] tracking-tight">Projects</h1>
+              <h1 className="text-3xl font-bold text-[#131218] tracking-tight">Portfolio</h1>
             </div>
             <p className="text-xs text-[#131218]/30 font-medium pb-1">
               {new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
@@ -107,21 +127,40 @@ export default async function AdminPage() {
           </div>
 
           {/* Global stats row */}
-          <div className="grid grid-cols-5 gap-px bg-[#E0E0D8] rounded-2xl overflow-hidden">
-            <div className="bg-white px-6 py-4">
+          <div className="grid grid-cols-6 gap-px bg-[#E0E0D8] rounded-2xl overflow-hidden">
+            <div className="bg-white px-5 py-4">
               <p className="text-2xl font-bold tracking-tight text-[#131218]">{projects.length}</p>
-              <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest mt-1">Active Projects</p>
+              <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest mt-1">Active</p>
             </div>
-            <div className="bg-white px-6 py-4">
+            <div className="bg-white px-5 py-4">
+              {withBlockers.length > 0 ? (
+                <p className="text-2xl font-bold tracking-tight text-red-500">{withBlockers.length}</p>
+              ) : (
+                <p className="text-2xl font-bold tracking-tight text-[#131218]/20">0</p>
+              )}
+              <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest mt-1">Blocked</p>
+            </div>
+            <div className="bg-white px-5 py-4">
+              {needsUpdate.length > 0 ? (
+                <p className="text-2xl font-bold tracking-tight text-amber-500">{needsUpdate.length}</p>
+              ) : (
+                <p className="text-2xl font-bold tracking-tight text-[#131218]/20">0</p>
+              )}
+              <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest mt-1">Update needed</p>
+              {staleProjects.length > 0 && (
+                <p className="text-[9px] text-red-400 font-bold mt-1.5">{staleProjects.length} stale (&gt;30d)</p>
+              )}
+            </div>
+            <div className="bg-white px-5 py-4">
               <p className="text-2xl font-bold tracking-tight text-[#131218]">{totalSources}</p>
               <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest mt-1">Sources</p>
-              <p className="text-[10px] text-[#131218]/30 font-medium mt-1.5 space-x-2">
+              <p className="text-[10px] text-[#131218]/30 font-medium mt-1.5 space-x-1">
                 <span>✉ {totalEmails}</span>
                 <span>· ◎ {totalMeetings}</span>
                 <span>· ▤ {totalDocs}</span>
               </p>
             </div>
-            <div className="bg-white px-6 py-4">
+            <div className="bg-white px-5 py-4">
               <div className="flex items-start gap-2">
                 <p className="text-2xl font-bold tracking-tight text-[#131218]">{totalEvidence}</p>
                 {totalNewEvidence > 0 && (
@@ -132,13 +171,9 @@ export default async function AdminPage() {
               </div>
               <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest mt-1">Evidence</p>
             </div>
-            <div className="bg-white px-6 py-4">
-              <p className="text-2xl font-bold tracking-tight text-[#131218]">{totalValidated}</p>
-              <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest mt-1">Validated</p>
-            </div>
-            <div className="bg-white px-6 py-4">
+            <div className="bg-white px-5 py-4">
               <p className="text-2xl font-bold tracking-tight text-[#B2FF59] bg-[#131218] w-fit px-2 rounded-lg">{validationRate}%</p>
-              <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest mt-1">Validation Rate</p>
+              <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest mt-1">Val. Rate</p>
             </div>
           </div>
 
@@ -166,9 +201,16 @@ export default async function AdminPage() {
             {/* Portfolio Pulse */}
             <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden flex flex-col" style={{ height: 380 }}>
               <div className="h-1 bg-[#131218]" />
-              <div className="px-6 py-4 border-b border-[#EFEFEA]">
-                <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Portfolio Pulse</p>
-                <p className="text-sm font-bold text-[#131218] tracking-tight mt-0.5">Needs Attention</p>
+              <div className="px-6 py-4 border-b border-[#EFEFEA] flex items-center justify-between">
+                <div>
+                  <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Attention Queue</p>
+                  <p className="text-sm font-bold text-[#131218] tracking-tight mt-0.5">Blockers &amp; Updates</p>
+                </div>
+                {(withBlockers.length + needsUpdate.length) > 0 && (
+                  <span className="text-[10px] font-bold bg-amber-100 text-amber-700 px-2.5 py-1 rounded-full uppercase tracking-widest">
+                    {withBlockers.length + needsUpdate.length} items
+                  </span>
+                )}
               </div>
 
               {/* Attention items + recent sources — scrollable */}
@@ -189,20 +231,28 @@ export default async function AdminPage() {
                     </div>
                   </div>
                 ))}
-                {needsUpdate.map(p => (
-                  <div key={`update-${p.id}`} className="px-6 py-2.5 flex items-center gap-3">
-                    <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-semibold text-[#131218] truncate">{p.name}</p>
-                      <p className="text-[10px] text-amber-500 font-bold uppercase tracking-widest mt-0.5">Update needed</p>
+                {needsUpdate.map(p => {
+                  const days = daysSince(p.lastUpdate);
+                  return (
+                    <div key={`update-${p.id}`} className="px-6 py-2.5 flex items-center gap-3">
+                      <span className={`w-2 h-2 rounded-full shrink-0 ${staleDotColor(days)}`} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold text-[#131218] truncate">{p.name}</p>
+                        <p className="text-[10px] text-amber-500 font-bold uppercase tracking-widest mt-0.5">Update needed</p>
+                      </div>
+                      {p.lastUpdate && (
+                        <div className="text-right shrink-0">
+                          <p className="text-[10px] text-[#131218]/25 font-medium">
+                            {new Date(p.lastUpdate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+                          </p>
+                          <p className={`text-[9px] font-bold ${days > 30 ? "text-red-400" : "text-amber-400"}`}>
+                            {days < 999 ? `${days}d ago` : ""}
+                          </p>
+                        </div>
+                      )}
                     </div>
-                    {p.lastUpdate && (
-                      <p className="text-[10px] text-[#131218]/25 font-medium shrink-0">
-                        {new Date(p.lastUpdate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
-                      </p>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
 
                 {/* Recent sources — inside scroll area */}
                 {recentActivity.length > 0 && (
@@ -251,10 +301,10 @@ export default async function AdminPage() {
         <div className="px-8 pt-6">
           <div className="grid grid-cols-4 gap-4">
             {[
-              { label: "Decisions",       value: totalDecisions,    bar: "bg-[#B2FF59]", icon: "✓", iconCls: "bg-[#131218] text-[#B2FF59]" },
-              { label: "Dependencies",    value: totalDependencies, bar: "bg-amber-400",  icon: "◷", iconCls: "bg-amber-50 text-amber-500"  },
-              { label: "Outcomes",        value: totalOutcomes,     bar: "bg-[#B2FF59]", icon: "↗", iconCls: "bg-[#131218] text-[#B2FF59]" },
-              { label: "Knowledge Ready", value: totalReusable,     bar: "bg-[#131218]", icon: "◈", iconCls: "bg-[#131218] text-[#B2FF59]" },
+              { label: "Decisions",     value: totalDecisions,    bar: "bg-[#B2FF59]", icon: "✓", iconCls: "bg-[#131218] text-[#B2FF59]" },
+              { label: "Dependencies",  value: totalDependencies, bar: "bg-amber-400",  icon: "⊡", iconCls: "bg-amber-50 text-amber-500"  },
+              { label: "Outcomes",      value: totalOutcomes,     bar: "bg-[#B2FF59]", icon: "↗", iconCls: "bg-[#131218] text-[#B2FF59]" },
+              { label: "Reusable",      value: totalReusable,     bar: "bg-[#131218]", icon: "◈", iconCls: "bg-[#131218] text-[#B2FF59]" },
             ].map(card => (
               <div key={card.label} className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
                 <div className={`h-1 ${card.bar}`} />
@@ -277,6 +327,10 @@ export default async function AdminPage() {
           <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
 
             {/* Table header */}
+            <div className="h-1 bg-[#131218]" />
+            <div className="px-6 py-3 border-b border-[#EFEFEA]">
+              <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Project roster</p>
+            </div>
             <div className="grid grid-cols-[2fr_1fr_1fr_1fr_80px_80px_80px_80px_120px_40px] gap-0 border-b border-[#EFEFEA] px-4 py-3">
               {["Project", "Status", "Stage", "Geography", "Sources", "Evidence", "Validated", "Blockers", "Last update", ""].map(h => (
                 <div key={h} className="px-2 text-[10px] font-bold text-[#131218]/25 uppercase tracking-widest">
@@ -359,11 +413,20 @@ export default async function AdminPage() {
 
                   {/* Last update */}
                   <div className="px-2">
-                    <span className="text-xs text-[#131218]/35 font-medium">
-                      {p.lastUpdate
-                        ? new Date(p.lastUpdate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
-                        : "—"}
-                    </span>
+                    {p.lastUpdate ? (
+                      <>
+                        <span className={`text-xs font-medium ${staleColor(daysSince(p.lastUpdate))}`}>
+                          {new Date(p.lastUpdate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                        </span>
+                        <p className={`text-[9px] font-medium mt-0.5 ${
+                          daysSince(p.lastUpdate) > 14 ? staleColor(daysSince(p.lastUpdate)) : "text-[#131218]/20"
+                        }`}>
+                          {daysSince(p.lastUpdate) < 999 ? `${daysSince(p.lastUpdate)}d ago` : ""}
+                        </p>
+                      </>
+                    ) : (
+                      <span className="text-[#131218]/15 text-sm">—</span>
+                    )}
                     {p.updateNeeded && (
                       <span className="block text-[9px] font-bold text-amber-500 mt-0.5">⚠ Update needed</span>
                     )}
@@ -380,13 +443,20 @@ export default async function AdminPage() {
             {/* Footer */}
             <div className="px-6 py-3 border-t border-[#EFEFEA] flex items-center justify-between">
               <p className="text-[10px] text-[#131218]/25 font-bold uppercase tracking-widest">
-                COUNT {projects.length}
+                {projects.length} project{projects.length !== 1 ? "s" : ""}
               </p>
-              {totalBlockers > 0 && (
-                <span className="text-[10px] font-bold text-red-500">
-                  ↯ {totalBlockers} active blocker{totalBlockers > 1 ? "s" : ""} across projects
-                </span>
-              )}
+              <div className="flex items-center gap-3">
+                {totalBlockers > 0 && (
+                  <span className="text-[10px] font-bold text-red-500">
+                    ↯ {totalBlockers} blocker{totalBlockers !== 1 ? "s" : ""}
+                  </span>
+                )}
+                {needsUpdate.length > 0 && (
+                  <span className="text-[10px] font-bold text-amber-500">
+                    ⚠ {needsUpdate.length} update{needsUpdate.length !== 1 ? "s" : ""} needed
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         </div>
