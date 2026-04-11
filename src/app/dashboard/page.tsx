@@ -12,9 +12,8 @@ import { MeetingsSection } from "@/components/MeetingsSection";
 import { CollapsibleSection } from "@/components/CollapsibleSection";
 
 const NAV = [
-  { label: "Overview",  href: "/dashboard",           icon: "◈" },
-  { label: "Decisions", href: "/dashboard/decisions",  icon: "⚡" },
-  { label: "Contacts",  href: "/dashboard/contacts",   icon: "◎" },
+  { label: "The Hall", href: "/hall",      icon: "◈" },
+  { label: "Overview", href: "/dashboard", icon: "◫" },
 ];
 
 export default async function DashboardPage() {

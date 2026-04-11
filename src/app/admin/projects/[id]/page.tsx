@@ -16,7 +16,7 @@ import { CollapsibleSection } from "@/components/CollapsibleSection";
 export default async function ProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { userId } = await auth();
   if (!userId) redirect("/sign-in");
-  if (!isAdminUser(userId)) redirect("/dashboard");
+  if (!isAdminUser(userId)) redirect("/hall");
 
   const { id } = await params;
 
@@ -81,6 +81,69 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
         </div>
 
         <div className="px-8 py-6 space-y-6">
+
+          {/* House Configuration — workspace assignment */}
+          <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
+            <div className="h-1 bg-[#131218]" />
+            <div className="px-6 py-4 border-b border-[#EFEFEA] flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">House Configuration</p>
+                <p className="text-xs text-[#131218]/30 mt-0.5">Workspace assignment · set in Notion</p>
+              </div>
+              <a
+                href={`https://www.notion.so/${project.id.replace(/-/g, "")}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[10px] font-bold text-[#131218]/30 hover:text-[#131218]/70 uppercase tracking-widest transition-colors"
+              >
+                Edit in Notion ↗
+              </a>
+            </div>
+            <div className="px-6 py-4 grid grid-cols-4 gap-4">
+              {/* Primary Workspace */}
+              <div>
+                <p className="text-[10px] font-bold text-[#131218]/25 uppercase tracking-widest mb-1.5">Primary Workspace</p>
+                <span className={`inline-block text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-widest ${
+                  project.primaryWorkspace === "garage"   ? "bg-yellow-100 text-yellow-700" :
+                  project.primaryWorkspace === "workroom" ? "bg-blue-100 text-blue-700" :
+                  "bg-[#131218] text-[#B2FF59]"
+                }`}>
+                  {project.primaryWorkspace || "hall"}
+                </span>
+              </div>
+              {/* Engagement Stage */}
+              <div>
+                <p className="text-[10px] font-bold text-[#131218]/25 uppercase tracking-widest mb-1.5">Engagement Stage</p>
+                <span className={`inline-block text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-widest ${
+                  project.engagementStage === "active"   ? "bg-green-100 text-green-700" :
+                  project.engagementStage === "pre-sale" ? "bg-orange-100 text-orange-700" :
+                  "bg-[#EFEFEA] text-[#131218]/30"
+                }`}>
+                  {project.engagementStage || "—"}
+                </span>
+              </div>
+              {/* Engagement Model */}
+              <div>
+                <p className="text-[10px] font-bold text-[#131218]/25 uppercase tracking-widest mb-1.5">Engagement Model</p>
+                <span className={`inline-block text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-widest ${
+                  project.engagementModel === "startup"  ? "bg-yellow-100 text-yellow-700" :
+                  project.engagementModel === "delivery" ? "bg-blue-100 text-blue-700" :
+                  "bg-[#EFEFEA] text-[#131218]/30"
+                }`}>
+                  {project.engagementModel || "—"}
+                </span>
+              </div>
+              {/* Workroom Mode */}
+              <div>
+                <p className="text-[10px] font-bold text-[#131218]/25 uppercase tracking-widest mb-1.5">Workroom Mode</p>
+                <span className={`inline-block text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-widest ${
+                  project.workroomMode ? "bg-[#EFEFEA] text-[#131218]/60" : "bg-[#EFEFEA] text-[#131218]/20"
+                }`}>
+                  {project.workroomMode || (project.primaryWorkspace === "workroom" ? "not set" : "—")}
+                </span>
+              </div>
+            </div>
+          </div>
 
           {/* Blockers alert */}
           {blockers.length > 0 && (

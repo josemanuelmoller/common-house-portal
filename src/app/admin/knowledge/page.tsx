@@ -10,7 +10,7 @@ import { NAV } from "../page";
 export default async function KnowledgePage() {
   const { userId } = await auth();
   if (!userId) redirect("/sign-in");
-  if (!isAdminUser(userId)) redirect("/dashboard");
+  if (!isAdminUser(userId)) redirect("/hall");
 
   const [assets, reusable, projects, allEvidence] = await Promise.all([
     getKnowledgeAssets(),

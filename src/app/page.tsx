@@ -3,6 +3,8 @@ import { auth } from "@clerk/nextjs/server";
 
 export default async function Home() {
   const { userId } = await auth();
-  if (userId) redirect("/dashboard");
+  // The Hall is the default client home.
+  // /dashboard remains accessible via the sidebar "Overview" link.
+  if (userId) redirect("/hall");
   redirect("/sign-in");
 }

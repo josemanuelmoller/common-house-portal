@@ -32,24 +32,31 @@ export function Sidebar({ projectName, isAdmin, items }: Props) {
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 px-3 py-4 space-y-0.5">
-        {items.map(item => {
-          const active = pathname === item.href;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                active
-                  ? "bg-white/10 text-white"
-                  : "text-white/40 hover:text-white/80 hover:bg-white/5"
-              }`}
-            >
-              <span className="text-base">{item.icon}</span>
-              {item.label}
-            </Link>
-          );
-        })}
+      <nav className="flex-1 px-3 py-4">
+        {isAdmin && (
+          <p className="text-[10px] font-bold text-white/20 uppercase tracking-widest px-3 mb-2">
+            Control Room
+          </p>
+        )}
+        <div className="space-y-0.5">
+          {items.map(item => {
+            const active = pathname === item.href;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                  active
+                    ? "bg-white/10 text-white"
+                    : "text-white/40 hover:text-white/80 hover:bg-white/5"
+                }`}
+              >
+                <span className="text-base">{item.icon}</span>
+                {item.label}
+              </Link>
+            );
+          })}
+        </div>
       </nav>
 
       {/* User */}

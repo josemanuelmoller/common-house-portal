@@ -11,7 +11,7 @@ import { NAV } from "../page";
 export default async function OSPage() {
   const { userId } = await auth();
   if (!userId) redirect("/sign-in");
-  if (!isAdminUser(userId)) redirect("/dashboard");
+  if (!isAdminUser(userId)) redirect("/hall");
 
   const [allEvidence, sources, projects] = await Promise.all([
     getAllEvidence(),

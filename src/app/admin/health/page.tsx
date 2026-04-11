@@ -15,7 +15,7 @@ function daysSince(dateStr: string | null): number {
 export default async function HealthPage() {
   const { userId } = await auth();
   if (!userId) redirect("/sign-in");
-  if (!isAdminUser(userId)) redirect("/dashboard");
+  if (!isAdminUser(userId)) redirect("/hall");
 
   const [allEvidence, sources, projects] = await Promise.all([
     getAllEvidence(),

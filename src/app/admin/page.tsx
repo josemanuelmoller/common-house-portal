@@ -1,3 +1,19 @@
+/**
+ * Control Room — Internal staff layer.
+ *
+ * This is not a Room (Hall / Workroom / Garage). It is the Control Room:
+ * the internal operating layer for the Common House team.
+ *
+ * Control Room surfaces mapped here:
+ *   PMO / Delivery  → /admin          (this page) — project health, source activity
+ *   Intake          → /admin/os       — unprocessed sources, evidence queue
+ *   Knowledge       → /admin/knowledge — knowledge assets review
+ *   System Health   → /admin/health   — OS hygiene, validation stats (stub)
+ *
+ * Clients never enter /admin. All /admin routes are gated by isAdminUser().
+ * See src/types/house.ts for the full House architecture documentation.
+ */
+
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
@@ -59,7 +75,7 @@ export const NAV = [
 export default async function AdminPage() {
   const { userId } = await auth();
   if (!userId) redirect("/sign-in");
-  if (!isAdminUser(userId)) redirect("/dashboard");
+  if (!isAdminUser(userId)) redirect("/hall");
 
   const [projects, allSources] = await Promise.all([
     getProjectsOverview(),
@@ -115,6 +131,10 @@ export default async function AdminPage() {
             <div>
               <div className="flex items-center gap-3 mb-3">
                 <CHIsotipo size={16} className="text-[#131218]" />
+                <p className="text-[10px] font-bold text-[#131218]/25 uppercase tracking-widest">
+                  Control Room · House View
+                </p>
+                <span className="text-[#131218]/15">·</span>
                 <p className="text-[10px] font-bold text-[#B2FF59] bg-[#131218] px-2.5 py-1 rounded-full uppercase tracking-widest">
                   PMO / Delivery
                 </p>

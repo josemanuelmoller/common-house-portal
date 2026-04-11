@@ -2,6 +2,14 @@ import { Client } from "@notionhq/client";
 
 export const notion = new Client({ auth: process.env.NOTION_API_KEY });
 
+// Notion database PAGE IDs — used by the @notionhq/client SDK (databases.query, pages.create, etc.)
+// These differ from the collection/data-source IDs used by Notion MCP tools (collection://...).
+// Both ID formats resolve to the same live databases in the "Common House Notion" workspace.
+//   SDK page ID   ↔  MCP collection ID
+//   49d59b18...   ↔  collection://5ef16ab9-e762-4548-b6c9-f386da4f6b29  (CH Projects [OS v2])
+//   fa281249...   ↔  collection://ed78f965-d6e5-47ee-b60c-d7056d381454  (CH Evidence [OS v2])
+//   d88aff1b...   ↔  collection://6f804e20-834c-4de2-a746-f6343fc75451  (CH Sources [OS v2])
+//   0f4bfe95...   ↔  collection://e7d711a5-f441-4cc8-96c1-bd33151c09b8  (CH Knowledge Assets [OS v2])
 export const DB = {
   projects:  "49d59b18095f46588960f2e717832c5f",
   evidence:  "fa28124978d043039d8932ac9964ccf5",
@@ -22,6 +30,22 @@ export type Project = {
   updateNeeded: boolean;
   geography: string[];
   themes: string[];
+  // Hall editorial fields — written by CH team in Notion, read by /hall
+  hallWelcomeNote: string;
+  hallCurrentFocus: string;
+  hallNextMilestone: string;
+  hallChallenge: string;
+  hallMattersMost: string;
+  hallObstacles: string;
+  hallSuccess: string;
+  // House architecture fields — drive workspace routing and room configuration
+  // Source of truth: CH Projects [OS v2] select properties
+  // primaryWorkspace: "hall" | "garage" | "workroom" — default "hall"
+  // See src/types/house.ts for full architecture documentation
+  primaryWorkspace: string;
+  engagementStage: string;
+  engagementModel: string;
+  workroomMode: string;
 };
 
 export type ProjectCard = Project & {
@@ -133,15 +157,9 @@ function relationIds(p: any): string[] {
 
 // ─── Project queries ──────────────────────────────────────────────────────────
 
-export async function getAllProjects(): Promise<Project[]> {
-  const res = await notion.databases.query({
-    database_id: DB.projects,
-    filter: { property: "Project Status", select: { equals: "Active" } },
-    sorts: [{ property: "Last Status Update", direction: "descending" }],
-  });
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return res.results.map((page: any) => ({
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function parseProject(page: any): Project {
+  return {
     id: page.id,
     name: text(prop(page, "Project Name")),
     status: select(prop(page, "Project Status")),
@@ -152,25 +170,38 @@ export async function getAllProjects(): Promise<Project[]> {
     updateNeeded: checkbox(prop(page, "Project Update Needed?")),
     geography: multiSelect(prop(page, "Geography")),
     themes: multiSelect(prop(page, "Themes / Topics")),
-  }));
+    hallWelcomeNote:    text(prop(page, "Hall Welcome Note")),
+    hallCurrentFocus:   text(prop(page, "Hall Current Focus")),
+    hallNextMilestone:  text(prop(page, "Hall Next Milestone")),
+    hallChallenge:      text(prop(page, "Hall Challenge")),
+    hallMattersMost:    text(prop(page, "Hall Matters Most")),
+    hallObstacles:      text(prop(page, "Hall Obstacles")),
+    hallSuccess:        text(prop(page, "Hall Success")),
+    // House architecture — workspace routing and room configuration
+    // See src/types/house.ts for full model documentation
+    primaryWorkspace:  select(prop(page, "Primary Workspace"))  || "hall",
+    engagementStage:   select(prop(page, "Engagement Stage")),
+    engagementModel:   select(prop(page, "Engagement Model")),
+    workroomMode:      select(prop(page, "Workroom Mode")),
+  };
+}
+
+export async function getAllProjects(): Promise<Project[]> {
+  const res = await notion.databases.query({
+    database_id: DB.projects,
+    filter: { property: "Project Status", select: { equals: "Active" } },
+    sorts: [{ property: "Last Status Update", direction: "descending" }],
+  });
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return res.results.map((page: any) => parseProject(page));
 }
 
 export async function getProjectById(id: string): Promise<Project | null> {
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const page: any = await notion.pages.retrieve({ page_id: id });
-    return {
-      id: page.id,
-      name: text(prop(page, "Project Name")),
-      status: select(prop(page, "Project Status")),
-      stage: select(prop(page, "Current Stage")),
-      statusSummary: text(prop(page, "Status Summary")),
-      draftUpdate: text(prop(page, "Draft Status Update")),
-      lastUpdate: date(prop(page, "Last Status Update")),
-      updateNeeded: checkbox(prop(page, "Project Update Needed?")),
-      geography: multiSelect(prop(page, "Geography")),
-      themes: multiSelect(prop(page, "Themes / Topics")),
-    };
+    return parseProject(page);
   } catch {
     return null;
   }
@@ -226,8 +257,10 @@ export async function getProjectsOverview(): Promise<ProjectCard[]> {
       newEvidenceCount: projEvidence.filter(e =>
         select(prop(e, "Validation Status")) === "New"
       ).length,
+      // Include both Reusable and Canonical tiers (Canonical is the higher tier)
       reusableCount: projEvidence.filter(e =>
-        select(prop(e, "Reusability Level")) === "Reusable" &&
+        (select(prop(e, "Reusability Level")) === "Reusable" ||
+         select(prop(e, "Reusability Level")) === "Canonical") &&
         select(prop(e, "Validation Status")) === "Validated"
       ).length,
     };
@@ -286,13 +319,21 @@ export async function getAllEvidence(validationStatus?: string): Promise<Evidenc
   }));
 }
 
-// Reusable + validated evidence — for Knowledge System
+// Reusable + Canonical validated evidence — for Knowledge System.
+// Includes both "Reusable" and "Canonical" tiers (Canonical = highest reusability level;
+// produced by the OS engine's triage-knowledge skill). Filtering only "Reusable" would
+// silently omit the most important cross-cutting knowledge items.
 export async function getReusableEvidence(): Promise<EvidenceItem[]> {
   const res = await notion.databases.query({
     database_id: DB.evidence,
     filter: {
       and: [
-        { property: "Reusability Level", select: { equals: "Reusable" } },
+        {
+          or: [
+            { property: "Reusability Level", select: { equals: "Reusable" } },
+            { property: "Reusability Level", select: { equals: "Canonical" } },
+          ],
+        },
         { property: "Validation Status", select: { equals: "Validated" } },
       ],
     },
@@ -498,9 +539,10 @@ export async function getKnowledgeAssets(): Promise<KnowledgeAsset[]> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return res.results.map((page: any) => ({
     id: page.id,
-    name: text(prop(page, "Asset Name")) || text(prop(page, "Name")) || text(prop(page, "Title")) || "Untitled",
-    category: select(prop(page, "Category")) || select(prop(page, "Asset Category")) || "",
-    assetType: select(prop(page, "Asset Type")) || select(prop(page, "Type")) || "",
+    name: text(prop(page, "Asset Name")) || "Untitled",
+    // "Domain / Theme" is the canonical field (multi_select). "Category"/"Asset Category" don't exist in the schema.
+    category: multiSelect(prop(page, "Domain / Theme")).join(", "),
+    assetType: select(prop(page, "Asset Type")) || "",
     status: select(prop(page, "Status")) || "",
     lastUpdated: page.last_edited_time ?? null,
   }));
@@ -514,6 +556,8 @@ export type MeetingItem = {
   date: string | null;
   url: string;
   platform: string;
+  // "Processed Summary" field from CH Sources [OS v2] — populated by the OS engine after meeting intake
+  processedSummary?: string;
 };
 
 export type SourceActivity = {
@@ -551,11 +595,14 @@ export async function getSourceActivity(projectId: string): Promise<SourceActivi
 
       if (isMeeting) {
         meetings.push({
-          id:       page.id,
-          title:    text(prop(page, "Source Title")) || "Untitled",
-          date:     date(prop(page, "Source Date")),
-          url:      page.properties?.["Source URL"]?.url ?? "",
+          id:               page.id,
+          title:            text(prop(page, "Source Title")) || "Untitled",
+          date:             date(prop(page, "Source Date")),
+          url:              page.properties?.["Source URL"]?.url ?? "",
           platform,
+          // "Processed Summary" is written by the OS engine after meeting intake.
+          // It may be empty for older sources that were ingested before the field was populated.
+          processedSummary: text(prop(page, "Processed Summary")) || undefined,
         });
       } else if (isEmail) {
         emailCount++;
@@ -614,8 +661,10 @@ export async function getDashboardStats(projectId?: string): Promise<DashboardSt
       select(prop(e, "Evidence Type")) === "Dependency" &&
       select(prop(e, "Validation Status")) === "Validated"
     ).length,
+    // Include both Reusable and Canonical tiers
     knowledgeCandidates: evidence.filter(e =>
-      select(prop(e, "Reusability Level")) === "Reusable" &&
+      (select(prop(e, "Reusability Level")) === "Reusable" ||
+       select(prop(e, "Reusability Level")) === "Canonical") &&
       select(prop(e, "Validation Status")) === "Validated"
     ).length,
   };

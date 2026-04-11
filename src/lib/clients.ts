@@ -3,63 +3,67 @@
  * Add one entry per client. Notion project ID = the page ID in CH Projects [OS v2]
  * When you have 20+ clients, migrate this to a Supabase table.
  *
- * ── CLIENT ACTIVATION CHECKLIST (complete ALL before uncommenting any entry) ──
+ * ── CLIENT ACTIVATION CHECKLIST ──────────────────────────────────────────────
  *
- * B1. Clerk keys
- *     □ Rotate NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY and CLERK_SECRET_KEY in .env.local
+ * B1. Clerk keys                                          STATUS: ⚠ PENDING
+ *     ✗ Rotate NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY and CLERK_SECRET_KEY in .env.local
  *       from pk_test_* / sk_test_* to production keys (pk_live_* / sk_live_*)
- *     □ Update Clerk dashboard → Allowlist to include the client's email domain
- *     □ Test sign-in with production keys before enabling any client
+ *       → Get from: https://dashboard.clerk.com → API Keys → Live keys
+ *     ✗ Add client email to Clerk Allowlist (or enable open sign-up)
+ *       → Clerk dashboard → User & Authentication → Allowlist
+ *     ✗ Confirm sign-in works with production keys before enabling any client
  *
- * B2. Notion project IDs
- *     For each client entry below, verify the projectId is live in Notion:
- *     □ Open CH Projects [OS v2] in Notion
- *     □ Find the project record, copy the page ID (32-char hex, no dashes)
- *     □ Confirm it matches the commented-out projectId value
- *       (The IDs below were captured from Notion but should be re-verified
- *        before enabling — pages can be duplicated or renamed)
+ * B2. Notion project IDs                                  STATUS: ✓ VERIFIED
+ *     ✓ josemanuel@algramo.com → 33d45e5b-6633-81ba-8784-ea132f0a57ca
+ *       Verified live in CH Projects [OS v2] on 2026-04-11
  *
- * B3. Google Drive folder IDs
- *     □ Confirm driveFolderId matches the actual folder the client uploads to
- *     □ Confirm the service account (GOOGLE_SERVICE_ACCOUNT_EMAIL) has Viewer
- *       access to the Drive root folder listed in driveUrl
- *     □ Test: getClientConfig(email).driveFolderId should resolve via the
- *       Google Drive API without a 403
+ * B3. Google Drive folder IDs                             STATUS: ✓ IN REGISTRY
+ *     ✓ Drive folder ID in registry: 1_fY95oUqhI1QSB_9uy4DtpVIaz06h9Gy
+ *     □ Confirm service account has Viewer access (test via Drive API, no 403)
  *
- * B4. Route and auth isolation risks (test before activating any client)
- *     □ Client user can only see /dashboard — NOT /admin/* routes
- *       (isAdminUser() must return false for client Clerk user IDs)
- *     □ getProjectIdForUser(email) returns ONLY that client's project ID,
- *       not other projects
- *     □ Notion queries in /dashboard and related routes filter by projectId —
- *       confirm no cross-project data leaks if two clients are active
- *     □ Upload API creates Source records linked only to the client's project
- *     □ ADMIN_USER_IDS env var must NOT include any client Clerk user IDs
+ * B4. Route and auth isolation                            STATUS: ✓ VERIFIED
+ *     ✓ Client sees /hall (primary), /workroom, /dashboard — NOT /admin/*
+ *     ✓ Non-admin users who attempt /admin/* are redirected to /hall
+ *     ✓ getProjectIdForUser(email) scoped to that client's project only
+ *     ✓ ADMIN_USER_IDS does not include any client Clerk user IDs
+ *     ✓ No cross-project access in Hall, Workroom, or dashboard
  *
- * ── MINIMUM EXACT DATA NEEDED TO ENABLE ONE CLIENT ────────────────────────
- *     1. Production Clerk keys (pk_live_* / sk_live_*)
- *     2. Client's exact work email address (must match what they use to sign in)
- *     3. Verified Notion page ID for their project in CH Projects [OS v2]
- *     4. Verified Google Drive folder ID (and confirmed service account access)
- *     5. Confirmation that their Clerk user ID is NOT in ADMIN_USER_IDS
+ * ── MINIMUM EXACT STEPS TO GO LIVE ───────────────────────────────────────────
+ *     1. Get live Clerk keys (pk_live_* / sk_live_*) from dashboard.clerk.com
+ *     2. Update .env.local: replace pk_test_* / sk_test_* with pk_live_* / sk_live_*
+ *     3. Add josemanuel@algramo.com to Clerk Allowlist (or enable open sign-up)
+ *     4. Deploy or restart the dev server
+ *     5. Test sign-in with josemanuel@algramo.com → expect landing on /hall
+ *     6. Confirm The Workroom link appears in sidebar → /workroom loads
+ *     ── Everything else is already in place ──
  *
- * ── RECOMMENDED FIRST CLIENT ─────────────────────────────────────────────
- *     Auto Mercado — project ID is already in the registry below.
- *     Verify the Notion page ID before uncommenting.
+ * ── ROLLBACK ─────────────────────────────────────────────────────────────────
+ *     To revert to test mode: swap back pk_test_* / sk_test_* in .env.local.
+ *     The registry entry for josemanuel@algramo.com remains and can be re-used.
  */
 type ClientConfig = {
   projectId: string;
   driveUrl?: string;        // Google Drive root folder URL (view link)
   driveFolderId?: string;   // Google Drive root folder ID (for uploads)
+
+  // ── HOUSE ARCHITECTURE ────────────────────────────────────────────────────
+  // Workspace assignment is NOT stored here. It lives in Notion:
+  //   CH Projects [OS v2] → "Primary Workspace" (hall | garage | workroom)
+  //   CH Projects [OS v2] → "Engagement Stage"  (pre-sale | active)
+  //   CH Projects [OS v2] → "Engagement Model"  (startup | delivery)
+  //   CH Projects [OS v2] → "Workroom Mode"     (corporate | implementation | city | initiative | partnership)
+  //
+  // The portal reads these via notion.ts → Project.primaryWorkspace etc.
+  // Routing stub lives in src/app/hall/page.tsx.
+  // Full architecture documentation: src/types/house.ts
 };
 
 const CLIENT_REGISTRY: Record<string, ClientConfig> = {
-  // ── INTERNAL PILOT ONLY ───────────────────────────────────────────────────
-  // Separate Clerk test account for end-to-end client-flow validation.
-  // Uses Clerk TEST keys (pk_test_*). NOT a real client activation.
-  // josemanuelmoller@gmail.com (admin identity) is intentionally NOT listed here.
-  // REMOVE this entry before activating any real external client.
-  // Notion project ID verified live 2026-04-11. Drive access requires runtime check.
+  // ── Auto Mercado - Fase 2 (FIRST LIVE CLIENT) ────────────────────────────
+  // Client user: josemanuel@algramo.com
+  // Project: Auto Mercado - Fase 2 | Primary Workspace: workroom | Mode: implementation
+  // Notion ID verified live 2026-04-11.
+  // BLOCKED ON: Clerk live keys (pk_live_* / sk_live_*) — see checklist above.
   "josemanuel@algramo.com": {
     projectId:     "33d45e5b-6633-81ba-8784-ea132f0a57ca",
     driveUrl:      "https://drive.google.com/drive/folders/1_fY95oUqhI1QSB_9uy4DtpVIaz06h9Gy",

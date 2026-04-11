@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { StatusBadge } from "./StatusBadge";
-import { validateEvidence, rejectEvidence } from "@/app/admin/os/actions";
+import { markEvidenceReviewed, rejectEvidence } from "@/app/admin/os/actions";
 
 type Props = {
   id: string;
@@ -16,12 +16,12 @@ type Props = {
 
 export function EvidenceQueueRow({ id, title, excerpt, projectName, type, validationStatus, dateCaptured }: Props) {
   const [isPending, startTransition] = useTransition();
-  const [done, setDone] = useState<"validated" | "rejected" | null>(null);
+  const [done, setDone] = useState<"reviewed" | "rejected" | null>(null);
 
-  function handleValidate() {
+  function handleReview() {
     startTransition(async () => {
-      await validateEvidence(id);
-      setDone("validated");
+      await markEvidenceReviewed(id);
+      setDone("reviewed");
     });
   }
 
@@ -37,7 +37,7 @@ export function EvidenceQueueRow({ id, title, excerpt, projectName, type, valida
     return (
       <tr className="opacity-40 transition-opacity">
         <td className="px-6 py-3 text-sm text-[#131218]/40 italic">
-          {done === "validated" ? "✓ Validated" : "✕ Rejected"} — {title}
+          {done === "reviewed" ? "✓ Reviewed" : "✕ Rejected"} — {title}
         </td>
         <td colSpan={4} />
       </tr>
@@ -65,11 +65,12 @@ export function EvidenceQueueRow({ id, title, excerpt, projectName, type, valida
       <td className="px-4 py-3">
         <div className="flex items-center gap-2">
           <button
-            onClick={handleValidate}
+            onClick={handleReview}
             disabled={isPending}
             className="inline-flex items-center gap-1 text-[10px] font-bold bg-[#B2FF59] text-[#131218] px-2.5 py-1 rounded-full uppercase tracking-widest hover:bg-[#9ee84a] transition-colors disabled:opacity-50"
+            title="Mark as Reviewed — engine validates from here"
           >
-            {isPending ? "..." : "✓ Accept"}
+            {isPending ? "..." : "✓ Reviewed"}
           </button>
           <button
             onClick={handleReject}
