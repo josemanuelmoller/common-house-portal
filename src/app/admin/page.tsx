@@ -160,19 +160,19 @@ export default async function AdminPage() {
 
         {/* Map + Attention panel */}
         <div className="px-8 pt-6">
-          <div className="grid grid-cols-2 gap-6">
+          <div className="grid grid-cols-2 gap-6 items-start">
             <ProjectsMap projects={projects.map(p => ({ id: p.id, name: p.name, geography: p.geography }))} />
 
             {/* Portfolio Pulse */}
-            <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden flex flex-col">
+            <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden flex flex-col" style={{ height: 380 }}>
               <div className="h-1 bg-[#131218]" />
               <div className="px-6 py-4 border-b border-[#EFEFEA]">
                 <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Portfolio Pulse</p>
                 <p className="text-sm font-bold text-[#131218] tracking-tight mt-0.5">Needs Attention</p>
               </div>
 
-              {/* Attention items */}
-              <div className="divide-y divide-[#EFEFEA]">
+              {/* Attention items + recent sources — scrollable */}
+              <div className="flex-1 overflow-y-auto divide-y divide-[#EFEFEA]">
                 {needsUpdate.length === 0 && withBlockers.length === 0 && (
                   <div className="px-6 py-4 text-center">
                     <p className="text-xs text-[#131218]/25 font-medium">All projects up to date</p>
@@ -203,15 +203,13 @@ export default async function AdminPage() {
                     )}
                   </div>
                 ))}
-              </div>
 
-              {/* Recent sources */}
-              {recentActivity.length > 0 && (
-                <>
-                  <div className="px-6 py-2 bg-[#EFEFEA]/40 border-y border-[#EFEFEA]">
-                    <p className="text-[9px] font-bold text-[#131218]/30 uppercase tracking-widest">Recent Sources</p>
-                  </div>
-                  <div className="divide-y divide-[#EFEFEA]">
+                {/* Recent sources — inside scroll area */}
+                {recentActivity.length > 0 && (
+                  <>
+                    <div className="px-6 py-2 bg-[#EFEFEA]/40 border-b border-[#EFEFEA]">
+                      <p className="text-[9px] font-bold text-[#131218]/30 uppercase tracking-widest">Recent Sources</p>
+                    </div>
                     {recentActivity.map(s => (
                       <div key={s.id} className="px-6 py-2.5 flex items-center gap-2.5">
                         <span className="text-[11px] text-[#131218]/30 shrink-0 w-4">{sourceIcon(s.sourceType)}</span>
@@ -226,9 +224,9 @@ export default async function AdminPage() {
                         )}
                       </div>
                     ))}
-                  </div>
-                </>
-              )}
+                  </>
+                )}
+              </div>
 
               {/* Footer: source type counts */}
               <div className="mt-auto px-6 py-3 border-t border-[#EFEFEA] grid grid-cols-3 gap-2">
