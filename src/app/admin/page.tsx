@@ -5,8 +5,32 @@ import { Sidebar } from "@/components/Sidebar";
 import { StatusBadge } from "@/components/StatusBadge";
 import { ProjectAvatar } from "@/components/ProjectAvatar";
 import { ProjectsMap } from "@/components/ProjectsMap";
-import { getProjectsOverview } from "@/lib/notion";
+import { getProjectsOverview, getAllSources } from "@/lib/notion";
 import { isAdminUser } from "@/lib/clients";
+
+function CHIsotipo({ size = 28 }: { size?: number }) {
+  return (
+    <svg width={size * 2} height={size} viewBox="0 0 120 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M46 8 C26 8 12 18 12 30 C12 42 26 52 46 52" stroke="currentColor" strokeWidth="9" strokeLinecap="round" />
+      <circle cx="85" cy="30" r="20" stroke="currentColor" strokeWidth="9" />
+    </svg>
+  );
+}
+
+function sourceIcon(type: string): string {
+  if (type.includes("Email") || type.includes("Gmail")) return "✉";
+  if (type.includes("Meeting") || type.includes("Fireflies")) return "◷";
+  return "▤";
+}
+
+const STAGE_COLORS: Record<string, string> = {
+  "Discovery":  "bg-blue-50 text-blue-600 border border-blue-200",
+  "Validation": "bg-amber-50 text-amber-600 border border-amber-200",
+  "Execution":  "bg-[#131218] text-[#B2FF59]",
+  "Completion": "bg-[#B2FF59] text-[#131218]",
+  "On Hold":    "bg-gray-100 text-gray-400 border border-gray-200",
+  "Paused":     "bg-gray-100 text-gray-400 border border-gray-200",
+};
 
 export const NAV = [
   { label: "Home",               href: "/admin",            icon: "◈" },
@@ -19,15 +43,45 @@ export default async function AdminPage() {
   if (!userId) redirect("/sign-in");
   if (!isAdminUser(userId)) redirect("/dashboard");
 
-  const projects = await getProjectsOverview();
+  const [projects, allSources] = await Promise.all([
+    getProjectsOverview(),
+    getAllSources(),
+  ]);
 
   const totalEvidence  = projects.reduce((s, p) => s + p.evidenceCount, 0);
   const totalValidated = projects.reduce((s, p) => s + p.validatedCount, 0);
   const totalSources   = projects.reduce((s, p) => s + p.sourcesCount, 0);
   const totalBlockers  = projects.reduce((s, p) => s + p.blockerCount, 0);
+  const totalEmails    = projects.reduce((s, p) => s + p.emailCount, 0);
+  const totalMeetings  = projects.reduce((s, p) => s + p.meetingCount, 0);
+  const totalDocs      = projects.reduce((s, p) => s + p.documentCount, 0);
   const validationRate = totalEvidence > 0
     ? Math.round((totalValidated / totalEvidence) * 100)
     : 0;
+
+  const totalDecisions    = projects.reduce((s, p) => s + p.decisionCount, 0);
+  const totalDependencies = projects.reduce((s, p) => s + p.dependencyCount, 0);
+  const totalOutcomes     = projects.reduce((s, p) => s + p.outcomeCount, 0);
+  const totalNewEvidence  = projects.reduce((s, p) => s + p.newEvidenceCount, 0);
+  const totalReusable     = projects.reduce((s, p) => s + p.reusableCount, 0);
+
+  const needsUpdate  = projects.filter(p => p.updateNeeded);
+  const withBlockers = projects.filter(p => p.blockerCount > 0);
+
+  // Stage distribution
+  const stageCounts = projects.reduce((acc, p) => {
+    const s = p.stage || "Unknown";
+    acc[s] = (acc[s] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+  const stageEntries = Object.entries(stageCounts).sort((a, b) => b[1] - a[1]);
+
+  // Recent sources (last 8 across all projects, with project name)
+  const projectById = Object.fromEntries(projects.map(p => [p.id, p.name]));
+  const recentActivity = allSources.slice(0, 8).map(s => ({
+    ...s,
+    projectName: (s.projectId && projectById[s.projectId]) || "—",
+  }));
 
   return (
     <div className="flex min-h-screen bg-[#EFEFEA]">
@@ -39,9 +93,12 @@ export default async function AdminPage() {
         <div className="bg-white border-b border-[#E0E0D8] px-8 py-6">
           <div className="flex items-end justify-between mb-6">
             <div>
-              <p className="text-[10px] font-bold text-[#B2FF59] bg-[#131218] px-2.5 py-1 rounded-full uppercase tracking-widest inline-block mb-3">
-                Admin
-              </p>
+              <div className="flex items-center gap-3 mb-3">
+                <CHIsotipo size={16} className="text-[#131218]" />
+                <p className="text-[10px] font-bold text-[#B2FF59] bg-[#131218] px-2.5 py-1 rounded-full uppercase tracking-widest">
+                  Admin
+                </p>
+              </div>
               <h1 className="text-3xl font-bold text-[#131218] tracking-tight">Projects</h1>
             </div>
             <p className="text-xs text-[#131218]/30 font-medium pb-1">
@@ -51,27 +108,169 @@ export default async function AdminPage() {
 
           {/* Global stats row */}
           <div className="grid grid-cols-5 gap-px bg-[#E0E0D8] rounded-2xl overflow-hidden">
-            {[
-              { label: "Active Projects", value: projects.length,  },
-              { label: "Sources",         value: totalSources,     },
-              { label: "Evidence",        value: totalEvidence,    },
-              { label: "Validated",       value: totalValidated,   },
-              { label: "Validation Rate", value: `${validationRate}%`, highlight: true },
-            ].map(m => (
-              <div key={m.label} className="bg-white px-6 py-4">
-                <p className={`text-2xl font-bold tracking-tight ${m.highlight ? "text-[#B2FF59] bg-[#131218] w-fit px-2 rounded-lg" : "text-[#131218]"}`}>
-                  {m.value}
-                </p>
-                <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest mt-1">{m.label}</p>
+            <div className="bg-white px-6 py-4">
+              <p className="text-2xl font-bold tracking-tight text-[#131218]">{projects.length}</p>
+              <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest mt-1">Active Projects</p>
+            </div>
+            <div className="bg-white px-6 py-4">
+              <p className="text-2xl font-bold tracking-tight text-[#131218]">{totalSources}</p>
+              <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest mt-1">Sources</p>
+              <p className="text-[10px] text-[#131218]/30 font-medium mt-1.5 space-x-2">
+                <span>✉ {totalEmails}</span>
+                <span>· ◎ {totalMeetings}</span>
+                <span>· ▤ {totalDocs}</span>
+              </p>
+            </div>
+            <div className="bg-white px-6 py-4">
+              <div className="flex items-start gap-2">
+                <p className="text-2xl font-bold tracking-tight text-[#131218]">{totalEvidence}</p>
+                {totalNewEvidence > 0 && (
+                  <span className="text-[9px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full mt-1 whitespace-nowrap">
+                    {totalNewEvidence} pending
+                  </span>
+                )}
               </div>
-            ))}
+              <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest mt-1">Evidence</p>
+            </div>
+            <div className="bg-white px-6 py-4">
+              <p className="text-2xl font-bold tracking-tight text-[#131218]">{totalValidated}</p>
+              <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest mt-1">Validated</p>
+            </div>
+            <div className="bg-white px-6 py-4">
+              <p className="text-2xl font-bold tracking-tight text-[#B2FF59] bg-[#131218] w-fit px-2 rounded-lg">{validationRate}%</p>
+              <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest mt-1">Validation Rate</p>
+            </div>
           </div>
+
+          {/* Stage distribution strip */}
+          {stageEntries.length > 0 && (
+            <div className="flex items-center gap-2 mt-4 flex-wrap">
+              <p className="text-[9px] font-bold text-[#131218]/25 uppercase tracking-widest mr-1">Stage</p>
+              {stageEntries.map(([stage, count]) => (
+                <span
+                  key={stage}
+                  className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${STAGE_COLORS[stage] ?? "bg-[#EFEFEA] text-[#131218]/50"}`}
+                >
+                  {stage} {count}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* Map */}
+        {/* Map + Attention panel */}
         <div className="px-8 pt-6">
           <div className="grid grid-cols-2 gap-6">
             <ProjectsMap projects={projects.map(p => ({ id: p.id, name: p.name, geography: p.geography }))} />
+
+            {/* Portfolio Pulse */}
+            <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden flex flex-col">
+              <div className="h-1 bg-[#131218]" />
+              <div className="px-6 py-4 border-b border-[#EFEFEA]">
+                <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Portfolio Pulse</p>
+                <p className="text-sm font-bold text-[#131218] tracking-tight mt-0.5">Needs Attention</p>
+              </div>
+
+              {/* Attention items */}
+              <div className="divide-y divide-[#EFEFEA]">
+                {needsUpdate.length === 0 && withBlockers.length === 0 && (
+                  <div className="px-6 py-4 text-center">
+                    <p className="text-xs text-[#131218]/25 font-medium">All projects up to date</p>
+                  </div>
+                )}
+                {withBlockers.map(p => (
+                  <div key={`blocker-${p.id}`} className="px-6 py-2.5 flex items-center gap-3">
+                    <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-[#131218] truncate">{p.name}</p>
+                      <p className="text-[10px] text-red-500 font-bold uppercase tracking-widest mt-0.5">
+                        {p.blockerCount} blocker{p.blockerCount > 1 ? "s" : ""}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+                {needsUpdate.map(p => (
+                  <div key={`update-${p.id}`} className="px-6 py-2.5 flex items-center gap-3">
+                    <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-[#131218] truncate">{p.name}</p>
+                      <p className="text-[10px] text-amber-500 font-bold uppercase tracking-widest mt-0.5">Update needed</p>
+                    </div>
+                    {p.lastUpdate && (
+                      <p className="text-[10px] text-[#131218]/25 font-medium shrink-0">
+                        {new Date(p.lastUpdate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Recent sources */}
+              {recentActivity.length > 0 && (
+                <>
+                  <div className="px-6 py-2 bg-[#EFEFEA]/40 border-y border-[#EFEFEA]">
+                    <p className="text-[9px] font-bold text-[#131218]/30 uppercase tracking-widest">Recent Sources</p>
+                  </div>
+                  <div className="divide-y divide-[#EFEFEA]">
+                    {recentActivity.map(s => (
+                      <div key={s.id} className="px-6 py-2.5 flex items-center gap-2.5">
+                        <span className="text-[11px] text-[#131218]/30 shrink-0 w-4">{sourceIcon(s.sourceType)}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium text-[#131218] truncate">{s.title}</p>
+                          <p className="text-[10px] text-[#131218]/30 font-medium truncate">{s.projectName}</p>
+                        </div>
+                        {s.dateIngested && (
+                          <p className="text-[10px] text-[#131218]/25 font-medium shrink-0">
+                            {new Date(s.dateIngested).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {/* Footer: source type counts */}
+              <div className="mt-auto px-6 py-3 border-t border-[#EFEFEA] grid grid-cols-3 gap-2">
+                <div className="text-center">
+                  <p className="text-lg font-bold text-[#131218]">{totalEmails}</p>
+                  <p className="text-[9px] font-bold text-[#131218]/25 uppercase tracking-widest">Emails</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-lg font-bold text-[#131218]">{totalMeetings}</p>
+                  <p className="text-[9px] font-bold text-[#131218]/25 uppercase tracking-widest">Meetings</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-lg font-bold text-[#131218]">{totalDocs}</p>
+                  <p className="text-[9px] font-bold text-[#131218]/25 uppercase tracking-widest">Docs</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Evidence breakdown */}
+        <div className="px-8 pt-6">
+          <div className="grid grid-cols-4 gap-4">
+            {[
+              { label: "Decisions",       value: totalDecisions,    bar: "bg-[#B2FF59]", icon: "✓", iconCls: "bg-[#131218] text-[#B2FF59]" },
+              { label: "Dependencies",    value: totalDependencies, bar: "bg-amber-400",  icon: "◷", iconCls: "bg-amber-50 text-amber-500"  },
+              { label: "Outcomes",        value: totalOutcomes,     bar: "bg-[#B2FF59]", icon: "↗", iconCls: "bg-[#131218] text-[#B2FF59]" },
+              { label: "Knowledge Ready", value: totalReusable,     bar: "bg-[#131218]", icon: "◈", iconCls: "bg-[#131218] text-[#B2FF59]" },
+            ].map(card => (
+              <div key={card.label} className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
+                <div className={`h-1 ${card.bar}`} />
+                <div className="px-5 py-4 flex items-center gap-3">
+                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 text-sm font-bold ${card.iconCls}`}>
+                    {card.icon}
+                  </div>
+                  <div>
+                    <p className="text-xl font-bold text-[#131218] tracking-tight">{card.value}</p>
+                    <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">{card.label}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 

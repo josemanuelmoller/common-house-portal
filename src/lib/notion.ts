@@ -29,6 +29,14 @@ export type ProjectCard = Project & {
   validatedCount: number;
   blockerCount: number;
   sourcesCount: number;
+  emailCount: number;
+  meetingCount: number;
+  documentCount: number;
+  decisionCount: number;
+  dependencyCount: number;
+  outcomeCount: number;
+  newEvidenceCount: number;
+  reusableCount: number;
 };
 
 export type EvidenceItem = {
@@ -185,6 +193,10 @@ export async function getProjectsOverview(): Promise<ProjectCard[]> {
     );
     const projSources = allSrcs.filter(s => s.projectId === project.id);
 
+    const emailCount    = projSources.filter(s => s.sourceType.includes("Email")   || s.sourceType === "Gmail").length;
+    const meetingCount  = projSources.filter(s => s.sourceType.includes("Meeting") || s.sourceType === "Fireflies").length;
+    const documentCount = projSources.filter(s => s.sourceType === "Document"      || s.sourceType === "Google Drive").length;
+
     return {
       ...project,
       evidenceCount: projEvidence.length,
@@ -196,6 +208,28 @@ export async function getProjectsOverview(): Promise<ProjectCard[]> {
         select(prop(e, "Validation Status")) === "Validated"
       ).length,
       sourcesCount: projSources.length,
+      emailCount,
+      meetingCount,
+      documentCount,
+      decisionCount: projEvidence.filter(e =>
+        select(prop(e, "Evidence Type")) === "Decision" &&
+        select(prop(e, "Validation Status")) === "Validated"
+      ).length,
+      dependencyCount: projEvidence.filter(e =>
+        select(prop(e, "Evidence Type")) === "Dependency" &&
+        select(prop(e, "Validation Status")) === "Validated"
+      ).length,
+      outcomeCount: projEvidence.filter(e =>
+        select(prop(e, "Evidence Type")) === "Outcome" &&
+        select(prop(e, "Validation Status")) === "Validated"
+      ).length,
+      newEvidenceCount: projEvidence.filter(e =>
+        select(prop(e, "Validation Status")) === "New"
+      ).length,
+      reusableCount: projEvidence.filter(e =>
+        select(prop(e, "Reusability Level")) === "Reusable" &&
+        select(prop(e, "Validation Status")) === "Validated"
+      ).length,
     };
   });
 }
