@@ -58,6 +58,36 @@ export async function GET(
       }
     }
 
+    // If no block content, fall back to rich_text properties (Fireflies sources store content in props)
+    if (sections.length === 0) {
+      const textPropNames = [
+        "Processed Summary", "Sanitized Notes", "Attachment Notes",
+        "Source Excerpt", "Excerpt", "Summary", "Meeting Summary",
+        "Notes", "Meeting Notes", "Transcript", "Content", "Description",
+      ];
+      for (const propName of textPropNames) {
+        const propVal = props[propName];
+        if (!propVal) continue;
+        const text =
+          propVal.rich_text?.map((t: any) => t.plain_text).join("") ||
+          propVal.title?.[0]?.plain_text ||
+          "";
+        if (text.trim()) {
+          // Split on newlines to get multiple paragraphs/bullets
+          text.split("\n").forEach((line: string) => {
+            const trimmed = line.trim();
+            if (!trimmed) return;
+            const isBullet = /^[-•*]\s/.test(trimmed);
+            sections.push({
+              type: isBullet ? "bullet" : "paragraph",
+              text: isBullet ? trimmed.replace(/^[-•*]\s/, "") : trimmed,
+            });
+          });
+          break; // use first prop that has content
+        }
+      }
+    }
+
     // Try to extract attendees from content if not in properties
     let attendees = attendeesProp;
     if (attendees.length === 0) {
