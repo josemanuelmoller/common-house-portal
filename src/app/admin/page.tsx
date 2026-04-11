@@ -8,9 +8,9 @@ import { ProjectsMap } from "@/components/ProjectsMap";
 import { getProjectsOverview, getAllSources } from "@/lib/notion";
 import { isAdminUser } from "@/lib/clients";
 
-function CHIsotipo({ size = 28 }: { size?: number }) {
+function CHIsotipo({ size = 28, className }: { size?: number; className?: string }) {
   return (
-    <svg width={size * 2} height={size} viewBox="0 0 120 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <svg width={size * 2} height={size} viewBox="0 0 120 60" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
       <path d="M46 8 C26 8 12 18 12 30 C12 42 26 52 46 52" stroke="currentColor" strokeWidth="9" strokeLinecap="round" />
       <circle cx="85" cy="30" r="20" stroke="currentColor" strokeWidth="9" />
     </svg>
