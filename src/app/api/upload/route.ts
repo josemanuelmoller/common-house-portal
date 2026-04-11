@@ -72,8 +72,12 @@ export async function POST(req: NextRequest) {
         "Linked Projects": {
           relation: [{ id: projectId }],
         },
+        // Set to Ingested (not Processed) so the OS engine's finalize-source-processing skill
+        // can validate this record through its 9-condition hygiene check before marking it
+        // Processed. Setting Processed directly would create hygiene-skipped source records
+        // with no Processed Summary, Dedup Key, or Sensitivity set.
         "Processing Status": {
-          select: { name: "Processed" },
+          select: { name: "Ingested" },
         },
         "Source Date": {
           date: { start: new Date().toISOString().split("T")[0] },
@@ -92,9 +96,15 @@ export async function POST(req: NextRequest) {
 
   } catch (err) {
     console.error("Upload error:", err);
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Upload failed" },
-      { status: 500 }
-    );
+    const msg = err instanceof Error ? err.message : "Upload failed";
+    // Service accounts can't store files in personal My Drive folders (no quota).
+    // Until the target folder is migrated to a Shared Drive, surface a clear message.
+    if (msg.includes("do not have storage quota") || msg.includes("storageQuota")) {
+      return NextResponse.json(
+        { error: "Document upload is not available yet for this project. The team has been notified." },
+        { status: 503 }
+      );
+    }
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
