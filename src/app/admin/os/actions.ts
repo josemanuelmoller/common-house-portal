@@ -5,7 +5,13 @@ import { revalidatePath } from "next/cache";
 import { notion } from "@/lib/notion";
 import { isAdminUser } from "@/lib/clients";
 
-export async function validateEvidence(evidenceId: string) {
+// WRITE PATH DECISION (2026-04-11):
+// The OS engine's validation-operator is the sole writer of Validation Status = "Validated".
+// The portal sets Validation Status = "Reviewed" to signal human review without bypassing the
+// engine's validation criteria (Source Excerpt check, Confidence level, etc.).
+// "Reviewed" is a terminal state in the portal — the engine skips records not at "New".
+// If a record needs to reach "Validated", run the OS engine on it explicitly.
+export async function markEvidenceReviewed(evidenceId: string) {
   const { userId } = await auth();
   if (!userId || !isAdminUser(userId)) throw new Error("Unauthorized");
 
@@ -13,7 +19,7 @@ export async function validateEvidence(evidenceId: string) {
     page_id: evidenceId,
     properties: {
       "Validation Status": {
-        select: { name: "Validated" },
+        select: { name: "Reviewed" },
       },
     },
   });
@@ -22,6 +28,8 @@ export async function validateEvidence(evidenceId: string) {
   revalidatePath("/admin");
 }
 
+// "Rejected" is safe to write from portal — both portal and engine use the same value
+// and rejection is a deliberate human decision that should not be deferred to the engine.
 export async function rejectEvidence(evidenceId: string) {
   const { userId } = await auth();
   if (!userId || !isAdminUser(userId)) throw new Error("Unauthorized");

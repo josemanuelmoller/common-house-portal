@@ -3,7 +3,7 @@ import { HallProject } from "@/types/hall";
 export function HallHero({ project }: { project: HallProject }) {
   return (
     <div className="bg-[#131218] px-8 py-10">
-      <div className="max-w-4xl">
+      <div className="max-w-4xl mx-auto">
         {/* Eyebrow */}
         <p className="text-[10px] font-bold text-white/30 uppercase tracking-widest mb-6">
           Welcome to The Hall

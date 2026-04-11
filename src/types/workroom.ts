@@ -127,6 +127,6 @@ export type WorkspaceReadiness = {
 
 // Current readiness state — update here when a workspace goes live:
 export const WORKSPACE_READY: WorkspaceReadiness = {
-  workroom: true,   // /workroom is now built and client-ready
-  garage: false,    // /garage not yet built
+  workroom: true,   // /workroom is built and client-ready
+  garage: true,     // /garage is built — activate by setting Primary Workspace = "garage" in Notion
 };

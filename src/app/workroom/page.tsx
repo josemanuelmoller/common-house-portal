@@ -4,10 +4,12 @@ import { Sidebar } from "@/components/Sidebar";
 import { WorkroomHeader } from "@/components/workroom/WorkroomHeader";
 import { ExecutiveSnapshot } from "@/components/workroom/ExecutiveSnapshot";
 import { ActiveBlockers } from "@/components/workroom/ActiveBlockers";
+import { WorkroomDelta } from "@/components/workroom/WorkroomDelta";
 import { WhatsInMotion } from "@/components/workroom/WhatsInMotion";
 import { DocumentsSection } from "@/components/DocumentsSection";
 import { SessionLog } from "@/components/workroom/SessionLog";
 import { AgreementsReached } from "@/components/workroom/AgreementsReached";
+import { WorkroomDigitalResidents } from "@/components/workroom/WorkroomDigitalResidents";
 import {
   getProjectById,
   getEvidenceForProject,
@@ -22,6 +24,7 @@ import type {
   WorkroomSession,
   WorkroomDecision,
 } from "@/types/workroom";
+import type { WorkroomActivitySummary } from "@/components/workroom/WorkroomDelta";
 
 /**
  * /workroom — The Workroom (client-facing delivery workspace).
@@ -38,8 +41,8 @@ import type {
  */
 
 const NAV = [
-  { label: "The Workroom", href: "/workroom", icon: "◻" },
   { label: "The Hall",     href: "/hall",     icon: "◈" },
+  { label: "The Workroom", href: "/workroom", icon: "◻" },
 ];
 
 function formatDate(iso: string | null | undefined): string {
@@ -80,7 +83,7 @@ export default async function WorkroomPage() {
         <main className="flex-1 flex items-center justify-center">
           <div className="text-center bg-white rounded-2xl border border-[#E0E0D8] p-10 max-w-sm">
             <div className="w-12 h-12 bg-[#131218] rounded-full flex items-center justify-center mx-auto mb-4">
-              <span className="text-[#2563EB] text-lg">◻</span>
+              <span className="text-[#B2FF59] text-lg">◻</span>
             </div>
             <h2 className="text-lg font-bold text-[#131218] tracking-tight">
               No project linked
@@ -105,7 +108,6 @@ export default async function WorkroomPage() {
   if (!project) redirect("/sign-in");
 
   // Workspace gate: only workroom projects enter here.
-  // Clients on other workspaces (hall, garage) stay in their surface.
   if (project.primaryWorkspace !== "workroom" || !WORKSPACE_READY.workroom) {
     redirect("/hall");
   }
@@ -131,7 +133,6 @@ export default async function WorkroomPage() {
     }));
 
   // ── Session Log ──────────────────────────────────────────────────────────
-  // Only show meetings with a processed summary — hide engine-only records.
   const sessions: WorkroomSession[] = activity.meetings
     .filter((m) => !!m.processedSummary)
     .map((m) => ({
@@ -151,6 +152,17 @@ export default async function WorkroomPage() {
       context: e.excerpt || undefined,
     }));
 
+  // ── Activity Delta ────────────────────────────────────────────────────────
+  // Derived entirely from already-loaded data — no extra fetches.
+  const activitySummary: WorkroomActivitySummary = {
+    sessionCount:  sessions.length,
+    decisionCount: decisions.length,
+    blockerCount:  blockers.length,
+    lastSession:   sessions[0]
+      ? { title: sessions[0].title, date: sessions[0].date }
+      : undefined,
+  };
+
   return (
     <div className="flex min-h-screen bg-[#EFEFEA]">
       <Sidebar items={NAV} projectName={project.name} />
@@ -158,26 +170,34 @@ export default async function WorkroomPage() {
       <main className="flex-1 overflow-auto">
         <WorkroomHeader project={workroomProject} />
 
-        <div className="px-8 py-6 space-y-6">
+        <div className="px-8 py-6">
+          <div className="max-w-4xl mx-auto space-y-6">
 
-          {/* Where we stand — executive status line */}
-          <ExecutiveSnapshot project={workroomProject} />
+            {/* Latest OS status — distinct from editorial currentFocus */}
+            <ExecutiveSnapshot project={workroomProject} />
 
-          {/* Active blockers — surface before anything else */}
-          <ActiveBlockers blockers={blockers} />
+            {/* Active blockers — surface before anything else */}
+            <ActiveBlockers blockers={blockers} />
 
-          {/* What's in motion — current delivery focus */}
-          <WhatsInMotion project={workroomProject} />
+            {/* Activity pulse — sessions, decisions, blocker count */}
+            <WorkroomDelta activity={activitySummary} />
 
-          {/* Operational materials */}
-          <DocumentsSection documents={documents} />
+            {/* What's in motion + Operational materials */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+              <WhatsInMotion project={workroomProject} />
+              <DocumentsSection documents={documents} />
+            </div>
 
-          {/* Session log — working session recaps */}
-          <SessionLog sessions={sessions} />
+            {/* Session log — working session recaps */}
+            <SessionLog sessions={sessions} />
 
-          {/* Agreements reached — validated decisions */}
-          <AgreementsReached decisions={decisions} />
+            {/* Agreements reached — validated decisions */}
+            <AgreementsReached decisions={decisions} />
 
+            {/* Digital Residents — capability layer, closes the Workroom */}
+            <WorkroomDigitalResidents />
+
+          </div>
         </div>
       </main>
     </div>

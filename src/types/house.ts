@@ -17,17 +17,18 @@
  *                                         Configurable by WorkroomMode.
  *                                         Client-facing: LIVE.
  *
- *   The Garage   /garage       PLANNED ○  Primary workspace for startup /
+ *   The Garage   /garage       BUILT ✓   Primary workspace for startup /
  *                                         venture / acceleration engagements.
- *                                         Client-facing: NOT YET BUILT.
+ *                                         Client-facing: LIVE (waiting for
+ *                                         first garage project assignment).
  *
- *   The Library  /library      PLANNED ○  Transversal intelligence layer.
+ *   The Library  /library      BUILT ✓   Transversal intelligence layer.
  *                                         Signals, cases, viewpoints, patterns.
- *                                         Cross-project. Not a project workspace.
+ *                                         Cross-project. Admin-only for now.
  *
- *   The Residents /residents   PLANNED ○  Transversal people / network layer.
- *                                         Core team, partners, specialists.
- *                                         Cross-project. Not a project workspace.
+ *   The Residents /residents   BUILT ✓   Transversal people / network layer.
+ *                                         Co-Founders, Core Team, EIRs.
+ *                                         Cross-project. Admin-only for now.
  *
  * ─── DESIGN PRINCIPLES ────────────────────────────────────────────────────────
  *
@@ -50,7 +51,7 @@
 // RoomType — Client-facing experience surfaces. Built on top of the OS.
 //   "hall"     — Universal entry layer. Every client lands here first.         BUILT ✓
 //   "workroom" — Active delivery workspace (delivery / implementation engagements). BUILT ✓
-//   "garage"   — Startup / venture / acceleration workspace.                   PLANNED ○
+//   "garage"   — Startup / venture / acceleration workspace.                   BUILT ✓
 //
 // LAYER 2 — SYSTEMS (how the work is run — internal engine)
 // ─────────────────────────────────────────────────────────
@@ -189,42 +190,44 @@ export type LibraryItem = {
   accessLevel: "summary_only" | "full" | "restricted";
 };
 
-// ─── Residents — Transversal People / Network Layer ───────────────────────────
-// Route: /residents (not built)
-// Scope: Cross-project people and organization network.
-// Access: CH team; clients see their own team + CH team + selected network.
+// ─── Residents — The Unified House Layer ──────────────────────────────────────
+// Route: /residents   BUILT ✓   Admin-only (for now)
 //
-// Role:
-//   The Residents layer is the people and organizations of Common House.
-//   It is not a contact database — it is the network that powers the work.
-//   A person in Residents may appear across multiple projects.
-//   The goal is to make relationships legible, not just trackable.
+// DEFINITION:
+//   Residents is the transversal House layer that contains both:
+//     1. Human Residents  — the people behind the House
+//     2. Digital Residents — the capabilities that inhabit and support the House
 //
-// Resident categories:
-//   core_team     — Common House internal team members (Internal classification)
-//   client_team   — Client-side counterparts on active projects
-//   eir           — Entrepreneurs in Residence (advisory or embedded)
-//   partner       — Powered-by partners: iRefill, UNDP, etc.
-//   specialist    — Domain specialists, advisors (engaged per-project)
-//   network       — Extended network, not currently engaged
+//   This is the canonical home for all residents. Digital Residents may also appear
+//   contextually in Hall, Workroom, and Control Room — but those are surface-specific
+//   previews. The full picture lives here.
 //
-// Data source:
-//   CH People [Notion] — primary (resolution via getProjectPeople())
-//   CH Organizations [Notion] — orgs linked to projects
+// HUMAN RESIDENTS:
+//   The people of Common House — co-founders, team, EIRs, partners.
+//   They are not a contact database. They are the network that powers the work.
+//   Sourced from: CH People [OS v2] via getAllPeople()
 //
-// Minimum profile fields:
-//   name, jobTitle, email (where available), classification (Internal/External)
-//   roles: string[]    — from Relationship Roles multi-select
-//   projects: string[] — list of project IDs this person appears in
-//   category: ResidentCategory
-//   bio?: string       — optional short bio for client-facing display
-//   photoUrl?: string  — optional headshot
+//   Human sections (current):
+//     co_founder   — Internal + Founder role (2 people)
+//     core_team    — Internal, non-Founder (expandable)
+//     eir          — External + Startup Founder role (6 EIRs, 5 countries)
 //
-// Current coverage:
-//   The Project type already supports resolution of people via getProjectPeople().
-//   PersonRecord in notion.ts has: name, jobTitle, email, classification, roles.
-//   Missing for Residents: cross-project index, category, bio, photoUrl.
-//   These can be added as Notion properties on CH People without new databases.
+//   PersonRecord fields: name, jobTitle, email, classification, roles, linkedin?, location?
+//
+// DIGITAL RESIDENTS:
+//   The operational capabilities that inhabit the House.
+//   They are NOT people, NOT bots, NOT raw agents.
+//   They are the visible face of what the OS does — expressed as coherent roles.
+//   Sourced from: DIGITAL_RESIDENTS constant in house.ts (static — no DB)
+//
+//   Digital roles: memory_keeper, decision_keeper, progress_keeper (client-facing)
+//                  knowledge_keeper, house_steward (internal only)
+//
+//   Surface map:
+//     /residents   → canonical home — all 5 roles, full profile, admin view
+//     /hall        → contextual preview — client-facing roles (3), focused on Hall use
+//     /workroom    → contextual preview — client-facing roles (3), focused on delivery
+//     /admin       → knowledge_keeper + house_steward (internal layer)
 
 export type ResidentCategory =
   | "core_team"
@@ -246,6 +249,121 @@ export type ResidentProfile = {
   photoUrl?: string;
   initials: string;
 };
+
+// ─── Onboarding — Lifecycle / Transition Layer ───────────────────────────────
+//
+// Onboarding is NOT a Room, NOT a System, and NOT a Shared Space.
+// It is a lifecycle/transition layer that surfaces within Rooms at key threshold moments.
+// It creates continuity between engagement phases — it does not replace Room content.
+//
+// Onboarding moments:
+//   relationship_start    — client first enters the Hall in "explore" mode
+//   workroom_activation   — project activates to Workroom (live + workspace = workroom)
+//   garage_activation     — project activates to Garage (future — not yet built)
+//
+// Implementation model:
+//   Rendered as conditional blocks inside Rooms — no dedicated route.
+//   Triggered by HallMode (explore/live) and project.primaryWorkspace.
+//   Tone: editorial and minimal. NOT a checklist. NOT a tutorial. NOT a progress tracker.
+//
+// Surface map:
+//   The Hall     → relationship_start (explore mode) + workroom_activation (live mode)
+//   The Workroom → (entry is itself the workroom_activation result)
+//   The Garage   → garage_activation (future)
+
+export type OnboardingMoment =
+  | "relationship_start"
+  | "workroom_activation"
+  | "garage_activation";
+
+// ─── Digital Residents — Part of the Residents Layer ─────────────────────────
+//
+// Digital Residents are the operational capabilities that inhabit the House.
+// They are NOT people, NOT bots, NOT raw agents, NOT standalone features.
+// They are the visible face of what the OS does — expressed as coherent roles.
+//
+// CANONICAL HOME: /residents  (full profile, all roles including internal)
+// CONTEXTUAL PREVIEWS: /hall, /workroom, /admin  (surface-specific subset)
+//
+// Roles:
+//   memory_keeper     — captures conversations, documents, and exchanges
+//   decision_keeper   — records what was agreed, by whom, and when
+//   progress_keeper   — monitors what is moving, what is blocked, what has changed
+//   knowledge_keeper  — synthesises patterns and intelligence across projects
+//   house_steward     — oversees system health and operational continuity
+//
+// Surface map:
+//   /residents   → all 5 roles, full profile, admin-only canonical view
+//   /hall        → memory_keeper, decision_keeper, progress_keeper (client-facing preview)
+//   /workroom    → memory_keeper, decision_keeper, progress_keeper (delivery preview)
+//   /garage      → memory_keeper, decision_keeper, progress_keeper (builder preview)
+//   /admin       → knowledge_keeper, house_steward (internal-only layer)
+//
+// What Digital Residents are NOT:
+//   ✗ Chatbots or interactive assistants
+//   ✗ Raw subagents with exposed internal names
+//   ✗ Automation scripts or marketing features
+//   ✓ They are operational inhabitants of the House — they support the work,
+//     they do not replace judgment, conversation, or leadership.
+
+export type DigitalResidentRole =
+  | "memory_keeper"
+  | "decision_keeper"
+  | "progress_keeper"
+  | "knowledge_keeper"
+  | "house_steward";
+
+export type DigitalResidentProfile = {
+  role: DigitalResidentRole;
+  displayName: string;
+  tagline: string;
+  signals: string[];
+  surfaces: ("hall" | "workroom" | "garage" | "control_room")[];
+  clientVisible: boolean;
+};
+
+export const DIGITAL_RESIDENTS: DigitalResidentProfile[] = [
+  {
+    role: "memory_keeper",
+    displayName: "The Memory Keeper",
+    tagline: "Captures every conversation, document, and exchange",
+    signals: ["meeting transcripts", "email threads", "shared materials"],
+    surfaces: ["hall", "workroom", "garage"],
+    clientVisible: true,
+  },
+  {
+    role: "decision_keeper",
+    displayName: "The Decision Keeper",
+    tagline: "Records what was agreed, by whom, and when",
+    signals: ["validated decisions", "agreements", "key moments"],
+    surfaces: ["hall", "workroom", "garage"],
+    clientVisible: true,
+  },
+  {
+    role: "progress_keeper",
+    displayName: "The Progress Keeper",
+    tagline: "Monitors what is moving, what is blocked, what has changed",
+    signals: ["action items", "blockers", "status signals"],
+    surfaces: ["hall", "workroom", "garage"],
+    clientVisible: true,
+  },
+  {
+    role: "knowledge_keeper",
+    displayName: "The Knowledge Keeper",
+    tagline: "Synthesises patterns and intelligence across projects",
+    signals: ["reusable evidence", "cross-project insights", "canonical knowledge"],
+    surfaces: ["control_room"],
+    clientVisible: false,
+  },
+  {
+    role: "house_steward",
+    displayName: "The House Steward",
+    tagline: "Oversees system health and operational continuity",
+    signals: ["source hygiene", "validation backlog", "evidence completeness"],
+    surfaces: ["control_room"],
+    clientVisible: false,
+  },
+];
 
 // ─── Workspace Suggestion (future agent) ─────────────────────────────────────
 // A future skill should SUGGEST workspace assignment based on:

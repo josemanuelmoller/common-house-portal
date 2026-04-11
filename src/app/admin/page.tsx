@@ -66,10 +66,13 @@ const STAGE_COLORS: Record<string, string> = {
 };
 
 export const NAV = [
-  { label: "PMO / Delivery",       href: "/admin",            icon: "◈" },
+  { label: "House View",           href: "/admin",            icon: "◈" },
+  { label: "My Rooms",             href: "/admin/my-rooms",   icon: "◫" },
   { label: "Intake / Exceptions",  href: "/admin/os",         icon: "⬡" },
   { label: "Knowledge Assets",     href: "/admin/knowledge",  icon: "◉" },
   { label: "System Health",        href: "/admin/health",     icon: "◎" },
+  { label: "The Library",          href: "/library",          icon: "▤", section: "House Layers" },
+  { label: "The Residents",        href: "/residents",        icon: "◍", section: "House Layers" },
 ];
 
 export default async function AdminPage() {
@@ -316,6 +319,74 @@ export default async function AdminPage() {
             </div>
           </div>
         </div>
+
+        {/* Pressure & Stale — surfaces projects at risk of drift */}
+        {staleProjects.length > 0 && (
+          <div className="px-8 pt-6">
+            <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
+              <div className="h-1 bg-red-400" />
+              <div className="px-6 py-4 border-b border-[#EFEFEA] flex items-center justify-between">
+                <div>
+                  <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest">Pressure Building</p>
+                  <p className="text-sm font-bold text-[#131218] tracking-tight mt-0.5">Projects going stale — no update in 30+ days</p>
+                </div>
+                <span className="text-[10px] font-bold bg-red-50 text-red-600 border border-red-200 px-2.5 py-1 rounded-full uppercase tracking-widest">
+                  {staleProjects.length} stale
+                </span>
+              </div>
+              <div className="divide-y divide-[#EFEFEA]">
+                {staleProjects.map(p => (
+                  <Link
+                    key={p.id}
+                    href={`/admin/projects/${p.id}`}
+                    className="flex items-center gap-4 px-6 py-3.5 hover:bg-[#EFEFEA]/50 transition-colors group"
+                  >
+                    <span className="w-2 h-2 rounded-full bg-red-400 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-[#131218] truncate">{p.name}</p>
+                      <p className="text-[10px] text-[#131218]/30 font-medium mt-0.5">{p.stage || "—"}</p>
+                    </div>
+                    {p.lastUpdate && (
+                      <p className="text-xs font-semibold text-red-400 shrink-0">
+                        {daysSince(p.lastUpdate)}d ago
+                      </p>
+                    )}
+                    <span className="text-[#131218]/20 group-hover:text-[#131218]/60 transition-colors text-sm">→</span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* What Moved — recent source activity across all projects */}
+        {recentActivity.length > 0 && (
+          <div className="px-8 pt-6">
+            <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
+              <div className="h-1 bg-[#B2FF59]" />
+              <div className="px-6 py-4 border-b border-[#EFEFEA]">
+                <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">What Moved</p>
+                <p className="text-sm font-bold text-[#131218] tracking-tight mt-0.5">Recent source activity</p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-[#EFEFEA]">
+                {recentActivity.slice(0, 6).map(s => (
+                  <div key={s.id} className="flex items-start gap-3 px-6 py-3.5 border-b border-[#EFEFEA] last:border-b-0 sm:[&:nth-last-child(-n+2)]:border-b-0">
+                    <span className="text-base text-[#131218]/20 shrink-0 mt-0.5">{sourceIcon(s.sourceType)}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-[#131218] truncate">{s.title}</p>
+                      <p className="text-[10px] text-[#131218]/30 font-medium truncate mt-0.5">{s.projectName}</p>
+                    </div>
+                    {s.dateIngested && (
+                      <p className="text-[10px] text-[#131218]/25 font-medium shrink-0 mt-0.5">
+                        {new Date(s.dateIngested).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Evidence breakdown */}
         <div className="px-8 pt-6">

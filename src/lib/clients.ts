@@ -118,3 +118,41 @@ export function isAdminUser(userId: string): boolean {
   const adminIds = (process.env.ADMIN_USER_IDS ?? "").split(",").map(s => s.trim());
   return adminIds.includes(userId);
 }
+
+// ── Admin staff ownership registry ────────────────────────────────────────────
+//
+// Maps CH internal staff email → Notion project IDs they lead.
+// This is the minimal ownership model for My Rooms personalization.
+// No Notion schema change required — keeps assignment in code alongside
+// CLIENT_REGISTRY. Update when you reassign projects or onboard new staff.
+//
+// How to populate:
+//   1. Find the Notion page ID for the project in CH Projects [OS v2]
+//      (same IDs used in CLIENT_REGISTRY above)
+//   2. Add the staff email and their project ID array below
+//
+// Example:
+//   "jose@commonhouse.co": ["33d45e5b-6633-81ba-8784-ea132f0a57ca"],
+//
+const ADMIN_STAFF_REGISTRY: Record<string, string[]> = {
+  // José Manuel Moller — Founder, primary CH lead
+  // Sources: COP31 Project Lead field (explicit), ZWF Forum "Jose Named Primary Contact" (evidence),
+  //          Auto Mercado "Refill projects" per People Notes. Verified 2026-04-11.
+  // Intentionally excluded: Reuse for All (no explicit lead assignment in Notion).
+  "josemanuelmoller@gmail.com": [
+    "33d45e5b-6633-8189-8c56-ebb45bb5d68d", // COP31
+    "33d45e5b-6633-81b5-9119-e98c11b7b4c2", // ZWF Forum 2026
+    "33d45e5b-6633-81ba-8784-ea132f0a57ca", // Auto Mercado - Fase 2
+  ],
+  // Same person, CH work email — alias for josemanuelmoller@gmail.com.
+  // Ensures My Rooms works regardless of which identity Jose signs in with.
+  "josemanuel@wearecommonhouse.com": [
+    "33d45e5b-6633-8189-8c56-ebb45bb5d68d", // COP31
+    "33d45e5b-6633-81b5-9119-e98c11b7b4c2", // ZWF Forum 2026
+    "33d45e5b-6633-81ba-8784-ea132f0a57ca", // Auto Mercado - Fase 2
+  ],
+};
+
+export function getStaffProjectIds(email: string): string[] {
+  return ADMIN_STAFF_REGISTRY[email.toLowerCase()] ?? [];
+}

@@ -15,6 +15,8 @@ export const DB = {
   evidence:  "fa28124978d043039d8932ac9964ccf5",
   sources:   "d88aff1b019d4110bcefab7f5bfbd0ae",
   knowledge: "0f4bfe95549d4710a3a9ab6e119a9b04",
+  // CH People [OS v2] — collection: 6f4197dd-3597-4b00-a711-86d6fcf819ad
+  people:    "1bc0f96f33ca4a9e9ff26844377e81de",
 };
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -444,6 +446,8 @@ export type PersonRecord = {
   email: string;
   classification: "Internal" | "External" | "";
   roles: string[];
+  linkedin?: string;   // populated by getAllPeople() — not always set
+  location?: string;   // "City, Country" from People DB — not always set
 };
 
 export type OrgRecord = {
@@ -525,6 +529,105 @@ export async function getProjectPeople(projectId: string): Promise<ProjectPeople
   } catch {
     return { lead: [], team: [], primaryOrg: [], otherOrgs: [] };
   }
+}
+
+// ─── People — direct DB query (bypasses project-relation dependency) ─────────
+//
+// Used by The Residents page to surface all CH-network people regardless of
+// whether they are linked to an active project. This is the correct source for
+// Co-Founders, EIRs, and any people whose primary identity is not project-scoped.
+//
+// Classification map:
+//   Internal + Founder role   → Co-Founders section
+//   Internal + other roles    → Core Team section
+//   External + Startup Founder → Entrepreneurs in Residence section
+
+export async function getAllPeople(): Promise<PersonRecord[]> {
+  try {
+    const res = await notion.databases.query({
+      database_id: DB.people,
+      page_size: 100,
+    });
+    return (res.results as any[]) // eslint-disable-line @typescript-eslint/no-explicit-any
+      .map((page: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+        const country  = select(prop(page, "Country"));
+        const city     = text(prop(page, "City"));
+        const location = [city, country].filter(Boolean).join(", ");
+        return {
+          id:             page.id,
+          name:           text(prop(page, "Full Name")),
+          jobTitle:       text(prop(page, "Job Title / Role")),
+          email:          page.properties?.["Email"]?.email ?? "",
+          classification: (select(prop(page, "Person Classification")) as PersonRecord["classification"]) ?? "",
+          roles:          multiSelect(prop(page, "Relationship Roles")),
+          linkedin:       page.properties?.["LinkedIn"]?.url ?? undefined,
+          location:       location || undefined,
+        };
+      })
+      .filter(p => p.name.trim() !== "");
+  } catch {
+    return [];
+  }
+}
+
+// ─── Residents — cross-project people aggregation ────────────────────────────
+
+export type ResidentRecord = PersonRecord & {
+  projectIds: string[];
+  projectNames: string[];
+  isLead: boolean;
+};
+
+export async function getAllResidents(): Promise<ResidentRecord[]> {
+  const projects = await getAllProjects();
+
+  // Fetch each project page to extract person relation IDs (parallel)
+  const projectPersonMaps = await Promise.all(
+    projects.map(async (project) => {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const page: any = await notion.pages.retrieve({ page_id: project.id });
+        const leadIds = relationIds(prop(page, "Project Lead"));
+        const teamIds = relationIds(prop(page, "Team"));
+        return { projectId: project.id, projectName: project.name, leadIds, teamIds };
+      } catch {
+        return { projectId: project.id, projectName: project.name, leadIds: [], teamIds: [] };
+      }
+    })
+  );
+
+  // Build personId → project affiliation map
+  const personMap = new Map<string, { projectIds: string[]; projectNames: string[]; isLead: boolean }>();
+  for (const { projectId, projectName, leadIds, teamIds } of projectPersonMaps) {
+    const allIds = [...new Set([...leadIds, ...teamIds])];
+    for (const personId of allIds) {
+      if (!personMap.has(personId)) {
+        personMap.set(personId, { projectIds: [], projectNames: [], isLead: false });
+      }
+      const entry = personMap.get(personId)!;
+      if (!entry.projectIds.includes(projectId)) {
+        entry.projectIds.push(projectId);
+        entry.projectNames.push(projectName);
+      }
+      if (leadIds.includes(personId)) entry.isLead = true;
+    }
+  }
+
+  // Resolve all unique people in parallel
+  const uniqueIds = Array.from(personMap.keys());
+  const resolved = await Promise.all(uniqueIds.map(resolvePerson));
+
+  return resolved
+    .filter(Boolean)
+    .map((person) => {
+      const aff = personMap.get(person!.id) ?? { projectIds: [], projectNames: [], isLead: false };
+      return { ...person!, ...aff };
+    })
+    .sort((a, b) => {
+      if (a.classification === "Internal" && b.classification !== "Internal") return -1;
+      if (b.classification === "Internal" && a.classification !== "Internal") return 1;
+      return a.name.localeCompare(b.name);
+    });
 }
 
 // ─── Knowledge queries ────────────────────────────────────────────────────────

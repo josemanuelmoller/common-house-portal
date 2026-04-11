@@ -8,6 +8,9 @@ import { SharedMaterials } from "@/components/hall/SharedMaterials";
 import { Conversations } from "@/components/hall/Conversations";
 import { HallDecisions } from "@/components/hall/HallDecisions";
 import { HallTeam } from "@/components/hall/HallTeam";
+import { WorkspaceActivation } from "@/components/hall/WorkspaceActivation";
+import { GarageActivation } from "@/components/hall/GarageActivation";
+import { DigitalResidents } from "@/components/hall/DigitalResidents";
 import {
   getProjectById,
   getEvidenceForProject,
@@ -104,12 +107,15 @@ export default async function HallPage() {
   if (!project) redirect("/sign-in");
 
   // ── Navigation ───────────────────────────────────────────────────────────
-  // Show Workroom link only when this project's primary workspace is workroom
-  // AND the Workroom is client-ready. Hall always appears as the first item.
+  // Show workspace link only when this project's primary workspace is ready.
+  // Hall always appears as the first item.
   const NAV = [
     { label: "The Hall",     href: "/hall",      icon: "◈" },
     ...(project.primaryWorkspace === "workroom" && WORKSPACE_READY.workroom
       ? [{ label: "The Workroom", href: "/workroom", icon: "◻" }]
+      : []),
+    ...(project.primaryWorkspace === "garage" && WORKSPACE_READY.garage
+      ? [{ label: "The Garage", href: "/garage", icon: "◧" }]
       : []),
     { label: "Overview",    href: "/dashboard", icon: "◫" },
   ];
@@ -117,13 +123,12 @@ export default async function HallPage() {
   // ── Workspace routing ────────────────────────────────────────────────────
   // The Hall is the universal entry layer. It ALWAYS renders for all clients.
   // It is NEVER replaced by a redirect — workspace navigation is additive
-  // (sidebar link) not a forced redirect.
+  // (sidebar link + threshold block) not a forced redirect.
   //
   // WORKSPACE_READY controls whether a workspace link appears in the sidebar.
-  // Workroom is live (WORKSPACE_READY.workroom = true). Garage is not yet built.
-  //
-  // Future: once Garage is built, flip WORKSPACE_READY.garage = true and add
-  // the garage link to the NAV block above. No other routing change needed.
+  // Workroom is live (WORKSPACE_READY.workroom = true).
+  // Garage is built (WORKSPACE_READY.garage = true) — activate by assigning
+  // Primary Workspace = "garage" in CH Projects [OS v2].
 
   // ── Mode ─────────────────────────────────────────────────────────────────
   // Derive from stage. Discovery/Scoping → explore; everything actively underway → live.
@@ -212,6 +217,23 @@ export default async function HallPage() {
     !!(hallProject.theChallenge || hallProject.whatMattersMost ||
        hallProject.whatMayBeInTheWay || hallProject.whatSuccessCouldLookLike);
 
+  // Onboarding: workroom_activation moment — show threshold block when this project
+  // has graduated to Workroom delivery (live mode + workroom workspace + ready flag).
+  const showWorkspaceActivation =
+    isLive &&
+    project.primaryWorkspace === "workroom" &&
+    WORKSPACE_READY.workroom;
+
+  // Onboarding: garage_activation moment — show threshold block when this project
+  // has activated to The Garage (live mode + garage workspace + built flag).
+  const showGarageActivation =
+    isLive &&
+    project.primaryWorkspace === "garage" &&
+    WORKSPACE_READY.garage;
+
+  // Digital Residents — show capability layer when project is live and has real signals.
+  const showDigitalResidents = isLive;
+
   return (
     <div className="flex min-h-screen bg-[#EFEFEA]">
       <Sidebar items={NAV} projectName={project.name} />
@@ -219,34 +241,61 @@ export default async function HallPage() {
       <main className="flex-1 overflow-auto">
         <HallHero project={hallProject} />
 
-        <div className="px-8 py-6 space-y-6">
+        <div className="px-8 py-6">
+          <div className="max-w-4xl mx-auto space-y-6">
 
-          {/* What's Happening Now (2/3) + Team (1/3) */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2">
-              <WhatsHappeningNow project={hallProject} />
-            </div>
-            {team.length > 0 && (
-              <HallTeam team={team} />
+            {/* Onboarding: workroom_activation — threshold block, first in content area.
+                Pass the most recent session as a "something is already moving" signal. */}
+            {showWorkspaceActivation && (
+              <WorkspaceActivation
+                project={hallProject}
+                lastSession={conversations[0] ?? undefined}
+              />
             )}
+
+            {/* Onboarding: garage_activation — startup workspace threshold block. */}
+            {showGarageActivation && (
+              <GarageActivation
+                project={hallProject}
+                lastSession={conversations[0] ?? undefined}
+              />
+            )}
+
+            {/* What's Happening Now (2/3) + Team (1/3) */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2">
+                <WhatsHappeningNow project={hallProject} />
+              </div>
+              {team.length > 0 && (
+                <HallTeam team={team} />
+              )}
+            </div>
+
+            {/* What We Heard — hidden until editorial fields are populated */}
+            {showWhatWeHeard && <WhatWeHeard project={hallProject} />}
+
+            {/* Materials + Decisions — pair side-by-side when both present */}
+            {materials.length > 0 && isLive && decisions.length > 0 ? (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+                <SharedMaterials materials={materials} />
+                <HallDecisions decisions={decisions} />
+              </div>
+            ) : (
+              <>
+                {materials.length > 0 && <SharedMaterials materials={materials} />}
+                {isLive && decisions.length > 0 && <HallDecisions decisions={decisions} />}
+              </>
+            )}
+
+            {/* Conversations */}
+            {conversations.length > 0 && (
+              <Conversations conversations={conversations} />
+            )}
+
+            {/* Digital Residents — capability layer, closes the Hall */}
+            {showDigitalResidents && <DigitalResidents />}
+
           </div>
-
-          {/* What We Heard — hidden until editorial fields are populated */}
-          {showWhatWeHeard && <WhatWeHeard project={hallProject} />}
-
-          {/* Shared Materials */}
-          {materials.length > 0 && <SharedMaterials materials={materials} />}
-
-          {/* Conversations */}
-          {conversations.length > 0 && (
-            <Conversations conversations={conversations} />
-          )}
-
-          {/* Decisions — live only */}
-          {isLive && decisions.length > 0 && (
-            <HallDecisions decisions={decisions} />
-          )}
-
         </div>
       </main>
     </div>

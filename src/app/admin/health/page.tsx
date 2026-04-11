@@ -1,5 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { Sidebar } from "@/components/Sidebar";
 import { MetricCard } from "@/components/MetricCard";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -59,10 +60,12 @@ export default async function HealthPage() {
   const updateNeededProjects = projects.filter(p => p.updateNeeded);
   const staleProjects        = projects.filter(p => daysSince(p.lastUpdate) > 30);
 
+  // Missing excerpts intentionally excluded from overallHealthy — it is a content quality
+  // metric (tracked separately on the health page) not an operational blocker. Including it
+  // would permanently suppress "All clear" on any active system with large evidence volumes.
   const overallHealthy =
     newEvidence.length === 0 &&
     blockers.length === 0 &&
-    evidenceMissingExcerpt.length === 0 &&
     updateNeededProjects.length === 0 &&
     needsReviewSources.length === 0;
 
@@ -93,11 +96,81 @@ export default async function HealthPage() {
 
         <div className="px-8 py-6 space-y-6">
 
-          {/* Live signal banner */}
-          <div className="bg-[#131218] rounded-2xl px-6 py-4 flex items-center gap-3">
-            <span className="w-2 h-2 rounded-full bg-[#B2FF59] shrink-0" />
-            <p className="text-xs font-bold text-white/60 uppercase tracking-widest">Live signals — powered by current Notion data</p>
-          </div>
+          {/* Intervention summary — what needs action right now */}
+          {overallHealthy ? (
+            <div className="bg-[#131218] rounded-2xl px-6 py-5 flex items-center gap-4">
+              <span className="w-2 h-2 rounded-full bg-[#B2FF59] shrink-0" />
+              <div>
+                <p className="text-sm font-bold text-white tracking-tight">All clear — no intervention needed</p>
+                <p className="text-xs text-white/30 font-medium mt-0.5">Evidence is clean, blockers are resolved, sources are linked.</p>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-[#131218] rounded-2xl overflow-hidden">
+              <div className="px-6 py-4 border-b border-white/8 flex items-center justify-between">
+                <p className="text-[10px] font-bold text-white/30 uppercase tracking-widest">Intervention Needed</p>
+                <span className="text-[10px] font-bold bg-red-500 text-white px-2.5 py-1 rounded-full uppercase tracking-widest">
+                  {[
+                    blockers.length > 0 && "blockers",
+                    newEvidence.length > 0 && "pending evidence",
+                    updateNeededProjects.length > 0 && "updates needed",
+                    needsReviewSources.length > 0 && "source exceptions",
+                  ].filter(Boolean).length} signals
+                </span>
+              </div>
+              <div className="divide-y divide-white/5">
+                {blockers.length > 0 && (
+                  <div className="px-6 py-3 flex items-center gap-3">
+                    <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" />
+                    <p className="text-sm text-white/80 font-semibold flex-1">
+                      {blockers.length} active blocker{blockers.length !== 1 ? "s" : ""}
+                    </p>
+                    <p className="text-[10px] text-red-400 font-bold uppercase tracking-widest">Act now</p>
+                  </div>
+                )}
+                {needsReviewSources.length > 0 && (
+                  <div className="px-6 py-3 flex items-center gap-3">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+                    <p className="text-sm text-white/80 font-semibold flex-1">
+                      {needsReviewSources.length} source{needsReviewSources.length !== 1 ? "s" : ""} need review
+                    </p>
+                    <Link href="/admin/os" className="text-[10px] text-amber-400 font-bold uppercase tracking-widest hover:text-amber-300 transition-colors">
+                      Go to Intake →
+                    </Link>
+                  </div>
+                )}
+                {newEvidence.length > 0 && (
+                  <div className="px-6 py-3 flex items-center gap-3">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+                    <p className="text-sm text-white/80 font-semibold flex-1">
+                      {newEvidence.length} evidence item{newEvidence.length !== 1 ? "s" : ""} pending validation
+                    </p>
+                    <Link href="/admin/os" className="text-[10px] text-amber-400 font-bold uppercase tracking-widest hover:text-amber-300 transition-colors">
+                      Go to Intake →
+                    </Link>
+                  </div>
+                )}
+                {updateNeededProjects.length > 0 && (
+                  <div className="px-6 py-3 flex items-center gap-3">
+                    <span className="w-1.5 h-1.5 rounded-full bg-white/20 shrink-0" />
+                    <p className="text-sm text-white/80 font-semibold flex-1">
+                      {updateNeededProjects.length} project{updateNeededProjects.length !== 1 ? "s" : ""} need a status update
+                    </p>
+                    <p className="text-[10px] text-white/25 font-bold uppercase tracking-widest">This week</p>
+                  </div>
+                )}
+                {staleProjects.filter(p => !p.updateNeeded).length > 0 && (
+                  <div className="px-6 py-3 flex items-center gap-3">
+                    <span className="w-1.5 h-1.5 rounded-full bg-white/10 shrink-0" />
+                    <p className="text-sm text-white/50 font-semibold flex-1">
+                      {staleProjects.filter(p => !p.updateNeeded).length} project{staleProjects.filter(p => !p.updateNeeded).length !== 1 ? "s" : ""} stale (30d+)
+                    </p>
+                    <p className="text-[10px] text-white/20 font-bold uppercase tracking-widest">Watch</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Core health metrics */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -210,7 +283,11 @@ export default async function HealthPage() {
               </div>
               <div className="divide-y divide-[#EFEFEA]">
                 {backlogByProject.map(p => (
-                  <div key={p.id} className="px-6 py-3 flex items-center gap-4">
+                  <Link
+                    key={p.id}
+                    href={`/admin/projects/${p.id}`}
+                    className="flex items-center gap-4 px-6 py-3 hover:bg-[#EFEFEA]/50 transition-colors group"
+                  >
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-[#131218] text-sm truncate">{p.name}</p>
                       <div className="flex items-center gap-2 mt-0.5">
@@ -220,7 +297,8 @@ export default async function HealthPage() {
                     <span className="text-[10px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full uppercase tracking-widest shrink-0">
                       {p.pending} pending
                     </span>
-                  </div>
+                    <span className="text-[#131218]/20 group-hover:text-[#131218]/60 transition-colors text-sm shrink-0">→</span>
+                  </Link>
                 ))}
               </div>
             </div>
@@ -245,9 +323,14 @@ export default async function HealthPage() {
                     <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0 mt-1.5" />
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-[#131218] text-sm">{e.title}</p>
-                      <p className="text-xs text-[#131218]/40 font-medium mt-0.5">
-                        {e.projectId ? (projectNames[e.projectId] ?? "—") : "—"}
-                      </p>
+                      {e.projectId && (
+                        <Link
+                          href={`/admin/projects/${e.projectId}`}
+                          className="text-xs text-[#131218]/40 hover:text-[#131218]/70 font-medium mt-0.5 inline-block transition-colors"
+                        >
+                          {projectNames[e.projectId] ?? "—"} →
+                        </Link>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -279,19 +362,22 @@ export default async function HealthPage() {
               </div>
               <div className="divide-y divide-[#EFEFEA]">
                 {updateNeededProjects.map(p => (
-                  <div key={`upd-${p.id}`} className="px-6 py-3 flex items-center gap-3">
+                  <Link key={`upd-${p.id}`} href={`/admin/projects/${p.id}`}
+                    className="flex items-center gap-3 px-6 py-3 hover:bg-[#EFEFEA]/50 transition-colors group">
                     <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-[#131218] text-sm truncate">{p.name}</p>
                       <p className="text-[10px] text-amber-500 font-bold uppercase tracking-widest mt-0.5">
-                        Update needed · last update {daysSince(p.lastUpdate) < 999 ? `${daysSince(p.lastUpdate)}d ago` : "unknown"}
+                        Update needed · {daysSince(p.lastUpdate) < 999 ? `${daysSince(p.lastUpdate)}d ago` : "unknown"}
                       </p>
                     </div>
                     <StatusBadge value={p.stage} />
-                  </div>
+                    <span className="text-[#131218]/20 group-hover:text-[#131218]/60 transition-colors text-sm shrink-0">→</span>
+                  </Link>
                 ))}
                 {staleProjects.filter(p => !p.updateNeeded).map(p => (
-                  <div key={`stale-${p.id}`} className="px-6 py-3 flex items-center gap-3">
+                  <Link key={`stale-${p.id}`} href={`/admin/projects/${p.id}`}
+                    className="flex items-center gap-3 px-6 py-3 hover:bg-[#EFEFEA]/50 transition-colors group">
                     <span className="w-2 h-2 rounded-full bg-red-400 shrink-0" />
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-[#131218] text-sm truncate">{p.name}</p>
@@ -300,7 +386,8 @@ export default async function HealthPage() {
                       </p>
                     </div>
                     <StatusBadge value={p.stage} />
-                  </div>
+                    <span className="text-[#131218]/20 group-hover:text-[#131218]/60 transition-colors text-sm shrink-0">→</span>
+                  </Link>
                 ))}
               </div>
             </div>

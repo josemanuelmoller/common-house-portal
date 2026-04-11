@@ -78,7 +78,7 @@ export default async function DashboardPage() {
 
         {/* Header */}
         <div className="bg-white border-b border-[#E0E0D8] px-8 py-6">
-          <div className="flex items-start justify-between">
+          <div className="max-w-4xl mx-auto flex items-start justify-between">
             <div>
               <p className="text-[10px] font-bold text-[#B2FF59] bg-[#131218] px-2.5 py-1 rounded-full uppercase tracking-widest inline-block mb-3">
                 Project Dashboard
@@ -99,7 +99,8 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        <div className="px-8 py-6 space-y-6">
+        <div className="px-8 py-6">
+          <div className="max-w-4xl mx-auto space-y-6">
 
           {/* Active blockers — top priority */}
           {blockers.length > 0 && (
@@ -259,6 +260,7 @@ export default async function DashboardPage() {
             </CollapsibleSection>
           )}
 
+          </div>
         </div>
       </main>
     </div>
