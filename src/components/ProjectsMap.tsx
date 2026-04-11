@@ -34,6 +34,9 @@ const GEO_COORDS: Record<string, [number, number]> = {
   "USA":           [-95, 37],
   "United States": [-95, 37],
   "Canada":        [-96, 56],
+  // Europe / Middle East
+  "Turkey":        [35.2, 38.9],
+  "Türkiye":       [35.2, 38.9],
   // Rest of world
   "Australia":     [134, -25],
   "Japan":         [138.3, 36.2],
