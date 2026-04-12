@@ -12,7 +12,7 @@ import {
   type LivingRoomTheme,
   type InsightBrief,
 } from "@/lib/notion";
-import { isAdminUser } from "@/lib/clients";
+import { checkIsAdmin } from "@/lib/require-admin";
 
 /**
  * /living-room — Community showcase layer.
@@ -305,7 +305,7 @@ export default async function LivingRoomPage() {
   const { userId } = await auth();
   if (!userId) redirect("/sign-in");
 
-  const isAdmin = isAdminUser(userId);
+  const isAdmin = await checkIsAdmin();
 
   const [people, milestones, themes, signals, allProjects] = await Promise.all([
     getLivingRoomPeople(),

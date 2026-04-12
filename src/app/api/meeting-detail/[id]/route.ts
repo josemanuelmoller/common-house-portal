@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth, currentUser } from "@clerk/nextjs/server";
+import { currentUser } from "@clerk/nextjs/server";
 import { notion } from "@/lib/notion";
-import { getProjectIdForUser, isAdminUser } from "@/lib/clients";
+import { getProjectIdForUser, isAdminUser, isAdminEmail } from "@/lib/clients";
 
 /**
  * GET /api/meeting-detail/[id]
@@ -11,8 +11,9 @@ export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { userId } = await auth();
-  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const user = await currentUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const email = user.primaryEmailAddress?.emailAddress ?? "";
 
   const { id } = await params;
 
@@ -24,9 +25,7 @@ export async function GET(
     // Project ownership check — non-admin users may only read meetings linked to their project.
     // Without this check, any authenticated client could request any meeting by Notion page ID,
     // leaking content from other projects.
-    if (!isAdminUser(userId)) {
-      const user = await currentUser();
-      const email = user?.emailAddresses?.[0]?.emailAddress ?? "";
+    if (!isAdminUser(user.id) && !isAdminEmail(email)) {
       const userProjectId = getProjectIdForUser(email);
 
       if (!userProjectId) {

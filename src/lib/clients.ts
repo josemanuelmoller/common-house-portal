@@ -115,8 +115,13 @@ export function getClientConfig(email: string): ClientConfig | null {
 }
 
 export function isAdminUser(userId: string): boolean {
-  const adminIds = (process.env.ADMIN_USER_IDS ?? "").split(",").map(s => s.trim());
+  const adminIds = (process.env.ADMIN_USER_IDS ?? "").split(",").map(s => s.trim()).filter(Boolean);
   return adminIds.includes(userId);
+}
+
+export function isAdminEmail(email: string): boolean {
+  const adminEmails = (process.env.ADMIN_EMAILS ?? "").split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
+  return adminEmails.includes(email.toLowerCase());
 }
 
 // ── Admin staff ownership registry ────────────────────────────────────────────

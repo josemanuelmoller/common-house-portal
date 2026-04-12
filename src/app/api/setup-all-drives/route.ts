@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
-import { isAdminUser } from "@/lib/clients";
 import { createProjectFolders } from "@/lib/drive";
+import { adminGuardApi } from "@/lib/require-admin";
 import { notion, DB } from "@/lib/notion";
 
 /**
@@ -11,10 +10,8 @@ import { notion, DB } from "@/lib/notion";
  * paste the values into clients.ts.
  */
 export async function POST() {
-  const { userId } = await auth();
-  if (!userId || !isAdminUser(userId)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const guard = await adminGuardApi();
+  if (guard) return guard;
 
   // Get all projects from Notion
   const res = await notion.databases.query({

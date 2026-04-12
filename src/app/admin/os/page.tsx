@@ -1,17 +1,14 @@
-import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/Sidebar";
 import { StatusBadge } from "@/components/StatusBadge";
 import { MetricCard } from "@/components/MetricCard";
 import { EvidenceQueueRow } from "@/components/EvidenceQueueRow";
 import { getAllEvidence, getAllSources, getAllProjects } from "@/lib/notion";
-import { isAdminUser } from "@/lib/clients";
 import { NAV } from "../page";
+import { requireAdmin } from "@/lib/require-admin";
 
 export default async function OSPage() {
-  const { userId } = await auth();
-  if (!userId) redirect("/sign-in");
-  if (!isAdminUser(userId)) redirect("/hall");
+  await requireAdmin();
 
   const [allEvidence, sources, projects] = await Promise.all([
     getAllEvidence(),

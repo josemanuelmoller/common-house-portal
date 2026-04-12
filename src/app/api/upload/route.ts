@@ -1,29 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { currentUser } from "@clerk/nextjs/server";
 import { uploadFileToDrive, FolderName } from "@/lib/drive";
 import { notion, DB } from "@/lib/notion";
-import { getProjectIdForUser, getClientConfig, isAdminUser } from "@/lib/clients";
-import { currentUser } from "@clerk/nextjs/server";
+import { getProjectIdForUser, getClientConfig, isAdminUser, isAdminEmail } from "@/lib/clients";
 
 const MAX_SIZE_MB = 20;
 const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
 
 export async function POST(req: NextRequest) {
   try {
-    const { userId } = await auth();
-    if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const user = await currentUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const email = user.primaryEmailAddress?.emailAddress ?? "";
 
     // Get project context
     let projectId: string | null = null;
     let rootFolderId: string | null = null;
 
-    if (isAdminUser(userId)) {
+    if (isAdminUser(user.id) || isAdminEmail(email)) {
       // Admin can upload to any project — pass projectId in form
       projectId    = req.nextUrl.searchParams.get("projectId");
       rootFolderId = req.nextUrl.searchParams.get("folderId");
     } else {
-      const user  = await currentUser();
-      const email = user?.emailAddresses?.[0]?.emailAddress ?? "";
       projectId    = getProjectIdForUser(email);
       rootFolderId = getClientConfig(email)?.driveFolderId ?? null;
     }

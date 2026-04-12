@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
 import { createProjectFolders } from "@/lib/drive";
-import { isAdminUser } from "@/lib/clients";
+import { adminGuardApi } from "@/lib/require-admin";
 
 /**
  * POST /api/create-project-folders
@@ -9,10 +8,8 @@ import { isAdminUser } from "@/lib/clients";
  * Returns the rootFolderId — add this to clients.ts as driveFolderId.
  */
 export async function POST(req: NextRequest) {
-  const { userId } = await auth();
-  if (!userId || !isAdminUser(userId)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const guard = await adminGuardApi();
+  if (guard) return guard;
 
   const { projectName } = await req.json();
   if (!projectName) {

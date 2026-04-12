@@ -1,11 +1,10 @@
-import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Sidebar } from "@/components/Sidebar";
 import { StatusBadge } from "@/components/StatusBadge";
 import { getProjectById, getEvidenceForProject, getSourcesForProject, getDashboardStats, getProjectPeople, getDocumentsForProject, getSourceActivity } from "@/lib/notion";
-import { isAdminUser } from "@/lib/clients";
 import { NAV } from "../../page";
+import { requireAdmin } from "@/lib/require-admin";
 import { DraftUpdateCard } from "@/components/DraftUpdateCard";
 import { ProjectPeople } from "@/components/ProjectPeople";
 import { DocumentsSection } from "@/components/DocumentsSection";
@@ -14,9 +13,7 @@ import { MeetingsSection } from "@/components/MeetingsSection";
 import { CollapsibleSection } from "@/components/CollapsibleSection";
 
 export default async function ProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { userId } = await auth();
-  if (!userId) redirect("/sign-in");
-  if (!isAdminUser(userId)) redirect("/hall");
+  await requireAdmin();
 
   const { id } = await params;
 

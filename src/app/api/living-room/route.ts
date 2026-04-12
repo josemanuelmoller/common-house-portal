@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
-import { isAdminUser } from "@/lib/clients";
+import { adminGuardApi } from "@/lib/require-admin";
 import {
   updatePersonVisibility,
   updateProjectLivingRoom,
@@ -22,9 +21,8 @@ import {
  *   { type: "theme-active",       id: string, active: boolean }
  */
 export async function PATCH(req: NextRequest) {
-  const { userId } = await auth();
-  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!isAdminUser(userId)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const guard = await adminGuardApi();
+  if (guard) return guard;
 
   let body: Record<string, unknown>;
   try {

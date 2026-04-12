@@ -1,4 +1,4 @@
-import { auth, currentUser } from "@clerk/nextjs/server";
+import { currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/Sidebar";
 import { HallHero } from "@/components/hall/HallHero";
@@ -18,7 +18,7 @@ import {
   getDocumentsForProject,
   getSourceActivity,
 } from "@/lib/notion";
-import { getProjectIdForUser, isAdminUser } from "@/lib/clients";
+import { getProjectIdForUser, isAdminUser, isAdminEmail } from "@/lib/clients";
 import type {
   HallMode,
   HallProject,
@@ -65,12 +65,10 @@ function cleanConversationTitle(raw: string): string {
 }
 
 export default async function HallPage() {
-  const { userId } = await auth();
-  if (!userId) redirect("/sign-in");
-  if (isAdminUser(userId)) redirect("/admin");
-
   const user = await currentUser();
-  const email = user?.emailAddresses?.[0]?.emailAddress ?? "";
+  if (!user) redirect("/sign-in");
+  const email = user.primaryEmailAddress?.emailAddress ?? "";
+  if (isAdminUser(user.id) || isAdminEmail(email)) redirect("/admin");
   const projectId = getProjectIdForUser(email);
 
   if (!projectId) {

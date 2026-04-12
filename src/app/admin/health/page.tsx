@@ -1,12 +1,11 @@
-import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Sidebar } from "@/components/Sidebar";
 import { MetricCard } from "@/components/MetricCard";
 import { StatusBadge } from "@/components/StatusBadge";
 import { getAllEvidence, getAllSources, getAllProjects } from "@/lib/notion";
-import { isAdminUser } from "@/lib/clients";
 import { NAV } from "../page";
+import { requireAdmin } from "@/lib/require-admin";
 
 function daysSince(dateStr: string | null): number {
   if (!dateStr) return 999;
@@ -14,9 +13,7 @@ function daysSince(dateStr: string | null): number {
 }
 
 export default async function HealthPage() {
-  const { userId } = await auth();
-  if (!userId) redirect("/sign-in");
-  if (!isAdminUser(userId)) redirect("/hall");
+  await requireAdmin();
 
   const [allEvidence, sources, projects] = await Promise.all([
     getAllEvidence(),

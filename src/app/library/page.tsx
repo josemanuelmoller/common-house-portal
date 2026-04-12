@@ -1,9 +1,8 @@
-import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/Sidebar";
 import { getKnowledgeAssets, getReusableEvidence } from "@/lib/notion";
-import { isAdminUser } from "@/lib/clients";
 import { ADMIN_NAV as NAV } from "@/lib/admin-nav";
+import { requireAdmin } from "@/lib/require-admin";
 import type { LibraryContentFamily } from "@/types/house";
 
 // Map Notion assetType → Library content family
@@ -43,9 +42,7 @@ const FAMILY_META: Record<
 };
 
 export default async function LibraryPage() {
-  const { userId } = await auth();
-  if (!userId) redirect("/sign-in");
-  if (!isAdminUser(userId)) redirect("/hall");
+  await requireAdmin();
 
   const [assets, reusable] = await Promise.all([
     getKnowledgeAssets(),

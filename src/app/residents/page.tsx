@@ -1,9 +1,8 @@
-import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/Sidebar";
 import { getAllPeople, type PersonRecord } from "@/lib/notion";
-import { isAdminUser } from "@/lib/clients";
 import { ADMIN_NAV as NAV } from "@/lib/admin-nav";
+import { requireAdmin } from "@/lib/require-admin";
 import { DIGITAL_RESIDENTS, type DigitalResidentProfile } from "@/types/house";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -174,9 +173,7 @@ function LayerDivider({ label }: { label: string }) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default async function ResidentsPage() {
-  const { userId } = await auth();
-  if (!userId) redirect("/sign-in");
-  if (!isAdminUser(userId)) redirect("/hall");
+  await requireAdmin();
 
   const people = await getAllPeople();
 

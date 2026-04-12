@@ -1,9 +1,8 @@
 "use server";
 
-import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { notion } from "@/lib/notion";
-import { isAdminUser } from "@/lib/clients";
+import { requireAdminAction } from "@/lib/require-admin";
 
 // WRITE PATH DECISION (2026-04-11):
 // The OS engine's validation-operator is the sole writer of Validation Status = "Validated".
@@ -12,8 +11,7 @@ import { isAdminUser } from "@/lib/clients";
 // "Reviewed" is a terminal state in the portal — the engine skips records not at "New".
 // If a record needs to reach "Validated", run the OS engine on it explicitly.
 export async function markEvidenceReviewed(evidenceId: string) {
-  const { userId } = await auth();
-  if (!userId || !isAdminUser(userId)) throw new Error("Unauthorized");
+  await requireAdminAction();
 
   await notion.pages.update({
     page_id: evidenceId,
@@ -31,8 +29,7 @@ export async function markEvidenceReviewed(evidenceId: string) {
 // "Rejected" is safe to write from portal — both portal and engine use the same value
 // and rejection is a deliberate human decision that should not be deferred to the engine.
 export async function rejectEvidence(evidenceId: string) {
-  const { userId } = await auth();
-  if (!userId || !isAdminUser(userId)) throw new Error("Unauthorized");
+  await requireAdminAction();
 
   await notion.pages.update({
     page_id: evidenceId,

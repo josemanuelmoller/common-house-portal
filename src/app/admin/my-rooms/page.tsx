@@ -13,15 +13,15 @@
  * When registry is empty for this user, a setup prompt is shown instead.
  */
 
-import { auth, currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Sidebar } from "@/components/Sidebar";
 import { StatusBadge } from "@/components/StatusBadge";
 import { ProjectAvatar } from "@/components/ProjectAvatar";
 import { getProjectsOverview, getAllSources } from "@/lib/notion";
-import { isAdminUser, getStaffProjectIds } from "@/lib/clients";
+import { getStaffProjectIds } from "@/lib/clients";
 import { NAV } from "../page";
+import { requireAdmin } from "@/lib/require-admin";
 
 function daysSince(dateStr: string | null): number {
   if (!dateStr) return 999;
@@ -35,12 +35,8 @@ function sourceIcon(type: string): string {
 }
 
 export default async function MyRoomsPage() {
-  const { userId } = await auth();
-  if (!userId) redirect("/sign-in");
-  if (!isAdminUser(userId)) redirect("/hall");
-
-  const user = await currentUser();
-  const email = user?.emailAddresses?.[0]?.emailAddress ?? "";
+  const user = await requireAdmin();
+  const email = user?.primaryEmailAddress?.emailAddress ?? "";
 
   const [projects, allSources] = await Promise.all([
     getProjectsOverview(),

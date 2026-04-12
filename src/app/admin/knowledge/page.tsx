@@ -1,16 +1,13 @@
-import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/Sidebar";
 import { StatusBadge } from "@/components/StatusBadge";
 import { MetricCard } from "@/components/MetricCard";
 import { getKnowledgeAssets, getReusableEvidence, getAllProjects, getAllEvidence } from "@/lib/notion";
-import { isAdminUser } from "@/lib/clients";
 import { NAV } from "../page";
+import { requireAdmin } from "@/lib/require-admin";
 
 export default async function KnowledgePage() {
-  const { userId } = await auth();
-  if (!userId) redirect("/sign-in");
-  if (!isAdminUser(userId)) redirect("/hall");
+  await requireAdmin();
 
   const [assets, reusable, projects, allEvidence] = await Promise.all([
     getKnowledgeAssets(),

@@ -14,7 +14,6 @@
  * See src/types/house.ts for the full House architecture documentation.
  */
 
-import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Sidebar } from "@/components/Sidebar";
@@ -22,8 +21,8 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { ProjectAvatar } from "@/components/ProjectAvatar";
 import { ProjectsMap } from "@/components/ProjectsMap";
 import { getProjectsOverview, getAllSources } from "@/lib/notion";
-import { isAdminUser } from "@/lib/clients";
 import { ADMIN_NAV as NAV } from "@/lib/admin-nav";
+import { requireAdmin } from "@/lib/require-admin";
 
 function CHIsotipo({ size = 28, className }: { size?: number; className?: string }) {
   return (
@@ -70,9 +69,7 @@ const STAGE_COLORS: Record<string, string> = {
 export { ADMIN_NAV as NAV } from "@/lib/admin-nav";
 
 export default async function AdminPage() {
-  const { userId } = await auth();
-  if (!userId) redirect("/sign-in");
-  if (!isAdminUser(userId)) redirect("/hall");
+  await requireAdmin();
 
   const [projects, allSources] = await Promise.all([
     getProjectsOverview(),

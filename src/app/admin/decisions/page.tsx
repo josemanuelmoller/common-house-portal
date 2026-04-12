@@ -1,9 +1,8 @@
-import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/Sidebar";
 import { getDecisionItems, type DecisionItem } from "@/lib/notion";
-import { isAdminUser } from "@/lib/clients";
 import { ADMIN_NAV as NAV } from "@/lib/admin-nav";
+import { requireAdmin } from "@/lib/require-admin";
 
 /**
  * /admin/decisions — Decision Center view.
@@ -116,9 +115,7 @@ function DecisionRow({ item }: { item: DecisionItem }) {
 }
 
 export default async function DecisionsPage() {
-  const { userId } = await auth();
-  if (!userId) redirect("/sign-in");
-  if (!isAdminUser(userId)) redirect("/hall");
+  await requireAdmin();
 
   const allItems = await getDecisionItems();
 
