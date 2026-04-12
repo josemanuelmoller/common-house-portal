@@ -810,9 +810,14 @@ export async function getDecisionItems(statusFilter?: string): Promise<DecisionI
     });
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return res.results.map((page: any) => ({
+    return res.results.map((page: any) => {
+      // Notion title property can be named anything — find it by type
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const titleProp = Object.values(page.properties as Record<string, any>).find((p: any) => p.type === "title");
+      const pageTitle = titleProp?.title?.[0]?.plain_text ?? text(prop(page, "Decision Title")) ?? text(prop(page, "Name")) ?? "Untitled";
+      return ({
       id: page.id,
-      title: text(prop(page, "Decision Title")) || text(prop(page, "Name")) || "Untitled",
+      title: pageTitle,
       decisionType: select(prop(page, "Decision Type")),
       priority: select(prop(page, "Priority")),
       status: select(prop(page, "Status")),
@@ -822,7 +827,7 @@ export async function getDecisionItems(statusFilter?: string): Promise<DecisionI
       dueDate: date(prop(page, "Due Date")),
       notes: text(prop(page, "Notes")),
       notionUrl: page.url ?? "",
-    }));
+    }); }); 
   } catch {
     return [];
   }
