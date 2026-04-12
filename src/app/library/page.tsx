@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/Sidebar";
 import { getKnowledgeAssets, getReusableEvidence } from "@/lib/notion";
 import { isAdminUser } from "@/lib/clients";
-import { NAV } from "@/app/admin/page";
+import { ADMIN_NAV as NAV } from "@/lib/admin-nav";
 import type { LibraryContentFamily } from "@/types/house";
 
 // Map Notion assetType → Library content family

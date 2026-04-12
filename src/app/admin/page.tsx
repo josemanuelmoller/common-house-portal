@@ -23,6 +23,7 @@ import { ProjectAvatar } from "@/components/ProjectAvatar";
 import { ProjectsMap } from "@/components/ProjectsMap";
 import { getProjectsOverview, getAllSources } from "@/lib/notion";
 import { isAdminUser } from "@/lib/clients";
+import { ADMIN_NAV as NAV } from "@/lib/admin-nav";
 
 function CHIsotipo({ size = 28, className }: { size?: number; className?: string }) {
   return (
@@ -65,15 +66,8 @@ const STAGE_COLORS: Record<string, string> = {
   "Paused":     "bg-gray-100 text-gray-400 border border-gray-200",
 };
 
-export const NAV = [
-  { label: "House View",           href: "/admin",            icon: "◈" },
-  { label: "My Rooms",             href: "/admin/my-rooms",   icon: "◫" },
-  { label: "Intake / Exceptions",  href: "/admin/os",         icon: "⬡" },
-  { label: "Knowledge Assets",     href: "/admin/knowledge",  icon: "◉" },
-  { label: "System Health",        href: "/admin/health",     icon: "◎" },
-  { label: "The Library",          href: "/library",          icon: "▤", section: "House Layers" },
-  { label: "The Residents",        href: "/residents",        icon: "◍", section: "House Layers" },
-];
+// Re-export from shared module so server components can import from here
+export { ADMIN_NAV as NAV } from "@/lib/admin-nav";
 
 export default async function AdminPage() {
   const { userId } = await auth();

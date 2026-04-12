@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/Sidebar";
 import { getAllPeople, type PersonRecord } from "@/lib/notion";
 import { isAdminUser } from "@/lib/clients";
-import { NAV } from "@/app/admin/page";
+import { ADMIN_NAV as NAV } from "@/lib/admin-nav";
 import { DIGITAL_RESIDENTS, type DigitalResidentProfile } from "@/types/house";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────

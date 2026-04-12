@@ -11,12 +11,18 @@ export const notion = new Client({ auth: process.env.NOTION_API_KEY });
 //   d88aff1b...   ↔  collection://6f804e20-834c-4de2-a746-f6343fc75451  (CH Sources [OS v2])
 //   0f4bfe95...   ↔  collection://e7d711a5-f441-4cc8-96c1-bd33151c09b8  (CH Knowledge Assets [OS v2])
 export const DB = {
-  projects:  "49d59b18095f46588960f2e717832c5f",
-  evidence:  "fa28124978d043039d8932ac9964ccf5",
-  sources:   "d88aff1b019d4110bcefab7f5bfbd0ae",
-  knowledge: "0f4bfe95549d4710a3a9ab6e119a9b04",
+  projects:        "49d59b18095f46588960f2e717832c5f",
+  evidence:        "fa28124978d043039d8932ac9964ccf5",
+  sources:         "d88aff1b019d4110bcefab7f5bfbd0ae",
+  knowledge:       "0f4bfe95549d4710a3a9ab6e119a9b04",
   // CH People [OS v2] — collection: 6f4197dd-3597-4b00-a711-86d6fcf819ad
-  people:    "1bc0f96f33ca4a9e9ff26844377e81de",
+  people:          "1bc0f96f33ca4a9e9ff26844377e81de",
+  // Decision Items [OS v2] — collection: 1cdf6499-0468-4e2c-abcc-21e2bd8a803f
+  decisions:       "6b801204c4de49c7b6179e04761a285a",
+  // Insight Briefs [OS v2] — collection: 839cafc7-d52d-442f-a784-197a5ea34810
+  insightBriefs:   "04bed3a3fd1a4b3a99643cd21562e08a",
+  // Content Pipeline [OS v2] — collection: 29db8c9b-6738-41ab-bf0a-3a5f06c568a0
+  contentPipeline: "3bf5cf81f45c4db2840590f3878bfdc0",
 };
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -772,3 +778,255 @@ export async function getDashboardStats(projectId?: string): Promise<DashboardSt
     ).length,
   };
 }
+
+// ─── Decision Items ───────────────────────────────────────────────────────────
+
+export type DecisionItem = {
+  id: string;
+  title: string;
+  decisionType: string;   // "Approval" | "Missing Input" | "Ambiguity Resolution" | "Policy/Automation Decision" | "Draft Review"
+  priority: string;       // "P1 Critical" | "High" | "Medium" | "Low"
+  status: string;         // "Open" | "Resolved" | "Dismissed"
+  sourceAgent: string;
+  requiresExecute: boolean;
+  executeApproved: boolean;
+  dueDate: string | null;
+  notes: string;
+  notionUrl: string;
+};
+
+export async function getDecisionItems(statusFilter?: string): Promise<DecisionItem[]> {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const filter: any = statusFilter
+      ? { property: "Status", select: { equals: statusFilter } }
+      : undefined;
+
+    const res = await notion.databases.query({
+      database_id: DB.decisions,
+      filter,
+      sorts: [{ property: "Priority", direction: "ascending" }],
+      page_size: 100,
+    });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return res.results.map((page: any) => ({
+      id: page.id,
+      title: text(prop(page, "Decision Title")) || text(prop(page, "Name")) || "Untitled",
+      decisionType: select(prop(page, "Decision Type")),
+      priority: select(prop(page, "Priority")),
+      status: select(prop(page, "Status")),
+      sourceAgent: select(prop(page, "Source Agent")),
+      requiresExecute: checkbox(prop(page, "Requires Execute")),
+      executeApproved: checkbox(prop(page, "Execute Approved")),
+      dueDate: date(prop(page, "Due Date")),
+      notes: text(prop(page, "Notes")),
+      notionUrl: page.url ?? "",
+    }));
+  } catch {
+    return [];
+  }
+}
+
+// ─── Insight Briefs ───────────────────────────────────────────────────────────
+
+export type InsightBrief = {
+  id: string;
+  title: string;
+  theme: string[];
+  relevance: string[];
+  status: string;
+  communityRelevant: boolean;
+  visibility: string;
+  lastEdited: string | null;
+};
+
+export async function getInsightBriefs(communityOnly = false): Promise<InsightBrief[]> {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const filter: any = communityOnly
+      ? { property: "Community Relevant", checkbox: { equals: true } }
+      : undefined;
+
+    const res = await notion.databases.query({
+      database_id: DB.insightBriefs,
+      filter,
+      sorts: [{ timestamp: "last_edited_time", direction: "descending" }],
+      page_size: 50,
+    });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return res.results.map((page: any) => ({
+      id: page.id,
+      title: text(prop(page, "Brief Title")) || text(prop(page, "Name")) || "Untitled",
+      theme: multiSelect(prop(page, "Theme")),
+      relevance: multiSelect(prop(page, "Relevance")),
+      status: select(prop(page, "Status")),
+      communityRelevant: checkbox(prop(page, "Community Relevant")),
+      visibility: select(prop(page, "Visibility")),
+      lastEdited: page.last_edited_time ?? null,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+// ─── Living Room — community-safe queries ─────────────────────────────────────
+
+export type LivingRoomPerson = {
+  id: string;
+  name: string;
+  jobTitle: string;
+  location?: string;
+  roles: string[];
+  visibility: string;
+  linkedin?: string;
+};
+
+export type LivingRoomMilestone = {
+  id: string;
+  name: string;
+  stage: string;
+  milestoneType: string;
+  communityTheme: string;
+  geography: string[];
+  lastUpdate: string | null;
+};
+
+export type LivingRoomTheme = {
+  id: string;
+  name: string;
+  category: string;
+  assetType: string;
+};
+
+export async function getLivingRoomPeople(): Promise<LivingRoomPerson[]> {
+  try {
+    const res = await notion.databases.query({
+      database_id: DB.people,
+      filter: {
+        or: [
+          { property: "Visibility", select: { equals: "public-safe" } },
+          { property: "Visibility", select: { equals: "community" } },
+        ],
+      },
+      page_size: 50,
+    });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (res.results as any[])
+      .map((page: any) => {
+        const country  = select(prop(page, "Country"));
+        const city     = text(prop(page, "City"));
+        const location = [city, country].filter(Boolean).join(", ");
+        return {
+          id:         page.id,
+          name:       text(prop(page, "Full Name")),
+          jobTitle:   text(prop(page, "Job Title / Role")),
+          location:   location || undefined,
+          roles:      multiSelect(prop(page, "Relationship Roles")),
+          visibility: select(prop(page, "Visibility")),
+          linkedin:   page.properties?.["LinkedIn"]?.url ?? undefined,
+        };
+      })
+      .filter(p => p.name.trim() !== "");
+  } catch {
+    return [];
+  }
+}
+
+export async function getLivingRoomMilestones(): Promise<LivingRoomMilestone[]> {
+  try {
+    const res = await notion.databases.query({
+      database_id: DB.projects,
+      filter: {
+        and: [
+          { property: "Project Status", select: { equals: "Active" } },
+          { property: "Share to Living Room", checkbox: { equals: true } },
+        ],
+      },
+      sorts: [{ property: "Last Status Update", direction: "descending" }],
+      page_size: 30,
+    });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (res.results as any[]).map((page: any) => ({
+      id:             page.id,
+      name:           text(prop(page, "Project Name")),
+      stage:          select(prop(page, "Current Stage")),
+      milestoneType:  select(prop(page, "Milestone Type")),
+      communityTheme: text(prop(page, "Community Theme")),
+      geography:      multiSelect(prop(page, "Geography")),
+      lastUpdate:     date(prop(page, "Last Status Update")),
+    }));
+  } catch {
+    return [];
+  }
+}
+
+export async function getLivingRoomThemes(): Promise<LivingRoomTheme[]> {
+  try {
+    const res = await notion.databases.query({
+      database_id: DB.knowledge,
+      filter: { property: "Living Room Theme", checkbox: { equals: true } },
+      sorts: [{ timestamp: "last_edited_time", direction: "descending" }],
+      page_size: 20,
+    });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (res.results as any[]).map((page: any) => ({
+      id:        page.id,
+      name:      text(prop(page, "Asset Name")) || "Untitled",
+      category:  multiSelect(prop(page, "Domain / Theme")).join(", "),
+      assetType: select(prop(page, "Asset Type")),
+    }));
+  } catch {
+    return [];
+  }
+}
+
+// ─── Living Room admin writes ─────────────────────────────────────────────────
+
+export async function updatePersonVisibility(
+  personId: string,
+  visibility: "public-safe" | "community" | "private"
+): Promise<void> {
+  await notion.pages.update({
+    page_id: personId,
+    properties: { Visibility: { select: { name: visibility } } },
+  });
+}
+
+export async function updateProjectLivingRoom(
+  projectId: string,
+  share: boolean
+): Promise<void> {
+  await notion.pages.update({
+    page_id: projectId,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    properties: { "Share to Living Room": { checkbox: share } } as any,
+  });
+}
+
+export async function updateInsightBriefCommunityFlag(
+  briefId: string,
+  communityRelevant: boolean
+): Promise<void> {
+  await notion.pages.update({
+    page_id: briefId,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    properties: { "Community Relevant": { checkbox: communityRelevant } } as any,
+  });
+}
+
+export async function updateKnowledgeAssetTheme(
+  assetId: string,
+  active: boolean
+): Promise<void> {
+  await notion.pages.update({
+    page_id: assetId,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    properties: { "Living Room Theme": { checkbox: active } } as any,
+  });
+}
+
