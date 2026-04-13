@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { adminGuardApi } from "@/lib/require-admin";
+import { verifyToken } from "@clerk/nextjs/server";
 import { notion, DB, createKnowledgeAssetDraft } from "@/lib/notion";
 import * as XLSX from "xlsx";
 import mammoth from "mammoth";
@@ -235,8 +236,29 @@ function notionNumber(n: number | null) {
 // ─── POST handler ─────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
+  // Primary: Clerk session cookie via middleware context
   const guard = await adminGuardApi();
-  if (guard) return guard;
+  if (guard) {
+    // Fallback: explicit Bearer token sent by the UI (needed when middleware AsyncLocalStorage
+    // context is not propagated to Node.js serverless functions in Vercel)
+    const authHeader = req.headers.get("authorization") ?? "";
+    const bearerToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+    const agentKey = req.headers.get("x-agent-key");
+    const cronSecret = process.env.CRON_SECRET ?? "";
+
+    if (agentKey && cronSecret && agentKey === cronSecret) {
+      // Called from cron / internal agent — allow
+    } else if (bearerToken) {
+      try {
+        await verifyToken(bearerToken, { secretKey: process.env.CLERK_SECRET_KEY });
+        // Token valid — allow
+      } catch {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+    } else {
+      return guard; // Return original 401/403
+    }
+  }
 
   let body: IngestBody;
   try {

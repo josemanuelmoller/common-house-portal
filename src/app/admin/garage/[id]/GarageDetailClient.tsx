@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@clerk/nextjs";
 import type {
   Project,
   EvidenceItem,
@@ -1039,15 +1040,17 @@ export function GarageDetailClient({
   const [tab, setTab]               = useState<Tab>("pulse");
   const [showUpload, setShowUpload] = useState(false);
   const router = useRouter();
+  const { getToken } = useAuth();
   const [localDataRoom, setLocalDataRoom] = useState<DataRoomItem[]>(dataRoom);
   const [ingestState, setIngestState] = useState<IngestState>({ status: "idle" });
 
   async function handleIngest(fileId: string, fileUrl: string, fileName: string) {
     setIngestState({ status: "processing", fileId });
     try {
+      const token = await getToken();
       const res = await fetch("/api/garage-ingest", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...(token ? { "Authorization": `Bearer ${token}` } : {}) },
         body: JSON.stringify({
           fileUrl,
           fileName,
@@ -1072,9 +1075,10 @@ export function GarageDetailClient({
   async function handleIngestConfirm(fileId: string, fileUrl: string, fileName: string) {
     setIngestState({ status: "executing", fileId });
     try {
+      const token = await getToken();
       const res = await fetch("/api/garage-ingest", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...(token ? { "Authorization": `Bearer ${token}` } : {}) },
         body: JSON.stringify({
           fileUrl,
           fileName,
