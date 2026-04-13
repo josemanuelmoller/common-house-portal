@@ -1853,3 +1853,54 @@ export async function getReadyContent(): Promise<ReadyContent[]> {
   }
 }
 
+// ─── Garage — Portfolio opportunities for a startup ──────────────────────────
+
+export async function getPortfolioOpportunities(orgName?: string): Promise<OpportunityItem[]> {
+  try {
+    const res = await notion.databases.query({
+      database_id: DB.opportunities,
+      filter: {
+        and: [
+          {
+            or: [
+              { property: "Scope", select: { equals: "Portfolio" } },
+              { property: "Scope", select: { equals: "Both" } },
+            ],
+          },
+          { property: "Stage", select: { does_not_equal: "Archived" } },
+        ],
+      },
+      sorts: [{ timestamp: "last_edited_time", direction: "descending" }],
+      page_size: 50,
+    });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const all: OpportunityItem[] = (res.results as any[]).map(page => ({
+      id:                   page.id,
+      name:                 text(prop(page, "Opportunity Name")) || text(prop(page, "Name")) || "Untitled",
+      stage:                select(prop(page, "Stage")),
+      scope:                select(prop(page, "Scope")),
+      followUpStatus:       select(prop(page, "Follow-up Status")),
+      type:                 select(prop(page, "Type")) || select(prop(page, "Opportunity Type")) || "",
+      orgName:              text(prop(page, "Organization")) || "",
+      lastEdited:           page.last_edited_time?.slice(0, 10) ?? null,
+      notionUrl:            page.url ?? "",
+      score:                num(prop(page, "Opportunity Score")),
+      qualificationStatus:  select(prop(page, "Qualification Status")) || "Not Scored",
+    }));
+
+    // If orgName provided, prefer matches — show matched first, then all if none match
+    if (orgName) {
+      const lower = orgName.toLowerCase();
+      const matched = all.filter(o =>
+        o.orgName.toLowerCase().includes(lower) ||
+        o.name.toLowerCase().includes(lower)
+      );
+      return matched.length > 0 ? matched : all;
+    }
+    return all;
+  } catch {
+    return [];
+  }
+}
+

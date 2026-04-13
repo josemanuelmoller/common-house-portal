@@ -13,11 +13,12 @@ import type {
   ValuationRecord,
   CapTableEntry,
   DataRoomItem,
+  OpportunityItem,
 } from "@/lib/notion";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
-type Tab = "pulse" | "financials" | "valuation" | "captable" | "funding" | "dataroom";
+type Tab = "pulse" | "financials" | "valuation" | "captable" | "funding" | "commercial" | "investorupdate" | "dataroom";
 
 // Garage ingest types
 interface ExtractedData {
@@ -70,6 +71,7 @@ type Props = {
   capTable: CapTableEntry[];
   dataRoom: DataRoomItem[];
   orgId?: string;
+  opportunities: OpportunityItem[];
 };
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
@@ -311,9 +313,39 @@ function PulseTab({ project, evidence, sources, decisions }: {
   );
 }
 
+// ─── Contextual upload trigger ─────────────────────────────────────────────────
+
+function UploadCTA({ label, onUpload }: { label: string; onUpload: () => void }) {
+  return (
+    <button
+      onClick={onUpload}
+      className="w-full flex items-center gap-3 border-2 border-dashed border-[#E0E0D8] rounded-2xl px-6 py-5 text-left hover:border-[#131218]/25 hover:bg-[#EFEFEA]/50 transition-all group"
+    >
+      <span className="text-[#131218]/20 text-xl group-hover:text-[#131218]/40 transition-colors">↑</span>
+      <div>
+        <p className="text-[11.5px] font-semibold text-[#131218]/40 group-hover:text-[#131218]/70 transition-colors">{label}</p>
+        <p className="text-[10px] text-[#131218]/25 mt-0.5">PDF · XLSX · PPTX · DOCX</p>
+      </div>
+    </button>
+  );
+}
+
+// ─── Stage badge colours ────────────────────────────────────────────────────────
+
+const OPP_STAGE_COLORS: Record<string, string> = {
+  "New":           "bg-[#EFEFEA] text-[#131218]/40 border-[#E0E0D8]",
+  "Exploring":     "bg-blue-50 text-blue-600 border-blue-200",
+  "Qualifying":    "bg-amber-50 text-amber-700 border-amber-200",
+  "Active":        "bg-green-50 text-green-700 border-green-200",
+  "Proposal Sent": "bg-purple-50 text-purple-700 border-purple-200",
+  "Negotiation":   "bg-orange-50 text-orange-700 border-orange-200",
+  "Won":           "bg-[#c8f55a]/30 text-[#2d6a00] border-[#b2ff59]",
+  "Lost":          "bg-red-50 text-red-500 border-red-200",
+};
+
 // ─── Financials tab ────────────────────────────────────────────────────────────
 
-function FinancialsTab({ orgData, financials }: { orgData: StartupOrgData | null; financials: FinancialSnapshot[] }) {
+function FinancialsTab({ orgData, financials, onUpload }: { orgData: StartupOrgData | null; financials: FinancialSnapshot[]; onUpload: () => void }) {
   const latest = financials[0] ?? null;
 
   return (
@@ -398,6 +430,9 @@ function FinancialsTab({ orgData, financials }: { orgData: StartupOrgData | null
       ) : (
         <EmptyState label="financial snapshot" />
       )}
+
+      {/* Contextual upload */}
+      <UploadCTA label="Upload financial documents — model, P&L, projections, cap table" onUpload={onUpload} />
     </div>
   );
 }
@@ -809,33 +844,396 @@ function DataRoomTab({
   );
 }
 
-// ─── Funding tab (placeholder — no DB wired yet) ───────────────────────────────
+// ─── Funding tab ───────────────────────────────────────────────────────────────
 
-function FundingTab({ orgData }: { orgData: StartupOrgData | null }) {
+function FundingTab({
+  orgData,
+  opportunities,
+}: {
+  orgData: StartupOrgData | null;
+  opportunities: OpportunityItem[];
+}) {
+  const investorOpps = opportunities.filter(o => o.type === "Investor Match");
+  const grantOpps    = opportunities.filter(o => o.type === "Grant");
+
   return (
-    <div className="space-y-4">
-      {orgData && (orgData.fundingRound || orgData.investmentStatus) && (
-        <div className="grid grid-cols-2 gap-4">
-          {orgData.fundingRound && (
-            <div className="bg-white border border-[#E0E0D8] rounded-2xl px-5 py-4">
-              <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30 mb-1">Current Round</p>
-              <p className="text-xl font-bold text-[#131218]">{orgData.fundingRound}</p>
+    <div className="space-y-5">
+
+      {/* Org headline stats */}
+      {orgData && (orgData.fundingRound || orgData.investmentStatus || orgData.mrr) && (
+        <div className="grid grid-cols-3 gap-4">
+          {[
+            { label: "Current Round",      value: orgData.fundingRound     || "—" },
+            { label: "Investment Status",  value: orgData.investmentStatus || "—" },
+            { label: "MRR",                value: orgData.mrr              || "—" },
+          ].map(s => (
+            <div key={s.label} className="bg-white border border-[#E0E0D8] rounded-2xl px-5 py-4">
+              <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30 mb-1">{s.label}</p>
+              <p className="text-xl font-bold text-[#131218] tracking-tight">{s.value}</p>
             </div>
-          )}
-          {orgData.investmentStatus && (
-            <div className="bg-white border border-[#E0E0D8] rounded-2xl px-5 py-4">
-              <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30 mb-1">Investment Status</p>
-              <p className="text-xl font-bold text-[#131218]">{orgData.investmentStatus}</p>
+          ))}
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 gap-5">
+
+        {/* Investor pipeline */}
+        <div className="bg-white border border-[#E0E0D8] rounded-2xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-[#EFEFEA]">
+            <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30">Investor Pipeline</p>
+            <p className="text-sm font-bold text-[#131218] mt-0.5">
+              {investorOpps.length > 0 ? `${investorOpps.length} active` : "No matches logged"}
+            </p>
+          </div>
+          {investorOpps.length > 0 ? (
+            <div className="divide-y divide-[#EFEFEA]">
+              {investorOpps.map(opp => (
+                <div key={opp.id} className="px-5 py-3.5 flex items-center gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[12.5px] font-semibold text-[#131218] truncate">{opp.name}</p>
+                    {opp.orgName && (
+                      <p className="text-[9.5px] text-[#131218]/35 mt-0.5">{opp.orgName}</p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {opp.score !== null && (
+                      <span className="text-[10px] font-bold text-[#2d6a00]">{opp.score}</span>
+                    )}
+                    <span className={`text-[8.5px] font-bold px-2 py-0.5 rounded-full border ${OPP_STAGE_COLORS[opp.stage] ?? "bg-[#EFEFEA] text-[#131218]/40 border-[#E0E0D8]"}`}>
+                      {opp.stage}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="px-5 py-8 text-center">
+              <p className="text-xs text-[#131218]/25">No investor matches logged yet</p>
+              <p className="text-[10px] text-[#131218]/20 mt-1">Add Investor Match opportunities in Notion with Portfolio scope</p>
             </div>
           )}
         </div>
-      )}
-      <div className="bg-white border border-[#E0E0D8] rounded-2xl p-10 text-center">
-        <p className="text-sm font-bold text-[#131218]/25 mb-1">Funding rounds detail coming soon</p>
-        <p className="text-xs text-[#131218]/20">
-          A dedicated Funding Rounds DB will surface investor names, amounts, and closing dates.
-        </p>
+
+        {/* Grants as non-dilutive funding */}
+        <div className="bg-white border border-[#E0E0D8] rounded-2xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-[#EFEFEA]">
+            <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30">Grant Pipeline — Non-dilutive</p>
+            <p className="text-sm font-bold text-[#131218] mt-0.5">
+              {grantOpps.length > 0 ? `${grantOpps.length} opportunities` : "No grants tracked"}
+            </p>
+          </div>
+          {grantOpps.length > 0 ? (
+            <div className="divide-y divide-[#EFEFEA]">
+              {grantOpps.map(opp => (
+                <div key={opp.id} className="px-5 py-3.5 flex items-center gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[12.5px] font-semibold text-[#131218] truncate">{opp.name}</p>
+                    {opp.orgName && (
+                      <p className="text-[9.5px] text-[#131218]/35 mt-0.5">{opp.orgName}</p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {opp.score !== null && (
+                      <span className="text-[10px] font-bold text-green-700 bg-green-50 px-1.5 py-0.5 rounded-md">{opp.score}</span>
+                    )}
+                    <span className={`text-[8.5px] font-bold px-2 py-0.5 rounded-full border ${OPP_STAGE_COLORS[opp.stage] ?? "bg-[#EFEFEA] text-[#131218]/40 border-[#E0E0D8]"}`}>
+                      {opp.stage}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="px-5 py-8 text-center">
+              <p className="text-xs text-[#131218]/25">No grant opportunities tracked</p>
+              <p className="text-[10px] text-[#131218]/20 mt-1">Add Grant opportunities in Notion with Portfolio scope</p>
+            </div>
+          )}
+        </div>
+
       </div>
+    </div>
+  );
+}
+
+// ─── Commercial tab ────────────────────────────────────────────────────────────
+
+function CommercialTab({
+  evidence,
+  opportunities,
+  onUpload,
+}: {
+  evidence: EvidenceItem[];
+  opportunities: OpportunityItem[];
+  onUpload: () => void;
+}) {
+  const traction    = evidence.filter(e => e.type === "Traction" || e.type === "Milestone" || e.type === "Outcome");
+  const commercialOpps = opportunities.filter(o => o.type === "CH Sale" || o.type === "Partnership");
+
+  return (
+    <div className="space-y-5">
+
+      <div className="grid grid-cols-2 gap-5">
+
+        {/* Traction signals */}
+        <div className="bg-white border border-[#E0E0D8] rounded-2xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-[#EFEFEA]">
+            <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30">Traction Signals</p>
+            <p className="text-sm font-bold text-[#131218] mt-0.5">
+              {traction.length > 0 ? `${traction.length} validated signals` : "No traction logged yet"}
+            </p>
+          </div>
+          {traction.length > 0 ? (
+            <div className="divide-y divide-[#EFEFEA]">
+              {traction.slice(0, 6).map(ev => (
+                <div key={ev.id} className="px-5 py-3.5 flex items-start gap-3">
+                  <span className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ${ev.validationStatus === "Validated" ? "bg-green-400" : "bg-amber-400"}`} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                      <span className={`text-[8.5px] font-bold px-2 py-0.5 rounded-full border ${EVIDENCE_TYPE_COLORS[ev.type] ?? "bg-[#EFEFEA] text-[#131218]/50 border-[#E0E0D8]"}`}>
+                        {ev.type}
+                      </span>
+                      <span className="text-[8px] text-[#131218]/30">{fmtDate(ev.dateCaptured)}</span>
+                    </div>
+                    <p className="text-[12px] font-medium text-[#131218] leading-snug line-clamp-2">
+                      {ev.title || ev.excerpt || "—"}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="px-5 py-8 text-center">
+              <p className="text-xs text-[#131218]/25">No traction evidence captured yet</p>
+              <p className="text-[10px] text-[#131218]/20 mt-1">Upload commercial documents to extract signals</p>
+            </div>
+          )}
+        </div>
+
+        {/* Commercial opportunities */}
+        <div className="space-y-4">
+          <div className="bg-white border border-[#E0E0D8] rounded-2xl overflow-hidden">
+            <div className="px-5 py-4 border-b border-[#EFEFEA]">
+              <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30">Active Opportunities</p>
+              <p className="text-sm font-bold text-[#131218] mt-0.5">
+                {commercialOpps.length > 0 ? `${commercialOpps.length} tracked` : "No commercial opportunities"}
+              </p>
+            </div>
+            {commercialOpps.length > 0 ? (
+              <div className="divide-y divide-[#EFEFEA]">
+                {commercialOpps.map(opp => (
+                  <div key={opp.id} className="px-5 py-3.5 flex items-center gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[12.5px] font-semibold text-[#131218] truncate">{opp.name}</p>
+                      <p className="text-[9.5px] text-[#131218]/35 mt-0.5">{opp.type} {opp.orgName ? `· ${opp.orgName}` : ""}</p>
+                    </div>
+                    <span className={`text-[8.5px] font-bold px-2 py-0.5 rounded-full border shrink-0 ${OPP_STAGE_COLORS[opp.stage] ?? "bg-[#EFEFEA] text-[#131218]/40 border-[#E0E0D8]"}`}>
+                      {opp.stage}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="px-5 py-6 text-center">
+                <p className="text-xs text-[#131218]/25">No commercial opportunities logged</p>
+              </div>
+            )}
+          </div>
+
+          {/* Upload zone */}
+          <UploadCTA label="Upload commercial documents — deck, one-pager, contracts, case studies" onUpload={onUpload} />
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
+// ─── Investor Update tab ───────────────────────────────────────────────────────
+
+type UpdateConfig = {
+  period: string;
+  tone: string;
+  include: string[];
+};
+
+type UpdateState =
+  | { status: "idle" }
+  | { status: "generating" }
+  | { status: "done"; draft: string }
+  | { status: "error"; message: string };
+
+function InvestorUpdateTab({ project }: { project: Project }) {
+  const periods = ["Last 30 days", "Last quarter", "Last 6 months", "Custom"];
+  const tones   = ["Confident", "Transparent", "Technical", "Executive"];
+  const includeOptions = [
+    { id: "kpis",        label: "Financial KPIs"    },
+    { id: "fundraising", label: "Fundraising update" },
+    { id: "grants",      label: "Grants progress"   },
+    { id: "milestones",  label: "Key milestones"     },
+    { id: "nextsteps",   label: "Next steps"         },
+  ];
+
+  const [config, setConfig] = useState<UpdateConfig>({
+    period:  periods[0],
+    tone:    tones[0],
+    include: ["kpis", "fundraising", "grants"],
+  });
+  const [state, setState] = useState<UpdateState>({ status: "idle" });
+
+  function toggleInclude(id: string) {
+    setConfig(prev => ({
+      ...prev,
+      include: prev.include.includes(id)
+        ? prev.include.filter(x => x !== id)
+        : [...prev.include, id],
+    }));
+  }
+
+  async function generate() {
+    setState({ status: "generating" });
+    try {
+      const res = await fetch("/api/garage-investor-update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId: project.id, ...config }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error ?? `HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      setState({ status: "done", draft: data.draft });
+    } catch (err) {
+      setState({ status: "error", message: err instanceof Error ? err.message : "Generation failed" });
+    }
+  }
+
+  return (
+    <div className="grid grid-cols-[320px_1fr] gap-6 items-start">
+
+      {/* Left: config panel */}
+      <div className="space-y-4">
+        <div className="bg-white border border-[#E0E0D8] rounded-2xl p-5 space-y-5">
+          <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30">Generate Investor Update</p>
+
+          {/* Period */}
+          <div>
+            <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30 mb-2">Period</p>
+            <div className="flex flex-wrap gap-1.5">
+              {periods.map(p => (
+                <button key={p} onClick={() => setConfig(c => ({ ...c, period: p }))}
+                  className={`text-[10px] font-semibold px-3 py-1.5 rounded-lg border transition-all ${
+                    config.period === p
+                      ? "bg-[#131218] text-white border-[#131218]"
+                      : "bg-white text-[#131218]/50 border-[#E0E0D8] hover:border-[#131218]/30"
+                  }`}>
+                  {p}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Tone */}
+          <div>
+            <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30 mb-2">Tone</p>
+            <div className="flex flex-wrap gap-1.5">
+              {tones.map(t => (
+                <button key={t} onClick={() => setConfig(c => ({ ...c, tone: t }))}
+                  className={`text-[10px] font-semibold px-3 py-1.5 rounded-lg border transition-all ${
+                    config.tone === t
+                      ? "bg-[#131218] text-white border-[#131218]"
+                      : "bg-white text-[#131218]/50 border-[#E0E0D8] hover:border-[#131218]/30"
+                  }`}>
+                  {t}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Include */}
+          <div>
+            <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30 mb-2">Include</p>
+            <div className="space-y-2">
+              {includeOptions.map(opt => (
+                <label key={opt.id} className="flex items-center gap-2.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={config.include.includes(opt.id)}
+                    onChange={() => toggleInclude(opt.id)}
+                    className="w-3.5 h-3.5 rounded accent-[#c8f55a]"
+                  />
+                  <span className="text-[11.5px] text-[#131218]/70">{opt.label}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <button
+            onClick={generate}
+            disabled={state.status === "generating"}
+            className={`w-full py-2.5 rounded-xl text-[11.5px] font-bold transition-all ${
+              state.status === "generating"
+                ? "bg-[#EFEFEA] text-[#131218]/30 cursor-wait"
+                : "bg-[#c8f55a] text-[#131218] hover:bg-[#b8e84a]"
+            }`}
+          >
+            {state.status === "generating" ? "Generating…" : "⚡ Generate draft"}
+          </button>
+        </div>
+      </div>
+
+      {/* Right: preview */}
+      <div>
+        {state.status === "idle" && (
+          <div className="bg-white border border-[#E0E0D8] rounded-2xl p-12 text-center">
+            <p className="text-sm font-bold text-[#131218]/25 mb-1">Configure and generate</p>
+            <p className="text-xs text-[#131218]/20">
+              Select period, tone and content — then click Generate draft to build the investor update from your OS data.
+            </p>
+          </div>
+        )}
+        {state.status === "generating" && (
+          <div className="bg-white border border-[#E0E0D8] rounded-2xl p-12 text-center">
+            <p className="text-sm font-bold text-[#131218]/30 animate-pulse">Building investor update…</p>
+            <p className="text-xs text-[#131218]/20 mt-2">Reading evidence, financials and milestones from Notion</p>
+          </div>
+        )}
+        {state.status === "error" && (
+          <div className="bg-red-50 border border-red-200 rounded-2xl p-6">
+            <p className="text-sm font-bold text-red-600 mb-1">Generation failed</p>
+            <p className="text-xs text-red-500">{state.message}</p>
+            <button onClick={() => setState({ status: "idle" })} className="text-[10px] font-bold text-red-600 mt-3 hover:underline">Try again</button>
+          </div>
+        )}
+        {state.status === "done" && (
+          <div className="bg-white border-2 border-[#c8f55a] rounded-2xl overflow-hidden">
+            <div className="bg-[#c8f55a] px-5 py-3 flex items-center justify-between">
+              <span className="text-[10px] font-bold text-[#131218]">DRAFT GENERATED · {config.period}</span>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => navigator.clipboard.writeText(state.draft)}
+                  className="text-[9px] font-bold px-3 py-1 bg-white/60 rounded-md hover:bg-white transition-all"
+                >
+                  Copy
+                </button>
+                <button
+                  onClick={() => setState({ status: "idle" })}
+                  className="text-[9px] font-bold px-3 py-1 bg-[#131218] text-white rounded-md hover:bg-black transition-all"
+                >
+                  Regenerate
+                </button>
+              </div>
+            </div>
+            <div className="px-6 py-5">
+              <pre className="text-[12px] text-[#131218]/80 leading-relaxed whitespace-pre-wrap font-sans">
+                {state.draft}
+              </pre>
+            </div>
+          </div>
+        )}
+      </div>
+
     </div>
   );
 }
@@ -1025,17 +1423,19 @@ function UploadModal({ projectId, projectName, orgId, onDone }: {
 // ─── Main client component ─────────────────────────────────────────────────────
 
 const TABS: { id: Tab; label: string }[] = [
-  { id: "pulse",      label: "Pulse"      },
-  { id: "financials", label: "Financials" },
-  { id: "valuation",  label: "Valuation"  },
-  { id: "captable",   label: "Cap Table"  },
-  { id: "funding",    label: "Funding"    },
-  { id: "dataroom",   label: "Data Room"  },
+  { id: "pulse",         label: "Pulse"           },
+  { id: "financials",    label: "Financials"      },
+  { id: "valuation",     label: "Valuation"       },
+  { id: "captable",      label: "Cap Table"       },
+  { id: "funding",       label: "Funding"         },
+  { id: "commercial",    label: "Commercial"      },
+  { id: "investorupdate", label: "Investor Update" },
+  { id: "dataroom",      label: "Data Room"       },
 ];
 
 export function GarageDetailClient({
   project, evidence, sources, decisions,
-  orgData, financials, valuations, capTable, dataRoom, orgId,
+  orgData, financials, valuations, capTable, dataRoom, orgId, opportunities,
 }: Props) {
   const [tab, setTab]               = useState<Tab>("pulse");
   const [showUpload, setShowUpload] = useState(false);
@@ -1183,7 +1583,7 @@ export function GarageDetailClient({
           <PulseTab project={project} evidence={evidence} sources={sources} decisions={decisions} />
         )}
         {tab === "financials" && (
-          <FinancialsTab orgData={orgData} financials={financials} />
+          <FinancialsTab orgData={orgData} financials={financials} onUpload={() => setShowUpload(true)} />
         )}
         {tab === "valuation" && (
           <ValuationTab valuations={valuations} />
@@ -1192,7 +1592,13 @@ export function GarageDetailClient({
           <CapTableTab capTable={capTable} />
         )}
         {tab === "funding" && (
-          <FundingTab orgData={orgData} />
+          <FundingTab orgData={orgData} opportunities={opportunities} />
+        )}
+        {tab === "commercial" && (
+          <CommercialTab evidence={evidence} opportunities={opportunities} onUpload={() => setShowUpload(true)} />
+        )}
+        {tab === "investorupdate" && (
+          <InvestorUpdateTab project={project} />
         )}
         {tab === "dataroom" && (
           <DataRoomTab

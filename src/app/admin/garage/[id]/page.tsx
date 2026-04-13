@@ -12,6 +12,7 @@ import {
   getValuationsForProject,
   getCapTableForProject,
   getDataRoomForProject,
+  getPortfolioOpportunities,
 } from "@/lib/notion";
 import { GarageDetailClient } from "./GarageDetailClient";
 
@@ -54,6 +55,9 @@ export default async function GarageDetailPage({ params }: { params: Promise<{ i
     getCapTableForProject(id),
     getDataRoomForProject(id),
   ]);
+
+  // Fetch portfolio opportunities after project resolves so we can filter by org name
+  const opportunities = await getPortfolioOpportunities(orgData?.name || project?.name);
 
   if (!project) notFound();
 
@@ -157,6 +161,7 @@ export default async function GarageDetailPage({ params }: { params: Promise<{ i
           capTable={capTable}
           dataRoom={dataRoom}
           orgId={orgData?.id}
+          opportunities={opportunities}
         />
 
       </main>
