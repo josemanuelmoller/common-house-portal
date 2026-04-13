@@ -54,19 +54,16 @@ export default async function KnowledgePage() {
 
       <main className="flex-1 ml-[228px] overflow-auto">
         {/* Header */}
-        <div className="bg-white border-b border-[#E0E0D8] px-8 py-6">
-          <div className="flex items-end justify-between">
-            <div>
-              <p className="text-[10px] font-bold text-[#B2FF59] bg-[#131218] px-2.5 py-1 rounded-full uppercase tracking-widest inline-block mb-3">
-                Knowledge
-              </p>
-              <h1 className="text-3xl font-bold text-[#131218] tracking-tight">Knowledge Assets</h1>
-              <p className="text-sm text-[#131218]/40 mt-1">Canonical assets, reusable evidence, and cross-project intelligence</p>
-            </div>
-            <p className="text-xs text-[#131218]/30 font-medium pb-1">
-              {assets.length} asset{assets.length !== 1 ? "s" : ""} · {canonicalEvidence.length} canonical · {trueReusableEvidence.length} reusable
-            </p>
-          </div>
+        <div className="bg-[#131218] px-10 py-10">
+          <p className="text-[8px] font-bold uppercase tracking-[2.5px] text-white/20 mb-3">
+            CONTROL ROOM · KNOWLEDGE
+          </p>
+          <h1 className="text-[2.6rem] font-[300] text-white leading-[1] tracking-[-1.5px]">
+            Knowledge <em className="font-[900] italic text-[#c8f55a]">Assets</em>
+          </h1>
+          <p className="text-[12.5px] text-white/40 mt-3 max-w-[520px] leading-[1.65]">
+            Canonical assets, reusable evidence, and cross-project intelligence.
+          </p>
         </div>
 
         <div className="px-8 py-6 space-y-6">

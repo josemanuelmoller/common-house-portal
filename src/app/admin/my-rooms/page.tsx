@@ -76,25 +76,16 @@ export default async function MyRoomsPage() {
       <main className="flex-1 ml-[228px] overflow-auto">
 
         {/* Header */}
-        <div className="bg-white border-b border-[#E0E0D8] px-8 py-6">
-          <div className="flex items-end justify-between mb-1">
-            <div>
-              <div className="flex items-center gap-3 mb-3">
-                <p className="text-[10px] font-bold text-[#131218]/25 uppercase tracking-widest">
-                  Control Room · My Rooms
-                </p>
-                <span className="text-[#131218]/15">·</span>
-                <p className="text-[10px] font-bold text-[#B2FF59] bg-[#131218] px-2.5 py-1 rounded-full uppercase tracking-widest">
-                  Personal lens
-                </p>
-              </div>
-              <h1 className="text-3xl font-bold text-[#131218] tracking-tight">My Rooms</h1>
-              <p className="text-sm text-[#131218]/40 mt-1.5 font-medium">What belongs to you. What needs to move next.</p>
-            </div>
-            <p className="text-xs text-[#131218]/30 font-medium pb-1">
-              {new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
-            </p>
-          </div>
+        <div className="bg-[#131218] px-10 py-10">
+          <p className="text-[8px] font-bold uppercase tracking-[2.5px] text-white/20 mb-3">
+            CONTROL ROOM · MY ROOMS
+          </p>
+          <h1 className="text-[2.6rem] font-[300] text-white leading-[1] tracking-[-1.5px]">
+            My <em className="font-[900] italic text-[#c8f55a]">Rooms</em>
+          </h1>
+          <p className="text-[12.5px] text-white/40 mt-3 max-w-[520px] leading-[1.65]">
+            What belongs to you. What needs to move next.
+          </p>
         </div>
 
         <div className="px-8 py-6 space-y-6">

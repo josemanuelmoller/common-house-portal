@@ -145,7 +145,7 @@ type LiveStatus = "success" | "warning" | "error" | "skipped" | "none";
 
 function StatusDot({ status }: { status: LiveStatus }) {
   if (status === "success")
-    return <span className="w-2 h-2 rounded-full bg-[#B2FF59] flex-shrink-0" title="Success" />;
+    return <span className="w-2 h-2 rounded-full bg-[#c8f55a] flex-shrink-0" title="Success" />;
   if (status === "warning")
     return <span className="w-2 h-2 rounded-full bg-[#FFE066] flex-shrink-0" title="Warning" />;
   if (status === "error")
@@ -212,51 +212,46 @@ export default async function AgentsPage() {
       <Sidebar adminNav />
 
       <main className="flex-1 ml-60 flex flex-col">
-        {/* Top bar */}
-        <div className="bg-[#131218] px-10 py-4 flex items-center justify-between border-b border-white/6">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-[800] text-white tracking-tight">
-              Control Room
-            </span>
-            <span className="text-[10px] text-white/25 font-medium ml-1">
-              OS v2 · Agents
-            </span>
+        {/* Page header */}
+        <div className="bg-[#131218] px-10 py-10">
+          <p className="text-[8px] font-bold uppercase tracking-[2.5px] text-white/20 mb-3">
+            CONTROL ROOM · OS v2
+          </p>
+          <div className="flex items-end justify-between">
+            <div>
+              <h1 className="text-[2.6rem] font-[300] text-white leading-[1] tracking-[-1.5px]">
+                Agent <em className="font-[900] italic text-[#c8f55a]">Registry</em>
+              </h1>
+              <p className="text-[12.5px] text-white/40 mt-3 max-w-[520px] leading-[1.65]">
+                OS v2 agents — schedules, live run status, and telemetry.
+              </p>
+            </div>
+            <div className="flex items-center gap-3 pb-1">
+              {errorCount > 0 && (
+                <span className="inline-flex items-center gap-1.5 bg-[#3a0000] border border-[rgba(255,80,80,0.3)] rounded-full px-2.5 py-1 text-[9px] font-bold text-[#ff8080] uppercase tracking-[0.5px]">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#ff6060]" />
+                  {errorCount} error{errorCount > 1 ? "s" : ""}
+                </span>
+              )}
+              {warnCount > 0 && (
+                <span className="inline-flex items-center gap-1.5 bg-[#3a2000] border border-[rgba(255,200,80,0.3)] rounded-full px-2.5 py-1 text-[9px] font-bold text-[#FFE066] uppercase tracking-[0.5px]">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#FFE066]" />
+                  {warnCount} warning{warnCount > 1 ? "s" : ""}
+                </span>
+              )}
+              {errorCount === 0 && warnCount === 0 && hasTelemetry && (
+                <span className="inline-flex items-center gap-1.5 bg-[#c8f55a]/10 border border-[#c8f55a]/20 rounded-full px-2.5 py-1 text-[9px] font-bold text-[#c8f55a] uppercase tracking-[0.5px]">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#c8f55a]" />
+                  {successCount} ok
+                </span>
+              )}
+              {!hasTelemetry && (
+                <span className="inline-flex items-center gap-1.5 bg-white/5 border border-white/10 rounded-full px-2.5 py-1 text-[9px] font-bold text-white/30 uppercase tracking-[0.5px]">
+                  Sin telemetría
+                </span>
+              )}
+            </div>
           </div>
-          <div className="flex items-center gap-3">
-            {errorCount > 0 && (
-              <span className="inline-flex items-center gap-1.5 bg-[#3a0000] border border-[rgba(255,80,80,0.3)] rounded-full px-2.5 py-1 text-[9px] font-bold text-[#ff8080] uppercase tracking-[0.5px]">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#ff6060]" />
-                {errorCount} error{errorCount > 1 ? "s" : ""}
-              </span>
-            )}
-            {warnCount > 0 && (
-              <span className="inline-flex items-center gap-1.5 bg-[#3a2000] border border-[rgba(255,200,80,0.3)] rounded-full px-2.5 py-1 text-[9px] font-bold text-[#FFE066] uppercase tracking-[0.5px]">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#FFE066]" />
-                {warnCount} warning{warnCount > 1 ? "s" : ""}
-              </span>
-            )}
-            {errorCount === 0 && warnCount === 0 && hasTelemetry && (
-              <span className="inline-flex items-center gap-1.5 bg-[#B2FF59]/10 border border-[#B2FF59]/20 rounded-full px-2.5 py-1 text-[9px] font-bold text-[#B2FF59] uppercase tracking-[0.5px]">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#B2FF59]" />
-                {successCount} ok
-              </span>
-            )}
-            {!hasTelemetry && (
-              <span className="inline-flex items-center gap-1.5 bg-white/5 border border-white/10 rounded-full px-2.5 py-1 text-[9px] font-bold text-white/30 uppercase tracking-[0.5px]">
-                Sin telemetría
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Sub-nav breadcrumb */}
-        <div className="bg-white border-b border-[#E0E0D8] px-10 flex items-center gap-0 h-[46px]">
-          <a
-            href="/admin/agents"
-            className="text-[11px] font-semibold text-[#131218] h-full flex items-center border-b-2 border-[#131218] px-4 pl-0"
-          >
-            Agents
-          </a>
         </div>
 
         {/* Content */}

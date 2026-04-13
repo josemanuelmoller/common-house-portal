@@ -70,7 +70,7 @@ export default async function InvestorsPage() {
           <div className="flex items-end justify-between">
             <div>
               <h1 className="text-[2.6rem] font-light text-white tracking-[-1.5px] leading-none">
-                Investor <em className="font-black not-italic text-[#B2FF59]">Network</em>
+                Investor <em className="font-black italic text-[#c8f55a]">Network</em>
               </h1>
               <p className="text-sm text-white/40 mt-3">
                 Active investors, funders, and angels in the CH network. Matched to portfolio startups.

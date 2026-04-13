@@ -56,23 +56,22 @@ export default async function LivingRoomPage() {
   const nav = isAdmin ? LIVING_ROOM_NAV : CLIENT_NAV;
 
   return (
-    <div className="flex min-h-screen bg-[#EEEEE8]">
+    <div className="flex min-h-screen bg-[#EFEFEA]">
       <Sidebar items={nav} isAdmin={isAdmin} />
 
       <main className="flex-1 ml-[228px] overflow-auto">
 
         {/* ── Dark header ── */}
-        <header className="bg-black px-13 py-10 flex-shrink-0" style={{ padding: "40px 52px 44px" }}>
+        <header className="bg-[#131218] flex-shrink-0" style={{ padding: "40px 52px 44px" }}>
           <p className="text-[8px] font-bold tracking-[2.5px] uppercase text-white/20 mb-3">
-            Community layer · Common House
+            COMMUNITY LAYER · COMMON HOUSE
           </p>
           <div className="flex items-end justify-between gap-6 flex-wrap">
             <div>
-              <h1 className="text-[2.6rem] font-light text-white tracking-[-1.5px] leading-none">
-                Living{" "}
-                <em className="font-black not-italic text-[#B2FF59]">Room</em>
+              <h1 className="text-[2.6rem] font-[300] text-white tracking-[-1.5px] leading-none">
+                Living <em className="font-[900] italic text-[#c8f55a]">Room</em>
               </h1>
-              <p className="text-[12.5px] text-white/38 mt-3 max-w-lg leading-relaxed">
+              <p className="text-[12.5px] text-white/40 mt-3 max-w-lg leading-relaxed">
                 How life moves inside the House. Members, expertise, themes in motion, and shared
                 milestones — curated, not scrolled.
               </p>

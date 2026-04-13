@@ -28,7 +28,7 @@ export default async function ContentPipelinePage() {
           <div className="flex items-end justify-between">
             <div>
               <h1 className="text-[2.6rem] font-light text-white tracking-[-1.5px] leading-none">
-                Content <em className="font-black not-italic text-[#B2FF59]">Pipeline</em>
+                Content <em className="font-black italic text-[#c8f55a]">Pipeline</em>
               </h1>
               <p className="text-sm text-white/40 mt-3">
                 Posts, reports, investor updates and proposals — from brief to published.

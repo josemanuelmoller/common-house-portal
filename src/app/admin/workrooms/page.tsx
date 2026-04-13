@@ -56,7 +56,7 @@ export default async function WorkroomsPage() {
           <div className="flex items-end justify-between">
             <div>
               <h1 className="text-[2.6rem] font-light text-white tracking-[-1.5px] leading-none">
-                The <em className="font-black not-italic text-[#B2FF59]">Workrooms</em>
+                The <em className="font-black italic text-[#c8f55a]">Workrooms</em>
               </h1>
               <p className="text-sm text-white/40 mt-3">
                 Active client engagements. Evidence, momentum, and delivery — room by room.

@@ -47,7 +47,7 @@ export default async function CommsPage() {
         <header className="bg-[#131218] px-12 pt-10 pb-11">
           <p className="text-[8px] font-bold tracking-[2.5px] uppercase text-white/20 mb-3">Desks · Contenido escrito</p>
           <h1 className="text-[2.6rem] font-light text-white tracking-[-1.5px] leading-none">
-            Comms <em className="font-black not-italic text-[#B2FF59]">Desk</em>
+            Comms <em className="font-black italic text-[#c8f55a]">Desk</em>
           </h1>
           <p className="text-sm text-white/40 mt-3 leading-relaxed">
             Posts, newsletters, artículos y voz de fundador. Canal por canal, tono por tono.

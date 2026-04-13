@@ -75,8 +75,8 @@ export function InsightsTabs() {
       {/* Dark header */}
       <header className="bg-[#131218] px-12 pt-10 pb-0">
         <p className="text-[8px] font-bold tracking-[2.5px] uppercase text-white/20 mb-3">Desks · Inteligencia</p>
-        <h1 className="text-[2.6rem] font-light text-white tracking-[-1.5px] leading-none">
-          Insights <em className="font-black not-italic text-[#B2FF59]">Desk</em>
+        <h1 className="text-[2.6rem] font-[300] text-white tracking-[-1.5px] leading-none">
+          Insights <em className="font-[900] italic text-[#c8f55a]">Desk</em>
         </h1>
         <p className="text-sm text-white/40 mt-3 leading-relaxed">
           Sube documentos, revisa briefs validados y sigue los outputs enrutados al OS.

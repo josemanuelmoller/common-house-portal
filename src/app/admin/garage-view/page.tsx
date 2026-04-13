@@ -65,7 +65,7 @@ export default async function GarageViewPage() {
           <div className="flex items-end justify-between">
             <div>
               <h1 className="text-[2.6rem] font-light text-white tracking-[-1.5px] leading-none">
-                The <em className="font-black not-italic text-[#B2FF59]">Garage</em>
+                The <em className="font-black italic text-[#c8f55a]">Garage</em>
               </h1>
               <p className="text-sm text-white/40 mt-3">
                 Portfolio startups. Evidence, investor readiness, and growth signals — company by company.

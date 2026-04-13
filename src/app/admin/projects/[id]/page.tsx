@@ -46,34 +46,26 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
 
       <main className="flex-1 ml-[228px] overflow-auto">
         {/* Header */}
-        <div className="bg-white border-b border-[#E0E0D8] px-8 py-6">
-          {/* Back */}
-          <Link href="/admin" className="inline-flex items-center gap-1.5 text-[10px] font-bold text-[#131218]/30 hover:text-[#131218]/70 uppercase tracking-widest mb-4 transition-colors">
+        <div className="bg-[#131218] px-10 py-10">
+          <Link href="/admin" className="inline-flex items-center gap-1.5 text-[9px] font-bold text-white/30 hover:text-white/60 uppercase tracking-[2.5px] mb-4 transition-colors">
             ← Back to Projects
           </Link>
-          <div className="flex items-start justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-[#131218] tracking-tight">{project.name}</h1>
-              <div className="flex items-center gap-2 mt-3 flex-wrap">
-                <StatusBadge value={project.status} />
-                <StatusBadge value={project.stage} />
-                {project.geography.map(g => (
-                  <span key={g} className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">{g}</span>
-                ))}
-                {project.themes.map(t => (
-                  <span key={t} className="text-[9px] bg-[#EFEFEA] text-[#131218]/50 px-2 py-0.5 rounded-full font-bold uppercase tracking-wide">{t}</span>
-                ))}
-              </div>
-            </div>
-            <div className="text-right">
-              <p className="text-[10px] text-[#131218]/25 uppercase tracking-widest font-bold">Last update</p>
-              <p className="text-sm font-semibold text-[#131218]/50 mt-0.5">{lastUpdated}</p>
-              {project.updateNeeded && (
-                <span className="mt-2 inline-block text-[10px] font-bold text-amber-600 bg-amber-50 border border-amber-100 px-2 py-0.5 rounded-full">
-                  ! Update needed
-                </span>
-              )}
-            </div>
+          <p className="text-[8px] font-bold uppercase tracking-[2.5px] text-white/20 mb-3">
+            PORTFOLIO · PROJECT
+          </p>
+          <h1 className="text-[2.6rem] font-[300] text-white leading-[1] tracking-[-1.5px]">
+            <em className="font-[900] italic text-[#c8f55a]">{project.name}</em>
+          </h1>
+          <div className="flex items-center gap-3 mt-3 flex-wrap">
+            {project.stage && (
+              <span className="text-[9px] font-bold text-white/40 uppercase tracking-widest">{project.stage}</span>
+            )}
+            {project.geography.map(g => (
+              <span key={g} className="text-[9px] font-bold text-white/25 uppercase tracking-widest">{g}</span>
+            ))}
+            {project.updateNeeded && (
+              <span className="text-[9px] font-bold text-amber-400 uppercase tracking-widest">! Update needed</span>
+            )}
           </div>
         </div>
 

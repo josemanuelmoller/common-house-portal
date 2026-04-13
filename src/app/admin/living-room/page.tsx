@@ -236,25 +236,24 @@ export default function LivingRoomAdminPage() {
   const VIS_OPTS = ["public-safe", "community", "private"] as const;
 
   return (
-    <div className="flex min-h-screen bg-[#EEEEE8]">
+    <div className="flex min-h-screen bg-[#EFEFEA]">
       <Sidebar adminNav />
 
       <main className="flex-1 ml-[228px] overflow-auto flex flex-col">
 
         {/* ── Dark header ── */}
-        <header className="bg-black flex-shrink-0" style={{ padding: "40px 52px 44px" }}>
+        <header className="bg-[#131218] flex-shrink-0 px-[52px] pt-10 pb-11">
           <p className="text-[8px] font-bold tracking-[2.5px] uppercase text-white/20 mb-3">
-            Living Room · Editorial Curator
+            LIVING ROOM · EDITORIAL CURATOR
           </p>
           <div className="flex items-end justify-between gap-5 flex-wrap">
             <div>
-              <h1 className="text-[2.6rem] font-light text-white tracking-[-1.5px] leading-none">
-                Curate the{" "}
-                <em className="font-black not-italic text-[#B2FF59]">community</em>
+              <h1 className="text-[2.6rem] font-[300] text-white tracking-[-1.5px] leading-none">
+                Curate the <em className="font-[900] italic text-[#c8f55a]">community</em>
                 <br />
                 layer.
               </h1>
-              <p className="text-[12.5px] text-white/38 mt-3 max-w-xl leading-relaxed">
+              <p className="text-[12.5px] text-white/40 mt-3 max-w-xl leading-relaxed">
                 Control who appears, which milestones surface, which signals are shared,
                 and what themes are in motion — without touching Notion directly.
               </p>
@@ -667,7 +666,7 @@ export default function LivingRoomAdminPage() {
         {/* ── Fixed save bar ── */}
         {dirtyCount > 0 && (
           <div className="fixed bottom-7 left-1/2 -translate-x-1/2 z-50">
-            <div className="bg-black text-white rounded-xl px-6 py-3.5 flex items-center gap-4 shadow-2xl whitespace-nowrap">
+            <div className="bg-[#131218] text-white rounded-xl px-6 py-3.5 flex items-center gap-4 border border-white/10 whitespace-nowrap">
               <span className="text-[12px] font-semibold text-white/60">
                 <span className="text-[#B2FF59] font-extrabold">{dirtyCount}</span>{" "}
                 unsaved change{dirtyCount !== 1 ? "s" : ""}

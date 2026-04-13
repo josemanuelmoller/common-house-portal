@@ -84,15 +84,15 @@ export default async function LibraryPage() {
       <main className="flex-1 overflow-auto">
 
         {/* Header — reading room */}
-        <div className="bg-[#131218] px-8 py-8 border-b border-white/8">
+        <div className="bg-[#131218] px-10 py-10">
           <div className="max-w-4xl mx-auto">
-            <p className="text-[10px] font-bold text-white/25 uppercase tracking-widest mb-4">
-              The Library
+            <p className="text-[8px] font-bold text-white/20 uppercase tracking-[2.5px] mb-3">
+              THE LIBRARY · COMMON HOUSE
             </p>
-            <h1 className="text-3xl font-bold text-white tracking-tight">
-              Institutional Intelligence
+            <h1 className="text-[2.6rem] font-[300] text-white leading-[1] tracking-[-1.5px]">
+              Institutional <em className="font-[900] italic text-[#c8f55a]">Intelligence</em>
             </h1>
-            <p className="text-white/35 text-sm mt-2 max-w-2xl leading-relaxed">
+            <p className="text-[12.5px] text-white/40 mt-3 max-w-[520px] leading-[1.65]">
               Curated knowledge from across the Common House network — signals, cases,
               viewpoints, and patterns that accumulate as the work deepens.
             </p>

@@ -27,26 +27,22 @@ export default async function ResidentsPage() {
   const humanCount = coFounders.length + coreTeam.length + eirs.length;
 
   return (
-    <div className="flex min-h-screen bg-[#eeeee8]">
+    <div className="flex min-h-screen bg-[#EFEFEA]">
       <Sidebar items={NAV} isAdmin />
 
-      <main className="flex-1 overflow-auto ml-[220px]">
+      <main className="flex-1 overflow-auto ml-[228px]">
 
         {/* ── Page header ──────────────────────────────────────────────────── */}
-        <header className="bg-black px-14 pt-12 pb-[52px]">
-          <p className="text-[8.5px] font-bold tracking-[2.5px] uppercase text-white/20 mb-3.5">
-            Directorio vivo de capacidades
+        <header className="bg-[#131218] px-10 pt-10 pb-11">
+          <p className="text-[8px] font-bold tracking-[2.5px] uppercase text-white/20 mb-3">
+            COMMON HOUSE · DIRECTORY
           </p>
-          <div className="flex items-end justify-between gap-6 flex-wrap">
-            <div>
-              <h1 className="text-[2.8rem] font-light text-white tracking-[-1.5px] leading-none">
-                Residents
-              </h1>
-              <p className="text-[13px] text-white/40 mt-3.5 max-w-[500px] leading-[1.65]">
-                Humans and digital agents that make the House run. Not a team page — a living directory of activatable capabilities.
-              </p>
-            </div>
-          </div>
+          <h1 className="text-[2.6rem] font-[300] text-white tracking-[-1.5px] leading-none">
+            The <em className="font-[900] italic text-[#c8f55a]">Residents</em>
+          </h1>
+          <p className="text-[12.5px] text-white/40 mt-3 max-w-[520px] leading-[1.65]">
+            Humans and digital agents that make the House run. A living directory of activatable capabilities.
+          </p>
         </header>
 
         {/* ── Client: filter pills + content sections ───────────────────── */}

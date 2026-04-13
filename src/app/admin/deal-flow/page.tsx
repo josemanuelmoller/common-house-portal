@@ -74,64 +74,36 @@ export default async function DealFlowPage() {
   }).length;
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh", background: "#eeeee8" }}>
+    <div className="flex min-h-screen bg-[#EFEFEA]">
       <Sidebar adminNav />
 
-      <main style={{ flex: 1, marginLeft: 228 }}>
+      <main className="flex-1 ml-[228px]">
 
         {/* Dark header */}
-        <header style={{ background: "#0a0a0a", padding: "40px 48px 44px" }}>
-          <p style={{
-            fontSize: 8,
-            fontWeight: 700,
-            letterSpacing: "2.5px",
-            textTransform: "uppercase",
-            color: "rgba(255,255,255,0.2)",
-            marginBottom: 12,
-          }}>
-            CONTROL ROOM
+        <header className="bg-[#131218] px-12 pt-10 pb-11">
+          <p className="text-[8px] font-bold tracking-[2.5px] uppercase text-white/20 mb-3">
+            CONTROL ROOM · COMMERCIAL
           </p>
-          <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between" }}>
+          <div className="flex items-end justify-between">
             <div>
-              <h1 style={{
-                fontSize: "2.6rem",
-                fontWeight: 300,
-                color: "#ffffff",
-                letterSpacing: "-1.5px",
-                lineHeight: 1,
-                margin: 0,
-              }}>
-                Deal{" "}
-                <em style={{ fontStyle: "normal", fontWeight: 900, color: "#B2FF59" }}>
-                  Flow
-                </em>
+              <h1 className="text-[2.6rem] font-light text-white tracking-[-1.5px] leading-none">
+                Deal <em className="font-black italic text-[#c8f55a]">Flow</em>
               </h1>
-              <p style={{ fontSize: 14, color: "rgba(255,255,255,0.38)", marginTop: 12 }}>
+              <p className="text-sm text-white/40 mt-3">
                 Commercial opportunity pipeline. Qualify, advance, and close across every stage.
               </p>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 16, paddingBottom: 4 }}>
-              <div style={{ textAlign: "right" }}>
-                <p style={{ fontSize: "2rem", fontWeight: 900, color: "#ffffff", lineHeight: 1 }}>
-                  {openCount}
-                </p>
-                <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: "1.5px", textTransform: "uppercase", color: "rgba(255,255,255,0.3)", marginTop: 2 }}>
-                  Open
-                </p>
+            <div className="flex items-center gap-4 pb-1">
+              <div className="text-right">
+                <p className="text-[2rem] font-black text-white tracking-tight leading-none">{openCount}</p>
+                <p className="text-[9px] font-bold tracking-[1.5px] uppercase text-white/30 mt-0.5">Open</p>
               </div>
-              <div style={{ width: 1, height: 40, background: "rgba(255,255,255,0.1)" }} />
-              <div style={{ textAlign: "right" }}>
-                <p style={{
-                  fontSize: "2rem",
-                  fontWeight: 900,
-                  color: urgentDecisions.length > 0 ? "#f87171" : "#B2FF59",
-                  lineHeight: 1,
-                }}>
+              <div className="w-px h-10 bg-white/10" />
+              <div className="text-right">
+                <p className={`text-[2rem] font-black tracking-tight leading-none ${urgentDecisions.length > 0 ? "text-red-400" : "text-[#c8f55a]"}`}>
                   {commercialDecisions.length}
                 </p>
-                <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: "1.5px", textTransform: "uppercase", color: "rgba(255,255,255,0.3)", marginTop: 2 }}>
-                  Decisions
-                </p>
+                <p className="text-[9px] font-bold tracking-[1.5px] uppercase text-white/30 mt-0.5">Decisions</p>
               </div>
             </div>
           </div>
