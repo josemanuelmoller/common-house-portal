@@ -15,12 +15,15 @@
     "@supabase/supabase-js": "^2.103.0",
     "@tremor/react": "^3.18.7",
     "googleapis": "^171.4.0",
+    "mammoth": "^1.12.0",
     "next": "16.2.3",
+    "officeparser": "^6.0.7",
     "pptxgenjs": "^4.0.1",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-simple-maps": "^3.0.0",
-    "recharts": "^3.8.1"
+    "recharts": "^3.8.1",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
