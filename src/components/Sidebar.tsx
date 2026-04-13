@@ -52,7 +52,7 @@ export const ADMIN_NAV_V2: NavEntry[] = [
     items: [
       { label: "Pipeline",      href: "/admin/pipeline" },
       { label: "Opportunities", href: "/admin/opportunities" },
-      { label: "Deal Flow",     href: "/admin/deal-flow" },
+      { label: "Investor Match", href: "/admin/deal-flow" },
       { label: "Grants",        href: "/admin/grants" },
     ],
   },

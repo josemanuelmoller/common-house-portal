@@ -13,7 +13,7 @@ export const ADMIN_NAV = [
 
   // ── Commercial ────────────────────────────────────────────────────────────
   { label: "Pipeline",            href: "/admin/pipeline",       icon: "◉", section: "Commercial" },
-  { label: "Deal Flow",           href: "/admin/deal-flow",      icon: "⬡", section: "Commercial" },
+  { label: "Investor Match",       href: "/admin/deal-flow",      icon: "⬡", section: "Commercial" },
   { label: "Grants",              href: "/admin/grants",         icon: "◐", section: "Commercial" },
 
   // ── Desks ─────────────────────────────────────────────────────────────────
