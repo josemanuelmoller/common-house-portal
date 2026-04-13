@@ -1,33 +1,142 @@
 import Link from "next/link";
 import { Sidebar } from "@/components/Sidebar";
-import { getProjectsOverview, getDecisionItems } from "@/lib/notion";
+import { notion, DB, getDecisionItems } from "@/lib/notion";
 import { requireAdmin } from "@/lib/require-admin";
 
-const GRANT_THEMES = ["Grant", "Funding", "Innovation Fund", "EU", "Public Funding", "Impact Finance", "Impact Investing", "Green Finance"];
+// ─── Types ───────────────────────────────────────────────────────────────────
 
-function daysSince(dateStr: string | null): number {
-  if (!dateStr) return 999;
-  return Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000);
+interface GrantOpportunity {
+  id: string;
+  notionUrl: string;
+  name: string;
+  funder: string;
+  program: string;
+  startup: string;
+  status: string;
+  statusLabel: string;
+  priority: string;   // "P1" | "P2" | "P3" | "P4" | ""
+  orgId: string;
 }
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function titleOf(page: any): string {
+  for (const val of Object.values(page.properties ?? {}) as any[]) {
+    if (val?.type === "title" && val?.title?.[0]?.plain_text) {
+      return val.title[0].plain_text;
+    }
+  }
+  return "Untitled";
+}
+
+function parseOpportunityName(name: string): { program: string; startup: string } {
+  const stripped = name.replace(/^Grant\s*—\s*/i, "");
+  const midDot = stripped.lastIndexOf("·");
+  if (midDot !== -1) {
+    return { program: stripped.slice(0, midDot).trim(), startup: stripped.slice(midDot + 1).trim() };
+  }
+  const dashIdx = stripped.lastIndexOf(" — ");
+  if (dashIdx !== -1) {
+    return { program: stripped.slice(0, dashIdx).trim(), startup: stripped.slice(dashIdx + 3).trim() };
+  }
+  return { program: stripped, startup: "" };
+}
+
+const STATUS_LABEL: Record<string, string> = {
+  "New": "New", "Qualifying": "Qualifying", "Active": "Active", "Stalled": "Stalled",
+};
+
+const PRIORITY_SHORT: Record<string, string> = {
+  "P1 — Act Now": "P1", "P2 — This Quarter": "P2", "P3 — Backlog": "P3", "P4 — Watch": "P4",
+};
+
+const STATUS_COLOR: Record<string, string> = {
+  "Qualifying": "bg-[#B2FF59]/20 text-green-800",
+  "Active":     "bg-[#B2FF59]/20 text-green-800",
+  "New":        "bg-[#131218]/6 text-[#131218]/50",
+  "Stalled":    "bg-amber-100 text-amber-700",
+};
+
+const PRIORITY_COLOR: Record<string, string> = {
+  "P1": "bg-red-100 text-red-700",
+  "P2": "bg-amber-100 text-amber-700",
+  "P3": "bg-[#131218]/6 text-[#131218]/40",
+  "P4": "bg-[#131218]/6 text-[#131218]/30",
+};
+
+// ─── Data fetching ────────────────────────────────────────────────────────────
+
+async function getGrantOpportunities(): Promise<GrantOpportunity[]> {
+  const res = await notion.databases.query({
+    database_id: DB.opportunities,
+    filter: {
+      and: [
+        { property: "Opportunity Type", select: { equals: "Grant" } },
+        { property: "Opportunity Status", select: { does_not_equal: "Closed Lost" } },
+        { property: "Opportunity Status", select: { does_not_equal: "Closed Won" } },
+      ],
+    },
+    sorts: [
+      { property: "Priority", direction: "ascending" },
+      { timestamp: "last_edited_time", direction: "descending" },
+    ],
+    page_size: 50,
+  });
+
+  // Resolve org names
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const orgIds = [...new Set((res.results as any[])
+    .map(p => p.properties["Account / Organization"]?.relation?.[0]?.id)
+    .filter(Boolean)
+  )];
+  const orgNames: Record<string, string> = {};
+  await Promise.all(orgIds.map(async (id) => {
+    try {
+      const page = await notion.pages.retrieve({ page_id: id as string });
+      orgNames[id as string] = titleOf(page);
+    } catch { /* skip */ }
+  }));
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (res.results as any[]).map((page) => {
+    const props = page.properties;
+    const name    = titleOf(page);
+    const parsed  = parseOpportunityName(name);
+    const status  = props["Opportunity Status"]?.select?.name ?? "New";
+    const priority = props["Priority"]?.select?.name ?? "";
+    const orgId   = props["Account / Organization"]?.relation?.[0]?.id ?? "";
+    return {
+      id: page.id,
+      notionUrl: page.url ?? "",
+      name,
+      funder: orgNames[orgId] ?? parsed.program,
+      program: parsed.program,
+      startup: parsed.startup,
+      status,
+      statusLabel: STATUS_LABEL[status] ?? status,
+      priority: PRIORITY_SHORT[priority] ?? priority,
+      orgId,
+    };
+  });
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default async function GrantsPage() {
   await requireAdmin();
 
-  const [allProjects, decisions] = await Promise.all([
-    getProjectsOverview(),
+  const [grants, decisions] = await Promise.all([
+    getGrantOpportunities(),
     getDecisionItems(),
   ]);
 
-  // Projects explicitly marked as grant-eligible in Notion
-  const grantProjects = allProjects.filter(p => p.grantEligible === true);
-
-  // Decisions categorised as Grants in Notion
   const grantDecisions = decisions.filter(d => d.category === "Grants");
-
-  const urgentGrant = grantDecisions.filter(d =>
+  const urgentGrants   = grants.filter(g => g.priority === "P1");
+  const p1Decisions    = grantDecisions.filter(d =>
     d.priority === "P1" || d.priority === "P1 Critical" || d.priority === "Urgent"
   );
-  const withDeadlines = grantDecisions.filter(d => d.dueDate);
+  const withDeadlines  = grantDecisions.filter(d => d.dueDate);
 
   return (
     <div className="flex min-h-screen bg-[#EFEFEA]">
@@ -43,45 +152,44 @@ export default async function GrantsPage() {
           <div className="flex items-end justify-between">
             <div>
               <h1 className="text-[2.6rem] font-light text-white tracking-[-1.5px] leading-none">
-                Grants &amp; <em className="font-black italic text-[#c8f55a]">Funding</em>
+                Grants <em className="font-black italic text-[#c8f55a]">Desk</em>
               </h1>
               <p className="text-sm text-white/40 mt-3">
-                Grant opportunities, applications, and public funding pipeline.
+                Grant pipeline — funder, program, startup fit and application status.
               </p>
             </div>
             <div className="flex items-center gap-4 pb-1">
               <div className="text-right">
-                <p className="text-[2rem] font-black text-white tracking-tight leading-none">{grantProjects.length}</p>
-                <p className="text-[9px] font-bold tracking-[1.5px] uppercase text-white/30 mt-0.5">Eligible</p>
+                <p className="text-[2rem] font-black text-white tracking-tight leading-none">{grants.length}</p>
+                <p className="text-[9px] font-bold tracking-[1.5px] uppercase text-white/30 mt-0.5">Active</p>
               </div>
-              <div className="w-px h-10 bg-white/10" />
-              <div className="text-right">
-                <p className={`text-[2rem] font-black tracking-tight leading-none ${urgentGrant.length > 0 ? "text-red-400" : "text-[#B2FF59]"}`}>
-                  {grantDecisions.length}
-                </p>
-                <p className="text-[9px] font-bold tracking-[1.5px] uppercase text-white/30 mt-0.5">Open items</p>
-              </div>
+              {urgentGrants.length > 0 && (
+                <>
+                  <div className="w-px h-10 bg-white/10" />
+                  <div className="text-right">
+                    <p className="text-[2rem] font-black text-red-400 tracking-tight leading-none">{urgentGrants.length}</p>
+                    <p className="text-[9px] font-bold tracking-[1.5px] uppercase text-white/30 mt-0.5">P1 urgent</p>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </header>
 
         <div className="px-12 py-9 max-w-6xl space-y-6">
 
-          {/* P1 deadline banner */}
-          {(urgentGrant.length > 0 || withDeadlines.length > 0) && (
+          {/* P1 banner */}
+          {(p1Decisions.length > 0 || withDeadlines.length > 0) && (
             <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-xl px-5 py-3.5">
               <span className="w-2 h-2 rounded-full bg-red-500 shrink-0 animate-pulse" />
               <p className="text-sm text-[#131218] flex-1 min-w-0">
-                {urgentGrant.length > 0 && (
-                  <><strong>{urgentGrant.length} urgent</strong>{" — "}{urgentGrant[0].title}</>
+                {p1Decisions.length > 0 && (
+                  <><strong>{p1Decisions.length} urgent decision{p1Decisions.length !== 1 ? "s" : ""}</strong>{" — "}{p1Decisions[0].title}</>
                 )}
                 {withDeadlines.length > 0 && (
-                  <>{urgentGrant.length > 0 ? " · " : ""}
+                  <>{p1Decisions.length > 0 ? " · " : ""}
                   <strong>{withDeadlines.length} deadline{withDeadlines.length !== 1 ? "s" : ""}</strong>
-                  {" — "}{withDeadlines[0].dueDate
-                    ? `${withDeadlines[0].title} closes ${new Date(withDeadlines[0].dueDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`
-                    : withDeadlines[0].title
-                  }</>
+                  {" — "}{withDeadlines[0].title}{withDeadlines[0].dueDate ? ` closes ${new Date(withDeadlines[0].dueDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}` : ""}</>
                 )}
               </p>
               <Link href="/admin/decisions" className="text-[11px] font-bold text-red-600 shrink-0 hover:text-red-800 transition-colors whitespace-nowrap">
@@ -93,9 +201,17 @@ export default async function GrantsPage() {
           {/* Stats row */}
           <div className="grid grid-cols-3 gap-4">
             <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-4">
-              <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30 mb-2">Projects with funding scope</p>
-              <p className="text-3xl font-bold text-[#131218] tracking-tight">{grantProjects.length}</p>
-              <p className="text-[11px] text-[#131218]/40 font-medium mt-1.5">Eligible for grant applications</p>
+              <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30 mb-2">Grant pipeline</p>
+              <p className="text-3xl font-bold text-[#131218] tracking-tight">{grants.length}</p>
+              <p className="text-[11px] text-[#131218]/40 font-medium mt-1.5">Active opportunities</p>
+            </div>
+            <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-4">
+              <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30 mb-2">P1 — Act Now</p>
+              {urgentGrants.length > 0
+                ? <p className="text-3xl font-bold text-red-500 tracking-tight">{urgentGrants.length}</p>
+                : <p className="text-3xl font-bold text-[#131218]/15 tracking-tight">0</p>
+              }
+              <p className="text-[11px] text-[#131218]/40 font-medium mt-1.5">Require immediate action</p>
             </div>
             <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-4">
               <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30 mb-2">Open decisions</p>
@@ -103,78 +219,88 @@ export default async function GrantsPage() {
                 ? <p className="text-3xl font-bold text-amber-500 tracking-tight">{grantDecisions.length}</p>
                 : <p className="text-3xl font-bold text-[#131218]/15 tracking-tight">0</p>
               }
-              <p className="text-[11px] text-[#131218]/40 font-medium mt-1.5">Applications / approvals pending</p>
-            </div>
-            <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-4">
-              <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30 mb-2">With deadlines</p>
-              {withDeadlines.length > 0
-                ? <p className="text-3xl font-bold text-red-500 tracking-tight">{withDeadlines.length}</p>
-                : <p className="text-3xl font-bold text-[#131218]/15 tracking-tight">0</p>
-              }
-              <p className="text-[11px] text-[#131218]/40 font-medium mt-1.5">Time-sensitive applications</p>
+              <p className="text-[11px] text-[#131218]/40 font-medium mt-1.5">Approvals / inputs pending</p>
             </div>
           </div>
 
-          {/* Two-column layout */}
-          <div className="grid grid-cols-[1fr_340px] gap-6 items-start">
+          {/* Pipeline table + decisions side panel */}
+          <div className="grid grid-cols-[1fr_320px] gap-6 items-start">
 
-            {/* Grant-eligible projects */}
-            <div>
-              <div className="flex items-center gap-3 mb-3">
-                <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30">Eligible projects</p>
-                <div className="flex-1 h-px bg-[#E0E0D8]" />
-                <p className="text-[9px] font-bold text-[#131218]/25">{grantProjects.length}</p>
+            {/* Grant opportunity pipeline table */}
+            <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
+              <div className="flex items-center justify-between px-5 py-3.5 border-b border-[#EFEFEA]">
+                <div className="flex items-center gap-2">
+                  <div className="w-5 h-5 rounded-md bg-[#B2FF59] flex items-center justify-center">
+                    <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="#000" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                    </svg>
+                  </div>
+                  <span className="text-[11px] font-bold text-[#131218]/60 tracking-wide">Grant pipeline</span>
+                </div>
+                <a
+                  href="https://www.notion.so/687caa98594a41b595c9960c141be0c0"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[9px] font-bold text-[#131218]/30 hover:text-[#131218]/60 transition-colors uppercase tracking-widest"
+                >
+                  Open in Notion →
+                </a>
               </div>
 
-              {grantProjects.length > 0 ? (
-                <div className="flex flex-col gap-3">
-                  {grantProjects.map(p => {
-                    const days = daysSince(p.lastUpdate);
-                    return (
-                      <Link
-                        key={p.id}
-                        href={`/admin/projects/${p.id}`}
-                        className="group bg-white rounded-xl border border-[#E0E0D8] px-5 py-3.5 hover:border-[#131218]/25 hover:-translate-y-0.5 transition-all duration-200 flex items-center gap-4"
-                      >
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[12.5px] font-bold text-[#131218] truncate">{p.name}</p>
-                          <div className="flex items-center gap-2 mt-1 flex-wrap">
-                            {p.themes.filter(t => GRANT_THEMES.some(g => t.toLowerCase().includes(g.toLowerCase()))).slice(0, 3).map(t => (
-                              <span key={t} className="text-[8px] font-bold px-1.5 py-0.5 rounded bg-[#B2FF59]/20 text-green-800">
-                                {t}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                        <div className="text-right shrink-0">
-                          <p className="text-[10px] font-semibold text-[#131218]/50">
-                            {p.stage || "—"}
-                          </p>
-                          <p className="text-[9px] text-[#131218]/25 mt-0.5">
-                            {days < 999
-                              ? `${days}d ago`
-                              : "No update"
-                            }
-                          </p>
-                        </div>
-                        <span className="text-[#131218]/20 group-hover:text-[#131218]/60 transition-colors">→</span>
-                      </Link>
-                    );
-                  })}
+              {grants.length === 0 ? (
+                <div className="px-5 py-10 text-center">
+                  <p className="text-sm text-[#131218]/25">No active grant opportunities.</p>
                 </div>
               ) : (
-                <div className="bg-white rounded-2xl border border-[#E0E0D8] p-8 text-center">
-                  <p className="text-sm text-[#131218]/25">
-                    No grant-eligible projects found. Enable the &ldquo;Grant Eligible&rdquo; checkbox on a project in Notion to include it here.
-                  </p>
-                </div>
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="border-b border-[#EFEFEA]">
+                      {["Funder / Program", "Status", "Priority", "For"].map(h => (
+                        <th key={h} className="px-4 py-2.5 text-[8.5px] font-bold tracking-widest uppercase text-[#131218]/25 first:pl-5 last:pr-5">
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#EFEFEA]">
+                    {grants.map(g => (
+                      <tr key={g.id} className="hover:bg-[#EFEFEA]/40 transition-colors group">
+                        <td className="pl-5 pr-4 py-3.5">
+                          <p className="text-[12px] font-bold text-[#131218] leading-tight">{g.funder || g.program}</p>
+                          {g.program && g.program !== g.funder && (
+                            <p className="text-[10px] text-[#131218]/40 mt-0.5 font-medium">{g.program}</p>
+                          )}
+                        </td>
+                        <td className="px-4 py-3.5">
+                          <span className={`inline-flex text-[9px] font-bold px-2 py-0.5 rounded-full ${STATUS_COLOR[g.status] ?? "bg-[#131218]/6 text-[#131218]/40"}`}>
+                            {g.statusLabel}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3.5">
+                          {g.priority ? (
+                            <span className={`inline-flex text-[9px] font-bold px-2 py-0.5 rounded-full ${PRIORITY_COLOR[g.priority] ?? "bg-[#131218]/6 text-[#131218]/40"}`}>
+                              {g.priority}
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-[#131218]/20">—</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3.5 pr-5">
+                          <span className="text-[10px] font-semibold text-[#131218]/50">
+                            {g.startup || "—"}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               )}
             </div>
 
             {/* Grant decisions */}
             <div>
               <div className="flex items-center gap-3 mb-3">
-                <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30">Open items</p>
+                <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30">Open decisions</p>
                 <div className="flex-1 h-px bg-[#E0E0D8]" />
                 {grantDecisions.length > 0 && (
                   <span className="text-[9px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">{grantDecisions.length}</span>
@@ -220,7 +346,6 @@ export default async function GrantsPage() {
             </div>
 
           </div>
-
         </div>
       </main>
     </div>
