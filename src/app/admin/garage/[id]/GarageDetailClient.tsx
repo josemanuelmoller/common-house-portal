@@ -812,7 +812,7 @@ function UploadModal({ projectId, projectName, orgId, onDone }: {
               onClick={() => document.getElementById("garage-file-input")?.click()}
             >
               <p className="text-sm font-semibold text-[#131218]/40">Drop files here or click to browse</p>
-              <p className="text-[10px] text-[#131218]/25 mt-1">PDF · PPTX · XLSX · DOCX — up to 50 MB each</p>
+              <p className="text-[10px] text-[#131218]/25 mt-1">PDF · PPTX · XLSX · DOCX — up to 200 MB each</p>
               <input id="garage-file-input" type="file" multiple accept=".pdf,.pptx,.xlsx,.docx,.xls,.ppt"
                 className="hidden" onChange={e => addFiles(e.target.files)} />
             </div>
