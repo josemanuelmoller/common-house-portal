@@ -23,6 +23,8 @@ export const DB = {
   insightBriefs:   "04bed3a3fd1a4b3a99643cd21562e08a",
   // Content Pipeline [OS v2] — collection: 29db8c9b-6738-41ab-bf0a-3a5f06c568a0
   contentPipeline: "3bf5cf81f45c4db2840590f3878bfdc0",
+  // Style Profiles [OS v2] — collection: 3119b5c0-3b8b-4c17-bde0-2772fc9ba4a6
+  styleProfiles:   "606b1aafe63849a1a81ac6199683dc14",
 };
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -54,6 +56,8 @@ export type Project = {
   engagementStage: string;
   engagementModel: string;
   workroomMode: string;
+  hallMode?: string;
+  grantEligible?: boolean;
 };
 
 export type ProjectCard = Project & {
@@ -69,6 +73,7 @@ export type ProjectCard = Project & {
   outcomeCount: number;
   newEvidenceCount: number;
   reusableCount: number;
+  grantEligible?: boolean;
 };
 
 export type EvidenceItem = {
@@ -108,6 +113,7 @@ export type KnowledgeAsset = {
   assetType: string;
   status: string;
   lastUpdated: string | null;
+  portalVisibility?: string;
 };
 
 export type DashboardStats = {
@@ -191,6 +197,8 @@ function parseProject(page: any): Project {
     engagementStage:   select(prop(page, "Engagement Stage")),
     engagementModel:   select(prop(page, "Engagement Model")),
     workroomMode:      select(prop(page, "Workroom Mode")),
+    hallMode:          page.properties["Hall Mode"]?.select?.name ?? "explore",
+    grantEligible:     page.properties["Grant Eligible"]?.checkbox ?? false,
   };
 }
 
@@ -654,6 +662,7 @@ export async function getKnowledgeAssets(): Promise<KnowledgeAsset[]> {
     assetType: select(prop(page, "Asset Type")) || "",
     status: select(prop(page, "Status")) || "",
     lastUpdated: page.last_edited_time ?? null,
+    portalVisibility: page.properties["Portal Visibility"]?.select?.name ?? "admin-only",
   }));
 }
 
@@ -793,6 +802,7 @@ export type DecisionItem = {
   dueDate: string | null;
   notes: string;
   notionUrl: string;
+  category?: string;
 };
 
 export async function getDecisionItems(statusFilter?: string): Promise<DecisionItem[]> {
@@ -827,7 +837,8 @@ export async function getDecisionItems(statusFilter?: string): Promise<DecisionI
       dueDate: date(prop(page, "Due Date")),
       notes: text(prop(page, "Notes")),
       notionUrl: page.url ?? "",
-    }); }); 
+      category: page.properties["Decision Category"]?.select?.name ?? undefined,
+    }); });
   } catch {
     return [];
   }
@@ -992,17 +1003,35 @@ export async function getLivingRoomThemes(): Promise<LivingRoomTheme[]> {
 
 // ─── Content Pipeline ─────────────────────────────────────────────────────────
 
+export type StyleProfile = {
+  id: string;
+  name: string;
+  styleType: string;    // Voice / Tone | Deck Style | Proposal Style | etc.
+  scope: string;        // Common House | JMM | Portfolio Startup | Cross-entity
+  status: string;       // Active | Draft | Archived
+  masterPrompt: string;
+  toneSummary: string;
+  structuralRules: string;
+  vocabularyPatterns: string;
+  forbiddenPatterns: string;
+  ctaStyle: string;
+  firstPersonAllowed: boolean;
+};
+
 export type ContentPipelineItem = {
   id: string;
   title: string;
   status: string;       // Draft | Review | Approved | Published | Archived
   contentType: string;  // Post | Newsletter | Article | Report | Investor Update | Proposal
   channel: string;      // LinkedIn | Newsletter | Internal | etc.
+  desk: string;         // Comms | Design | Insights | Grants | ""
   projectId: string | null;
   projectName: string;
   draftDate: string | null;
   publishDate: string | null;
   notionUrl: string;
+  draftText: string;    // AI-generated draft (Draft Text property, multi-chunk rich_text)
+  slideHtml: string;    // HTML slide deck for Deck/One-pager/Proposal content types
 };
 
 export async function getContentPipeline(statusFilter?: string): Promise<ContentPipelineItem[]> {
@@ -1026,11 +1055,46 @@ export async function getContentPipeline(statusFilter?: string): Promise<Content
       status:      select(prop(page, "Status")),
       contentType: select(prop(page, "Content Type")),
       channel:     select(prop(page, "Channel")),
+      desk:        select(prop(page, "Desk")),
       projectId:   relationFirst(prop(page, "Projects")) ?? relationFirst(prop(page, "Project")),
       projectName: text(prop(page, "Project Name")) || "",
       draftDate:   date(prop(page, "Draft Date")) ?? date(prop(page, "Created Date")),
       publishDate: date(prop(page, "Publish Date")) ?? date(prop(page, "Published Date")),
       notionUrl:   page.url ?? "",
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      draftText:   (prop(page, "Draft Text")?.rich_text ?? []).map((r: any) => r.plain_text).join(""),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      slideHtml:   (prop(page, "Slide HTML")?.rich_text ?? []).map((r: any) => r.plain_text).join(""),
+    }));
+  } catch {
+    return [];
+  }
+}
+
+// ─── Style Profiles ───────────────────────────────────────────────────────────
+
+export async function getStyleProfiles(): Promise<StyleProfile[]> {
+  try {
+    const res = await notion.databases.query({
+      database_id: DB.styleProfiles,
+      filter: { property: "Status", select: { equals: "Active" } },
+      sorts: [{ property: "Scope", direction: "ascending" }],
+      page_size: 50,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (res.results as any[]).map(page => ({
+      id:                  page.id,
+      name:                text(prop(page, "Name")) || "Untitled",
+      styleType:           select(prop(page, "Style Type")),
+      scope:               select(prop(page, "Scope")),
+      status:              select(prop(page, "Status")),
+      masterPrompt:        text(prop(page, "Master Prompt")),
+      toneSummary:         text(prop(page, "Tone Summary")),
+      structuralRules:     text(prop(page, "Structural Rules")),
+      vocabularyPatterns:  text(prop(page, "Vocabulary Patterns")),
+      forbiddenPatterns:   text(prop(page, "Forbidden Patterns")),
+      ctaStyle:            text(prop(page, "CTA Style")),
+      firstPersonAllowed:  prop(page, "First Person Allowed")?.checkbox ?? false,
     }));
   } catch {
     return [];

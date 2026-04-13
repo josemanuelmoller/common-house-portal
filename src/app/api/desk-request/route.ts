@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { deskType, contentType, description, project, channel } = body;
+  const { deskType, contentType, description, project, channel, styleProfileId } = body;
 
   if (!description?.trim()) {
     return NextResponse.json({ error: "Description is required" }, { status: 400 });
@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
 
     // Fire-and-forget: generate AI draft in background, don't block the response
     if (process.env.ANTHROPIC_API_KEY) {
-      generateDraft(page.id).catch(err =>
+      generateDraft(page.id, styleProfileId || undefined).catch(err =>
         console.error("[desk-request] generate-draft failed", err)
       );
     }

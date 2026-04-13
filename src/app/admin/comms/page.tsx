@@ -1,44 +1,43 @@
 import { requireAdmin } from "@/lib/require-admin";
 import { Sidebar } from "@/components/Sidebar";
-import { getContentPipeline } from "@/lib/notion";
+import { getContentPipeline, getStyleProfiles } from "@/lib/notion";
 import DeskRequestForm from "@/components/DeskRequestForm";
+import { DeskQueueSection } from "@/components/ContentCard";
 
 const COMMS_TYPES = ["LinkedIn Post", "Newsletter Block", "Article Outline", "Commentary Note", "Instagram Caption"];
 const COMMS_CHANNELS = ["LinkedIn", "Newsletter", "Instagram", "Website / Article"];
 
-const STATUS_DOT: Record<string, string> = {
-  "Draft":            "bg-[#131218]/20",
-  "Review":           "bg-amber-400",
-  "Approved":         "bg-blue-500",
-  "Ready to Publish": "bg-blue-500",
-  "Published":        "bg-[#B2FF59]",
-  "Archived":         "bg-gray-300",
-};
-
-const STATUS_PILL: Record<string, string> = {
-  "Draft":            "bg-[#EFEFEA] text-[#131218]/50",
-  "Review":           "bg-amber-50 text-amber-800",
-  "Approved":         "bg-blue-50 text-blue-700",
-  "Ready to Publish": "bg-blue-50 text-blue-700",
-  "Published":        "bg-green-50 text-green-700",
-  "Archived":         "bg-gray-50 text-gray-500",
-};
-
 export default async function CommsPage() {
   await requireAdmin();
 
-  const allContent = await getContentPipeline();
+  const [allContent, styleProfiles] = await Promise.all([
+    getContentPipeline(),
+    getStyleProfiles(),
+  ]);
 
-  // Filter to comms-relevant types
-  const commsTypes = new Set(["Post", "Newsletter", "Artículo", "Article", "LinkedIn Post", "Newsletter Block", "Instagram Caption", "Article Outline"]);
-  const queue = allContent.filter(item =>
-    commsTypes.has(item.contentType) ||
-    (item.contentType && item.contentType.toLowerCase().includes("post")) ||
-    (item.contentType && item.contentType.toLowerCase().includes("newsletter")) ||
-    (item.contentType && item.contentType.toLowerCase().includes("article")) ||
-    (item.contentType && item.contentType.toLowerCase().includes("caption")) ||
-    (item.contentType && item.contentType.toLowerCase().includes("linkedin"))
-  ).slice(0, 8);
+  // Filter to Comms desk items; fall back to content-type matching for older items without Desk set
+  const commsTypes = new Set(["Post", "Newsletter", "Artículo", "Article", "LinkedIn Post", "Newsletter Block", "Instagram Caption", "Article Outline", "Commentary Note"]);
+  const deskItems = allContent.filter(item =>
+    item.desk === "Comms" ||
+    (!item.desk && (
+      commsTypes.has(item.contentType) ||
+      (item.contentType && (
+        item.contentType.toLowerCase().includes("post") ||
+        item.contentType.toLowerCase().includes("newsletter") ||
+        item.contentType.toLowerCase().includes("article") ||
+        item.contentType.toLowerCase().includes("caption") ||
+        item.contentType.toLowerCase().includes("linkedin")
+      ))
+    ))
+  );
+
+  const pending   = deskItems.filter(i => !i.draftText && !i.slideHtml);
+  const generated = deskItems.filter(i => i.draftText || i.slideHtml);
+
+  // Comms only needs Voice / Tone + Brand Identity profiles (not visual layout styles)
+  const commsProfiles = styleProfiles.filter(p =>
+    p.styleType === "Voice / Tone" || p.styleType === "Brand Identity" || p.scope === "JMM" || p.scope === "Common House" || p.scope === "Portfolio Startup"
+  );
 
   return (
     <div className="flex min-h-screen bg-[#EFEFEA]">
@@ -58,7 +57,7 @@ export default async function CommsPage() {
         <div className="px-12 py-9">
           <div className="max-w-5xl grid grid-cols-1 lg:grid-cols-[1fr_2fr] gap-6 items-start">
 
-            {/* Request form — client component */}
+            {/* Request form */}
             <div className="bg-white border border-[#E0E0D8] rounded-2xl overflow-hidden">
               <div className="px-5 py-4 border-b border-[#E0E0D8]">
                 <p className="text-[8px] font-bold tracking-[2px] uppercase text-[#131218]/30 mb-1">Nueva solicitud</p>
@@ -69,43 +68,12 @@ export default async function CommsPage() {
                 contentTypes={COMMS_TYPES}
                 channelOrProjectOptions={COMMS_CHANNELS}
                 channelOrProjectLabel="Plataforma"
+                styleProfiles={commsProfiles}
               />
             </div>
 
-            {/* Live queue from Content Pipeline */}
-            <div className="flex flex-col gap-4">
-              <div className="flex items-center gap-3">
-                <p className="text-[9px] font-bold tracking-[1.5px] uppercase text-[#131218]/30">Cola de contenido</p>
-                <div className="flex-1 h-px bg-[#E0E0D8]" />
-                <p className="text-[9px] font-bold text-[#131218]/25">{queue.length} items</p>
-              </div>
-              {queue.length > 0 ? queue.map(item => (
-                <a
-                  key={item.id}
-                  href={item.notionUrl || "#"}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="bg-white border border-[#E0E0D8] rounded-xl px-4 py-3.5 flex items-start gap-3 hover:border-[#131218]/25 transition-all"
-                >
-                  <span className={`w-2 h-2 rounded-full flex-shrink-0 mt-1 ${STATUS_DOT[item.status] ?? "bg-[#131218]/20"}`} />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[12.5px] font-bold text-[#131218] tracking-tight line-clamp-2">{item.title}</p>
-                    <p className="text-[10px] text-[#131218]/40 mt-0.5">
-                      {item.contentType || "—"}
-                      {item.channel ? ` · Canal: ${item.channel}` : ""}
-                    </p>
-                  </div>
-                  <span className={`text-[8.5px] font-bold tracking-[0.5px] px-2 py-1 rounded-md whitespace-nowrap flex-shrink-0 ${STATUS_PILL[item.status] ?? "bg-[#EFEFEA] text-[#131218]/50"}`}>
-                    {item.status || "Draft"}
-                  </span>
-                </a>
-              )) : (
-                <div className="bg-white border border-[#E0E0D8] rounded-xl px-4 py-8 text-center">
-                  <p className="text-[11px] text-[#131218]/25">No hay items de comms en el pipeline aún.</p>
-                  <p className="text-[10px] text-[#131218]/20 mt-1">Las solicitudes enviadas aparecerán aquí.</p>
-                </div>
-              )}
-            </div>
+            {/* Queue + Generated sections */}
+            <DeskQueueSection pending={pending} generated={generated} />
 
           </div>
         </div>
