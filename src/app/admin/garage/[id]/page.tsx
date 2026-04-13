@@ -156,6 +156,7 @@ export default async function GarageDetailPage({ params }: { params: Promise<{ i
           valuations={valuations}
           capTable={capTable}
           dataRoom={dataRoom}
+          orgId={orgData?.id}
         />
 
       </main>

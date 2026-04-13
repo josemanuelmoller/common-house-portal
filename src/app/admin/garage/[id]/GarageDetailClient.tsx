@@ -27,6 +27,7 @@ type Props = {
   valuations: ValuationRecord[];
   capTable: CapTableEntry[];
   dataRoom: DataRoomItem[];
+  orgId?: string;
 };
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
@@ -603,6 +604,152 @@ function FundingTab({ orgData }: { orgData: StartupOrgData | null }) {
   );
 }
 
+// ─── Upload panel ─────────────────────────────────────────────────────────────
+
+type UploadResult = { name: string; category: string; documentType: string };
+
+function UploadPanel({ projectId, projectName, orgId, onClose }: {
+  projectId: string;
+  projectName: string;
+  orgId?: string;
+  onClose: () => void;
+}) {
+  const [dragging, setDragging]   = useState(false);
+  const [files, setFiles]         = useState<File[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [done, setDone]           = useState<UploadResult[]>([]);
+  const [errors, setErrors]       = useState<string[]>([]);
+
+  function addFiles(incoming: FileList | null) {
+    if (!incoming) return;
+    setFiles(prev => {
+      const names = new Set(prev.map(f => f.name));
+      return [...prev, ...Array.from(incoming).filter(f => !names.has(f.name))];
+    });
+  }
+
+  async function handleUpload() {
+    if (!files.length) return;
+    setUploading(true);
+    const fd = new FormData();
+    fd.append("projectId", projectId);
+    fd.append("projectName", projectName);
+    if (orgId) fd.append("orgId", orgId);
+    files.forEach(f => fd.append("files", f));
+
+    try {
+      const res = await fetch("/api/garage-upload", { method: "POST", body: fd });
+      const data = await res.json();
+      setDone(data.results ?? []);
+      setErrors(data.errors ?? []);
+    } catch {
+      setErrors(["Upload failed — check console"]);
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  if (done.length > 0) {
+    return (
+      <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+        <div className="bg-white rounded-2xl border border-[#E0E0D8] p-8 w-full max-w-md">
+          <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30 mb-1">Upload complete</p>
+          <p className="text-lg font-bold text-[#131218] mb-5">{done.length} file{done.length > 1 ? "s" : ""} stored</p>
+          <div className="space-y-2 mb-6">
+            {done.map(r => (
+              <div key={r.name} className="flex items-center gap-3 bg-[#EFEFEA] rounded-xl px-4 py-2.5">
+                <span className="text-[10px] font-bold text-green-700 bg-green-100 px-2 py-0.5 rounded">✓</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[11px] font-semibold text-[#131218] truncate">{r.name}</p>
+                  <p className="text-[9px] text-[#131218]/40">{r.category} · {r.documentType}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+          {errors.length > 0 && (
+            <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3 mb-5">
+              {errors.map(e => <p key={e} className="text-[10px] text-red-600">{e}</p>)}
+            </div>
+          )}
+          <div className="bg-[#EFEFEA] rounded-xl px-4 py-3 mb-5">
+            <p className="text-[10px] font-semibold text-[#131218]/60">
+              Files saved to Data Room. Run <span className="font-bold text-[#131218]">ingest-garage-docs</span> in Claude Code to populate the full Garage profile from these documents.
+            </p>
+          </div>
+          <button onClick={onClose} className="w-full bg-[#131218] text-white text-[11px] font-bold py-2.5 rounded-xl">
+            Done
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+      <div className="bg-white rounded-2xl border border-[#E0E0D8] p-8 w-full max-w-lg">
+        <div className="flex items-start justify-between mb-5">
+          <div>
+            <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30 mb-1">Garage · {projectName}</p>
+            <p className="text-lg font-bold text-[#131218]">Upload documents</p>
+            <p className="text-xs text-[#131218]/40 mt-1">Pitch deck, financial model, cap table, one-pager…</p>
+          </div>
+          <button onClick={onClose} className="text-[#131218]/30 hover:text-[#131218] text-xl leading-none">×</button>
+        </div>
+
+        {/* Drop zone */}
+        <div
+          onDragOver={e => { e.preventDefault(); setDragging(true); }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={e => { e.preventDefault(); setDragging(false); addFiles(e.dataTransfer.files); }}
+          className={`border-2 border-dashed rounded-xl px-6 py-10 text-center cursor-pointer transition-colors ${
+            dragging ? "border-[#131218] bg-[#EFEFEA]" : "border-[#E0E0D8] hover:border-[#131218]/30"
+          }`}
+          onClick={() => document.getElementById("garage-file-input")?.click()}
+        >
+          <p className="text-sm font-semibold text-[#131218]/40">Drop files here or click to browse</p>
+          <p className="text-[10px] text-[#131218]/25 mt-1">PDF · PPTX · XLSX · DOCX — up to 50 MB each</p>
+          <input
+            id="garage-file-input"
+            type="file"
+            multiple
+            accept=".pdf,.pptx,.xlsx,.docx,.xls,.ppt"
+            className="hidden"
+            onChange={e => addFiles(e.target.files)}
+          />
+        </div>
+
+        {/* File list */}
+        {files.length > 0 && (
+          <div className="mt-4 space-y-1.5 max-h-48 overflow-y-auto">
+            {files.map(f => (
+              <div key={f.name} className="flex items-center gap-2 bg-[#EFEFEA] rounded-lg px-3 py-2">
+                <span className="text-[9px] font-bold text-[#131218]/30 uppercase">{f.name.split(".").pop()}</span>
+                <span className="text-[11px] text-[#131218] font-medium flex-1 truncate">{f.name}</span>
+                <button
+                  onClick={() => setFiles(prev => prev.filter(x => x.name !== f.name))}
+                  className="text-[#131218]/20 hover:text-[#131218]/60 text-sm"
+                >×</button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <button
+          onClick={handleUpload}
+          disabled={!files.length || uploading}
+          className={`mt-5 w-full py-2.5 rounded-xl text-[11.5px] font-bold transition-all ${
+            files.length && !uploading
+              ? "bg-[#c8f55a] text-[#131218] hover:bg-[#b8e84a]"
+              : "bg-[#EFEFEA] text-[#131218]/30 cursor-not-allowed"
+          }`}
+        >
+          {uploading ? "Uploading…" : `Upload ${files.length ? `${files.length} file${files.length > 1 ? "s" : ""}` : "files"}`}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main client component ─────────────────────────────────────────────────────
 
 const TABS: { id: Tab; label: string }[] = [
@@ -616,28 +763,46 @@ const TABS: { id: Tab; label: string }[] = [
 
 export function GarageDetailClient({
   project, evidence, sources, decisions,
-  orgData, financials, valuations, capTable, dataRoom,
+  orgData, financials, valuations, capTable, dataRoom, orgId,
 }: Props) {
-  const [tab, setTab] = useState<Tab>("pulse");
+  const [tab, setTab]         = useState<Tab>("pulse");
+  const [showUpload, setShowUpload] = useState(false);
 
   return (
     <>
+      {showUpload && (
+        <UploadPanel
+          projectId={project.id}
+          projectName={project.name}
+          orgId={orgId}
+          onClose={() => setShowUpload(false)}
+        />
+      )}
+
       {/* Tab nav */}
       <div className="bg-white border-b border-[#E0E0D8] px-12">
-        <div className="flex items-center gap-0">
-          {TABS.map(t => (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              className={`px-4 py-3.5 text-[11.5px] font-semibold border-b-2 transition-all ${
-                tab === t.id
-                  ? "border-[#131218] text-[#131218]"
-                  : "border-transparent text-[#131218]/38 hover:text-[#131218] hover:border-[#131218]/20"
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-0">
+            {TABS.map(t => (
+              <button
+                key={t.id}
+                onClick={() => setTab(t.id)}
+                className={`px-4 py-3.5 text-[11.5px] font-semibold border-b-2 transition-all ${
+                  tab === t.id
+                    ? "border-[#131218] text-[#131218]"
+                    : "border-transparent text-[#131218]/38 hover:text-[#131218] hover:border-[#131218]/20"
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={() => setShowUpload(true)}
+            className="flex items-center gap-1.5 text-[10.5px] font-bold text-[#131218]/40 hover:text-[#131218] hover:bg-[#EFEFEA] px-3 py-1.5 rounded-lg transition-all"
+          >
+            ↑ Upload docs
+          </button>
         </div>
       </div>
 
