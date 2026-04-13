@@ -8,12 +8,78 @@ function daysSince(dateStr: string | null): number {
   return Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000);
 }
 
-const STAGE_COLORS: Record<string, string> = {
-  "Discovery":  "bg-blue-50 text-blue-600 border border-blue-200",
-  "Validation": "bg-amber-50 text-amber-600 border border-amber-200",
-  "Execution":  "bg-[#131218] text-[#B2FF59]",
-  "Completion": "bg-[#B2FF59] text-[#131218]",
-  "On Hold":    "bg-gray-100 text-gray-400 border border-gray-200",
+// ── Stage config ──────────────────────────────────────────────────────────────
+
+const STAGE_ORDER = [
+  "Stakeholder Alignment",
+  "Discovery",
+  "Validation",
+  "Pilot Planning",
+  "Pilot Live",
+  "Execution",
+  "Scale",
+  "Completion",
+  "Design",
+  "On Hold",
+];
+
+const STAGE_STYLE: Record<string, { header: string; dot: string; card: string }> = {
+  "Stakeholder Alignment": {
+    header: "text-slate-500",
+    dot:    "bg-slate-400",
+    card:   "border-slate-200",
+  },
+  "Discovery": {
+    header: "text-blue-500",
+    dot:    "bg-blue-400",
+    card:   "border-blue-200",
+  },
+  "Validation": {
+    header: "text-amber-500",
+    dot:    "bg-amber-400",
+    card:   "border-amber-200",
+  },
+  "Pilot Planning": {
+    header: "text-amber-600",
+    dot:    "bg-amber-500",
+    card:   "border-amber-200",
+  },
+  "Pilot Live": {
+    header: "text-green-600",
+    dot:    "bg-green-500",
+    card:   "border-green-200",
+  },
+  "Execution": {
+    header: "text-green-700",
+    dot:    "bg-green-600",
+    card:   "border-green-200",
+  },
+  "Scale": {
+    header: "text-[#131218]",
+    dot:    "bg-[#c8f55a]",
+    card:   "border-[#c8f55a]/40",
+  },
+  "Completion": {
+    header: "text-[#131218]",
+    dot:    "bg-[#c8f55a]",
+    card:   "border-[#c8f55a]/60",
+  },
+  "Design": {
+    header: "text-purple-600",
+    dot:    "bg-purple-500",
+    card:   "border-purple-200",
+  },
+  "On Hold": {
+    header: "text-[#131218]/30",
+    dot:    "bg-[#131218]/20",
+    card:   "border-[#E0E0D8]",
+  },
+};
+
+const STAGE_STYLE_DEFAULT = {
+  header: "text-[#131218]/40",
+  dot:    "bg-[#131218]/20",
+  card:   "border-[#E0E0D8]",
 };
 
 export default async function PipelinePage() {
@@ -24,10 +90,8 @@ export default async function PipelinePage() {
     getDecisionItems(),
   ]);
 
-  // Pipeline = all active projects — the full commercial view across all workspaces
   const projects = allProjects;
 
-  // Commercial decision items — approvals, proposals, missing inputs
   const commercialDecisions = decisions.filter(d =>
     d.status !== "Approved" && d.status !== "Rejected" && d.status !== "Executed"
   );
@@ -36,23 +100,28 @@ export default async function PipelinePage() {
   );
   const withDeadlines = commercialDecisions.filter(d => d.dueDate);
 
-  // Stage breakdown
-  const byStage = projects.reduce((acc, p) => {
+  // Group projects by stage
+  const byStage: Record<string, typeof projects> = {};
+  for (const p of projects) {
     const s = p.stage || "Unknown";
-    acc[s] = (acc[s] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
+    if (!byStage[s]) byStage[s] = [];
+    byStage[s].push(p);
+  }
 
-  const stageOrder = ["Discovery", "Validation", "Execution", "Completion", "On Hold"];
+  // Ordered columns — only stages that have projects
+  const orderedStages = [
+    ...STAGE_ORDER.filter(s => byStage[s]?.length > 0),
+    ...Object.keys(byStage).filter(s => !STAGE_ORDER.includes(s) && byStage[s].length > 0),
+  ];
 
   return (
     <div className="flex min-h-screen bg-[#EFEFEA]">
       <Sidebar adminNav />
 
-      <main className="flex-1 ml-[228px]">
+      <main className="flex-1 ml-[228px] flex flex-col">
 
         {/* Dark header */}
-        <header className="bg-[#131218] px-12 pt-10 pb-11">
+        <header className="bg-[#131218] px-12 pt-10 pb-11 flex-shrink-0">
           <p className="text-[8px] font-bold tracking-[2.5px] uppercase text-white/20 mb-3">
             Commercial · Pipeline overview
           </p>
@@ -79,11 +148,11 @@ export default async function PipelinePage() {
           </div>
         </header>
 
-        <div className="px-12 py-9 max-w-7xl space-y-6">
+        <div className="flex-1 flex flex-col px-12 py-9 gap-6 min-w-0">
 
           {/* P1 banner */}
           {(urgentDecisions.length > 0 || withDeadlines.length > 0) && (
-            <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-xl px-5 py-3.5">
+            <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-xl px-5 py-3.5 flex-shrink-0">
               <span className="w-2 h-2 rounded-full bg-red-500 shrink-0 animate-pulse" />
               <p className="text-sm text-[#131218] flex-1 min-w-0">
                 {urgentDecisions.length > 0 && (
@@ -101,147 +170,140 @@ export default async function PipelinePage() {
             </div>
           )}
 
-          {/* Stage breakdown */}
+          {/* ── Kanban board ─────────────────────────────────────────────────── */}
           <div>
-            <div className="flex items-center gap-3 mb-3">
-              <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30">By stage</p>
+            <div className="flex items-center gap-3 mb-4">
+              <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30">Pipeline board</p>
               <div className="flex-1 h-px bg-[#E0E0D8]" />
+              <p className="text-[9px] font-bold text-[#131218]/25">{orderedStages.length} stages</p>
             </div>
-            <div className="flex gap-3 flex-wrap">
-              {stageOrder.filter(s => byStage[s] > 0).map(stage => (
-                <div key={stage} className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-bold ${STAGE_COLORS[stage] ?? "bg-[#EFEFEA] text-[#131218]/40 border-[#E0E0D8]"}`}>
-                  <span>{byStage[stage]}</span>
-                  <span className="opacity-60 text-[11px]">{stage}</span>
-                </div>
-              ))}
-              {Object.entries(byStage)
-                .filter(([s]) => !stageOrder.includes(s))
-                .map(([stage, count]) => (
-                  <div key={stage} className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[#E0E0D8] bg-[#EFEFEA] text-sm font-bold text-[#131218]/40">
-                    <span>{count}</span>
-                    <span className="opacity-60 text-[11px]">{stage}</span>
-                  </div>
-                ))
-              }
+
+            <div className="overflow-x-auto pb-2 -mx-2 px-2">
+              <div className="flex gap-3" style={{ minWidth: "max-content" }}>
+                {orderedStages.map(stage => {
+                  const cards = byStage[stage] ?? [];
+                  const style = STAGE_STYLE[stage] ?? STAGE_STYLE_DEFAULT;
+                  return (
+                    <div
+                      key={stage}
+                      className="flex flex-col gap-2"
+                      style={{ width: 210, minWidth: 210 }}
+                    >
+                      {/* Column header */}
+                      <div className="flex items-center gap-2 px-1">
+                        <span className={`w-2 h-2 rounded-full shrink-0 ${style.dot}`} />
+                        <p className={`text-[10px] font-bold uppercase tracking-widest truncate ${style.header}`}>
+                          {stage}
+                        </p>
+                        <span className="ml-auto text-[10px] font-bold text-[#131218]/25 shrink-0">
+                          {cards.length}
+                        </span>
+                      </div>
+
+                      {/* Cards */}
+                      <div className="flex flex-col gap-2">
+                        {cards.map(p => {
+                          const days = daysSince(p.lastUpdate);
+                          const isStale = days > 30;
+                          return (
+                            <Link
+                              key={p.id}
+                              href={`/admin/projects/${p.id}`}
+                              className={`bg-white rounded-xl border-[1.5px] ${style.card} px-3 py-3 hover:border-[#131218]/30 hover:translate-y-[-2px] transition-all block`}
+                            >
+                              <p className="text-[12px] font-bold text-[#131218] leading-snug mb-1.5">
+                                {p.name}
+                              </p>
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-1.5">
+                                  {p.primaryWorkspace === "garage" && (
+                                    <span className="text-[8px] font-bold bg-[#131218] text-[#c8f55a] px-1.5 py-0.5 rounded-md">
+                                      Garage
+                                    </span>
+                                  )}
+                                  {p.primaryWorkspace === "workroom" && (
+                                    <span className="text-[8px] font-bold bg-[#EFEFEA] text-[#131218]/50 border border-[#E0E0D8] px-1.5 py-0.5 rounded-md">
+                                      Room
+                                    </span>
+                                  )}
+                                </div>
+                                {p.lastUpdate && (
+                                  <p className={`text-[9px] font-medium shrink-0 ${isStale ? "text-red-400" : "text-[#131218]/30"}`}>
+                                    {new Date(p.lastUpdate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+                                  </p>
+                                )}
+                              </div>
+                              {p.blockerCount > 0 && (
+                                <p className="text-[9px] font-bold text-red-500 mt-1.5">
+                                  ↯ {p.blockerCount} blocker{p.blockerCount !== 1 ? "s" : ""}
+                                </p>
+                              )}
+                              {p.updateNeeded && !p.blockerCount && (
+                                <p className="text-[9px] font-bold text-amber-500 mt-1.5">! Update needed</p>
+                              )}
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
-          {/* Two-column: projects + open decisions */}
-          <div className="grid grid-cols-[1fr_340px] gap-6 items-start">
-
-            {/* Projects table */}
-            <div>
-              <div className="flex items-center gap-3 mb-3">
-                <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30">All engagements</p>
-                <div className="flex-1 h-px bg-[#E0E0D8]" />
-                <p className="text-[9px] font-bold text-[#131218]/25">{projects.length}</p>
-              </div>
-
-              <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-                <div className="grid grid-cols-[2fr_80px_80px_80px_24px] px-5 py-2.5 border-b border-[#EFEFEA]">
-                  {["Project", "Stage", "Type", "Update", ""].map(h => (
-                    <p key={h} className="text-[9px] font-bold text-[#131218]/25 uppercase tracking-widest">{h}</p>
-                  ))}
-                </div>
-
-                <div className="divide-y divide-[#EFEFEA]">
-                  {projects.map(p => {
-                    const days = daysSince(p.lastUpdate);
-                    const isStale = days > 30;
-                    const typeBadge = p.primaryWorkspace === "garage"
-                      ? "bg-[#131218] text-[#B2FF59]"
-                      : p.primaryWorkspace === "workroom"
-                        ? "bg-[#EFEFEA] text-[#131218]/60 border border-[#E0E0D8]"
-                        : "bg-[#EFEFEA] text-[#131218]/30 border border-[#E0E0D8]";
-
-                    return (
-                      <Link
-                        key={p.id}
-                        href={`/admin/projects/${p.id}`}
-                        className="grid grid-cols-[2fr_80px_80px_80px_24px] px-5 py-3 hover:bg-[#EFEFEA]/50 transition-colors group items-center"
-                      >
-                        <div className="min-w-0">
-                          <p className="text-[12px] font-semibold text-[#131218] truncate">{p.name}</p>
-                          {p.blockerCount > 0 && (
-                            <p className="text-[9px] font-bold text-red-500 mt-0.5">↯ {p.blockerCount} blocker{p.blockerCount !== 1 ? "s" : ""}</p>
-                          )}
-                        </div>
-                        <div>
-                          {p.stage ? (
-                            <span className={`inline-block text-[8px] font-bold px-1.5 py-0.5 rounded-full ${STAGE_COLORS[p.stage] ?? "bg-[#EFEFEA] text-[#131218]/50"}`}>
-                              {p.stage}
-                            </span>
-                          ) : <span className="text-[#131218]/20 text-xs">—</span>}
-                        </div>
-                        <div>
-                          <span className={`inline-block text-[8px] font-bold px-1.5 py-0.5 rounded-full ${typeBadge}`}>
-                            {p.primaryWorkspace === "garage" ? "Garage" : p.primaryWorkspace === "workroom" ? "Room" : "—"}
-                          </span>
-                        </div>
-                        <div>
-                          {p.lastUpdate ? (
-                            <p className={`text-[10px] font-medium ${isStale ? "text-red-400" : "text-[#131218]/40"}`}>
-                              {new Date(p.lastUpdate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
-                            </p>
-                          ) : <span className="text-[#131218]/20 text-xs">—</span>}
-                          {p.updateNeeded && <p className="text-[8px] font-bold text-amber-500">! Due</p>}
-                        </div>
-                        <div className="text-[#131218]/20 group-hover:text-[#131218]/60 transition-colors text-sm text-right">→</div>
-                      </Link>
-                    );
-                  })}
-                </div>
-              </div>
+          {/* ── Open decisions — full width list ─────────────────────────────── */}
+          <div>
+            <div className="flex items-center gap-3 mb-3">
+              <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30">Open decisions</p>
+              <div className="flex-1 h-px bg-[#E0E0D8]" />
+              {commercialDecisions.length > 0 && (
+                <span className="text-[9px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">
+                  {commercialDecisions.length}
+                </span>
+              )}
             </div>
 
-            {/* Open decisions sidebar */}
-            <div className="flex flex-col gap-4">
-              <div className="flex items-center gap-3 mb-0">
-                <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30">Open decisions</p>
-                <div className="flex-1 h-px bg-[#E0E0D8]" />
-                {commercialDecisions.length > 0 && (
-                  <span className="text-[9px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">{commercialDecisions.length}</span>
+            <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 divide-x divide-y divide-[#EFEFEA]">
+                {commercialDecisions.slice(0, 12).map(d => (
+                  <Link
+                    key={d.id}
+                    href="/admin/decisions"
+                    className="flex items-start gap-3 px-4 py-3 hover:bg-[#EFEFEA]/40 transition-colors group"
+                  >
+                    <div className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 mt-0.5 ${
+                      d.priority === "P1" || d.priority === "P1 Critical" || d.priority === "Urgent"
+                        ? "bg-red-100" : "bg-[#EFEFEA]"
+                    }`}>
+                      <span className={`text-[8px] font-bold ${
+                        d.priority === "P1" || d.priority === "P1 Critical" || d.priority === "Urgent"
+                          ? "text-red-600" : "text-[#131218]/30"
+                      }`}>
+                        {d.priority === "P1" || d.priority === "P1 Critical" ? "P1" : "·"}
+                      </span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[11px] font-semibold text-[#131218] leading-snug line-clamp-2">{d.title}</p>
+                      <p className="text-[9px] text-[#131218]/35 mt-0.5">
+                        {d.decisionType || "Decision"}
+                        {d.dueDate && ` · Due ${new Date(d.dueDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`}
+                      </p>
+                    </div>
+                  </Link>
+                ))}
+                {commercialDecisions.length === 0 && (
+                  <div className="col-span-4 px-4 py-6 text-center">
+                    <p className="text-[11px] text-[#131218]/25 font-medium">No open decisions</p>
+                  </div>
                 )}
               </div>
-
-              <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-                <div className="divide-y divide-[#EFEFEA]">
-                  {commercialDecisions.slice(0, 8).map(d => (
-                    <Link key={d.id} href="/admin/decisions" className="flex items-start gap-3 px-4 py-3 hover:bg-[#EFEFEA]/40 transition-colors group">
-                      <div className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 mt-0.5 ${
-                        d.priority === "P1" || d.priority === "P1 Critical" || d.priority === "Urgent"
-                          ? "bg-red-100" : "bg-[#EFEFEA]"
-                      }`}>
-                        <span className={`text-[8px] font-bold ${
-                          d.priority === "P1" || d.priority === "P1 Critical" || d.priority === "Urgent"
-                            ? "text-red-600" : "text-[#131218]/30"
-                        }`}>
-                          {d.priority === "P1" || d.priority === "P1 Critical" ? "P1" : "·"}
-                        </span>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[11px] font-semibold text-[#131218] leading-snug line-clamp-2">{d.title}</p>
-                        <p className="text-[9px] text-[#131218]/35 mt-0.5">
-                          {d.decisionType || "Decision"}
-                          {d.dueDate && ` · Due ${new Date(d.dueDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`}
-                        </p>
-                      </div>
-                    </Link>
-                  ))}
-                  {commercialDecisions.length === 0 && (
-                    <div className="px-4 py-6 text-center">
-                      <p className="text-[11px] text-[#131218]/25 font-medium">No open decisions</p>
-                    </div>
-                  )}
-                </div>
-                <div className="px-4 py-2.5 border-t border-[#EFEFEA]">
-                  <Link href="/admin/decisions" className="text-[9px] font-bold text-[#131218]/30 hover:text-[#131218]/60 transition-colors uppercase tracking-widest">
-                    All decisions →
-                  </Link>
-                </div>
+              <div className="px-4 py-2.5 border-t border-[#EFEFEA]">
+                <Link href="/admin/decisions" className="text-[9px] font-bold text-[#131218]/30 hover:text-[#131218]/60 transition-colors uppercase tracking-widest">
+                  All decisions →
+                </Link>
               </div>
             </div>
-
           </div>
 
         </div>
