@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminGuardApi } from "@/lib/require-admin";
 import { Client } from "@notionhq/client";
 import { DB } from "@/lib/notion";
-import { generateDraft } from "@/lib/generate-draft";
 
 const notion = new Client({ auth: process.env.NOTION_API_KEY });
 
@@ -81,13 +80,6 @@ export async function POST(req: NextRequest) {
     }
 
     const page = await notion.pages.create(pageBody as any);
-
-    // Fire-and-forget: generate AI draft in background, don't block the response
-    if (process.env.ANTHROPIC_API_KEY) {
-      generateDraft(page.id, styleProfileId || undefined).catch(err =>
-        console.error("[desk-request] generate-draft failed", err)
-      );
-    }
 
     return NextResponse.json({ ok: true, id: page.id });
   } catch (err) {

@@ -102,10 +102,30 @@ function OppList({ items, emptyMsg }: { items: OpportunityItem[]; emptyMsg: stri
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
+// ── Dummy data for UI testing ─────────────────────────────────────────────────
+const DUMMY_CH: OpportunityItem[] = [
+  { id: "1", name: "Retail Refill Implementation — Co-op", orgName: "Co-op", type: "CH Sale", stage: "Qualifying", scope: "CH", followUpStatus: "Needed", score: 59, qualificationStatus: "Needs Review", lastEdited: "2026-04-10", notionUrl: "#" },
+  { id: "2", name: "Circular Economy Strategy — Tesco", orgName: "Tesco", type: "CH Sale", stage: "New", scope: "CH", followUpStatus: "None", score: 43, qualificationStatus: "Below Threshold", lastEdited: "2026-04-08", notionUrl: "#" },
+  { id: "3", name: "ZWF Forum 2026 — Keynote + Workshop", orgName: "Zero Waste Forum", type: "Partnership", stage: "Active", scope: "CH", followUpStatus: "Waiting", score: 74, qualificationStatus: "Qualified", lastEdited: "2026-04-11", notionUrl: "#" },
+  { id: "4", name: "Waitrose Refill Pilot Scoping", orgName: "Waitrose", type: "CH Sale", stage: "Qualifying", scope: "CH", followUpStatus: "Sent", score: 53, qualificationStatus: "Needs Review", lastEdited: "2026-04-09", notionUrl: "#" },
+  { id: "5", name: "LIFE Programme — ENV-CIR Call", orgName: "European Commission", type: "Grant", stage: "Active", scope: "CH", followUpStatus: "Needed", score: 82, qualificationStatus: "Qualified", lastEdited: "2026-04-12", notionUrl: "#" },
+];
+const DUMMY_PORTFOLIO: OpportunityItem[] = [
+  { id: "6", name: "Yenxa — Seed Round Intro (Molten Ventures)", orgName: "Yenxa", type: "Investor Match", stage: "Active", scope: "Portfolio", followUpStatus: "Waiting", score: 78, qualificationStatus: "Qualified", lastEdited: "2026-04-11", notionUrl: "#" },
+  { id: "7", name: "iRefill — Innovate UK Smart Grant", orgName: "iRefill", type: "Grant", stage: "Qualifying", scope: "Portfolio", followUpStatus: "Needed", score: 65, qualificationStatus: "Needs Review", lastEdited: "2026-04-10", notionUrl: "#" },
+  { id: "8", name: "Moss Solutions — Pre-Seed (Fair By Design)", orgName: "Moss Solutions", type: "Investor Match", stage: "New", scope: "Portfolio", followUpStatus: "None", score: 55, qualificationStatus: "Needs Review", lastEdited: "2026-04-07", notionUrl: "#" },
+  { id: "9", name: "Beeok — Series A Intro (Circularity Capital)", orgName: "Beeok", type: "Investor Match", stage: "Proposal Sent", scope: "Portfolio", followUpStatus: "Sent", score: 88, qualificationStatus: "Qualified", lastEdited: "2026-04-12", notionUrl: "#" },
+  { id: "10", name: "SUFI — Fair4All Finance Application", orgName: "SUFI", type: "Grant", stage: "Active", scope: "Portfolio", followUpStatus: "Needed", score: 71, qualificationStatus: "Qualified", lastEdited: "2026-04-12", notionUrl: "#" },
+];
+
 export default async function OpportunitiesPage() {
   await requireAdmin();
 
-  const { ch, portfolio } = await getOpportunitiesByScope();
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { ch: _ch, portfolio: _portfolio } = await getOpportunitiesByScope();
+  // TODO: replace with live data once Opportunity Score field is populated in Notion
+  const ch = DUMMY_CH;
+  const portfolio = DUMMY_PORTFOLIO;
 
   // Sort by score descending (null scores last)
   const sortByScore = (a: OpportunityItem, b: OpportunityItem) => {

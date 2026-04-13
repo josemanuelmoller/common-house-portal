@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { notion, DB, getStyleProfiles } from "@/lib/notion";
+import { notion, DB } from "@/lib/notion";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -157,16 +157,64 @@ Format:
 - [ ] [Action] — Owner: [TBD] — By: [TBD]`,
 };
 
-// ─── HTML slide system prompt ─────────────────────────────────────────────────
+// ─── HTML system prompts ──────────────────────────────────────────────────────
 
 const HTML_SYSTEM_PROMPT = `You are a presentation designer and content strategist for Common House.
-You generate complete, self-contained HTML slide decks — beautiful, minimal, professional.
+You generate complete, self-contained HTML documents — beautiful, minimal, professional.
 Output ONLY raw HTML. No markdown, no explanation, no code fences. Just the full HTML document.`;
+
+// Content types that render as a single page (not a slide carousel)
+const ONE_PAGE_TYPES = new Set(["One-pager"]);
+
+function buildOnePagerPrompt(brief: string, styleContext: string, contentType = "One-pager"): string {
+  const typeStructure: Record<string, string> = {
+    "One-pager": "Sections: Hero header, Problem (1–2 lines), Solution (2–3 lines), Impact/Traction (3 numbers in a row), Why Now (1–2 lines), CTA strip at bottom.",
+    "Proposal":  "Sections: Hero (title + client + date), Context/Problem (2–3 lines), Proposed Approach (3 phases in a row), Deliverables (list), Timeline & Investment (side by side), Next Steps (3 bullets), CTA strip.",
+    "Exec Summary": "Sections: Hero (title + date), Situation (2 lines), Key Findings (3 callout numbers), Recommendation (2–3 lines), Next Steps (3 bullets). Tight, decision-ready.",
+    "Offer Deck": "Sections: Hero (offer name + tagline), The Opportunity (2 lines), What We Offer (3 service blocks side by side), Investment Tiers (2–3 tiers in a row), Why Common House (2–3 proof points), CTA.",
+    "Deck":      "Sections: Hero (title + subtitle), Key Context (2 lines), 3 Main Points (cards in a row with icons), Supporting Data (2 numbers + label), Conclusion (1–2 lines), CTA strip.",
+  };
+  const structure = typeStructure[contentType] ?? typeStructure["One-pager"];
+
+  return `${CH_BRAND_CONTEXT}
+
+${styleContext ? `─── STYLE PROFILE ───\n${styleContext}\n` : ""}
+─── REQUEST ───
+Content type: ${contentType} (document mode — single page, PDF/print ready)
+Brief: ${brief}
+
+─── DOCUMENT LAYOUT INSTRUCTIONS ───
+Create a single continuous page. All content visible at once — no slides, no navigation, no carousel.
+${structure}
+
+─── HTML REQUIREMENTS ───
+Generate a complete, self-contained HTML5 document.
+
+LAYOUT:
+- Single page, NO slide navigation, NO click-to-advance
+- Body: white background (#FFFFFF), width 900px, max-width 100%, centered with auto margins
+- No overflow hidden — everything visible, no scrolling needed
+- Print-ready: @media print { body { width: 100%; margin: 0; } }
+
+SECTIONS:
+1. HERO (dark): background #131218, padding 48px 56px. Large font-weight 300 title (2.8rem) + bold italic lime (#c8f55a) accent word. Eyebrow label above in 9px uppercase tracking-widest opacity 0.4. Subtitle in white/40.
+2. PROBLEM + SOLUTION (light): background #EEEEE8, padding 40px 56px. Two columns side by side. Left: "Problema" label + 2-line text. Right: "Solución" label + 2-line text. Divider between them.
+3. NUMBERS: white background, padding 40px 56px. Three stats side-by-side. Each: large number (3.5rem font-weight 900 #c8f55a) + label below in #131218/60.
+4. WHY NOW (light): background #EEEEE8, padding 32px 56px. Single paragraph, max 2 sentences.
+5. CTA STRIP (dark): background #131218, padding 28px 56px. Left: action text. Right: lime button pill.
+
+DESIGN RULES:
+- No shadows — use 1.5px borders #E0E0D8 between sections if needed
+- Font: Inter (import from Google Fonts)
+- Accent: #c8f55a (lime). Dark: #131218. Light bg: #EEEEE8. Border: #E0E0D8
+- NO navigation arrows, NO slide counter, NO JS click handlers
+
+OUTPUT: One complete HTML file. No external dependencies except Google Fonts Inter. All CSS in <style> tag. No JS needed.`;
+}
 
 function buildHtmlDeckPrompt(brief: string, contentType: string, styleContext: string): string {
   const typeInstructions: Record<string, string> = {
     "Deck": `Create a presentation deck with 8–12 slides. Each slide should have a clear title and 3–5 key points or one strong visual concept. Include: title slide, agenda/overview, 5–8 content slides, closing/CTA slide.`,
-    "One-pager": `Create a single-page document layout. Sections: headline, problem, solution, traction/impact (3 numbers), why now, CTA. Visually rich, scannable in 30 seconds.`,
     "Proposal": `Create a proposal presentation with 6–8 slides: title, context/problem, proposed approach (3 phases), deliverables, timeline/investment framing, next steps.`,
     "Exec Summary": `Create a 3–4 slide executive summary using Situation → Complication → Resolution structure. Clean, data-forward, decision-ready.`,
     "Offer Deck": `Create a commercial offer deck with 6–8 slides: title + tagline, problem/opportunity, the offer (what we do + scope), delivery model (phases/timeline), investment range (tiers if applicable), why CH (credibility), next steps. Commercial and confident. Include specific numbers where given.`,
@@ -190,7 +238,7 @@ Generate a complete, self-contained HTML5 document with:
 DESIGN SYSTEM:
 - Background: #EEEEE8 (page bg) or #131218 (dark slides)
 - Primary dark: #131218
-- Accent lime: #B2FF59
+- Accent lime: #c8f55a
 - White: #FFFFFF
 - Border: #E0E0D8
 - Font: Inter (import from Google Fonts)
@@ -207,6 +255,7 @@ NAVIGATION:
 - Arrow key navigation (← →) between slides
 - Slide counter bottom-right (e.g. "3 / 8")
 - Click anywhere to advance
+- IMPORTANT: expose navigation as window globals: window.nextSlide = nextSlide; window.prevSlide = prevSlide; so parent frame can control navigation
 
 TYPOGRAPHY:
 - Eyebrow labels: 9px, font-weight 700, letter-spacing 2.5px, uppercase, opacity 0.4
@@ -277,7 +326,14 @@ async function ensureSlideHtmlProperty() {
 
 // ─── Main export ──────────────────────────────────────────────────────────────
 
-export async function generateDraft(pageId: string, styleProfileId?: string): Promise<void> {
+const AUDIENCE_INSTRUCTIONS: Record<string, string> = {
+  "Inversor":       "AUDIENCE: Investors / VCs. Tone: data-forward, confident, outcome-focused. Lead with traction and numbers. Avoid jargon. Every claim needs a stat or example.",
+  "Cliente":        "AUDIENCE: Potential clients. Tone: persuasive, solutions-focused, clear ROI. Lead with the problem they have. Use 'you/your' framing. Commercial and warm.",
+  "Equipo interno": "AUDIENCE: Internal team. Tone: direct, no fluff, action-oriented. Bullet-heavy. Skip the pitch — go straight to what, why, and next steps.",
+  "Institución":    "AUDIENCE: Funders / institutions / NGOs. Tone: formal, evidence-based, impact-driven. Use sector language. Lead with mission alignment and measurable outcomes.",
+};
+
+export async function generateDraft(pageId: string, audience?: string, outputMode?: "slides" | "document"): Promise<void> {
   try {
     // 1. Read the page
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -290,35 +346,20 @@ export async function generateDraft(pageId: string, styleProfileId?: string): Pr
 
     if (!brief) return;
 
-    // 2. Load style profile if provided
-    let styleContext = "";
-    if (styleProfileId) {
-      try {
-        const profiles = await getStyleProfiles();
-        const profile = profiles.find(p => p.id === styleProfileId);
-        if (profile) {
-          styleContext = [
-            profile.masterPrompt ? `MASTER PROMPT: ${profile.masterPrompt}` : "",
-            profile.toneSummary  ? `TONE: ${profile.toneSummary}` : "",
-            profile.structuralRules ? `STRUCTURE RULES: ${profile.structuralRules}` : "",
-            profile.vocabularyPatterns ? `USE THESE PATTERNS: ${profile.vocabularyPatterns}` : "",
-            profile.forbiddenPatterns  ? `AVOID: ${profile.forbiddenPatterns}` : "",
-            profile.ctaStyle ? `CTA STYLE: ${profile.ctaStyle}` : "",
-            `FIRST PERSON: ${profile.firstPersonAllowed ? "allowed" : "avoid"}`,
-          ].filter(Boolean).join("\n");
-        }
-      } catch {
-        // Style profile load failed — continue without it
-      }
-    }
+    // 2. Build audience context
+    const styleContext = audience ? (AUDIENCE_INSTRUCTIONS[audience] ?? `AUDIENCE: ${audience}.`) : "";
 
-    const isVisual = VISUAL_TYPES.has(contentType);
+    const isVisual   = VISUAL_TYPES.has(contentType);
+    // One-pager is always document; other visual types respect outputMode (default: slides)
+    const isOnePage  = ONE_PAGE_TYPES.has(contentType) || outputMode === "document";
 
     if (isVisual) {
-      // 3a. Generate HTML slide deck
+      // 3a. Generate HTML visual (slide deck or single-page document)
       await ensureSlideHtmlProperty();
 
-      const prompt = buildHtmlDeckPrompt(brief, contentType, styleContext);
+      const prompt = isOnePage
+        ? buildOnePagerPrompt(brief, styleContext, contentType)
+        : buildHtmlDeckPrompt(brief, contentType, styleContext);
       const msg = await anthropic.messages.create({
         model: "claude-sonnet-4-6",
         max_tokens: 8000,

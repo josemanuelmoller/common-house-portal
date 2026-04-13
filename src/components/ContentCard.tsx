@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 
 // ─── Simple markdown renderer ─────────────────────────────────────────────────
 
@@ -154,11 +154,17 @@ export function ContentCard({ item, onArchive }: { item: ContentCardItem; onArch
   const [archiving, setArchiving] = useState(false);
   const [copied, setCopied] = useState(false);
   const [localStatus, setLocalStatus] = useState(item.status);
+  const [jpgLoading, setJpgLoading] = useState(false);
+  const [pptLoading, setPptLoading] = useState(false);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
 
   const pillClass  = STATUS_PILL[localStatus] ?? STATUS_PILL["Draft"];
   const dotClass   = STATUS_DOT[localStatus]  ?? STATUS_DOT["Draft"];
   const hasSlides  = Boolean(item.slideHtml);
   const hasContent = Boolean(item.draftText || item.slideHtml);
+  // Detect document mode: One-pager type OR generated HTML has no slide navigation
+  const isDocumentMode = item.contentType === "One-pager" ||
+    (hasSlides && !item.slideHtml.includes("nextSlide") && !item.slideHtml.includes("addEventListener(\"keydown"));
 
   async function handleArchive(e: React.MouseEvent) {
     e.stopPropagation();
@@ -183,41 +189,94 @@ export function ContentCard({ item, onArchive }: { item: ContentCardItem; onArch
     });
   }
 
-  function handleDownload(e: React.MouseEvent) {
+  const slug = item.title.slice(0, 60).replace(/[^a-z0-9 ]/gi, "_");
+
+  function handleDownloadHtml(e: React.MouseEvent) {
     e.stopPropagation();
-    if (hasSlides) {
-      const blob = new Blob([item.slideHtml], { type: "text/html" });
+    const blob = new Blob([item.slideHtml], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = `${slug}.html`; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function handleDownloadTxt(e: React.MouseEvent) {
+    e.stopPropagation();
+    const blob = new Blob([item.draftText], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = `${slug}.txt`; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function handleDownloadPdf(e: React.MouseEvent) {
+    e.stopPropagation();
+    // Inject auto-print trigger and open in new tab — browser saves as PDF
+    const printHtml = item.slideHtml.replace(
+      "</body>",
+      `<script>window.onload=function(){setTimeout(function(){window.print();},400);}</script></body>`
+    );
+    const blob = new Blob([printHtml], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    window.open(url, "_blank");
+    setTimeout(() => URL.revokeObjectURL(url), 15000);
+  }
+
+  async function handleDownloadPpt(e: React.MouseEvent) {
+    e.stopPropagation();
+    setPptLoading(true);
+    try {
+      const res = await fetch("/api/export-pptx", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pageId: item.id }),
+      });
+      if (!res.ok) throw new Error("PPT export failed");
+      const blob = await res.blob();
       const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${item.title.slice(0, 60).replace(/[^a-z0-9 ]/gi, "_")}.html`;
-      a.click();
+      const a = document.createElement("a"); a.download = `${slug}.pptx`; a.href = url; a.click();
       URL.revokeObjectURL(url);
-    } else {
-      const blob = new Blob([item.draftText], { type: "text/plain" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${item.title.slice(0, 60).replace(/[^a-z0-9 ]/gi, "_")}.txt`;
-      a.click();
-      URL.revokeObjectURL(url);
-    }
+    } catch (err) { console.error("PPT export failed", err); }
+    finally { setPptLoading(false); }
+  }
+
+  async function handleDownloadJpg(e: React.MouseEvent) {
+    e.stopPropagation();
+    const iframe = iframeRef.current;
+    if (!iframe?.contentDocument || !iframe?.contentWindow) return;
+    setJpgLoading(true);
+    try {
+      const iw = iframe.contentWindow as Window & { html2canvas?: (el: HTMLElement, opts: object) => Promise<HTMLCanvasElement> };
+      if (!iw.html2canvas) {
+        await new Promise<void>((resolve, reject) => {
+          const s = iframe.contentDocument!.createElement("script");
+          s.src = "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";
+          s.onload = () => resolve(); s.onerror = reject;
+          iframe.contentDocument!.head.appendChild(s);
+        });
+      }
+      const canvas = await iw.html2canvas!(iframe.contentDocument.documentElement, { scale: 2, useCORS: true });
+      const a = document.createElement("a"); a.download = `${slug}.jpg`;
+      a.href = canvas.toDataURL("image/jpeg", 0.93); a.click();
+    } catch (err) { console.error("JPG export failed", err); }
+    finally { setJpgLoading(false); }
   }
 
   return (
     <>
-      {/* Fullscreen slide overlay */}
+      {/* Fullscreen overlay */}
       {fullscreen && hasSlides && (
         <div className="fixed inset-0 z-50 bg-black flex flex-col">
           <div className="flex items-center justify-between px-4 py-2 bg-[#131218] border-b border-white/10 flex-shrink-0">
-            <p className="text-[10px] font-bold text-white/40 truncate max-w-[60%]">{item.title}</p>
+            <p className="text-[10px] font-bold text-white/40 truncate max-w-[50%]">{item.title}</p>
             <div className="flex items-center gap-2">
-              <button onClick={handleDownload} className="text-[9px] font-bold px-2.5 py-1 rounded-md border border-white/20 text-white/50 hover:text-white hover:border-white/40 transition-all">
-                Descargar .html
+              <button onClick={handleDownloadPdf} className="text-[9px] font-bold px-2.5 py-1 rounded-md border border-white/20 text-white/50 hover:text-white hover:border-white/40 transition-all">PDF</button>
+              <button onClick={handleDownloadPpt} disabled={pptLoading} className="text-[9px] font-bold px-2.5 py-1 rounded-md border border-white/20 text-white/50 hover:text-white hover:border-white/40 transition-all disabled:opacity-40">
+                {pptLoading ? "…" : "PPT"}
               </button>
-              <button onClick={() => setFullscreen(false)} className="text-[9px] font-bold px-3 py-1 rounded-md bg-white/10 text-white hover:bg-white/20 transition-all">
-                ✕ Cerrar
+              <button onClick={handleDownloadJpg} disabled={jpgLoading} className="text-[9px] font-bold px-2.5 py-1 rounded-md border border-white/20 text-white/50 hover:text-white hover:border-white/40 transition-all disabled:opacity-40">
+                {jpgLoading ? "…" : "JPG"}
               </button>
+              <button onClick={handleDownloadHtml} className="text-[9px] font-bold px-2.5 py-1 rounded-md border border-white/20 text-white/50 hover:text-white hover:border-white/40 transition-all">.html</button>
+              <button onClick={() => setFullscreen(false)} className="text-[9px] font-bold px-3 py-1 rounded-md bg-white/10 text-white hover:bg-white/20 transition-all">✕</button>
             </div>
           </div>
           <iframe srcDoc={item.slideHtml} className="flex-1 w-full border-0" sandbox="allow-scripts allow-same-origin" title={item.title} />
@@ -255,25 +314,34 @@ export function ContentCard({ item, onArchive }: { item: ContentCardItem; onArch
               <>
                 <div className="flex items-center justify-between px-4 py-2.5 bg-[#FAFAF8] border-b border-[#EFEFEA]">
                   <p className="text-[9px] font-bold tracking-[1.5px] uppercase text-[#131218]/25">
-                    {hasSlides ? "Vista previa — Slides" : "Vista previa del draft"}
+                    {hasSlides ? (isDocumentMode ? "Documento" : "Slides") : "Draft"}
                   </p>
                   <div className="flex items-center gap-2">
                     {hasSlides && (
-                      <button
-                        onClick={e => { e.stopPropagation(); setFullscreen(true); }}
-                        className="text-[9px] font-bold px-2.5 py-1 rounded-md bg-[#131218] text-[#B2FF59] border border-[#131218] hover:bg-[#131218]/80 transition-all"
-                      >
+                      <button onClick={e => { e.stopPropagation(); setFullscreen(true); }}
+                        className="text-[9px] font-bold px-2.5 py-1 rounded-md bg-[#131218] text-[#B2FF59] border border-[#131218] hover:bg-[#131218]/80 transition-all">
                         Expandir
                       </button>
                     )}
                     {!hasSlides && (
                       <button onClick={handleCopy} className="text-[9px] font-bold px-2.5 py-1 rounded-md border border-[#E0E0D8] text-[#131218]/50 hover:text-[#131218] hover:border-[#131218]/30 transition-all">
-                        {copied ? "✓ Copiado" : "Copiar texto"}
+                        {copied ? "✓ Copiado" : "Copiar"}
                       </button>
                     )}
-                    <button onClick={handleDownload} className="text-[9px] font-bold px-2.5 py-1 rounded-md border border-[#E0E0D8] text-[#131218]/50 hover:text-[#131218] hover:border-[#131218]/30 transition-all">
-                      {hasSlides ? "Descargar .html" : "Descargar .txt"}
-                    </button>
+                    {hasSlides ? (
+                      <>
+                        <button onClick={handleDownloadPdf} className="text-[9px] font-bold px-2.5 py-1 rounded-md border border-[#E0E0D8] text-[#131218]/50 hover:text-[#131218] hover:border-[#131218]/30 transition-all">PDF</button>
+                        <button onClick={handleDownloadPpt} disabled={pptLoading} className="text-[9px] font-bold px-2.5 py-1 rounded-md border border-[#E0E0D8] text-[#131218]/50 hover:text-[#131218] hover:border-[#131218]/30 transition-all disabled:opacity-40">
+                          {pptLoading ? "…" : "PPT"}
+                        </button>
+                        <button onClick={handleDownloadJpg} disabled={jpgLoading} className="text-[9px] font-bold px-2.5 py-1 rounded-md border border-[#E0E0D8] text-[#131218]/50 hover:text-[#131218] hover:border-[#131218]/30 transition-all disabled:opacity-40">
+                          {jpgLoading ? "…" : "JPG"}
+                        </button>
+                        <button onClick={handleDownloadHtml} className="text-[9px] font-bold px-2.5 py-1 rounded-md border border-[#E0E0D8] text-[#131218]/50 hover:text-[#131218] hover:border-[#131218]/30 transition-all">.html</button>
+                      </>
+                    ) : (
+                      <button onClick={handleDownloadTxt} className="text-[9px] font-bold px-2.5 py-1 rounded-md border border-[#E0E0D8] text-[#131218]/50 hover:text-[#131218] hover:border-[#131218]/30 transition-all">.txt</button>
+                    )}
                     {item.notionUrl && (
                       <a href={item.notionUrl} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
                         className="text-[9px] font-bold px-2.5 py-1 rounded-md border border-[#E0E0D8] text-[#131218]/50 hover:text-[#131218] hover:border-[#131218]/30 transition-all">
@@ -283,16 +351,33 @@ export function ContentCard({ item, onArchive }: { item: ContentCardItem; onArch
                     {localStatus !== "Archived" && (
                       <button onClick={handleArchive} disabled={archiving}
                         className="text-[9px] font-bold px-2.5 py-1 rounded-md border border-red-200 text-red-400 hover:text-red-600 hover:border-red-300 transition-all disabled:opacity-40">
-                        {archiving ? "Archivando…" : "Archivar"}
+                        {archiving ? "…" : "Archivar"}
                       </button>
                     )}
                   </div>
                 </div>
 
                 {hasSlides ? (
-                  <div className="relative bg-[#131218]">
-                    <iframe srcDoc={item.slideHtml} className="w-full h-[480px] border-0" sandbox="allow-scripts allow-same-origin" title={item.title} />
-                    <div className="absolute bottom-2 right-3 text-[9px] text-white/30 font-bold">← → para navegar · click para avanzar</div>
+                  <div className={`relative ${isDocumentMode ? "bg-[#EEEEE8]" : "bg-[#131218]"}`}>
+                    <iframe
+                      ref={iframeRef}
+                      srcDoc={item.slideHtml}
+                      className={`w-full border-0 ${isDocumentMode ? "h-[700px]" : "h-[480px]"}`}
+                      sandbox="allow-scripts allow-same-origin"
+                      title={item.title}
+                    />
+                    {!isDocumentMode && (
+                      <>
+                        <button
+                          onClick={e => { e.stopPropagation(); (iframeRef.current?.contentWindow as any)?.prevSlide?.(); }}
+                          className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/10 hover:bg-white/25 text-white/60 hover:text-white flex items-center justify-center text-sm transition-all"
+                        >‹</button>
+                        <button
+                          onClick={e => { e.stopPropagation(); (iframeRef.current?.contentWindow as any)?.nextSlide?.(); }}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/10 hover:bg-white/25 text-white/60 hover:text-white flex items-center justify-center text-sm transition-all"
+                        >›</button>
+                      </>
+                    )}
                   </div>
                 ) : (
                   <div className="px-5 py-4 max-h-[560px] overflow-y-auto">
@@ -319,101 +404,127 @@ export function ContentCard({ item, onArchive }: { item: ContentCardItem; onArch
   );
 }
 
-// ─── DeskQueueSection — used in Comms/Design desk pages ──────────────────────
-// Shows two sections: "En cola" (pending, no draft) + "Generados" (has draft)
+// ─── DeskQueueSection — unified production list with status badges ─────────────
 
 const DESK_MAX = 5;
 
-export function DeskQueueSection({
-  pending,
-  generated,
-}: {
-  pending: ContentCardItem[];
-  generated: ContentCardItem[];
-}) {
-  const [hiddenIds, setHiddenIds]       = useState<Set<string>>(new Set());
-  const [showAllPending, setShowAllPending]     = useState(false);
-  const [showAllGenerated, setShowAllGenerated] = useState(false);
+type ItemPhase = "draft" | "review" | "ready" | "archived" | "no-content";
 
-  const visible   = generated.filter(i => !hiddenIds.has(i.id) && i.status !== "Archived");
-  const shownPending   = showAllPending   ? pending : pending.slice(0, DESK_MAX);
-  const shownGenerated = showAllGenerated ? visible  : visible.slice(0, DESK_MAX);
+function getPhase(item: ContentCardItem): ItemPhase {
+  const s = item.status?.toLowerCase() ?? "";
+  if (s === "archived") return "archived";
+  if (s === "published" || s === "ready" || s === "approved") return "ready";
+  if (s === "review" || s === "briefed" || s === "in review") return "review";
+  if (item.draftText || item.slideHtml) return "draft";
+  return "no-content";
+}
+
+const PHASE_BADGE: Record<ItemPhase, { label: string; className: string }> = {
+  "no-content": { label: "Sin draft",    className: "bg-[#EFEFEA] text-[#131218]/35 border border-[#E0E0D8]" },
+  "draft":      { label: "Borrador",     className: "bg-amber-50 text-amber-700 border border-amber-200" },
+  "review":     { label: "En revisión",  className: "bg-blue-50 text-blue-700 border border-blue-200" },
+  "ready":      { label: "Listo",        className: "bg-[#B2FF59]/20 text-[#3a6600] border border-[#B2FF59]/50" },
+  "archived":   { label: "Archivado",    className: "bg-[#EFEFEA] text-[#131218]/25 border border-[#E0E0D8]" },
+};
+
+export function DeskQueueSection({
+  items,
+}: {
+  items: ContentCardItem[];
+}) {
+  const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
+  const [showArchived, setShowArchived] = useState(false);
+  const [showAll, setShowAll] = useState(false);
+
+  const active   = items.filter(i => !hiddenIds.has(i.id) && getPhase(i) !== "archived");
+  const archived = items.filter(i => !hiddenIds.has(i.id) && getPhase(i) === "archived");
+  const shown    = showAll ? active : active.slice(0, DESK_MAX);
 
   return (
-    <div className="grid grid-cols-2 gap-4 items-start">
+    <div className="flex flex-col gap-4">
 
-      {/* En cola */}
-      <div>
-        <div className="flex items-center gap-3 mb-3">
-          <p className="text-[9px] font-bold tracking-[1.5px] uppercase text-[#131218]/30">En cola</p>
-          <div className="flex-1 h-px bg-[#E0E0D8]" />
-          <p className="text-[9px] font-bold text-[#131218]/25">{pending.length} items</p>
-        </div>
-        {pending.length > 0 ? (
-          <>
-            <div className="flex flex-col gap-2">
-              {shownPending.map(item => (
+      {/* Header */}
+      <div className="flex items-center gap-3">
+        <p className="text-[9px] font-bold tracking-[1.5px] uppercase text-[#131218]/30">Producción</p>
+        <div className="flex-1 h-px bg-[#E0E0D8]" />
+        <p className="text-[9px] font-bold text-[#131218]/25">{active.length} items</p>
+      </div>
+
+      {/* Items — single column */}
+      {active.length > 0 ? (
+        <>
+          <div className="grid grid-cols-1 gap-2.5">
+            {shown.map(item => {
+              const phase = getPhase(item);
+              const badge = PHASE_BADGE[phase];
+              const hasContent = phase !== "no-content";
+
+              if (hasContent) {
+                return (
+                  <ContentCard
+                    key={item.id}
+                    item={item}
+                    onArchive={id => setHiddenIds(prev => new Set([...prev, id]))}
+                  />
+                );
+              }
+
+              // No-content row (item exists but draft not generated yet)
+              return (
                 <div key={item.id} className="bg-white border border-[#E0E0D8] rounded-[12px] px-4 py-3 flex items-center gap-3">
-                  <span className="w-2 h-2 rounded-full flex-shrink-0 bg-[#131218]/15 animate-pulse" />
                   <div className="flex-1 min-w-0">
                     <p className="text-[12px] font-bold text-[#131218] truncate">{item.title}</p>
                     <p className="text-[10px] text-[#131218]/35 mt-0.5">{item.contentType || "—"}</p>
                   </div>
-                  <span className="text-[8.5px] font-bold px-2 py-0.5 rounded-full bg-[#EFEFEA] text-[#131218]/40 border border-[#E0E0D8]">
-                    Generando…
+                  <span className={`text-[8.5px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${badge.className}`}>
+                    {badge.label}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+
+          {active.length > DESK_MAX && (
+            <button
+              onClick={() => setShowAll(v => !v)}
+              className="text-[9px] font-bold text-[#131218]/30 hover:text-[#131218]/60 py-1 transition-colors text-left"
+            >
+              {showAll ? "▲ Mostrar menos" : `▼ Expandir (${active.length - DESK_MAX} más)`}
+            </button>
+          )}
+        </>
+      ) : (
+        <div className="bg-white border border-dashed border-[#E0E0D8] rounded-[12px] px-4 py-6 text-center">
+          <p className="text-[11px] text-[#131218]/20">Los items generados aparecerán aquí.</p>
+        </div>
+      )}
+
+      {/* Archived toggle */}
+      {archived.length > 0 && (
+        <div>
+          <button
+            onClick={() => setShowArchived(v => !v)}
+            className="text-[9px] font-bold text-[#131218]/25 hover:text-[#131218]/50 transition-colors"
+          >
+            {showArchived ? "▲ Ocultar archivados" : `▼ ${archived.length} archivado${archived.length > 1 ? "s" : ""}`}
+          </button>
+          {showArchived && (
+            <div className="flex flex-col gap-2 mt-2">
+              {archived.map(item => (
+                <div key={item.id} className="bg-[#FAFAF8] border border-[#E0E0D8] rounded-[12px] px-4 py-3 flex items-center gap-3 opacity-50">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[12px] font-bold text-[#131218] truncate">{item.title}</p>
+                    <p className="text-[10px] text-[#131218]/35 mt-0.5">{item.contentType || "—"}</p>
+                  </div>
+                  <span className="text-[8.5px] font-bold px-2 py-0.5 rounded-full bg-[#EFEFEA] text-[#131218]/30 border border-[#E0E0D8]">
+                    Archivado
                   </span>
                 </div>
               ))}
             </div>
-            {pending.length > DESK_MAX && (
-              <button
-                onClick={() => setShowAllPending(v => !v)}
-                className="mt-2 w-full text-[9px] font-bold text-[#131218]/30 hover:text-[#131218]/60 py-1.5 transition-colors"
-              >
-                {showAllPending ? "▲ Ver menos" : `▼ Ver ${pending.length - DESK_MAX} más`}
-              </button>
-            )}
-          </>
-        ) : (
-          <div className="bg-white border border-dashed border-[#E0E0D8] rounded-[12px] px-4 py-5 text-center">
-            <p className="text-[11px] text-[#131218]/20">Cola vacía — las solicitudes nuevas aparecerán aquí.</p>
-          </div>
-        )}
-      </div>
-
-      {/* Generados */}
-      <div>
-        <div className="flex items-center gap-3 mb-3">
-          <p className="text-[9px] font-bold tracking-[1.5px] uppercase text-[#131218]/30">Generados</p>
-          <div className="flex-1 h-px bg-[#E0E0D8]" />
-          <p className="text-[9px] font-bold text-[#131218]/25">{visible.length} items</p>
+          )}
         </div>
-        {visible.length > 0 ? (
-          <>
-            <div className="flex flex-col gap-2.5">
-              {shownGenerated.map(item => (
-                <ContentCard
-                  key={item.id}
-                  item={item}
-                  onArchive={id => setHiddenIds(prev => new Set([...prev, id]))}
-                />
-              ))}
-            </div>
-            {visible.length > DESK_MAX && (
-              <button
-                onClick={() => setShowAllGenerated(v => !v)}
-                className="mt-2 w-full text-[9px] font-bold text-[#131218]/30 hover:text-[#131218]/60 py-1.5 transition-colors"
-              >
-                {showAllGenerated ? "▲ Ver menos" : `▼ Ver ${visible.length - DESK_MAX} más`}
-              </button>
-            )}
-          </>
-        ) : (
-          <div className="bg-white border border-dashed border-[#E0E0D8] rounded-[12px] px-4 py-5 text-center">
-            <p className="text-[11px] text-[#131218]/20">Los drafts generados aparecerán aquí.</p>
-          </div>
-        )}
-      </div>
+      )}
 
     </div>
   );

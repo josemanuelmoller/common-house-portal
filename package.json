@@ -16,6 +16,7 @@
     "@tremor/react": "^3.18.7",
     "googleapis": "^171.4.0",
     "next": "16.2.3",
+    "pptxgenjs": "^4.0.1",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-simple-maps": "^3.0.0",

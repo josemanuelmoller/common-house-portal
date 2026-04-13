@@ -1,22 +1,42 @@
 /**
- * Control Room — The Hall (admin home)
+ * Control Room — The Hall v2
  *
- * Redesigned to match platform-admin.html view-hall spec:
- * - Greeting header + date
- * - P1 banner (blockers + deadlines from Notion)
- * - Stats row: active projects, pending review, agent status, next meeting
- * - Agent pulse bar
- * - Today's 3 urgencies
- * - Two-column: active projects table (type/warmth/update) + pending/upcoming
+ * Sprint A+B Hall redesign — productivity-first, OS-driven.
+ * All data from Notion. Fresh read on every load (no caching).
+ *
+ * Sections:
+ *   0  Header — greeting + date
+ *   1  Focus of the Day — from Daily Briefings [OS v2]
+ *   2  P1 Banner — blockers + deadlines
+ *   3  Stats row
+ *   4  Agent Queue — pending personal agent drafts
+ *   5  Follow-up Queue — opted-in opportunities needing action
+ *   6  My Commitments — from decisions + briefing
+ *   7  Relationship Queue — cold / dormant contacts
+ *   8  Active Portfolio — project table
+ *   9  Opportunities Explorer — CH vs Portfolio (explore, no pressure)
+ *  10  Ready to Publish — content pipeline
+ *      Right sidebar: pending review + stale projects
  */
 
 import Link from "next/link";
 import { Sidebar } from "@/components/Sidebar";
-import { getProjectsOverview, getDecisionItems } from "@/lib/notion";
+import { AgentQueueSection } from "@/components/AgentQueueSection";
+import { DraftCheckinButton } from "@/components/DraftCheckinButton";
+import { DraftFollowupButton } from "@/components/DraftFollowupButton";
+import {
+  getProjectsOverview,
+  getDecisionItems,
+  getDailyBriefing,
+  getAgentDrafts,
+  getFollowUpOpportunities,
+  getOpportunitiesByScope,
+  getColdRelationships,
+  getReadyContent,
+} from "@/lib/notion";
 import { ADMIN_NAV } from "@/lib/admin-nav";
 import { requireAdmin } from "@/lib/require-admin";
 
-// Re-export from shared module so server components can import from here
 export { ADMIN_NAV as NAV } from "@/lib/admin-nav";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -34,16 +54,23 @@ function warmthLabel(days: number): { label: string; dot: string; text: string }
   return              { label: "Dormant", dot: "bg-[#131218]/15", text: "text-[#131218]/35" };
 }
 
-function projectType(primaryWorkspace: string): string {
-  if (primaryWorkspace === "garage")   return "Garage";
-  if (primaryWorkspace === "workroom") return "Workroom";
-  return "—";
+function personWarmthBadge(warmth: string): { dot: string; text: string; bg: string } {
+  if (warmth === "Hot")     return { dot: "bg-red-400",    text: "text-red-600",    bg: "bg-red-50 border-red-200" };
+  if (warmth === "Warm")    return { dot: "bg-amber-400",  text: "text-amber-600",  bg: "bg-amber-50 border-amber-200" };
+  if (warmth === "Cold")    return { dot: "bg-blue-400",   text: "text-blue-600",   bg: "bg-blue-50 border-blue-200" };
+  return                    { dot: "bg-gray-300",   text: "text-gray-400",   bg: "bg-gray-50 border-gray-200" };
 }
 
 function projectTypeBadge(primaryWorkspace: string): string {
   if (primaryWorkspace === "garage")   return "bg-[#131218] text-[#B2FF59]";
   if (primaryWorkspace === "workroom") return "bg-[#EFEFEA] text-[#131218]/60 border border-[#E0E0D8]";
   return "bg-[#EFEFEA] text-[#131218]/30 border border-[#E0E0D8]";
+}
+
+function projectTypeLabel(primaryWorkspace: string): string {
+  if (primaryWorkspace === "garage")   return "Garage";
+  if (primaryWorkspace === "workroom") return "Workroom";
+  return "—";
 }
 
 const STAGE_COLORS: Record<string, string> = {
@@ -55,45 +82,81 @@ const STAGE_COLORS: Record<string, string> = {
   "Paused":     "bg-gray-100 text-gray-400 border border-gray-200",
 };
 
+// Section header — consistent across all Hall sections
+function SectionHeader({ label, count, action, href }: {
+  label: string;
+  count?: number;
+  action?: string;
+  href?: string;
+}) {
+  return (
+    <div className="flex items-center gap-3 mb-3">
+      <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">{label}</p>
+      {count !== undefined && (
+        <span className="text-[9px] font-bold bg-[#131218]/6 text-[#131218]/40 px-1.5 py-0.5 rounded-full">
+          {count}
+        </span>
+      )}
+      <div className="flex-1 h-px bg-[#E0E0D8]" />
+      {action && href && (
+        <Link href={href} className="text-[9px] font-bold text-[#131218]/30 hover:text-[#131218]/70 transition-colors uppercase tracking-widest whitespace-nowrap">
+          {action} →
+        </Link>
+      )}
+    </div>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default async function AdminPage() {
-  await requireAdmin();
+  const adminUser = await requireAdmin();
 
-  const [projects, decisions] = await Promise.all([
+  const [
+    projects,
+    decisions,
+    dailyBriefing,
+    agentDrafts,
+    followUpOpps,
+    opportunities,
+    coldRelationships,
+    readyContent,
+  ] = await Promise.all([
     getProjectsOverview(),
     getDecisionItems(),
+    getDailyBriefing(),
+    getAgentDrafts("Pending Review"),
+    getFollowUpOpportunities(),
+    getOpportunitiesByScope(),
+    getColdRelationships(),
+    getReadyContent(),
   ]);
 
-  // Derived counts
+  // ── Derived state ────────────────────────────────────────────────────────────
   const withBlockers    = projects.filter(p => p.blockerCount > 0);
   const needsUpdate     = projects.filter(p => p.updateNeeded);
   const staleProjects   = projects.filter(p => !p.updateNeeded && daysSince(p.lastUpdate) > 30);
   const workroomCount   = projects.filter(p => p.primaryWorkspace === "workroom").length;
   const garageCount     = projects.filter(p => p.primaryWorkspace === "garage").length;
 
-  // Pending review items from decisions
   const openDecisions   = decisions.filter(d => d.status !== "Approved" && d.status !== "Rejected" && d.status !== "Executed");
   const urgentDecisions = openDecisions.filter(d => d.priority === "P1" || d.priority === "Urgent");
-
-  // Deadline decisions (those with a dueDate)
   const withDeadlines   = openDecisions.filter(d => d.dueDate);
+  const blockerCount    = withBlockers.length;
+  const deadlineCount   = withDeadlines.length;
+  const totalPending    = needsUpdate.length + openDecisions.length;
 
-  // P1 banner text
-  const blockerCount   = withBlockers.length;
-  const deadlineCount  = withDeadlines.length;
+  const dormantRelationships = coldRelationships.filter(r => r.warmth === "Dormant");
+  const coldOnly             = coldRelationships.filter(r => r.warmth === "Cold");
 
-  // Total pending review: needsUpdate + openDecisions
-  const totalPending = needsUpdate.length + openDecisions.length;
-
+  // ── Date + greeting ──────────────────────────────────────────────────────────
   const today = new Date();
   const dateLabel = today.toLocaleDateString("en-GB", {
     weekday: "long", day: "numeric", month: "long", year: "numeric",
   });
-
-  // Hour-based greeting
-  const hour = today.getHours();
-  const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+  const hour      = today.getHours();
+  const greeting  = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+  const firstName = adminUser.firstName || adminUser.primaryEmailAddress?.emailAddress?.split("@")[0] || "Common House";
 
   return (
     <div className="flex min-h-screen bg-[#EFEFEA]">
@@ -101,14 +164,14 @@ export default async function AdminPage() {
 
       <main className="flex-1 ml-60 overflow-auto">
 
-        {/* ── Page header ─────────────────────────────────────────────── */}
+        {/* ── 0. Header ─────────────────────────────────────────────────── */}
         <div className="bg-[#131218] px-10 py-10">
           <p className="text-[8px] font-bold uppercase tracking-[2.5px] text-white/20 mb-3">
             HOME · {dateLabel.toUpperCase()}
           </p>
           <h1 className="text-[2.6rem] font-[300] text-white leading-[1] tracking-[-1.5px]">
             {greeting},<br />
-            <em className="font-[900] italic text-[#c8f55a]">Common House.</em>
+            <em className="font-[900] italic text-[#c8f55a]">{firstName}.</em>
           </h1>
           <p className="text-[12.5px] text-white/40 mt-3 max-w-[520px] leading-[1.65]">
             Here is your day — what moves, what waits, and what needs your attention.
@@ -117,7 +180,41 @@ export default async function AdminPage() {
 
         <div className="px-8 py-6 space-y-6 max-w-7xl">
 
-          {/* ── P1 Banner ───────────────────────────────────────────────── */}
+          {/* ── 1. Focus of the Day ───────────────────────────────────────── */}
+          {dailyBriefing ? (
+            <div className="bg-[#131218] rounded-2xl px-7 py-5 border border-[#131218]">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <p className="text-[9px] font-bold uppercase tracking-[2.5px] text-[#c8f55a]/70 mb-2">
+                    Focus of the Day
+                  </p>
+                  <p className="text-[14px] text-white/85 leading-[1.65] max-w-[680px]">
+                    {dailyBriefing.focusOfDay || "No focus set for today — run generate-daily-briefing."}
+                  </p>
+                </div>
+                <div className="shrink-0 text-right">
+                  <span className="inline-block text-[9px] font-bold text-[#c8f55a]/50 uppercase tracking-widest border border-[#c8f55a]/20 rounded-full px-2.5 py-1">
+                    {dailyBriefing.status || "Fresh"}
+                  </span>
+                  {dailyBriefing.generatedAt && (
+                    <p className="text-[9px] text-white/20 mt-1">
+                      {new Date(dailyBriefing.generatedAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-[#131218]/6 border border-dashed border-[#131218]/15 rounded-2xl px-7 py-5 flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[2.5px] text-[#131218]/30 mb-1">Focus of the Day</p>
+                <p className="text-[13px] text-[#131218]/40">No briefing generated yet today.</p>
+                <p className="text-[11px] text-[#131218]/25 mt-0.5">Run <code className="bg-[#131218]/6 px-1 rounded">generate-daily-briefing</code> to synthesise Calendar + Gmail + Fireflies.</p>
+              </div>
+            </div>
+          )}
+
+          {/* ── 2. P1 Banner ──────────────────────────────────────────────── */}
           {(blockerCount > 0 || deadlineCount > 0) && (
             <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-xl px-5 py-3.5">
               <span className="w-2 h-2 rounded-full bg-red-500 shrink-0 animate-pulse" />
@@ -139,243 +236,412 @@ export default async function AdminPage() {
             </div>
           )}
 
-          {/* ── Stats row ───────────────────────────────────────────────── */}
-          <div className="grid grid-cols-4 gap-4">
-            {/* Active projects */}
-            <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-4">
-              <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest mb-2">Active projects</p>
-              <p className="text-3xl font-bold text-[#131218] tracking-tight">{projects.length}</p>
-              <p className="text-[11px] text-[#131218]/40 font-medium mt-1.5">
-                {workroomCount} Workroom{workroomCount !== 1 ? "s" : ""} · {garageCount} Garage
-              </p>
-            </div>
+          {/* ── 3. Stats row ──────────────────────────────────────────────── */}
+          <div className="grid grid-cols-3 gap-4">
 
-            {/* Pending review */}
-            <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-4">
-              <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest mb-2">Pending review</p>
-              {totalPending > 0 ? (
-                <p className="text-3xl font-bold text-amber-500 tracking-tight">{totalPending}</p>
-              ) : (
-                <p className="text-3xl font-bold text-[#131218]/15 tracking-tight">0</p>
+            {/* Tile 1 — Portfolio */}
+            <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-5">
+              <p className="text-[9px] font-bold text-[#131218]/25 uppercase tracking-widest mb-2">Portfolio activo</p>
+              <p className="text-3xl font-[800] text-[#131218] tracking-tight leading-none mb-2">{projects.length}</p>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-semibold text-[#131218]/40">{workroomCount} Workroom · {garageCount} Garage</span>
+              </div>
+              {blockerCount > 0 && (
+                <div className="mt-2.5 flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" />
+                  <span className="text-[10px] font-bold text-red-500">{blockerCount} blocker{blockerCount !== 1 ? "s" : ""}</span>
+                </div>
               )}
-              <p className="text-[11px] text-[#131218]/40 font-medium mt-1.5">
-                Updates · Decisions · Content
+            </div>
+
+            {/* Tile 2 — Cola de trabajo */}
+            <Link href="/admin/decisions" className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-5 hover:bg-[#EFEFEA]/40 transition-colors block">
+              <p className="text-[9px] font-bold text-[#131218]/25 uppercase tracking-widest mb-2">Decisiones + updates</p>
+              <p className={`text-3xl font-[800] tracking-tight leading-none mb-2 ${totalPending > 0 ? "text-amber-500" : "text-[#131218]/15"}`}>
+                {totalPending}
               </p>
-            </div>
-
-            {/* Agents */}
-            <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-4">
-              <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest mb-2">Agents</p>
-              <p className="text-3xl font-bold text-[#B2FF59] bg-[#131218] w-fit px-3 py-0.5 rounded-xl tracking-tight">OK</p>
-              <p className="text-[11px] text-[#131218]/40 font-medium mt-1.5">OS v2 running</p>
-            </div>
-
-            {/* Blockers */}
-            <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-4">
-              <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest mb-2">Blockers</p>
-              {blockerCount > 0 ? (
-                <p className="text-3xl font-bold text-red-500 tracking-tight">{blockerCount}</p>
-              ) : (
-                <p className="text-3xl font-bold text-[#131218]/15 tracking-tight">0</p>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-semibold text-[#131218]/40">
+                  {urgentDecisions.length} urgentes · {needsUpdate.length} proyectos por actualizar
+                </span>
+              </div>
+              {withDeadlines.length > 0 && (
+                <div className="mt-2.5 flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+                  <span className="text-[10px] font-bold text-amber-500">{withDeadlines.length} deadline{withDeadlines.length !== 1 ? "s" : ""} esta semana</span>
+                </div>
               )}
-              <p className="text-[11px] text-[#131218]/40 font-medium mt-1.5">
-                {staleProjects.length > 0 ? `${staleProjects.length} stale (30d+)` : "All projects active"}
-              </p>
+            </Link>
+
+            {/* Tile 3 — OS Layer */}
+            <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-5">
+              <p className="text-[9px] font-bold text-[#131218]/25 uppercase tracking-widest mb-3">OS activo</p>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] text-[#131218]/50">Borradores de agentes</span>
+                  <span className={`text-[13px] font-[800] ${agentDrafts.length > 0 ? "text-[#131218]" : "text-[#131218]/15"}`}>{agentDrafts.length}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] text-[#131218]/50">Follow-ups activos</span>
+                  <span className={`text-[13px] font-[800] ${followUpOpps.length > 0 ? "text-amber-500" : "text-[#131218]/15"}`}>{followUpOpps.length}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] text-[#131218]/50">Relaciones frías</span>
+                  <span className={`text-[13px] font-[800] ${coldRelationships.length > 0 ? "text-blue-500" : "text-[#131218]/15"}`}>{coldRelationships.length}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] text-[#131218]/50">Dormantes</span>
+                  <span className={`text-[13px] font-[800] ${dormantRelationships.length > 0 ? "text-[#131218]/40" : "text-[#131218]/15"}`}>{dormantRelationships.length}</span>
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* ── Agent pulse bar ─────────────────────────────────────────── */}
-          <div style={{ background: "rgba(0,0,0,0.04)", borderRadius: 10, padding: "1rem 1.25rem", display: "flex", alignItems: "center", gap: "0.75rem" }}>
-            <div style={{ width: 8, height: 8, borderRadius: "50%", background: "rgba(0,0,0,0.2)" }} />
-            <span style={{ fontSize: 13, color: "rgba(0,0,0,0.45)" }}>
-              Telemetría de agentes en configuración · <a href="/admin/agents" style={{ color: "rgba(0,0,0,0.55)", textDecoration: "underline" }}>Ver registro</a>
-            </span>
-          </div>
-
-          {/* ── Today's urgencies ───────────────────────────────────────── */}
-          {(blockerCount > 0 || urgentDecisions.length > 0 || needsUpdate.length > 0) && (
-            <div className="grid grid-cols-3 gap-3">
-              {/* Blocker card */}
-              {withBlockers[0] ? (
-                <div className="bg-red-50/80 border border-red-200 rounded-xl px-4 py-3.5">
-                  <p className="text-[8px] font-bold tracking-widest uppercase text-red-600 mb-1.5">Active blocker</p>
-                  <p className="text-[12.5px] font-bold text-[#131218] leading-snug mb-1">{withBlockers[0].name}</p>
-                  <p className="text-[10.5px] text-[#131218]/50">
-                    {withBlockers[0].blockerCount} blocker{withBlockers[0].blockerCount !== 1 ? "s" : ""} · review required
-                  </p>
-                </div>
-              ) : (
-                <div className="bg-[#EFEFEA]/60 border border-[#E0E0D8] rounded-xl px-4 py-3.5 flex items-center justify-center">
-                  <p className="text-[11px] text-[#131218]/25 font-medium">No blockers today</p>
-                </div>
-              )}
-
-              {/* Deadline card */}
-              {withDeadlines[0] ? (
-                <div className="bg-red-50/80 border border-red-200 rounded-xl px-4 py-3.5">
-                  <p className="text-[8px] font-bold tracking-widest uppercase text-red-600 mb-1.5">
-                    Deadline{withDeadlines[0].dueDate ? ` · ${daysSince(withDeadlines[0].dueDate) < 0 ? Math.abs(daysSince(withDeadlines[0].dueDate)) : daysSince(withDeadlines[0].dueDate)} days` : ""}
-                  </p>
-                  <p className="text-[12.5px] font-bold text-[#131218] leading-snug mb-1">{withDeadlines[0].title}</p>
-                  <p className="text-[10.5px] text-[#131218]/50">
-                    {withDeadlines[0].dueDate
-                      ? `Closes ${new Date(withDeadlines[0].dueDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`
-                      : "Review required"}
-                  </p>
-                </div>
-              ) : (
-                <div className="bg-[#EFEFEA]/60 border border-[#E0E0D8] rounded-xl px-4 py-3.5 flex items-center justify-center">
-                  <p className="text-[11px] text-[#131218]/25 font-medium">No deadlines this week</p>
-                </div>
-              )}
-
-              {/* Review card */}
-              {needsUpdate[0] ? (
-                <div className="bg-amber-50/80 border border-amber-200 rounded-xl px-4 py-3.5">
-                  <p className="text-[8px] font-bold tracking-widest uppercase text-amber-600 mb-1.5">Review today</p>
-                  <p className="text-[12.5px] font-bold text-[#131218] leading-snug mb-1">{needsUpdate[0].name}</p>
-                  <p className="text-[10.5px] text-[#131218]/50">
-                    {needsUpdate[0].stage || "No stage"} · update pending
-                  </p>
-                </div>
-              ) : urgentDecisions[0] ? (
-                <div className="bg-amber-50/80 border border-amber-200 rounded-xl px-4 py-3.5">
-                  <p className="text-[8px] font-bold tracking-widest uppercase text-amber-600 mb-1.5">Review today</p>
-                  <p className="text-[12.5px] font-bold text-[#131218] leading-snug mb-1">{urgentDecisions[0].title}</p>
-                  <p className="text-[10.5px] text-[#131218]/50">
-                    {urgentDecisions[0].decisionType || "Decision"} · approval pending
-                  </p>
-                </div>
-              ) : (
-                <div className="bg-[#EFEFEA]/60 border border-[#E0E0D8] rounded-xl px-4 py-3.5 flex items-center justify-center">
-                  <p className="text-[11px] text-[#131218]/25 font-medium">Queue clear</p>
-                </div>
-              )}
+          {/* ── 4. Agent Queue ────────────────────────────────────────────── */}
+          {agentDrafts.length > 0 && (
+            <div>
+              <SectionHeader label="Agent queue" count={agentDrafts.length} />
+              <AgentQueueSection drafts={agentDrafts} />
             </div>
           )}
 
-          {/* ── Two-column layout ───────────────────────────────────────── */}
+          {/* ── Two-column main layout ─────────────────────────────────────── */}
           <div className="grid grid-cols-[1fr_340px] gap-6 items-start">
 
-            {/* Left: Active projects table */}
-            <div>
-              <div className="flex items-center gap-3 mb-3">
-                <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Active portfolio</p>
-                <div className="flex-1 h-px bg-[#E0E0D8]" />
-                <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">{projects.length} projects</p>
+            {/* ── LEFT COLUMN ───────────────────────────────────────────────── */}
+            <div className="space-y-6">
+
+              {/* ── 5. Follow-up Queue ────────────────────────────────────── */}
+              <div>
+                <SectionHeader
+                  label="Follow-up queue"
+                  count={followUpOpps.length}
+                  action={followUpOpps.length > 0 ? "All opportunities" : undefined}
+                  href="/admin"
+                />
+                {followUpOpps.length > 0 ? (
+                  <div className="bg-white rounded-2xl border border-[#E0E0D8] divide-y divide-[#EFEFEA] overflow-hidden">
+                    {followUpOpps.map(opp => {
+                      const lastEditDays = opp.lastEdited ? daysSince(opp.lastEdited) : null;
+                      const isUrgent = lastEditDays !== null && lastEditDays > 14;
+                      return (
+                        <div key={opp.id} className="flex items-center gap-3 px-5 py-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-0.5">
+                              {isUrgent && (
+                                <span className="text-[8px] font-bold text-red-600 bg-red-50 border border-red-200 px-1.5 rounded-full uppercase tracking-wide">Urgent</span>
+                              )}
+                              <span className="text-[8px] font-bold uppercase tracking-widest text-[#131218]/25">{opp.scope}</span>
+                            </div>
+                            <p className="text-[12.5px] font-semibold text-[#131218] truncate">{opp.name}</p>
+                            <p className="text-[10px] text-[#131218]/40 mt-0.5">
+                              {opp.stage}{opp.orgName ? ` · ${opp.orgName}` : ""}
+                              {lastEditDays !== null ? ` · ${lastEditDays}d silent` : ""}
+                            </p>
+                          </div>
+                          <DraftFollowupButton
+                            opportunityId={opp.id}
+                            notionUrl={opp.notionUrl}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="bg-white/50 border border-dashed border-[#E0E0D8] rounded-2xl px-5 py-10 text-center">
+                    <p className="text-[12px] text-[#131218]/25 font-medium">Sin follow-ups activos</p>
+                    <p className="text-[10.5px] text-[#131218]/18 mt-1">Marca &quot;Me interesa&quot; en una oportunidad para trackearlo aquí</p>
+                  </div>
+                )}
               </div>
 
-              <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-                {/* Table header */}
-                <div className="grid grid-cols-[2fr_1fr_90px_90px_90px_24px] px-5 py-2.5 border-b border-[#EFEFEA]">
-                  {["Project", "Stage", "Type", "Warmth", "Update", ""].map(h => (
-                    <div key={h} className="text-[9px] font-bold text-[#131218]/25 uppercase tracking-widest">{h}</div>
-                  ))}
-                </div>
-
-                {/* Rows */}
-                <div className="divide-y divide-[#EFEFEA]">
-                  {projects.map(p => {
-                    const days   = daysSince(p.lastUpdate);
-                    const warmth = warmthLabel(days);
-                    const type   = projectType(p.primaryWorkspace);
-                    const typeCls = projectTypeBadge(p.primaryWorkspace);
-
-                    return (
-                      <Link
-                        key={p.id}
-                        href={`/admin/projects/${p.id}`}
-                        className="grid grid-cols-[2fr_1fr_90px_90px_90px_24px] px-5 py-3 hover:bg-[#EFEFEA]/50 transition-colors group items-center"
-                      >
-                        {/* Name */}
-                        <div className="min-w-0">
-                          <p className="text-[12.5px] font-semibold text-[#131218] truncate">{p.name}</p>
-                          {p.geography.length > 0 && (
-                            <p className="text-[10px] text-[#131218]/30 font-medium truncate mt-0.5">
-                              {p.geography.slice(0, 2).join(" · ")}
-                            </p>
-                          )}
+              {/* ── 6. My Commitments (from briefing + decisions) ─────────── */}
+              {(dailyBriefing?.myCommitments || openDecisions.length > 0) && (
+                <div>
+                  <SectionHeader label="My commitments" count={openDecisions.length} action="Decisions" href="/admin/decisions" />
+                  <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
+                    {dailyBriefing?.myCommitments ? (
+                      <div className="px-5 py-4 border-b border-[#EFEFEA]">
+                        <p className="text-[9px] font-bold uppercase tracking-widest text-[#131218]/25 mb-2">From today&apos;s briefing</p>
+                        <pre className="text-[11.5px] text-[#131218]/70 leading-[1.65] whitespace-pre-wrap font-sans">
+                          {dailyBriefing.myCommitments.slice(0, 600)}
+                        </pre>
+                      </div>
+                    ) : null}
+                    {openDecisions.slice(0, 5).map(d => (
+                      <Link key={d.id} href="/admin/decisions" className="flex items-center gap-3 px-5 py-3.5 hover:bg-[#EFEFEA]/40 transition-colors border-b border-[#EFEFEA] last:border-0">
+                        <div className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 ${d.priority === "P1" || d.priority === "Urgent" ? "bg-red-100" : "bg-[#EFEFEA]"}`}>
+                          <span className={`text-[9px] font-bold ${d.priority === "P1" || d.priority === "Urgent" ? "text-red-600" : "text-[#131218]/35"}`}>!</span>
                         </div>
-
-                        {/* Stage */}
-                        <div>
-                          {p.stage ? (
-                            <span className={`inline-block text-[9px] font-bold px-2 py-0.5 rounded-full ${STAGE_COLORS[p.stage] ?? "bg-[#EFEFEA] text-[#131218]/50"}`}>
-                              {p.stage}
+                        <p className="text-[11px] font-medium text-[#131218] flex-1 min-w-0 truncate">{d.title}</p>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {d.dueDate && (
+                            <span className="text-[9px] font-bold text-[#131218]/35">
+                              {new Date(d.dueDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
                             </span>
-                          ) : (
-                            <span className="text-[#131218]/20 text-xs">—</span>
                           )}
+                          <span className="text-[9px] font-bold text-[#131218]/25">{d.decisionType}</span>
                         </div>
-
-                        {/* Type */}
-                        <div>
-                          {type !== "—" ? (
-                            <span className={`inline-block text-[9px] font-bold px-2 py-0.5 rounded-full ${typeCls}`}>
-                              {type}
-                            </span>
-                          ) : (
-                            <span className="text-[#131218]/20 text-xs">—</span>
-                          )}
-                        </div>
-
-                        {/* Warmth */}
-                        <div className="flex items-center gap-1.5">
-                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${warmth.dot}`} />
-                          <span className={`text-[10px] font-semibold ${warmth.text}`}>{warmth.label}</span>
-                        </div>
-
-                        {/* Update */}
-                        <div>
-                          {p.lastUpdate ? (
-                            <p className="text-[10px] text-[#131218]/50 font-medium">
-                              {new Date(p.lastUpdate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
-                            </p>
-                          ) : (
-                            <span className="text-[#131218]/15 text-xs">—</span>
-                          )}
-                          {p.updateNeeded && (
-                            <p className="text-[9px] font-bold text-amber-500 mt-0.5">! Update</p>
-                          )}
-                          {p.blockerCount > 0 && (
-                            <p className="text-[9px] font-bold text-red-500 mt-0.5">↯ Blocked</p>
-                          )}
-                        </div>
-
-                        {/* Arrow */}
-                        <div className="text-[#131218]/20 group-hover:text-[#131218]/60 transition-colors text-sm text-right">→</div>
                       </Link>
-                    );
-                  })}
-
-                  {projects.length === 0 && (
-                    <div className="px-5 py-8 text-center">
-                      <p className="text-sm text-[#131218]/25 font-medium">No active projects</p>
-                    </div>
-                  )}
+                    ))}
+                  </div>
                 </div>
+              )}
 
-                {/* Footer */}
-                <div className="px-5 py-2.5 border-t border-[#EFEFEA] flex items-center justify-between">
-                  <p className="text-[9px] font-bold text-[#131218]/25 uppercase tracking-widest">
-                    {projects.length} project{projects.length !== 1 ? "s" : ""}
-                  </p>
-                  <div className="flex items-center gap-3">
-                    {blockerCount > 0 && (
-                      <span className="text-[9px] font-bold text-red-500">↯ {blockerCount} blocker{blockerCount !== 1 ? "s" : ""}</span>
-                    )}
-                    {needsUpdate.length > 0 && (
-                      <span className="text-[9px] font-bold text-amber-500">! {needsUpdate.length} need update</span>
+              {/* ── 7. Relationship Queue ─────────────────────────────────── */}
+              {coldRelationships.length > 0 && (
+                <div>
+                  <SectionHeader label="Relationship queue" count={coldRelationships.length} />
+                  <div className="bg-white rounded-2xl border border-[#E0E0D8] divide-y divide-[#EFEFEA] overflow-hidden">
+                    {coldRelationships.slice(0, 6).map(r => {
+                      const badge = personWarmthBadge(r.warmth);
+                      const lastContactDays = r.lastContactDate ? daysSince(r.lastContactDate) : null;
+                      const calUrl = r.email
+                        ? `https://calendar.google.com/calendar/r/eventedit?add=${encodeURIComponent(r.email)}&text=Catch+up+with+${encodeURIComponent(r.name)}`
+                        : "https://calendar.google.com/calendar/r/eventedit";
+                      return (
+                        <div key={r.id} className="flex items-center gap-3 px-5 py-3">
+                          <div className={`w-2 h-2 rounded-full shrink-0 ${badge.dot}`} />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[12px] font-semibold text-[#131218] truncate">{r.name}</p>
+                            <p className="text-[10px] text-[#131218]/35 truncate mt-0.5">
+                              {r.jobTitle}
+                              {lastContactDays !== null ? ` · ${lastContactDays}d silent` : " · never contacted"}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className={`text-[8px] font-bold px-2 py-0.5 rounded-full border ${badge.bg} ${badge.text}`}>
+                              {r.warmth}
+                            </span>
+                            <a
+                              href={calUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-[#c8f55a] text-[#131218] hover:bg-[#b8e54a] transition-colors"
+                            >
+                              Catch up
+                            </a>
+                            <DraftCheckinButton
+                              personId={r.id}
+                              notionUrl={r.notionUrl}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* ── 8. Active Portfolio ───────────────────────────────────── */}
+              <div>
+                <SectionHeader label="Active portfolio" count={projects.length} />
+                <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
+                  <div className="grid grid-cols-[2fr_1fr_80px_80px_80px_20px] px-5 py-2.5 border-b border-[#EFEFEA]">
+                    {["Project", "Stage", "Type", "Warmth", "Update", ""].map(h => (
+                      <div key={h} className="text-[9px] font-bold text-[#131218]/25 uppercase tracking-widest">{h}</div>
+                    ))}
+                  </div>
+                  <div className="divide-y divide-[#EFEFEA]">
+                    {projects.map(p => {
+                      const days    = daysSince(p.lastUpdate);
+                      const warmth  = warmthLabel(days);
+                      const typeLbl = projectTypeLabel(p.primaryWorkspace);
+                      const typeCls = projectTypeBadge(p.primaryWorkspace);
+                      return (
+                        <Link
+                          key={p.id}
+                          href={`/admin/projects/${p.id}`}
+                          className="grid grid-cols-[2fr_1fr_80px_80px_80px_20px] px-5 py-4 hover:bg-[#EFEFEA]/50 transition-colors group items-center"
+                        >
+                          <div className="min-w-0">
+                            <p className="text-[12px] font-semibold text-[#131218] truncate">{p.name}</p>
+                            {p.geography.length > 0 && (
+                              <p className="text-[10px] text-[#131218]/30 font-medium truncate mt-0.5">{p.geography.slice(0, 2).join(" · ")}</p>
+                            )}
+                          </div>
+                          <div>
+                            {p.stage ? (
+                              <span className={`inline-block text-[9px] font-bold px-2 py-0.5 rounded-full ${STAGE_COLORS[p.stage] ?? "bg-[#EFEFEA] text-[#131218]/50"}`}>
+                                {p.stage}
+                              </span>
+                            ) : <span className="text-[#131218]/15 text-xs">—</span>}
+                          </div>
+                          <div>
+                            {typeLbl !== "—" ? (
+                              <span className={`inline-block text-[9px] font-bold px-2 py-0.5 rounded-full ${typeCls}`}>{typeLbl}</span>
+                            ) : <span className="text-[#131218]/15 text-xs">—</span>}
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${warmth.dot}`} />
+                            <span className={`text-[10px] font-semibold ${warmth.text}`}>{warmth.label}</span>
+                          </div>
+                          <div>
+                            {p.lastUpdate ? (
+                              <p className="text-[10px] text-[#131218]/50 font-medium">
+                                {new Date(p.lastUpdate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+                              </p>
+                            ) : <span className="text-[#131218]/15 text-xs">—</span>}
+                            {p.updateNeeded && <p className="text-[9px] font-bold text-amber-500 mt-0.5">! Update</p>}
+                            {p.blockerCount > 0 && <p className="text-[9px] font-bold text-red-500 mt-0.5">↯ Blocked</p>}
+                          </div>
+                          <div className="text-[#131218]/20 group-hover:text-[#131218]/60 transition-colors text-sm text-right">→</div>
+                        </Link>
+                      );
+                    })}
+                    {projects.length === 0 && (
+                      <div className="px-5 py-8 text-center">
+                        <p className="text-sm text-[#131218]/25 font-medium">No active projects</p>
+                      </div>
                     )}
                   </div>
                 </div>
               </div>
+
+              {/* ── 9. Opportunities Explorer ─────────────────────────────── */}
+              {(opportunities.ch.length > 0 || opportunities.portfolio.length > 0) && (
+                <div>
+                  <SectionHeader label="Opportunities — explore" count={opportunities.ch.length + opportunities.portfolio.length} />
+                  <div className="grid grid-cols-2 gap-4">
+
+                    {/* CH Opportunities */}
+                    <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
+                      <div className="px-4 py-3 border-b border-[#EFEFEA]">
+                        <p className="text-[9px] font-bold uppercase tracking-widest text-[#131218]/30">Common House</p>
+                      </div>
+                      <div className="divide-y divide-[#EFEFEA]">
+                        {opportunities.ch.slice(0, 6).map(o => (
+                          <a
+                            key={o.id}
+                            href={o.notionUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-3 px-4 py-2.5 hover:bg-[#EFEFEA]/40 transition-colors"
+                          >
+                            <div className="flex-1 min-w-0">
+                              <p className="text-[11.5px] font-semibold text-[#131218] truncate">{o.name}</p>
+                              <p className="text-[10px] text-[#131218]/35 mt-0.5">{o.stage}{o.type ? ` · ${o.type}` : ""}</p>
+                            </div>
+                            {o.followUpStatus !== "None" && o.followUpStatus !== "" && (
+                              <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wide shrink-0 ${
+                                o.followUpStatus === "Needed" ? "bg-amber-50 text-amber-600 border border-amber-200" :
+                                o.followUpStatus === "Waiting" ? "bg-blue-50 text-blue-600 border border-blue-200" :
+                                "bg-[#EFEFEA] text-[#131218]/30"
+                              }`}>
+                                {o.followUpStatus}
+                              </span>
+                            )}
+                          </a>
+                        ))}
+                        {opportunities.ch.length === 0 && (
+                          <div className="px-4 py-5 text-center">
+                            <p className="text-[11px] text-[#131218]/25">No CH opportunities</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Portfolio Opportunities */}
+                    <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
+                      <div className="px-4 py-3 border-b border-[#EFEFEA]">
+                        <p className="text-[9px] font-bold uppercase tracking-widest text-[#131218]/30">Portfolio</p>
+                      </div>
+                      <div className="divide-y divide-[#EFEFEA]">
+                        {opportunities.portfolio.slice(0, 6).map(o => (
+                          <a
+                            key={o.id}
+                            href={o.notionUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-3 px-4 py-2.5 hover:bg-[#EFEFEA]/40 transition-colors"
+                          >
+                            <div className="flex-1 min-w-0">
+                              <p className="text-[11.5px] font-semibold text-[#131218] truncate">{o.name}</p>
+                              <p className="text-[10px] text-[#131218]/35 mt-0.5">{o.stage}{o.orgName ? ` · ${o.orgName}` : ""}</p>
+                            </div>
+                            {o.followUpStatus !== "None" && o.followUpStatus !== "" && (
+                              <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wide shrink-0 ${
+                                o.followUpStatus === "Needed" ? "bg-amber-50 text-amber-600 border border-amber-200" :
+                                o.followUpStatus === "Waiting" ? "bg-blue-50 text-blue-600 border border-blue-200" :
+                                "bg-[#EFEFEA] text-[#131218]/30"
+                              }`}>
+                                {o.followUpStatus}
+                              </span>
+                            )}
+                          </a>
+                        ))}
+                        {opportunities.portfolio.length === 0 && (
+                          <div className="px-4 py-5 text-center">
+                            <p className="text-[11px] text-[#131218]/25">No portfolio opportunities</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                  </div>
+                </div>
+              )}
+
+              {/* ── 10. Ready to Publish ─────────────────────────────────── */}
+              {readyContent.length > 0 && (
+                <div>
+                  <SectionHeader label="Ready to publish" count={readyContent.length} />
+                  <div className="grid grid-cols-3 gap-3">
+                    {readyContent.map(c => (
+                      <a
+                        key={c.id}
+                        href={c.notionUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="bg-white rounded-xl border border-[#E0E0D8] px-4 py-3.5 hover:bg-[#EFEFEA]/50 transition-colors"
+                      >
+                        <p className="text-[9px] font-bold uppercase tracking-widest text-[#131218]/25 mb-1">
+                          {c.platform} · {c.contentType}
+                        </p>
+                        <p className="text-[12px] font-semibold text-[#131218] leading-snug">{c.title}</p>
+                        {c.publishWindow && (
+                          <p className="text-[10px] text-[#131218]/35 mt-1">Window: {c.publishWindow}</p>
+                        )}
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+
             </div>
 
-            {/* Right column */}
+            {/* ── RIGHT COLUMN ──────────────────────────────────────────────── */}
             <div className="flex flex-col gap-4">
 
-              {/* Pending items */}
+              {/* Meeting Prep from briefing */}
+              {dailyBriefing?.meetingPrep && (
+                <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
+                  <div className="px-5 py-3 border-b border-[#EFEFEA]">
+                    <p className="text-xs font-bold text-[#131218]">Meeting prep</p>
+                  </div>
+                  <div className="px-5 py-4">
+                    <pre className="text-[11px] text-[#131218]/65 leading-[1.65] whitespace-pre-wrap font-sans">
+                      {dailyBriefing.meetingPrep.slice(0, 700)}
+                    </pre>
+                  </div>
+                </div>
+              )}
+
+              {/* Market Signals from briefing */}
+              {dailyBriefing?.marketSignals && (
+                <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
+                  <div className="px-5 py-3 border-b border-[#EFEFEA]">
+                    <p className="text-xs font-bold text-[#131218]">Market signals</p>
+                  </div>
+                  <div className="px-5 py-4">
+                    <pre className="text-[11px] text-[#131218]/65 leading-[1.65] whitespace-pre-wrap font-sans">
+                      {dailyBriefing.marketSignals.slice(0, 500)}
+                    </pre>
+                  </div>
+                </div>
+              )}
+
+              {/* Pending review queue */}
               <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
                 <div className="px-5 py-3.5 border-b border-[#EFEFEA] flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -390,11 +656,9 @@ export default async function AdminPage() {
                     <span className="text-[10px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">{totalPending}</span>
                   )}
                 </div>
-
                 <div className="divide-y divide-[#EFEFEA]">
-                  {/* Blockers */}
                   {withBlockers.slice(0, 2).map(p => (
-                    <Link key={`blk-${p.id}`} href={`/admin/projects/${p.id}`} className="flex items-center gap-3 px-5 py-2.5 hover:bg-[#EFEFEA]/40 transition-colors">
+                    <Link key={`blk-${p.id}`} href={`/admin/projects/${p.id}`} className="flex items-center gap-3 px-5 py-3.5 hover:bg-[#EFEFEA]/40 transition-colors">
                       <div className="w-5 h-5 rounded-md bg-red-100 flex items-center justify-center shrink-0">
                         <span className="text-[9px] font-bold text-red-600">!</span>
                       </div>
@@ -402,10 +666,8 @@ export default async function AdminPage() {
                       <span className="text-[9px] font-bold text-[#131218]/30 shrink-0">Blocker</span>
                     </Link>
                   ))}
-
-                  {/* Urgent decisions */}
                   {urgentDecisions.slice(0, 2).map(d => (
-                    <Link key={`urg-${d.id}`} href="/admin/decisions" className="flex items-center gap-3 px-5 py-2.5 hover:bg-[#EFEFEA]/40 transition-colors">
+                    <Link key={`urg-${d.id}`} href="/admin/decisions" className="flex items-center gap-3 px-5 py-3.5 hover:bg-[#EFEFEA]/40 transition-colors">
                       <div className="w-5 h-5 rounded-md bg-red-100 flex items-center justify-center shrink-0">
                         <span className="text-[9px] font-bold text-red-600">!</span>
                       </div>
@@ -413,21 +675,8 @@ export default async function AdminPage() {
                       <span className="text-[9px] font-bold text-[#131218]/30 shrink-0">Decision</span>
                     </Link>
                   ))}
-
-                  {/* Open decisions */}
-                  {openDecisions.filter(d => d.priority !== "P1" && d.priority !== "Urgent").slice(0, 2).map(d => (
-                    <Link key={`dec-${d.id}`} href="/admin/decisions" className="flex items-center gap-3 px-5 py-2.5 hover:bg-[#EFEFEA]/40 transition-colors">
-                      <div className="w-5 h-5 rounded-md bg-[#EFEFEA] flex items-center justify-center shrink-0">
-                        <span className="text-[9px] font-bold text-[#131218]/40">·</span>
-                      </div>
-                      <p className="text-[11px] font-medium text-[#131218] flex-1 min-w-0 truncate">{d.title}</p>
-                      <span className="text-[9px] font-bold text-[#131218]/30 shrink-0">Decision</span>
-                    </Link>
-                  ))}
-
-                  {/* Updates needed */}
-                  {needsUpdate.slice(0, 2).map(p => (
-                    <Link key={`upd-${p.id}`} href={`/admin/projects/${p.id}`} className="flex items-center gap-3 px-5 py-2.5 hover:bg-[#EFEFEA]/40 transition-colors">
+                  {needsUpdate.slice(0, 3).map(p => (
+                    <Link key={`upd-${p.id}`} href={`/admin/projects/${p.id}`} className="flex items-center gap-3 px-5 py-3.5 hover:bg-[#EFEFEA]/40 transition-colors">
                       <div className="w-5 h-5 rounded-md bg-[#EFEFEA] flex items-center justify-center shrink-0">
                         <span className="text-[9px] font-bold text-amber-500">!</span>
                       </div>
@@ -435,14 +684,12 @@ export default async function AdminPage() {
                       <span className="text-[9px] font-bold text-[#131218]/30 shrink-0">Update</span>
                     </Link>
                   ))}
-
                   {totalPending === 0 && (
                     <div className="px-5 py-5 text-center">
-                      <p className="text-[11px] text-[#131218]/25 font-medium">Queue clear — nothing pending</p>
+                      <p className="text-[11px] text-[#131218]/25 font-medium">Queue clear</p>
                     </div>
                   )}
                 </div>
-
                 <div className="px-5 py-2.5 border-t border-[#EFEFEA]">
                   <Link href="/admin/decisions" className="text-[10px] font-bold text-[#131218]/30 hover:text-[#131218]/70 transition-colors uppercase tracking-widest">
                     All decisions →
@@ -450,7 +697,7 @@ export default async function AdminPage() {
                 </div>
               </div>
 
-              {/* Stale projects — compact warning */}
+              {/* Stale projects */}
               {staleProjects.length > 0 && (
                 <div className="bg-white rounded-2xl border border-red-200 overflow-hidden">
                   <div className="h-1 bg-red-400" />
@@ -460,7 +707,7 @@ export default async function AdminPage() {
                   </div>
                   <div className="divide-y divide-[#EFEFEA]">
                     {staleProjects.slice(0, 3).map(p => (
-                      <Link key={p.id} href={`/admin/projects/${p.id}`} className="flex items-center gap-3 px-5 py-2.5 hover:bg-[#EFEFEA]/40 transition-colors group">
+                      <Link key={p.id} href={`/admin/projects/${p.id}`} className="flex items-center gap-3 px-5 py-3.5 hover:bg-[#EFEFEA]/40 transition-colors group">
                         <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" />
                         <p className="text-[11px] font-medium text-[#131218] flex-1 min-w-0 truncate">{p.name}</p>
                         <span className="text-[10px] font-bold text-red-400 shrink-0">{daysSince(p.lastUpdate)}d</span>
@@ -469,6 +716,15 @@ export default async function AdminPage() {
                   </div>
                 </div>
               )}
+
+              {/* OS pulse */}
+              <div className="bg-[#131218]/4 rounded-xl px-4 py-3 flex items-center gap-2.5">
+                <div className="w-2 h-2 rounded-full bg-[#c8f55a]" />
+                <div>
+                  <p className="text-[10px] font-bold text-[#131218]/50">OS v2 · {coldOnly.length} cold · {dormantRelationships.length} dormant</p>
+                  <a href="/admin/agents" className="text-[9px] text-[#131218]/30 hover:text-[#131218]/60 transition-colors">Agent log →</a>
+                </div>
+              </div>
 
             </div>
           </div>

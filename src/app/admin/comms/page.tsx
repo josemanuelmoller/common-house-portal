@@ -31,9 +31,6 @@ export default async function CommsPage() {
     ))
   );
 
-  const pending   = deskItems.filter(i => !i.draftText && !i.slideHtml);
-  const generated = deskItems.filter(i => i.draftText || i.slideHtml);
-
   // Comms only needs Voice / Tone + Brand Identity profiles (not visual layout styles)
   const commsProfiles = styleProfiles.filter(p =>
     p.styleType === "Voice / Tone" || p.styleType === "Brand Identity" || p.scope === "JMM" || p.scope === "Common House" || p.scope === "Portfolio Startup"
@@ -54,28 +51,25 @@ export default async function CommsPage() {
           </p>
         </header>
 
-        <div className="px-12 py-9">
-          <div className="max-w-5xl grid grid-cols-1 lg:grid-cols-[1fr_2fr] gap-6 items-start">
+        <div className="px-8 py-8 flex gap-8 items-start">
 
-            {/* Request form */}
-            <div className="bg-white border border-[#E0E0D8] rounded-2xl overflow-hidden">
-              <div className="px-5 py-4 border-b border-[#E0E0D8]">
-                <p className="text-[8px] font-bold tracking-[2px] uppercase text-[#131218]/30 mb-1">Nueva solicitud</p>
-                <p className="text-sm font-bold text-[#131218]">Comms Desk</p>
-              </div>
-              <DeskRequestForm
-                deskType="comms"
-                contentTypes={COMMS_TYPES}
-                channelOrProjectOptions={COMMS_CHANNELS}
-                channelOrProjectLabel="Plataforma"
-                styleProfiles={commsProfiles}
-              />
-            </div>
-
-            {/* Queue + Generated sections */}
-            <DeskQueueSection pending={pending} generated={generated} />
-
+          {/* Form panel — sticky */}
+          <div className="flex-shrink-0 sticky top-6">
+            <DeskRequestForm
+              deskType="comms"
+              deskLabel="Comms Desk"
+              contentTypes={COMMS_TYPES}
+              channelOrProjectOptions={COMMS_CHANNELS}
+              channelOrProjectLabel="Plataforma"
+              styleProfiles={commsProfiles}
+            />
           </div>
+
+          {/* Production list — fills remaining space */}
+          <div className="flex-1 min-w-0">
+            <DeskQueueSection items={deskItems} />
+          </div>
+
         </div>
       </main>
     </div>

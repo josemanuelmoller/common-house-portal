@@ -35,8 +35,6 @@ export default async function DesignPage() {
     ))
   );
 
-  const pending   = deskItems.filter(i => !i.draftText && !i.slideHtml);
-  const generated = deskItems.filter(i => i.draftText || i.slideHtml);
 
   // Visual layout styles only — 3 options max
   const designStyleProfiles = styleProfiles.filter(p => DESIGN_STYLE_TYPES.has(p.styleType));
@@ -62,28 +60,25 @@ export default async function DesignPage() {
           </p>
         </header>
 
-        <div className="px-12 py-9">
-          <div className="max-w-5xl grid grid-cols-1 lg:grid-cols-[1fr_2fr] gap-6 items-start">
+        <div className="px-8 py-8 flex gap-8 items-start">
 
-            {/* Request form */}
-            <div className="bg-white border border-[#E0E0D8] rounded-[14px] overflow-hidden">
-              <div className="px-5 py-4 border-b border-[#E0E0D8]">
-                <p className="text-[8px] font-bold tracking-[2px] uppercase text-[#0e0e0e]/28 mb-1">Nueva solicitud</p>
-                <p className="text-sm font-bold text-[#0e0e0e] tracking-[-0.3px]">Design Desk</p>
-              </div>
-              <DeskRequestForm
-                deskType="design"
-                contentTypes={DESIGN_TYPES}
-                channelOrProjectOptions={projectNames.length > 0 ? projectNames : ["CH Institucional", "Auto Mercado", "Fair Cycle", "LATAM NGO"]}
-                channelOrProjectLabel="Proyecto"
-                styleProfiles={designStyleProfiles}
-              />
-            </div>
-
-            {/* Queue + Generated sections */}
-            <DeskQueueSection pending={pending} generated={generated} />
-
+          {/* Form panel — sticky */}
+          <div className="flex-shrink-0 sticky top-6">
+            <DeskRequestForm
+              deskType="design"
+              deskLabel="Design Desk"
+              contentTypes={DESIGN_TYPES}
+              channelOrProjectOptions={projectNames.length > 0 ? projectNames : ["CH Institucional", "Auto Mercado", "Fair Cycle", "LATAM NGO"]}
+              channelOrProjectLabel="Proyecto"
+              styleProfiles={designStyleProfiles}
+            />
           </div>
+
+          {/* Production list — fills remaining space */}
+          <div className="flex-1 min-w-0">
+            <DeskQueueSection items={deskItems} />
+          </div>
+
         </div>
       </main>
     </div>
