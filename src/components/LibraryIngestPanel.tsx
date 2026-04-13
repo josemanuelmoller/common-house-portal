@@ -8,6 +8,8 @@ type Result = {
   tags: string[];
   summary: string;
   notionId: string;
+  sourceFileUrl?: string;
+  storagePath?: string;
 };
 
 export function LibraryIngestPanel() {
@@ -18,6 +20,7 @@ export function LibraryIngestPanel() {
   const [status, setStatus] = useState<"idle" | "processing" | "done" | "error">("idle");
   const [result, setResult] = useState<Result | null>(null);
   const [error, setError] = useState("");
+  const [deleting, setDeleting] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   async function handleIngest() {
@@ -54,6 +57,22 @@ export function LibraryIngestPanel() {
     }
   }
 
+  async function handleDelete() {
+    if (!result?.notionId) return;
+    setDeleting(true);
+    try {
+      await fetch("/api/ingest-library", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notionId: result.notionId, storagePath: result.storagePath }),
+      });
+      setResult(null);
+      setStatus("idle");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   const canSubmit = status !== "processing" &&
     (mode === "paste" ? text.trim().length > 0 : file !== null);
 
@@ -69,7 +88,7 @@ export function LibraryIngestPanel() {
           {(["paste", "upload"] as const).map(m => (
             <button
               key={m}
-              onClick={() => { setMode(m); setFile(null); setText(""); }}
+              onClick={() => { setMode(m); setFile(null); setText(""); setStatus("idle"); setResult(null); }}
               className={`text-[10px] font-bold px-3 py-1.5 rounded-lg border transition-all ${
                 mode === m
                   ? "bg-[#131218] text-white border-[#131218]"
@@ -121,7 +140,7 @@ export function LibraryIngestPanel() {
               <>
                 <p className="text-2xl mb-2 text-[#131218]/20">↑</p>
                 <p className="text-sm font-semibold text-[#131218]/50">Subir archivo</p>
-                <p className="text-[10px] text-[#131218]/25 mt-1">PDF, TXT, MD, DOCX, CSV</p>
+                <p className="text-[10px] text-[#131218]/25 mt-1">PDF, TXT, MD, DOCX, CSV · máx 50 MB</p>
               </>
             )}
           </div>
@@ -170,14 +189,41 @@ export function LibraryIngestPanel() {
               </span>
             </div>
             <p className="text-[10px] text-[#131218]/50 leading-relaxed mb-2">{result.summary}</p>
-            <div className="flex flex-wrap gap-1">
+            <div className="flex flex-wrap gap-1 mb-3">
               {result.tags.map(t => (
                 <span key={t} className="text-[8px] font-semibold bg-[#131218]/5 text-[#131218]/40 px-2 py-0.5 rounded-full">
                   {t}
                 </span>
               ))}
             </div>
-            <p className="text-[8px] text-[#131218]/20 mt-2">Draft creado en Notion · revisar antes de publicar</p>
+
+            {/* File link + actions */}
+            <div className="flex items-center justify-between pt-2.5 border-t border-[#E0E0D8]">
+              <div className="flex items-center gap-3">
+                {result.sourceFileUrl ? (
+                  <a
+                    href={result.sourceFileUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[9px] font-bold text-[#131218]/50 hover:text-[#131218] transition-colors flex items-center gap-1"
+                  >
+                    ↓ Descargar archivo original
+                  </a>
+                ) : (
+                  <p className="text-[8px] text-[#131218]/20">Texto procesado · sin archivo adjunto</p>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <p className="text-[8px] text-[#131218]/20">Draft en Notion · revisar antes de publicar</p>
+                <button
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  className="text-[9px] font-bold text-[#131218]/25 hover:text-red-500 transition-colors"
+                >
+                  {deleting ? "..." : "Descartar"}
+                </button>
+              </div>
+            </div>
           </div>
         )}
 

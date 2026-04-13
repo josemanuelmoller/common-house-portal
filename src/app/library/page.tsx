@@ -226,6 +226,16 @@ export default async function LibraryPage() {
                                     {asset.category}
                                   </span>
                                 )}
+                                {asset.sourceFileUrl && (
+                                  <a
+                                    href={asset.sourceFileUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-[10px] font-medium text-[#131218]/35 hover:text-[#131218] transition-colors flex items-center gap-0.5"
+                                  >
+                                    ↓ archivo
+                                  </a>
+                                )}
                               </div>
                             </div>
                             <div className="flex items-center gap-2 shrink-0">

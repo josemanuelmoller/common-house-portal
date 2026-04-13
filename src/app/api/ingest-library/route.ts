@@ -1,11 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
+import { createClient } from "@supabase/supabase-js";
 import { adminGuardApi } from "@/lib/require-admin";
-import { createKnowledgeAssetDraft } from "@/lib/notion";
+import { createKnowledgeAssetDraft, notion } from "@/lib/notion";
 
 export const maxDuration = 120;
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_KEY!
+);
+
+const BUCKET = "library-docs";
+// Signed URL valid for 10 years
+const SIGNED_URL_EXPIRY = 60 * 60 * 24 * 365 * 10;
 
 const CLASSIFY_PROMPT = `You are a knowledge curator for Common House, a startup ecosystem operator in circular economy and sustainable retail.
 
@@ -33,6 +43,8 @@ Tags should be 2-5 keywords from: Refill, Packaging, Circular Economy, Zero Wast
 
 Return ONLY the JSON object, no markdown, no explanation.`;
 
+// ─── POST — ingest text or file ───────────────────────────────────────────────
+
 export async function POST(req: NextRequest) {
   const guard = await adminGuardApi();
   if (guard) return guard;
@@ -41,24 +53,31 @@ export async function POST(req: NextRequest) {
   let sourceNote = "";
   let isPdf = false;
   let pdfBase64 = "";
+  let originalFileName = "";
+  let fileBuffer: Buffer | null = null;
+  let fileMimeType = "application/octet-stream";
 
   const contentType = req.headers.get("content-type") ?? "";
 
   if (contentType.includes("multipart/form-data")) {
-    // File upload
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
     const pastedText = formData.get("text") as string | null;
     sourceNote = (formData.get("source") as string | null) ?? "";
 
     if (file) {
+      originalFileName = file.name;
+      fileMimeType = file.type || "application/octet-stream";
       sourceNote = sourceNote || file.name;
+
+      const arrayBuffer = await file.arrayBuffer();
+      fileBuffer = Buffer.from(arrayBuffer);
+
       if (file.type === "application/pdf") {
-        const buffer = await file.arrayBuffer();
-        pdfBase64 = Buffer.from(buffer).toString("base64");
+        pdfBase64 = fileBuffer.toString("base64");
         isPdf = true;
       } else {
-        textContent = await file.text();
+        textContent = fileBuffer.toString("utf-8");
       }
     } else if (pastedText) {
       textContent = pastedText;
@@ -66,7 +85,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No file or text provided" }, { status: 400 });
     }
   } else {
-    // JSON text paste
     const body = await req.json();
     textContent = body.text ?? "";
     sourceNote = body.source ?? "";
@@ -79,7 +97,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "ANTHROPIC_API_KEY not configured" }, { status: 500 });
   }
 
-  // Build Claude message — PDF via document block, text via text block
+  // Build Claude message
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const userContent: any[] = isPdf
     ? [
@@ -105,7 +123,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Classification failed" }, { status: 500 });
   }
 
-  // Parse JSON from Claude response
   let parsed: {
     title: string;
     summary: string;
@@ -122,6 +139,33 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Failed to parse classification", raw }, { status: 500 });
   }
 
+  // Upload file to Supabase if we have one
+  let storagePath: string | undefined;
+  let sourceFileUrl: string | undefined;
+
+  if (fileBuffer && originalFileName) {
+    const slug = Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 6);
+    storagePath = `library/${slug}-${originalFileName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from(BUCKET)
+      .upload(storagePath, fileBuffer, {
+        contentType: fileMimeType,
+        upsert: false,
+      });
+
+    if (uploadError) {
+      console.error("[ingest-library] Supabase upload error:", uploadError);
+      // Non-fatal — continue without file storage
+      storagePath = undefined;
+    } else {
+      const { data: signedData } = await supabase.storage
+        .from(BUCKET)
+        .createSignedUrl(storagePath, SIGNED_URL_EXPIRY);
+      sourceFileUrl = signedData?.signedUrl;
+    }
+  }
+
   // Create Knowledge Asset draft in Notion
   let notionId: string | null = null;
   try {
@@ -132,9 +176,15 @@ export async function POST(req: NextRequest) {
       assetType: parsed.assetType ?? "Reference",
       tags: parsed.tags ?? [],
       sourceNote,
+      sourceFileUrl,
+      storagePath,
     });
   } catch (err) {
     console.error("[ingest-library] Notion create error:", err);
+    // If Notion fails but we uploaded the file, clean it up
+    if (storagePath) {
+      await supabase.storage.from(BUCKET).remove([storagePath]);
+    }
     return NextResponse.json({ error: "Notion create failed" }, { status: 500 });
   }
 
@@ -145,5 +195,32 @@ export async function POST(req: NextRequest) {
     assetType: parsed.assetType,
     tags: parsed.tags,
     summary: parsed.summary,
+    sourceFileUrl,
+    storagePath,
   });
+}
+
+// ─── DELETE — remove a library asset (Notion archive + Supabase delete) ───────
+
+export async function DELETE(req: NextRequest) {
+  const guard = await adminGuardApi();
+  if (guard) return guard;
+
+  const { notionId, storagePath } = await req.json();
+  const errs: string[] = [];
+
+  if (notionId) {
+    try {
+      await notion.pages.update({ page_id: notionId, archived: true });
+    } catch {
+      errs.push("Failed to archive Notion record");
+    }
+  }
+
+  if (storagePath) {
+    const { error } = await supabase.storage.from(BUCKET).remove([storagePath]);
+    if (error) errs.push(`Storage delete failed: ${error.message}`);
+  }
+
+  return NextResponse.json({ ok: errs.length === 0, errors: errs });
 }

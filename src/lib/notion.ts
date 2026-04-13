@@ -138,6 +138,7 @@ export type KnowledgeAsset = {
   status: string;
   lastUpdated: string | null;
   portalVisibility?: string;
+  sourceFileUrl?: string;
 };
 
 export type DashboardStats = {
@@ -691,6 +692,7 @@ export async function getKnowledgeAssets(): Promise<KnowledgeAsset[]> {
     status: select(prop(page, "Status")) || "",
     lastUpdated: page.last_edited_time ?? null,
     portalVisibility: page.properties["Portal Visibility"]?.select?.name ?? "admin-only",
+    sourceFileUrl: page.properties["Source File URL"]?.url ?? null,
   }));
 }
 
@@ -703,8 +705,10 @@ export async function createKnowledgeAssetDraft(opts: {
   assetType: string;
   tags: string[];
   sourceNote?: string;
+  sourceFileUrl?: string;
+  storagePath?: string;
 }): Promise<string> {
-  const { title, summary, keyPoints, assetType, tags, sourceNote } = opts;
+  const { title, summary, keyPoints, assetType, tags, sourceNote, sourceFileUrl, storagePath } = opts;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const page = await notion.pages.create({
@@ -715,6 +719,7 @@ export async function createKnowledgeAssetDraft(opts: {
       "Domain / Theme":    { multi_select: tags.slice(0, 5).map(t => ({ name: t })) },
       "Status":            { select: { name: "Draft" } },
       "Portal Visibility": { select: { name: "admin-only" } },
+      ...(sourceFileUrl ? { "Source File URL": { url: sourceFileUrl } } : {}),
     } as any, // eslint-disable-line @typescript-eslint/no-explicit-any
     children: [
       {
@@ -734,11 +739,16 @@ export async function createKnowledgeAssetDraft(opts: {
           bulleted_list_item: { rich_text: [{ type: "text" as const, text: { content: pt } }] },
         })),
       ] : []),
-      ...(sourceNote ? [{
+      ...(sourceNote || storagePath ? [{
         object: "block" as const,
         type: "paragraph" as const,
         paragraph: {
-          rich_text: [{ type: "text" as const, text: { content: `📎 Source: ${sourceNote}` } }],
+          rich_text: [{ type: "text" as const, text: {
+            content: [
+              sourceNote ? `📎 Source: ${sourceNote}` : null,
+              storagePath ? `🗂 storage: ${storagePath}` : null,
+            ].filter(Boolean).join("  ·  "),
+          }}],
         },
       }] : []),
     ],
