@@ -237,7 +237,7 @@ export default function LivingRoomAdminPage() {
 
   return (
     <div className="flex min-h-screen bg-[#EEEEE8]">
-      <Sidebar items={ADMIN_NAV} isAdmin />
+      <Sidebar adminNav />
 
       <main className="flex-1 overflow-auto flex flex-col">
 

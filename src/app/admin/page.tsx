@@ -98,7 +98,7 @@ export default async function AdminPage() {
 
   return (
     <div className="flex min-h-screen bg-[#EFEFEA]">
-      <Sidebar items={ADMIN_NAV} isAdmin />
+      <Sidebar adminNav />
 
       <main className="flex-1 ml-60 overflow-auto">
 

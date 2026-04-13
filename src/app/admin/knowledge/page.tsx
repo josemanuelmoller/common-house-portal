@@ -52,7 +52,7 @@ export default async function KnowledgePage() {
     <div className="flex min-h-screen bg-[#EFEFEA]">
       <Sidebar items={NAV} isAdmin />
 
-      <main className="flex-1 overflow-auto">
+      <main className="flex-1 ml-[228px] overflow-auto">
         {/* Header */}
         <div className="bg-white border-b border-[#E0E0D8] px-8 py-6">
           <div className="flex items-end justify-between">
