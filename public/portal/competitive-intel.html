@@ -1,0 +1,1124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Common House — Competitive Intelligence</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,700;1,800&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --lime: #c8f55a;
+  --black: #000000;
+  --white: #ffffff;
+  --ink: #0e0e0e;
+  --muted: #6b6b6b;
+  --border: #d8d8d0;
+  --bg: #eeeee8;
+  --sidebar-w: 228px;
+  --hot: #22c55e;
+  --warm: #f59e0b;
+  --cold: #ef4444;
+  --dormant: #9ca3af;
+}
+
+body { font-family: 'Inter', sans-serif; background: var(--bg); display: flex; min-height: 100vh; }
+
+/* ── Sidebar ── */
+.sidebar {
+  width: var(--sidebar-w); min-height: 100vh; background: var(--white);
+  border-right: 1px solid var(--border); display: flex; flex-direction: column;
+  padding: 20px 0 0; position: fixed; top: 0; left: 0; z-index: 10; overflow-y: auto;
+}
+.sidebar-logo { padding: 0 18px 18px; border-bottom: 1px solid var(--border); margin-bottom: 12px; }
+.sidebar-logo-inner { display: flex; align-items: center; gap: 9px; }
+.logo-mark { width: 28px; height: 28px; background: var(--black); border-radius: 7px; display: flex; align-items: center; justify-content: center; }
+.logo-mark span { color: var(--lime); font-size: 14px; font-weight: 900; }
+.wordmark { display: flex; flex-direction: column; line-height: 1.1; }
+.wordmark span { font-size: 11px; font-weight: 500; color: var(--ink); letter-spacing: 0.2px; }
+
+.nav-section-label {
+  font-size: 7px; font-weight: 700; letter-spacing: 2.5px; text-transform: uppercase;
+  color: rgba(0,0,0,0.2); padding: 0 18px; margin: 10px 0 3px;
+}
+.nav-item {
+  display: flex; align-items: center; gap: 9px; padding: 7px 18px;
+  font-size: 11.5px; font-weight: 600; color: rgba(0,0,0,0.42); cursor: pointer;
+  text-decoration: none; border-left: 2px solid transparent;
+  transition: color 0.15s, background 0.15s;
+}
+.nav-item:hover { color: var(--ink); background: rgba(0,0,0,0.03); }
+.nav-item.active { color: var(--ink); border-left-color: var(--lime); background: rgba(200,245,90,0.14); }
+.nav-icon { font-size: 13px; opacity: 0.5; flex-shrink: 0; }
+.nav-item.active .nav-icon { opacity: 1; }
+
+.nav-group {}
+.nav-group-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 7px 18px; font-size: 11.5px; font-weight: 600;
+  color: rgba(0,0,0,0.42); cursor: pointer; transition: color 0.15s;
+}
+.nav-group-header:hover { color: var(--ink); background: rgba(0,0,0,0.025); }
+.nav-group-header-left { display: flex; align-items: center; gap: 9px; }
+.nav-group-arrow { font-size: 9px; opacity: 0.3; transition: transform 0.2s; }
+.nav-group.collapsed .nav-group-arrow { transform: rotate(-90deg); }
+.nav-group.collapsed .nav-group-items { display: none; }
+.nav-sub-item {
+  display: flex; align-items: center; gap: 8px; padding: 6px 18px 6px 34px;
+  font-size: 11px; font-weight: 500; color: rgba(0,0,0,0.38); cursor: pointer;
+  text-decoration: none; border-left: 2px solid transparent;
+  transition: color 0.15s, background 0.15s;
+}
+.nav-sub-item:hover { color: var(--ink); background: rgba(0,0,0,0.025); }
+.nav-sub-item.active { color: var(--ink); border-left-color: var(--lime); background: rgba(200,245,90,0.12); font-weight: 600; }
+.nav-sub-icon { font-size: 11px; opacity: 0.5; flex-shrink: 0; }
+.nav-badge {
+  margin-left: auto; background: rgba(0,0,0,0.07); color: rgba(0,0,0,0.38);
+  font-size: 8.5px; font-weight: 700; padding: 2px 6px; border-radius: 8px;
+}
+.nav-badge.red { background: rgba(239,68,68,0.1); color: #dc2626; }
+.nav-badge.lime { background: rgba(200,245,90,0.3); color: #3a8c00; }
+
+.sidebar-footer { margin-top: auto; padding: 14px 18px; border-top: 1px solid var(--border); }
+.sidebar-footer p { font-size: 8.5px; color: rgba(0,0,0,0.2); letter-spacing: 0.5px; }
+
+/* ── Main ── */
+.main { margin-left: var(--sidebar-w); flex: 1; display: flex; flex-direction: column; min-height: 100vh; }
+
+/* ── Page header ── */
+.page-header { background: var(--black); padding: 40px 52px 44px; flex-shrink: 0; }
+.page-eyebrow { font-size: 8px; font-weight: 700; letter-spacing: 2.5px; text-transform: uppercase; color: rgba(255,255,255,0.2); margin-bottom: 12px; }
+.page-title { font-size: 2.6rem; font-weight: 300; color: var(--white); letter-spacing: -1.5px; line-height: 1; }
+.page-title em { font-weight: 900; font-style: italic; color: var(--lime); }
+.page-sub { font-size: 12.5px; color: rgba(255,255,255,0.38); margin-top: 12px; max-width: 520px; line-height: 1.65; }
+.page-header-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+
+/* ── Tab bar ── */
+.tab-bar { background: var(--white); border-bottom: 1.5px solid var(--border); padding: 0 52px; display: flex; gap: 0; flex-shrink: 0; }
+.tab-btn { padding: 16px 20px 14px; font-size: 11.5px; font-weight: 600; color: rgba(0,0,0,0.38); cursor: pointer; border-bottom: 2px solid transparent; transition: color 0.15s; white-space: nowrap; user-select: none; }
+.tab-btn:hover { color: var(--ink); }
+.tab-btn.active { color: var(--ink); border-bottom-color: var(--lime); }
+
+/* ── Content ── */
+.content { flex: 1; padding: 36px 52px 60px; }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* ── Stats row ── */
+.stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 32px; }
+.stat-pill { background: var(--white); border: 1.5px solid var(--border); border-radius: 12px; padding: 16px 18px; }
+.stat-label { font-size: 8px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: rgba(0,0,0,0.25); margin-bottom: 7px; }
+.stat-value { font-size: 1.6rem; font-weight: 900; color: var(--ink); letter-spacing: -1px; line-height: 1; }
+.stat-value.lime { color: #3a8c00; }
+.stat-value.amber { color: #b45309; }
+.stat-sub { font-size: 10px; color: var(--muted); margin-top: 5px; }
+
+/* ── Section bar ── */
+.section-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; margin-top: 36px; }
+.section-bar:first-child { margin-top: 0; }
+.section-label { font-size: 8.5px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: rgba(0,0,0,0.28); white-space: nowrap; }
+.section-line { flex: 1; height: 1px; background: var(--border); }
+.section-count { font-size: 8.5px; font-weight: 700; color: rgba(0,0,0,0.18); }
+
+/* ── Cards ── */
+.card { background: var(--white); border: 1.5px solid var(--border); border-radius: 14px; overflow: hidden; transition: border-color 0.2s, transform 0.15s; }
+.card:hover { border-color: #aaa; transform: translateY(-2px); }
+.card-header { padding: 16px 20px 14px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.card-header-left { display: flex; align-items: center; gap: 9px; }
+.card-icon { width: 26px; height: 26px; border-radius: 7px; background: var(--ink); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.card-icon.lime { background: var(--lime); }
+.card-icon.ghost { background: var(--bg); border: 1px solid var(--border); }
+.card-icon svg { width: 13px; height: 13px; }
+.card-label { font-size: 12px; font-weight: 800; color: var(--ink); letter-spacing: -0.2px; }
+.card-body { padding: 18px 20px; }
+
+/* ── Buttons ── */
+.btn { display: inline-flex; align-items: center; gap: 6px; font-size: 10.5px; font-weight: 700; padding: 8px 16px; border-radius: 8px; border: none; cursor: pointer; text-decoration: none; letter-spacing: 0.2px; transition: opacity 0.15s; }
+.btn:hover { opacity: 0.82; }
+.btn-primary { background: var(--black); color: var(--white); }
+.btn-lime { background: var(--lime); color: var(--black); }
+.btn-ghost { background: transparent; border: 1.5px solid var(--border); color: var(--ink); }
+.btn-sm { padding: 5px 11px; font-size: 9.5px; border-radius: 6px; }
+
+/* ── Pills ── */
+.pill { display: inline-flex; align-items: center; gap: 4px; background: var(--black); color: var(--white); font-size: 8px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; border-radius: 20px; padding: 3px 9px; }
+.pill.lime { background: rgba(200,245,90,0.25); color: #3a8c00; border: 1px solid rgba(200,245,90,0.5); }
+.pill.blue { background: #dbeafe; color: #1e40af; }
+.pill.amber { background: #fff3cd; color: #7a5800; }
+.pill.ghost { background: transparent; border: 1.5px solid #ddd; color: #888; }
+.pill.red { background: #fee2e2; color: #991b1b; }
+.pill.purple { background: #ede9fe; color: #5b21b6; }
+.pill.green { background: #dcfce7; color: #166534; }
+.pill.gray { background: #f3f4f6; color: #4b5563; }
+
+/* ── Mini select ── */
+.mini-select { font-size: 10px; font-weight: 600; color: var(--ink); border: 1.5px solid var(--border); border-radius: 7px; padding: 5px 8px; background: var(--white); cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%23888' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 8px center; padding-right: 24px; }
+.mini-select:focus { outline: none; border-color: var(--lime); }
+
+/* ── Table rows ── */
+.data-table { width: 100%; border-collapse: collapse; }
+.data-table th { font-size: 8px; font-weight: 700; letter-spacing: 1.8px; text-transform: uppercase; color: rgba(0,0,0,0.22); padding: 0 12px 10px; text-align: left; border-bottom: 1.5px solid var(--border); }
+.data-table td { padding: 14px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.data-table tr:last-child td { border-bottom: none; }
+.data-table tbody tr { transition: background 0.12s; }
+.data-table tbody tr:hover { background: rgba(0,0,0,0.018); }
+.row-name { font-size: 13px; font-weight: 700; color: var(--ink); letter-spacing: -0.2px; }
+.row-sub { font-size: 10px; color: var(--muted); margin-top: 2px; }
+.row-meta { font-size: 11px; color: #555; }
+
+/* ── Status dot ── */
+.status-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 5px; flex-shrink: 0; }
+.status-dot.active { background: var(--hot); }
+.status-dot.paused { background: var(--dormant); }
+
+/* ── Signal cards ── */
+.signal-feed { display: flex; flex-direction: column; gap: 0; }
+.signal-item { padding: 18px 20px; border-bottom: 1px solid var(--border); display: grid; grid-template-columns: 1fr auto; gap: 16px; align-items: start; transition: background 0.12s; }
+.signal-item:last-child { border-bottom: none; }
+.signal-item:hover { background: rgba(0,0,0,0.018); }
+.signal-title { font-size: 13px; font-weight: 700; color: var(--ink); letter-spacing: -0.2px; margin-bottom: 5px; }
+.signal-summary { font-size: 11.5px; color: #444; line-height: 1.6; margin-bottom: 8px; }
+.signal-meta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.signal-date { font-size: 9.5px; color: var(--muted); font-weight: 500; }
+.signal-source { font-size: 9.5px; color: var(--muted); }
+.signal-source a { color: #2563eb; text-decoration: none; }
+.signal-source a:hover { text-decoration: underline; }
+.signal-actions { display: flex; flex-direction: column; gap: 6px; align-items: flex-end; flex-shrink: 0; }
+
+/* ── Filter bar ── */
+.filter-bar { display: flex; gap: 8px; align-items: center; margin-bottom: 20px; flex-wrap: wrap; }
+.filter-bar select { font-size: 10.5px; font-weight: 600; color: var(--ink); border: 1.5px solid var(--border); border-radius: 8px; padding: 7px 28px 7px 10px; background: var(--white); cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%23888' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 9px center; }
+.filter-bar select:focus { outline: none; border-color: var(--lime); }
+.filter-divider { width: 1px; height: 20px; background: var(--border); flex-shrink: 0; }
+
+/* ── Benchmark grid ── */
+.benchmark-grid { display: grid; grid-template-columns: 180px repeat(4, 1fr); gap: 0; border: 1.5px solid var(--border); border-radius: 14px; overflow: hidden; }
+.bm-header { background: var(--black); color: var(--white); padding: 14px 16px; font-size: 11px; font-weight: 700; letter-spacing: -0.2px; }
+.bm-header.dim { background: #111; font-size: 8px; font-weight: 700; letter-spacing: 1.8px; text-transform: uppercase; color: rgba(255,255,255,0.4); }
+.bm-cell { padding: 14px 16px; border-top: 1px solid var(--border); border-right: 1px solid var(--border); font-size: 12px; color: var(--ink); background: var(--white); }
+.bm-cell:last-child { border-right: none; }
+.bm-row-label { padding: 14px 16px; border-top: 1px solid var(--border); background: var(--bg); font-size: 10px; font-weight: 700; letter-spacing: 0.5px; color: rgba(0,0,0,0.42); display: flex; align-items: center; }
+.bm-score { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 8px; font-size: 11px; font-weight: 800; }
+.bm-score.high { background: #dcfce7; color: #166534; }
+.bm-score.mid { background: #fff3cd; color: #7a5800; }
+.bm-score.low { background: #fee2e2; color: #991b1b; }
+.bm-score.na { background: var(--bg); color: var(--muted); font-size: 9px; }
+
+/* ── Scan panel ── */
+.scan-panel { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
+.scan-entity-list { display: flex; flex-direction: column; gap: 0; }
+.scan-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border); gap: 12px; }
+.scan-row:last-child { border-bottom: none; }
+.scan-row-left { display: flex; align-items: center; gap: 10px; }
+.scan-name { font-size: 12.5px; font-weight: 700; color: var(--ink); }
+.scan-type { font-size: 9.5px; color: var(--muted); }
+.scan-toggle { position: relative; display: inline-block; width: 34px; height: 20px; flex-shrink: 0; }
+.scan-toggle input { opacity: 0; width: 0; height: 0; }
+.scan-toggle-slider { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: #d1d5db; border-radius: 20px; transition: background 0.2s; cursor: pointer; }
+.scan-toggle-slider:before { content: ''; position: absolute; width: 14px; height: 14px; border-radius: 50%; background: white; top: 3px; left: 3px; transition: transform 0.2s; }
+.scan-toggle input:checked + .scan-toggle-slider { background: #3a8c00; }
+.scan-toggle input:checked + .scan-toggle-slider:before { transform: translateX(14px); }
+
+.scan-log { display: flex; flex-direction: column; gap: 0; }
+.log-item { padding: 10px 0; border-bottom: 1px solid var(--border); display: flex; gap: 12px; align-items: flex-start; }
+.log-item:last-child { border-bottom: none; }
+.log-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; margin-top: 4px; }
+.log-dot.ok { background: var(--hot); }
+.log-dot.warn { background: var(--warm); }
+.log-dot.err { background: var(--cold); }
+.log-text { font-size: 11px; color: var(--ink); line-height: 1.5; }
+.log-time { font-size: 9px; color: var(--muted); margin-top: 2px; }
+
+/* ── Info note ── */
+.info-note { background: rgba(200,245,90,0.08); border: 1px solid rgba(200,245,90,0.3); border-radius: 10px; padding: 12px 16px; font-size: 11px; color: #3a6600; line-height: 1.6; display: flex; gap: 10px; align-items: flex-start; margin-bottom: 24px; }
+
+/* ── Two col ── */
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
+.three-col { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════ SIDEBAR -->
+<nav class="sidebar">
+  <div class="sidebar-logo">
+    <div class="sidebar-logo-inner">
+      <div class="logo-mark"><span>&#8962;</span></div>
+      <div class="wordmark">
+        <span style="font-weight:800;font-size:12px">Common House</span>
+        <span style="color:var(--muted)">OS v2 · Admin</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="nav-section-label">Platform</div>
+  <a class="nav-item" href="platform-admin.html"><span class="nav-icon">&#9672;</span> The Hall</a>
+  <a class="nav-item" href="living-room-admin.html"><span class="nav-icon">&#8962;</span> Living Room</a>
+
+  <div class="nav-group collapsed" id="group-portfolio">
+    <div class="nav-group-header" onclick="toggleGroup('group-portfolio')">
+      <div class="nav-group-header-left"><span class="nav-icon">&#9633;</span> Portfolio</div>
+      <span class="nav-group-arrow">&#9662;</span>
+    </div>
+    <div class="nav-group-items">
+      <a class="nav-sub-item" href="#"><span class="nav-sub-icon">&#9635;</span> Garage</a>
+    </div>
+  </div>
+
+  <div class="nav-group collapsed" id="group-commercial">
+    <div class="nav-group-header" onclick="toggleGroup('group-commercial')">
+      <div class="nav-group-header-left"><span class="nav-icon">&#9672;</span> Commercial</div>
+      <span class="nav-group-arrow">&#9662;</span>
+    </div>
+    <div class="nav-group-items">
+      <a class="nav-sub-item" href="#"><span class="nav-sub-icon">&#9672;</span> Pipeline</a>
+      <a class="nav-sub-item" href="#"><span class="nav-sub-icon">&#9672;</span> Grants</a>
+    </div>
+  </div>
+
+  <div class="nav-section-label" style="margin-top:16px">Intelligence</div>
+  <a class="nav-item active" href="competitive-intel.html"><span class="nav-icon">&#9675;</span> Competitive Intel <span class="nav-badge lime">New</span></a>
+
+  <div class="nav-section-label" style="margin-top:16px">OS v2</div>
+  <div class="nav-group collapsed" id="group-cr">
+    <div class="nav-group-header" onclick="toggleGroup('group-cr')">
+      <div class="nav-group-header-left"><span class="nav-icon">&#9643;</span> Control Room</div>
+      <span class="nav-group-arrow">&#9662;</span>
+    </div>
+    <div class="nav-group-items">
+      <a class="nav-sub-item" href="#"><span class="nav-sub-icon">&#9672;</span> Automation Health</a>
+      <a class="nav-sub-item" href="#"><span class="nav-sub-icon">&#9672;</span> Agent Log</a>
+    </div>
+  </div>
+
+  <div class="sidebar-footer">
+    <p>Sprint 30 · April 2026</p>
+    <p style="margin-top:3px">Competitive Intelligence</p>
+  </div>
+</nav>
+
+<!-- ═══════════════════════════════════════ MAIN -->
+<div class="main">
+
+  <!-- Page Header -->
+  <div class="page-header">
+    <div class="page-header-row">
+      <div>
+        <div class="page-eyebrow">Intelligence · Benchmark</div>
+        <h1 class="page-title">Competitive <em>radar.</em></h1>
+        <p class="page-sub">Sigue lo que hacen los actores que importan. Configura tu watchlist, captura señales y compara posiciones — sin ruido.</p>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+        <button class="btn btn-ghost" style="color:white;border-color:rgba(255,255,255,0.18)" onclick="switchTab('tab-scan', document.querySelectorAll('.tab-btn')[3])">Configurar scans</button>
+        <button class="btn btn-lime" onclick="runScanNow()">&#9654; Escanear ahora</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab bar -->
+  <div class="tab-bar">
+    <div class="tab-btn active" onclick="switchTab('tab-watchlist', this)">Watchlist</div>
+    <div class="tab-btn" onclick="switchTab('tab-feed', this)">Signal Feed <span style="background:rgba(239,68,68,0.12);color:#dc2626;font-size:8px;font-weight:700;padding:2px 7px;border-radius:8px;margin-left:6px">3 New</span></div>
+    <div class="tab-btn" onclick="switchTab('tab-benchmark', this)">Actividad</div>
+    <div class="tab-btn" onclick="switchTab('tab-scan', this)">Scan Config</div>
+  </div>
+
+  <!-- ═══ CONTENT ═══ -->
+  <div class="content">
+
+    <!-- ──────────────── TAB: WATCHLIST ── -->
+    <div class="tab-panel active" id="tab-watchlist">
+
+      <div class="stats-row">
+        <div class="stat-pill">
+          <div class="stat-label">En Watchlist</div>
+          <div class="stat-value">0</div>
+          <div class="stat-sub">Entidades activas</div>
+        </div>
+        <div class="stat-pill">
+          <div class="stat-label">Competidores</div>
+          <div class="stat-value lime">0</div>
+          <div class="stat-sub">Tipo Competitor</div>
+        </div>
+        <div class="stat-pill">
+          <div class="stat-label">Referentes</div>
+          <div class="stat-value">0</div>
+          <div class="stat-sub">Inspiracion / sector</div>
+        </div>
+        <div class="stat-pill">
+          <div class="stat-label">Ultimo scan</div>
+          <div class="stat-value amber" style="font-size:1rem">--</div>
+          <div class="stat-sub">Pendiente primer scan</div>
+        </div>
+      </div>
+
+      <div class="info-note">
+        <span style="flex-shrink:0;margin-top:1px">i</span>
+        <span>Rellena el Watchlist desde Notion (<strong>CH Watchlist [OS v2]</strong>) — es la fuente de verdad. Aqui veras el estado de cada entidad y podras lanzar scans individuales. Los datos de las señales viven en <strong>CH Competitive Intel [OS v2]</strong>.</span>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-header-left">
+            <div class="card-icon ghost">
+              <svg viewBox="0 0 14 14" fill="none" stroke="white" stroke-width="1.5"><circle cx="7" cy="7" r="5.5"/><path d="M7 4v3.5l2 1.5"/></svg>
+            </div>
+            <span class="card-label">Watchlist</span>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <select class="mini-select">
+              <option>Todos los tipos</option>
+              <option>Competitor</option>
+              <option>Referente</option>
+              <option>Sector</option>
+              <option>Cliente potencial</option>
+            </select>
+            <select class="mini-select">
+              <option>Todos los tags</option>
+              <option>sustainability</option>
+              <option>retail</option>
+              <option>fmcg</option>
+              <option>impact</option>
+              <option>accelerator</option>
+            </select>
+            <a href="https://www.notion.so" target="_blank" class="btn btn-lime btn-sm">+ Agregar en Notion</a>
+          </div>
+        </div>
+        <div class="card-body" style="padding:0">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="padding-left:20px">Entidad</th>
+                <th>Tipo</th>
+                <th>Tags</th>
+                <th>Scan</th>
+                <th>Ultimas senales</th>
+                <th>Estado</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="watchlist-body">
+              <!-- Demo rows — se reemplazan con datos reales via agent -->
+              <tr>
+                <td style="padding-left:20px">
+                  <div class="row-name" style="color:var(--muted);font-weight:500;font-size:12px">Watchlist vacia</div>
+                  <div class="row-sub">Agrega entidades desde Notion para empezar</div>
+                </td>
+                <td></td><td></td><td></td><td></td>
+                <td></td>
+                <td style="padding-right:20px"></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Demo: how it looks with data -->
+      <div class="section-bar" style="margin-top:36px">
+        <span class="section-label">Preview — como se vera con datos</span>
+        <div class="section-line"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-body" style="padding:0">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="padding-left:20px">Entidad</th>
+                <th>Tipo</th>
+                <th>Tags</th>
+                <th>Frecuencia</th>
+                <th>Senales (30d)</th>
+                <th>Estado</th>
+                <th style="padding-right:20px"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="padding-left:20px">
+                  <div class="row-name">Acme Accelerator</div>
+                  <div class="row-sub">acme.co</div>
+                </td>
+                <td><span class="pill red">Competitor</span></td>
+                <td style="display:flex;gap:4px;flex-wrap:wrap;padding-top:14px">
+                  <span class="pill gray">impact</span>
+                  <span class="pill gray">accelerator</span>
+                </td>
+                <td><span class="pill lime">Weekly</span></td>
+                <td><span style="font-size:13px;font-weight:800;color:var(--ink)">7</span> <span class="row-sub" style="display:inline">senales</span></td>
+                <td>
+                  <span class="status-dot active"></span>
+                  <span style="font-size:10px;color:var(--muted)">Activo</span>
+                </td>
+                <td style="padding-right:20px"><button class="btn btn-ghost btn-sm">Ver senales</button></td>
+              </tr>
+              <tr>
+                <td style="padding-left:20px">
+                  <div class="row-name">Greenwave Fund</div>
+                  <div class="row-sub">greenwave.vc</div>
+                </td>
+                <td><span class="pill blue">Referente</span></td>
+                <td style="display:flex;gap:4px;flex-wrap:wrap;padding-top:14px">
+                  <span class="pill gray">sustainability</span>
+                  <span class="pill gray">fund</span>
+                </td>
+                <td><span class="pill amber">Monthly</span></td>
+                <td><span style="font-size:13px;font-weight:800;color:var(--ink)">3</span> <span class="row-sub" style="display:inline">senales</span></td>
+                <td>
+                  <span class="status-dot active"></span>
+                  <span style="font-size:10px;color:var(--muted)">Activo</span>
+                </td>
+                <td style="padding-right:20px"><button class="btn btn-ghost btn-sm">Ver senales</button></td>
+              </tr>
+              <tr>
+                <td style="padding-left:20px">
+                  <div class="row-name">EcoRetail UK</div>
+                  <div class="row-sub">ecoretail.co.uk</div>
+                </td>
+                <td><span class="pill gray">Sector</span></td>
+                <td style="display:flex;gap:4px;flex-wrap:wrap;padding-top:14px">
+                  <span class="pill gray">retail</span>
+                  <span class="pill gray">fmcg</span>
+                </td>
+                <td><span class="pill ghost">Manual</span></td>
+                <td><span style="font-size:13px;font-weight:800;color:var(--muted)">0</span> <span class="row-sub" style="display:inline">senales</span></td>
+                <td>
+                  <span class="status-dot paused"></span>
+                  <span style="font-size:10px;color:var(--muted)">Pausado</span>
+                </td>
+                <td style="padding-right:20px"><button class="btn btn-ghost btn-sm">Ver senales</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div><!-- /tab-watchlist -->
+
+
+    <!-- ──────────────── TAB: SIGNAL FEED ── -->
+    <div class="tab-panel" id="tab-feed">
+
+      <div class="filter-bar">
+        <select>
+          <option>Todas las entidades</option>
+          <option>Acme Accelerator</option>
+          <option>Greenwave Fund</option>
+        </select>
+        <select>
+          <option>Todos los tipos</option>
+          <option>Producto</option>
+          <option>Pricing</option>
+          <option>Campana</option>
+          <option>Contenido</option>
+          <option>Partnership</option>
+          <option>Hiring</option>
+          <option>Funding</option>
+          <option>Evento</option>
+        </select>
+        <select>
+          <option>Toda la relevancia</option>
+          <option>Alta</option>
+          <option>Media</option>
+          <option>Baja</option>
+        </select>
+        <select>
+          <option>Todos los estados</option>
+          <option>New</option>
+          <option>Reviewed</option>
+          <option>Archived</option>
+        </select>
+        <div class="filter-divider"></div>
+        <select>
+          <option>Ultimos 30 dias</option>
+          <option>Ultima semana</option>
+          <option>Ultimos 90 dias</option>
+          <option>Todo</option>
+        </select>
+        <button class="btn btn-ghost btn-sm" style="margin-left:auto">Exportar</button>
+      </div>
+
+      <div class="section-bar" style="margin-top:0">
+        <span class="section-label">Senales recientes</span>
+        <div class="section-line"></div>
+        <span class="section-count">0 registros</span>
+      </div>
+
+      <div class="card">
+        <div class="signal-feed">
+          <!-- Empty state -->
+          <div style="padding:40px 20px;text-align:center">
+            <div style="font-size:13px;font-weight:700;color:var(--muted);margin-bottom:8px">Sin senales todavia</div>
+            <div style="font-size:11px;color:var(--muted);margin-bottom:20px">Agrega entidades al Watchlist y lanza el primer scan para ver senales aqui.</div>
+            <button class="btn btn-lime" onclick="switchTab('tab-scan', document.querySelectorAll('.tab-btn')[3])">Configurar primer scan</button>
+          </div>
+
+          <!-- Demo signals (visible for reference) -->
+          <div style="border-top:1.5px solid var(--border);padding:16px 20px 8px">
+            <div style="font-size:8px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:rgba(0,0,0,0.2);margin-bottom:12px">Ejemplo de senales — se poblara automaticamente</div>
+          </div>
+
+          <div class="signal-item">
+            <div>
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+                <span class="pill red">Competitor</span>
+                <span style="font-size:9.5px;font-weight:700;color:var(--muted)">Acme Accelerator</span>
+              </div>
+              <div class="signal-title">Acme lanza programa de aceleracion para startups de retail sostenible</div>
+              <div class="signal-summary">Acme Accelerator anuncio un nuevo cohort enfocado exclusivamente en retail sostenible con tickets de hasta 150K GBP, en competencia directa con nuestra oferta de portfolio acceleration.</div>
+              <div class="signal-meta">
+                <span class="pill amber">Producto</span>
+                <span class="pill red">Alta relevancia</span>
+                <span class="signal-date">12 Apr 2026</span>
+                <span class="signal-source">Fuente: <a href="#">techcrunch.com</a></span>
+              </div>
+            </div>
+            <div class="signal-actions">
+              <span class="pill ghost">New</span>
+              <button class="btn btn-ghost btn-sm">Revisar</button>
+              <button class="btn btn-sm" style="background:#f3f4f6;color:#6b7280;font-size:9px">Archivar</button>
+            </div>
+          </div>
+
+          <div class="signal-item">
+            <div>
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+                <span class="pill blue">Referente</span>
+                <span style="font-size:9.5px;font-weight:700;color:var(--muted)">Greenwave Fund</span>
+              </div>
+              <div class="signal-title">Greenwave cierra segundo fondo de 80M EUR para impacto climatico</div>
+              <div class="signal-summary">El fondo anuncio el final de su segundo vehiculo, con foco en soluciones de packaging y cadena de suministro sostenible en Europa occidental.</div>
+              <div class="signal-meta">
+                <span class="pill purple">Funding</span>
+                <span class="pill amber">Media relevancia</span>
+                <span class="signal-date">9 Apr 2026</span>
+                <span class="signal-source">Fuente: <a href="#">euvc.eu</a></span>
+              </div>
+            </div>
+            <div class="signal-actions">
+              <span class="pill ghost">New</span>
+              <button class="btn btn-ghost btn-sm">Revisar</button>
+              <button class="btn btn-sm" style="background:#f3f4f6;color:#6b7280;font-size:9px">Archivar</button>
+            </div>
+          </div>
+
+          <div class="signal-item">
+            <div>
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+                <span class="pill red">Competitor</span>
+                <span style="font-size:9.5px;font-weight:700;color:var(--muted)">Acme Accelerator</span>
+              </div>
+              <div class="signal-title">Acme contrata Director de Partnerships con experiencia en Co-op y Waitrose</div>
+              <div class="signal-summary">LinkedIn muestra nueva contratacion de senior hire con historial de relaciones con los grandes retailers britanicos — posible movimiento para acceder a los mismos canales que CH persigue.</div>
+              <div class="signal-meta">
+                <span class="pill green">Hiring</span>
+                <span class="pill amber">Media relevancia</span>
+                <span class="signal-date">7 Apr 2026</span>
+                <span class="signal-source">Fuente: <a href="#">linkedin.com</a></span>
+              </div>
+            </div>
+            <div class="signal-actions">
+              <span class="pill lime">Reviewed</span>
+              <button class="btn btn-ghost btn-sm">Ver nota</button>
+              <button class="btn btn-sm" style="background:#f3f4f6;color:#6b7280;font-size:9px">Archivar</button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div><!-- /tab-feed -->
+
+
+    <!-- ──────────────── TAB: ACTIVIDAD ── -->
+    <div class="tab-panel" id="tab-benchmark">
+
+      <!-- Stats row by signal type -->
+      <div class="stats-row" style="grid-template-columns:repeat(6,1fr);margin-bottom:28px">
+        <div class="stat-pill">
+          <div class="stat-label">Grants</div>
+          <div class="stat-value lime">0</div>
+          <div class="stat-sub">Ganados / solicitados</div>
+        </div>
+        <div class="stat-pill">
+          <div class="stat-label">Partnerships</div>
+          <div class="stat-value">0</div>
+          <div class="stat-sub">Acuerdos firmados</div>
+        </div>
+        <div class="stat-pill">
+          <div class="stat-label">Eventos</div>
+          <div class="stat-value">0</div>
+          <div class="stat-sub">Participacion detectada</div>
+        </div>
+        <div class="stat-pill">
+          <div class="stat-label">Contrataciones</div>
+          <div class="stat-value">0</div>
+          <div class="stat-sub">Hires detectados</div>
+        </div>
+        <div class="stat-pill">
+          <div class="stat-label">Media / PR</div>
+          <div class="stat-value">0</div>
+          <div class="stat-sub">Entrevistas / cobertura</div>
+        </div>
+        <div class="stat-pill">
+          <div class="stat-label">Funding</div>
+          <div class="stat-value amber">0</div>
+          <div class="stat-sub">Rondas / capital</div>
+        </div>
+      </div>
+
+      <!-- Filter bar -->
+      <div class="filter-bar" style="margin-bottom:20px">
+        <select>
+          <option>Todas las entidades</option>
+          <option>Acme Accelerator</option>
+          <option>Greenwave Fund</option>
+        </select>
+        <select id="activity-type-filter">
+          <option value="">Todos los tipos</option>
+          <option>Grant</option>
+          <option>Partnership</option>
+          <option>Evento</option>
+          <option>Hiring</option>
+          <option>Media / PR</option>
+          <option>Funding</option>
+          <option>Producto</option>
+          <option>Campana</option>
+          <option>Contenido</option>
+        </select>
+        <select>
+          <option>Ultimos 90 dias</option>
+          <option>Ultimo mes</option>
+          <option>Ultimos 6 meses</option>
+          <option>Todo</option>
+        </select>
+        <div class="filter-divider"></div>
+        <button class="btn btn-ghost btn-sm" style="margin-left:auto">Exportar</button>
+      </div>
+
+      <!-- Activity timeline -->
+      <div class="section-bar" style="margin-top:0">
+        <span class="section-label">Abril 2026</span>
+        <div class="section-line"></div>
+        <span class="section-count">0 actividades</span>
+      </div>
+
+      <!-- Empty state -->
+      <div class="card" style="margin-bottom:20px">
+        <div style="padding:40px 20px;text-align:center">
+          <div style="font-size:13px;font-weight:700;color:var(--muted);margin-bottom:8px">Sin actividad registrada todavia</div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:20px">El agente poblara este timeline automaticamente tras el primer scan.</div>
+          <button class="btn btn-lime" onclick="switchTab('tab-scan', document.querySelectorAll('.tab-btn')[3])">Lanzar primer scan</button>
+        </div>
+      </div>
+
+      <!-- Demo: como se vera con datos -->
+      <div class="section-bar">
+        <span class="section-label">Ejemplo — como se vera con datos</span>
+        <div class="section-line"></div>
+      </div>
+
+      <!-- Month group: Abril -->
+      <div style="margin-bottom:8px;display:flex;align-items:center;gap:10px">
+        <span style="font-size:11px;font-weight:800;color:var(--ink);letter-spacing:-0.2px">Abril 2026</span>
+        <span style="font-size:9px;color:var(--muted);font-weight:600">5 actividades</span>
+      </div>
+
+      <div class="card" style="margin-bottom:20px">
+        <div class="signal-feed">
+
+          <!-- Grant -->
+          <div class="signal-item">
+            <div>
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+                <span class="pill" style="background:#fce7f3;color:#9d174d;border:1px solid rgba(157,23,77,0.2)">Grant</span>
+                <span style="font-size:9.5px;font-weight:700;color:var(--muted)">Acme Accelerator</span>
+                <span style="font-size:9px;color:var(--muted)">· 11 Apr</span>
+              </div>
+              <div class="signal-title">Acme gana grant de Innovate UK por £480K para expansion de programa sostenible</div>
+              <div class="signal-summary">Innovate UK ha concedido a Acme Accelerator financiacion no dilutiva para escalar su programa de impacto en retail a 3 nuevas ciudades britanicas en 2026–27.</div>
+              <div class="signal-meta">
+                <span class="pill red">Alta relevancia</span>
+                <span class="signal-source">Fuente: <a href="#">innovateuk.org</a></span>
+              </div>
+            </div>
+            <div class="signal-actions">
+              <span class="pill ghost">New</span>
+              <button class="btn btn-ghost btn-sm">Revisar</button>
+            </div>
+          </div>
+
+          <!-- Hiring -->
+          <div class="signal-item">
+            <div>
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+                <span class="pill green">Hiring</span>
+                <span style="font-size:9.5px;font-weight:700;color:var(--muted)">Acme Accelerator</span>
+                <span style="font-size:9px;color:var(--muted)">· 9 Apr</span>
+              </div>
+              <div class="signal-title">Nuevo Director of Partnerships contratado — ex Waitrose y Co-op</div>
+              <div class="signal-summary">LinkedIn muestra senior hire con historial en los principales retailers britanicos. Movimiento estrategico que refuerza su acceso a los mismos canales que CH persigue.</div>
+              <div class="signal-meta">
+                <span class="pill amber">Media relevancia</span>
+                <span class="signal-source">Fuente: <a href="#">linkedin.com</a></span>
+              </div>
+            </div>
+            <div class="signal-actions">
+              <span class="pill ghost">New</span>
+              <button class="btn btn-ghost btn-sm">Revisar</button>
+            </div>
+          </div>
+
+          <!-- Media / PR -->
+          <div class="signal-item">
+            <div>
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+                <span class="pill gray">Media / PR</span>
+                <span style="font-size:9.5px;font-weight:700;color:var(--muted)">Greenwave Fund</span>
+                <span style="font-size:9px;color:var(--muted)">· 7 Apr</span>
+              </div>
+              <div class="signal-title">Entrevista en Bloomberg: "Por que los fondos de impacto estan ganando terreno en Europa"</div>
+              <div class="signal-summary">La managing partner de Greenwave aparece en Bloomberg Europe explicando su tesis de inversion en sostenibilidad de cadena de suministro. Visibilidad media-alta en audiencias financieras.</div>
+              <div class="signal-meta">
+                <span class="pill amber">Media relevancia</span>
+                <span class="signal-source">Fuente: <a href="#">bloomberg.com</a></span>
+              </div>
+            </div>
+            <div class="signal-actions">
+              <span class="pill lime">Reviewed</span>
+              <button class="btn btn-ghost btn-sm">Ver nota</button>
+            </div>
+          </div>
+
+          <!-- Evento -->
+          <div class="signal-item">
+            <div>
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+                <span class="pill ghost">Evento</span>
+                <span style="font-size:9.5px;font-weight:700;color:var(--muted)">Acme Accelerator</span>
+                <span style="font-size:9px;color:var(--muted)">· 3 Apr</span>
+              </div>
+              <div class="signal-title">Acme en Sustainable Retail Summit Londres — panel principal y sponsor</div>
+              <div class="signal-summary">Acme patrocina el evento mas importante de retail sostenible en UK y tiene a su CEO en el panel de apertura. Acceso directo a decision makers de los grandes retailers.</div>
+              <div class="signal-meta">
+                <span class="pill red">Alta relevancia</span>
+                <span class="signal-source">Fuente: <a href="#">sustainableretailsummit.co.uk</a></span>
+              </div>
+            </div>
+            <div class="signal-actions">
+              <span class="pill ghost">New</span>
+              <button class="btn btn-ghost btn-sm">Revisar</button>
+            </div>
+          </div>
+
+          <!-- Partnership -->
+          <div class="signal-item">
+            <div>
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+                <span class="pill blue">Partnership</span>
+                <span style="font-size:9.5px;font-weight:700;color:var(--muted)">Greenwave Fund</span>
+                <span style="font-size:9px;color:var(--muted)">· 1 Apr</span>
+              </div>
+              <div class="signal-title">Greenwave firma acuerdo de co-inversion con Bridges Fund Management</div>
+              <div class="signal-summary">Acuerdo marco para co-invertir en startups de impacto en fases Seed y Series A en el mercado europeo. Amplia significativamente su capacidad de cheque y red.</div>
+              <div class="signal-meta">
+                <span class="pill amber">Media relevancia</span>
+                <span class="signal-source">Fuente: <a href="#">privateequitynews.com</a></span>
+              </div>
+            </div>
+            <div class="signal-actions">
+              <span class="pill lime">Reviewed</span>
+              <button class="btn btn-ghost btn-sm">Ver nota</button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Month group: Marzo -->
+      <div style="margin-bottom:8px;display:flex;align-items:center;gap:10px">
+        <span style="font-size:11px;font-weight:800;color:var(--ink);letter-spacing:-0.2px">Marzo 2026</span>
+        <span style="font-size:9px;color:var(--muted);font-weight:600">2 actividades</span>
+      </div>
+
+      <div class="card">
+        <div class="signal-feed">
+          <div class="signal-item">
+            <div>
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+                <span class="pill" style="background:#fce7f3;color:#9d174d;border:1px solid rgba(157,23,77,0.2)">Grant</span>
+                <span style="font-size:9.5px;font-weight:700;color:var(--muted)">Acme Accelerator</span>
+                <span style="font-size:9px;color:var(--muted)">· 18 Mar</span>
+              </div>
+              <div class="signal-title">Acme presenta solicitud a Horizon Europe — £1.2M para programa paneuropeo</div>
+              <div class="signal-summary">Solicitud confirmada por documentos publicos de la UE. Resultado esperado en Q3 2026. Si lo consiguen, podrian escalar a 5 paises simultaneamente.</div>
+              <div class="signal-meta">
+                <span class="pill red">Alta relevancia</span>
+                <span class="signal-source">Fuente: <a href="#">cordis.europa.eu</a></span>
+              </div>
+            </div>
+            <div class="signal-actions">
+              <span class="pill lime">Reviewed</span>
+              <button class="btn btn-ghost btn-sm">Ver nota</button>
+            </div>
+          </div>
+
+          <div class="signal-item">
+            <div>
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+                <span class="pill gray">Media / PR</span>
+                <span style="font-size:9.5px;font-weight:700;color:var(--muted)">Acme Accelerator</span>
+                <span style="font-size:9px;color:var(--muted)">· 5 Mar</span>
+              </div>
+              <div class="signal-title">Guardian: "Los aceleradores que estan cambiando el retail britanico"</div>
+              <div class="signal-summary">Acme aparece como caso de estudio principal en pieza del Guardian sobre el ecosistema de innovacion en retail sostenible. Posicionamiento editorial solido.</div>
+              <div class="signal-meta">
+                <span class="pill amber">Media relevancia</span>
+                <span class="signal-source">Fuente: <a href="#">theguardian.com</a></span>
+              </div>
+            </div>
+            <div class="signal-actions">
+              <span class="pill" style="background:#f3f4f6;color:#6b7280">Archived</span>
+              <button class="btn btn-ghost btn-sm">Ver</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /tab-benchmark -->
+
+
+    <!-- ──────────────── TAB: SCAN CONFIG ── -->
+    <div class="tab-panel" id="tab-scan">
+
+      <div class="two-col" style="align-items:start">
+        <!-- Left: entity config -->
+        <div>
+          <div class="section-bar" style="margin-top:0">
+            <span class="section-label">Entidades a escanear</span>
+            <div class="section-line"></div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div class="card-header-left">
+                <div class="card-icon ghost">
+                  <svg viewBox="0 0 14 14" fill="none" stroke="white" stroke-width="1.5"><path d="M7 1l1.5 4.5H13l-3.5 2.5 1.5 4.5L7 10l-4 2.5 1.5-4.5L1 5.5h4.5z"/></svg>
+                </div>
+                <span class="card-label">Seleccion de entidades</span>
+              </div>
+              <span style="font-size:10px;color:var(--muted)">0 en watchlist</span>
+            </div>
+            <div class="card-body" style="padding:0">
+              <div class="scan-entity-list" style="padding:0 20px">
+                <div style="padding:32px 0;text-align:center">
+                  <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:6px">Watchlist vacia</div>
+                  <div style="font-size:10.5px;color:var(--muted)">Agrega entidades en Notion primero</div>
+                </div>
+
+                <!-- Demo rows -->
+                <div style="border-top:1px solid var(--border);padding-top:4px;padding-bottom:4px">
+                  <div class="scan-row">
+                    <div class="scan-row-left">
+                      <div>
+                        <div class="scan-name">Acme Accelerator</div>
+                        <div class="scan-type">Competitor · Weekly</div>
+                      </div>
+                    </div>
+                    <label class="scan-toggle">
+                      <input type="checkbox" checked>
+                      <span class="scan-toggle-slider"></span>
+                    </label>
+                  </div>
+                  <div class="scan-row">
+                    <div class="scan-row-left">
+                      <div>
+                        <div class="scan-name">Greenwave Fund</div>
+                        <div class="scan-type">Referente · Monthly</div>
+                      </div>
+                    </div>
+                    <label class="scan-toggle">
+                      <input type="checkbox" checked>
+                      <span class="scan-toggle-slider"></span>
+                    </label>
+                  </div>
+                  <div class="scan-row">
+                    <div class="scan-row-left">
+                      <div>
+                        <div class="scan-name">EcoRetail UK</div>
+                        <div class="scan-type">Sector · Manual</div>
+                      </div>
+                    </div>
+                    <label class="scan-toggle">
+                      <input type="checkbox">
+                      <span class="scan-toggle-slider"></span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card" style="margin-top:16px">
+            <div class="card-header">
+              <div class="card-header-left">
+                <div class="card-icon">
+                  <svg viewBox="0 0 14 14" fill="none" stroke="white" stroke-width="1.5"><rect x="1.5" y="1.5" width="11" height="11" rx="2"/><path d="M4.5 7h5M7 4.5v5"/></svg>
+                </div>
+                <span class="card-label">Configuracion de scan</span>
+              </div>
+            </div>
+            <div class="card-body">
+              <div style="display:flex;flex-direction:column;gap:14px">
+                <div>
+                  <div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:rgba(0,0,0,0.35);margin-bottom:6px">Tipos de senal a buscar</div>
+                  <div style="display:flex;flex-wrap:wrap;gap:6px">
+                    <label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer"><input type="checkbox" checked> Producto / Launch</label>
+                    <label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer"><input type="checkbox" checked> Contenido / PR</label>
+                    <label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer"><input type="checkbox" checked> Partnership</label>
+                    <label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer"><input type="checkbox"> Pricing</label>
+                    <label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer"><input type="checkbox"> Hiring</label>
+                    <label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer"><input type="checkbox"> Funding</label>
+                    <label style="display:flex;align-items:center;gap:5px;font-size:11px;cursor:pointer"><input type="checkbox"> Evento</label>
+                  </div>
+                </div>
+                <div>
+                  <div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:rgba(0,0,0,0.35);margin-bottom:6px">Cron automatico</div>
+                  <select class="mini-select" style="max-width:100%;width:100%">
+                    <option>Lunes 08:00 (semanal)</option>
+                    <option>Diario 09:00</option>
+                    <option>Solo manual</option>
+                  </select>
+                </div>
+                <div>
+                  <div style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:rgba(0,0,0,0.35);margin-bottom:6px">Profundidad de busqueda</div>
+                  <select class="mini-select" style="max-width:100%;width:100%">
+                    <option>Rapido — 3 queries por entidad</option>
+                    <option selected>Estandar — 6 queries por entidad</option>
+                    <option>Profundo — 12 queries por entidad</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: run log -->
+        <div>
+          <div class="section-bar" style="margin-top:0">
+            <span class="section-label">Ejecutar scan</span>
+            <div class="section-line"></div>
+          </div>
+
+          <div class="card" style="margin-bottom:16px">
+            <div class="card-body" style="display:flex;flex-direction:column;gap:12px">
+              <div style="font-size:12px;color:#444;line-height:1.6">El agente buscara noticias, publicaciones, lanzamientos y cambios relevantes para cada entidad activa del Watchlist. Los resultados se guardan en <strong>CH Competitive Intel [OS v2]</strong> en Notion.</div>
+              <button class="btn btn-lime" style="width:100%;justify-content:center;font-size:11px;padding:11px" onclick="runScanNow()">&#9654; Lanzar scan ahora</button>
+              <button class="btn btn-ghost" style="width:100%;justify-content:center;font-size:11px">Vista previa (dry run)</button>
+            </div>
+          </div>
+
+          <div class="section-bar">
+            <span class="section-label">Log de scans recientes</span>
+            <div class="section-line"></div>
+          </div>
+
+          <div class="card">
+            <div class="card-body" style="padding:12px 20px">
+              <div class="scan-log">
+                <div style="padding:20px 0;text-align:center">
+                  <div style="font-size:11px;color:var(--muted)">Sin scans ejecutados todavia</div>
+                </div>
+
+                <!-- Demo log items -->
+                <div style="border-top:1px solid var(--border);padding-top:4px">
+                  <div class="log-item">
+                    <div class="log-dot ok"></div>
+                    <div>
+                      <div class="log-text"><strong>Acme Accelerator</strong> — 3 senales nuevas encontradas</div>
+                      <div class="log-time">Lun 13 Apr · 08:04</div>
+                    </div>
+                  </div>
+                  <div class="log-item">
+                    <div class="log-dot ok"></div>
+                    <div>
+                      <div class="log-text"><strong>Greenwave Fund</strong> — 1 senal nueva encontrada</div>
+                      <div class="log-time">Lun 13 Apr · 08:06</div>
+                    </div>
+                  </div>
+                  <div class="log-item">
+                    <div class="log-dot warn"></div>
+                    <div>
+                      <div class="log-text"><strong>EcoRetail UK</strong> — Sin resultados relevantes (pausado)</div>
+                      <div class="log-time">Lun 13 Apr · 08:06</div>
+                    </div>
+                  </div>
+                  <div class="log-item">
+                    <div class="log-dot ok"></div>
+                    <div>
+                      <div class="log-text">Scan completado — 4 senales guardadas en Notion</div>
+                      <div class="log-time">Lun 13 Apr · 08:07</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div><!-- /tab-scan -->
+
+  </div><!-- /content -->
+</div><!-- /main -->
+
+<script>
+function switchTab(id, btn) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  if (btn) btn.classList.add('active');
+}
+
+function toggleGroup(id) {
+  document.getElementById(id).classList.toggle('collapsed');
+}
+
+// Inject "Ver fuente" button into every signal item that has a source link
+function injectSourceButtons() {
+  document.querySelectorAll('.signal-item').forEach(item => {
+    const sourceLink = item.querySelector('.signal-source a');
+    const actions = item.querySelector('.signal-actions');
+    if (sourceLink && actions && !actions.querySelector('.btn-source')) {
+      const btn = document.createElement('a');
+      btn.href = sourceLink.href;
+      btn.target = '_blank';
+      btn.rel = 'noopener noreferrer';
+      btn.className = 'btn btn-ghost btn-sm btn-source';
+      btn.style.cssText = 'font-size:9.5px;letter-spacing:0.1px';
+      btn.textContent = 'Ver fuente \u2197';
+      actions.appendChild(btn);
+    }
+  });
+}
+document.addEventListener('DOMContentLoaded', injectSourceButtons);
+
+function runScanNow() {
+  const btn = event.target;
+  const orig = btn.innerHTML;
+  btn.innerHTML = '... Escaneando';
+  btn.disabled = true;
+  setTimeout(() => {
+    btn.innerHTML = '&#10003; Scan completado';
+    btn.style.background = '#dcfce7';
+    btn.style.color = '#166534';
+    setTimeout(() => {
+      btn.innerHTML = orig;
+      btn.style.background = '';
+      btn.style.color = '';
+      btn.disabled = false;
+    }, 2500);
+  }, 2200);
+}
+</script>
+
+</body>
+</html>

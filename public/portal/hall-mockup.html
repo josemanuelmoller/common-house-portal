@@ -1,0 +1,1257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Hall — Common House (Mockup)</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --lime: #c8f55a;
+    --black: #000000;
+    --white: #ffffff;
+    --ink: #111111;
+    --muted: #666666;
+    --border: #e8e8e8;
+    --bg: #f7f7f5;
+    --sidebar-w: 220px;
+  }
+
+  body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    background: var(--bg);
+    min-height: 100vh;
+    display: flex;
+  }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    width: var(--sidebar-w);
+    min-height: 100vh;
+    background: var(--black);
+    display: flex;
+    flex-direction: column;
+    padding: 28px 0;
+    position: fixed;
+    top: 0; left: 0;
+    z-index: 10;
+  }
+
+  .sidebar-logo {
+    padding: 0 22px 24px;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+    margin-bottom: 16px;
+  }
+  .sidebar-logo-inner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .wordmark { display: flex; flex-direction: column; line-height: 1.1; }
+  .wordmark span { font-size: 11px; font-weight: 400; color: var(--white); letter-spacing: 0.3px; }
+  .nav-section-label {
+    font-size: 7px;
+    font-weight: 700;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.18);
+    padding: 0 24px;
+    margin-top: 16px;
+    margin-bottom: 4px;
+  }
+
+  .sidebar-project {
+    padding: 0 24px 20px;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+    margin-bottom: 20px;
+  }
+  .sidebar-project-label {
+    font-size: 8.5px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.25);
+    margin-bottom: 6px;
+  }
+  .sidebar-project-name {
+    font-size: 13px;
+    font-weight: 700;
+    color: rgba(255,255,255,0.85);
+    line-height: 1.3;
+  }
+
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 24px;
+    font-size: 12px;
+    font-weight: 600;
+    color: rgba(255,255,255,0.4);
+    cursor: pointer;
+    border-radius: 0;
+    transition: color 0.15s, background 0.15s;
+    text-decoration: none;
+    border-left: 2px solid transparent;
+  }
+  .nav-item:hover { color: rgba(255,255,255,0.8); background: rgba(255,255,255,0.04); }
+  .nav-item.active {
+    color: var(--lime);
+    border-left-color: var(--lime);
+    background: rgba(200,245,90,0.06);
+  }
+  .nav-icon { font-size: 14px; opacity: 0.6; }
+  .nav-item.active .nav-icon { opacity: 1; }
+
+  .sidebar-footer {
+    margin-top: auto;
+    padding: 20px 24px 0;
+    border-top: 1px solid rgba(255,255,255,0.07);
+  }
+  .sidebar-footer p {
+    font-size: 9px;
+    color: rgba(255,255,255,0.18);
+    letter-spacing: 0.5px;
+  }
+
+  /* ── Main ── */
+  .main {
+    margin-left: var(--sidebar-w);
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+  }
+
+  /* ── Hero ── */
+  .hero {
+    background: var(--black);
+    padding: 48px 56px 52px;
+  }
+  .hero-eyebrow {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.22);
+    margin-bottom: 20px;
+  }
+  .hero-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 24px;
+    flex-wrap: wrap;
+  }
+  .hero-title {
+    font-size: 3rem;
+    font-weight: 900;
+    color: var(--white);
+    letter-spacing: -2px;
+    line-height: 1;
+  }
+  .hero-title em { font-style: italic; color: var(--lime); }
+  .hero-stage {
+    display: inline-block;
+    background: var(--lime);
+    color: var(--black);
+    font-size: 8.5px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    border-radius: 20px;
+    padding: 4px 11px;
+    margin-top: 14px;
+  }
+  .hero-updated {
+    text-align: right;
+    flex-shrink: 0;
+  }
+  .hero-updated-label {
+    font-size: 8.5px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.18);
+  }
+  .hero-updated-val {
+    font-size: 12px;
+    font-weight: 600;
+    color: rgba(255,255,255,0.35);
+    margin-top: 4px;
+  }
+  .hero-divider {
+    height: 1px;
+    background: rgba(255,255,255,0.07);
+    margin: 28px 0;
+  }
+  .hero-welcome {
+    font-size: 15px;
+    color: rgba(255,255,255,0.65);
+    line-height: 1.7;
+    max-width: 660px;
+    font-weight: 400;
+  }
+  .hero-prepared {
+    font-size: 10px;
+    color: rgba(255,255,255,0.18);
+    font-weight: 600;
+    margin-top: 20px;
+    letter-spacing: 0.3px;
+  }
+
+  /* ── Content area ── */
+  .content {
+    flex: 1;
+    padding: 40px 56px 60px;
+  }
+  .content-inner {
+    max-width: 960px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  /* ── Cards — base ── */
+  .card {
+    background: var(--white);
+    border: 1.5px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+  }
+  .card-accent { height: 3px; background: var(--lime); }
+  .card-accent.grey { background: #ddd; }
+  .card-header {
+    padding: 18px 24px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .card-header-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .card-icon {
+    width: 28px; height: 28px;
+    border-radius: 8px;
+    background: var(--ink);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .card-icon.lime { background: var(--lime); }
+  .card-icon.ghost { background: var(--bg); border: 1px solid var(--border); }
+  .card-label {
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: -0.2px;
+    color: var(--ink);
+  }
+  .card-body { padding: 22px 24px; }
+  .card-body.tight { padding: 18px 24px; }
+
+  /* ── Card: What's Happening Now — big live feel ── */
+  .card-now .card-header { padding: 20px 24px 18px; border-bottom: none; }
+  .card-now .card-label { font-size: 14px; font-weight: 900; letter-spacing: -0.5px; }
+
+  /* ── Card: What We Heard — editorial, serif-ish italic body ── */
+  .card-heard .card-header { background: var(--ink); border-bottom: 1px solid rgba(255,255,255,0.08); }
+  .card-heard .card-label { color: var(--white); font-size: 13px; font-weight: 800; }
+  .card-heard .card-icon { background: rgba(255,255,255,0.1); }
+  .heard-q {
+    font-size: 8.5px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: rgba(0,0,0,0.28);
+    margin-bottom: 7px;
+  }
+  .heard-a {
+    font-size: 14px;
+    color: var(--ink);
+    line-height: 1.55;
+    font-weight: 500;
+    font-style: italic;
+    letter-spacing: -0.2px;
+  }
+
+  /* ── Card: Team — compact, personal ── */
+  .card-team .card-label { font-size: 11px; font-weight: 700; color: #555; }
+
+  /* ── Card: Materials — functional list ── */
+  .card-materials .card-label { font-size: 12px; font-weight: 800; }
+  .material-title { font-size: 12px; font-weight: 700; color: var(--ink); line-height: 1.3; }
+  .material-meta { font-size: 9.5px; color: var(--muted); margin-top: 2px; font-family: 'Menlo', 'Courier New', monospace; }
+
+  /* ── Card: Decisions — structured, confirmed ── */
+  .card-decisions .card-header { background: #f9ffe6; border-bottom: 1px solid #ddf0a0; }
+  .card-decisions .card-label { font-size: 13px; font-weight: 900; letter-spacing: -0.3px; }
+  .decision-title { font-size: 13px; font-weight: 700; color: var(--ink); line-height: 1.4; }
+  .decision-date { font-size: 9px; color: var(--muted); white-space: nowrap; flex-shrink: 0; font-family: 'Menlo', 'Courier New', monospace; }
+  .decision-context { font-size: 11.5px; color: #666; margin-top: 5px; line-height: 1.5; }
+
+  /* ── Card: Conversations — timeline feel ── */
+  .card-convs .card-label { font-size: 13px; font-weight: 900; letter-spacing: -0.3px; }
+  .conv-title { font-size: 13px; font-weight: 800; color: var(--ink); letter-spacing: -0.3px; }
+  .conv-date { font-size: 9px; color: var(--muted); white-space: nowrap; flex-shrink: 0; margin-top: 2px; font-family: 'Menlo', 'Courier New', monospace; }
+  .conv-summary { font-size: 12px; color: #666; margin-top: 6px; line-height: 1.6; }
+
+  /* ── Pill ── */
+  .pill {
+    display: inline-block;
+    background: var(--black);
+    color: var(--white);
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 1.8px;
+    text-transform: uppercase;
+    border-radius: 20px;
+    padding: 3px 9px;
+  }
+  .pill.lime { background: var(--lime); color: var(--black); }
+  .pill.ghost { background: transparent; border: 1.5px solid #ddd; color: #888; }
+
+  /* ── What's Happening Now ── */
+  .now-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+  }
+  .now-block { padding: 22px 24px; }
+  .now-block + .now-block { border-left: 1px solid var(--border); }
+  .now-label {
+    font-size: 8.5px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: rgba(0,0,0,0.22);
+    margin-bottom: 10px;
+  }
+  .now-text {
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--ink);
+    line-height: 1.55;
+  }
+  .now-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 9px;
+    font-weight: 600;
+    color: #888;
+    border: 1px solid #e0e0e0;
+    border-radius: 20px;
+    padding: 3px 9px;
+    margin-top: 10px;
+  }
+  .now-tag-dot {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: var(--lime);
+    flex-shrink: 0;
+  }
+
+  /* ── Sidebar layout for Now + Team ── */
+  .two-col {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 24px;
+    align-items: start;
+  }
+
+  /* ── Team ── */
+  .team-list { display: flex; flex-direction: column; gap: 14px; }
+  .team-member { display: flex; align-items: center; gap: 12px; }
+  .team-avatar {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: var(--black);
+    color: var(--lime);
+    font-size: 11px;
+    font-weight: 800;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    letter-spacing: -0.5px;
+  }
+  .team-name { font-size: 12.5px; font-weight: 700; color: var(--ink); }
+  .team-role { font-size: 10px; color: var(--muted); margin-top: 1px; }
+
+  /* ── What We Heard ── */
+  .heard-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+  }
+  .heard-block {
+    padding: 22px 24px;
+    border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+  .heard-block:nth-child(2n) { border-right: none; }
+  .heard-block:nth-last-child(-n+2) { border-bottom: none; }
+  .heard-q {
+    font-size: 8.5px;
+    font-weight: 700;
+    letter-spacing: 1.8px;
+    text-transform: uppercase;
+    color: rgba(0,0,0,0.25);
+    margin-bottom: 9px;
+  }
+  .heard-a {
+    font-size: 13px;
+    color: var(--ink);
+    line-height: 1.6;
+    font-weight: 500;
+  }
+
+  /* ── Proposal card ── */
+  .card-proposal {
+    background: var(--ink);
+    border-color: transparent;
+    position: relative;
+    overflow: hidden;
+  }
+  .card-proposal::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: var(--lime);
+  }
+  .card-proposal .card-header {
+    background: transparent;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+    padding: 22px 28px 20px;
+  }
+  .card-proposal .card-label { color: var(--white); font-size: 13px; font-weight: 800; }
+  .card-proposal .card-icon { background: var(--lime); }
+  .proposal-body {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 32px;
+    align-items: center;
+    padding: 28px 28px 32px;
+  }
+  .proposal-title {
+    font-size: 1.5rem;
+    font-weight: 900;
+    color: var(--white);
+    letter-spacing: -0.8px;
+    line-height: 1.15;
+    margin-bottom: 14px;
+  }
+  .proposal-title em { color: var(--lime); font-style: italic; }
+  .proposal-summary {
+    font-size: 13.5px;
+    color: rgba(255,255,255,0.55);
+    line-height: 1.65;
+    max-width: 580px;
+  }
+  .proposal-scope {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+    margin-top: 18px;
+  }
+  .scope-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 20px;
+    padding: 4px 11px;
+    font-size: 10px;
+    font-weight: 600;
+    color: rgba(255,255,255,0.45);
+    letter-spacing: 0.2px;
+  }
+  .scope-tag-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--lime); flex-shrink: 0; }
+  .proposal-cta {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+  .btn-proposal {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--lime);
+    color: var(--black);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.3px;
+    padding: 12px 22px;
+    border-radius: 10px;
+    border: none;
+    cursor: pointer;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .btn-proposal:hover { opacity: 0.88; }
+  .proposal-meta {
+    font-size: 9px;
+    color: rgba(255,255,255,0.2);
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    text-align: center;
+  }
+
+  /* ── PO / Sign-off card ── */
+  .card-po {
+    border-color: #d4edda;
+    background: #f8fff9;
+  }
+  .card-po.pending {
+    border-color: #ffe4a0;
+    background: #fffdf5;
+  }
+  .card-po .card-header {
+    background: transparent;
+    border-bottom: 1px solid #e8f5ea;
+  }
+  .card-po.pending .card-header { border-bottom-color: #ffefc0; }
+  .card-po .card-label { font-size: 13px; font-weight: 900; letter-spacing: -0.3px; }
+  .po-body {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    align-items: center;
+    padding: 22px 24px 24px;
+  }
+  .po-ref {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 1.8px;
+    text-transform: uppercase;
+    color: rgba(0,0,0,0.22);
+    margin-bottom: 6px;
+    font-family: 'Menlo', 'Courier New', monospace;
+  }
+  .po-description {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink);
+    line-height: 1.5;
+    margin-bottom: 10px;
+  }
+  .po-amount {
+    font-size: 1.25rem;
+    font-weight: 900;
+    color: var(--ink);
+    letter-spacing: -0.5px;
+  }
+  .po-amount-label {
+    font-size: 9px;
+    font-weight: 700;
+    color: rgba(0,0,0,0.3);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .po-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    border-radius: 20px;
+    padding: 3px 10px;
+    margin-top: 10px;
+  }
+  .po-status-badge.pending { background: #fff3cd; color: #7a5800; }
+  .po-status-badge.approved { background: #d4edda; color: #1a6630; }
+  .po-status-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+  .btn-approve {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    background: var(--black);
+    color: var(--white);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.3px;
+    padding: 12px 22px;
+    border-radius: 10px;
+    border: none;
+    cursor: pointer;
+    text-decoration: none;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .btn-approve:hover { background: #222; }
+
+  /* ── Two-col grid for materials + decisions ── */
+  .two-col-equal {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    align-items: start;
+  }
+
+  /* ── Materials ── */
+  .material-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .material-item:last-child { border-bottom: none; padding-bottom: 0; }
+  .material-icon {
+    width: 34px; height: 34px;
+    border-radius: 8px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    font-size: 14px;
+  }
+  .material-title {
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--ink);
+    line-height: 1.3;
+  }
+  .material-meta {
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 3px;
+  }
+  .material-link {
+    font-size: 9px;
+    font-weight: 700;
+    color: var(--black);
+    text-decoration: none;
+    letter-spacing: 0.5px;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    margin-top: 5px;
+    opacity: 0.45;
+  }
+
+  /* ── Decisions ── */
+  .decision-item {
+    padding: 14px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .decision-item:last-child { border-bottom: none; padding-bottom: 0; }
+  .decision-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .decision-title {
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--ink);
+    line-height: 1.4;
+  }
+  .decision-date {
+    font-size: 9.5px;
+    color: var(--muted);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .decision-context {
+    font-size: 11px;
+    color: #666;
+    margin-top: 5px;
+    line-height: 1.5;
+  }
+  .decision-check {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 8.5px;
+    font-weight: 700;
+    color: #3a8c00;
+    letter-spacing: 0.5px;
+    margin-top: 6px;
+  }
+  .check-icon {
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: #c8f55a;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 8px;
+    color: var(--black);
+  }
+
+  /* ── Conversations ── */
+  .conv-item {
+    padding: 18px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .conv-item:first-child { padding-top: 0; }
+  .conv-item:last-child { border-bottom: none; padding-bottom: 0; }
+  .conv-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .conv-title {
+    font-size: 13.5px;
+    font-weight: 800;
+    color: var(--ink);
+    letter-spacing: -0.3px;
+  }
+  .conv-date {
+    font-size: 9.5px;
+    color: var(--muted);
+    white-space: nowrap;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .conv-summary {
+    font-size: 12px;
+    color: #555;
+    margin-top: 8px;
+    line-height: 1.6;
+  }
+  .conv-participants {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+  }
+  .conv-participants-label {
+    font-size: 8.5px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: rgba(0,0,0,0.2);
+    margin-right: 2px;
+  }
+  .conv-participant {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 2px 8px 2px 4px;
+    font-size: 10px;
+    font-weight: 600;
+    color: #444;
+  }
+  .conv-participant-avatar {
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: var(--ink);
+    color: var(--lime);
+    font-size: 7px;
+    font-weight: 800;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    letter-spacing: -0.3px;
+  }
+  .conv-expand {
+    font-size: 9px;
+    font-weight: 700;
+    color: #999;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    margin-top: 8px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    border: none;
+    background: none;
+    padding: 0;
+  }
+
+  /* ── Digital Residents ── */
+  .residents-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
+  }
+  .resident-card {
+    border: 1.5px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    background: var(--white);
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .resident-icon {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: #f0f0f0;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .resident-name {
+    font-size: 11.5px;
+    font-weight: 800;
+    color: var(--ink);
+    letter-spacing: -0.2px;
+  }
+  .resident-desc {
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 3px;
+    line-height: 1.45;
+  }
+
+  /* ── Dashed note box (like diagram) ── */
+  .note-box {
+    border: 1.5px dashed #ccc;
+    border-radius: 10px;
+    padding: 14px 18px;
+    font-size: 12px;
+    color: #555;
+    line-height: 1.6;
+    background: transparent;
+  }
+  .note-box.lime {
+    border-color: var(--lime);
+    background: #f9ffe6;
+  }
+
+  /* SVG icons helper */
+  .icon-sm svg { width: 16px; height: 16px; }
+
+  /* ── Main 2-col grid ── */
+  .page-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    align-items: start;
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 768px) {
+    :root { --sidebar-w: 0px; }
+    .sidebar { display: none; }
+    .hero, .content { padding-left: 24px; padding-right: 24px; }
+    .two-col { grid-template-columns: 1fr; }
+    .two-col-equal { grid-template-columns: 1fr; }
+    .now-grid { grid-template-columns: 1fr; }
+    .now-block + .now-block { border-left: none; border-top: 1px solid var(--border); }
+    .hero { padding: 32px 24px 36px; }
+    .hero-title { font-size: 2rem; }
+    .content { padding: 24px 16px 40px; }
+    .card-heard [style*="grid-template-columns"] { grid-template-columns: 1fr !important; }
+    .card-heard [style*="background:rgba(255,255,255,0.08)"] { height: 1px; width: 100%; }
+    .proposal-body { grid-template-columns: 1fr; }
+    .proposal-cta { align-items: flex-start; }
+    .proposal-title { font-size: 1.2rem; }
+    .po-body { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="sidebar-logo-inner">
+      <svg viewBox="0 0 108 50" fill="none" width="34" height="16">
+        <path d="M42 4 A21 21 0 1 0 42 46" stroke="white" stroke-width="10" stroke-linecap="butt"/>
+        <circle cx="84" cy="25" r="21" stroke="white" stroke-width="10"/>
+      </svg>
+      <div class="wordmark">
+        <span>common</span>
+        <span>house</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="sidebar-project">
+    <div class="sidebar-project-label">Project</div>
+    <div class="sidebar-project-name">Auto Mercado<br>Fase 2</div>
+  </div>
+
+  <nav>
+    <div class="nav-section-label">Workspace</div>
+    <a href="#" class="nav-item active">
+      <span class="nav-icon">◈</span> The Hall
+    </a>
+    <a href="residents-mockup.html" class="nav-item" style="padding-left:36px;font-size:11px;">
+      <span class="nav-icon" style="font-size:11px;">◉</span> Residents
+    </a>
+    <a href="#" class="nav-item">
+      <span class="nav-icon">◻</span> The Workroom
+    </a>
+    <a href="#" class="nav-item">
+      <span class="nav-icon">◫</span> Overview
+    </a>
+
+    <div class="nav-section-label" style="margin-top:20px;">Desks</div>
+    <a href="#" class="nav-item">
+      <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;opacity:0.7;"><rect x="2" y="3" width="12" height="10" rx="1"/><path d="M5 7h6M5 10h4"/></svg>
+      Design
+    </a>
+    <a href="#" class="nav-item">
+      <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;opacity:0.7;"><path d="M13 3H3a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h3l2 2 2-2h3a1 1 0 0 0 1-1V4a1 1 0 0 0-1-1z"/></svg>
+      Comms
+    </a>
+    <a href="#" class="nav-item">
+      <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;opacity:0.7;"><circle cx="8" cy="6" r="3"/><path d="M2 13c0-3.3 2.7-6 6-6s6 2.7 6 6"/></svg>
+      Insights
+    </a>
+    <a href="#" class="nav-item">
+      <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;opacity:0.7;"><path d="M8 14s-6-3-6-7.5A3.5 3.5 0 0 1 8 3a3.5 3.5 0 0 1 6 3.5C14 11 8 14 8 14z"/></svg>
+      Grants
+    </a>
+  </nav>
+
+  <div class="sidebar-footer">
+    <p>Common House OS v2</p>
+  </div>
+</aside>
+
+<!-- Main -->
+<div class="main">
+
+  <!-- Hero -->
+  <header class="hero">
+    <p class="hero-eyebrow">Welcome to The Hall</p>
+    <div class="hero-top">
+      <div>
+        <h1 class="hero-title">Auto Mercado <em>Fase 2</em></h1>
+        <span class="hero-stage">Pilot Planning</span>
+      </div>
+      <div class="hero-updated">
+        <div class="hero-updated-label">Last updated</div>
+        <div class="hero-updated-val">11 April 2026</div>
+      </div>
+    </div>
+    <div class="hero-divider"></div>
+    <p class="hero-welcome">
+      The work is underway. This is your home base — where you'll find what's happened,
+      what's next, and anything that needs your attention.
+    </p>
+    <p class="hero-prepared">Prepared by Common House</p>
+  </header>
+
+  <!-- Content -->
+  <div class="content">
+    <div class="content-inner">
+    <!-- Row 1: What's Happening Now (2fr) + Team (1fr) -->
+    <div class="two-col">
+
+      <!-- What's Happening Now -->
+      <div class="card card-now">
+        <div class="card-accent"></div>
+        <div class="card-header">
+          <div class="card-header-left">
+            <div class="card-icon lime">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#000" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            </div>
+            <span class="card-label">What's happening now</span>
+          </div>
+          <span class="pill lime">Active</span>
+        </div>
+        <div class="now-grid">
+          <div class="now-block">
+            <div class="now-label">Current focus</div>
+            <div class="now-text">Validating the refill station pilot model with two high-footfall Auto Mercado locations in San José.</div>
+            <div class="now-tag"><span class="now-tag-dot"></span> In progress</div>
+          </div>
+          <div class="now-block">
+            <div class="now-label">Next milestone</div>
+            <div class="now-text">Pilot kickoff with TI team — station installation confirmed for both locations.</div>
+            <div class="now-tag" style="color:#aaa;border-color:#eee;"><span style="width:5px;height:5px;border-radius:50%;background:#ddd;flex-shrink:0;display:inline-block;"></span> Q2 2026</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Team -->
+      <div class="card card-team">
+        <div class="card-accent grey"></div>
+        <div class="card-header">
+          <div class="card-header-left">
+            <div class="card-icon ghost">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#555" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            </div>
+            <span class="card-label">Your team at CH</span>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="team-list">
+            <div class="team-member">
+              <div class="team-avatar">JM</div>
+              <div>
+                <div class="team-name">José Manuel</div>
+                <div class="team-role">Project Lead</div>
+              </div>
+            </div>
+            <div class="team-member">
+              <div class="team-avatar">SC</div>
+              <div>
+                <div class="team-name">Sofía Castro</div>
+                <div class="team-role">Strategy</div>
+              </div>
+            </div>
+            <div class="team-member">
+              <div class="team-avatar">AP</div>
+              <div>
+                <div class="team-name">Andrés Pérez</div>
+                <div class="team-role">Operations</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /two-col -->
+
+    <!-- Row 2: What We Heard — full width, black, 4-col inside -->
+    <div class="card card-heard">
+      <div class="card-header">
+        <div class="card-header-left">
+          <div class="card-icon">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="rgba(255,255,255,0.8)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V20c0 1 0 1 1 1z"/><path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3c0 1 0 1 1 1z"/></svg>
+          </div>
+          <span class="card-label">What we heard</span>
+        </div>
+        <span class="pill" style="background:rgba(255,255,255,0.12);color:rgba(255,255,255,0.5);letter-spacing:1.5px;">Editorial</span>
+      </div>
+      <!-- 2-col grid inside, divided by a black line -->
+      <div style="display:grid;grid-template-columns:1fr 1px 1fr 1px 1fr 1px 1fr;">
+        <div style="padding:22px 24px;">
+          <div class="heard-q">The challenge</div>
+          <div class="heard-a">Consumers want sustainable options but won't change behaviour unless the experience is as convenient as the status quo.</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.08);"></div>
+        <div style="padding:22px 24px;">
+          <div class="heard-q">What matters most</div>
+          <div class="heard-a">Proving that refill can work inside a major supermarket chain — the format, not just the category.</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.08);"></div>
+        <div style="padding:22px 24px;">
+          <div class="heard-q">What may be in the way</div>
+          <div class="heard-a">Internal alignment across TI, operations, and category management teams at Auto Mercado. Each has a veto.</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.08);"></div>
+        <div style="padding:22px 24px;">
+          <div class="heard-q">What success looks like</div>
+          <div class="heard-a">Two locations running, unit economics validated, and a clear commercial model ready to present to the Auto Mercado board.</div>
+        </div>
+      </div>
+    </div><!-- /card-heard -->
+
+    <!-- Row 3: Proposal — full width, dark -->
+    <div class="card card-proposal">
+      <div class="card-header">
+        <div class="card-header-left">
+          <div class="card-icon">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#000" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+          </div>
+          <span class="card-label">Our proposal</span>
+        </div>
+        <span class="pill" style="background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.4);letter-spacing:1.5px;">Ver. 1.2</span>
+      </div>
+      <div class="proposal-body">
+        <div>
+          <div class="proposal-title">Pilot Rollout —<br><em>Auto Mercado Fase 2</em></div>
+          <div class="proposal-summary">
+            A two-location refill pilot designed to validate the unit economics and in-store operating model before full chain rollout. The proposal covers station design, TI integration, staff training, and a 12-week measurement framework to generate board-ready data.
+          </div>
+          <div class="proposal-scope">
+            <span class="scope-tag"><span class="scope-tag-dot"></span>2 pilot locations</span>
+            <span class="scope-tag"><span class="scope-tag-dot"></span>12-week runway</span>
+            <span class="scope-tag"><span class="scope-tag-dot"></span>TI integration</span>
+            <span class="scope-tag"><span class="scope-tag-dot"></span>Unit economics model</span>
+            <span class="scope-tag"><span class="scope-tag-dot"></span>Board-ready report</span>
+          </div>
+        </div>
+        <div class="proposal-cta">
+          <a href="#" class="btn-proposal">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+            View full proposal
+          </a>
+          <div class="proposal-meta">Updated 11 Apr 2026 · PDF</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 4: PO Sign-off — full width, action -->
+    <div class="card card-po pending">
+      <div class="card-header">
+        <div class="card-header-left">
+          <div class="card-icon" style="background:#fff3cd;">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#7a5800" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          </div>
+          <span class="card-label">Purchase order</span>
+        </div>
+        <div class="po-status-badge pending"><span class="po-status-dot"></span>Awaiting approval</div>
+      </div>
+      <div class="po-body">
+        <div>
+          <div class="po-ref">PO-2026-AM-002</div>
+          <div class="po-description">
+            Common House — Pilot Planning &amp; Execution, Auto Mercado Fase 2<br>
+            <span style="font-size:11.5px;font-weight:500;color:#888;">Covers strategy, design, TI coordination, and measurement framework for the 12-week pilot.</span>
+          </div>
+          <div>
+            <div class="po-amount-label">Total</div>
+            <div class="po-amount">$18,500 USD</div>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:10px;flex-shrink:0;">
+          <a href="#" class="btn-approve">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            Approve PO
+          </a>
+          <div style="font-size:9px;color:#aaa;font-weight:600;letter-spacing:0.3px;text-align:right;">Sent 11 Apr 2026 · Secure link</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 5: Conversations — full width -->
+    <div class="card card-convs">
+      <div class="card-accent grey"></div>
+      <div class="card-header">
+        <div class="card-header-left">
+          <div class="card-icon ghost">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#555" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          </div>
+          <span class="card-label">Conversations</span>
+        </div>
+        <span class="pill ghost">4 sessions</span>
+      </div>
+      <div class="card-body">
+        <div class="conv-item" style="padding-top:0;">
+          <div class="conv-top">
+            <div class="conv-title">Reunión TI — Alineación técnica</div>
+            <div class="conv-date">9 Apr 2026</div>
+          </div>
+          <div class="conv-summary">El equipo de TI confirmó que las estaciones pueden integrarse con el sistema de POS existente sin cambios de infraestructura mayores.</div>
+          <div class="conv-participants">
+            <span class="conv-participants-label">From AM</span>
+            <span class="conv-participant"><span class="conv-participant-avatar">CR</span>Carlos Rojas</span>
+            <span class="conv-participant"><span class="conv-participant-avatar">ML</span>María López</span>
+          </div>
+          <button class="conv-expand">Read more ↓</button>
+        </div>
+        <div class="conv-item">
+          <div class="conv-top">
+            <div class="conv-title">Kickoff Comercial Fase 2</div>
+            <div class="conv-date">28 Mar 2026</div>
+          </div>
+          <div class="conv-summary">Se definieron los dos locales piloto y se acordó el calendario de instalación para Q2 2026.</div>
+          <div class="conv-participants">
+            <span class="conv-participants-label">From AM</span>
+            <span class="conv-participant"><span class="conv-participant-avatar">PV</span>Pablo Vargas</span>
+            <span class="conv-participant"><span class="conv-participant-avatar">AL</span>Ana Leiva</span>
+            <span class="conv-participant"><span class="conv-participant-avatar">CR</span>Carlos Rojas</span>
+          </div>
+          <button class="conv-expand">Read more ↓</button>
+        </div>
+        <div class="conv-item">
+          <div class="conv-top">
+            <div class="conv-title">Revisión modelo económico</div>
+            <div class="conv-date">15 Mar 2026</div>
+          </div>
+          <div class="conv-summary">Se actualizó el modelo de unit economics con los costos reales de la primera fase.</div>
+          <div class="conv-participants">
+            <span class="conv-participants-label">From AM</span>
+            <span class="conv-participant"><span class="conv-participant-avatar">PV</span>Pablo Vargas</span>
+          </div>
+          <button class="conv-expand">Read more ↓</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 6: Materials (1fr) + Decisions (1fr) -->
+    <div class="two-col-equal">
+
+      <!-- Shared Materials -->
+      <div class="card card-materials">
+        <div class="card-accent grey"></div>
+        <div class="card-header">
+          <div class="card-header-left">
+            <div class="card-icon ghost">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#555" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+            </div>
+            <span class="card-label">Shared materials</span>
+          </div>
+          <span class="pill ghost">3 files</span>
+        </div>
+        <div class="card-body tight">
+          <div class="material-item">
+            <div class="material-icon"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#555" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></div>
+            <div>
+              <div class="material-title">Pilot Scope — Auto Mercado Fase 2</div>
+              <div class="material-meta">Google Drive · 28 Mar 2026</div>
+              <a href="#" class="material-link">Open ↗</a>
+            </div>
+          </div>
+          <div class="material-item">
+            <div class="material-icon"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#555" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg></div>
+            <div>
+              <div class="material-title">Unit Economics Model v2</div>
+              <div class="material-meta">Google Sheets · 3 Apr 2026</div>
+              <a href="#" class="material-link">Open ↗</a>
+            </div>
+          </div>
+          <div class="material-item">
+            <div class="material-icon"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#555" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></div>
+            <div>
+              <div class="material-title">TI Alignment Brief</div>
+              <div class="material-meta">Google Docs · 9 Apr 2026</div>
+              <a href="#" class="material-link">Open ↗</a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Decisions -->
+      <div class="card card-decisions">
+        <div class="card-header">
+          <div class="card-header-left">
+            <div class="card-icon lime">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#000" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            </div>
+            <span class="card-label">Decisions made</span>
+          </div>
+          <span class="pill lime">Confirmed</span>
+        </div>
+        <div class="card-body tight">
+          <div class="decision-item">
+            <div class="decision-top">
+              <div class="decision-title">Two pilot locations confirmed: Escazú and Santa Ana</div>
+              <div class="decision-date">2 Apr 2026</div>
+            </div>
+            <div class="decision-context">Selected for high foot traffic and demographic fit with early adopters.</div>
+            <div class="decision-check"><div class="check-icon">✓</div> Validated</div>
+          </div>
+          <div class="decision-item">
+            <div class="decision-top">
+              <div class="decision-title">12-week pilot window agreed</div>
+              <div class="decision-date">9 Apr 2026</div>
+            </div>
+            <div class="decision-context">Sufficient to gather meaningful purchase data across both formats.</div>
+            <div class="decision-check"><div class="check-icon">✓</div> Validated</div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /two-col-equal -->
+
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>

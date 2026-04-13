@@ -1,0 +1,1510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Living Room — Common House</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,700;1,800&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --lime: #c8f55a;
+  --black: #000000;
+  --white: #ffffff;
+  --ink: #0e0e0e;
+  --muted: #6b6b6b;
+  --border: #d8d8d0;
+  --bg: #eeeee8;
+  --sidebar-w: 228px;
+}
+
+body { font-family: 'Inter', sans-serif; background: var(--bg); display: flex; min-height: 100vh; }
+
+/* ── Sidebar (white) ── */
+.sidebar {
+  width: var(--sidebar-w);
+  min-height: 100vh;
+  background: var(--white);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  padding: 20px 0 0;
+  position: fixed;
+  top: 0; left: 0;
+  z-index: 10;
+  overflow-y: auto;
+}
+.sidebar-logo {
+  padding: 0 18px 18px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 12px;
+}
+.sidebar-logo-inner { display: flex; align-items: center; gap: 9px; }
+.wordmark { display: flex; flex-direction: column; line-height: 1.1; }
+.wordmark span { font-size: 11px; font-weight: 500; color: var(--ink); letter-spacing: 0.2px; }
+
+.nav-section-label {
+  font-size: 7px;
+  font-weight: 700;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  color: rgba(0,0,0,0.2);
+  padding: 0 18px;
+  margin: 10px 0 3px;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 18px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: rgba(0,0,0,0.42);
+  cursor: pointer;
+  text-decoration: none;
+  border-left: 2px solid transparent;
+  transition: color 0.15s, background 0.15s;
+  user-select: none;
+}
+.nav-item:hover { color: var(--ink); background: rgba(0,0,0,0.03); }
+.nav-item.active { color: var(--ink); border-left-color: var(--lime); background: rgba(200,245,90,0.14); }
+.nav-item.active .nav-icon { opacity: 1; }
+.nav-icon { font-size: 13px; opacity: 0.5; flex-shrink: 0; }
+
+/* Collapsible nav groups */
+.nav-group { }
+.nav-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 18px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: rgba(0,0,0,0.42);
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.15s;
+  gap: 6px;
+}
+.nav-group-header:hover { color: var(--ink); background: rgba(0,0,0,0.025); }
+.nav-group-header-left { display: flex; align-items: center; gap: 9px; }
+.nav-group-arrow {
+  font-size: 9px;
+  opacity: 0.3;
+  transition: transform 0.2s;
+  flex-shrink: 0;
+}
+.nav-group.collapsed .nav-group-arrow { transform: rotate(-90deg); }
+.nav-group-items { overflow: hidden; }
+.nav-group.collapsed .nav-group-items { display: none; }
+.nav-sub-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 18px 6px 34px;
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(0,0,0,0.38);
+  cursor: pointer;
+  text-decoration: none;
+  border-left: 2px solid transparent;
+  transition: color 0.15s, background 0.15s;
+}
+.nav-sub-item:hover { color: var(--ink); background: rgba(0,0,0,0.025); }
+.nav-sub-icon { font-size: 11px; opacity: 0.5; flex-shrink: 0; }
+
+.nav-badge {
+  margin-left: auto;
+  background: rgba(0,0,0,0.07);
+  color: rgba(0,0,0,0.38);
+  font-size: 8.5px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+.nav-badge.red { background: rgba(239,68,68,0.1); color: #dc2626; }
+.nav-badge.lime { background: rgba(200,245,90,0.2); color: #3a6600; }
+
+.sidebar-footer {
+  margin-top: auto;
+  padding: 14px 18px;
+  border-top: 1px solid var(--border);
+}
+.sidebar-footer p { font-size: 8.5px; color: rgba(0,0,0,0.2); letter-spacing: 0.5px; }
+
+/* ── Main ── */
+.main { margin-left: var(--sidebar-w); flex: 1; display: flex; flex-direction: column; min-height: 100vh; }
+
+/* ── Page header (dark) ── */
+.page-header {
+  background: var(--black);
+  padding: 40px 52px 44px;
+  flex-shrink: 0;
+}
+.page-eyebrow {
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.2);
+  margin-bottom: 12px;
+}
+.page-title {
+  font-size: 2.6rem;
+  font-weight: 300;
+  color: var(--white);
+  letter-spacing: -1.5px;
+  line-height: 1;
+}
+.page-title em { font-weight: 900; font-style: italic; color: var(--lime); }
+.page-sub {
+  font-size: 12.5px;
+  color: rgba(255,255,255,0.38);
+  margin-top: 12px;
+  max-width: 520px;
+  line-height: 1.65;
+}
+.page-header-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+.header-stats { display: flex; gap: 28px; align-self: flex-end; }
+.header-stat { text-align: right; }
+.header-stat-num {
+  font-size: 26px;
+  font-weight: 900;
+  color: var(--lime);
+  letter-spacing: -1px;
+  line-height: 1;
+}
+.header-stat-label {
+  font-size: 8.5px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.22);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  margin-top: 3px;
+}
+
+/* ── Tab bar ── */
+.tab-bar {
+  background: var(--black);
+  border-top: 1px solid rgba(255,255,255,0.07);
+  padding: 0 52px;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding-bottom: 14px;
+  flex-shrink: 0;
+}
+.tab-btn {
+  padding: 7px 13px;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.28);
+  cursor: pointer;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 7px;
+  background: transparent;
+  white-space: nowrap;
+  transition: all 0.15s;
+  letter-spacing: 0.2px;
+}
+.tab-btn:hover { color: rgba(255,255,255,0.65); border-color: rgba(255,255,255,0.2); }
+.tab-btn.active { color: var(--lime); border-color: rgba(200,245,90,0.4); background: rgba(200,245,90,0.06); }
+
+/* ── Visibility legend ── */
+.vis-legend {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  padding: 10px 16px;
+  background: var(--white);
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+}
+.vis-legend-title {
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: rgba(0,0,0,0.22);
+  flex-shrink: 0;
+}
+.vis-legend-sep { width: 1px; height: 14px; background: var(--border); flex-shrink: 0; }
+.vis-legend-item { display: flex; align-items: center; gap: 6px; font-size: 9.5px; font-weight: 600; color: var(--muted); }
+
+/* ── Visibility badges ── */
+.vis-badge {
+  font-size: 7.5px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.vis-badge.public { background: rgba(200,245,90,0.18); color: #3a6600; }
+.vis-badge.community { background: rgba(59,130,246,0.1); color: #1d4ed8; }
+.vis-badge.private { background: rgba(0,0,0,0.05); color: rgba(0,0,0,0.3); }
+
+/* ── Content ── */
+.content { flex: 1; padding: 36px 52px 60px; display: flex; flex-direction: column; gap: 0; }
+
+/* ── Stat pills row ── */
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 32px;
+}
+.stat-pill {
+  background: var(--white);
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 18px;
+}
+.stat-label {
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: rgba(0,0,0,0.25);
+  margin-bottom: 7px;
+}
+.stat-value {
+  font-size: 1.6rem;
+  font-weight: 900;
+  color: var(--ink);
+  letter-spacing: -1px;
+  line-height: 1;
+}
+.stat-value.lime { color: #3a8c00; }
+.stat-sub { font-size: 10px; color: var(--muted); margin-top: 5px; }
+
+/* ── Collapsible module ── */
+.module { margin-bottom: 32px; }
+.module-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  cursor: pointer;
+  user-select: none;
+}
+.module-header:hover .module-label { color: var(--ink); }
+.module-label {
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: rgba(0,0,0,0.28);
+  white-space: nowrap;
+  transition: color 0.15s;
+}
+.module-line { flex: 1; height: 1px; background: var(--border); }
+.module-count { font-size: 8.5px; font-weight: 700; color: rgba(0,0,0,0.18); white-space: nowrap; }
+.module-arrow {
+  font-size: 9px;
+  color: rgba(0,0,0,0.2);
+  transition: transform 0.2s;
+  flex-shrink: 0;
+}
+.module.collapsed .module-arrow { transform: rotate(-90deg); }
+.module-body { overflow: hidden; }
+.module.collapsed .module-body { display: none; }
+.module-cta {
+  font-size: 9.5px;
+  font-weight: 700;
+  color: rgba(0,0,0,0.3);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: color 0.15s;
+}
+.module-cta:hover { color: var(--ink); }
+
+/* ── Card base ── */
+.card {
+  background: var(--white);
+  border: 1.5px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.card-header {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.card-icon {
+  width: 26px; height: 26px;
+  border-radius: 7px;
+  background: var(--ink);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  font-size: 12px;
+}
+.card-icon.lime { background: var(--lime); }
+.card-label { font-size: 12px; font-weight: 800; color: var(--ink); letter-spacing: -0.2px; }
+.card-body { padding: 18px 20px; }
+.card-body.tight { padding: 14px 20px; }
+
+/* ── Grid helpers ── */
+.two-col-32 { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; align-items: start; }
+.three-col { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+/* ── Member row (compact list in card) ── */
+.member-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.member-row:last-child { border-bottom: none; }
+.m-avatar {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--lime);
+  font-size: 11px;
+  font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  letter-spacing: -0.3px;
+}
+.m-avatar.lime { background: var(--lime); color: var(--ink); }
+.m-avatar.warm { background: #f5e6c8; color: #7a4f1a; }
+.m-avatar.sky { background: #dbeafe; color: #1d4ed8; }
+.m-avatar.digital {
+  background: var(--bg);
+  border: 1.5px dashed var(--border);
+  color: #888;
+  font-size: 14px;
+}
+.m-name { font-size: 12.5px; font-weight: 700; color: var(--ink); letter-spacing: -0.2px; }
+.m-role { font-size: 10px; color: var(--muted); margin-top: 1px; }
+.m-geo { font-size: 9.5px; color: rgba(0,0,0,0.3); font-weight: 600; }
+.m-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-left: auto; }
+.tag {
+  font-size: 8.5px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  background: var(--bg);
+}
+.tag.lime {
+  color: #2a5500;
+  background: rgba(200,245,90,0.15);
+  border-color: rgba(200,245,90,0.4);
+}
+.m-action {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  color: var(--ink);
+  background: var(--bg);
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+.m-action:hover { background: var(--ink); color: var(--white); border-color: var(--ink); }
+.m-action.primary { background: var(--ink); color: var(--white); border-color: var(--ink); }
+
+/* ── Week panel (dark card) ── */
+.week-panel {
+  background: var(--ink);
+  border-radius: 14px;
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.week-panel-title {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.25);
+}
+.week-item {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.week-item:last-child { border-bottom: none; padding-bottom: 0; }
+.week-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--lime); flex-shrink: 0; margin-top: 4px; }
+.week-title { font-size: 12.5px; font-weight: 700; color: var(--white); letter-spacing: -0.2px; line-height: 1.25; margin-bottom: 3px; }
+.week-desc { font-size: 10px; color: rgba(255,255,255,0.35); line-height: 1.55; }
+.week-footer-btn {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(255,255,255,0.15);
+  color: rgba(255,255,255,0.5);
+  background: transparent;
+  cursor: pointer;
+  text-decoration: none;
+  align-self: flex-start;
+  transition: all 0.15s;
+}
+.week-footer-btn:hover { color: var(--white); border-color: rgba(255,255,255,0.4); }
+
+/* ── Milestone rows ── */
+.milestone-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border);
+}
+.milestone-row:last-child { border-bottom: none; }
+.ms-dot-col { display: flex; flex-direction: column; align-items: center; gap: 6px; padding-top: 3px; flex-shrink: 0; width: 16px; }
+.ms-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.ms-dot.lime { background: var(--lime); }
+.ms-dot.amber { background: #f59e0b; }
+.ms-dot.teal { background: #14b8a6; }
+.ms-dot.sky { background: #3b82f6; }
+.ms-line { flex: 1; width: 1px; background: var(--border); }
+.ms-body { flex: 1; }
+.ms-type {
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: rgba(0,0,0,0.25);
+  margin-bottom: 4px;
+}
+.ms-headline { font-size: 13px; font-weight: 700; color: var(--ink); letter-spacing: -0.2px; line-height: 1.35; margin-bottom: 5px; }
+.ms-context { font-size: 10.5px; color: #666; line-height: 1.6; margin-bottom: 8px; }
+.ms-footer { display: flex; align-items: center; gap: 10px; }
+.ms-who { display: flex; align-items: center; gap: 6px; }
+.ms-avatar { width: 20px; height: 20px; border-radius: 50%; background: var(--ink); color: var(--lime); font-size: 7px; font-weight: 800; display: flex; align-items: center; justify-content: center; }
+.ms-who-name { font-size: 9.5px; font-weight: 700; color: var(--ink); }
+.ms-date { font-size: 9px; color: rgba(0,0,0,0.25); font-weight: 600; margin-left: auto; }
+.ms-share-pill {
+  font-size: 8px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: rgba(200,245,90,0.18);
+  color: #2d6a00;
+}
+
+/* ── Theme cards ── */
+.theme-card {
+  background: var(--white);
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: border-color 0.2s;
+}
+.theme-card:hover { border-color: #aaa; }
+.theme-name { font-size: 13px; font-weight: 800; color: var(--ink); letter-spacing: -0.3px; line-height: 1.25; }
+.theme-desc { font-size: 10.5px; color: #666; line-height: 1.6; }
+.theme-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.theme-meta { display: flex; align-items: center; gap: 8px; margin-top: auto; }
+.theme-count { font-size: 9px; font-weight: 600; color: rgba(0,0,0,0.28); }
+.pulse-pill {
+  font-size: 8px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 20px;
+  background: rgba(200,245,90,0.15);
+  color: #2d6a00;
+  border: 1px solid rgba(200,245,90,0.35);
+}
+.monitor-pill {
+  font-size: 8px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 20px;
+  background: var(--bg);
+  color: rgba(0,0,0,0.35);
+  border: 1px solid var(--border);
+}
+
+/* ── Signal rows ── */
+.signal-row {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border);
+}
+.signal-row:last-child { border-bottom: none; }
+.signal-icon {
+  width: 34px; height: 34px;
+  border-radius: 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+.signal-headline { font-size: 12px; font-weight: 700; color: var(--ink); letter-spacing: -0.2px; line-height: 1.35; margin-bottom: 4px; }
+.signal-context { font-size: 10.5px; color: #666; line-height: 1.55; margin-bottom: 8px; }
+.signal-footer { display: flex; align-items: center; gap: 8px; }
+.signal-source { font-size: 8.5px; font-weight: 700; color: rgba(0,0,0,0.22); letter-spacing: 0.5px; text-transform: uppercase; }
+.relevance-high { font-size: 8px; font-weight: 700; padding: 2px 7px; border-radius: 4px; background: rgba(200,245,90,0.18); color: #2d6a00; }
+.relevance-med { font-size: 8px; font-weight: 700; padding: 2px 7px; border-radius: 4px; background: #fffbeb; color: #92400e; }
+
+/* ── Geo cards ── */
+.geo-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.geo-card {
+  background: var(--white);
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.geo-flag { font-size: 22px; line-height: 1; }
+.geo-region { font-size: 12px; font-weight: 800; color: var(--ink); letter-spacing: -0.2px; }
+.geo-count { font-size: 9px; font-weight: 700; color: var(--muted); }
+.geo-people { display: flex; margin-top: 4px; }
+.geo-avatar {
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--lime);
+  font-size: 7px;
+  font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+  border: 2px solid var(--white);
+  margin-left: -5px;
+  flex-shrink: 0;
+}
+.geo-avatar:first-child { margin-left: 0; }
+.geo-avatar.lime { background: var(--lime); color: var(--ink); }
+.geo-avatar.warm { background: #f5e6c8; color: #7a4f1a; }
+.geo-avatar.sky { background: #dbeafe; color: #1d4ed8; }
+.geo-avatar.digi { background: var(--bg); border-style: dashed; color: #888; font-size: 10px; }
+
+/* ── Cluster card ── */
+.cluster-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.cluster-card {
+  background: var(--white);
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  padding: 18px;
+}
+.cluster-name { font-size: 13px; font-weight: 800; color: var(--ink); letter-spacing: -0.3px; margin-bottom: 8px; }
+.cluster-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 12px; }
+.cluster-people { font-size: 10px; color: var(--muted); font-weight: 600; display: flex; align-items: center; gap: 7px; }
+
+/* ── Connect strip ── */
+.connect-strip {
+  background: var(--ink);
+  border-radius: 14px;
+  padding: 26px 30px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.connect-title { font-size: 16px; font-weight: 800; color: var(--white); letter-spacing: -0.4px; }
+.connect-sub { font-size: 11.5px; color: rgba(255,255,255,0.38); margin-top: 4px; }
+.connect-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.connect-btn {
+  font-size: 9.5px;
+  font-weight: 700;
+  padding: 8px 14px;
+  border-radius: 7px;
+  cursor: pointer;
+  text-decoration: none;
+  letter-spacing: 0.2px;
+  border: 1px solid rgba(255,255,255,0.15);
+  color: rgba(255,255,255,0.6);
+  background: transparent;
+  transition: all 0.15s;
+}
+.connect-btn:hover { color: var(--white); border-color: rgba(255,255,255,0.4); }
+.connect-btn.lime { background: var(--lime); color: var(--black); border-color: var(--lime); }
+.connect-btn.lime:hover { background: #b8e44a; }
+
+/* ── Pill / type badge ── */
+.pill {
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 20px;
+}
+.pill.black { background: var(--ink); color: var(--white); }
+.pill.ghost { background: transparent; border: 1.5px solid var(--border); color: #888; }
+
+/* ── Responsive ── */
+@media (max-width: 1100px) {
+  .three-col { grid-template-columns: 1fr 1fr; }
+  .geo-grid { grid-template-columns: 1fr 1fr; }
+  .cluster-grid { grid-template-columns: 1fr 1fr; }
+  .two-col-32 { grid-template-columns: 1fr; }
+  .stats-row { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 700px) {
+  :root { --sidebar-w: 0px; }
+  .sidebar { display: none; }
+  .page-header { padding: 28px 24px 32px; }
+  .content { padding: 24px 20px 40px; }
+  .three-col, .geo-grid, .cluster-grid { grid-template-columns: 1fr; }
+  .tab-bar { padding: 0 20px 12px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════
+     SIDEBAR — white, collapsible groups
+════════════════════════════════════════════════ -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="sidebar-logo-inner">
+      <svg viewBox="0 0 108 50" fill="none" width="34" height="16">
+        <path d="M42 4 A21 21 0 1 0 42 46" stroke="#0e0e0e" stroke-width="10" stroke-linecap="butt"/>
+        <circle cx="84" cy="25" r="21" stroke="#0e0e0e" stroke-width="10"/>
+      </svg>
+      <div class="wordmark">
+        <span>common</span>
+        <span>house</span>
+      </div>
+    </div>
+  </div>
+
+  <nav>
+    <!-- Hall -->
+    <a href="hall-vitrina.html" class="nav-item">
+      <span class="nav-icon">◈</span> The Hall
+    </a>
+
+    <!-- Residents -->
+    <a href="residents-mockup.html" class="nav-item">
+      <span class="nav-icon">◉</span> Residents
+    </a>
+
+    <!-- Living Room — ACTIVE -->
+    <a href="#" class="nav-item active">
+      <span class="nav-icon">⌂</span> Living Room
+      <span class="nav-badge lime">New</span>
+    </a>
+
+    <!-- Portfolio group (collapsible) -->
+    <div class="nav-group collapsed" id="group-portfolio">
+      <div class="nav-group-header" onclick="toggleGroup('portfolio')">
+        <div class="nav-group-header-left">
+          <span class="nav-icon" style="font-size:13px;opacity:0.5;">◻</span>
+          <span>Portfolio</span>
+        </div>
+        <span class="nav-group-arrow">▾</span>
+      </div>
+      <div class="nav-group-items">
+        <a href="#" class="nav-sub-item">
+          <span class="nav-sub-icon">◻</span> Workrooms
+          <span class="nav-badge">3</span>
+        </a>
+        <a href="#" class="nav-sub-item">
+          <span class="nav-sub-icon">◧</span> Garage
+          <span class="nav-badge">5</span>
+        </a>
+      </div>
+    </div>
+
+    <!-- Commercial group (collapsible) -->
+    <div class="nav-group collapsed" id="group-commercial">
+      <div class="nav-group-header" onclick="toggleGroup('commercial')">
+        <div class="nav-group-header-left">
+          <span class="nav-icon" style="font-size:13px;opacity:0.5;">◇</span>
+          <span>Commercial</span>
+        </div>
+        <span class="nav-group-arrow">▾</span>
+      </div>
+      <div class="nav-group-items">
+        <a href="#" class="nav-sub-item">Pipeline</a>
+        <a href="#" class="nav-sub-item">Offers &amp; Proposals</a>
+        <a href="#" class="nav-sub-item">
+          Grants <span class="nav-badge red">2</span>
+        </a>
+      </div>
+    </div>
+
+    <!-- Desks group (collapsible) -->
+    <div class="nav-group collapsed" id="group-desks">
+      <div class="nav-group-header" onclick="toggleGroup('desks')">
+        <div class="nav-group-header-left">
+          <span class="nav-icon" style="font-size:13px;opacity:0.5;">◫</span>
+          <span>Desks</span>
+        </div>
+        <span class="nav-group-arrow">▾</span>
+      </div>
+      <div class="nav-group-items">
+        <a href="#" class="nav-sub-item">Design</a>
+        <a href="#" class="nav-sub-item">Comms</a>
+        <a href="#" class="nav-sub-item">Insights</a>
+        <a href="#" class="nav-sub-item">Grants</a>
+      </div>
+    </div>
+
+    <!-- Library -->
+    <a href="#" class="nav-item">
+      <span class="nav-icon">◑</span> Library
+    </a>
+
+    <!-- Control Room (collapsible) -->
+    <div class="nav-group collapsed" id="group-controlroom">
+      <div class="nav-group-header" onclick="toggleGroup('controlroom')">
+        <div class="nav-group-header-left">
+          <span class="nav-icon" style="font-size:13px;opacity:0.5;">◫</span>
+          <span>Control Room</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span class="nav-badge red">3</span>
+          <span class="nav-group-arrow">▾</span>
+        </div>
+      </div>
+      <div class="nav-group-items">
+        <a href="control-room.html" class="nav-sub-item">Overview</a>
+        <a href="#" class="nav-sub-item">Decisions <span class="nav-badge" style="margin-left:4px;">8</span></a>
+        <a href="#" class="nav-sub-item">Agents</a>
+        <a href="#" class="nav-sub-item">Content</a>
+        <a href="#" class="nav-sub-item">Insights</a>
+        <a href="#" class="nav-sub-item">Knowledge</a>
+        <a href="#" class="nav-sub-item">System Health</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="sidebar-footer">
+    <p>Common House OS v2 · Sprint 25</p>
+  </div>
+</aside>
+
+<!-- ═══════════════════════════════════════════════
+     MAIN
+════════════════════════════════════════════════ -->
+<div class="main">
+
+  <!-- Page header -->
+  <header class="page-header">
+    <p class="page-eyebrow">Community layer · Sprint 25 · April 2026</p>
+    <div class="page-header-row">
+      <div>
+        <h1 class="page-title">Living <em>Room</em></h1>
+        <p class="page-sub">How life moves inside the House. Members, expertise, themes in motion, and shared milestones — curated, not scrolled.</p>
+      </div>
+      <div class="header-stats">
+        <div class="header-stat">
+          <div class="header-stat-num">14</div>
+          <div class="header-stat-label">Members</div>
+        </div>
+        <div class="header-stat">
+          <div class="header-stat-num">6</div>
+          <div class="header-stat-label">Themes</div>
+        </div>
+        <div class="header-stat">
+          <div class="header-stat-num">3</div>
+          <div class="header-stat-label">Milestones</div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Tab bar -->
+  <div class="tab-bar">
+    <button class="tab-btn active">All</button>
+    <button class="tab-btn">Members</button>
+    <button class="tab-btn">Milestones</button>
+    <button class="tab-btn">Themes</button>
+    <button class="tab-btn">Signals</button>
+    <button class="tab-btn">Geography</button>
+  </div>
+
+  <!-- Content -->
+  <div class="content">
+
+    <!-- Stats row -->
+    <div class="stats-row">
+      <div class="stat-pill">
+        <div class="stat-label">Members active</div>
+        <div class="stat-value">14</div>
+        <div class="stat-sub">4 geographies · 6 expertise clusters</div>
+      </div>
+      <div class="stat-pill">
+        <div class="stat-label">Themes in motion</div>
+        <div class="stat-value lime">6</div>
+        <div class="stat-sub">4 active · 2 monitoring</div>
+      </div>
+      <div class="stat-pill">
+        <div class="stat-label">Shareable milestones</div>
+        <div class="stat-value">3</div>
+        <div class="stat-sub">2 public · 1 community</div>
+      </div>
+      <div class="stat-pill">
+        <div class="stat-label">Community signals</div>
+        <div class="stat-value" style="font-size:1.2rem;letter-spacing:-0.5px;">3 new</div>
+        <div class="stat-sub">Curated · this week</div>
+      </div>
+    </div>
+
+    <!-- Visibility legend -->
+    <div class="vis-legend" style="margin-bottom:32px;">
+      <span class="vis-legend-title">Visibility</span>
+      <div class="vis-legend-sep"></div>
+      <div class="vis-legend-item">
+        <span class="vis-badge public">Public</span> Safe to share externally
+      </div>
+      <div class="vis-legend-item">
+        <span class="vis-badge community">Community</span> Authenticated members only
+      </div>
+      <div class="vis-legend-item">
+        <span class="vis-badge private">Private</span> Never surfaced here
+      </div>
+    </div>
+
+    <!-- ───────────────────────────────────
+         MODULE A — Featured Members
+    ─────────────────────────────────── -->
+    <div class="module" id="mod-members">
+      <div class="module-header" onclick="toggleModule('mod-members')">
+        <span class="module-label">Featured Members</span>
+        <div class="module-line"></div>
+        <a href="residents-mockup.html" class="module-cta" onclick="event.stopPropagation()">Explore all →</a>
+        <span class="module-arrow">▾</span>
+      </div>
+      <div class="module-body">
+        <div class="two-col-32">
+
+          <!-- Members list in card -->
+          <div class="card">
+            <div class="card-header">
+              <div style="display:flex;align-items:center;gap:8px;">
+                <div class="card-icon" style="font-size:11px;">👥</div>
+                <span class="card-label">People in the House</span>
+              </div>
+              <span class="vis-badge public">Public</span>
+            </div>
+            <div class="card-body tight" style="padding:0 20px;">
+
+              <div class="member-row">
+                <div class="m-avatar lime">JM</div>
+                <div style="flex:1;min-width:0;">
+                  <div class="m-name">José Manuel</div>
+                  <div class="m-role">Co-founder · Strategy</div>
+                  <div class="m-geo">📍 LATAM / London</div>
+                </div>
+                <div class="m-tags">
+                  <span class="tag lime">Strategy</span>
+                  <span class="tag lime">Zero waste</span>
+                  <span class="tag">Retail</span>
+                </div>
+                <a href="residents-mockup.html" class="m-action primary">Profile →</a>
+              </div>
+
+              <div class="member-row">
+                <div class="m-avatar">SC</div>
+                <div style="flex:1;min-width:0;">
+                  <div class="m-name">Sofía Castro</div>
+                  <div class="m-role">Co-founder · Intelligence &amp; Policy</div>
+                  <div class="m-geo">📍 Madrid / Brussels</div>
+                </div>
+                <div class="m-tags">
+                  <span class="tag lime">Advocacy</span>
+                  <span class="tag">Policy</span>
+                  <span class="tag">EU</span>
+                </div>
+                <a href="residents-mockup.html" class="m-action">Profile →</a>
+              </div>
+
+              <div class="member-row">
+                <div class="m-avatar warm">CR</div>
+                <div style="flex:1;min-width:0;">
+                  <div class="m-name">Carlos Reyes</div>
+                  <div class="m-role">EIR · Retail &amp; Supply Chain</div>
+                  <div class="m-geo">📍 Mexico City</div>
+                </div>
+                <div class="m-tags">
+                  <span class="tag lime">Retail ops</span>
+                  <span class="tag">Pilots</span>
+                </div>
+                <a href="residents-mockup.html" class="m-action">Profile →</a>
+              </div>
+
+              <div class="member-row">
+                <div class="m-avatar sky">EF</div>
+                <div style="flex:1;min-width:0;">
+                  <div class="m-name">Elena Flores</div>
+                  <div class="m-role">EIR · Climate Finance</div>
+                  <div class="m-geo">📍 London</div>
+                </div>
+                <div class="m-tags">
+                  <span class="tag lime">Impact invest</span>
+                  <span class="tag">DFI</span>
+                </div>
+                <a href="residents-mockup.html" class="m-action">Profile →</a>
+              </div>
+
+              <div class="member-row">
+                <div class="m-avatar digital">⚡</div>
+                <div style="flex:1;min-width:0;">
+                  <div class="m-name" style="color:var(--muted);">os-runner</div>
+                  <div class="m-role">Digital resident · Full OS cadence</div>
+                  <div class="m-geo">Always on · 6 steps</div>
+                </div>
+                <div class="m-tags">
+                  <span class="tag">Digital</span>
+                </div>
+                <a href="residents-mockup.html" class="m-action">Residents →</a>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- Week panel -->
+          <div class="week-panel">
+            <div class="week-panel-title">What the House is moving · Week 15</div>
+
+            <div class="week-item">
+              <div class="week-dot"></div>
+              <div>
+                <div class="week-title">Retail Refill · UK Pilots</div>
+                <div class="week-desc">3 active conversations with major UK grocery chains. Co-op and Waitrose in focus this week.</div>
+              </div>
+            </div>
+
+            <div class="week-item">
+              <div class="week-dot"></div>
+              <div>
+                <div class="week-title">Grant landscape · Q2 2026</div>
+                <div class="week-desc">SUFI and Fair4All decisions expected before Apr 21. Two new EU funder opportunities flagged.</div>
+              </div>
+            </div>
+
+            <div class="week-item">
+              <div class="week-dot"></div>
+              <div>
+                <div class="week-title">EU Packaging Regulation</div>
+                <div class="week-desc">New draft published. Relevant for 4 portfolio startups and 2 active client projects.</div>
+              </div>
+            </div>
+
+            <a href="#" class="week-footer-btn">See all themes →</a>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- ───────────────────────────────────
+         MODULE B — Shareable Milestones
+    ─────────────────────────────────── -->
+    <div class="module" id="mod-milestones">
+      <div class="module-header" onclick="toggleModule('mod-milestones')">
+        <span class="module-label">Shareable Milestones</span>
+        <div class="module-line"></div>
+        <span class="module-count">3 recent</span>
+        <a href="#" class="module-cta" style="margin-left:12px;" onclick="event.stopPropagation()">View all →</a>
+        <span class="module-arrow">▾</span>
+      </div>
+      <div class="module-body">
+        <div class="card">
+          <div class="card-header">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <div class="card-icon lime" style="font-size:11px;">🏆</div>
+              <span class="card-label">Recent highlights</span>
+            </div>
+          </div>
+          <div class="card-body tight" style="padding:0 20px;">
+
+            <div class="milestone-row">
+              <div class="ms-dot-col">
+                <div class="ms-dot lime"></div>
+                <div class="ms-line"></div>
+              </div>
+              <div class="ms-body">
+                <div class="ms-type">Pilot milestone</div>
+                <div class="ms-headline">Greenleaf Retail signs first refill pilot agreement with regional grocery chain</div>
+                <div class="ms-context">After 8 months of preparation, Greenleaf's refill-as-a-service model enters pilot phase. CH supported strategy and investor narrative throughout.</div>
+                <div class="ms-footer">
+                  <div class="ms-who">
+                    <div class="ms-avatar">GL</div>
+                    <span class="ms-who-name">Greenleaf Retail</span>
+                  </div>
+                  <span class="ms-share-pill">Shareable</span>
+                  <span class="vis-badge public">Public</span>
+                  <span class="ms-date">Apr 10</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="milestone-row">
+              <div class="ms-dot-col">
+                <div class="ms-dot amber"></div>
+                <div class="ms-line"></div>
+              </div>
+              <div class="ms-body">
+                <div class="ms-type">Grant win</div>
+                <div class="ms-headline">Portfolio startup secures £180k circular economy grant from UK funder</div>
+                <div class="ms-context">First significant grant for a CH-supported startup in Q1 2026. Opens the door for second-round applications in the same funder track.</div>
+                <div class="ms-footer">
+                  <div class="ms-who">
+                    <div class="ms-avatar" style="background:#f5e6c8;color:#7a4f1a;">CH</div>
+                    <span class="ms-who-name">CH Portfolio</span>
+                  </div>
+                  <span class="vis-badge community">Community</span>
+                  <span class="ms-date">Apr 8</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="milestone-row">
+              <div class="ms-dot-col">
+                <div class="ms-dot teal"></div>
+              </div>
+              <div class="ms-body">
+                <div class="ms-type">Speaking engagement</div>
+                <div class="ms-headline">Sofía Castro speaks at EU Circular Economy Forum — policy session, Brussels</div>
+                <div class="ms-context">Policy brief co-authored with CH intelligence layer. Connected with 3 relevant funders and 2 academic partners during the event.</div>
+                <div class="ms-footer">
+                  <div class="ms-who">
+                    <div class="ms-avatar">SC</div>
+                    <span class="ms-who-name">Sofía Castro</span>
+                  </div>
+                  <span class="ms-share-pill">Shareable</span>
+                  <span class="vis-badge public">Public</span>
+                  <span class="ms-date">Apr 5</span>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ───────────────────────────────────
+         MODULE C — Themes in Motion
+    ─────────────────────────────────── -->
+    <div class="module" id="mod-themes">
+      <div class="module-header" onclick="toggleModule('mod-themes')">
+        <span class="module-label">Themes in Motion</span>
+        <div class="module-line"></div>
+        <span class="module-count">6 active</span>
+        <a href="#" class="module-cta" style="margin-left:12px;" onclick="event.stopPropagation()">Explore →</a>
+        <span class="module-arrow">▾</span>
+      </div>
+      <div class="module-body">
+        <div class="three-col">
+
+          <div class="theme-card">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
+              <div class="theme-name">Retail Refill Implementation</div>
+              <span class="vis-badge public">Public</span>
+            </div>
+            <div class="theme-desc">UK grocery chains moving toward refill formats. Active pipeline with 5 major retailers. Pilot design and partnership strategy in progress.</div>
+            <div class="theme-tags">
+              <span class="tag lime">Retail</span>
+              <span class="tag">UK</span>
+              <span class="tag">Circular</span>
+            </div>
+            <div class="theme-meta">
+              <span class="pulse-pill">● Active</span>
+              <span class="theme-count">5 opportunities · 3 members</span>
+            </div>
+          </div>
+
+          <div class="theme-card">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
+              <div class="theme-name">EU Packaging Regulation</div>
+              <span class="vis-badge public">Public</span>
+            </div>
+            <div class="theme-desc">New EU packaging and packaging waste regulation draft creates urgency for FMCG brands and retailers. Advocacy and advisory window open.</div>
+            <div class="theme-tags">
+              <span class="tag lime">Policy</span>
+              <span class="tag">EU</span>
+              <span class="tag">FMCG</span>
+            </div>
+            <div class="theme-meta">
+              <span class="pulse-pill">● Active</span>
+              <span class="theme-count">2 briefs · 2 members</span>
+            </div>
+          </div>
+
+          <div class="theme-card">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
+              <div class="theme-name">Startup Fundraising Q2</div>
+              <span class="vis-badge community">Community</span>
+            </div>
+            <div class="theme-desc">Three portfolio startups in active raise. Grant landscape and impact investor pipeline being mapped for intersecting opportunities.</div>
+            <div class="theme-tags">
+              <span class="tag">Fundraising</span>
+              <span class="tag">Startups</span>
+              <span class="tag">Impact</span>
+            </div>
+            <div class="theme-meta">
+              <span class="pulse-pill">● Active</span>
+              <span class="theme-count">3 startups · 4 members</span>
+            </div>
+          </div>
+
+          <div class="theme-card">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
+              <div class="theme-name">Zero Waste Cities</div>
+              <span class="vis-badge public">Public</span>
+            </div>
+            <div class="theme-desc">Urban circular economy initiatives gaining traction in UK and Spain. Intersection of policy, community infrastructure, and procurement.</div>
+            <div class="theme-tags">
+              <span class="tag lime">Zero waste</span>
+              <span class="tag">Urban</span>
+              <span class="tag">Policy</span>
+            </div>
+            <div class="theme-meta">
+              <span class="monitor-pill">Monitoring</span>
+              <span class="theme-count">1 brief · 2 members</span>
+            </div>
+          </div>
+
+          <div class="theme-card">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
+              <div class="theme-name">Climate / Waste Intersections</div>
+              <span class="vis-badge public">Public</span>
+            </div>
+            <div class="theme-desc">Funders increasingly connecting climate action with waste reduction. New angles for grant narrative and investor positioning.</div>
+            <div class="theme-tags">
+              <span class="tag">Climate</span>
+              <span class="tag">Grants</span>
+              <span class="tag">Narrative</span>
+            </div>
+            <div class="theme-meta">
+              <span class="monitor-pill">Monitoring</span>
+              <span class="theme-count">3 briefs · 3 members</span>
+            </div>
+          </div>
+
+          <div class="theme-card">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
+              <div class="theme-name">LATAM Retail &amp; Sustainable Ops</div>
+              <span class="vis-badge public">Public</span>
+            </div>
+            <div class="theme-desc">Growing market interest in sustainable retail operations in Mexico, Colombia, and Costa Rica. Active project pipeline in the region.</div>
+            <div class="theme-tags">
+              <span class="tag lime">LATAM</span>
+              <span class="tag">Retail</span>
+              <span class="tag">Ops</span>
+            </div>
+            <div class="theme-meta">
+              <span class="pulse-pill">● Active</span>
+              <span class="theme-count">2 projects · 2 members</span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- ───────────────────────────────────
+         MODULE D — Community Signals
+    ─────────────────────────────────── -->
+    <div class="module" id="mod-signals">
+      <div class="module-header" onclick="toggleModule('mod-signals')">
+        <span class="module-label">Community Signals</span>
+        <div class="module-line"></div>
+        <span class="module-count">Curated · this week</span>
+        <a href="#" class="module-cta" style="margin-left:12px;" onclick="event.stopPropagation()">All signals →</a>
+        <span class="module-arrow">▾</span>
+      </div>
+      <div class="module-body">
+        <div class="card">
+          <div class="card-body tight" style="padding:0 20px;">
+
+            <div class="signal-row">
+              <div class="signal-icon">📋</div>
+              <div>
+                <div class="signal-headline">UK government confirms extended producer responsibility scheme scope — packaging update</div>
+                <div class="signal-context">Direct implications for FMCG clients and retail partners in CH portfolio. EPR fees confirmed for 2026. Advocacy window is closing.</div>
+                <div class="signal-footer">
+                  <span class="signal-source">Gov.uk · Policy</span>
+                  <span class="relevance-high">High relevance</span>
+                  <span class="vis-badge public">Public</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="signal-row">
+              <div class="signal-icon">🌍</div>
+              <div>
+                <div class="signal-headline">Esmée Fairbairn Foundation opens next round — zero waste and community focus</div>
+                <div class="signal-context">Timing aligns with 2 active portfolio startups. Fit score assessment underway in Grants desk. Application window: 6 weeks.</div>
+                <div class="signal-footer">
+                  <span class="signal-source">Funder radar · Grants</span>
+                  <span class="relevance-high">High relevance</span>
+                  <span class="vis-badge community">Community</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="signal-row">
+              <div class="signal-icon">📰</div>
+              <div>
+                <div class="signal-headline">Waitrose announces £20M sustainability supplier fund — circular packaging priority</div>
+                <div class="signal-context">Retail partner context for Retail Refill opportunity. Useful context for Co-op and Waitrose conversations currently in motion.</div>
+                <div class="signal-footer">
+                  <span class="signal-source">Retail sector · Comms</span>
+                  <span class="relevance-med">Medium relevance</span>
+                  <span class="vis-badge public">Public</span>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ───────────────────────────────────
+         MODULE E — People by Geography
+    ─────────────────────────────────── -->
+    <div class="module" id="mod-geo">
+      <div class="module-header" onclick="toggleModule('mod-geo')">
+        <span class="module-label">People by Geography</span>
+        <div class="module-line"></div>
+        <a href="residents-mockup.html" class="module-cta" onclick="event.stopPropagation()">Explore →</a>
+        <span class="module-arrow">▾</span>
+      </div>
+      <div class="module-body">
+        <div class="geo-grid">
+
+          <div class="geo-card">
+            <div class="geo-flag">🇬🇧</div>
+            <div class="geo-region">London / UK</div>
+            <div class="geo-count">5 members</div>
+            <div class="geo-people">
+              <div class="geo-avatar">SC</div>
+              <div class="geo-avatar sky">EF</div>
+              <div class="geo-avatar">AP</div>
+              <div class="geo-avatar">LG</div>
+              <div class="geo-avatar digi">⚡</div>
+            </div>
+          </div>
+
+          <div class="geo-card">
+            <div class="geo-flag">🇲🇽</div>
+            <div class="geo-region">Mexico / LATAM</div>
+            <div class="geo-count">4 members</div>
+            <div class="geo-people">
+              <div class="geo-avatar lime">JM</div>
+              <div class="geo-avatar warm">CR</div>
+              <div class="geo-avatar sky">ML</div>
+              <div class="geo-avatar digi">📊</div>
+            </div>
+          </div>
+
+          <div class="geo-card">
+            <div class="geo-flag">🇪🇸</div>
+            <div class="geo-region">Spain / EU</div>
+            <div class="geo-count">3 members</div>
+            <div class="geo-people">
+              <div class="geo-avatar">PR</div>
+              <div class="geo-avatar warm">IA</div>
+              <div class="geo-avatar digi">🔍</div>
+            </div>
+          </div>
+
+          <div class="geo-card">
+            <div class="geo-flag">🇨🇷</div>
+            <div class="geo-region">Costa Rica</div>
+            <div class="geo-count">2 members</div>
+            <div class="geo-people">
+              <div class="geo-avatar">NV</div>
+              <div class="geo-avatar digi">⚡</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- ───────────────────────────────────
+         MODULE F — Expertise Clusters
+    ─────────────────────────────────── -->
+    <div class="module" id="mod-clusters">
+      <div class="module-header" onclick="toggleModule('mod-clusters')">
+        <span class="module-label">Expertise Clusters</span>
+        <div class="module-line"></div>
+        <a href="residents-mockup.html" class="module-cta" onclick="event.stopPropagation()">See Residents →</a>
+        <span class="module-arrow">▾</span>
+      </div>
+      <div class="module-body">
+        <div class="cluster-grid">
+
+          <div class="cluster-card">
+            <div class="cluster-name">Strategy &amp; Operations</div>
+            <div class="cluster-tags">
+              <span class="tag lime">Zero waste ops</span>
+              <span class="tag lime">Project mgmt</span>
+              <span class="tag">Retail strategy</span>
+              <span class="tag">Change mgmt</span>
+            </div>
+            <div class="cluster-people">
+              <div style="display:flex;">
+                <div class="geo-avatar lime" style="width:22px;height:22px;font-size:7.5px;border:2px solid var(--white);">JM</div>
+                <div class="geo-avatar warm" style="width:22px;height:22px;font-size:7.5px;border:2px solid var(--white);margin-left:-5px;">CR</div>
+              </div>
+              <span>2 residents · 3 active projects</span>
+            </div>
+          </div>
+
+          <div class="cluster-card">
+            <div class="cluster-name">Intelligence &amp; Policy</div>
+            <div class="cluster-tags">
+              <span class="tag lime">Advocacy</span>
+              <span class="tag lime">Policy</span>
+              <span class="tag">Grant intel</span>
+              <span class="tag">EU affairs</span>
+            </div>
+            <div class="cluster-people">
+              <div style="display:flex;">
+                <div class="geo-avatar" style="width:22px;height:22px;font-size:7.5px;border:2px solid var(--white);">SC</div>
+              </div>
+              <span>1 resident · 5 briefs produced</span>
+            </div>
+          </div>
+
+          <div class="cluster-card">
+            <div class="cluster-name">Climate Finance &amp; Funding</div>
+            <div class="cluster-tags">
+              <span class="tag lime">Impact invest</span>
+              <span class="tag">Grants</span>
+              <span class="tag">DFI</span>
+              <span class="tag">Fundraising</span>
+            </div>
+            <div class="cluster-people">
+              <div style="display:flex;">
+                <div class="geo-avatar sky" style="width:22px;height:22px;font-size:7.5px;border:2px solid var(--white);">EF</div>
+              </div>
+              <span>1 EIR · 10 funder relationships</span>
+            </div>
+          </div>
+
+          <div class="cluster-card">
+            <div class="cluster-name">Design &amp; Comms</div>
+            <div class="cluster-tags">
+              <span class="tag">Brand</span>
+              <span class="tag">Decks</span>
+              <span class="tag">Narrative</span>
+              <span class="tag">Visual system</span>
+            </div>
+            <div class="cluster-people">
+              <div style="display:flex;">
+                <div class="geo-avatar" style="background:#dbeafe;color:#1d4ed8;width:22px;height:22px;font-size:7.5px;border:2px solid var(--white);">AP</div>
+              </div>
+              <span>1 resident · 7 outputs in pipeline</span>
+            </div>
+          </div>
+
+          <div class="cluster-card">
+            <div class="cluster-name">Digital Intelligence Layer</div>
+            <div class="cluster-tags">
+              <span class="tag">Evidence analysis</span>
+              <span class="tag">Grant scanning</span>
+              <span class="tag">Insight briefs</span>
+              <span class="tag">Automation</span>
+            </div>
+            <div class="cluster-people">
+              <div style="display:flex;">
+                <div class="geo-avatar digi" style="width:22px;height:22px;font-size:10px;border:2px solid var(--white);">⚡</div>
+                <div class="geo-avatar digi" style="width:22px;height:22px;font-size:10px;border:2px solid var(--white);margin-left:-5px;">🔍</div>
+              </div>
+              <span>6 digital residents · always on</span>
+            </div>
+          </div>
+
+          <div class="cluster-card">
+            <div class="cluster-name">Retail &amp; Supply Chain</div>
+            <div class="cluster-tags">
+              <span class="tag lime">Retail ops</span>
+              <span class="tag">Supply chain</span>
+              <span class="tag">Pilots</span>
+              <span class="tag">LATAM</span>
+            </div>
+            <div class="cluster-people">
+              <div style="display:flex;">
+                <div class="geo-avatar warm" style="width:22px;height:22px;font-size:7.5px;border:2px solid var(--white);">CR</div>
+              </div>
+              <span>1 EIR · 3 pilot engagements</span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- ───────────────────────────────────
+         MODULE G — Ways to Connect
+    ─────────────────────────────────── -->
+    <div class="connect-strip">
+      <div>
+        <div class="connect-title">Ways to connect through the House</div>
+        <div class="connect-sub">Explore members, discover shared themes, or find who's working on what you care about.</div>
+      </div>
+      <div class="connect-actions">
+        <a href="residents-mockup.html" class="connect-btn lime">Explore members →</a>
+        <a href="#" class="connect-btn">See who's working on retail</a>
+        <a href="#" class="connect-btn">Explore themes</a>
+        <a href="#" class="connect-btn">View milestones</a>
+        <a href="#" class="connect-btn">See expertise map</a>
+        <a href="hall-vitrina.html" class="connect-btn">Request a conversation</a>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /main -->
+
+<script>
+// Toggle nav groups
+function toggleGroup(id) {
+  const group = document.getElementById('group-' + id);
+  if (group) group.classList.toggle('collapsed');
+}
+
+// Toggle content modules
+function toggleModule(id) {
+  const mod = document.getElementById(id);
+  if (mod) mod.classList.toggle('collapsed');
+}
+
+// Tab switching (visual only)
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  });
+});
+</script>
+
+</body>
+</html>
