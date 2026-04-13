@@ -13,7 +13,6 @@ export const ADMIN_NAV = [
 
   // ── Commercial ────────────────────────────────────────────────────────────
   { label: "Pipeline",            href: "/admin/pipeline",       icon: "◉", section: "Commercial" },
-  { label: "Offers & Proposals",  href: "/admin/offers",         icon: "◫", section: "Commercial" },
   { label: "Deal Flow",           href: "/admin/deal-flow",      icon: "⬡", section: "Commercial" },
   { label: "Grants",              href: "/admin/grants",         icon: "◐", section: "Commercial" },
 
@@ -21,6 +20,7 @@ export const ADMIN_NAV = [
   { label: "Design",              href: "/admin/design",         icon: "◑", section: "Desks" },
   { label: "Comms",               href: "/admin/comms",          icon: "◒", section: "Desks" },
   { label: "Insights",            href: "/admin/insights",       icon: "◓", section: "Desks" },
+  { label: "Offers & Proposals",  href: "/admin/offers",         icon: "◫", section: "Desks" },
 
   // ── Control Room ──────────────────────────────────────────────────────────
   { label: "Decisions",           href: "/admin/decisions",      icon: "✓", section: "Control Room" },

@@ -50,18 +50,18 @@ export const ADMIN_NAV_V2: NavEntry[] = [
   {
     kind: "group", label: "Commercial", icon: "◉",
     items: [
-      { label: "Pipeline",           href: "/admin/pipeline" },
-      { label: "Offers & Proposals", href: "/admin/offers" },
-      { label: "Deal Flow",          href: "/admin/deal-flow" },
-      { label: "Grants",             href: "/admin/grants" },
+      { label: "Pipeline",  href: "/admin/pipeline" },
+      { label: "Deal Flow", href: "/admin/deal-flow" },
+      { label: "Grants",    href: "/admin/grants" },
     ],
   },
   {
     kind: "group", label: "Desks", icon: "◒",
     items: [
-      { label: "Design",   href: "/admin/design" },
-      { label: "Comms",    href: "/admin/comms" },
-      { label: "Insights", href: "/admin/insights" },
+      { label: "Design",             href: "/admin/design" },
+      { label: "Comms",              href: "/admin/comms" },
+      { label: "Insights",           href: "/admin/insights" },
+      { label: "Offers & Proposals", href: "/admin/offers" },
     ],
   },
   { kind: "link",  label: "Library",      href: "/library",       icon: "▤" },
