@@ -1,0 +1,1894 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Common House — The Hall</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,700;1,800;1,900&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --lime: #c8f55a;
+  --black: #000000;
+  --white: #ffffff;
+  --ink: #0e0e0e;
+  --muted: #6b6b6b;
+  --border: #d8d8d0;
+  --bg: #eeeee8;
+  --max: 1100px;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: 'Inter', -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: #ccc; border-radius: 2px; }
+
+/* ══════════════════════════════════════
+   TOP NAV
+══════════════════════════════════════ */
+.topnav {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 100;
+  background: var(--black);
+  height: 60px;
+  display: flex;
+  align-items: center;
+  padding: 0 48px;
+  gap: 0;
+}
+.topnav-logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  flex-shrink: 0;
+}
+.co-mark svg { display: block; }
+.wordmark {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+.wordmark span {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--white);
+  letter-spacing: 0.3px;
+}
+.topnav-links {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  margin-left: auto;
+}
+.topnav-links a {
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255,255,255,0.45);
+  text-decoration: none;
+  letter-spacing: 0.2px;
+  transition: color 0.15s;
+}
+.topnav-links a:hover { color: rgba(255,255,255,0.85); }
+.btn-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--lime);
+  color: var(--black);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  margin-left: 28px;
+  flex-shrink: 0;
+}
+.btn-nav:hover { opacity: 0.88; }
+
+/* ══════════════════════════════════════
+   SHARED SECTION STYLES
+══════════════════════════════════════ */
+.section { width: 100%; }
+.section-inner {
+  max-width: var(--max);
+  margin: 0 auto;
+  padding: 96px 48px;
+}
+.section-bar {
+  background: var(--lime);
+  padding: 11px 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.section-bar-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--black);
+}
+.section-num {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--black);
+  letter-spacing: 1px;
+  font-variant-numeric: tabular-nums;
+}
+.eyebrow {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 18px;
+}
+.eyebrow.light { color: rgba(255,255,255,0.3); }
+.eyebrow.lime { color: var(--lime); }
+.section-title {
+  font-size: clamp(2rem, 4vw, 3.2rem);
+  font-weight: 300;
+  color: var(--ink);
+  letter-spacing: -1.5px;
+  line-height: 1.05;
+}
+.section-title em { font-weight: 900; font-style: italic; }
+.section-title.white { color: var(--white); }
+.section-sub {
+  font-size: 15px;
+  color: var(--muted);
+  line-height: 1.7;
+  max-width: 520px;
+  margin-top: 16px;
+  font-weight: 400;
+}
+.section-sub.white { color: rgba(255,255,255,0.5); }
+hr.section-rule { border: none; border-top: 1px solid var(--border); margin: 48px 0; }
+hr.section-rule.dark { border-top-color: rgba(255,255,255,0.08); }
+
+/* ══════════════════════════════════════
+   01. HERO
+══════════════════════════════════════ */
+.hero {
+  background: var(--black);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding-top: 60px; /* nav height */
+}
+.hero-inner {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  max-width: var(--max);
+  margin: 0 auto;
+  width: 100%;
+  padding: 64px 48px 80px;
+}
+.hero-headline {
+  font-size: clamp(3.5rem, 9vw, 8.5rem);
+  font-weight: 300;
+  color: var(--white);
+  letter-spacing: -4px;
+  line-height: 0.9;
+  margin-bottom: 36px;
+}
+.hero-headline em {
+  font-weight: 900;
+  font-style: italic;
+  color: var(--lime);
+}
+.hero-bottom {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 40px;
+  flex-wrap: wrap;
+}
+.hero-tagline {
+  font-size: 16px;
+  color: rgba(255,255,255,0.45);
+  line-height: 1.65;
+  max-width: 420px;
+  font-weight: 400;
+}
+.hero-ctas {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+.btn-hero-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--lime);
+  color: var(--black);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  padding: 13px 22px;
+  border-radius: 8px;
+  text-decoration: none;
+}
+.btn-hero-primary:hover { opacity: 0.88; }
+.btn-hero-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: transparent;
+  color: rgba(255,255,255,0.5);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 13px 22px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.12);
+  text-decoration: none;
+}
+.btn-hero-ghost:hover { color: rgba(255,255,255,0.85); border-color: rgba(255,255,255,0.3); }
+.hero-scroll-hint {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.15);
+  margin-top: 64px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.hero-scroll-hint::before {
+  content: '';
+  display: block;
+  width: 32px;
+  height: 1px;
+  background: rgba(255,255,255,0.12);
+}
+
+/* ══════════════════════════════════════
+   02. CAPABILITIES
+══════════════════════════════════════ */
+.capabilities-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0;
+  margin-top: 56px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--white);
+}
+.cap-card {
+  padding: 28px 24px 32px;
+  border-right: 1px solid var(--border);
+  transition: background 0.2s;
+}
+.cap-card:last-child { border-right: none; }
+.cap-card:hover { background: #f9f9f6; }
+.cap-icon {
+  width: 36px; height: 36px;
+  border-radius: 10px;
+  background: var(--black);
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 18px;
+}
+.cap-icon.lime { background: var(--lime); }
+.cap-name {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--ink);
+  letter-spacing: -0.3px;
+  margin-bottom: 8px;
+}
+.cap-desc {
+  font-size: 11.5px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+.cap-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 14px;
+}
+.cap-tag {
+  font-size: 9.5px;
+  font-weight: 600;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 2px 8px;
+  letter-spacing: 0.2px;
+}
+
+/* ══════════════════════════════════════
+   03. RESIDENTS PREVIEW
+══════════════════════════════════════ */
+.residents-section { background: var(--black); }
+.residents-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 48px;
+  flex-wrap: wrap;
+}
+.residents-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+.resident-card {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 14px;
+  padding: 22px;
+  transition: background 0.2s, border-color 0.2s;
+}
+.resident-card:hover {
+  background: rgba(255,255,255,0.07);
+  border-color: rgba(200,245,90,0.25);
+}
+.resident-avatar {
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  background: var(--lime);
+  color: var(--black);
+  font-size: 13px;
+  font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 14px;
+  letter-spacing: -0.5px;
+}
+.resident-avatar.digital {
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.12);
+}
+.resident-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--white);
+  margin-bottom: 3px;
+  letter-spacing: -0.2px;
+}
+.resident-role {
+  font-size: 10.5px;
+  color: rgba(255,255,255,0.35);
+  font-weight: 500;
+  margin-bottom: 12px;
+}
+.resident-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.resident-tag {
+  font-size: 9px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.3);
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 20px;
+  padding: 2px 7px;
+  letter-spacing: 0.3px;
+}
+.resident-tag.lime { color: var(--lime); background: rgba(200,245,90,0.07); border-color: rgba(200,245,90,0.2); }
+.btn-ghost-white {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: transparent;
+  color: rgba(255,255,255,0.6);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 10px 18px;
+  border-radius: 7px;
+  border: 1px solid rgba(255,255,255,0.15);
+  text-decoration: none;
+  flex-shrink: 0;
+  letter-spacing: 0.2px;
+}
+.btn-ghost-white:hover { color: white; border-color: rgba(255,255,255,0.4); }
+.digital-row {
+  margin-top: 24px;
+  padding: 20px 24px;
+  background: rgba(200,245,90,0.05);
+  border: 1px solid rgba(200,245,90,0.15);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.digital-row-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.digital-row-icon {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  background: rgba(200,245,90,0.12);
+  border: 1px solid rgba(200,245,90,0.25);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.digital-row-text {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.6);
+}
+.digital-row-text strong { color: var(--lime); font-weight: 700; }
+.digital-row-agents {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.agent-pill {
+  font-size: 9.5px;
+  font-weight: 600;
+  color: rgba(200,245,90,0.6);
+  background: rgba(200,245,90,0.06);
+  border: 1px solid rgba(200,245,90,0.15);
+  border-radius: 20px;
+  padding: 3px 10px;
+  letter-spacing: 0.3px;
+}
+
+/* ══════════════════════════════════════
+   04. THE DESKS (Section Entry UX)
+══════════════════════════════════════ */
+.desks-section { background: var(--bg); }
+.desks-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 16px;
+  margin-top: 52px;
+}
+.desk-card {
+  background: var(--white);
+  border: 1.5px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: border-color 0.2s, transform 0.15s;
+}
+.desk-card:hover { border-color: var(--ink); transform: translateY(-2px); }
+.desk-card.featured {
+  border-color: var(--black);
+  grid-row: span 1;
+}
+.desk-header {
+  padding: 22px 22px 18px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+.desk-icon {
+  width: 38px; height: 38px;
+  border-radius: 10px;
+  background: var(--black);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.desk-icon.lime { background: var(--lime); }
+.desk-icon.green { background: #2d5a1b; }
+.desk-name {
+  font-size: 15px;
+  font-weight: 900;
+  color: var(--ink);
+  letter-spacing: -0.5px;
+  margin-top: 2px;
+}
+.desk-tagline {
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 500;
+  margin-top: 3px;
+}
+.desk-body { padding: 18px 22px 22px; flex: 1; display: flex; flex-direction: column; }
+.desk-offers-label {
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: rgba(0,0,0,0.2);
+  margin-bottom: 10px;
+}
+.desk-offers {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+.desk-offer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.desk-offer::before {
+  content: '';
+  width: 4px; height: 4px;
+  border-radius: 50%;
+  background: var(--lime);
+  flex-shrink: 0;
+}
+.desk-cta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.btn-desk {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--black);
+  color: var(--white);
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 9px 14px;
+  border-radius: 7px;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  letter-spacing: 0.2px;
+}
+.btn-desk:hover { background: #222; }
+.btn-desk.lime { background: var(--lime); color: var(--black); }
+.btn-desk.lime:hover { opacity: 0.88; }
+.desk-systems {
+  font-size: 9px;
+  color: rgba(0,0,0,0.2);
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+/* Desk form (expanded request) */
+.desk-form {
+  border-top: 1px solid var(--border);
+  padding: 18px 22px;
+  background: #f9f9f6;
+}
+.desk-form-label {
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: rgba(0,0,0,0.25);
+  margin-bottom: 8px;
+}
+.desk-form-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.form-pill {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--ink);
+  background: var(--white);
+  border: 1.5px solid var(--border);
+  border-radius: 20px;
+  padding: 5px 12px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.form-pill:hover, .form-pill.active {
+  border-color: var(--black);
+  background: var(--black);
+  color: var(--white);
+}
+.form-pill.active-lime {
+  border-color: var(--lime);
+  background: var(--lime);
+  color: var(--black);
+}
+
+/* ══════════════════════════════════════
+   05. WHAT CLIENTS UNLOCK
+══════════════════════════════════════ */
+.unlock-section { background: var(--black); }
+.unlock-grid {
+  display: grid;
+  grid-template-columns: 1fr 1px 1fr 1px 1fr;
+  margin-top: 52px;
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 16px;
+  overflow: hidden;
+}
+.unlock-divider { background: rgba(255,255,255,0.07); }
+.unlock-item { padding: 32px 28px; }
+.unlock-num {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  color: var(--lime);
+  margin-bottom: 14px;
+  font-variant-numeric: tabular-nums;
+}
+.unlock-title {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--white);
+  letter-spacing: -0.4px;
+  margin-bottom: 10px;
+  line-height: 1.3;
+}
+.unlock-desc {
+  font-size: 12px;
+  color: rgba(255,255,255,0.4);
+  line-height: 1.65;
+}
+.unlock-items {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.unlock-bullet {
+  font-size: 11px;
+  color: rgba(255,255,255,0.35);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.unlock-bullet::before {
+  content: '';
+  width: 3px; height: 3px;
+  border-radius: 50%;
+  background: var(--lime);
+  flex-shrink: 0;
+}
+
+/* ══════════════════════════════════════
+   06. WORKROOM PREVIEW
+══════════════════════════════════════ */
+.workroom-section { background: var(--bg); }
+.workroom-preview {
+  margin-top: 48px;
+  border: 1.5px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--white);
+  position: relative;
+}
+.workroom-header-bar {
+  background: var(--black);
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.workroom-dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,0.15); }
+.workroom-breadcrumb {
+  font-size: 10px;
+  font-weight: 500;
+  color: rgba(255,255,255,0.3);
+  letter-spacing: 0.5px;
+}
+.workroom-breadcrumb span { color: rgba(255,255,255,0.55); }
+.workroom-body {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  min-height: 340px;
+}
+.workroom-sidebar {
+  background: #f5f5f2;
+  border-right: 1px solid var(--border);
+  padding: 20px 16px;
+}
+.workroom-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 7px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #888;
+  margin-bottom: 2px;
+  cursor: default;
+}
+.workroom-nav-item.active {
+  background: var(--black);
+  color: var(--lime);
+}
+.workroom-content { padding: 24px 28px; }
+.workroom-content-title {
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: -0.5px;
+  color: var(--ink);
+  margin-bottom: 4px;
+}
+.workroom-content-sub {
+  font-size: 10.5px;
+  color: var(--muted);
+  margin-bottom: 20px;
+}
+.workroom-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.wk-card {
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  background: var(--bg);
+}
+.wk-card-label {
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: rgba(0,0,0,0.2);
+  margin-bottom: 6px;
+}
+.wk-card-val {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1.4;
+}
+.workroom-blur-overlay {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 120px;
+  background: linear-gradient(to bottom, transparent, rgba(238,238,232,0.96));
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 24px;
+}
+.btn-unlock {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--black);
+  color: var(--white);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 10px 20px;
+  border-radius: 8px;
+  text-decoration: none;
+  letter-spacing: 0.3px;
+}
+
+/* ══════════════════════════════════════
+   07. SAMPLE OUTPUTS
+══════════════════════════════════════ */
+.outputs-section { background: var(--white); }
+.outputs-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-top: 52px;
+}
+.output-card {
+  border: 1.5px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--bg);
+  transition: border-color 0.2s;
+}
+.output-card:hover { border-color: #aaa; }
+.output-thumb {
+  height: 120px;
+  background: var(--black);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  position: relative;
+}
+.output-thumb.lime { background: var(--lime); }
+.output-thumb.offwhite { background: var(--bg); border-bottom: 1px solid var(--border); }
+.output-thumb-title {
+  font-size: 22px;
+  font-weight: 900;
+  font-style: italic;
+  color: rgba(255,255,255,0.15);
+  letter-spacing: -1px;
+  line-height: 1;
+  text-align: center;
+}
+.output-thumb.lime .output-thumb-title { color: rgba(0,0,0,0.12); }
+.output-thumb-num {
+  position: absolute;
+  bottom: 12px;
+  right: 16px;
+  font-size: 10px;
+  font-weight: 800;
+  color: rgba(255,255,255,0.12);
+  letter-spacing: 1px;
+  font-variant-numeric: tabular-nums;
+}
+.output-body { padding: 16px 18px 18px; }
+.output-type {
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.output-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1.3;
+  letter-spacing: -0.3px;
+  margin-bottom: 6px;
+}
+.output-desc { font-size: 11px; color: var(--muted); line-height: 1.5; }
+.output-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+}
+.output-desk-pill {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--muted);
+  background: rgba(0,0,0,0.05);
+  border-radius: 20px;
+  padding: 2px 8px;
+  letter-spacing: 0.3px;
+}
+
+/* ══════════════════════════════════════
+   08. INTELLIGENCE PREVIEW
+══════════════════════════════════════ */
+.intel-section { background: var(--black); }
+.intel-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 16px;
+  margin-top: 52px;
+}
+.intel-card {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 14px;
+  padding: 22px 22px 20px;
+}
+.intel-card-type {
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.2);
+  margin-bottom: 10px;
+}
+.intel-card-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.7);
+  letter-spacing: -0.3px;
+  line-height: 1.4;
+  margin-bottom: 10px;
+}
+.intel-card-excerpt {
+  font-size: 11.5px;
+  color: rgba(255,255,255,0.25);
+  line-height: 1.6;
+  position: relative;
+}
+.intel-blur {
+  filter: blur(4px);
+  user-select: none;
+  pointer-events: none;
+}
+.intel-card-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 14px;
+}
+.intel-card-date {
+  font-size: 9.5px;
+  color: rgba(255,255,255,0.18);
+  font-family: 'Menlo', monospace;
+}
+.intel-lock {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 9px;
+  font-weight: 600;
+  color: rgba(200,245,90,0.5);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+/* ══════════════════════════════════════
+   09. GRANTS PREVIEW
+══════════════════════════════════════ */
+.grants-section { background: var(--bg); }
+.grants-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 16px;
+  margin-top: 52px;
+}
+.grant-card {
+  background: var(--white);
+  border: 1.5px solid var(--border);
+  border-radius: 14px;
+  padding: 22px;
+}
+.grant-match {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.grant-match-score {
+  font-size: 20px;
+  font-weight: 900;
+  color: var(--ink);
+  letter-spacing: -1px;
+}
+.grant-match-label {
+  font-size: 9.5px;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+.grant-match-bar {
+  flex: 1;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.grant-match-fill {
+  height: 100%;
+  background: var(--lime);
+  border-radius: 2px;
+}
+.grant-name {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--ink);
+  letter-spacing: -0.3px;
+  margin-bottom: 5px;
+  line-height: 1.3;
+}
+.grant-org {
+  font-size: 10.5px;
+  color: var(--muted);
+  font-weight: 500;
+  margin-bottom: 12px;
+}
+.grant-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.grant-tag {
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 2px 8px;
+}
+.grant-amount {
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(0,0,0,0.2);
+  font-family: 'Menlo', monospace;
+  margin-top: 14px;
+  letter-spacing: 0.5px;
+  filter: blur(5px);
+  user-select: none;
+}
+
+/* ══════════════════════════════════════
+   10. FINAL CTA
+══════════════════════════════════════ */
+.cta-section {
+  background: var(--black);
+  position: relative;
+  overflow: hidden;
+}
+.cta-co-bg {
+  position: absolute;
+  right: -60px;
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0.04;
+  pointer-events: none;
+}
+.cta-inner {
+  max-width: var(--max);
+  margin: 0 auto;
+  padding: 120px 48px;
+  position: relative;
+  z-index: 1;
+}
+.cta-headline {
+  font-size: clamp(3rem, 6vw, 5.5rem);
+  font-weight: 300;
+  color: var(--white);
+  letter-spacing: -3px;
+  line-height: 1;
+  margin-bottom: 32px;
+}
+.cta-headline em { font-weight: 900; font-style: italic; color: var(--lime); }
+.cta-sub {
+  font-size: 15px;
+  color: rgba(255,255,255,0.35);
+  max-width: 420px;
+  line-height: 1.65;
+  margin-bottom: 44px;
+}
+.cta-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.btn-cta-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--lime);
+  color: var(--black);
+  font-size: 13px;
+  font-weight: 800;
+  padding: 15px 28px;
+  border-radius: 10px;
+  text-decoration: none;
+  letter-spacing: -0.2px;
+}
+.btn-cta-primary:hover { opacity: 0.88; }
+.btn-cta-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  color: rgba(255,255,255,0.4);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 15px 22px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.1);
+  text-decoration: none;
+}
+.btn-cta-ghost:hover { color: rgba(255,255,255,0.75); border-color: rgba(255,255,255,0.25); }
+.cta-footer {
+  margin-top: 80px;
+  padding-top: 32px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.cta-url {
+  font-size: 11px;
+  color: rgba(255,255,255,0.15);
+  font-weight: 500;
+  text-decoration: none;
+  letter-spacing: 0.3px;
+  text-underline-offset: 3px;
+}
+.cta-url:hover { color: rgba(255,255,255,0.35); text-decoration: underline; }
+
+/* ══════════════════════════════════════
+   RESPONSIVE
+══════════════════════════════════════ */
+@media (max-width: 960px) {
+  .capabilities-grid { grid-template-columns: repeat(3, 1fr); }
+  .residents-grid { grid-template-columns: repeat(2, 1fr); }
+  .desks-grid { grid-template-columns: repeat(3, 1fr); }
+  .unlock-grid { grid-template-columns: 1fr; }
+  .unlock-divider { height: 1px; width: auto; }
+  .intel-grid, .grants-grid, .outputs-grid { grid-template-columns: repeat(2, 1fr); }
+  .workroom-body { grid-template-columns: 1fr; }
+  .workroom-sidebar { display: none; }
+}
+@media (max-width: 640px) {
+  .topnav { padding: 0 20px; }
+  .topnav-links { display: none; }
+  .section-inner { padding: 64px 24px; }
+  .hero-inner { padding: 40px 24px 60px; }
+  .hero-headline { letter-spacing: -2px; }
+  .capabilities-grid { grid-template-columns: 1fr 1fr; }
+  .residents-grid { grid-template-columns: 1fr; }
+  .desks-grid { grid-template-columns: 1fr; }
+  .outputs-grid { grid-template-columns: 1fr 1fr; }
+  .intel-grid, .grants-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<!-- ──────────────────────────────────── TOP NAV ── -->
+<nav class="topnav">
+  <a href="#" class="topnav-logo">
+    <div class="co-mark">
+      <svg viewBox="0 0 108 50" fill="none" width="38" height="18">
+        <path d="M42 4 A21 21 0 1 0 42 46" stroke="white" stroke-width="10" stroke-linecap="butt"/>
+        <circle cx="84" cy="25" r="21" stroke="white" stroke-width="10"/>
+      </svg>
+    </div>
+    <div class="wordmark">
+      <span>common</span>
+      <span>house</span>
+    </div>
+  </a>
+  <div class="topnav-links">
+    <a href="#capabilities">The House</a>
+    <a href="#residents">Residents</a>
+    <a href="#desks">How we work</a>
+  </div>
+  <a href="#cta" class="btn-nav">Request a conversation</a>
+</nav>
+
+
+<!-- ──────────────────────────────────── 01. HERO ── -->
+<section class="hero" id="top">
+  <div class="hero-inner">
+    <div class="hero-headline">
+      The house<br>is <em>ready</em><br>to work.
+    </div>
+    <div class="hero-bottom">
+      <div class="hero-tagline">
+        Strategy, intelligence and production capacity — built around the people and organisations making zero waste real.
+      </div>
+      <div class="hero-ctas">
+        <a href="#residents" class="btn-hero-primary">
+          Explore Residents
+          <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="8" x2="13" y2="8"/><polyline points="9 4 13 8 9 12"/></svg>
+        </a>
+        <a href="#desks" class="btn-hero-ghost">
+          See how the House works
+        </a>
+      </div>
+    </div>
+    <div class="hero-scroll-hint">Scroll to explore</div>
+  </div>
+</section>
+
+
+<!-- ──────────────────────────────────── 02. CAPABILITIES ── -->
+<section class="section" id="capabilities">
+  <div class="section-bar">
+    <span class="section-bar-label">What the House does</span>
+    <span class="section-num">01</span>
+  </div>
+  <div class="section-inner">
+    <div class="section-title">Five capabilities.<br><em>One operating system.</em></div>
+    <div class="section-sub">Every engagement activates the full House — not just a consultant or a tool, but a system that works together.</div>
+
+    <div class="capabilities-grid">
+      <div class="cap-card">
+        <div class="cap-icon lime">
+          <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="#000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2L2 7l8 5 8-5-8-5z"/><path d="M2 12l8 5 8-5"/><path d="M2 17l8 5 8-5"/></svg>
+        </div>
+        <div class="cap-name">Strategy & Operations</div>
+        <div class="cap-desc">Project management, roadmaps, decision tracking, and governance — keeping the work moving.</div>
+        <div class="cap-tags">
+          <span class="cap-tag">Workrooms</span>
+          <span class="cap-tag">Decisions</span>
+          <span class="cap-tag">Roadmaps</span>
+        </div>
+      </div>
+      <div class="cap-card">
+        <div class="cap-icon">
+          <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="16" height="13" rx="1"/><path d="M6 7h8M6 10h5"/></svg>
+        </div>
+        <div class="cap-name">Design & Production</div>
+        <div class="cap-desc">Decks, one-pagers, proposals, reports and investor briefs — built to move conversations forward.</div>
+        <div class="cap-tags">
+          <span class="cap-tag">Design Desk</span>
+          <span class="cap-tag">Comms Desk</span>
+          <span class="cap-tag">Brand Brain</span>
+        </div>
+      </div>
+      <div class="cap-card">
+        <div class="cap-icon">
+          <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="8"/><path d="M10 6v4l3 2"/></svg>
+        </div>
+        <div class="cap-name">Intelligence</div>
+        <div class="cap-desc">Continuous synthesis of signals, sources, and conversations into actionable insight briefs.</div>
+        <div class="cap-tags">
+          <span class="cap-tag">Insights Desk</span>
+          <span class="cap-tag">Knowledge</span>
+          <span class="cap-tag">Evidence</span>
+        </div>
+      </div>
+      <div class="cap-card">
+        <div class="cap-icon">
+          <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2H4a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V7z"/><polyline points="12 2 12 7 17 7"/></svg>
+        </div>
+        <div class="cap-name">Grants & Funding</div>
+        <div class="cap-desc">Funder mapping, grant fit reviews, backlog management, and active monitoring across the portfolio.</div>
+        <div class="cap-tags">
+          <span class="cap-tag">Grants Desk</span>
+          <span class="cap-tag">Pipeline</span>
+          <span class="cap-tag">Monitoring</span>
+        </div>
+      </div>
+      <div class="cap-card">
+        <div class="cap-icon">
+          <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        </div>
+        <div class="cap-name">Relationships</div>
+        <div class="cap-desc">Relationship warmth tracking, investor matching, and portfolio health — the relational layer of the system.</div>
+        <div class="cap-tags">
+          <span class="cap-tag">Residents</span>
+          <span class="cap-tag">Garage</span>
+          <span class="cap-tag">Portfolio</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ──────────────────────────────────── 03. RESIDENTS ── -->
+<section class="section residents-section" id="residents">
+  <div class="section-bar" style="background:rgba(200,245,90,0.12);border-bottom:1px solid rgba(200,245,90,0.2);">
+    <span class="section-bar-label" style="color:rgba(255,255,255,0.5);">Residents</span>
+    <span class="section-num" style="color:rgba(255,255,255,0.3);">02</span>
+  </div>
+  <div class="section-inner">
+    <div class="residents-header">
+      <div>
+        <div class="eyebrow lime">Directorio vivo de capacidades</div>
+        <div class="section-title white">Not a team page.<br><em>A living directory.</em></div>
+      </div>
+      <a href="residents-mockup.html" class="btn-ghost-white">
+        View all Residents
+        <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="8" x2="13" y2="8"/><polyline points="9 4 13 8 9 12"/></svg>
+      </a>
+    </div>
+
+    <div class="residents-grid">
+      <div class="resident-card">
+        <div class="resident-avatar">JM</div>
+        <div class="resident-name">José Manuel</div>
+        <div class="resident-role">Co-founder · Project Lead</div>
+        <div class="resident-tags">
+          <span class="resident-tag lime">Strategy</span>
+          <span class="resident-tag">Zero waste</span>
+          <span class="resident-tag">Operations</span>
+        </div>
+      </div>
+      <div class="resident-card">
+        <div class="resident-avatar">SC</div>
+        <div class="resident-name">Sofía Castro</div>
+        <div class="resident-role">Co-founder · Strategy</div>
+        <div class="resident-tags">
+          <span class="resident-tag lime">Intelligence</span>
+          <span class="resident-tag">Policy</span>
+          <span class="resident-tag">Advocacy</span>
+        </div>
+      </div>
+      <div class="resident-card">
+        <div class="resident-avatar">AP</div>
+        <div class="resident-name">Andrés Pérez</div>
+        <div class="resident-role">Design & Comms Lead</div>
+        <div class="resident-tags">
+          <span class="resident-tag lime">Design</span>
+          <span class="resident-tag">Brand</span>
+          <span class="resident-tag">Production</span>
+        </div>
+      </div>
+      <div class="resident-card">
+        <div class="resident-avatar">LV</div>
+        <div class="resident-name">Laura Vargas</div>
+        <div class="resident-role">Grants & Funding Advisor</div>
+        <div class="resident-tags">
+          <span class="resident-tag lime">Grants</span>
+          <span class="resident-tag">Impact</span>
+          <span class="resident-tag">EU Policy</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="digital-row">
+      <div class="digital-row-left">
+        <div class="digital-row-icon">
+          <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="rgba(200,245,90,0.6)" stroke-width="1.8" stroke-linecap="round"><circle cx="8" cy="8" r="6"/><path d="M8 5v3l2 1.5"/></svg>
+        </div>
+        <div class="digital-row-text">And <strong>6 digital residents</strong> that run continuously — capturing, analysing, and maintaining the system.</div>
+      </div>
+      <div class="digital-row-agents">
+        <span class="agent-pill">Information Coordinator</span>
+        <span class="agent-pill">Intelligence Analyst</span>
+        <span class="agent-pill">Project Manager</span>
+        <span class="agent-pill">Internal Auditor</span>
+        <span class="agent-pill">Portfolio Director</span>
+        <span class="agent-pill">Chief of Staff</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ──────────────────────────────────── 04. THE DESKS ── -->
+<section class="section desks-section" id="desks">
+  <div class="section-bar">
+    <span class="section-bar-label">The Desks — Section Entry</span>
+    <span class="section-num">03</span>
+  </div>
+  <div class="section-inner">
+    <div class="section-title">Go to the desk<br>that fits <em>the work.</em></div>
+    <div class="section-sub">Each desk is a contextual entry point. You go to the right team with the right ask — not a generic form or a chatbot.</div>
+
+    <div class="desks-grid" style="margin-top:52px;">
+
+      <!-- Design Desk — FEATURED with form open -->
+      <div class="desk-card featured">
+        <div class="desk-header">
+          <div>
+            <div class="desk-name">Design</div>
+            <div class="desk-tagline">Visual production & documents</div>
+          </div>
+          <div class="desk-icon lime">
+            <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="#000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="16" height="13" rx="1"/><path d="M6 7h8M6 10h5"/></svg>
+          </div>
+        </div>
+        <div class="desk-body">
+          <div class="desk-offers-label">What you can get</div>
+          <div class="desk-offers">
+            <div class="desk-offer">Deck / Presentation</div>
+            <div class="desk-offer">One-pager</div>
+            <div class="desk-offer">Proposal</div>
+            <div class="desk-offer">Investor brief</div>
+            <div class="desk-offer">Report skeleton</div>
+          </div>
+        </div>
+        <div class="desk-form">
+          <div class="desk-form-label">What type?</div>
+          <div class="desk-form-pills">
+            <span class="form-pill active-lime">Deck</span>
+            <span class="form-pill">One-pager</span>
+            <span class="form-pill">Proposal</span>
+            <span class="form-pill">Brief</span>
+            <span class="form-pill">Report</span>
+          </div>
+          <div class="desk-form-label" style="margin-top:10px;">Tell us more</div>
+          <div style="background:white;border:1.5px solid #d8d8d0;border-radius:8px;padding:10px 12px;font-size:12px;color:#aaa;line-height:1.5;">What's it for, who's the audience, any references...</div>
+          <div style="margin-top:10px;">
+            <a href="#" class="btn-desk lime" style="width:100%;justify-content:center;font-size:11px;">Send to Design desk →</a>
+          </div>
+        </div>
+        <div style="padding:12px 22px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+          <span class="desk-systems">Feeds: Brand Brain · Design System</span>
+        </div>
+      </div>
+
+      <!-- Comms Desk -->
+      <div class="desk-card">
+        <div class="desk-header">
+          <div>
+            <div class="desk-name">Comms</div>
+            <div class="desk-tagline">Voice, narrative & content</div>
+          </div>
+          <div class="desk-icon">
+            <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 14a2 2 0 0 1-2 2H6l-4 4V4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10z"/></svg>
+          </div>
+        </div>
+        <div class="desk-body">
+          <div class="desk-offers-label">What you can get</div>
+          <div class="desk-offers">
+            <div class="desk-offer">Post / social copy</div>
+            <div class="desk-offer">Newsletter block</div>
+            <div class="desk-offer">Article angle</div>
+            <div class="desk-offer">Founder voice piece</div>
+            <div class="desk-offer">CH institutional piece</div>
+          </div>
+          <div class="desk-cta">
+            <a href="#" class="btn-desk">Request from Comms →</a>
+            <span class="desk-systems">Comms System · Voice</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Insights Desk -->
+      <div class="desk-card">
+        <div class="desk-header">
+          <div>
+            <div class="desk-name">Insights</div>
+            <div class="desk-tagline">Analysis & intelligence</div>
+          </div>
+          <div class="desk-icon">
+            <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="8"/><path d="M10 6v4l3 2"/></svg>
+          </div>
+        </div>
+        <div class="desk-body">
+          <div class="desk-offers-label">What you can get</div>
+          <div class="desk-offers">
+            <div class="desk-offer">PDF / PPT digest</div>
+            <div class="desk-offer">Grant scan</div>
+            <div class="desk-offer">Project intel brief</div>
+            <div class="desk-offer">Open exploration</div>
+          </div>
+          <div style="margin-top:14px;">
+            <div class="desk-form-label">Upload a source</div>
+            <div style="background:#f5f5f2;border:1.5px dashed #d0d0c8;border-radius:8px;padding:12px;text-align:center;font-size:10.5px;color:#aaa;">PDF · PPT · DOC · URL</div>
+          </div>
+          <div class="desk-cta">
+            <a href="#" class="btn-desk">Go to Insights →</a>
+            <span class="desk-systems">Insight Engine</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Grants Desk -->
+      <div class="desk-card">
+        <div class="desk-header">
+          <div>
+            <div class="desk-name">Grants</div>
+            <div class="desk-tagline">Funding fit & monitoring</div>
+          </div>
+          <div class="desk-icon" style="background:#1a3a08;">
+            <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="#c8f55a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2H4a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V7z"/><polyline points="12 2 12 7 17 7"/></svg>
+          </div>
+        </div>
+        <div class="desk-body">
+          <div class="desk-offers-label">What you can get</div>
+          <div class="desk-offers">
+            <div class="desk-offer">Grant fit review</div>
+            <div class="desk-offer">Funding scan</div>
+            <div class="desk-offer">Funder mapping</div>
+            <div class="desk-offer">Grant backlog & next steps</div>
+          </div>
+          <div class="desk-cta">
+            <a href="#" class="btn-desk">Go to Grants →</a>
+            <span class="desk-systems">Grants System · OS v2</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Proposals & Offers Desk -->
+      <div class="desk-card">
+        <div class="desk-header">
+          <div>
+            <div class="desk-name">Proposals & Offers</div>
+            <div class="desk-tagline">Scoping & commercial packaging</div>
+          </div>
+          <div class="desk-icon" style="background:#2a1a4a;">
+            <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="#c8f55a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="2" width="14" height="16" rx="1"/><path d="M7 6h6M7 10h4"/><circle cx="14" cy="15" r="3" fill="#2a1a4a" stroke="#c8f55a"/><path d="M14 13.5v3M12.5 15h3"/></svg>
+          </div>
+        </div>
+        <div class="desk-body">
+          <div class="desk-offers-label">What you can get</div>
+          <div class="desk-offers">
+            <div class="desk-offer">Scoped Proposal Brief</div>
+            <div class="desk-offer">Productised Offer</div>
+            <div class="desk-offer">Commercial scope doc</div>
+            <div class="desk-offer">Pipeline entry</div>
+          </div>
+          <div class="desk-cta">
+            <a href="#" class="btn-desk">Build a proposal →</a>
+            <span class="desk-systems">Proposal Briefs · Offers</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+
+<!-- ──────────────────────────────────── 05. WHAT CLIENTS UNLOCK ── -->
+<section class="section unlock-section" id="unlock">
+  <div class="section-bar" style="background:rgba(200,245,90,0.07);border-bottom:1px solid rgba(200,245,90,0.12);">
+    <span class="section-bar-label" style="color:rgba(255,255,255,0.4);">What clients unlock</span>
+    <span class="section-num" style="color:rgba(255,255,255,0.2);">04</span>
+  </div>
+  <div class="section-inner">
+    <div class="section-title white">Inside the House,<br><em>everything connects.</em></div>
+    <div class="section-sub white">Once you're in, you have a home base — visibility into your project, intelligence on demand, and a team that's always current on your work.</div>
+
+    <div class="unlock-grid">
+      <div class="unlock-item">
+        <div class="unlock-num">01 —</div>
+        <div class="unlock-title">Your Hall</div>
+        <div class="unlock-desc">A private portal showing your project's current state, decisions, materials, and team.</div>
+        <div class="unlock-items">
+          <div class="unlock-bullet">Live project status</div>
+          <div class="unlock-bullet">Decision log</div>
+          <div class="unlock-bullet">Shared materials</div>
+          <div class="unlock-bullet">Conversations history</div>
+        </div>
+      </div>
+      <div class="unlock-divider"></div>
+      <div class="unlock-item">
+        <div class="unlock-num">02 —</div>
+        <div class="unlock-title">The Workroom or Garage</div>
+        <div class="unlock-desc">An active workspace where all deliverables, sessions, and milestones are tracked and visible.</div>
+        <div class="unlock-items">
+          <div class="unlock-bullet">Executive snapshot</div>
+          <div class="unlock-bullet">What's in motion</div>
+          <div class="unlock-bullet">Blockers surfaced</div>
+          <div class="unlock-bullet">Investor & grant fit</div>
+        </div>
+      </div>
+      <div class="unlock-divider"></div>
+      <div class="unlock-item">
+        <div class="unlock-num">03 —</div>
+        <div class="unlock-title">The full system</div>
+        <div class="unlock-desc">Intelligence, design, comms, and grants capacity — available through contextual desk requests, not queues.</div>
+        <div class="unlock-items">
+          <div class="unlock-bullet">Design desk on demand</div>
+          <div class="unlock-bullet">Comms production</div>
+          <div class="unlock-bullet">Insight digests</div>
+          <div class="unlock-bullet">Funding support</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ──────────────────────────────────── 06. WORKROOM PREVIEW ── -->
+<section class="section workroom-section" id="workroom">
+  <div class="section-bar">
+    <span class="section-bar-label">Workroom — inside view</span>
+    <span class="section-num">05</span>
+  </div>
+  <div class="section-inner">
+    <div class="section-title">Where active work<br>becomes <em>visible.</em></div>
+
+    <div class="workroom-preview">
+      <div class="workroom-header-bar">
+        <div class="workroom-dot"></div>
+        <div class="workroom-dot"></div>
+        <div class="workroom-dot"></div>
+        <div class="workroom-breadcrumb">common house › <span>Auto Mercado Fase 2</span> › <span>The Workroom</span></div>
+      </div>
+      <div class="workroom-body">
+        <div class="workroom-sidebar">
+          <div class="workroom-nav-item active">
+            <svg viewBox="0 0 14 14" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="1" y="1" width="12" height="12" rx="1"/></svg>
+            Overview
+          </div>
+          <div class="workroom-nav-item">
+            <svg viewBox="0 0 14 14" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="7" cy="7" r="5"/><path d="M7 4v3l2 1.5"/></svg>
+            In motion
+          </div>
+          <div class="workroom-nav-item">
+            <svg viewBox="0 0 14 14" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="2 5 7 9 12 5"/></svg>
+            Decisions
+          </div>
+          <div class="workroom-nav-item">
+            <svg viewBox="0 0 14 14" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 2h10M2 5h8M2 8h6"/></svg>
+            Materials
+          </div>
+        </div>
+        <div class="workroom-content">
+          <div class="workroom-content-title">Auto Mercado <em style="font-style:italic;color:#888;">Fase 2</em></div>
+          <div class="workroom-content-sub">Pilot Planning · Last updated 11 Apr 2026</div>
+          <div class="workroom-cards">
+            <div class="wk-card">
+              <div class="wk-card-label">Current focus</div>
+              <div class="wk-card-val">Validating pilot model at 2 locations</div>
+            </div>
+            <div class="wk-card">
+              <div class="wk-card-label">Next milestone</div>
+              <div class="wk-card-val">Pilot kickoff with TI team — Q2 2026</div>
+            </div>
+            <div class="wk-card" style="opacity:0.5;">
+              <div class="wk-card-label">Decisions made</div>
+              <div class="wk-card-val">2 confirmed this cycle</div>
+            </div>
+            <div class="wk-card" style="opacity:0.5;">
+              <div class="wk-card-label">Materials</div>
+              <div class="wk-card-val">3 shared documents</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="workroom-blur-overlay">
+        <a href="hall-mockup.html" class="btn-unlock">
+          <svg viewBox="0 0 14 14" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="10" height="7" rx="1"/><path d="M4.5 6V4a2.5 2.5 0 0 1 5 0v2"/></svg>
+          Unlocks with your engagement
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ──────────────────────────────────── 07. SAMPLE OUTPUTS ── -->
+<section class="section outputs-section" id="outputs">
+  <div class="section-bar">
+    <span class="section-bar-label">Sample outputs</span>
+    <span class="section-num">06</span>
+  </div>
+  <div class="section-inner">
+    <div class="section-title">What the House <em>produces.</em></div>
+    <div class="outputs-grid">
+      <div class="output-card">
+        <div class="output-thumb">
+          <div class="output-thumb-title">Propuesta<br>de trabajo</div>
+          <div class="output-thumb-num">01</div>
+        </div>
+        <div class="output-body">
+          <div class="output-type">Design Desk</div>
+          <div class="output-name">Pilot Scope & Proposal</div>
+          <div class="output-desc">Full engagement proposal with scope, timeline, team, and commercial model.</div>
+          <div class="output-meta">
+            <span class="output-desk-pill">Design</span>
+            <span class="output-desk-pill">PDF · 18p</span>
+          </div>
+        </div>
+      </div>
+      <div class="output-card">
+        <div class="output-thumb lime">
+          <div class="output-thumb-title" style="color:rgba(0,0,0,0.1);">Insight<br>Brief</div>
+          <div class="output-thumb-num" style="color:rgba(0,0,0,0.1);">02</div>
+        </div>
+        <div class="output-body">
+          <div class="output-type">Insights Desk</div>
+          <div class="output-name">Circular Economy — LATAM 2026</div>
+          <div class="output-desc">Synthesis of 12 sources into a 4-point strategic brief with opportunities and risks.</div>
+          <div class="output-meta">
+            <span class="output-desk-pill">Insights</span>
+            <span class="output-desk-pill">Brief · 4p</span>
+          </div>
+        </div>
+      </div>
+      <div class="output-card">
+        <div class="output-thumb offwhite" style="align-items:flex-start;padding:20px 22px;">
+          <div>
+            <div style="font-size:8px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#ccc;margin-bottom:8px;">Advocacy Strategy</div>
+            <div style="font-size:16px;font-weight:900;font-style:italic;color:#ddd;letter-spacing:-0.5px;line-height:1.1;">Chief x Common House</div>
+            <div style="margin-top:10px;display:flex;flex-direction:column;gap:5px;">
+              <div style="background:#eee;border-radius:3px;height:6px;width:80%;"></div>
+              <div style="background:#eee;border-radius:3px;height:6px;width:60%;"></div>
+            </div>
+          </div>
+        </div>
+        <div class="output-body">
+          <div class="output-type">Design + Comms</div>
+          <div class="output-name">Advocacy Roadmap Deck</div>
+          <div class="output-desc">Strategic deck translating operational impact into structural influence for board use.</div>
+          <div class="output-meta">
+            <span class="output-desk-pill">Design</span>
+            <span class="output-desk-pill">Comms</span>
+          </div>
+        </div>
+      </div>
+      <div class="output-card">
+        <div class="output-thumb" style="background:#111;">
+          <div style="text-align:center;">
+            <div style="font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:rgba(200,245,90,0.3);margin-bottom:6px;">Grant Landscape</div>
+            <div style="display:flex;flex-direction:column;gap:4px;">
+              <div style="display:flex;align-items:center;gap:6px;">
+                <div style="width:8px;height:8px;border-radius:50%;background:rgba(200,245,90,0.2);"></div>
+                <div style="background:rgba(255,255,255,0.06);border-radius:3px;height:5px;width:100px;"></div>
+                <div style="font-size:9px;color:rgba(200,245,90,0.3);font-weight:700;">82%</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;">
+                <div style="width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,0.08);"></div>
+                <div style="background:rgba(255,255,255,0.04);border-radius:3px;height:5px;width:80px;"></div>
+                <div style="font-size:9px;color:rgba(255,255,255,0.2);font-weight:700;">64%</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;">
+                <div style="width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,0.08);"></div>
+                <div style="background:rgba(255,255,255,0.04);border-radius:3px;height:5px;width:60px;"></div>
+                <div style="font-size:9px;color:rgba(255,255,255,0.2);font-weight:700;">51%</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="output-body">
+          <div class="output-type">Grants Desk</div>
+          <div class="output-name">Funder Fit Mapping</div>
+          <div class="output-desc">Ranked funder landscape with fit scores, next steps, and application backlog.</div>
+          <div class="output-meta">
+            <span class="output-desk-pill">Grants</span>
+            <span class="output-desk-pill">Mapping</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ──────────────────────────────────── 08. INTELLIGENCE PREVIEW ── -->
+<section class="section intel-section" id="intelligence">
+  <div class="section-bar" style="background:rgba(200,245,90,0.07);border-bottom:1px solid rgba(200,245,90,0.12);">
+    <span class="section-bar-label" style="color:rgba(255,255,255,0.4);">Intelligence layer — preview</span>
+    <span class="section-num" style="color:rgba(255,255,255,0.2);">07</span>
+  </div>
+  <div class="section-inner">
+    <div class="section-title white">Signals that feed <em>the work.</em></div>
+    <div class="section-sub white">The system continuously monitors conversations, documents, and sources — surfacing what matters, when it matters.</div>
+
+    <div class="intel-grid">
+      <div class="intel-card">
+        <div class="intel-card-type">Insight Brief · CH Portfolio</div>
+        <div class="intel-card-title">New regulation opens packaging reuse mandate across 4 EU markets</div>
+        <div class="intel-card-excerpt">
+          <span class="intel-blur">Applies to retailers with &gt;50 locations starting Q3 2026. Auto Mercado's pilot positions them ahead of the compliance curve in LATAM analogues.</span>
+        </div>
+        <div class="intel-card-meta">
+          <span class="intel-card-date">9 Apr 2026</span>
+          <span class="intel-lock">
+            <svg viewBox="0 0 12 12" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="5" width="8" height="6" rx="1"/><path d="M4 5V3.5a2 2 0 0 1 4 0V5"/></svg>
+            Client-only
+          </span>
+        </div>
+      </div>
+      <div class="intel-card">
+        <div class="intel-card-type">Decision Validated · Auto Mercado</div>
+        <div class="intel-card-title">TI integration confirmed: no infrastructure changes required</div>
+        <div class="intel-card-excerpt">
+          <span class="intel-blur">Signed off by Carlos Rojas (TI Director) on 9 Apr. Integration through existing POS API. Reduces pilot cost by an estimated 12–18%.</span>
+        </div>
+        <div class="intel-card-meta">
+          <span class="intel-card-date">9 Apr 2026</span>
+          <span class="intel-lock">
+            <svg viewBox="0 0 12 12" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="5" width="8" height="6" rx="1"/><path d="M4 5V3.5a2 2 0 0 1 4 0V5"/></svg>
+            Client-only
+          </span>
+        </div>
+      </div>
+      <div class="intel-card">
+        <div class="intel-card-type">Grant Signal · Grants System</div>
+        <div class="intel-card-title">SUFI / Fair4All: deadline approaching — strong fit signal for 2 portfolio startups</div>
+        <div class="intel-card-excerpt">
+          <span class="intel-blur">Application window closes 30 Apr. Scoring 78–82% match on sector and geography criteria. P1 action required by portfolio lead this week.</span>
+        </div>
+        <div class="intel-card-meta">
+          <span class="intel-card-date">11 Apr 2026</span>
+          <span class="intel-lock" style="color:rgba(255,180,0,0.7);">
+            <svg viewBox="0 0 12 12" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="5" width="8" height="6" rx="1"/><path d="M4 5V3.5a2 2 0 0 1 4 0V5"/></svg>
+            Internal · P1
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ──────────────────────────────────── 09. GRANTS PREVIEW ── -->
+<section class="section grants-section" id="grants">
+  <div class="section-bar">
+    <span class="section-bar-label">Grants — funding fit</span>
+    <span class="section-num">08</span>
+  </div>
+  <div class="section-inner">
+    <div class="section-title">Funding fit,<br>mapped and <em>monitored.</em></div>
+    <div class="section-sub">The House maintains a live view of grant opportunities across the portfolio — matching funders to projects continuously.</div>
+
+    <div class="grants-grid">
+      <div class="grant-card">
+        <div class="grant-match">
+          <div>
+            <div class="grant-match-label">Match</div>
+            <div class="grant-match-score">82%</div>
+          </div>
+          <div class="grant-match-bar" style="flex:1;">
+            <div class="grant-match-fill" style="width:82%;"></div>
+          </div>
+        </div>
+        <div class="grant-name">Circular Economy Innovation Fund</div>
+        <div class="grant-org">European Investment Bank</div>
+        <div class="grant-tags">
+          <span class="grant-tag">Circular economy</span>
+          <span class="grant-tag">SME</span>
+          <span class="grant-tag">LATAM-eligible</span>
+        </div>
+        <div class="grant-amount">€ ██,███ — €███,███</div>
+      </div>
+      <div class="grant-card">
+        <div class="grant-match">
+          <div>
+            <div class="grant-match-label">Match</div>
+            <div class="grant-match-score">74%</div>
+          </div>
+          <div class="grant-match-bar">
+            <div class="grant-match-fill" style="width:74%;"></div>
+          </div>
+        </div>
+        <div class="grant-name">Fair4All Finance — Impact Lending</div>
+        <div class="grant-org">SUFI · Fair4All Finance</div>
+        <div class="grant-tags">
+          <span class="grant-tag">Impact</span>
+          <span class="grant-tag">Retail</span>
+          <span class="grant-tag">P1 — deadline Apr 30</span>
+        </div>
+        <div class="grant-amount">$ ██,███ — $███,███</div>
+      </div>
+      <div class="grant-card" style="background:#f9f9f6;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+          <div style="width:36px;height:36px;border-radius:50%;background:var(--lime);display:flex;align-items:center;justify-content:center;">
+            <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="#000" stroke-width="2" stroke-linecap="round"><circle cx="8" cy="8" r="6"/><path d="M8 5v3l2 1.5"/></svg>
+          </div>
+          <div>
+            <div style="font-size:11px;font-weight:800;color:var(--ink);">Grants desk active</div>
+            <div style="font-size:10px;color:var(--muted);">11 funders mapped · 3 in pipeline</div>
+          </div>
+        </div>
+        <div style="font-size:12px;color:var(--muted);line-height:1.6;">The Grants desk continuously monitors the funder landscape and surfaces fit matches as new opportunities emerge.</div>
+        <div style="margin-top:18px;">
+          <a href="#desks" class="btn-desk lime" style="font-size:11px;">Explore Grants desk →</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ──────────────────────────────────── 10. FINAL CTA ── -->
+<section class="cta-section" id="cta">
+  <div class="cta-co-bg">
+    <svg viewBox="0 0 600 280" fill="none" width="600" height="280">
+      <path d="M220 20 A120 120 0 1 0 220 260" stroke="white" stroke-width="55" stroke-linecap="butt"/>
+      <circle cx="460" cy="140" r="120" stroke="white" stroke-width="55"/>
+    </svg>
+  </div>
+  <div class="cta-inner">
+    <div class="cta-headline">
+      Enough context.<br><em>Time to talk.</em>
+    </div>
+    <div class="cta-sub">
+      If the work sounds familiar — or if you want to understand what activating the House could mean for your organisation — let's have a real conversation.
+    </div>
+    <div class="cta-actions">
+      <a href="#" class="btn-cta-primary">
+        Request a conversation
+        <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="3" y1="8" x2="13" y2="8"/><polyline points="9 4 13 8 9 12"/></svg>
+      </a>
+      <a href="#residents" class="btn-cta-ghost">
+        Explore Residents
+      </a>
+      <a href="#desks" class="btn-cta-ghost">
+        See how the House works
+      </a>
+    </div>
+    <div class="cta-footer">
+      <a href="http://wearecommonhouse.com" class="cta-url" target="_blank">wearecommonhouse.com</a>
+      <div>
+        <svg viewBox="0 0 108 50" fill="none" width="54" height="25">
+          <path d="M42 4 A21 21 0 1 0 42 46" stroke="rgba(255,255,255,0.1)" stroke-width="10" stroke-linecap="butt"/>
+          <circle cx="84" cy="25" r="21" stroke="rgba(255,255,255,0.1)" stroke-width="10"/>
+        </svg>
+      </div>
+    </div>
+  </div>
+</section>
+
+</body>
+</html>

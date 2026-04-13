@@ -1,1 +1,35 @@
-{"version":"0.0.1","configurations":[{"name":"common-house-app","runtimeExecutable":"npm","runtimeArgs":["run","dev"],"port":3000}]}
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "CH Mockups",
+      "runtimeExecutable": "C:\\Users\\josem\\OneDrive\\Escritorio\\Claude Code\\start-mockups.cmd",
+      "runtimeArgs": [],
+      "port": 5501
+    },
+    {
+      "name": "Diagrama Agentes",
+      "runtimeExecutable": "C:\\Users\\josem\\OneDrive\\Escritorio\\Claude Code\\start-diagram.cmd",
+      "runtimeArgs": [],
+      "port": 5500
+    },
+    {
+      "name": "Common House Portal",
+      "runtimeExecutable": "C:\\Users\\josem\\OneDrive\\Escritorio\\common-house-app\\start-portal.cmd",
+      "runtimeArgs": [],
+      "port": 3000
+    },
+    {
+      "name": "CHIRI – Next.js Dev",
+      "runtimeExecutable": "C:\\Users\\josem\\OneDrive\\Escritorio\\Claude Code\\start-frontend.cmd",
+      "runtimeArgs": [],
+      "port": 3000
+    },
+    {
+      "name": "CHIRI – Docker Compose (PostgreSQL + servicios)",
+      "runtimeExecutable": "docker",
+      "runtimeArgs": ["compose", "up"],
+      "port": 5432
+    }
+  ]
+}

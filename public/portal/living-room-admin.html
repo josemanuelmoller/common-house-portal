@@ -1,0 +1,1235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Common House — Living Room Curator</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,700;1,800&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --lime: #c8f55a;
+  --black: #000000;
+  --white: #ffffff;
+  --ink: #0e0e0e;
+  --muted: #6b6b6b;
+  --border: #d8d8d0;
+  --bg: #eeeee8;
+  --sidebar-w: 228px;
+  --hot: #22c55e;
+  --warm: #f59e0b;
+  --cold: #ef4444;
+  --dormant: #9ca3af;
+}
+
+body { font-family: 'Inter', sans-serif; background: var(--bg); display: flex; min-height: 100vh; }
+
+/* ── Sidebar ── */
+.sidebar {
+  width: var(--sidebar-w);
+  min-height: 100vh;
+  background: var(--white);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  padding: 20px 0 0;
+  position: fixed;
+  top: 0; left: 0;
+  z-index: 10;
+  overflow-y: auto;
+}
+.sidebar-logo { padding: 0 18px 18px; border-bottom: 1px solid var(--border); margin-bottom: 12px; }
+.sidebar-logo-inner { display: flex; align-items: center; gap: 9px; }
+.logo-mark { width: 28px; height: 28px; background: var(--black); border-radius: 7px; display: flex; align-items: center; justify-content: center; }
+.logo-mark span { color: var(--lime); font-size: 14px; font-weight: 900; }
+.wordmark { display: flex; flex-direction: column; line-height: 1.1; }
+.wordmark span { font-size: 11px; font-weight: 500; color: var(--ink); letter-spacing: 0.2px; }
+
+.nav-section-label {
+  font-size: 7px; font-weight: 700; letter-spacing: 2.5px;
+  text-transform: uppercase; color: rgba(0,0,0,0.2);
+  padding: 0 18px; margin: 10px 0 3px;
+}
+
+.nav-item {
+  display: flex; align-items: center; gap: 9px;
+  padding: 7px 18px; font-size: 11.5px; font-weight: 600;
+  color: rgba(0,0,0,0.42); cursor: pointer; text-decoration: none;
+  border-left: 2px solid transparent;
+  transition: color 0.15s, background 0.15s; user-select: none;
+}
+.nav-item:hover { color: var(--ink); background: rgba(0,0,0,0.03); }
+.nav-item.active { color: var(--ink); border-left-color: var(--lime); background: rgba(200,245,90,0.14); }
+.nav-icon { font-size: 13px; opacity: 0.5; flex-shrink: 0; }
+.nav-item.active .nav-icon { opacity: 1; }
+
+.nav-group { }
+.nav-group-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 7px 18px; font-size: 11.5px; font-weight: 600;
+  color: rgba(0,0,0,0.42); cursor: pointer; user-select: none;
+  transition: color 0.15s;
+}
+.nav-group-header:hover { color: var(--ink); background: rgba(0,0,0,0.025); }
+.nav-group-header.group-active { color: var(--ink); }
+.nav-group-header-left { display: flex; align-items: center; gap: 9px; }
+.nav-group-arrow { font-size: 9px; opacity: 0.3; transition: transform 0.2s; flex-shrink: 0; }
+.nav-group.collapsed .nav-group-arrow { transform: rotate(-90deg); }
+.nav-group-items { overflow: hidden; }
+.nav-group.collapsed .nav-group-items { display: none; }
+.nav-sub-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 18px 6px 34px; font-size: 11px; font-weight: 500;
+  color: rgba(0,0,0,0.38); cursor: pointer; text-decoration: none;
+  border-left: 2px solid transparent; transition: color 0.15s, background 0.15s;
+}
+.nav-sub-item:hover { color: var(--ink); background: rgba(0,0,0,0.025); }
+.nav-sub-item.active { color: var(--ink); border-left-color: var(--lime); background: rgba(200,245,90,0.12); font-weight: 600; }
+.nav-sub-icon { font-size: 11px; opacity: 0.5; flex-shrink: 0; }
+
+.nav-badge {
+  margin-left: auto;
+  background: rgba(0,0,0,0.07); color: rgba(0,0,0,0.38);
+  font-size: 8.5px; font-weight: 700; padding: 2px 6px;
+  border-radius: 8px; flex-shrink: 0;
+}
+.nav-badge.red { background: rgba(239,68,68,0.1); color: #dc2626; }
+.nav-badge.lime { background: rgba(200,245,90,0.3); color: #3a8c00; }
+
+.sidebar-footer { margin-top: auto; padding: 14px 18px; border-top: 1px solid var(--border); }
+.sidebar-footer p { font-size: 8.5px; color: rgba(0,0,0,0.2); letter-spacing: 0.5px; }
+
+/* ── Main ── */
+.main { margin-left: var(--sidebar-w); flex: 1; display: flex; flex-direction: column; min-height: 100vh; }
+
+/* ── Page header (dark) ── */
+.page-header { background: var(--black); padding: 40px 52px 44px; flex-shrink: 0; }
+.page-eyebrow {
+  font-size: 8px; font-weight: 700; letter-spacing: 2.5px;
+  text-transform: uppercase; color: rgba(255,255,255,0.2); margin-bottom: 12px;
+}
+.page-title { font-size: 2.6rem; font-weight: 300; color: var(--white); letter-spacing: -1.5px; line-height: 1; }
+.page-title em { font-weight: 900; font-style: italic; color: var(--lime); }
+.page-sub { font-size: 12.5px; color: rgba(255,255,255,0.38); margin-top: 12px; max-width: 520px; line-height: 1.65; }
+.page-header-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+
+/* ── Tab bar ── */
+.tab-bar {
+  background: var(--white);
+  border-bottom: 1.5px solid var(--border);
+  padding: 0 52px;
+  display: flex;
+  gap: 0;
+  flex-shrink: 0;
+}
+.tab-btn {
+  padding: 16px 20px 14px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: rgba(0,0,0,0.38);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s;
+  white-space: nowrap;
+  user-select: none;
+}
+.tab-btn:hover { color: var(--ink); }
+.tab-btn.active { color: var(--ink); border-bottom-color: var(--lime); }
+
+/* ── Content area ── */
+.content { flex: 1; padding: 36px 52px 60px; }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* ── Stat pills ── */
+.stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 32px; }
+.stat-pill { background: var(--white); border: 1.5px solid var(--border); border-radius: 12px; padding: 16px 18px; }
+.stat-label { font-size: 8px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: rgba(0,0,0,0.25); margin-bottom: 7px; }
+.stat-value { font-size: 1.6rem; font-weight: 900; color: var(--ink); letter-spacing: -1px; line-height: 1; }
+.stat-value.lime { color: #3a8c00; }
+.stat-sub { font-size: 10px; color: var(--muted); margin-top: 5px; }
+
+/* ── Section bar ── */
+.section-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; margin-top: 36px; }
+.section-bar:first-child { margin-top: 0; }
+.section-label { font-size: 8.5px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: rgba(0,0,0,0.28); white-space: nowrap; }
+.section-line { flex: 1; height: 1px; background: var(--border); }
+.section-count { font-size: 8.5px; font-weight: 700; color: rgba(0,0,0,0.18); }
+
+/* ── Cards ── */
+.card { background: var(--white); border: 1.5px solid var(--border); border-radius: 14px; overflow: hidden; }
+.card-header {
+  padding: 16px 20px 14px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+}
+.card-header-left { display: flex; align-items: center; gap: 9px; }
+.card-icon { width: 26px; height: 26px; border-radius: 7px; background: var(--ink); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.card-icon.lime { background: var(--lime); }
+.card-icon.ghost { background: var(--bg); border: 1px solid var(--border); }
+.card-icon.blue { background: #dbeafe; }
+.card-icon span { font-size: 12px; }
+.card-label { font-size: 12px; font-weight: 800; color: var(--ink); letter-spacing: -0.2px; }
+.card-body { padding: 18px 20px; }
+.card-meta { font-size: 10px; color: var(--muted); }
+
+/* ── Buttons ── */
+.btn { display: inline-flex; align-items: center; gap: 6px; font-size: 10.5px; font-weight: 700; padding: 8px 16px; border-radius: 8px; border: none; cursor: pointer; text-decoration: none; letter-spacing: 0.2px; transition: opacity 0.15s; }
+.btn:hover { opacity: 0.82; }
+.btn-primary { background: var(--black); color: var(--white); }
+.btn-lime { background: var(--lime); color: var(--black); }
+.btn-ghost { background: transparent; border: 1.5px solid var(--border); color: var(--ink); }
+.btn-sm { padding: 5px 11px; font-size: 9.5px; border-radius: 6px; }
+
+/* ── Pills / badges ── */
+.pill {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: var(--black); color: var(--white);
+  font-size: 8px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase;
+  border-radius: 20px; padding: 3px 9px;
+}
+.pill.lime { background: rgba(200,245,90,0.25); color: #3a8c00; border: 1px solid rgba(200,245,90,0.5); }
+.pill.blue { background: #dbeafe; color: #1e40af; }
+.pill.amber { background: #fff3cd; color: #7a5800; }
+.pill.ghost { background: transparent; border: 1.5px solid #ddd; color: #888; }
+.pill.purple { background: #ede9fe; color: #5b21b6; }
+.pill.red { background: #fee2e2; color: #991b1b; }
+.pill.green { background: #dcfce7; color: #166534; }
+.pill.gray { background: #f3f4f6; color: #4b5563; }
+
+/* ── Curator rows (people, milestones, signals) ── */
+.curator-list { display: flex; flex-direction: column; }
+.curator-row {
+  display: grid;
+  gap: 14px;
+  padding: 13px 0;
+  border-bottom: 1px solid var(--border);
+  align-items: center;
+}
+.curator-row:last-child { border-bottom: none; }
+.curator-row-header {
+  display: grid;
+  gap: 14px;
+  padding: 0 0 10px;
+  border-bottom: 1.5px solid var(--border);
+}
+/* People: name | role | location | visibility | action */
+.curator-row.people { grid-template-columns: 1.8fr 1.2fr 1fr 130px 80px; }
+.curator-row-header.people { grid-template-columns: 1.8fr 1.2fr 1fr 130px 80px; }
+/* Milestones: name | org | type | share | visibility | action */
+.curator-row.milestone { grid-template-columns: 2fr 1fr 110px 80px 110px 80px; }
+.curator-row-header.milestone { grid-template-columns: 2fr 1fr 110px 80px 110px 80px; }
+/* Signals: title | theme | relevance | visibility | action */
+.curator-row.signal { grid-template-columns: 2.2fr 1fr 100px 110px 80px; }
+.curator-row-header.signal { grid-template-columns: 2.2fr 1fr 100px 110px 80px; }
+
+.col-label { font-size: 8px; font-weight: 700; letter-spacing: 1.8px; text-transform: uppercase; color: rgba(0,0,0,0.22); }
+.row-name { font-size: 13px; font-weight: 700; color: var(--ink); letter-spacing: -0.2px; }
+.row-sub { font-size: 10px; color: var(--muted); margin-top: 2px; }
+.row-meta { font-size: 10.5px; color: #555; }
+
+/* ── Toggle switch ── */
+.toggle-wrap { display: flex; align-items: center; gap: 8px; }
+.toggle {
+  position: relative; display: inline-block;
+  width: 34px; height: 20px; cursor: pointer; flex-shrink: 0;
+}
+.toggle input { opacity: 0; width: 0; height: 0; }
+.toggle-slider {
+  position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+  background: #d1d5db; border-radius: 20px;
+  transition: background 0.2s;
+}
+.toggle-slider:before {
+  content: ''; position: absolute;
+  width: 14px; height: 14px; border-radius: 50%;
+  background: white; top: 3px; left: 3px;
+  transition: transform 0.2s;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+.toggle input:checked + .toggle-slider { background: #3a8c00; }
+.toggle input:checked + .toggle-slider:before { transform: translateX(14px); }
+.toggle-label { font-size: 10px; font-weight: 600; color: var(--muted); }
+
+/* ── Select override ── */
+.mini-select {
+  font-size: 10px; font-weight: 600; color: var(--ink);
+  border: 1.5px solid var(--border); border-radius: 7px;
+  padding: 5px 8px; background: var(--white);
+  cursor: pointer; max-width: 130px; width: 100%;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%23888' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  padding-right: 24px;
+}
+.mini-select:focus { outline: none; border-color: var(--lime); }
+
+/* ── Theme editor ── */
+.theme-card {
+  background: var(--white);
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  padding: 18px 20px;
+  transition: border-color 0.15s;
+}
+.theme-card:hover { border-color: #bbb; }
+.theme-card.active-theme { border-color: rgba(200,245,90,0.6); background: rgba(200,245,90,0.04); }
+.theme-name { font-size: 14px; font-weight: 800; color: var(--ink); letter-spacing: -0.3px; margin-bottom: 5px; }
+.theme-desc { font-size: 11px; color: var(--muted); line-height: 1.6; margin-bottom: 12px; }
+.theme-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 14px; }
+.theme-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.theme-stats { font-size: 9.5px; color: var(--muted); display: flex; gap: 12px; }
+.theme-stat-val { font-weight: 700; color: var(--ink); }
+.theme-actions { display: flex; gap: 6px; align-items: center; }
+
+/* ── Status indicator ── */
+.status-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; display: inline-block; margin-right: 5px; }
+.status-dot.active { background: var(--hot); }
+.status-dot.monitoring { background: var(--warm); }
+.status-dot.paused { background: var(--dormant); }
+
+/* ── Visibility badge ── */
+.vis-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 8.5px; font-weight: 700; letter-spacing: 0.5px;
+  padding: 3px 8px; border-radius: 6px;
+}
+.vis-badge.public { background: #dcfce7; color: #166534; }
+.vis-badge.community { background: #dbeafe; color: #1e40af; }
+.vis-badge.private { background: #f3f4f6; color: #6b7280; }
+
+/* ── Toast / save bar ── */
+.save-bar {
+  position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%);
+  background: var(--black); color: var(--white);
+  border-radius: 12px; padding: 12px 22px;
+  display: none; align-items: center; gap: 14px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+  z-index: 100; font-size: 12px; font-weight: 600;
+  white-space: nowrap;
+}
+.save-bar.visible { display: flex; }
+.save-bar-count { color: var(--lime); font-weight: 800; }
+
+/* ── Grid layouts ── */
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
+.three-col { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.info-note {
+  background: rgba(200,245,90,0.08); border: 1px solid rgba(200,245,90,0.3);
+  border-radius: 10px; padding: 12px 16px;
+  font-size: 11px; color: #3a6600; line-height: 1.6;
+  display: flex; gap: 10px; align-items: flex-start;
+  margin-bottom: 24px;
+}
+.info-note-icon { flex-shrink: 0; margin-top: 1px; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════ SIDEBAR -->
+<nav class="sidebar">
+  <div class="sidebar-logo">
+    <div class="sidebar-logo-inner">
+      <div class="logo-mark"><span>⌂</span></div>
+      <div class="wordmark">
+        <span style="font-weight:800;font-size:12px">Common House</span>
+        <span style="color:var(--muted)">OS v2 · Admin</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="nav-section-label">Platform</div>
+  <a class="nav-item" href="platform-admin.html"><span class="nav-icon">◈</span> The Hall</a>
+  <a class="nav-item" href="residents-mockup.html"><span class="nav-icon">◉</span> Residents</a>
+  <a class="nav-item active" href="living-room-admin.html"><span class="nav-icon">⌂</span> Living Room <span class="nav-badge lime">Curator</span></a>
+  <a class="nav-item" href="living-room.html"><span class="nav-icon" style="font-size:10px;opacity:0.35">↗</span> LR Preview</a>
+
+  <div class="nav-group collapsed" id="group-portfolio">
+    <div class="nav-group-header" onclick="toggleGroup('group-portfolio')">
+      <div class="nav-group-header-left"><span class="nav-icon">◻</span> Portfolio</div>
+      <span class="nav-group-arrow">▾</span>
+    </div>
+    <div class="nav-group-items">
+      <a class="nav-sub-item" href="#"><span class="nav-sub-icon">◻</span> Workrooms</a>
+      <a class="nav-sub-item" href="#"><span class="nav-sub-icon">◧</span> Garage</a>
+    </div>
+  </div>
+
+  <div class="nav-group collapsed" id="group-commercial">
+    <div class="nav-group-header" onclick="toggleGroup('group-commercial')">
+      <div class="nav-group-header-left"><span class="nav-icon">◈</span> Commercial</div>
+      <span class="nav-group-arrow">▾</span>
+    </div>
+    <div class="nav-group-items">
+      <a class="nav-sub-item" href="#"><span class="nav-sub-icon">◈</span> Pipeline</a>
+      <a class="nav-sub-item" href="#"><span class="nav-sub-icon">◈</span> Offers & Proposals</a>
+      <a class="nav-sub-item" href="#"><span class="nav-sub-icon">◈</span> Grants</a>
+    </div>
+  </div>
+
+  <div class="nav-section-label" style="margin-top:16px">OS v2</div>
+  <div class="nav-group collapsed" id="group-cr">
+    <div class="nav-group-header" onclick="toggleGroup('group-cr')">
+      <div class="nav-group-header-left"><span class="nav-icon">◫</span> Control Room</div>
+      <span class="nav-group-arrow">▾</span>
+    </div>
+    <div class="nav-group-items">
+      <a class="nav-sub-item" href="#"><span class="nav-sub-icon">◈</span> Automation Health</a>
+      <a class="nav-sub-item" href="#"><span class="nav-sub-icon">◈</span> Agent Log</a>
+    </div>
+  </div>
+
+  <div class="sidebar-footer">
+    <p>Sprint 28 · April 2026</p>
+    <p style="margin-top:3px">Living Room Curator</p>
+  </div>
+</nav>
+
+<!-- ═══════════════════════════════════════════════════════ MAIN -->
+<div class="main">
+
+  <!-- Page Header -->
+  <div class="page-header">
+    <div class="page-header-row">
+      <div>
+        <div class="page-eyebrow">Living Room · Editorial Curator</div>
+        <h1 class="page-title">Curate the <em>community</em><br>layer.</h1>
+        <p class="page-sub">Control who appears, which milestones surface, which signals are shared, and what themes are in motion — without touching Notion directly.</p>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+        <button class="btn btn-ghost" style="color:white;border-color:rgba(255,255,255,0.18)">↗ Preview Living Room</button>
+        <button class="btn btn-lime" onclick="showSaveBar()">Save all changes</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab bar -->
+  <div class="tab-bar">
+    <div class="tab-btn active" onclick="switchTab('tab-people', this)">👤 People Visibility</div>
+    <div class="tab-btn" onclick="switchTab('tab-milestones', this)">🏆 Milestones</div>
+    <div class="tab-btn" onclick="switchTab('tab-signals', this)">📡 Community Signals</div>
+    <div class="tab-btn" onclick="switchTab('tab-themes', this)">🌊 Themes in Motion</div>
+  </div>
+
+  <!-- ═══ CONTENT ═══ -->
+  <div class="content">
+
+    <!-- ──────────────────────────── TAB: PEOPLE VISIBILITY ── -->
+    <div class="tab-panel active" id="tab-people">
+
+      <div class="info-note">
+        <span class="info-note-icon">ℹ</span>
+        <span>Set who is visible in Living Room. <strong>Public-safe</strong> members appear in Featured Members, Geography, and Hall teasers. <strong>Community</strong> members appear to authenticated users only. <strong>Private</strong> members are never shown.</span>
+      </div>
+
+      <div class="stats-row">
+        <div class="stat-pill">
+          <div class="stat-label">Total Members</div>
+          <div class="stat-value">24</div>
+          <div class="stat-sub">In CH People OS v2</div>
+        </div>
+        <div class="stat-pill">
+          <div class="stat-label">Public-Safe</div>
+          <div class="stat-value lime">9</div>
+          <div class="stat-sub">Visible externally</div>
+        </div>
+        <div class="stat-pill">
+          <div class="stat-label">Community</div>
+          <div class="stat-value">8</div>
+          <div class="stat-sub">Authenticated only</div>
+        </div>
+        <div class="stat-pill">
+          <div class="stat-label">Private / Unset</div>
+          <div class="stat-value" style="color:#ef4444">7</div>
+          <div class="stat-sub">Not surfaced</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-header-left">
+            <div class="card-icon lime"><span>👤</span></div>
+            <span class="card-label">People Visibility</span>
+          </div>
+          <div style="display:flex;gap:8px">
+            <select class="mini-select" style="width:auto">
+              <option>All members</option>
+              <option>Public-safe only</option>
+              <option>Community only</option>
+              <option>Private / Unset</option>
+            </select>
+            <button class="btn btn-ghost btn-sm">Filter by role</button>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="curator-list">
+            <!-- Header -->
+            <div class="curator-row-header people">
+              <span class="col-label">Name</span>
+              <span class="col-label">Role</span>
+              <span class="col-label">Location</span>
+              <span class="col-label">Visibility</span>
+              <span class="col-label">Action</span>
+            </div>
+
+            <!-- Rows -->
+            <div class="curator-row people">
+              <div>
+                <div class="row-name">Alejandro Reyes</div>
+                <div class="row-sub">EIR · iRefill</div>
+              </div>
+              <div class="row-meta">EIR</div>
+              <div class="row-meta">London, UK</div>
+              <div>
+                <select class="mini-select" onchange="markDirty()">
+                  <option selected>public-safe</option>
+                  <option>community</option>
+                  <option>private</option>
+                </select>
+              </div>
+              <button class="btn btn-ghost btn-sm" onclick="markDirty()">Save</button>
+            </div>
+
+            <div class="curator-row people">
+              <div>
+                <div class="row-name">Sofía Marchetti</div>
+                <div class="row-sub">EIR · SUFI</div>
+              </div>
+              <div class="row-meta">EIR</div>
+              <div class="row-meta">Madrid, Spain</div>
+              <div>
+                <select class="mini-select" onchange="markDirty()">
+                  <option>public-safe</option>
+                  <option selected>community</option>
+                  <option>private</option>
+                </select>
+              </div>
+              <button class="btn btn-ghost btn-sm" onclick="markDirty()">Save</button>
+            </div>
+
+            <div class="curator-row people">
+              <div>
+                <div class="row-name">Priya Nambiar</div>
+                <div class="row-sub">EIR · Beeok</div>
+              </div>
+              <div class="row-meta">EIR</div>
+              <div class="row-meta">Amsterdam, NL</div>
+              <div>
+                <select class="mini-select" onchange="markDirty()">
+                  <option selected>public-safe</option>
+                  <option>community</option>
+                  <option>private</option>
+                </select>
+              </div>
+              <button class="btn btn-ghost btn-sm" onclick="markDirty()">Save</button>
+            </div>
+
+            <div class="curator-row people">
+              <div>
+                <div class="row-name">Tom Kinsley</div>
+                <div class="row-sub">Advisor · Refill</div>
+              </div>
+              <div class="row-meta">Advisor</div>
+              <div class="row-meta">Bristol, UK</div>
+              <div>
+                <select class="mini-select" onchange="markDirty()">
+                  <option>public-safe</option>
+                  <option>community</option>
+                  <option selected>private</option>
+                </select>
+              </div>
+              <button class="btn btn-ghost btn-sm" onclick="markDirty()">Save</button>
+            </div>
+
+            <div class="curator-row people">
+              <div>
+                <div class="row-name">Valentina Cruz</div>
+                <div class="row-sub">EIR · Yenxa</div>
+              </div>
+              <div class="row-meta">EIR</div>
+              <div class="row-meta">Bogotá, Colombia</div>
+              <div>
+                <select class="mini-select" onchange="markDirty()">
+                  <option selected>public-safe</option>
+                  <option>community</option>
+                  <option>private</option>
+                </select>
+              </div>
+              <button class="btn btn-ghost btn-sm" onclick="markDirty()">Save</button>
+            </div>
+
+            <div class="curator-row people">
+              <div>
+                <div class="row-name">James Okafor</div>
+                <div class="row-sub">Core Team</div>
+              </div>
+              <div class="row-meta">Core Team</div>
+              <div class="row-meta">London, UK</div>
+              <div>
+                <select class="mini-select" onchange="markDirty()">
+                  <option>public-safe</option>
+                  <option selected>community</option>
+                  <option>private</option>
+                </select>
+              </div>
+              <button class="btn btn-ghost btn-sm" onclick="markDirty()">Save</button>
+            </div>
+
+            <div class="curator-row people">
+              <div>
+                <div class="row-name">Lena Hoffmann</div>
+                <div class="row-sub">Advisor · Circular Economy</div>
+              </div>
+              <div class="row-meta">Advisor</div>
+              <div class="row-meta">Berlin, Germany</div>
+              <div>
+                <select class="mini-select" onchange="markDirty()">
+                  <option selected>public-safe</option>
+                  <option>community</option>
+                  <option>private</option>
+                </select>
+              </div>
+              <button class="btn btn-ghost btn-sm" onclick="markDirty()">Save</button>
+            </div>
+
+          </div>
+          <div style="padding:14px 0 2px;display:flex;justify-content:center">
+            <button class="btn btn-ghost btn-sm">Load all 24 members</button>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /tab-people -->
+
+    <!-- ──────────────────────────── TAB: MILESTONES ── -->
+    <div class="tab-panel" id="tab-milestones">
+
+      <div class="info-note">
+        <span class="info-note-icon">ℹ</span>
+        <span>Toggle <strong>Share to Living Room</strong> to surface a project milestone in the community feed. Set <strong>Milestone Type</strong> and <strong>Visibility</strong> to control how it appears. Only items marked <em>Share = Yes</em> appear in Living Room Module C.</span>
+      </div>
+
+      <div class="stats-row">
+        <div class="stat-pill">
+          <div class="stat-label">Active Projects</div>
+          <div class="stat-value">18</div>
+          <div class="stat-sub">In CH Projects OS v2</div>
+        </div>
+        <div class="stat-pill">
+          <div class="stat-label">Shared to LR</div>
+          <div class="stat-value lime">5</div>
+          <div class="stat-sub">Live in community feed</div>
+        </div>
+        <div class="stat-pill">
+          <div class="stat-label">Public visible</div>
+          <div class="stat-value">3</div>
+          <div class="stat-sub">On Hall + external</div>
+        </div>
+        <div class="stat-pill">
+          <div class="stat-label">Community only</div>
+          <div class="stat-value">2</div>
+          <div class="stat-sub">Auth members only</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-header-left">
+            <div class="card-icon lime"><span>🏆</span></div>
+            <span class="card-label">Milestone Curator</span>
+          </div>
+          <div style="display:flex;gap:8px">
+            <select class="mini-select" style="width:auto">
+              <option>All projects</option>
+              <option>Shared to LR</option>
+              <option>Not shared</option>
+            </select>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="curator-list">
+            <!-- Header -->
+            <div class="curator-row-header milestone">
+              <span class="col-label">Project</span>
+              <span class="col-label">Organization</span>
+              <span class="col-label">Milestone type</span>
+              <span class="col-label">Share</span>
+              <span class="col-label">Visibility</span>
+              <span class="col-label">Action</span>
+            </div>
+
+            <div class="curator-row milestone">
+              <div>
+                <div class="row-name">iRefill Pilot — Co-op UK</div>
+                <div class="row-sub">Pilot Live · Retail / Refill</div>
+              </div>
+              <div class="row-meta">Co-op UK</div>
+              <div>
+                <select class="mini-select" onchange="markDirty()">
+                  <option selected>Pilot</option>
+                  <option>Grant win</option>
+                  <option>Launch</option>
+                  <option>Speaking</option>
+                  <option>Publication</option>
+                  <option>Partnership</option>
+                  <option>Progress</option>
+                </select>
+              </div>
+              <div class="toggle-wrap">
+                <label class="toggle">
+                  <input type="checkbox" checked onchange="markDirty()">
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+              <div>
+                <select class="mini-select" onchange="markDirty()">
+                  <option selected>public</option>
+                  <option>community</option>
+                </select>
+              </div>
+              <button class="btn btn-ghost btn-sm" onclick="markDirty()">Save</button>
+            </div>
+
+            <div class="curator-row milestone">
+              <div>
+                <div class="row-name">SUFI — Fair4All Grant</div>
+                <div class="row-sub">Active · Financial Inclusion</div>
+              </div>
+              <div class="row-meta">Fair4All Finance</div>
+              <div>
+                <select class="mini-select" onchange="markDirty()">
+                  <option>Pilot</option>
+                  <option selected>Grant win</option>
+                  <option>Launch</option>
+                  <option>Speaking</option>
+                  <option>Publication</option>
+                  <option>Partnership</option>
+                  <option>Progress</option>
+                </select>
+              </div>
+              <div class="toggle-wrap">
+                <label class="toggle">
+                  <input type="checkbox" checked onchange="markDirty()">
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+              <div>
+                <select class="mini-select" onchange="markDirty()">
+                  <option>public</option>
+                  <option selected>community</option>
+                </select>
+              </div>
+              <button class="btn btn-ghost btn-sm" onclick="markDirty()">Save</button>
+            </div>
+
+            <div class="curator-row milestone">
+              <div>
+                <div class="row-name">Beeok — Circular Cities Report</div>
+                <div class="row-sub">Research · Zero Waste</div>
+              </div>
+              <div class="row-meta">Beeok</div>
+              <div>
+                <select class="mini-select" onchange="markDirty()">
+                  <option>Pilot</option>
+                  <option>Grant win</option>
+                  <option>Launch</option>
+                  <option>Speaking</option>
+                  <option selected>Publication</option>
+                  <option>Partnership</option>
+                  <option>Progress</option>
+                </select>
+              </div>
+              <div class="toggle-wrap">
+                <label class="toggle">
+                  <input type="checkbox" checked onchange="markDirty()">
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+              <div>
+                <select class="mini-select" onchange="markDirty()">
+                  <option selected>public</option>
+                  <option>community</option>
+                </select>
+              </div>
+              <button class="btn btn-ghost btn-sm" onclick="markDirty()">Save</button>
+            </div>
+
+            <div class="curator-row milestone">
+              <div>
+                <div class="row-name">Yenxa — EPR Stakeholder Summit</div>
+                <div class="row-sub">Event · Policy</div>
+              </div>
+              <div class="row-meta">Yenxa</div>
+              <div>
+                <select class="mini-select" onchange="markDirty()">
+                  <option>Pilot</option>
+                  <option>Grant win</option>
+                  <option>Launch</option>
+                  <option selected>Speaking</option>
+                  <option>Publication</option>
+                  <option>Partnership</option>
+                  <option>Progress</option>
+                </select>
+              </div>
+              <div class="toggle-wrap">
+                <label class="toggle">
+                  <input type="checkbox" onchange="markDirty()">
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+              <div>
+                <select class="mini-select" onchange="markDirty()">
+                  <option selected>public</option>
+                  <option>community</option>
+                </select>
+              </div>
+              <button class="btn btn-ghost btn-sm" onclick="markDirty()">Save</button>
+            </div>
+
+            <div class="curator-row milestone">
+              <div>
+                <div class="row-name">Retail Refill — Waitrose Scoping</div>
+                <div class="row-sub">Scoping · Retail / Refill</div>
+              </div>
+              <div class="row-meta">Waitrose</div>
+              <div>
+                <select class="mini-select" onchange="markDirty()">
+                  <option>Pilot</option>
+                  <option>Grant win</option>
+                  <option>Launch</option>
+                  <option>Speaking</option>
+                  <option>Publication</option>
+                  <option>Partnership</option>
+                  <option selected>Progress</option>
+                </select>
+              </div>
+              <div class="toggle-wrap">
+                <label class="toggle">
+                  <input type="checkbox" onchange="markDirty()">
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+              <div>
+                <select class="mini-select" onchange="markDirty()">
+                  <option>public</option>
+                  <option selected>community</option>
+                </select>
+              </div>
+              <button class="btn btn-ghost btn-sm" onclick="markDirty()">Save</button>
+            </div>
+
+          </div>
+          <div style="padding:14px 0 2px;display:flex;justify-content:center">
+            <button class="btn btn-ghost btn-sm">Load all 18 projects</button>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /tab-milestones -->
+
+    <!-- ──────────────────────────── TAB: SIGNALS ── -->
+    <div class="tab-panel" id="tab-signals">
+
+      <div class="info-note">
+        <span class="info-note-icon">ℹ</span>
+        <span>Mark Insight Briefs as <strong>Community Relevant</strong> to surface them in Living Room Module E (Community Signals). Set Visibility to control who sees the full detail. Only curated items appear — this is not automated scraping.</span>
+      </div>
+
+      <div class="stats-row">
+        <div class="stat-pill">
+          <div class="stat-label">Insight Briefs</div>
+          <div class="stat-value">12</div>
+          <div class="stat-sub">Total in system</div>
+        </div>
+        <div class="stat-pill">
+          <div class="stat-label">Community Relevant</div>
+          <div class="stat-value lime">4</div>
+          <div class="stat-sub">Tagged for Living Room</div>
+        </div>
+        <div class="stat-pill">
+          <div class="stat-label">Showing in LR</div>
+          <div class="stat-value">3</div>
+          <div class="stat-sub">Active in feed</div>
+        </div>
+        <div class="stat-pill">
+          <div class="stat-label">Awaiting review</div>
+          <div class="stat-value" style="color:#f59e0b">5</div>
+          <div class="stat-sub">Not yet classified</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-header-left">
+            <div class="card-icon" style="background:#dbeafe"><span>📡</span></div>
+            <span class="card-label">Signal Curator</span>
+          </div>
+          <div style="display:flex;gap:8px">
+            <select class="mini-select" style="width:auto">
+              <option>All briefs</option>
+              <option>Community relevant</option>
+              <option>Not classified</option>
+            </select>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="curator-list">
+            <!-- Header -->
+            <div class="curator-row-header signal">
+              <span class="col-label">Brief</span>
+              <span class="col-label">Theme</span>
+              <span class="col-label">Community</span>
+              <span class="col-label">Visibility</span>
+              <span class="col-label">Action</span>
+            </div>
+
+            <div class="curator-row signal">
+              <div>
+                <div class="row-name">UK EPR Update — April 2026</div>
+                <div class="row-sub">Policy Doc · UK · High confidence</div>
+              </div>
+              <div><span class="pill amber">Policy / Grants</span></div>
+              <div class="toggle-wrap">
+                <label class="toggle">
+                  <input type="checkbox" checked onchange="markDirty()">
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+              <div>
+                <select class="mini-select" onchange="markDirty()">
+                  <option selected>public</option>
+                  <option>community</option>
+                </select>
+              </div>
+              <button class="btn btn-ghost btn-sm" onclick="markDirty()">Save</button>
+            </div>
+
+            <div class="curator-row signal">
+              <div>
+                <div class="row-name">Circular Economy Investment Trends</div>
+                <div class="row-sub">Sector Report · Global · Medium</div>
+              </div>
+              <div><span class="pill" style="background:#dcfce7;color:#166534">Circular Economy</span></div>
+              <div class="toggle-wrap">
+                <label class="toggle">
+                  <input type="checkbox" checked onchange="markDirty()">
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+              <div>
+                <select class="mini-select" onchange="markDirty()">
+                  <option selected>public</option>
+                  <option>community</option>
+                </select>
+              </div>
+              <button class="btn btn-ghost btn-sm" onclick="markDirty()">Save</button>
+            </div>
+
+            <div class="curator-row signal">
+              <div>
+                <div class="row-name">LIFE Programme — Round 2 Open</div>
+                <div class="row-sub">Policy Doc · EU · High</div>
+              </div>
+              <div><span class="pill amber">Policy / Grants</span></div>
+              <div class="toggle-wrap">
+                <label class="toggle">
+                  <input type="checkbox" checked onchange="markDirty()">
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+              <div>
+                <select class="mini-select" onchange="markDirty()">
+                  <option>public</option>
+                  <option selected>community</option>
+                </select>
+              </div>
+              <button class="btn btn-ghost btn-sm" onclick="markDirty()">Save</button>
+            </div>
+
+            <div class="curator-row signal">
+              <div>
+                <div class="row-name">Refill Adoption Rates — UK Q1 2026</div>
+                <div class="row-sub">Report · UK · High</div>
+              </div>
+              <div><span class="pill" style="background:#dcfce7;color:#166534">Circular Economy</span></div>
+              <div class="toggle-wrap">
+                <label class="toggle">
+                  <input type="checkbox" onchange="markDirty()">
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+              <div>
+                <select class="mini-select" onchange="markDirty()">
+                  <option selected>public</option>
+                  <option>community</option>
+                </select>
+              </div>
+              <button class="btn btn-ghost btn-sm" onclick="markDirty()">Save</button>
+            </div>
+
+            <div class="curator-row signal">
+              <div>
+                <div class="row-name">SUFI — Financial Inclusion LatAm Trends</div>
+                <div class="row-sub">Article · LatAm · Medium</div>
+              </div>
+              <div><span class="pill blue">Ecosystem / VC</span></div>
+              <div class="toggle-wrap">
+                <label class="toggle">
+                  <input type="checkbox" onchange="markDirty()">
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+              <div>
+                <select class="mini-select" onchange="markDirty()">
+                  <option>public</option>
+                  <option selected>community</option>
+                </select>
+              </div>
+              <button class="btn btn-ghost btn-sm" onclick="markDirty()">Save</button>
+            </div>
+
+          </div>
+          <div style="padding:14px 0 2px;display:flex;justify-content:center">
+            <button class="btn btn-ghost btn-sm">Load all 12 briefs</button>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /tab-signals -->
+
+    <!-- ──────────────────────────── TAB: THEMES ── -->
+    <div class="tab-panel" id="tab-themes">
+
+      <div class="info-note">
+        <span class="info-note-icon">ℹ</span>
+        <span>Themes in Motion are manually curated. They represent what the House is actively working on or monitoring. Topic-level only — no client names, no pipeline details. Max 6 active themes shown in Living Room at a time.</span>
+      </div>
+
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+        <div>
+          <div style="font-size:12px;font-weight:700;color:var(--ink)">6 themes configured · 4 active · 2 monitoring</div>
+          <div style="font-size:10px;color:var(--muted);margin-top:3px">Living Room shows max 6. Drag to reorder (coming soon).</div>
+        </div>
+        <button class="btn btn-lime" onclick="markDirty()">+ Add theme</button>
+      </div>
+
+      <div class="three-col">
+
+        <div class="theme-card active-theme">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span class="status-dot active"></span>
+              <span style="font-size:9px;font-weight:700;color:var(--hot);letter-spacing:0.5px">ACTIVE</span>
+            </div>
+            <div style="display:flex;gap:6px">
+              <button class="btn btn-ghost btn-sm" onclick="markDirty()">Edit</button>
+              <button class="btn btn-ghost btn-sm" style="color:#ef4444;border-color:#fecaca" onclick="markDirty()">Remove</button>
+            </div>
+          </div>
+          <div class="theme-name">Retail Refill Scale-Up</div>
+          <div class="theme-desc">Scaling reusable packaging in mainstream retail — pilots across UK grocers and FMCG brands.</div>
+          <div class="theme-tags">
+            <span class="pill" style="background:#dcfce7;color:#166534">Refill</span>
+            <span class="pill" style="background:#dbeafe;color:#1e40af">Retail</span>
+            <span class="pill" style="background:#f3f4f6;color:#4b5563">UK</span>
+          </div>
+          <div class="theme-footer">
+            <div class="theme-stats">
+              <span><span class="theme-stat-val">5</span> members</span>
+              <span><span class="theme-stat-val">4</span> projects</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="theme-card active-theme">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span class="status-dot active"></span>
+              <span style="font-size:9px;font-weight:700;color:var(--hot);letter-spacing:0.5px">ACTIVE</span>
+            </div>
+            <div style="display:flex;gap:6px">
+              <button class="btn btn-ghost btn-sm" onclick="markDirty()">Edit</button>
+              <button class="btn btn-ghost btn-sm" style="color:#ef4444;border-color:#fecaca" onclick="markDirty()">Remove</button>
+            </div>
+          </div>
+          <div class="theme-name">EPR Policy Navigation</div>
+          <div class="theme-desc">Extended Producer Responsibility — tracking new rules and helping startups and corporates adapt.</div>
+          <div class="theme-tags">
+            <span class="pill amber">Policy</span>
+            <span class="pill" style="background:#ede9fe;color:#5b21b6">EPR</span>
+            <span class="pill" style="background:#f3f4f6;color:#4b5563">EU / UK</span>
+          </div>
+          <div class="theme-footer">
+            <div class="theme-stats">
+              <span><span class="theme-stat-val">4</span> members</span>
+              <span><span class="theme-stat-val">2</span> projects</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="theme-card active-theme">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span class="status-dot active"></span>
+              <span style="font-size:9px;font-weight:700;color:var(--hot);letter-spacing:0.5px">ACTIVE</span>
+            </div>
+            <div style="display:flex;gap:6px">
+              <button class="btn btn-ghost btn-sm" onclick="markDirty()">Edit</button>
+              <button class="btn btn-ghost btn-sm" style="color:#ef4444;border-color:#fecaca" onclick="markDirty()">Remove</button>
+            </div>
+          </div>
+          <div class="theme-name">Circular Finance &amp; Impact Investment</div>
+          <div class="theme-desc">Connecting impact investors with circular economy startups — deal flow and grant-equity blends.</div>
+          <div class="theme-tags">
+            <span class="pill" style="background:#dcfce7;color:#166534">Finance</span>
+            <span class="pill" style="background:#dbeafe;color:#1e40af">Investment</span>
+            <span class="pill" style="background:#f3f4f6;color:#4b5563">Global</span>
+          </div>
+          <div class="theme-footer">
+            <div class="theme-stats">
+              <span><span class="theme-stat-val">6</span> members</span>
+              <span><span class="theme-stat-val">3</span> projects</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="theme-card active-theme">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span class="status-dot active"></span>
+              <span style="font-size:9px;font-weight:700;color:var(--hot);letter-spacing:0.5px">ACTIVE</span>
+            </div>
+            <div style="display:flex;gap:6px">
+              <button class="btn btn-ghost btn-sm" onclick="markDirty()">Edit</button>
+              <button class="btn btn-ghost btn-sm" style="color:#ef4444;border-color:#fecaca" onclick="markDirty()">Remove</button>
+            </div>
+          </div>
+          <div class="theme-name">Cities &amp; Municipal Waste Innovation</div>
+          <div class="theme-desc">Working with city governments on zero-waste systems, collection infrastructure, and behaviour change.</div>
+          <div class="theme-tags">
+            <span class="pill" style="background:#dbeafe;color:#1e40af">Cities</span>
+            <span class="pill" style="background:#f3f4f6;color:#4b5563">Zero Waste</span>
+            <span class="pill" style="background:#f3f4f6;color:#4b5563">LatAm</span>
+          </div>
+          <div class="theme-footer">
+            <div class="theme-stats">
+              <span><span class="theme-stat-val">3</span> members</span>
+              <span><span class="theme-stat-val">2</span> projects</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="theme-card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span class="status-dot monitoring"></span>
+              <span style="font-size:9px;font-weight:700;color:var(--warm);letter-spacing:0.5px">MONITORING</span>
+            </div>
+            <div style="display:flex;gap:6px">
+              <button class="btn btn-ghost btn-sm" onclick="markDirty()">Edit</button>
+              <button class="btn btn-ghost btn-sm" style="color:#ef4444;border-color:#fecaca" onclick="markDirty()">Remove</button>
+            </div>
+          </div>
+          <div class="theme-name">Packaging Innovation &amp; Alternatives</div>
+          <div class="theme-desc">New materials, compostable packaging, and the shift away from single-use plastic across sectors.</div>
+          <div class="theme-tags">
+            <span class="pill" style="background:#ede9fe;color:#5b21b6">Packaging</span>
+            <span class="pill" style="background:#f3f4f6;color:#4b5563">EU</span>
+          </div>
+          <div class="theme-footer">
+            <div class="theme-stats">
+              <span><span class="theme-stat-val">2</span> members</span>
+              <span><span class="theme-stat-val">1</span> project</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="theme-card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span class="status-dot monitoring"></span>
+              <span style="font-size:9px;font-weight:700;color:var(--warm);letter-spacing:0.5px">MONITORING</span>
+            </div>
+            <div style="display:flex;gap:6px">
+              <button class="btn btn-ghost btn-sm" onclick="markDirty()">Edit</button>
+              <button class="btn btn-ghost btn-sm" style="color:#ef4444;border-color:#fecaca" onclick="markDirty()">Remove</button>
+            </div>
+          </div>
+          <div class="theme-name">Behaviour Change at Consumer Level</div>
+          <div class="theme-desc">Research and programmes shifting consumer habits around reuse, refill, and sustainable purchasing.</div>
+          <div class="theme-tags">
+            <span class="pill" style="background:#dcfce7;color:#166534">Behaviour</span>
+            <span class="pill" style="background:#f3f4f6;color:#4b5563">Research</span>
+            <span class="pill" style="background:#f3f4f6;color:#4b5563">UK</span>
+          </div>
+          <div class="theme-footer">
+            <div class="theme-stats">
+              <span><span class="theme-stat-val">3</span> members</span>
+              <span><span class="theme-stat-val">1</span> project</span>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /three-col -->
+
+    </div><!-- /tab-themes -->
+
+  </div><!-- /content -->
+
+</div><!-- /main -->
+
+<!-- Save bar -->
+<div class="save-bar" id="save-bar">
+  <span>You have <span class="save-bar-count" id="dirty-count">0</span> unsaved changes</span>
+  <button class="btn btn-ghost btn-sm" style="color:white;border-color:rgba(255,255,255,0.25)" onclick="hideSaveBar()">Discard</button>
+  <button class="btn btn-lime btn-sm" onclick="saveAll()">Save to Notion</button>
+</div>
+
+<script>
+  let dirtyCount = 0;
+
+  function toggleGroup(id) {
+    const g = document.getElementById(id);
+    g.classList.toggle('collapsed');
+  }
+
+  function switchTab(panelId, btn) {
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(panelId).classList.add('active');
+    btn.classList.add('active');
+  }
+
+  function markDirty() {
+    dirtyCount++;
+    document.getElementById('dirty-count').textContent = dirtyCount;
+    document.getElementById('save-bar').classList.add('visible');
+  }
+
+  function showSaveBar() {
+    if (dirtyCount === 0) {
+      document.getElementById('dirty-count').textContent = 'all';
+      document.getElementById('save-bar').classList.add('visible');
+    }
+  }
+
+  function hideSaveBar() {
+    dirtyCount = 0;
+    document.getElementById('dirty-count').textContent = 0;
+    document.getElementById('save-bar').classList.remove('visible');
+  }
+
+  function saveAll() {
+    const bar = document.getElementById('save-bar');
+    bar.querySelector('span').textContent = '✓ Saved to Notion';
+    setTimeout(() => {
+      hideSaveBar();
+      bar.querySelector('span').textContent = 'You have ';
+      bar.querySelector('span').append(document.getElementById('dirty-count'));
+      bar.querySelector('span').append(' unsaved changes');
+    }, 2000);
+  }
+</script>
+</body>
+</html>

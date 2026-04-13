@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Common House — Design System</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,700;1,800&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --lime:    #c8f55a;
+  --black:   #000000;
+  --white:   #ffffff;
+  --ink:     #0e0e0e;
+  --muted:   #6b6b6b;
+  --border:  #d8d8d0;
+  --bg:      #eeeee8;
+  --hot:     #22c55e;
+  --warm:    #f59e0b;
+  --cold:    #ef4444;
+  --dormant: #9ca3af;
+}
+
+body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--ink); }
+
+/* ── Nav ── */
+.ds-nav {
+  position: sticky; top: 0; z-index: 100;
+  background: var(--black);
+  padding: 0 52px;
+  display: flex; align-items: center; gap: 32px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+.ds-nav-logo { display: flex; align-items: center; gap: 10px; padding: 16px 0; }
+.ds-nav-logo-mark {
+  width: 28px; height: 28px; border-radius: 7px;
+  background: var(--lime); display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 900; color: var(--black); letter-spacing: -0.5px;
+}
+.ds-nav-title { font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.6); letter-spacing: 0.3px; }
+.ds-nav-links { display: flex; gap: 4px; margin-left: 20px; }
+.ds-nav-link {
+  font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.38);
+  padding: 6px 12px; border-radius: 6px; cursor: pointer;
+  text-decoration: none; transition: color 0.15s, background 0.15s;
+}
+.ds-nav-link:hover { color: var(--white); background: rgba(255,255,255,0.07); }
+.ds-nav-link.active { color: var(--white); background: rgba(200,245,90,0.12); }
+
+/* ── Hero ── */
+.ds-hero {
+  background: var(--black);
+  padding: 64px 52px 60px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.ds-eyebrow {
+  font-size: 8px; font-weight: 700; letter-spacing: 2.5px;
+  text-transform: uppercase; color: rgba(255,255,255,0.2); margin-bottom: 16px;
+}
+.ds-hero-title {
+  font-size: 3.2rem; font-weight: 300; color: var(--white);
+  letter-spacing: -2px; line-height: 1; margin-bottom: 16px;
+}
+.ds-hero-title em { font-weight: 900; font-style: italic; color: var(--lime); }
+.ds-hero-sub { font-size: 13px; color: rgba(255,255,255,0.38); max-width: 480px; line-height: 1.65; }
+
+/* ── Layout ── */
+.ds-body { display: grid; grid-template-columns: 200px 1fr; min-height: calc(100vh - 180px); }
+
+.ds-sidebar {
+  position: sticky; top: 53px; height: calc(100vh - 53px);
+  overflow-y: auto; background: var(--white);
+  border-right: 1px solid var(--border);
+  padding: 24px 0;
+}
+.ds-sidebar-section { font-size: 7px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: rgba(0,0,0,0.2); padding: 0 18px; margin: 16px 0 6px; }
+.ds-sidebar-link {
+  display: block; padding: 6px 18px; font-size: 11px; font-weight: 500;
+  color: rgba(0,0,0,0.45); text-decoration: none; cursor: pointer;
+  transition: color 0.15s, background 0.15s; border-left: 2px solid transparent;
+}
+.ds-sidebar-link:hover { color: var(--ink); background: rgba(0,0,0,0.03); }
+.ds-sidebar-link.active { color: var(--ink); border-left-color: var(--lime); background: rgba(200,245,90,0.12); font-weight: 600; }
+
+.ds-content { padding: 48px 52px 80px; }
+
+/* ── Sections ── */
+.ds-section { margin-bottom: 72px; }
+.ds-section-title {
+  font-size: 1.5rem; font-weight: 800; color: var(--ink);
+  letter-spacing: -0.5px; margin-bottom: 6px;
+}
+.ds-section-desc { font-size: 12px; color: var(--muted); line-height: 1.6; margin-bottom: 32px; max-width: 560px; }
+.ds-divider { height: 1px; background: var(--border); margin-bottom: 32px; }
+
+/* ── Subsections ── */
+.ds-sub-title { font-size: 9px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: rgba(0,0,0,0.28); margin-bottom: 16px; margin-top: 32px; }
+
+/* ── Token swatches ── */
+.swatch-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
+.swatch {
+  border-radius: 10px; overflow: hidden;
+  border: 1.5px solid var(--border);
+}
+.swatch-color { height: 64px; }
+.swatch-info { padding: 10px 12px; background: var(--white); }
+.swatch-name { font-size: 10px; font-weight: 700; color: var(--ink); }
+.swatch-hex { font-size: 9.5px; color: var(--muted); font-family: monospace; margin-top: 2px; }
+.swatch-use { font-size: 9px; color: var(--muted); margin-top: 4px; line-height: 1.4; }
+
+/* ── Type scale ── */
+.type-row {
+  display: grid; grid-template-columns: 200px 1fr;
+  gap: 20px; align-items: center;
+  padding: 16px 0; border-bottom: 1px solid var(--border);
+}
+.type-row:last-child { border-bottom: none; }
+.type-meta { }
+.type-label { font-size: 9px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: rgba(0,0,0,0.28); }
+.type-spec { font-size: 9.5px; color: var(--muted); margin-top: 3px; line-height: 1.5; font-family: monospace; }
+
+/* ── Component demos ── */
+.demo-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start; margin-bottom: 24px; }
+.demo-block { background: var(--white); border: 1.5px solid var(--border); border-radius: 12px; padding: 20px; }
+.demo-label { font-size: 8px; font-weight: 700; letter-spacing: 1.8px; text-transform: uppercase; color: rgba(0,0,0,0.22); margin-bottom: 12px; }
+
+/* Re-use platform styles */
+.btn { display: inline-flex; align-items: center; gap: 6px; font-size: 10.5px; font-weight: 700; padding: 8px 16px; border-radius: 8px; border: none; cursor: pointer; letter-spacing: 0.2px; transition: opacity 0.15s; font-family: 'Inter', sans-serif; }
+.btn:hover { opacity: 0.82; }
+.btn-primary { background: var(--black); color: var(--white); }
+.btn-lime { background: var(--lime); color: var(--black); }
+.btn-ghost { background: transparent; border: 1.5px solid var(--border); color: var(--ink); }
+
+.pill { display: inline-flex; align-items: center; background: var(--black); color: var(--white); font-size: 8px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; border-radius: 20px; padding: 3px 9px; }
+.pill.lime { background: var(--lime); color: var(--black); }
+.pill.ghost { background: transparent; border: 1.5px solid #ddd; color: #888; }
+.pill.amber { background: #fff3cd; color: #7a5800; }
+.pill.red { background: #fee2e2; color: #991b1b; }
+
+.warmth { display: inline-flex; align-items: center; gap: 5px; font-size: 9.5px; font-weight: 600; color: var(--muted); }
+.warmth-dot { width: 7px; height: 7px; border-radius: 50%; }
+.warmth-dot.hot { background: var(--hot); }
+.warmth-dot.warm { background: var(--warm); }
+.warmth-dot.cold { background: var(--cold); }
+.warmth-dot.dormant { background: var(--dormant); }
+
+.nav-badge { background: rgba(0,0,0,0.07); color: rgba(0,0,0,0.38); font-size: 8.5px; font-weight: 700; padding: 2px 6px; border-radius: 8px; }
+.nav-badge.red { background: rgba(239,68,68,0.1); color: #dc2626; }
+
+.stat-pill { background: var(--white); border: 1.5px solid var(--border); border-radius: 12px; padding: 16px 18px; min-width: 130px; }
+.stat-label-ds { font-size: 8px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: rgba(0,0,0,0.25); margin-bottom: 7px; }
+.stat-value-ds { font-size: 1.6rem; font-weight: 900; color: var(--ink); letter-spacing: -1px; line-height: 1; }
+.stat-value-ds.lime { color: #3a8c00; }
+.stat-sub-ds { font-size: 10px; color: var(--muted); margin-top: 5px; }
+
+.p1-banner { background: #1a0000; border: 1px solid rgba(239,68,68,0.3); border-radius: 10px; padding: 12px 18px; display: flex; align-items: center; gap: 12px; }
+.p1-dot { width: 7px; height: 7px; border-radius: 50%; background: #ef4444; flex-shrink: 0; }
+.p1-text { font-size: 12px; font-weight: 600; color: #fca5a5; flex: 1; line-height: 1.5; }
+.p1-link { font-size: 10px; font-weight: 700; color: #ef4444; text-decoration: none; letter-spacing: 0.3px; opacity: 0.8; }
+
+.card-demo { background: var(--white); border: 1.5px solid var(--border); border-radius: 14px; overflow: hidden; width: 280px; }
+.card-demo-header { padding: 14px 18px 12px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 9px; }
+.card-demo-icon { width: 26px; height: 26px; border-radius: 7px; background: var(--ink); display: flex; align-items: center; justify-content: center; font-size: 12px; flex-shrink: 0; }
+.card-demo-icon.lime { background: var(--lime); }
+.card-demo-icon.ghost { background: var(--bg); border: 1px solid var(--border); }
+.card-demo-label { font-size: 12px; font-weight: 800; color: var(--ink); letter-spacing: -0.2px; }
+.card-demo-body { padding: 16px 18px; font-size: 11px; color: var(--muted); line-height: 1.6; }
+
+.section-bar-demo { display: flex; align-items: center; gap: 12px; }
+.section-label-ds { font-size: 8.5px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: rgba(0,0,0,0.28); white-space: nowrap; }
+.section-line-ds { flex: 1; height: 1px; background: var(--border); }
+.section-count-ds { font-size: 8.5px; font-weight: 700; color: rgba(0,0,0,0.18); }
+
+/* Severity */
+.sev { display: inline-flex; align-items: center; font-size: 8.5px; font-weight: 700; padding: 2px 8px; border-radius: 5px; letter-spacing: 0.3px; }
+.sev.critical { background: #fee2e2; color: #991b1b; }
+.sev.high { background: #fffbeb; color: #92400e; }
+.sev.medium { background: #eff6ff; color: #1e40af; }
+.sev.low { background: var(--bg); color: var(--muted); }
+.sev.ok { background: rgba(200,245,90,0.2); color: #2d6a00; }
+
+/* Radius table */
+.radius-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 12px; }
+.radius-demo { background: var(--white); border: 1.5px solid var(--border); padding: 20px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.radius-box { width: 56px; height: 56px; background: var(--ink); }
+.radius-name { font-size: 9px; font-weight: 700; text-align: center; color: var(--ink); }
+.radius-val { font-size: 9px; color: var(--muted); font-family: monospace; }
+
+/* Transitions demo */
+.trans-demo { display: flex; gap: 12px; flex-wrap: wrap; }
+.trans-box {
+  width: 80px; height: 80px; background: var(--white); border: 1.5px solid var(--border);
+  border-radius: 12px; display: flex; align-items: center; justify-content: center;
+  font-size: 9px; font-weight: 700; color: var(--muted); text-align: center;
+  cursor: pointer; line-height: 1.4;
+}
+.trans-box.card-t:hover { border-color: #aaa; transform: translateY(-2px); transition: border-color 0.2s, transform 0.15s; }
+.trans-box.btn-t:hover { opacity: 0.82; transition: opacity 0.15s; }
+.trans-box.nav-t:hover { color: var(--ink); background: rgba(0,0,0,0.03); transition: color 0.15s, background 0.15s; }
+
+/* Checklist */
+.checklist { display: flex; flex-direction: column; gap: 10px; }
+.check-item { display: flex; align-items: flex-start; gap: 12px; padding: 12px 16px; background: var(--white); border: 1.5px solid var(--border); border-radius: 10px; }
+.check-box { width: 18px; height: 18px; border-radius: 5px; border: 1.5px solid var(--border); flex-shrink: 0; margin-top: 1px; }
+.check-text { font-size: 11px; color: var(--ink); line-height: 1.5; }
+.check-code { font-family: monospace; font-size: 10px; background: var(--bg); padding: 1px 6px; border-radius: 4px; color: #555; }
+
+/* Donts */
+.dont-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+.dont-item { padding: 14px 16px; border-radius: 10px; border: 1.5px solid #fee2e2; background: #fff8f8; display: flex; gap: 10px; align-items: flex-start; }
+.dont-x { font-size: 12px; color: #dc2626; font-weight: 900; flex-shrink: 0; margin-top: 1px; }
+.dont-text { font-size: 11px; color: var(--ink); line-height: 1.5; }
+
+/* Code block */
+.code { background: #0e0e0e; color: #c8f55a; font-family: 'Menlo', 'Courier New', monospace; font-size: 11px; line-height: 1.7; padding: 20px 24px; border-radius: 10px; overflow-x: auto; white-space: pre; margin-bottom: 16px; }
+.code .comment { color: rgba(200,245,90,0.35); }
+.code .prop { color: #7dd3fc; }
+.code .val { color: #fca5a5; }
+.code .cls { color: rgba(255,255,255,0.7); }
+</style>
+</head>
+<body>
+
+<!-- Nav -->
+<nav class="ds-nav">
+  <div class="ds-nav-logo">
+    <div class="ds-nav-logo-mark">CH</div>
+    <span class="ds-nav-title">Design System</span>
+  </div>
+  <div class="ds-nav-links">
+    <a class="ds-nav-link active" href="#tokens">Tokens</a>
+    <a class="ds-nav-link" href="#typography">Tipografía</a>
+    <a class="ds-nav-link" href="#layout">Layout</a>
+    <a class="ds-nav-link" href="#components">Componentes</a>
+    <a class="ds-nav-link" href="#signals">Señales</a>
+    <a class="ds-nav-link" href="#motion">Motion</a>
+    <a class="ds-nav-link" href="#rules">Reglas</a>
+    <a class="ds-nav-link" href="#checklist">Checklist</a>
+  </div>
+</nav>
+
+<!-- Hero -->
+<div class="ds-hero">
+  <p class="ds-eyebrow">Common House · Platform</p>
+  <h1 class="ds-hero-title">Design <em>System</em></h1>
+  <p class="ds-hero-sub">Referencia canónica para construir nuevas vistas. Todo extraído del CSS existente — no inventar variantes sin aprobación.</p>
+</div>
+
+<div class="ds-body">
+
+  <!-- Sidebar -->
+  <aside class="ds-sidebar">
+    <div class="ds-sidebar-section">Fundamentos</div>
+    <a class="ds-sidebar-link active" href="#tokens">Tokens de color</a>
+    <a class="ds-sidebar-link" href="#typography">Tipografía</a>
+    <a class="ds-sidebar-link" href="#layout">Layout</a>
+    <a class="ds-sidebar-link" href="#motion">Motion</a>
+    <a class="ds-sidebar-link" href="#radii">Radios y bordes</a>
+    <div class="ds-sidebar-section">Componentes</div>
+    <a class="ds-sidebar-link" href="#buttons">Botones</a>
+    <a class="ds-sidebar-link" href="#pills">Pills</a>
+    <a class="ds-sidebar-link" href="#cards">Cards</a>
+    <a class="ds-sidebar-link" href="#stats">Stat pills</a>
+    <a class="ds-sidebar-link" href="#sectionbar">Section bar</a>
+    <a class="ds-sidebar-link" href="#p1banner">P1 Banner</a>
+    <a class="ds-sidebar-link" href="#signals">Señales</a>
+    <div class="ds-sidebar-section">Patrones</div>
+    <a class="ds-sidebar-link" href="#pageheader">Page header</a>
+    <a class="ds-sidebar-link" href="#nav">Nav sidebar</a>
+    <a class="ds-sidebar-link" href="#tabs">Tabs</a>
+    <div class="ds-sidebar-section">Guidelines</div>
+    <a class="ds-sidebar-link" href="#rules">No hacer</a>
+    <a class="ds-sidebar-link" href="#checklist">Checklist</a>
+  </aside>
+
+  <!-- Content -->
+  <main class="ds-content">
+
+    <!-- TOKENS -->
+    <section class="ds-section" id="tokens">
+      <h2 class="ds-section-title">Tokens de color</h2>
+      <p class="ds-section-desc">9 variables CSS. Nunca usar valores hex directos en el código — siempre via var().</p>
+
+      <div class="swatch-grid">
+        <div class="swatch">
+          <div class="swatch-color" style="background:#c8f55a;"></div>
+          <div class="swatch-info"><div class="swatch-name">--lime</div><div class="swatch-hex">#c8f55a</div><div class="swatch-use">CTAs, active states, em title</div></div>
+        </div>
+        <div class="swatch">
+          <div class="swatch-color" style="background:#000000;"></div>
+          <div class="swatch-info"><div class="swatch-name">--black</div><div class="swatch-hex">#000000</div><div class="swatch-use">Page headers, btn-primary</div></div>
+        </div>
+        <div class="swatch">
+          <div class="swatch-color" style="background:#ffffff;border-bottom:1px solid #eee;"></div>
+          <div class="swatch-info"><div class="swatch-name">--white</div><div class="swatch-hex">#ffffff</div><div class="swatch-use">Cards, sidebar, contenido</div></div>
+        </div>
+        <div class="swatch">
+          <div class="swatch-color" style="background:#0e0e0e;"></div>
+          <div class="swatch-info"><div class="swatch-name">--ink</div><div class="swatch-hex">#0e0e0e</div><div class="swatch-use">Texto principal</div></div>
+        </div>
+        <div class="swatch">
+          <div class="swatch-color" style="background:#6b6b6b;"></div>
+          <div class="swatch-info"><div class="swatch-name">--muted</div><div class="swatch-hex">#6b6b6b</div><div class="swatch-use">Texto secundario, metadata</div></div>
+        </div>
+        <div class="swatch">
+          <div class="swatch-color" style="background:#d8d8d0;"></div>
+          <div class="swatch-info"><div class="swatch-name">--border</div><div class="swatch-hex">#d8d8d0</div><div class="swatch-use">Bordes de cards, divisores</div></div>
+        </div>
+        <div class="swatch">
+          <div class="swatch-color" style="background:#eeeee8;"></div>
+          <div class="swatch-info"><div class="swatch-name">--bg</div><div class="swatch-hex">#eeeee8</div><div class="swatch-use">Fondo general (off-white)</div></div>
+        </div>
+        <div class="swatch">
+          <div class="swatch-color" style="background:#22c55e;"></div>
+          <div class="swatch-info"><div class="swatch-name">--hot</div><div class="swatch-hex">#22c55e</div><div class="swatch-use">Relación caliente / positivo</div></div>
+        </div>
+        <div class="swatch">
+          <div class="swatch-color" style="background:#f59e0b;"></div>
+          <div class="swatch-info"><div class="swatch-name">--warm</div><div class="swatch-hex">#f59e0b</div><div class="swatch-use">Relación tibia / advertencia</div></div>
+        </div>
+        <div class="swatch">
+          <div class="swatch-color" style="background:#ef4444;"></div>
+          <div class="swatch-info"><div class="swatch-name">--cold</div><div class="swatch-hex">#ef4444</div><div class="swatch-use">Relación fría / error</div></div>
+        </div>
+        <div class="swatch">
+          <div class="swatch-color" style="background:#9ca3af;"></div>
+          <div class="swatch-info"><div class="swatch-name">--dormant</div><div class="swatch-hex">#9ca3af</div><div class="swatch-use">Inactivo / sin señal</div></div>
+        </div>
+      </div>
+
+      <div class="ds-sub-title">Opacidades en fondo oscuro</div>
+      <div style="background:var(--black);border-radius:12px;padding:20px 24px;display:flex;flex-direction:column;gap:10px;">
+        <div style="font-size:13px;font-weight:300;color:rgba(255,255,255,1);">rgba(255,255,255,1.0) — texto activo</div>
+        <div style="font-size:13px;font-weight:400;color:rgba(255,255,255,0.6);">rgba(255,255,255,0.6) — nav links</div>
+        <div style="font-size:13px;font-weight:400;color:rgba(255,255,255,0.38);">rgba(255,255,255,0.38) — subtítulos</div>
+        <div style="font-size:13px;font-weight:400;color:rgba(255,255,255,0.2);">rgba(255,255,255,0.2) — eyebrows</div>
+        <div style="font-size:13px;font-weight:400;color:rgba(255,255,255,0.1);">rgba(255,255,255,0.1) — mínimo visible</div>
+      </div>
+    </section>
+
+    <div class="ds-divider"></div>
+
+    <!-- TIPOGRAFÍA -->
+    <section class="ds-section" id="typography">
+      <h2 class="ds-section-title">Tipografía</h2>
+      <p class="ds-section-desc">Inter en todos los pesos. El patrón de título combina weight 300 (ligero) + 900 italic lime (énfasis).</p>
+
+      <div class="ds-sub-title">Patrón de título de vista</div>
+      <div style="background:var(--black);border-radius:12px;padding:32px 36px;margin-bottom:24px;">
+        <h1 style="font-size:2.6rem;font-weight:300;color:var(--white);letter-spacing:-1.5px;line-height:1;">The <em style="font-weight:900;font-style:italic;color:var(--lime);">Garage</em></h1>
+        <p style="font-size:8px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:rgba(255,255,255,0.2);margin-top:14px;">PORTFOLIO · STARTUPS</p>
+      </div>
+
+      <div class="ds-sub-title">Escala completa</div>
+      <div>
+        <div class="type-row">
+          <div class="type-meta"><div class="type-label">Page title</div><div class="type-spec">2.6rem / 300<br>letter-spacing: -1.5px</div></div>
+          <div style="font-size:2.2rem;font-weight:300;color:var(--ink);letter-spacing:-1.5px;line-height:1;">Common House</div>
+        </div>
+        <div class="type-row">
+          <div class="type-meta"><div class="type-label">Page title em</div><div class="type-spec">2.6rem / 900 italic<br>color: --lime</div></div>
+          <div style="font-size:2.2rem;font-weight:900;font-style:italic;color:var(--lime);letter-spacing:-1.5px;line-height:1;">Garage</div>
+        </div>
+        <div class="type-row">
+          <div class="type-meta"><div class="type-label">Stat value (grande)</div><div class="type-spec">1.6rem / 900<br>letter-spacing: -1px</div></div>
+          <div style="font-size:1.6rem;font-weight:900;color:var(--ink);letter-spacing:-1px;line-height:1;">£182k</div>
+        </div>
+        <div class="type-row">
+          <div class="type-meta"><div class="type-label">Card / section name</div><div class="type-spec">14–15px / 800<br>letter-spacing: -0.4px</div></div>
+          <div style="font-size:14px;font-weight:800;color:var(--ink);letter-spacing:-0.4px;">Investor Pipeline</div>
+        </div>
+        <div class="type-row">
+          <div class="type-meta"><div class="type-label">Body text</div><div class="type-spec">12px / 400–600<br>line-height: 1.6</div></div>
+          <div style="font-size:12px;font-weight:500;color:var(--ink);line-height:1.6;max-width:360px;">Texto de contenido principal. Se usa para descripciones, párrafos informativos y metadata de segundo nivel.</div>
+        </div>
+        <div class="type-row">
+          <div class="type-meta"><div class="type-label">Label ALL-CAPS</div><div class="type-spec">8–9px / 700<br>letter-spacing: 1.5–2px<br>text-transform: uppercase</div></div>
+          <div style="font-size:8.5px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:rgba(0,0,0,0.28);">Investor Match</div>
+        </div>
+        <div class="type-row">
+          <div class="type-meta"><div class="type-label">Eyebrow (dark bg)</div><div class="type-spec">8px / 700<br>letter-spacing: 2.5px<br>rgba(255,255,255,0.2)</div></div>
+          <div style="font-size:8px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--muted);">Portfolio · Startups</div>
+        </div>
+        <div class="type-row">
+          <div class="type-meta"><div class="type-label">Meta / fecha</div><div class="type-spec">9.5–10px / 400–500<br>color: --muted</div></div>
+          <div style="font-size:10px;color:var(--muted);">Meeting 10 Apr · 2d ago</div>
+        </div>
+        <div class="type-row">
+          <div class="type-meta"><div class="type-label">Badge / pill</div><div class="type-spec">8–8.5px / 700<br>letter-spacing: 1.5px</div></div>
+          <div style="font-size:8px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;">FUNDRAISING</div>
+        </div>
+      </div>
+    </section>
+
+    <div class="ds-divider"></div>
+
+    <!-- LAYOUT -->
+    <section class="ds-section" id="layout">
+      <h2 class="ds-section-title">Layout</h2>
+      <p class="ds-section-desc">Sidebar fijo de 228px. Content area con padding simétrico de 52px. Grids con gap de 16–24px.</p>
+
+      <div class="code"><span class="comment">/* Estructura base */</span>
+<span class="prop">--sidebar-w</span>: <span class="val">228px</span>;
+
+<span class="cls">.main</span>        { margin-left: var(--sidebar-w); }
+<span class="cls">.page-header</span> { padding: <span class="val">40px 52px 44px</span>; background: var(--black); }
+<span class="cls">.content</span>     { padding: <span class="val">36px 52px 60px</span>; }
+
+<span class="comment">/* Grids de contenido */</span>
+<span class="cls">.two-col</span>    { grid-template-columns: <span class="val">1fr 1fr</span>;          gap: 20px; }
+<span class="cls">.two-col-32</span> { grid-template-columns: <span class="val">2fr 1fr</span>;          gap: 20px; }
+<span class="cls">.three-col</span>  { grid-template-columns: <span class="val">repeat(3, 1fr)</span>;   gap: 16px; }
+<span class="cls">.stats-row</span>  { grid-template-columns: <span class="val">repeat(4, 1fr)</span>;   gap: 12px; }</div>
+    </section>
+
+    <div class="ds-divider"></div>
+
+    <!-- BUTTONS -->
+    <section class="ds-section" id="buttons">
+      <h2 class="ds-section-title">Botones</h2>
+      <p class="ds-section-desc">Tres variantes. btn-lime para el CTA principal visible. btn-primary para acciones de confirmación. btn-ghost para secundarios.</p>
+      <div class="demo-row">
+        <button class="btn btn-lime">⚡ CTA Principal</button>
+        <button class="btn btn-primary">Acción primaria</button>
+        <button class="btn btn-ghost">Secundario</button>
+        <button class="btn">Neutral</button>
+      </div>
+      <div class="code"><span class="cls">.btn</span>         { font-size: <span class="val">10.5px</span>; font-weight: <span class="val">700</span>; padding: <span class="val">8px 16px</span>; border-radius: <span class="val">8px</span>; }
+<span class="cls">.btn-primary</span> { background: var(--black); color: var(--white); }
+<span class="cls">.btn-lime</span>    { background: var(--lime);  color: var(--black); }
+<span class="cls">.btn-ghost</span>   { border: <span class="val">1.5px solid</span> var(--border); color: var(--ink); }</div>
+    </section>
+
+    <div class="ds-divider"></div>
+
+    <!-- PILLS -->
+    <section class="ds-section" id="pills">
+      <h2 class="ds-section-title">Pills de status</h2>
+      <p class="ds-section-desc">Siempre ALL-CAPS, font-size 8px, border-radius 20px. Cinco variantes semánticas.</p>
+      <div class="demo-row" style="align-items:center;">
+        <span class="pill">Default</span>
+        <span class="pill lime">Activo</span>
+        <span class="pill ghost">Inactivo</span>
+        <span class="pill amber">Pendiente</span>
+        <span class="pill red">Urgente</span>
+      </div>
+      <div style="margin-top:20px;">
+        <div class="ds-sub-title">Warmth dots</div>
+        <div class="demo-row" style="align-items:center;margin-top:12px;">
+          <span class="warmth"><span class="warmth-dot hot"></span>Hot</span>
+          <span class="warmth"><span class="warmth-dot warm"></span>Warm</span>
+          <span class="warmth"><span class="warmth-dot cold"></span>Cold</span>
+          <span class="warmth"><span class="warmth-dot dormant"></span>Dormant</span>
+        </div>
+        <div style="margin-top:20px;">
+          <div class="ds-sub-title">Nav badges</div>
+          <div class="demo-row" style="align-items:center;margin-top:12px;">
+            <span class="nav-badge">5</span>
+            <span class="nav-badge red">3</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="ds-divider"></div>
+
+    <!-- CARDS -->
+    <section class="ds-section" id="cards">
+      <h2 class="ds-section-title">Cards</h2>
+      <p class="ds-section-desc">Fondo blanco, borde 1.5px, radio 14px. Tres variantes de card-icon. Hover eleva 2px.</p>
+      <div class="demo-row">
+        <div class="card-demo">
+          <div class="card-demo-header">
+            <div class="card-demo-icon">📊</div>
+            <span class="card-demo-label">Financials</span>
+          </div>
+          <div class="card-demo-body">Icono dark (default) — acciones con contexto claro.</div>
+        </div>
+        <div class="card-demo">
+          <div class="card-demo-header">
+            <div class="card-demo-icon lime">⚡</div>
+            <span class="card-demo-label">Pipeline</span>
+          </div>
+          <div class="card-demo-body">Icono lime — acciones positivas o destacadas.</div>
+        </div>
+        <div class="card-demo">
+          <div class="card-demo-header">
+            <div class="card-demo-icon ghost">◧</div>
+            <span class="card-demo-label">Pendientes</span>
+          </div>
+          <div class="card-demo-body">Icono ghost — neutral o informativo.</div>
+        </div>
+      </div>
+    </section>
+
+    <div class="ds-divider"></div>
+
+    <!-- STATS -->
+    <section class="ds-section" id="stats">
+      <h2 class="ds-section-title">Stat pills</h2>
+      <p class="ds-section-desc">Para métricas destacadas. Label ALL-CAPS arriba, valor 1.6rem en negrita, sub en muted.</p>
+      <div class="demo-row">
+        <div class="stat-pill">
+          <div class="stat-label-ds">ARR</div>
+          <div class="stat-value-ds">£182k</div>
+          <div class="stat-sub-ds">↑ 28% MoM</div>
+        </div>
+        <div class="stat-pill">
+          <div class="stat-label-ds">Runway</div>
+          <div class="stat-value-ds lime">32m</div>
+          <div class="stat-sub-ds">Burn £24k/mo</div>
+        </div>
+        <div class="stat-pill">
+          <div class="stat-label-ds">Data Room</div>
+          <div class="stat-value-ds">54%</div>
+          <div class="stat-sub-ds">13/24 docs</div>
+        </div>
+      </div>
+    </section>
+
+    <div class="ds-divider"></div>
+
+    <!-- SECTION BAR -->
+    <section class="ds-section" id="sectionbar">
+      <h2 class="ds-section-title">Section bar</h2>
+      <p class="ds-section-desc">Divisor con label ALL-CAPS y línea decorativa. Opcional: contador a la derecha.</p>
+      <div style="background:var(--white);border:1.5px solid var(--border);border-radius:12px;padding:20px;">
+        <div class="section-bar-demo">
+          <span class="section-label-ds">Investor Pipeline</span>
+          <div class="section-line-ds"></div>
+          <span class="section-count-ds">4</span>
+        </div>
+        <div style="margin-top:16px;" class="section-bar-demo">
+          <span class="section-label-ds">Grant Pipeline</span>
+          <div class="section-line-ds"></div>
+        </div>
+      </div>
+    </section>
+
+    <div class="ds-divider"></div>
+
+    <!-- P1 BANNER -->
+    <section class="ds-section" id="p1banner">
+      <h2 class="ds-section-title">P1 Banner</h2>
+      <p class="ds-section-desc">Siempre al tope de la vista. Solo para señales críticas que bloquean progreso.</p>
+      <div class="p1-banner">
+        <div class="p1-dot"></div>
+        <p class="p1-text"><strong>Fair4All Finance — deadline 30 Apr:</strong> Eligibility check pendiente. Bloquea la aplicación SUFI.</p>
+        <a class="p1-link">Revisar →</a>
+      </div>
+    </section>
+
+    <div class="ds-divider"></div>
+
+    <!-- SIGNALS -->
+    <section class="ds-section" id="signals">
+      <h2 class="ds-section-title">Señales y severity</h2>
+      <p class="ds-section-desc">Cinco niveles semánticos. Crítico y Alto siempre visibles; Medio y Bajo pueden estar colapsados.</p>
+      <div class="demo-row" style="align-items:center;margin-bottom:24px;">
+        <span class="sev critical">Crítico</span>
+        <span class="sev high">Alto</span>
+        <span class="sev medium">Medio</span>
+        <span class="sev low">Bajo</span>
+        <span class="sev ok">OK</span>
+      </div>
+      <div style="background:var(--white);border:1.5px solid var(--border);border-radius:12px;overflow:hidden;">
+        <div style="display:grid;grid-template-columns:80px 100px 120px 1fr;gap:0;font-size:8.5px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(0,0,0,0.28);padding:10px 16px;border-bottom:1px solid var(--border);">
+          <span>Nivel</span><span>Hex</span><span>Bg</span><span>Uso</span>
+        </div>
+        <div style="display:grid;grid-template-columns:80px 100px 120px 1fr;gap:0;align-items:center;padding:10px 16px;border-bottom:1px solid var(--border);">
+          <span class="sev critical">Crítico</span><span style="font-family:monospace;font-size:10px;">#dc2626</span><span style="font-family:monospace;font-size:10px;">#fee2e2</span><span style="font-size:11px;color:var(--muted);">Bloquea — sin alternativa</span>
+        </div>
+        <div style="display:grid;grid-template-columns:80px 100px 120px 1fr;gap:0;align-items:center;padding:10px 16px;border-bottom:1px solid var(--border);">
+          <span class="sev high">Alto</span><span style="font-family:monospace;font-size:10px;">#d97706</span><span style="font-family:monospace;font-size:10px;">#fffbeb</span><span style="font-size:11px;color:var(--muted);">Impacta significativamente</span>
+        </div>
+        <div style="display:grid;grid-template-columns:80px 100px 120px 1fr;gap:0;align-items:center;padding:10px 16px;border-bottom:1px solid var(--border);">
+          <span class="sev medium">Medio</span><span style="font-family:monospace;font-size:10px;">#2563eb</span><span style="font-family:monospace;font-size:10px;">#eff6ff</span><span style="font-size:11px;color:var(--muted);">Debilita — atender pronto</span>
+        </div>
+        <div style="display:grid;grid-template-columns:80px 100px 120px 1fr;gap:0;align-items:center;padding:10px 16px;border-bottom:1px solid var(--border);">
+          <span class="sev low">Bajo</span><span style="font-family:monospace;font-size:10px;">#6b6b6b</span><span style="font-family:monospace;font-size:10px;">--bg</span><span style="font-size:11px;color:var(--muted);">Mejora — cuando haya tiempo</span>
+        </div>
+        <div style="display:grid;grid-template-columns:80px 100px 120px 1fr;gap:0;align-items:center;padding:10px 16px;">
+          <span class="sev ok">OK</span><span style="font-family:monospace;font-size:10px;">#16a34a</span><span style="font-family:monospace;font-size:10px;">lime 20%</span><span style="font-size:11px;color:var(--muted);">Confirmado / completo</span>
+        </div>
+      </div>
+    </section>
+
+    <div class="ds-divider"></div>
+
+    <!-- MOTION -->
+    <section class="ds-section" id="motion">
+      <h2 class="ds-section-title">Motion</h2>
+      <p class="ds-section-desc">Tres duraciones estándar. Hover sobre cada caja para ver la transición.</p>
+      <div class="trans-demo">
+        <div class="trans-box card-t">Card hover<br><span style="color:var(--lime);font-family:monospace;font-size:8px;">0.15s / 0.2s</span></div>
+        <div class="trans-box btn-t">Button hover<br><span style="color:var(--lime);font-family:monospace;font-size:8px;">opacity 0.15s</span></div>
+        <div class="trans-box nav-t">Nav hover<br><span style="color:var(--lime);font-family:monospace;font-size:8px;">color 0.15s</span></div>
+      </div>
+      <div class="code" style="margin-top:20px;"><span class="comment">/* Cards — elevación */</span>
+transition: border-color <span class="val">0.2s</span>, transform <span class="val">0.15s</span>;
+<span class="cls">:hover</span> { border-color: <span class="val">#aaa</span>; transform: translateY(<span class="val">-2px</span>); }
+
+<span class="comment">/* Botones */</span>
+transition: opacity <span class="val">0.15s</span>;
+<span class="cls">:hover</span> { opacity: <span class="val">0.82</span>; }
+
+<span class="comment">/* Nav items */</span>
+transition: color <span class="val">0.15s</span>, background <span class="val">0.15s</span>;</div>
+    </section>
+
+    <div class="ds-divider"></div>
+
+    <!-- RADIOS -->
+    <section class="ds-section" id="radii">
+      <h2 class="ds-section-title">Radios y bordes</h2>
+      <p class="ds-section-desc">Border siempre 1.5px en cards, 1px en divisores internos.</p>
+      <div class="radius-grid">
+        <div class="radius-demo" style="border-radius:10px;">
+          <div class="radius-box" style="border-radius:14px;"></div>
+          <div class="radius-name">Cards</div>
+          <div class="radius-val">14px</div>
+        </div>
+        <div class="radius-demo" style="border-radius:10px;">
+          <div class="radius-box" style="border-radius:8px;width:40px;height:28px;"></div>
+          <div class="radius-name">Botones</div>
+          <div class="radius-val">8px</div>
+        </div>
+        <div class="radius-demo" style="border-radius:10px;">
+          <div class="radius-box" style="border-radius:20px;width:60px;height:24px;"></div>
+          <div class="radius-name">Pills</div>
+          <div class="radius-val">20px</div>
+        </div>
+        <div class="radius-demo" style="border-radius:10px;">
+          <div class="radius-box" style="border-radius:10px;width:40px;height:40px;"></div>
+          <div class="radius-name">Avatares</div>
+          <div class="radius-val">10px</div>
+        </div>
+        <div class="radius-demo" style="border-radius:10px;">
+          <div class="radius-box" style="border-radius:7px;width:28px;height:28px;"></div>
+          <div class="radius-name">Card icons</div>
+          <div class="radius-val">7px</div>
+        </div>
+        <div class="radius-demo" style="border-radius:10px;">
+          <div class="radius-box" style="border-radius:8px;width:56px;height:24px;"></div>
+          <div class="radius-name">Inputs</div>
+          <div class="radius-val">8px</div>
+        </div>
+      </div>
+    </section>
+
+    <div class="ds-divider"></div>
+
+    <!-- PAGE HEADER PATTERN -->
+    <section class="ds-section" id="pageheader">
+      <h2 class="ds-section-title">Page header</h2>
+      <p class="ds-section-desc">Toda vista nueva empieza con este bloque oscuro. Eyebrow → título con em → subtítulo.</p>
+      <div style="border-radius:14px;overflow:hidden;border:1.5px solid var(--border);">
+        <div style="background:var(--black);padding:32px 36px;">
+          <p style="font-size:8px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:rgba(255,255,255,0.2);margin-bottom:12px;">PORTFOLIO · STARTUPS</p>
+          <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:20px;">
+            <div>
+              <h1 style="font-size:2.4rem;font-weight:300;color:var(--white);letter-spacing:-1.5px;line-height:1;">The <em style="font-weight:900;font-style:italic;color:var(--lime);">Garage</em></h1>
+              <p style="font-size:12.5px;color:rgba(255,255,255,0.38);margin-top:12px;line-height:1.65;">Startups en engagement activo. Investor match, grant fit y warmth en un vistazo.</p>
+            </div>
+            <button class="btn btn-lime" style="flex-shrink:0;">+ Nueva startup</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="ds-divider"></div>
+
+    <!-- RULES -->
+    <section class="ds-section" id="rules">
+      <h2 class="ds-section-title">Reglas — No hacer</h2>
+      <p class="ds-section-desc">Restricciones del sistema. Violarlas rompe la coherencia visual.</p>
+      <div class="dont-grid">
+        <div class="dont-item"><div class="dont-x">✕</div><div class="dont-text">Usar colores fuera de la paleta de variables CSS</div></div>
+        <div class="dont-item"><div class="dont-x">✕</div><div class="dont-text">Usar font-weight &lt; 300 o &gt; 900</div></div>
+        <div class="dont-item"><div class="dont-x">✕</div><div class="dont-text">Border-radius &gt; 14px en cards (excepto pills)</div></div>
+        <div class="dont-item"><div class="dont-x">✕</div><div class="dont-text">Box-shadow — el sistema usa bordes, no sombras</div></div>
+        <div class="dont-item"><div class="dont-x">✕</div><div class="dont-text">Fondo de color en cards — siempre --white o --bg</div></div>
+        <div class="dont-item"><div class="dont-x">✕</div><div class="dont-text">Texto con opacity &lt; 0.18 — ilegible</div></div>
+        <div class="dont-item"><div class="dont-x">✕</div><div class="dont-text">Nuevas variantes de componente sin documentarlas aquí</div></div>
+        <div class="dont-item"><div class="dont-x">✕</div><div class="dont-text">Padding de contenido &gt; 52px horizontal</div></div>
+        <div class="dont-item"><div class="dont-x">✕</div><div class="dont-text">--lime decorativo — solo para acciones / CTAs positivos</div></div>
+        <div class="dont-item"><div class="dont-x">✕</div><div class="dont-text">Emojis como iconos en contextos formales o institucionales</div></div>
+      </div>
+    </section>
+
+    <div class="ds-divider"></div>
+
+    <!-- CHECKLIST -->
+    <section class="ds-section" id="checklist">
+      <h2 class="ds-section-title">Checklist — nueva vista</h2>
+      <p class="ds-section-desc">Verificar antes de finalizar cualquier vista nueva.</p>
+      <div class="checklist">
+        <div class="check-item"><div class="check-box"></div><div class="check-text">Header oscuro con <span class="check-code">background: var(--black)</span></div></div>
+        <div class="check-item"><div class="check-box"></div><div class="check-text">Eyebrow en mayúsculas con la ruta (ej. <span class="check-code">Portfolio · Startups</span>)</div></div>
+        <div class="check-item"><div class="check-box"></div><div class="check-text">Título con patrón texto-light + <span class="check-code">&lt;em&gt;</span> bold italic lime</div></div>
+        <div class="check-item"><div class="check-box"></div><div class="check-text">Content area con <span class="check-code">padding: 36px 52px</span></div></div>
+        <div class="check-item"><div class="check-box"></div><div class="check-text">Cards con <span class="check-code">border: 1.5px solid var(--border); border-radius: 14px</span></div></div>
+        <div class="check-item"><div class="check-box"></div><div class="check-text">Labels ALL-CAPS en 8–9px / 700 / letter-spacing ≥ 1.5px</div></div>
+        <div class="check-item"><div class="check-box"></div><div class="check-text">CTA principal en <span class="check-code">btn-lime</span></div></div>
+        <div class="check-item"><div class="check-box"></div><div class="check-text">P1 banner al tope si hay señales críticas</div></div>
+        <div class="check-item"><div class="check-box"></div><div class="check-text">Nav active state con <span class="check-code">border-left: 2px solid var(--lime)</span></div></div>
+        <div class="check-item"><div class="check-box"></div><div class="check-text">Transiciones en todos los elementos interactivos (0.15s–0.2s)</div></div>
+        <div class="check-item"><div class="check-box"></div><div class="check-text">Fondo de página es <span class="check-code">var(--bg)</span> — no blanco</div></div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+// Highlight active sidebar link on scroll
+const sections = document.querySelectorAll('.ds-section[id]');
+const sidebarLinks = document.querySelectorAll('.ds-sidebar-link');
+
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      sidebarLinks.forEach(l => l.classList.remove('active'));
+      const active = document.querySelector(`.ds-sidebar-link[href="#${entry.target.id}"]`);
+      if (active) active.classList.add('active');
+    }
+  });
+}, { rootMargin: '-30% 0px -60% 0px' });
+
+sections.forEach(s => observer.observe(s));
+
+// Smooth scroll
+document.querySelectorAll('a[href^="#"]').forEach(a => {
+  a.addEventListener('click', e => {
+    e.preventDefault();
+    document.querySelector(a.getAttribute('href'))?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+});
+</script>
+</body>
+</html>

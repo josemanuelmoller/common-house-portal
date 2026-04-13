@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Control Room — Common House</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,700;1,800;1,900&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --lime: #c8f55a;
+  --black: #000000;
+  --white: #ffffff;
+  --ink: #0e0e0e;
+  --muted: #6b6b6b;
+  --border: #d8d8d0;
+  --bg: #eeeee8;
+  --sidebar-w: 220px;
+  --subnav-h: 46px;
+}
+body { font-family: 'Inter', sans-serif; background: var(--bg); display: flex; min-height: 100vh; }
+
+/* ── Sidebar ── */
+.sidebar {
+  width: var(--sidebar-w);
+  min-height: 100vh;
+  background: var(--black);
+  display: flex;
+  flex-direction: column;
+  padding: 28px 0;
+  position: fixed;
+  top: 0; left: 0;
+  z-index: 10;
+}
+.sidebar-logo { padding: 0 22px 24px; border-bottom: 1px solid rgba(255,255,255,0.07); margin-bottom: 18px; }
+.sidebar-logo-inner { display: flex; align-items: center; gap: 10px; }
+.wordmark { display: flex; flex-direction: column; line-height: 1.1; }
+.wordmark span { font-size: 11px; font-weight: 400; color: var(--white); }
+.nav-item {
+  display: flex; align-items: center; gap: 9px;
+  padding: 8px 22px; font-size: 11.5px; font-weight: 600;
+  color: rgba(255,255,255,0.4); cursor: pointer; text-decoration: none;
+  border-left: 2px solid transparent; transition: color 0.15s;
+}
+.nav-item:hover { color: rgba(255,255,255,0.8); }
+.nav-item.active { color: var(--lime); border-left-color: var(--lime); background: rgba(200,245,90,0.05); }
+.nav-icon { font-size: 13px; opacity: 0.7; flex-shrink: 0; }
+.nav-item.active .nav-icon { opacity: 1; }
+.sidebar-footer { margin-top: auto; padding: 18px 22px 0; border-top: 1px solid rgba(255,255,255,0.06); }
+.sidebar-footer p { font-size: 8.5px; color: rgba(255,255,255,0.15); }
+
+/* ── Main ── */
+.main { margin-left: var(--sidebar-w); flex: 1; display: flex; flex-direction: column; }
+
+/* ── Top bar ── */
+.top-bar {
+  background: var(--black);
+  padding: 16px 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.top-bar-title {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--white);
+  letter-spacing: -0.3px;
+}
+.top-bar-meta {
+  font-size: 10px;
+  color: rgba(255,255,255,0.25);
+  margin-left: 10px;
+  font-weight: 500;
+}
+.top-bar-right { display: flex; align-items: center; gap: 12px; }
+.p1-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #3a0000;
+  border: 1px solid rgba(255,80,80,0.3);
+  border-radius: 20px;
+  padding: 4px 10px;
+  font-size: 9px;
+  font-weight: 700;
+  color: #ff8080;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+.p1-dot { width: 6px; height: 6px; border-radius: 50%; background: #ff6060; flex-shrink: 0; }
+
+/* ── Sub-nav ── */
+.subnav {
+  height: var(--subnav-h);
+  background: var(--white);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 40px;
+  gap: 0;
+  overflow-x: auto;
+}
+.subnav-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 16px;
+  height: 100%;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+  letter-spacing: 0.2px;
+  transition: color 0.15s;
+}
+.subnav-item:hover { color: var(--ink); }
+.subnav-item.active { color: var(--ink); border-bottom-color: var(--ink); }
+.subnav-badge {
+  font-size: 8.5px;
+  font-weight: 700;
+  background: #fee;
+  color: #c00;
+  border-radius: 10px;
+  padding: 1px 5px;
+  min-width: 16px;
+  text-align: center;
+}
+.subnav-badge.lime { background: rgba(200,245,90,0.2); color: #3a6600; }
+
+/* ── Content area ── */
+.cr-content { flex: 1; padding: 32px 40px 60px; }
+
+/* ── P1 Banner ── */
+.p1-banner {
+  background: #1a0000;
+  border: 1px solid rgba(255,80,80,0.2);
+  border-radius: 12px;
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 28px;
+  flex-wrap: wrap;
+}
+.p1-banner-left { display: flex; align-items: center; gap: 12px; }
+.p1-banner-title { font-size: 12px; font-weight: 800; color: #ff9090; margin-bottom: 2px; letter-spacing: -0.2px; }
+.p1-banner-desc { font-size: 10.5px; color: rgba(255,144,144,0.6); line-height: 1.4; }
+.p1-banner-action {
+  font-size: 10px;
+  font-weight: 700;
+  color: #ff9090;
+  border: 1px solid rgba(255,100,100,0.25);
+  border-radius: 7px;
+  padding: 7px 14px;
+  text-decoration: none;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+/* ── Grid layouts ── */
+.overview-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 20px;
+  align-items: start;
+}
+.overview-col { display: flex; flex-direction: column; gap: 20px; }
+
+/* ── Card base ── */
+.cr-card {
+  background: var(--white);
+  border: 1.5px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.cr-card-header {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.cr-card-title {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--ink);
+  letter-spacing: -0.2px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.cr-card-icon {
+  width: 24px; height: 24px;
+  border-radius: 6px;
+  background: var(--black);
+  display: flex; align-items: center; justify-content: center;
+}
+.cr-card-icon.lime { background: var(--lime); }
+.cr-card-body { padding: 16px 20px; }
+.cr-card-body.tight { padding: 12px 20px; }
+.pill {
+  display: inline-block;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  border-radius: 20px;
+  padding: 3px 9px;
+}
+.pill.black { background: var(--black); color: var(--white); }
+.pill.lime { background: var(--lime); color: var(--black); }
+.pill.ghost { border: 1.5px solid var(--border); color: #888; }
+.pill.red { background: rgba(255,80,80,0.1); color: #c00; border: 1px solid rgba(255,80,80,0.2); }
+
+/* ── Metrics row ── */
+.metrics-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.metric-card {
+  background: var(--white);
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 18px;
+}
+.metric-label {
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 1.8px;
+  text-transform: uppercase;
+  color: rgba(0,0,0,0.2);
+  margin-bottom: 6px;
+}
+.metric-val {
+  font-size: 1.8rem;
+  font-weight: 900;
+  color: var(--ink);
+  letter-spacing: -1px;
+  line-height: 1;
+}
+.metric-val.lime { color: #3a6600; }
+.metric-val.red { color: #c00; }
+.metric-sub { font-size: 9.5px; color: var(--muted); margin-top: 4px; font-weight: 500; }
+
+/* ── Decision list ── */
+.decision-item {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.decision-item:last-child { border-bottom: none; padding-bottom: 0; }
+.decision-check {
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: var(--lime);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.decision-check.pending { background: #fff3cd; }
+.decision-title { font-size: 12px; font-weight: 700; color: var(--ink); line-height: 1.3; }
+.decision-meta { font-size: 9.5px; color: var(--muted); margin-top: 3px; font-family: 'Menlo', monospace; }
+
+/* ── Agent list ── */
+.agent-item {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.agent-item:last-child { border-bottom: none; }
+.agent-status-dot { width: 7px; height: 7px; border-radius: 50%; background: #ccc; flex-shrink: 0; }
+.agent-status-dot.active { background: var(--lime); }
+.agent-status-dot.scheduled { background: #ffe066; }
+.agent-name { font-size: 11px; font-weight: 700; color: var(--ink); flex: 1; }
+.agent-next { font-size: 9.5px; color: var(--muted); font-family: 'Menlo', monospace; }
+
+/* ── Pipeline items ── */
+.pipeline-item {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.pipeline-item:last-child { border-bottom: none; }
+.pipeline-avatar {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  background: var(--black);
+  color: var(--lime);
+  font-size: 10px;
+  font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.pipeline-name { font-size: 12px; font-weight: 700; color: var(--ink); }
+.pipeline-stage { font-size: 9.5px; color: var(--muted); margin-top: 2px; }
+.pipeline-score {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--ink);
+  flex-shrink: 0;
+}
+
+/* ── Content queue ── */
+.content-item {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.content-item:last-child { border-bottom: none; }
+.content-type-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.content-title { font-size: 11.5px; font-weight: 600; color: var(--ink); flex: 1; line-height: 1.3; }
+.content-desk { font-size: 9px; font-weight: 700; color: var(--muted); white-space: nowrap; }
+
+/* ── Grants mini ── */
+.grant-mini {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.grant-mini:last-child { border-bottom: none; }
+.grant-mini-score {
+  font-size: 13px;
+  font-weight: 900;
+  color: var(--ink);
+  flex-shrink: 0;
+  width: 36px;
+  letter-spacing: -0.5px;
+}
+.grant-mini-name { font-size: 11px; font-weight: 600; color: var(--ink); flex: 1; line-height: 1.3; }
+.grant-mini-deadline { font-size: 9px; font-weight: 700; color: #c00; font-family: 'Menlo', monospace; }
+
+/* ── System health ── */
+.health-row {
+  padding: 9px 0;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.health-row:last-child { border-bottom: none; }
+.health-name { font-size: 11px; font-weight: 600; color: var(--ink); flex: 1; }
+.health-status {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 9.5px;
+  font-weight: 700;
+  color: #3a6600;
+}
+.health-status.warn { color: #7a5800; }
+.health-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+/* ── Responsive ── */
+@media (max-width: 860px) {
+  .overview-grid { grid-template-columns: 1fr; }
+  .metrics-row { grid-template-columns: 1fr 1fr; }
+  .cr-content { padding: 24px 24px 50px; }
+}
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="sidebar-logo-inner">
+      <svg viewBox="0 0 108 50" fill="none" width="34" height="16">
+        <path d="M42 4 A21 21 0 1 0 42 46" stroke="white" stroke-width="10" stroke-linecap="butt"/>
+        <circle cx="84" cy="25" r="21" stroke="white" stroke-width="10"/>
+      </svg>
+      <div class="wordmark">
+        <span>common</span>
+        <span>house</span>
+      </div>
+    </div>
+  </div>
+  <nav>
+    <a href="hall-vitrina.html" class="nav-item">
+      <span class="nav-icon">◈</span> The Hall
+    </a>
+    <a href="residents-mockup.html" class="nav-item">
+      <span class="nav-icon">◉</span> Residents
+    </a>
+    <a href="#" class="nav-item">
+      <span class="nav-icon">◻</span> Workrooms
+    </a>
+    <a href="#" class="nav-item">
+      <span class="nav-icon">◧</span> Garage
+    </a>
+    <a href="control-room.html" class="nav-item active">
+      <span class="nav-icon">◫</span> Control Room
+    </a>
+  </nav>
+  <div class="sidebar-footer">
+    <p>Common House OS v2 · Internal</p>
+  </div>
+</aside>
+
+<!-- Main -->
+<div class="main">
+
+  <!-- Top bar -->
+  <div class="top-bar">
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span class="top-bar-title">Control Room</span>
+      <span class="top-bar-meta">OS v2 · Week 15 · 12 Apr 2026</span>
+    </div>
+    <div class="top-bar-right">
+      <span class="p1-badge"><span class="p1-dot"></span>2 P1 signals</span>
+    </div>
+  </div>
+
+  <!-- Sub-nav -->
+  <nav class="subnav">
+    <a href="#" class="subnav-item active">Overview</a>
+    <a href="#" class="subnav-item">Decisions <span class="subnav-badge">3</span></a>
+    <a href="#" class="subnav-item">Agents</a>
+    <a href="#" class="subnav-item">Pipeline</a>
+    <a href="#" class="subnav-item">Grants <span class="subnav-badge">1</span></a>
+    <a href="#" class="subnav-item">Content</a>
+    <a href="#" class="subnav-item">Insights</a>
+    <a href="#" class="subnav-item">Knowledge</a>
+    <a href="#" class="subnav-item">System Health <span class="subnav-badge lime">OK</span></a>
+  </nav>
+
+  <!-- Content -->
+  <div class="cr-content">
+
+    <!-- P1 Banner -->
+    <div class="p1-banner">
+      <div class="p1-banner-left">
+        <div style="width:32px;height:32px;border-radius:50%;background:rgba(255,80,80,0.12);border:1px solid rgba(255,80,80,0.25);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+          <svg viewBox="0 0 14 14" width="13" height="13" fill="none" stroke="#ff8080" stroke-width="2" stroke-linecap="round"><path d="M7 2v5M7 10v1"/><circle cx="7" cy="7" r="6"/></svg>
+        </div>
+        <div>
+          <div class="p1-banner-title">P1 · SUFI / Fair4All — grant deadline 30 Apr 2026</div>
+          <div class="p1-banner-desc">Strong fit for 2 portfolio startups. Application window closing. Requires portfolio lead action this week.</div>
+        </div>
+      </div>
+      <a href="#" class="p1-banner-action">Review now →</a>
+    </div>
+
+    <!-- Metrics row -->
+    <div class="metrics-row">
+      <div class="metric-card">
+        <div class="metric-label">Active projects</div>
+        <div class="metric-val">8</div>
+        <div class="metric-sub">4 in Pilot Planning</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Decisions awaiting</div>
+        <div class="metric-val red">3</div>
+        <div class="metric-sub">2 from this week</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Agents last 7d</div>
+        <div class="metric-val lime">24</div>
+        <div class="metric-sub">runs completed</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Grant pipeline</div>
+        <div class="metric-val">10</div>
+        <div class="metric-sub">1 urgent · 3 active</div>
+      </div>
+    </div>
+
+    <!-- Main overview grid -->
+    <div class="overview-grid">
+
+      <!-- Left column -->
+      <div class="overview-col">
+
+        <!-- Decisions awaiting review -->
+        <div class="cr-card">
+          <div class="cr-card-header">
+            <div class="cr-card-title">
+              <div class="cr-card-icon lime">
+                <svg viewBox="0 0 14 14" width="12" height="12" fill="none" stroke="#000" stroke-width="2" stroke-linecap="round"><polyline points="2 7 5 10 12 3"/></svg>
+              </div>
+              Decisions awaiting review
+            </div>
+            <span class="pill red">3 pending</span>
+          </div>
+          <div class="cr-card-body">
+            <div class="decision-item">
+              <div class="decision-check pending">
+                <svg viewBox="0 0 10 10" width="9" height="9" fill="none" stroke="#7a5800" stroke-width="1.8"><circle cx="5" cy="5" r="4"/><path d="M5 3v2.5"/></svg>
+              </div>
+              <div>
+                <div class="decision-title">TI integration confirmed — no infra changes required</div>
+                <div class="decision-meta">Auto Mercado · Evidence #1142 · Apr 9</div>
+              </div>
+              <span class="pill ghost" style="flex-shrink:0;">Review</span>
+            </div>
+            <div class="decision-item">
+              <div class="decision-check pending">
+                <svg viewBox="0 0 10 10" width="9" height="9" fill="none" stroke="#7a5800" stroke-width="1.8"><circle cx="5" cy="5" r="4"/><path d="M5 3v2.5"/></svg>
+              </div>
+              <div>
+                <div class="decision-title">12-week pilot window agreed with operations team</div>
+                <div class="decision-meta">Auto Mercado · Evidence #1138 · Apr 9</div>
+              </div>
+              <span class="pill ghost" style="flex-shrink:0;">Review</span>
+            </div>
+            <div class="decision-item">
+              <div class="decision-check">
+                <svg viewBox="0 0 10 10" width="9" height="9" fill="none" stroke="#000" stroke-width="2"><polyline points="2 5 4 7 8 3"/></svg>
+              </div>
+              <div>
+                <div class="decision-title">Two pilot locations confirmed: Escazú and Santa Ana</div>
+                <div class="decision-meta">Auto Mercado · Evidence #1121 · Apr 2 · Validated</div>
+              </div>
+              <span class="pill lime" style="flex-shrink:0;">Done</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Content queue -->
+        <div class="cr-card">
+          <div class="cr-card-header">
+            <div class="cr-card-title">
+              <div class="cr-card-icon">
+                <svg viewBox="0 0 14 14" width="12" height="12" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round"><rect x="2" y="2" width="10" height="10" rx="1"/><path d="M4 5h6M4 7h4"/></svg>
+              </div>
+              Content queue
+            </div>
+            <span class="pill black">7 at review</span>
+          </div>
+          <div class="cr-card-body">
+            <div class="content-item">
+              <div class="content-type-dot" style="background:#c8f55a;"></div>
+              <div class="content-title">Pilot Scope Deck — Auto Mercado Fase 2</div>
+              <span class="content-desk">Design</span>
+            </div>
+            <div class="content-item">
+              <div class="content-type-dot" style="background:#888;"></div>
+              <div class="content-title">CH Institutional Post — Zero Waste Week</div>
+              <span class="content-desk">Comms</span>
+            </div>
+            <div class="content-item">
+              <div class="content-type-dot" style="background:#c8f55a;"></div>
+              <div class="content-title">Circular Economy — LATAM 2026 Insight Brief</div>
+              <span class="content-desk">Insights</span>
+            </div>
+            <div class="content-item">
+              <div class="content-type-dot" style="background:#888;"></div>
+              <div class="content-title">Founder Voice — Refill Infrastructure in Retail</div>
+              <span class="content-desk">Comms</span>
+            </div>
+            <div class="content-item" style="opacity:0.5;">
+              <div class="content-type-dot" style="background:#ccc;"></div>
+              <div class="content-title">+ 3 more in queue</div>
+              <span class="content-desk">—</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Recent insights -->
+        <div class="cr-card">
+          <div class="cr-card-header">
+            <div class="cr-card-title">
+              <div class="cr-card-icon">
+                <svg viewBox="0 0 14 14" width="12" height="12" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round"><circle cx="7" cy="7" r="5"/><path d="M7 4v3l2 1.5"/></svg>
+              </div>
+              Recent insight briefs
+            </div>
+            <span class="pill ghost">5 this cycle</span>
+          </div>
+          <div class="cr-card-body">
+            <div class="decision-item" style="gap:12px;">
+              <div style="width:6px;height:6px;border-radius:50%;background:var(--lime);flex-shrink:0;margin-top:5px;"></div>
+              <div>
+                <div class="decision-title">EU packaging reuse mandate — LATAM opportunity signal</div>
+                <div class="decision-meta">Insight #18 · Portfolio scope · Apr 9</div>
+              </div>
+            </div>
+            <div class="decision-item" style="gap:12px;">
+              <div style="width:6px;height:6px;border-radius:50%;background:var(--lime);flex-shrink:0;margin-top:5px;"></div>
+              <div>
+                <div class="decision-title">Refill format conversion rates — retail context</div>
+                <div class="decision-meta">Insight #17 · Design scope · Apr 6</div>
+              </div>
+            </div>
+            <div class="decision-item" style="gap:12px;opacity:0.5;">
+              <div style="width:6px;height:6px;border-radius:50%;background:#ccc;flex-shrink:0;margin-top:5px;"></div>
+              <div>
+                <div class="decision-title">+ 3 more validated this cycle</div>
+                <div class="decision-meta">View all in Insights →</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Right column -->
+      <div class="overview-col">
+
+        <!-- Agents -->
+        <div class="cr-card">
+          <div class="cr-card-header">
+            <div class="cr-card-title">
+              <div class="cr-card-icon">
+                <svg viewBox="0 0 14 14" width="12" height="12" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round"><circle cx="7" cy="5" r="3"/><path d="M1 12a6 6 0 0 1 12 0"/></svg>
+              </div>
+              Agents
+            </div>
+            <span class="pill lime">24 runs / 7d</span>
+          </div>
+          <div class="cr-card-body tight">
+            <div class="agent-item">
+              <div class="agent-status-dot active"></div>
+              <div class="agent-name">source-intake</div>
+              <span class="agent-next">Next: daily 08:00</span>
+            </div>
+            <div class="agent-item">
+              <div class="agent-status-dot active"></div>
+              <div class="agent-name">evidence-review</div>
+              <span class="agent-next">Next: daily 08:30</span>
+            </div>
+            <div class="agent-item">
+              <div class="agent-status-dot scheduled"></div>
+              <div class="agent-name">validation-operator</div>
+              <span class="agent-next">Next: daily 09:00</span>
+            </div>
+            <div class="agent-item">
+              <div class="agent-status-dot scheduled"></div>
+              <div class="agent-name">project-operator</div>
+              <span class="agent-next">Next: daily 09:15</span>
+            </div>
+            <div class="agent-item">
+              <div class="agent-status-dot"></div>
+              <div class="agent-name">hygiene-agent</div>
+              <span class="agent-next">Next: Mon 07:00</span>
+            </div>
+            <div class="agent-item">
+              <div class="agent-status-dot"></div>
+              <div class="agent-name">briefing-agent</div>
+              <span class="agent-next">Next: Mon 06:00</span>
+            </div>
+            <div class="agent-item">
+              <div class="agent-status-dot"></div>
+              <div class="agent-name">portfolio-health-agent</div>
+              <span class="agent-next">Next: Mon 07:30</span>
+            </div>
+            <div class="agent-item">
+              <div class="agent-status-dot"></div>
+              <div class="agent-name">grant-monitor-agent</div>
+              <span class="agent-next">Next: 1st Mon 06:00</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Grants -->
+        <div class="cr-card">
+          <div class="cr-card-header">
+            <div class="cr-card-title">
+              <div class="cr-card-icon" style="background:#1a3a08;">
+                <svg viewBox="0 0 14 14" width="12" height="12" fill="none" stroke="#c8f55a" stroke-width="1.8" stroke-linecap="round"><path d="M2 2h8l2 2v8a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V2z"/><path d="M8 2v4h4"/></svg>
+              </div>
+              Grants pipeline
+            </div>
+            <span class="pill red">1 urgent</span>
+          </div>
+          <div class="cr-card-body tight">
+            <div class="grant-mini">
+              <div class="grant-mini-score" style="color:#c00;">82%</div>
+              <div class="grant-mini-name">SUFI / Fair4All Finance</div>
+              <span class="grant-mini-deadline">Apr 30 ⚠</span>
+            </div>
+            <div class="grant-mini">
+              <div class="grant-mini-score">74%</div>
+              <div class="grant-mini-name">Circular Economy Fund — EIB</div>
+              <span class="grant-mini-deadline" style="color:var(--muted);">Jun 15</span>
+            </div>
+            <div class="grant-mini">
+              <div class="grant-mini-score">61%</div>
+              <div class="grant-mini-name">Green Impact Bond — IDB</div>
+              <span class="grant-mini-deadline" style="color:var(--muted);">Jul 1</span>
+            </div>
+            <div class="grant-mini" style="opacity:0.4;">
+              <div class="grant-mini-score">—</div>
+              <div class="grant-mini-name">+ 7 more in pipeline</div>
+              <span class="grant-mini-deadline" style="color:var(--muted);">→</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- System Health -->
+        <div class="cr-card">
+          <div class="cr-card-header">
+            <div class="cr-card-title">
+              <div class="cr-card-icon lime">
+                <svg viewBox="0 0 14 14" width="12" height="12" fill="none" stroke="#000" stroke-width="2" stroke-linecap="round"><polyline points="1 7 3 3 5 9 7 5 9 8 11 6 13 7"/></svg>
+              </div>
+              System health
+            </div>
+            <span class="pill lime">All green</span>
+          </div>
+          <div class="cr-card-body tight">
+            <div class="health-row">
+              <div class="health-name">Sources ingested (7d)</div>
+              <div class="health-status"><div class="health-dot"></div>14 records</div>
+            </div>
+            <div class="health-row">
+              <div class="health-name">Evidence validated (7d)</div>
+              <div class="health-status"><div class="health-dot"></div>38 items</div>
+            </div>
+            <div class="health-row">
+              <div class="health-name">Automation errors</div>
+              <div class="health-status"><div class="health-dot"></div>0 this week</div>
+            </div>
+            <div class="health-row">
+              <div class="health-name">Duplicate risk</div>
+              <div class="health-status warn"><div class="health-dot"></div>2 flagged</div>
+            </div>
+            <div class="health-row">
+              <div class="health-name">Knowledge Assets</div>
+              <div class="health-status"><div class="health-dot"></div>12 current</div>
+            </div>
+            <div class="health-row">
+              <div class="health-name">DB hygiene</div>
+              <div class="health-status"><div class="health-dot"></div>Last run: Apr 11</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Active pipeline -->
+        <div class="cr-card">
+          <div class="cr-card-header">
+            <div class="cr-card-title">
+              <div class="cr-card-icon">
+                <svg viewBox="0 0 14 14" width="12" height="12" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round"><polyline points="2 10 7 4 10 7 13 2"/></svg>
+              </div>
+              Pipeline highlights
+            </div>
+            <span class="pill ghost">8 active</span>
+          </div>
+          <div class="cr-card-body tight">
+            <div class="pipeline-item">
+              <div class="pipeline-avatar">AM</div>
+              <div>
+                <div class="pipeline-name">Auto Mercado Fase 2</div>
+                <div class="pipeline-stage">Pilot Planning · Workroom active</div>
+              </div>
+              <div class="pipeline-score">🟢</div>
+            </div>
+            <div class="pipeline-item">
+              <div class="pipeline-avatar" style="background:#222;">CH</div>
+              <div>
+                <div class="pipeline-name">Chief — Advocacy Strategy</div>
+                <div class="pipeline-stage">Discovery · Scoping active</div>
+              </div>
+              <div class="pipeline-score">🟡</div>
+            </div>
+            <div class="pipeline-item" style="opacity:0.4;">
+              <div class="pipeline-avatar" style="background:#555;">+6</div>
+              <div>
+                <div class="pipeline-name">6 more active projects</div>
+                <div class="pipeline-stage">View full pipeline →</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

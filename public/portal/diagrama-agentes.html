@@ -1,0 +1,998 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Common House OS v2 — Agent Map</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: #ffffff;
+    min-height: 100vh;
+    padding: 48px 40px 56px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── Header ── */
+  .page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 40px;
+    padding-bottom: 24px;
+    border-bottom: 2px solid #000;
+  }
+  .page-header h1 {
+    font-size: 2.4rem;
+    font-weight: 900;
+    color: #000;
+    letter-spacing: -1px;
+    line-height: 1;
+  }
+  .page-header h1 em {
+    font-style: italic;
+    font-weight: 900;
+  }
+  .page-num {
+    font-size: 2.4rem;
+    font-weight: 900;
+    color: #000;
+    letter-spacing: -1px;
+    line-height: 1;
+  }
+
+  /* ── Pill label (like "POWERED BY" badges) ── */
+  .pill {
+    display: inline-block;
+    background: #000;
+    color: #fff;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 1.8px;
+    text-transform: uppercase;
+    border-radius: 20px;
+    padding: 4px 10px;
+  }
+  .pill.lime {
+    background: #c8f55a;
+    color: #000;
+  }
+
+  /* ── Layout ── */
+  .layout {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 48px;
+    align-items: start;
+  }
+
+  .intro h2 {
+    font-size: 1.55rem;
+    font-weight: 900;
+    color: #000;
+    line-height: 1.2;
+    letter-spacing: -0.5px;
+    margin-bottom: 16px;
+  }
+  .intro p {
+    font-size: 0.85rem;
+    color: #444;
+    line-height: 1.6;
+    border: 1.5px dashed #ccc;
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin-top: 14px;
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 860px) {
+    body { padding: 32px 20px 40px; }
+
+    .layout {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+
+    /* Dismantle intro box — children join the flex flow directly */
+    .intro { display: contents; }
+
+    /* h2 floats above diagram */
+    .intro h2 {
+      order: 0;
+      font-size: 1.15rem;
+      margin-bottom: 14px;
+    }
+
+    /* Diagram takes full width, scrolls if too narrow */
+    .diagram-wrap { order: 1; margin-bottom: 24px; overflow-x: auto; }
+    .diagram { min-width: 620px; }
+
+    /* Info boxes go below diagram */
+    .intro p {
+      order: 2;
+      margin-top: 0;
+    }
+    .intro p + p { margin-top: 10px; }
+
+    .footer {
+      flex-direction: column;
+      gap: 16px;
+      align-items: flex-start;
+    }
+  }
+
+  /* ── Diagram ── */
+  .diagram-wrap {
+    position: relative;
+  }
+
+  .diagram-top-label {
+    margin-bottom: 10px;
+  }
+
+  .diagram {
+    position: relative;
+    width: 100%;
+    height: 710px;
+  }
+
+  /* ── os-runner orchestrator node ── */
+  .orch-strip {
+    position: absolute;
+    top: 28px;
+    left: 0;
+    width: 250px;
+    display: flex;
+    flex-direction: row-reverse;
+    align-items: center;
+    gap: 13px;
+    padding: 6px 0 6px 6px;
+  }
+  .orch-bubble {
+    width: 50px; height: 50px;
+    border-radius: 50%;
+    background: #111;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: -0.3px;
+    color: #fff;
+    flex-shrink: 0;
+    position: relative;
+  }
+  .orch-bubble::after {
+    content: '';
+    position: absolute;
+    bottom: -14px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 1.5px;
+    height: 10px;
+    background: #ddd;
+  }
+  .orch-meta { text-align: right; }
+  .orch-meta strong {
+    display: block;
+    font-size: 12.5px;
+    font-weight: 800;
+    color: #000;
+    letter-spacing: -0.2px;
+  }
+  .orch-meta .orch-desc {
+    display: block;
+    font-size: 10px;
+    color: #666;
+    margin-top: 2px;
+    max-width: 160px;
+  }
+  .orch-meta .orch-sub {
+    display: block;
+    font-size: 9px;
+    color: #bbb;
+    margin-top: 2px;
+  }
+
+  .col-label {
+    position: absolute;
+    top: 0;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #aaa;
+  }
+  .col-label.left  { left: 100px; transform: translateX(-50%); }
+  .col-label.right { right: 110px; transform: translateX(50%); }
+
+  .agents-col, .dbs-col {
+    position: absolute;
+    top: 28px;
+    bottom: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-evenly;
+    padding: 4px 0;
+  }
+  /* Text LEFT, bubble RIGHT — so bubble faces the center corridor */
+  .agents-col { left: 0; width: 250px; align-items: flex-end; top: 82px; }
+  /* Cylinder LEFT, text RIGHT — so cylinder faces the center corridor */
+  .dbs-col    { right: 0; width: 250px; align-items: flex-start; }
+
+  #lines-svg {
+    position: absolute;
+    top: 28px; left: 0;
+    width: 100%; height: calc(100% - 28px);
+    pointer-events: none;
+    overflow: visible;
+  }
+
+  /* ── Agent node ── */
+  .agent-node {
+    display: flex;
+    flex-direction: row-reverse; /* bubble on RIGHT, text on LEFT */
+    align-items: center;
+    gap: 14px;
+    cursor: pointer;
+    padding: 6px 0 6px 6px;
+    border-radius: 60px;
+    transition: opacity 0.2s ease;
+    user-select: none;
+  }
+  .agent-node.dimmed { opacity: 0.1; }
+
+  .agent-bubble {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: -0.3px;
+    color: #333;
+    flex-shrink: 0;
+    background: #f0f0f0;
+    border: none;
+    transition: transform 0.22s ease, background 0.2s, color 0.2s;
+    position: relative;
+  }
+  .agent-node.active .agent-bubble {
+    transform: scale(1.1);
+    background: #c8f55a;
+    border: none;
+    color: #000;
+  }
+
+  .cap-badge { display: none; }
+
+  .agent-meta { text-align: right; }
+  .agent-meta strong {
+    display: block;
+    font-size: 12.5px;
+    font-weight: 800;
+    color: #000;
+    letter-spacing: -0.2px;
+  }
+  .agent-meta .desc {
+    display: block;
+    font-size: 10px;
+    color: #666;
+    margin-top: 2px;
+    max-width: 160px;
+    line-height: 1.4;
+  }
+  .agent-meta .caps {
+    display: block;
+    font-size: 9px;
+    color: #aaa;
+    margin-top: 3px;
+    max-width: 160px;
+    line-height: 1.5;
+  }
+  .agent-node.active .agent-meta .caps { color: #555; }
+  .agent-node.active .agent-meta strong { color: #000; }
+
+  /* ── DB node ── */
+  .db-node {
+    display: flex;
+    flex-direction: row; /* cylinder LEFT, text RIGHT */
+    align-items: center;
+    gap: 10px;
+    padding: 4px;
+    border-radius: 12px;
+    transition: opacity 0.2s;
+  }
+  .db-node.dimmed { opacity: 0.08; }
+
+  .db-meta { text-align: left; line-height: 1.3; }
+  .db-meta strong {
+    display: block;
+    font-size: 11.5px;
+    font-weight: 700;
+    color: #000;
+    letter-spacing: -0.2px;
+  }
+  .db-meta small {
+    display: block;
+    font-size: 9px;
+    color: #aaa;
+    font-style: italic;
+    margin-top: 1px;
+  }
+
+  /* Cylinder SVG */
+  .db-icon-wrap {
+    flex-shrink: 0;
+    transition: filter 0.3s, transform 0.3s;
+  }
+  .db-node.active .db-icon-wrap {
+    filter: drop-shadow(0 2px 6px rgba(0,0,0,0.2));
+  }
+  .db-node.live-target .db-icon-wrap {
+    filter: drop-shadow(0 0 8px rgba(0,0,0,0.35)) drop-shadow(0 0 3px rgba(0,0,0,0.2));
+    transform: scale(1.08);
+  }
+  .db-node.live-target .db-meta strong { color: #333; }
+
+  /* ── Live log in orch-desc ── */
+  .orch-desc.live-log {
+    color: #000 !important;
+    font-size: 9.5px !important;
+    letter-spacing: 0;
+  }
+  .orch-desc .log-w { color: #333; font-weight: 700; }
+  .orch-desc .log-r { color: #999; }
+
+  /* ── Idle breathing ── */
+  @keyframes idle-breathe {
+    0%, 100% { opacity: 0.55; }
+    50%       { opacity: 0.85; }
+  }
+  .agent-node.idle-breathe { animation: idle-breathe 3s ease-in-out infinite; }
+
+  /* ── Lines ── */
+  .conn {
+    fill: none;
+    stroke-linecap: round;
+    transition: stroke 0.2s, stroke-width 0.2s, opacity 0.2s;
+  }
+  .conn.type-write { stroke: #ddd; stroke-width: 1.8; opacity: 0.7; }
+  .conn.type-read  { stroke: #ddd; stroke-width: 1.4; opacity: 0.5; stroke-dasharray: 5 4; }
+  .conn.active.type-write { stroke: #000; stroke-width: 2.5; opacity: 1; }
+  .conn.active.type-read  { stroke: #888; stroke-width: 1.8; opacity: 0.9; stroke-dasharray: 5 4; }
+  .conn.dimmed { opacity: 0.04 !important; }
+
+  /* ── Live mode animations ── */
+  @keyframes sonar {
+    0%   { transform: scale(1);   opacity: 0.6; }
+    100% { transform: scale(1.5); opacity: 0; }
+  }
+  @keyframes agent-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(200,245,90,0.7); }
+    50%       { box-shadow: 0 0 0 10px rgba(200,245,90,0); }
+  }
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.25; }
+  }
+  @keyframes dash-flow {
+    from { stroke-dashoffset: 24; }
+    to   { stroke-dashoffset: 0; }
+  }
+
+  .agent-node.live .agent-bubble {
+    background: #c8f55a !important;
+    border-color: #000 !important;
+    transform: scale(1.12);
+    animation: agent-pulse 1.4s ease-in-out infinite;
+  }
+
+  .sonar-ring {
+    position: absolute;
+    inset: -3px;
+    border-radius: 50%;
+    border: 2px solid #999;
+    animation: sonar 1.4s ease-out infinite;
+    pointer-events: none;
+  }
+  .sonar-ring:nth-child(2) { animation-delay: 0.5s; }
+
+  /* Write: dots flow agent → DB */
+  @keyframes flow-fwd {
+    from { stroke-dashoffset: 13; }
+    to   { stroke-dashoffset: 0; }
+  }
+  /* Read: dots flow DB → agent */
+  @keyframes flow-bwd {
+    from { stroke-dashoffset: 0; }
+    to   { stroke-dashoffset: 13; }
+  }
+
+  .conn.live-flow.type-write {
+    stroke: #000 !important;
+    stroke-dasharray: 3 10;
+    stroke-width: 2;
+    opacity: 1 !important;
+    animation: flow-fwd 0.55s linear infinite;
+  }
+  .conn.live-flow.type-read {
+    stroke: #999 !important;
+    stroke-dasharray: 3 10;
+    stroke-width: 1.8;
+    opacity: 0.8 !important;
+    animation: flow-bwd 0.55s linear infinite;
+  }
+
+  /* ── Live button ── */
+  .live-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #000;
+    color: #fff;
+    font-family: 'Inter', sans-serif;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 1.8px;
+    text-transform: uppercase;
+    border: none;
+    border-radius: 20px;
+    padding: 5px 12px;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+  }
+  .live-btn .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: #555;
+    transition: background 0.2s;
+  }
+  .live-btn.active {
+    background: #c8f55a;
+    color: #000;
+  }
+  .live-btn.active .dot {
+    background: #000;
+    animation: blink 0.9s ease-in-out infinite;
+  }
+
+  /* ── Footer / legend ── */
+  .footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 32px;
+    padding-top: 20px;
+    border-top: 1.5px solid #eee;
+  }
+  .legend {
+    display: flex;
+    gap: 20px;
+    font-size: 10px;
+    color: #888;
+  }
+  .legend-item { display: flex; align-items: center; gap: 7px; }
+
+  .logo {
+    font-size: 1.2rem;
+    font-weight: 900;
+    color: #c8f55a;
+    letter-spacing: -1px;
+    font-style: italic;
+  }
+
+  /* ── Tooltip ── */
+  .tooltip {
+    position: fixed;
+    background: #000;
+    color: #fff;
+    padding: 10px 14px;
+    border-radius: 10px;
+    font-size: 11px;
+    line-height: 1.5;
+    pointer-events: none;
+    z-index: 999;
+    max-width: 240px;
+    opacity: 0;
+    transition: opacity 0.15s;
+    font-family: 'Inter', sans-serif;
+  }
+  .tooltip.visible { opacity: 1; }
+  .tooltip .tt-name  { font-size: 12px; font-weight: 800; margin-bottom: 2px; }
+  .tooltip .tt-desc  { color: #aaa; margin-bottom: 6px; font-size: 10.5px; }
+  .tooltip .tt-caps  { color: #c8f55a; font-size: 9.5px; margin-bottom: 7px; line-height: 1.6; }
+  .tooltip .tags     { display: flex; gap: 4px; flex-wrap: wrap; }
+  .tooltip .tag      { font-size: 9px; border-radius: 5px; padding: 2px 7px; }
+  .tooltip .tag.write { background: #c8f55a; color: #000; font-weight: 600; }
+  .tooltip .tag.read  { background: #333; color: #ccc; }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="page-header">
+  <h1>How our OS <em>works</em></h1>
+</div>
+
+<!-- Layout -->
+<div class="layout">
+
+  <!-- Left intro -->
+  <div class="intro">
+    <h2>Six agents running Common House's operating system.</h2>
+    <p>
+      Each agent holds a specific role — like a team member — and connects
+      to the databases it needs to read or update. Hover any agent to see
+      exactly what it touches.
+    </p>
+    <p style="margin-top:12px; border-color:#c8f55a; background:#f9ffe6;">
+      The system runs autonomously, surfaces signals for human review,
+      and never overwrites validated data without a gate.
+    </p>
+  </div>
+
+  <!-- Right diagram -->
+  <div class="diagram-wrap">
+    <div class="diagram-top-label" style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+      <span class="pill">AGENT ARCHITECTURE</span>
+      <button class="live-btn" id="live-btn" onclick="toggleLive()">
+        <span class="dot"></span> LIVE
+      </button>
+    </div>
+    <div class="legend" style="margin-bottom:14px;">
+      <div class="legend-item">
+        <svg width="20" height="20"><circle cx="10" cy="10" r="8" fill="#f5f5f5" stroke="#000" stroke-width="1.5"/></svg>
+        Agent
+      </div>
+      <div class="legend-item">
+        <svg width="20" height="26" viewBox="0 0 20 26">
+          <rect x="2" y="6" width="16" height="18" rx="2" fill="#e0e0e0"/>
+          <ellipse cx="10" cy="7" rx="8" ry="3.5" fill="#f0f0f0"/>
+          <ellipse cx="10" cy="24" rx="8" ry="3.5" fill="#ccc" opacity="0.7"/>
+        </svg>
+        Private database
+      </div>
+      <div class="legend-item">
+        <svg width="30" height="8"><line x1="0" y1="4" x2="30" y2="4" stroke="#000" stroke-width="2"/></svg>
+        Writes
+      </div>
+      <div class="legend-item">
+        <svg width="30" height="8"><line x1="0" y1="4" x2="30" y2="4" stroke="#888" stroke-width="1.5" stroke-dasharray="5 3"/></svg>
+        Reads
+      </div>
+    </div>
+
+    <div class="diagram" id="diagram">
+      <span class="col-label left">Agents</span>
+      <span class="col-label right">Databases</span>
+
+      <div class="orch-strip">
+        <div class="orch-bubble" id="orch-bubble"></div>
+        <div class="orch-meta">
+          <strong>Operations Manager</strong>
+          <span class="orch-desc">Decides when and in what order each agent runs</span>
+          <span class="orch-sub">os-runner</span>
+        </div>
+      </div>
+
+      <div class="agents-col" id="agents-col"></div>
+      <svg id="lines-svg"></svg>
+      <div class="dbs-col" id="dbs-col"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Footer -->
+<div class="footer">
+  <div class="logo">co</div>
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+// Feather-style SVG icons — stroke-based, monochrome
+const I = (d) => `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+const ICONS = {
+  intake:    I('<polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>'),
+  evidence:  I('<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>'),
+  knowledge: I('<polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>'),
+  hygiene:   I('<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>'),
+  portfolio: I('<polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/>'),
+  reporting: I('<line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>'),
+  runner:    I('<rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/>'),
+};
+
+const AGENTS = [
+  {
+    id: 'intake',
+    name: 'Information Coordinator',
+    desc: 'Captures emails and meetings and registers them in the OS',
+    caps: ['source-intake', 'ingest-conversation'],
+    icon: ICONS.intake,
+  },
+  {
+    id: 'evidence',
+    name: 'Intelligence Analyst',
+    desc: 'Extracts atomic signals from sources and certifies their validity',
+    caps: ['evidence-review', 'validation-operator'],
+    icon: ICONS.evidence,
+  },
+  {
+    id: 'knowledge',
+    name: 'Project Manager',
+    desc: 'Gates material changes and keeps projects and knowledge current',
+    caps: ['project-operator', 'update-project-status', 'update-knowledge-asset'],
+    icon: ICONS.knowledge,
+  },
+  {
+    id: 'hygiene',
+    name: 'Internal Auditor',
+    desc: 'Detects inconsistencies, repairs records, and flags duplicates',
+    caps: ['db-hygiene-operator', 'hygiene-agent'],
+    icon: ICONS.hygiene,
+  },
+  {
+    id: 'portfolio',
+    name: 'Portfolio Director',
+    desc: 'Tracks relationships, matches investors, and monitors grants',
+    caps: ['portfolio-health-agent', 'deal-flow-agent', 'grant-monitor-agent'],
+    icon: ICONS.portfolio,
+  },
+  {
+    id: 'reporting',
+    name: 'Chief of Staff',
+    desc: 'Prepares executive briefings and surfaces items for human review',
+    caps: ['briefing-agent', 'review-queue'],
+    icon: ICONS.reporting,
+    readonly: true,
+  },
+];
+
+const DBS = [
+  { id: 'db_sources',       name: 'Sources',               sub: 'CH Sources [OS v2]',        color: '#1a1a1a', light: '#555', dark: '#000' },
+  { id: 'db_conversations', name: 'Conversations',          sub: 'CH Conversations [OS v2]',  color: '#2d2d2d', light: '#666', dark: '#111' },
+  { id: 'db_evidence',      name: 'Evidence',               sub: 'CH Evidence [OS v2]',       color: '#444',    light: '#888', dark: '#222' },
+  { id: 'db_projects',      name: 'Projects',               sub: 'CH Projects [OS v2]',       color: '#555',    light: '#999', dark: '#333' },
+  { id: 'db_knowledge',     name: 'Knowledge Assets',       sub: 'CH Knowledge Assets',       color: '#666',    light: '#aaa', dark: '#444' },
+  { id: 'db_people',        name: 'People',                 sub: 'CH People [OS v2]',         color: '#777',    light: '#bbb', dark: '#555' },
+  { id: 'db_orgs',          name: 'Organizations',          sub: 'CH Organizations [OS v2]',  color: '#888',    light: '#ccc', dark: '#666' },
+  { id: 'db_opportunities', name: 'Opportunities',          sub: 'Opportunities',             color: '#999',    light: '#ddd', dark: '#777' },
+  { id: 'db_agreements',    name: 'Agreements & Grants',    sub: 'Agreements',                color: '#aaa',    light: '#e8e8e8', dark: '#888' },
+];
+
+const CONNECTIONS = [
+  { from: 'intake',     to: 'db_sources',       type: 'write' },
+  { from: 'intake',     to: 'db_conversations', type: 'write' },
+  { from: 'evidence',   to: 'db_sources',       type: 'read'  },
+  { from: 'evidence',   to: 'db_conversations', type: 'read'  },
+  { from: 'evidence',   to: 'db_projects',      type: 'read'  },
+  { from: 'evidence',   to: 'db_people',        type: 'read'  },
+  { from: 'evidence',   to: 'db_orgs',          type: 'read'  },
+  { from: 'evidence',   to: 'db_evidence',      type: 'write' },
+  { from: 'knowledge',  to: 'db_evidence',      type: 'read'  },
+  { from: 'knowledge',  to: 'db_projects',      type: 'write' },
+  { from: 'knowledge',  to: 'db_knowledge',     type: 'write' },
+  { from: 'hygiene',    to: 'db_sources',       type: 'write' },
+  { from: 'hygiene',    to: 'db_evidence',      type: 'write' },
+  { from: 'portfolio',  to: 'db_projects',      type: 'read'  },
+  { from: 'portfolio',  to: 'db_people',        type: 'write' },
+  { from: 'portfolio',  to: 'db_orgs',          type: 'read'  },
+  { from: 'portfolio',  to: 'db_opportunities', type: 'write' },
+  { from: 'portfolio',  to: 'db_agreements',    type: 'write' },
+  { from: 'reporting',  to: 'db_evidence',      type: 'read'  },
+  { from: 'reporting',  to: 'db_projects',      type: 'read'  },
+  { from: 'reporting',  to: 'db_knowledge',     type: 'read'  },
+  { from: 'reporting',  to: 'db_people',        type: 'read'  },
+  { from: 'reporting',  to: 'db_opportunities', type: 'read'  },
+];
+
+// Cylinder — monochrome with lime accent on hover (via CSS class)
+function cylinderSVG(color, light, dark) {
+  const W = 30, H = 40, RY = 4.5;
+  return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+    <rect x="0" y="${RY}" width="${W}" height="${H-RY}" rx="2.5" fill="${color}"/>
+    <ellipse cx="${W/2}" cy="${RY}" rx="${W/2}" ry="${RY}" fill="${light}"/>
+    <ellipse cx="${W/2}" cy="${H-RY}" rx="${W/2}" ry="${RY}" fill="${dark}" opacity="0.6"/>
+    <line x1="3" y1="${RY+8}"  x2="${W-3}" y2="${RY+8}"  stroke="white" stroke-opacity="0.15" stroke-width="0.8"/>
+    <line x1="3" y1="${RY+16}" x2="${W-3}" y2="${RY+16}" stroke="white" stroke-opacity="0.15" stroke-width="0.8"/>
+  </svg>`;
+}
+
+// Render agents
+const agentsCol = document.getElementById('agents-col');
+AGENTS.forEach(a => {
+  const div = document.createElement('div');
+  div.className = 'agent-node';
+  div.dataset.id = a.id;
+  div.innerHTML = `
+    <div class="agent-bubble">
+      ${a.icon}
+      <span class="cap-badge">${a.caps.length}</span>
+    </div>
+    <div class="agent-meta">
+      <strong>${a.name}</strong>
+      <span class="desc">${a.desc}</span>
+      <span class="caps">${a.caps.join(' · ')}</span>
+    </div>`;
+  agentsCol.appendChild(div);
+});
+
+// Inject runner icon into Operations Manager bubble
+document.getElementById('orch-bubble').innerHTML = ICONS.runner;
+
+// Render databases
+const dbsCol = document.getElementById('dbs-col');
+DBS.forEach(d => {
+  const div = document.createElement('div');
+  div.className = 'db-node';
+  div.dataset.id = d.id;
+  div.innerHTML = `
+    <div class="db-icon-wrap">${cylinderSVG(d.color, d.light, d.dark)}</div>
+    <div class="db-meta">
+      <strong>${d.name}</strong>
+      <small>${d.sub}</small>
+    </div>`;
+  dbsCol.appendChild(div);
+});
+
+// Draw lines
+const svg = document.getElementById('lines-svg');
+function drawLines() {
+  svg.innerHTML = '';
+  const svgRect = svg.getBoundingClientRect();
+
+  CONNECTIONS.forEach(conn => {
+    const bubble = document.querySelector(`.agent-node[data-id="${conn.from}"] .agent-bubble`);
+    const dbWrap = document.querySelector(`.db-node[data-id="${conn.to}"] .db-icon-wrap`);
+    if (!bubble || !dbWrap) return;
+    const aR = bubble.getBoundingClientRect();
+    const dR = dbWrap.getBoundingClientRect();
+    // Bubble right edge → cylinder left edge — center corridor is text-free
+    const x1 = aR.right - svgRect.left;
+    const y1 = aR.top + aR.height / 2 - svgRect.top;
+    const x2 = dR.left  - svgRect.left;
+    const y2 = dR.top + dR.height / 2 - svgRect.top;
+    const t  = (x2 - x1) * 0.44;
+
+    const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+    path.setAttribute('d', `M ${x1} ${y1} C ${x1+t} ${y1}, ${x2-t} ${y2}, ${x2} ${y2}`);
+    path.setAttribute('class', `conn type-${conn.type}`);
+    path.dataset.from = conn.from;
+    path.dataset.to   = conn.to;
+    svg.appendChild(path);
+  });
+}
+requestAnimationFrame(() => requestAnimationFrame(drawLines));
+window.addEventListener('resize', drawLines);
+
+// Hover
+const tooltip = document.getElementById('tooltip');
+
+// activeAgentIds: Set of currently highlighted agent IDs (supports multi-agent)
+let activeAgentIds = new Set();
+
+function highlightAgents(ids) {
+  activeAgentIds = new Set(ids);
+  const touchedDbs = new Set(
+    CONNECTIONS.filter(c => activeAgentIds.has(c.from)).map(c => c.to)
+  );
+  document.querySelectorAll('.agent-node').forEach(n => {
+    const isActive = activeAgentIds.has(n.dataset.id);
+    n.classList.toggle('active', isActive);
+    n.classList.toggle('dimmed', !isActive);
+  });
+  document.querySelectorAll('.db-node').forEach(n => {
+    const hit = touchedDbs.has(n.dataset.id);
+    n.classList.toggle('active', hit);
+    n.classList.toggle('dimmed', !hit);
+  });
+  document.querySelectorAll('.conn').forEach(line => {
+    const active = activeAgentIds.has(line.dataset.from);
+    line.classList.toggle('active', active);
+    line.classList.toggle('dimmed', !active);
+  });
+}
+
+function highlightAgent(id) {
+  highlightAgents([id]);
+}
+
+function resetHighlight() {
+  document.querySelectorAll('.agent-node, .db-node').forEach(n => n.classList.remove('active','dimmed'));
+  document.querySelectorAll('.conn').forEach(l => l.classList.remove('active','dimmed'));
+  tooltip.classList.remove('visible');
+}
+
+document.querySelectorAll('.agent-node').forEach(node => {
+  node.addEventListener('mouseenter', e => {
+    const id    = node.dataset.id;
+    const agent = AGENTS.find(a => a.id === id);
+    const conns = CONNECTIONS.filter(c => c.from === id);
+    const writes = conns.filter(c => c.type==='write').map(c => DBS.find(d=>d.id===c.to)?.name);
+    const reads  = conns.filter(c => c.type==='read' ).map(c => DBS.find(d=>d.id===c.to)?.name);
+    highlightAgent(id);
+    tooltip.innerHTML = `
+      <div class="tt-name">${agent.name}</div>
+      <div class="tt-desc">${agent.desc}</div>
+      <div class="tt-caps">${agent.caps.join(' · ')}</div>
+      <div class="tags">
+        ${writes.length ? `<span class="tag write">✏ ${writes.join(' · ')}</span>` : ''}
+        ${reads.length  ? `<span class="tag read">◎ ${reads.join(' · ')}</span>`   : ''}
+      </div>`;
+    tooltip.classList.add('visible');
+  });
+  node.addEventListener('mousemove', e => {
+    tooltip.style.left = (e.clientX + 18) + 'px';
+    tooltip.style.top  = (e.clientY - 14) + 'px';
+  });
+  node.addEventListener('mouseleave', resetHighlight);
+});
+
+document.querySelectorAll('.db-node').forEach(node => {
+  node.addEventListener('mouseenter', e => {
+    const db      = DBS.find(d => d.id === node.dataset.id);
+    const writers = CONNECTIONS.filter(c => c.to===node.dataset.id && c.type==='write').map(c => AGENTS.find(a=>a.id===c.from)?.name);
+    const readers = CONNECTIONS.filter(c => c.to===node.dataset.id && c.type==='read' ).map(c => AGENTS.find(a=>a.id===c.from)?.name);
+    tooltip.innerHTML = `
+      <div class="tt-name">${db.name}</div>
+      <div class="tt-desc" style="font-size:9px;color:#666">${db.sub}</div>
+      <div class="tags" style="margin-top:8px">
+        ${writers.length ? `<span class="tag write">✏ ${writers.join(' · ')}</span>` : ''}
+        ${readers.length ? `<span class="tag read">◎ ${readers.join(' · ')}</span>`  : ''}
+      </div>`;
+    tooltip.classList.add('visible');
+  });
+  node.addEventListener('mousemove', e => {
+    tooltip.style.left = (e.clientX - 260) + 'px';
+    tooltip.style.top  = (e.clientY - 14) + 'px';
+  });
+  node.addEventListener('mouseleave', () => tooltip.classList.remove('visible'));
+});
+
+// ─── Live mode ────────────────────────────────────────────────────────────────
+let liveMode      = false;
+let liveTimer     = null;
+let liveIndex     = -1;
+let breatheTimers = [];
+
+const orchDesc = document.querySelector('.orch-desc');
+const STATIC_DESC = 'Decides when and in what order each agent runs';
+
+function toggleLive() {
+  liveMode = !liveMode;
+  const btn = document.getElementById('live-btn');
+  if (liveMode) {
+    btn.classList.add('active');
+    btn.innerHTML = '<span class="dot"></span> LIVE';
+    startIdleBreathing();
+    runNextLiveAgent();
+  } else {
+    btn.classList.remove('active');
+    btn.innerHTML = '<span class="dot"></span> LIVE';
+    clearTimeout(liveTimer);
+    breatheTimers.forEach(clearTimeout);
+    breatheTimers = [];
+    document.querySelectorAll('.agent-node').forEach(n => n.classList.remove('idle-breathe'));
+    clearLiveState();
+    resetHighlight();
+    orchDesc.className = 'orch-desc';
+    orchDesc.textContent = STATIC_DESC;
+  }
+}
+
+function startIdleBreathing() {
+  // Stagger breathe animation start per agent so they're all out of phase
+  AGENTS.forEach((a, i) => {
+    const t = setTimeout(() => {
+      const node = document.querySelector(`.agent-node[data-id="${a.id}"]`);
+      if (node && !node.classList.contains('live')) node.classList.add('idle-breathe');
+    }, i * 420);
+    breatheTimers.push(t);
+  });
+}
+
+function clearLiveState() {
+  activeAgentIds.clear();
+  document.querySelectorAll('.agent-node').forEach(n => n.classList.remove('live'));
+  document.querySelectorAll('.sonar-ring').forEach(r => r.remove());
+  document.querySelectorAll('.conn').forEach(l => l.classList.remove('live-flow'));
+  document.querySelectorAll('.db-node').forEach(n => n.classList.remove('live-target'));
+}
+
+function activateLiveAgent(agentId) {
+  const agent  = AGENTS.find(a => a.id === agentId);
+  const node   = document.querySelector(`.agent-node[data-id="${agentId}"]`);
+  if (!node) return;
+
+  // Add to active set and re-highlight all active agents together
+  activeAgentIds.add(agentId);
+  highlightAgents([...activeAgentIds]);
+  node.classList.remove('idle-breathe');
+  node.classList.add('live');
+
+  // Sonar rings
+  const bubble = node.querySelector('.agent-bubble');
+  [0, 500].forEach(delay => {
+    const ring = document.createElement('div');
+    ring.className = 'sonar-ring';
+    ring.style.animationDelay = delay + 'ms';
+    bubble.appendChild(ring);
+  });
+
+  // Live-flow connections + DB target glow
+  const conns = CONNECTIONS.filter(c => c.from === agentId);
+  conns.forEach(c => {
+    document.querySelectorAll(`.conn[data-from="${agentId}"]`).forEach(p => p.classList.add('live-flow'));
+    const dbNode = document.querySelector(`.db-node[data-id="${c.to}"]`);
+    if (dbNode) dbNode.classList.add('live-target');
+  });
+
+  // Update orch log
+  const writes = conns.filter(c => c.type === 'write').map(c => DBS.find(d => d.id === c.to)?.name).filter(Boolean);
+  const reads  = conns.filter(c => c.type === 'read' ).map(c => DBS.find(d => d.id === c.to)?.name).filter(Boolean);
+  const parts = [];
+  if (writes.length) parts.push(`<span class="log-w">→ ${writes.join(', ')}</span>`);
+  if (reads.length)  parts.push(`<span class="log-r">← ${reads.join(', ')}</span>`);
+  orchDesc.className = 'orch-desc live-log';
+  orchDesc.innerHTML = `<strong>${agent.name}</strong> &nbsp;${parts.join(' &nbsp;')}`;
+}
+
+function runNextLiveAgent() {
+  if (!liveMode) return;
+  clearLiveState();
+
+  // Restart idle breathing on all idle nodes
+  AGENTS.forEach(a => {
+    const n = document.querySelector(`.agent-node[data-id="${a.id}"]`);
+    if (n) n.classList.add('idle-breathe');
+  });
+
+  // Sometimes run 2 agents concurrently (~25% chance)
+  const runTwo = Math.random() < 0.25 && AGENTS.length >= 2;
+
+  liveIndex = (liveIndex + 1) % AGENTS.length;
+  activateLiveAgent(AGENTS[liveIndex].id);
+
+  if (runTwo) {
+    const secondIdx = (liveIndex + 1) % AGENTS.length;
+    setTimeout(() => {
+      if (liveMode) activateLiveAgent(AGENTS[secondIdx].id);
+    }, 600);
+  }
+
+  // Organic timing: 2.8–4s per cycle
+  liveTimer = setTimeout(runNextLiveAgent, 2800 + Math.random() * 1200);
+}
+
+// ── Iframe embed mode ──
+if (window.self !== window.top) {
+  document.addEventListener('DOMContentLoaded', () => {
+    // Hide header and intro text, keep only the diagram
+    const header = document.querySelector('.page-header');
+    const intro = document.querySelector('.intro');
+    const layout = document.querySelector('.layout');
+    if (header) header.style.display = 'none';
+    if (intro) intro.style.display = 'none';
+    if (layout) {
+      layout.style.display = 'block'; // single column
+      layout.style.padding = '0';
+    }
+    // Reduce body padding
+    document.body.style.padding = '20px 24px 24px';
+    // Auto-start live animation
+    setTimeout(() => {
+      liveMode = false;
+      toggleLive();
+    }, 400);
+  });
+}
+</script>
+</body>
+</html>
