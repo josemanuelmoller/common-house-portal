@@ -65,5 +65,30 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ uploaded: results.length, results, errors });
+  // Auto-ingest PDFs in background — fire and forget, doesn't block the response
+  const pdfUploads = results.filter(r =>
+    r.name.toLowerCase().endsWith(".pdf") && r.notionId && r.storagePath
+  );
+  if (pdfUploads.length > 0 && projectId) {
+    const ingestUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/api/garage-ingest`;
+    const agentKey  = process.env.CRON_SECRET ?? "";
+
+    for (const upload of pdfUploads) {
+      // Non-blocking background ingest
+      fetch(ingestUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-agent-key": agentKey },
+        body: JSON.stringify({
+          fileUrl:     upload.url,
+          fileName:    upload.name,
+          projectId,
+          projectName,
+          orgId,
+          mode: "execute",
+        }),
+      }).catch(() => { /* silence — ingest failure shouldn't block upload */ });
+    }
+  }
+
+  return NextResponse.json({ uploaded: results.length, results, errors, autoIngestTriggered: pdfUploads.length });
 }

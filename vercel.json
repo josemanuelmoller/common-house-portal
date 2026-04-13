@@ -24,6 +24,18 @@
     {
       "path": "/api/extract-meeting-evidence",
       "schedule": "0 2 * * 2-6"
+    },
+    {
+      "path": "/api/ingest-gmail",
+      "schedule": "0 7 * * 1-5"
+    },
+    {
+      "path": "/api/evidence-to-knowledge",
+      "schedule": "0 4 * * 1-5"
+    },
+    {
+      "path": "/api/project-operator",
+      "schedule": "0 5 * * 1-5"
     }
   ]
 }
