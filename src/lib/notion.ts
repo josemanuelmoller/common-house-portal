@@ -1472,26 +1472,41 @@ export async function getDataRoomForProject(projectId: string): Promise<DataRoom
   try {
     const orgIds = await getPrimaryOrgIds(projectId);
 
-    if (orgIds.length) {
-      const res = await notion.databases.query({
+    // Run both queries in parallel: items linked via Startup relation AND items
+    // uploaded before the org was linked (stored by projectId in Notes). This
+    // ensures legacy records are never lost when the org relation is later set.
+    const [orgRes, notesRes] = await Promise.all([
+      orgIds.length
+        ? notion.databases.query({
+            database_id: DB.dataRoom,
+            filter: { property: "Startup", relation: { contains: orgIds[0] } },
+            sorts: [{ property: "Priority", direction: "ascending" }],
+            page_size: 50,
+          })
+        : Promise.resolve({ results: [] }),
+      notion.databases.query({
         database_id: DB.dataRoom,
-        filter: { property: "Startup", relation: { contains: orgIds[0] } },
+        filter: { property: "Notes", rich_text: { contains: projectId } },
         sorts: [{ property: "Priority", direction: "ascending" }],
         page_size: 50,
-      });
+      }),
+    ]);
+
+    // Merge and deduplicate by page id
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const seen = new Set<string>();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const merged: any[] = [];
+    for (const page of [...orgRes.results, ...notesRes.results]) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return (res.results as any[]).map(mapDataRoomPage);
+      if (!seen.has((page as any).id)) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        seen.add((page as any).id);
+        merged.push(page);
+      }
     }
 
-    // Fallback: no org linked — find items by project ID stored in Notes field
-    const res = await notion.databases.query({
-      database_id: DB.dataRoom,
-      filter: { property: "Notes", rich_text: { contains: projectId } },
-      sorts: [{ property: "Priority", direction: "ascending" }],
-      page_size: 50,
-    });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (res.results as any[]).map(mapDataRoomPage);
+    return merged.map(mapDataRoomPage);
   } catch {
     return [];
   }

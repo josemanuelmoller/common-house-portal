@@ -36,6 +36,10 @@
     {
       "path": "/api/project-operator",
       "schedule": "0 5 * * 1-5"
+    },
+    {
+      "path": "/api/validation-operator",
+      "schedule": "0 3 * * 1-5"
     }
   ]
 }
