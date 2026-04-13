@@ -25,7 +25,9 @@ export async function POST(req: NextRequest) {
   const results: { name: string; storagePath: string; signedUrl: string; error?: string }[] = [];
 
   for (const file of files) {
-    const storagePath = `${projectId}/${Date.now()}-${Math.random().toString(36).slice(2, 6)}-${file.name}`;
+    // Sanitize filename — spaces and special chars break Supabase storage paths
+    const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, "_");
+    const storagePath = `${projectId}/${Date.now()}-${Math.random().toString(36).slice(2, 6)}-${safeName}`;
     const { data, error } = await supabase.storage
       .from("garage-docs")
       .createSignedUploadUrl(storagePath);

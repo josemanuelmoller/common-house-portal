@@ -732,10 +732,16 @@ function UploadModal({ projectId, projectName, orgId, onDone }: {
         const file = files.find(f => f.name === name)!;
         const putRes = await fetch(signedUrl, {
           method: "PUT",
-          headers: { "Content-Type": file.type || "application/octet-stream" },
+          headers: {
+            "Content-Type": file.type || "application/octet-stream",
+            "x-upsert": "false",
+          },
           body: file,
         });
-        if (!putRes.ok) throw new Error(`${name}: upload failed (${putRes.status})`);
+        if (!putRes.ok) {
+          const detail = await putRes.text().catch(() => "");
+          throw new Error(`${name}: upload failed (${putRes.status})${detail ? ` — ${detail}` : ""}`);
+        }
       }));
 
       // Step 3 — finalize: create signed read URLs + Notion Data Room records
