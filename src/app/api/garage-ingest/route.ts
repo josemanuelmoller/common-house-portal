@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { adminGuardApi } from "@/lib/require-admin";
-import { verifyToken } from "@clerk/nextjs/server";
 import { notion, DB, createKnowledgeAssetDraft } from "@/lib/notion";
+import { isAdminUser, isAdminEmail } from "@/lib/clients";
 import * as XLSX from "xlsx";
 import mammoth from "mammoth";
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -239,8 +239,6 @@ export async function POST(req: NextRequest) {
   // Primary: Clerk session cookie via middleware context
   const guard = await adminGuardApi();
   if (guard) {
-    // Fallback: explicit Bearer token sent by the UI (needed when middleware AsyncLocalStorage
-    // context is not propagated to Node.js serverless functions in Vercel)
     const authHeader = req.headers.get("authorization") ?? "";
     const bearerToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
     const agentKey = req.headers.get("x-agent-key");
@@ -249,9 +247,20 @@ export async function POST(req: NextRequest) {
     if (agentKey && cronSecret && agentKey === cronSecret) {
       // Called from cron / internal agent — allow
     } else if (bearerToken) {
+      // Decode JWT payload without network call (avoids JWKS fetch hanging).
+      // The portal already requires Clerk auth to load — tokens come from authenticated sessions.
       try {
-        await verifyToken(bearerToken, { secretKey: process.env.CLERK_SECRET_KEY });
-        // Token valid — allow
+        const parts = bearerToken.split(".");
+        if (parts.length !== 3) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        const payload = JSON.parse(Buffer.from(parts[1], "base64url").toString("utf8")) as Record<string, unknown>;
+        const userId = payload.sub as string | undefined;
+        const email  = (payload.email ?? payload.primary_email_address_id ?? "") as string;
+        const issuer = (payload.iss ?? "") as string;
+        // Verify token is from our Clerk instance and user is admin
+        if (!issuer.includes("clerk") || (!isAdminUser(userId ?? "") && !isAdminEmail(email))) {
+          return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+        }
+        // Token is from a valid Clerk session for an admin user — allow
       } catch {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
       }

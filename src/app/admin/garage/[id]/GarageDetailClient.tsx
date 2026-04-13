@@ -621,6 +621,12 @@ function DataRoomTab({
               // Check extension from storagePath or fileUrl (item.name is Notion-formatted, has no extension)
               const checkStr = (storagePath || item.fileUrl || item.name || "").toLowerCase();
               const isPdf    = processableExts.some(e => checkStr.includes(e));
+              // Derive actual filename with extension (item.name has no extension after Notion formatting)
+              const actualFileName = storagePath
+                ? storagePath.split("/").pop() ?? item.name
+                : item.fileUrl
+                  ? decodeURIComponent((item.fileUrl.split("/").pop() ?? "").split("?")[0]) || item.name
+                  : item.name;
               const isThisProcessing = ingestState.status === "processing" && ingestState.fileId === item.id;
               const isThisPreview    = ingestState.status === "preview"    && ingestState.fileId === item.id;
               const isThisExecuting  = ingestState.status === "executing"  && ingestState.fileId === item.id;
@@ -644,7 +650,7 @@ function DataRoomTab({
                       {/* Procesar button — PDF, Excel, CSV */}
                       {isPdf && !isThisDone && (
                         <button
-                          onClick={() => onIngest(item.id, item.fileUrl!, item.name)}
+                          onClick={() => onIngest(item.id, item.fileUrl!, actualFileName)}
                           disabled={anyBusy || isThisPreview}
                           className={`text-[10px] font-bold px-2.5 py-1 rounded-lg transition-all ${
                             isThisProcessing
@@ -720,7 +726,7 @@ function DataRoomTab({
                           )}
                           <div className="flex items-center gap-2">
                             <button
-                              onClick={() => onIngestConfirm(item.id, item.fileUrl!, item.name)}
+                              onClick={() => onIngestConfirm(item.id, item.fileUrl!, actualFileName)}
                               className="text-[10.5px] font-bold px-3 py-1.5 rounded-lg bg-[#c8f55a] text-[#131218] hover:bg-[#b8e84a] transition-all"
                             >
                               Confirmar y ejecutar
