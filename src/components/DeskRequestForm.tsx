@@ -118,7 +118,7 @@ export default function DeskRequestForm({
         }`}
       >
         {status === "success"
-          ? "✓ Solicitud enviada"
+          ? "✓ Draft en camino — revisa Notion en ~30s"
           : status === "error"
           ? "Error — intenta de nuevo"
           : status === "loading"

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminGuardApi } from "@/lib/require-admin";
 import { Client } from "@notionhq/client";
 import { DB } from "@/lib/notion";
+import { generateDraft } from "@/lib/generate-draft";
 
 const notion = new Client({ auth: process.env.NOTION_API_KEY });
 
@@ -50,6 +51,16 @@ export async function POST(req: NextRequest) {
       properties["Platform"] = { select: { name: channel } };
     }
 
+    if (deskType) {
+      const deskLabel =
+        deskType === "design"   ? "Design"   :
+        deskType === "comms"    ? "Comms"    :
+        deskType === "insights" ? "Insights" :
+        deskType === "grants"   ? "Grants"   :
+        deskType.charAt(0).toUpperCase() + deskType.slice(1);
+      properties["Desk"] = { select: { name: deskLabel } };
+    }
+
     // Add a note with source desk
     const pageBody: Record<string, unknown> = {
       parent: { database_id: DB.contentPipeline },
@@ -70,6 +81,13 @@ export async function POST(req: NextRequest) {
     }
 
     const page = await notion.pages.create(pageBody as any);
+
+    // Fire-and-forget: generate AI draft in background, don't block the response
+    if (process.env.ANTHROPIC_API_KEY) {
+      generateDraft(page.id).catch(err =>
+        console.error("[desk-request] generate-draft failed", err)
+      );
+    }
 
     return NextResponse.json({ ok: true, id: page.id });
   } catch (err) {
