@@ -93,10 +93,17 @@ function DecisionRow({ item }: { item: DecisionItem }) {
             </span>
           )}
         </div>
-        {item.notes && (
-          <p className="text-[11px] text-[#131218]/40 font-medium mt-1.5 leading-relaxed line-clamp-2">
+        {item.notes ? (
+          <p className="text-[12px] text-[#131218]/65 mt-2 leading-relaxed">
             {item.notes}
           </p>
+        ) : (
+          <p className="text-[11px] text-[#131218]/25 italic mt-1.5">No context provided — open in Notion for details.</p>
+        )}
+        {item.category && (
+          <span className="inline-block mt-1.5 text-[9px] font-bold text-[#131218]/35 bg-[#EFEFEA] px-2 py-0.5 rounded-full uppercase tracking-widest">
+            {item.category}
+          </span>
         )}
         <DecisionActions
           id={item.id}
