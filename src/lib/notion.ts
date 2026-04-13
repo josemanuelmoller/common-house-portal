@@ -1626,6 +1626,76 @@ export async function getFollowUpOpportunities(): Promise<OpportunityItem[]> {
   }
 }
 
+// ─── Commercial Pipeline — active pursuit only ───────────────────────────────
+// Stages shown: Active | Proposal Sent | Negotiation
+// Won/Lost/Archived are excluded (Won → Workroom, Lost/Archived → done)
+
+export type PipelineOpportunity = OpportunityItem & {
+  daysInStage: number | null;
+};
+
+export async function getPipelineOpportunities(): Promise<{
+  active:       PipelineOpportunity[];
+  proposalSent: PipelineOpportunity[];
+  negotiation:  PipelineOpportunity[];
+  recentlyClosed: PipelineOpportunity[]; // Won or Lost in last 30 days
+}> {
+  try {
+    const res = await notion.databases.query({
+      database_id: DB.opportunities,
+      filter: {
+        or: [
+          { property: "Stage", select: { equals: "Active" } },
+          { property: "Stage", select: { equals: "Proposal Sent" } },
+          { property: "Stage", select: { equals: "Negotiation" } },
+          { property: "Stage", select: { equals: "Won" } },
+          { property: "Stage", select: { equals: "Lost" } },
+        ],
+      },
+      sorts: [{ property: "Opportunity Score", direction: "descending" }],
+      page_size: 100,
+    });
+
+    const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const all: PipelineOpportunity[] = (res.results as any[]).map(page => ({
+      id:                  page.id,
+      name:                text(prop(page, "Opportunity Name")) || text(prop(page, "Name")) || "Untitled",
+      stage:               select(prop(page, "Stage")),
+      scope:               select(prop(page, "Scope")),
+      followUpStatus:      select(prop(page, "Follow-up Status")),
+      type:                select(prop(page, "Type")) || select(prop(page, "Opportunity Type")) || "",
+      orgName:             text(prop(page, "Organization")) || "",
+      lastEdited:          page.last_edited_time?.slice(0, 10) ?? null,
+      notionUrl:           page.url ?? "",
+      score:               num(prop(page, "Opportunity Score")),
+      qualificationStatus: select(prop(page, "Qualification Status")) || "Not Scored",
+      daysInStage:         page.last_edited_time
+        ? Math.floor((Date.now() - new Date(page.last_edited_time).getTime()) / 86400000)
+        : null,
+    }));
+
+    return {
+      active:         all.filter(o => o.stage === "Active"),
+      proposalSent:   all.filter(o => o.stage === "Proposal Sent"),
+      negotiation:    all.filter(o => o.stage === "Negotiation"),
+      recentlyClosed: all.filter(o =>
+        (o.stage === "Won" || o.stage === "Lost") &&
+        page_last_edited_after(res.results, o.id, cutoff)
+      ),
+    };
+  } catch {
+    return { active: [], proposalSent: [], negotiation: [], recentlyClosed: [] };
+  }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function page_last_edited_after(results: any[], id: string, cutoff: string): boolean {
+  const page = results.find((p: any) => p.id === id);
+  return page ? page.last_edited_time >= cutoff : false;
+}
+
 // ─── Hall v2 — Relationship warmth ───────────────────────────────────────────
 
 export type WarmthRecord = {

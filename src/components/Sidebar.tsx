@@ -50,10 +50,10 @@ export const ADMIN_NAV_V2: NavEntry[] = [
   {
     kind: "group", label: "Commercial", icon: "◉",
     items: [
-      { label: "Pipeline",      href: "/admin/pipeline" },
-      { label: "Opportunities", href: "/admin/opportunities" },
+      { label: "Opportunities",  href: "/admin/opportunities" },
+      { label: "Pipeline",       href: "/admin/pipeline" },
+      { label: "Grants",         href: "/admin/grants" },
       { label: "Investor Match", href: "/admin/deal-flow" },
-      { label: "Grants",        href: "/admin/grants" },
     ],
   },
   {

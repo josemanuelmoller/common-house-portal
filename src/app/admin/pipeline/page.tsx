@@ -1,310 +1,208 @@
 import Link from "next/link";
 import { Sidebar } from "@/components/Sidebar";
-import { getProjectsOverview, getDecisionItems } from "@/lib/notion";
+import { getPipelineOpportunities, PipelineOpportunity } from "@/lib/notion";
 import { requireAdmin } from "@/lib/require-admin";
 
-function daysSince(dateStr: string | null): number {
-  if (!dateStr) return 999;
-  return Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000);
-}
-
-// ── Stage config ──────────────────────────────────────────────────────────────
-
-const STAGE_ORDER = [
-  "Stakeholder Alignment",
-  "Discovery",
-  "Validation",
-  "Pilot Planning",
-  "Pilot Live",
-  "Execution",
-  "Scale",
-  "Completion",
-  "Design",
-  "On Hold",
+// ── Dummy data for UI testing ─────────────────────────────────────────────────
+const DUMMY_ACTIVE: PipelineOpportunity[] = [
+  { id: "a1", name: "Retail Refill — Co-op", orgName: "Co-op", type: "CH Sale", stage: "Active", scope: "CH", followUpStatus: "Needed", score: 59, qualificationStatus: "Needs Review", lastEdited: "2026-04-10", notionUrl: "#", daysInStage: 8 },
+  { id: "a2", name: "ZWF Forum 2026 — Strategy", orgName: "Zero Waste Forum", type: "Partnership", stage: "Active", scope: "CH", followUpStatus: "Waiting", score: 74, qualificationStatus: "Qualified", lastEdited: "2026-04-11", notionUrl: "#", daysInStage: 3 },
+  { id: "a3", name: "SUFI — Fair4All Finance", orgName: "SUFI", type: "Grant", stage: "Active", scope: "Portfolio", followUpStatus: "Needed", score: 71, qualificationStatus: "Qualified", lastEdited: "2026-04-12", notionUrl: "#", daysInStage: 1 },
+];
+const DUMMY_PROPOSAL: PipelineOpportunity[] = [
+  { id: "p1", name: "Waitrose Refill Pilot", orgName: "Waitrose", type: "CH Sale", stage: "Proposal Sent", scope: "CH", followUpStatus: "Sent", score: 53, qualificationStatus: "Needs Review", lastEdited: "2026-04-07", notionUrl: "#", daysInStage: 6 },
+  { id: "p2", name: "Beeok — Series A (Circularity Capital)", orgName: "Beeok", type: "Investor Match", stage: "Proposal Sent", scope: "Portfolio", followUpStatus: "Waiting", score: 88, qualificationStatus: "Qualified", lastEdited: "2026-04-09", notionUrl: "#", daysInStage: 4 },
+];
+const DUMMY_NEGOTIATION: PipelineOpportunity[] = [
+  { id: "n1", name: "LIFE Programme — ENV-CIR Call", orgName: "European Commission", type: "Grant", stage: "Negotiation", scope: "CH", followUpStatus: "None", score: 82, qualificationStatus: "Qualified", lastEdited: "2026-04-12", notionUrl: "#", daysInStage: 2 },
+];
+const DUMMY_CLOSED: PipelineOpportunity[] = [
+  { id: "c1", name: "Auto Mercado Fase 2", orgName: "Auto Mercado", type: "CH Sale", stage: "Won", scope: "CH", followUpStatus: "None", score: 91, qualificationStatus: "Qualified", lastEdited: "2026-04-05", notionUrl: "#", daysInStage: null },
+  { id: "c2", name: "COP31 Activation Brief", orgName: "UNFCCC", type: "Partnership", stage: "Lost", scope: "CH", followUpStatus: "None", score: 44, qualificationStatus: "Needs Review", lastEdited: "2026-04-03", notionUrl: "#", daysInStage: null },
 ];
 
-const STAGE_STYLE: Record<string, { header: string; dot: string; card: string }> = {
-  "Stakeholder Alignment": {
-    header: "text-slate-500",
-    dot:    "bg-slate-400",
-    card:   "border-slate-200",
-  },
-  "Discovery": {
-    header: "text-blue-500",
-    dot:    "bg-blue-400",
-    card:   "border-blue-200",
-  },
-  "Validation": {
-    header: "text-amber-500",
-    dot:    "bg-amber-400",
-    card:   "border-amber-200",
-  },
-  "Pilot Planning": {
-    header: "text-amber-600",
-    dot:    "bg-amber-500",
-    card:   "border-amber-200",
-  },
-  "Pilot Live": {
-    header: "text-green-600",
-    dot:    "bg-green-500",
-    card:   "border-green-200",
-  },
-  "Execution": {
-    header: "text-green-700",
-    dot:    "bg-green-600",
-    card:   "border-green-200",
-  },
-  "Scale": {
-    header: "text-[#131218]",
-    dot:    "bg-[#c8f55a]",
-    card:   "border-[#c8f55a]/40",
-  },
-  "Completion": {
-    header: "text-[#131218]",
-    dot:    "bg-[#c8f55a]",
-    card:   "border-[#c8f55a]/60",
-  },
-  "Design": {
-    header: "text-purple-600",
-    dot:    "bg-purple-500",
-    card:   "border-purple-200",
-  },
-  "On Hold": {
-    header: "text-[#131218]/30",
-    dot:    "bg-[#131218]/20",
-    card:   "border-[#E0E0D8]",
-  },
-};
+// ── Sub-components ────────────────────────────────────────────────────────────
 
-const STAGE_STYLE_DEFAULT = {
-  header: "text-[#131218]/40",
-  dot:    "bg-[#131218]/20",
-  card:   "border-[#E0E0D8]",
-};
+function ScoreBadge({ score }: { score: number | null }) {
+  if (score === null) return <span className="text-[9px] font-bold text-[#131218]/20">—</span>;
+  const cls = score >= 70
+    ? "bg-[#B2FF59]/25 text-green-800"
+    : score >= 50
+    ? "bg-amber-100 text-amber-800"
+    : "bg-red-50 text-red-600";
+  return <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full tabular-nums ${cls}`}>{score}</span>;
+}
+
+function FollowUpDot({ status }: { status: string }) {
+  if (status === "Needed")  return <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" title="Follow-up needed" />;
+  if (status === "Sent")    return <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" title="Sent" />;
+  if (status === "Waiting") return <span className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" title="Waiting" />;
+  return <span className="w-1.5 h-1.5 shrink-0" />;
+}
+
+function TypePill({ type }: { type: string }) {
+  const colours: Record<string, string> = {
+    "CH Sale":       "bg-[#131218]/8 text-[#131218]/50",
+    "Grant":         "bg-[#B2FF59]/15 text-green-800",
+    "Partnership":   "bg-blue-50 text-blue-700",
+    "Investor Match":"bg-purple-50 text-purple-700",
+  };
+  return (
+    <span className={`text-[7.5px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide ${colours[type] ?? "bg-[#EFEFEA] text-[#131218]/40"}`}>
+      {type}
+    </span>
+  );
+}
+
+function OppCard({ opp }: { opp: PipelineOpportunity }) {
+  return (
+    <Link
+      href={opp.notionUrl || "#"}
+      target={opp.notionUrl && opp.notionUrl !== "#" ? "_blank" : undefined}
+      rel="noopener noreferrer"
+      className="group bg-white rounded-xl border border-[#E0E0D8] px-3.5 py-3 hover:border-[#131218]/20 hover:-translate-y-0.5 transition-all duration-150 flex flex-col gap-2"
+    >
+      <div className="flex items-start gap-2">
+        <FollowUpDot status={opp.followUpStatus} />
+        <p className="text-[11.5px] font-bold text-[#131218] leading-tight flex-1 line-clamp-2">{opp.name}</p>
+        <span className="text-[#131218]/15 group-hover:text-[#131218]/40 transition-colors text-xs shrink-0">↗</span>
+      </div>
+      <div className="flex items-center justify-between gap-2 pl-3.5">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {opp.orgName && <span className="text-[9px] text-[#131218]/35 font-medium">{opp.orgName}</span>}
+          <TypePill type={opp.type} />
+        </div>
+        <div className="flex items-center gap-1.5 shrink-0">
+          {opp.daysInStage !== null && (
+            <span className={`text-[8.5px] font-bold ${opp.daysInStage > 14 ? "text-red-400" : "text-[#131218]/25"}`}>
+              {opp.daysInStage}d
+            </span>
+          )}
+          <ScoreBadge score={opp.score} />
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+function KanbanCol({ label, items, accent }: { label: string; items: PipelineOpportunity[]; accent: string }) {
+  return (
+    <div className="flex flex-col gap-3 min-w-0">
+      <div className="flex items-center gap-2">
+        <span className={`w-2 h-2 rounded-full shrink-0 ${accent}`} />
+        <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/40">{label}</p>
+        <div className="flex-1 h-px bg-[#E0E0D8]" />
+        <span className="text-[9px] font-bold text-[#131218]/25">{items.length}</span>
+      </div>
+      {items.length === 0 ? (
+        <div className="bg-white/60 rounded-xl border border-dashed border-[#E0E0D8] px-4 py-6 text-center">
+          <p className="text-[10px] text-[#131218]/20">—</p>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {items.map(opp => <OppCard key={opp.id} opp={opp} />)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Page ──────────────────────────────────────────────────────────────────────
 
 export default async function PipelinePage() {
   await requireAdmin();
 
-  const [allProjects, decisions] = await Promise.all([
-    getProjectsOverview(),
-    getDecisionItems(),
-  ]);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _live = await getPipelineOpportunities();
+  // TODO: replace with live data once Opportunity Score field is populated in Notion
+  const active       = DUMMY_ACTIVE;
+  const proposalSent = DUMMY_PROPOSAL;
+  const negotiation  = DUMMY_NEGOTIATION;
+  const recentlyClosed = DUMMY_CLOSED;
 
-  const projects = allProjects;
-
-  const commercialDecisions = decisions.filter(d =>
-    d.status !== "Approved" && d.status !== "Rejected" && d.status !== "Executed"
-  );
-  const urgentDecisions = commercialDecisions.filter(d =>
-    d.priority === "P1" || d.priority === "P1 Critical" || d.priority === "Urgent"
-  );
-  const withDeadlines = commercialDecisions.filter(d => d.dueDate);
-
-  // Group projects by stage
-  const byStage: Record<string, typeof projects> = {};
-  for (const p of projects) {
-    const s = p.stage || "Unknown";
-    if (!byStage[s]) byStage[s] = [];
-    byStage[s].push(p);
-  }
-
-  // Ordered columns — only stages that have projects
-  const orderedStages = [
-    ...STAGE_ORDER.filter(s => byStage[s]?.length > 0),
-    ...Object.keys(byStage).filter(s => !STAGE_ORDER.includes(s) && byStage[s].length > 0),
-  ];
+  const total   = active.length + proposalSent.length + negotiation.length;
+  const wonCount  = recentlyClosed.filter(o => o.stage === "Won").length;
+  const lostCount = recentlyClosed.filter(o => o.stage === "Lost").length;
 
   return (
     <div className="flex min-h-screen bg-[#EFEFEA]">
       <Sidebar adminNav />
 
-      <main className="flex-1 ml-[228px] flex flex-col">
+      <main className="flex-1 ml-[228px]">
 
         {/* Dark header */}
-        <header className="bg-[#131218] px-12 pt-10 pb-11 flex-shrink-0">
+        <header className="bg-[#131218] px-12 pt-10 pb-11">
           <p className="text-[8px] font-bold tracking-[2.5px] uppercase text-white/20 mb-3">
-            Commercial · Pipeline overview
+            Commercial · Pursuit
           </p>
           <div className="flex items-end justify-between">
             <div>
               <h1 className="text-[2.6rem] font-light text-white tracking-[-1.5px] leading-none">
-                Commercial <em className="font-black italic text-[#c8f55a]">Pipeline</em>
+                Commercial <em className="font-black italic text-[#c8f55a]">Pipeline.</em>
               </h1>
               <p className="text-sm text-white/40 mt-3">
-                All active engagements by stage. Decisions, deadlines, and delivery signals.
+                Opportunities in active pursuit. Won → Workroom. Lost → out.
               </p>
             </div>
             <div className="flex items-center gap-4 pb-1">
               <div className="text-right">
-                <p className="text-[2rem] font-black text-white tracking-tight leading-none">{projects.length}</p>
-                <p className="text-[9px] font-bold tracking-[1.5px] uppercase text-white/30 mt-0.5">Active</p>
+                <p className="text-[2rem] font-black text-white tracking-tight leading-none">{total}</p>
+                <p className="text-[9px] font-bold tracking-[1.5px] uppercase text-white/30 mt-0.5">In pursuit</p>
               </div>
               <div className="w-px h-10 bg-white/10" />
               <div className="text-right">
-                <p className="text-[2rem] font-black text-amber-400 tracking-tight leading-none">{commercialDecisions.length}</p>
-                <p className="text-[9px] font-bold tracking-[1.5px] uppercase text-white/30 mt-0.5">Open items</p>
+                <p className={`text-[2rem] font-black tracking-tight leading-none ${wonCount > 0 ? "text-[#c8f55a]" : "text-white/20"}`}>
+                  {wonCount}
+                </p>
+                <p className="text-[9px] font-bold tracking-[1.5px] uppercase text-white/30 mt-0.5">Won (30d)</p>
+              </div>
+              <div className="w-px h-10 bg-white/10" />
+              <div className="text-right">
+                <p className={`text-[2rem] font-black tracking-tight leading-none ${lostCount > 0 ? "text-red-400" : "text-white/20"}`}>
+                  {lostCount}
+                </p>
+                <p className="text-[9px] font-bold tracking-[1.5px] uppercase text-white/30 mt-0.5">Lost (30d)</p>
               </div>
             </div>
           </div>
         </header>
 
-        <div className="flex-1 flex flex-col px-12 py-9 gap-6 min-w-0">
+        <div className="px-12 py-9 max-w-6xl space-y-8">
 
-          {/* P1 banner */}
-          {(urgentDecisions.length > 0 || withDeadlines.length > 0) && (
-            <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-xl px-5 py-3.5 flex-shrink-0">
-              <span className="w-2 h-2 rounded-full bg-red-500 shrink-0 animate-pulse" />
-              <p className="text-sm text-[#131218] flex-1 min-w-0">
-                {urgentDecisions.length > 0 && (
-                  <><strong>{urgentDecisions.length} urgent decision{urgentDecisions.length !== 1 ? "s" : ""}</strong>
-                  {" — "}{urgentDecisions.slice(0, 1).map(d => d.title).join(", ")}</>
-                )}
-                {withDeadlines.length > 0 && (
-                  <>{urgentDecisions.length > 0 ? " · " : ""}
-                  <strong>{withDeadlines.length} with deadline</strong></>
-                )}
-              </p>
-              <Link href="/admin/decisions" className="text-[11px] font-bold text-red-600 shrink-0 hover:text-red-800 transition-colors whitespace-nowrap">
-                Review decisions →
-              </Link>
-            </div>
-          )}
-
-          {/* ── Kanban board ─────────────────────────────────────────────────── */}
-          <div>
-            <div className="flex items-center gap-3 mb-4">
-              <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30">Pipeline board</p>
-              <div className="flex-1 h-px bg-[#E0E0D8]" />
-              <p className="text-[9px] font-bold text-[#131218]/25">{orderedStages.length} stages</p>
-            </div>
-
-            <div className="overflow-x-auto pb-2 -mx-2 px-2">
-              <div className="flex gap-3" style={{ minWidth: "max-content" }}>
-                {orderedStages.map(stage => {
-                  const cards = byStage[stage] ?? [];
-                  const style = STAGE_STYLE[stage] ?? STAGE_STYLE_DEFAULT;
-                  return (
-                    <div
-                      key={stage}
-                      className="flex flex-col gap-2"
-                      style={{ width: 210, minWidth: 210 }}
-                    >
-                      {/* Column header */}
-                      <div className="flex items-center gap-2 px-1">
-                        <span className={`w-2 h-2 rounded-full shrink-0 ${style.dot}`} />
-                        <p className={`text-[10px] font-bold uppercase tracking-widest truncate ${style.header}`}>
-                          {stage}
-                        </p>
-                        <span className="ml-auto text-[10px] font-bold text-[#131218]/25 shrink-0">
-                          {cards.length}
-                        </span>
-                      </div>
-
-                      {/* Cards */}
-                      <div className="flex flex-col gap-2">
-                        {cards.map(p => {
-                          const days = daysSince(p.lastUpdate);
-                          const isStale = days > 30;
-                          return (
-                            <Link
-                              key={p.id}
-                              href={`/admin/projects/${p.id}`}
-                              className={`bg-white rounded-xl border-[1.5px] ${style.card} px-3 py-3 hover:border-[#131218]/30 hover:translate-y-[-2px] transition-all block`}
-                            >
-                              <p className="text-[12px] font-bold text-[#131218] leading-snug mb-1.5">
-                                {p.name}
-                              </p>
-                              <div className="flex items-center justify-between gap-2">
-                                <div className="flex items-center gap-1.5">
-                                  {p.primaryWorkspace === "garage" && (
-                                    <span className="text-[8px] font-bold bg-[#131218] text-[#c8f55a] px-1.5 py-0.5 rounded-md">
-                                      Garage
-                                    </span>
-                                  )}
-                                  {p.primaryWorkspace === "workroom" && (
-                                    <span className="text-[8px] font-bold bg-[#EFEFEA] text-[#131218]/50 border border-[#E0E0D8] px-1.5 py-0.5 rounded-md">
-                                      Room
-                                    </span>
-                                  )}
-                                </div>
-                                {p.lastUpdate && (
-                                  <p className={`text-[9px] font-medium shrink-0 ${isStale ? "text-red-400" : "text-[#131218]/30"}`}>
-                                    {new Date(p.lastUpdate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
-                                  </p>
-                                )}
-                              </div>
-                              {p.blockerCount > 0 && (
-                                <p className="text-[9px] font-bold text-red-500 mt-1.5">
-                                  ↯ {p.blockerCount} blocker{p.blockerCount !== 1 ? "s" : ""}
-                                </p>
-                              )}
-                              {p.updateNeeded && !p.blockerCount && (
-                                <p className="text-[9px] font-bold text-amber-500 mt-1.5">! Update needed</p>
-                              )}
-                            </Link>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+          {/* Kanban */}
+          <div className="grid grid-cols-3 gap-5 items-start">
+            <KanbanCol label="Active"        items={active}       accent="bg-[#B2FF59]" />
+            <KanbanCol label="Proposal Sent" items={proposalSent} accent="bg-amber-400" />
+            <KanbanCol label="Negotiation"   items={negotiation}  accent="bg-orange-400" />
           </div>
 
-          {/* ── Open decisions — full width list ─────────────────────────────── */}
-          <div>
-            <div className="flex items-center gap-3 mb-3">
-              <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30">Open decisions</p>
-              <div className="flex-1 h-px bg-[#E0E0D8]" />
-              {commercialDecisions.length > 0 && (
-                <span className="text-[9px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">
-                  {commercialDecisions.length}
-                </span>
-              )}
-            </div>
-
-            <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 divide-x divide-y divide-[#EFEFEA]">
-                {commercialDecisions.slice(0, 12).map(d => (
+          {/* Recently closed */}
+          {recentlyClosed.length > 0 && (
+            <div>
+              <div className="flex items-center gap-3 mb-3">
+                <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/25">Recently closed (30d)</p>
+                <div className="flex-1 h-px bg-[#E0E0D8]" />
+              </div>
+              <div className="flex flex-col gap-2">
+                {recentlyClosed.map(opp => (
                   <Link
-                    key={d.id}
-                    href="/admin/decisions"
-                    className="flex items-start gap-3 px-4 py-3 hover:bg-[#EFEFEA]/40 transition-colors group"
+                    key={opp.id}
+                    href={opp.notionUrl || "#"}
+                    target={opp.notionUrl && opp.notionUrl !== "#" ? "_blank" : undefined}
+                    rel="noopener noreferrer"
+                    className="group bg-white/60 rounded-xl border border-[#E0E0D8] px-4 py-2.5 flex items-center gap-3 hover:bg-white transition-colors"
                   >
-                    <div className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 mt-0.5 ${
-                      d.priority === "P1" || d.priority === "P1 Critical" || d.priority === "Urgent"
-                        ? "bg-red-100" : "bg-[#EFEFEA]"
-                    }`}>
-                      <span className={`text-[8px] font-bold ${
-                        d.priority === "P1" || d.priority === "P1 Critical" || d.priority === "Urgent"
-                          ? "text-red-600" : "text-[#131218]/30"
-                      }`}>
-                        {d.priority === "P1" || d.priority === "P1 Critical" ? "P1" : "·"}
-                      </span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[11px] font-semibold text-[#131218] leading-snug line-clamp-2">{d.title}</p>
-                      <p className="text-[9px] text-[#131218]/35 mt-0.5">
-                        {d.decisionType || "Decision"}
-                        {d.dueDate && ` · Due ${new Date(d.dueDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`}
-                      </p>
-                    </div>
+                    <span className={`text-[8px] font-bold px-2 py-0.5 rounded-full ${opp.stage === "Won" ? "bg-[#B2FF59]/30 text-green-800" : "bg-red-50 text-red-500"}`}>
+                      {opp.stage === "Won" ? "WON → Workroom" : "LOST"}
+                    </span>
+                    <p className="text-[11px] font-semibold text-[#131218]/50 flex-1 truncate">{opp.name}</p>
+                    <span className="text-[9px] text-[#131218]/25">{opp.orgName}</span>
+                    <ScoreBadge score={opp.score} />
                   </Link>
                 ))}
-                {commercialDecisions.length === 0 && (
-                  <div className="col-span-4 px-4 py-6 text-center">
-                    <p className="text-[11px] text-[#131218]/25 font-medium">No open decisions</p>
-                  </div>
-                )}
-              </div>
-              <div className="px-4 py-2.5 border-t border-[#EFEFEA]">
-                <Link href="/admin/decisions" className="text-[9px] font-bold text-[#131218]/30 hover:text-[#131218]/60 transition-colors uppercase tracking-widest">
-                  All decisions →
-                </Link>
               </div>
             </div>
-          </div>
+          )}
 
         </div>
       </main>
