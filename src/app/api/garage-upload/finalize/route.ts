@@ -14,8 +14,9 @@ const supabase = createClient(
 export async function POST(req: NextRequest) {
   await requireAdmin();
 
-  const { projectName, orgId, uploads } = await req.json() as {
+  const { projectName, projectId, orgId, uploads } = await req.json() as {
     projectName: string;
+    projectId?: string;
     orgId?: string;
     uploads: { name: string; storagePath: string }[];
   };
@@ -45,11 +46,11 @@ export async function POST(req: NextRequest) {
         const properties: Record<string, unknown> = {
           "Item Name":     { title: [{ text: { content: itemName } }] },
           "Category":      { select: { name: category } },
-          "Document Type": { rich_text: [{ text: { content: documentType } }] },
+          "Document Type": { select: { name: documentType } },
           "Status":        { select: { name: "Complete" } },
           "Priority":      { select: { name: priority } },
           "File URL":      { url: fileUrl },
-          "Notes":         { rich_text: [{ text: { content: `Uploaded via portal. Storage path: ${upload.storagePath}` } }] },
+          "Notes":         { rich_text: [{ text: { content: `Uploaded via portal. Project: ${projectName}${projectId ? ` (${projectId})` : ""}. Storage path: ${upload.storagePath}` } }] },
         };
         if (orgId) properties["Startup"] = { relation: [{ id: orgId }] };
 

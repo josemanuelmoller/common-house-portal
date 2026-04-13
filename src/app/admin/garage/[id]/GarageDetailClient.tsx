@@ -909,6 +909,7 @@ function UploadModal({ projectId, projectName, orgId, onDone }: {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           projectName,
+          projectId,
           orgId,
           uploads: ready.map(r => ({ name: r.name, storagePath: r.storagePath })),
         }),

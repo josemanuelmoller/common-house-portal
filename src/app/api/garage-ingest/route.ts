@@ -329,12 +329,11 @@ export async function POST(req: NextRequest) {
         "Evidence Title":    notionTitle(ev.title || "Untitled"),
         "Validation Status": notionSelect("New"),
         "Date Captured":     { date: { start: today } },
-        "Source Reference":  notionRichText(fileName),
+        "Source Excerpt":    notionRichText(ev.statement || fileName),
         "Project":           notionRelation(projectId),
       };
       if (ev.type)       props["Evidence Type"]    = notionSelect(ev.type);
-      if (ev.statement)  props["Evidence Statement"] = notionRichText(ev.statement);
-      if (ev.confidence) props["Confidence Level"]  = notionSelect(ev.confidence);
+      if (ev.confidence) props["Confidence Level"] = notionSelect(ev.confidence);
 
       await notion.pages.create({
         parent: { database_id: DB.evidence },
@@ -355,13 +354,13 @@ export async function POST(req: NextRequest) {
       };
       const dateVal = notionDate(fin.period);
       if (dateVal) props["Period"] = dateVal;
-      const revenue = notionNumber(fin.revenue);            if (revenue)           props["Revenue"] = revenue;
-      const burn    = notionNumber(fin.burn);               if (burn)              props["Burn Rate"] = burn;
-      const gm      = notionNumber(fin.gross_margin_pct);  if (gm)               props["Gross Margin %"] = gm;
-      const cash    = notionNumber(fin.cash);               if (cash)              props["Cash Position"] = cash;
-      const runway  = notionNumber(fin.runway_months);      if (runway)            props["Runway (months)"] = runway;
-      const arr     = notionNumber(fin.arr);                if (arr)               props["ARR"] = arr;
-      const mrr     = notionNumber(fin.mrr);                if (mrr)               props["MRR"] = mrr;
+      const revenue = notionNumber(fin.revenue);           if (revenue) props["Revenue"]      = revenue;
+      const burn    = notionNumber(fin.burn);              if (burn)    props["Burn"]          = burn;
+      const gm      = notionNumber(fin.gross_margin_pct); if (gm)      props["Gross Margin"]  = gm;
+      const cash    = notionNumber(fin.cash);              if (cash)    props["Cash"]          = cash;
+      const runway  = notionNumber(fin.runway_months);     if (runway)  props["Runway"]        = runway;
+      const arr     = notionNumber(fin.arr);               if (arr)     props["ARR"]           = arr;
+      const mrr     = notionNumber(fin.mrr);               if (mrr)     props["MRR"]           = mrr;
 
       await notion.pages.create({
         parent: { database_id: DB.financialSnapshots },
@@ -384,8 +383,8 @@ export async function POST(req: NextRequest) {
       if (ct.type)          props["Shareholder Type"] = notionSelect(ct.type);
       if (ct.share_class)   props["Share Class"]      = notionSelect(ct.share_class);
       if (ct.round)         props["Round"]            = notionSelect(ct.round);
-      const own = notionNumber(ct.ownership_pct);   if (own)   props["Ownership %"]     = own;
-      const inv = notionNumber(ct.invested_amount); if (inv)   props["Amount Invested"]  = inv;
+      const own = notionNumber(ct.ownership_pct);   if (own)   props["Ownership Pct"]        = own;
+      const inv = notionNumber(ct.invested_amount); if (inv)   props["Invested Amount (£)"]  = inv;
 
       await notion.pages.create({
         parent: { database_id: DB.capTable },
@@ -403,11 +402,10 @@ export async function POST(req: NextRequest) {
       const props: Record<string, unknown> = {
         "Valuation Name": notionTitle(`${projectName} — ${val.round}`),
       };
-      if (orgId)      props["Startup"]                  = notionRelation(orgId);
-      if (val.round)  props["Round"]                    = notionSelect(val.round);
-      if (val.method) props["Valuation Method"]         = notionSelect(val.method);
-      const min = notionNumber(val.pre_money_min); if (min) props["Pre-money Valuation Min"] = min;
-      const max = notionNumber(val.pre_money_max); if (max) props["Pre-money Valuation Max"] = max;
+      if (orgId)      props["Startup"]          = notionRelation(orgId);
+      if (val.method) props["Method"]           = notionSelect(val.method);
+      const min = notionNumber(val.pre_money_min); if (min) props["Pre-money Min (£)"] = min;
+      const max = notionNumber(val.pre_money_max); if (max) props["Pre-money Max (£)"] = max;
 
       await notion.pages.create({
         parent: { database_id: DB.valuations },
@@ -441,16 +439,14 @@ export async function POST(req: NextRequest) {
   const insightItems = (extraction.insight_briefs ?? []).slice(0, 2);
   for (const ib of insightItems) {
     try {
+      const ibProps: Record<string, unknown> = {
+        "Name": notionTitle(ib.title),
+      };
+      if (ib.theme?.length) ibProps["Theme"] = notionSelect(ib.theme[0]);
+
       const page = await notion.pages.create({
         parent: { database_id: DB.insightBriefs },
-        properties: {
-          "Brief Title": notionTitle(ib.title),
-          "Status":      notionSelect("Draft") as Parameters<typeof notion.pages.create>[0]["properties"][string],
-          "Visibility":  notionSelect("Internal") as Parameters<typeof notion.pages.create>[0]["properties"][string],
-          ...((ib.theme?.length ?? 0) > 0
-            ? { "Theme": notionMultiSelect(ib.theme) as Parameters<typeof notion.pages.create>[0]["properties"][string] }
-            : {}),
-        } as Parameters<typeof notion.pages.create>[0]["properties"],
+        properties: ibProps as Parameters<typeof notion.pages.create>[0]["properties"],
       });
 
       // Add summary as page body paragraph
@@ -477,13 +473,12 @@ export async function POST(req: NextRequest) {
   for (const di of decisionItems) {
     try {
       const props: Record<string, unknown> = {
-        "Decision Title": notionTitle(di.title),
-        "Status":         notionSelect("Open"),
-        "Project":        notionRelation(projectId),
+        "Name":   notionTitle(di.title),
+        "Status": notionSelect("Open"),
       };
-      if (di.category) props["Category"] = notionSelect(di.category);
-      if (di.priority) props["Priority"] = notionSelect(di.priority);
-      if (di.notes)    props["Notes"]    = notionRichText(di.notes);
+      if (di.category) props["Decision Category"] = notionSelect(di.category);
+      if (di.priority) props["Priority"]           = notionSelect(di.priority);
+      if (di.notes)    props["Notes"]              = notionRichText(di.notes);
 
       await notion.pages.create({
         parent: { database_id: DB.decisions },

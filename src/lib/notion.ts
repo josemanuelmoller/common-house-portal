@@ -1421,28 +1421,45 @@ export type DataRoomItem = {
   notes: string;
 };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mapDataRoomPage(page: any): DataRoomItem {
+  return {
+    id:           page.id,
+    name:         text(prop(page, "Item Name")),
+    category:     select(prop(page, "Category")),
+    documentType: select(prop(page, "Document Type")),
+    fileUrl:      page.properties?.["File URL"]?.url ?? "",
+    status:       select(prop(page, "Status")),
+    priority:     select(prop(page, "Priority")),
+    vcRelevance:  select(prop(page, "VC Relevance")),
+    notes:        text(prop(page, "Notes")),
+  };
+}
+
 export async function getDataRoomForProject(projectId: string): Promise<DataRoomItem[]> {
   try {
     const orgIds = await getPrimaryOrgIds(projectId);
-    if (!orgIds.length) return [];
+
+    if (orgIds.length) {
+      const res = await notion.databases.query({
+        database_id: DB.dataRoom,
+        filter: { property: "Startup", relation: { contains: orgIds[0] } },
+        sorts: [{ property: "Priority", direction: "ascending" }],
+        page_size: 50,
+      });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (res.results as any[]).map(mapDataRoomPage);
+    }
+
+    // Fallback: no org linked — find items by project ID stored in Notes field
     const res = await notion.databases.query({
       database_id: DB.dataRoom,
-      filter: { property: "Startup", relation: { contains: orgIds[0] } },
+      filter: { property: "Notes", rich_text: { contains: projectId } },
       sorts: [{ property: "Priority", direction: "ascending" }],
       page_size: 50,
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (res.results as any[]).map(page => ({
-      id:           page.id,
-      name:         text(prop(page, "Item Name")),
-      category:     select(prop(page, "Category")),
-      documentType: select(prop(page, "Document Type")),
-      fileUrl:      page.properties?.["File URL"]?.url ?? "",
-      status:       select(prop(page, "Status")),
-      priority:     select(prop(page, "Priority")),
-      vcRelevance:  select(prop(page, "VC Relevance")),
-      notes:        text(prop(page, "Notes")),
-    }));
+    return (res.results as any[]).map(mapDataRoomPage);
   } catch {
     return [];
   }
