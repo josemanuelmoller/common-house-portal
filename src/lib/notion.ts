@@ -39,6 +39,16 @@ export const DB = {
   proposalBriefs:     "76bfd50fa99143619b9b51de4b8eae67",
   // Offers [OS v2] — collection: 10c7de04-8f71-45ff-9e37-32e683829232
   offers:             "58b863e9c789465b82eb244674bc394f",
+  // Opportunities [OS v2] — collection: 687caa98-594a-41b5-95c9-960c141be0c0
+  // Scope: CH | Portfolio | Both  |  Follow-up Status: None | Needed | Sent | Waiting
+  opportunities:      "687caa98594a41b595c9960c141be0c0",
+  // Agent Drafts [OS v2] — collection: e41e1599-0c89-483f-b271-c078c33898ce
+  // Types: LinkedIn Post | Follow-up Email | Check-in Email
+  // Status: Pending Review | Approved | Revision Requested | Superseded
+  agentDrafts:        "9844ece875ea4c618f616e8cc97d5a90",
+  // Daily Briefings [OS v2] — collection: 17585064-56f1-4af6-9030-4af4294c0a99
+  // Written daily by generate-daily-briefing skill; read by Hall on every load
+  dailyBriefings:     "d206d6cdb09040d3ac2f34a977ad9f2a",
 };
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -161,6 +171,10 @@ function select(p: any): string {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function multiSelect(p: any): string[] {
   return p?.multi_select?.map((s: any) => s.name) ?? [];
+}
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function num(p: any): number | null {
+  return typeof p?.number === "number" ? p.number : null;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1430,6 +1444,257 @@ export async function getCommercialOffers(): Promise<CommercialOffer[]> {
       offerStatus:  select(prop(page, "Offer Status")),
       offerCategory: select(prop(page, "Offer Category")),
       notionUrl:    page.url ?? "",
+    }));
+  } catch {
+    return [];
+  }
+}
+
+// ─── Hall v2 — Daily Briefing ─────────────────────────────────────────────────
+
+export type DailyBriefing = {
+  id: string;
+  date: string | null;
+  focusOfDay: string;
+  meetingPrep: string;
+  myCommitments: string;
+  followUpQueue: string;
+  agentQueue: string;
+  marketSignals: string;
+  readyToPublish: string;
+  generatedAt: string | null;
+  status: string;  // Fresh | Stale | Generating
+};
+
+export async function getDailyBriefing(dateStr?: string): Promise<DailyBriefing | null> {
+  try {
+    const target = dateStr ?? new Date().toISOString().slice(0, 10);
+    const res = await notion.databases.query({
+      database_id: DB.dailyBriefings,
+      filter: { property: "Date", date: { equals: target } },
+      page_size: 1,
+    });
+    if (!res.results.length) return null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const page: any = res.results[0];
+    return {
+      id:             page.id,
+      date:           date(prop(page, "Date")),
+      focusOfDay:     text(prop(page, "Focus of the Day")),
+      meetingPrep:    text(prop(page, "Meeting Prep")),
+      myCommitments:  text(prop(page, "My Commitments")),
+      followUpQueue:  text(prop(page, "Follow-up Queue")),
+      agentQueue:     text(prop(page, "Agent Queue")),
+      marketSignals:  text(prop(page, "Market Signals")),
+      readyToPublish: text(prop(page, "Ready to Publish")),
+      generatedAt:    date(prop(page, "Generated At")),
+      status:         select(prop(page, "Status")),
+    };
+  } catch {
+    return null;
+  }
+}
+
+// ─── Hall v2 — Agent Drafts ───────────────────────────────────────────────────
+
+export type AgentDraft = {
+  id: string;
+  title: string;
+  draftType: string;    // LinkedIn Post | Follow-up Email | Check-in Email
+  status: string;       // Pending Review | Approved | Revision Requested | Superseded
+  voice: string;        // JMM | CH
+  platform: string;     // LinkedIn | Email | Internal
+  draftText: string;
+  relatedEntityId: string | null;
+  createdDate: string | null;
+  notionUrl: string;
+};
+
+export async function getAgentDrafts(statusFilter = "Pending Review"): Promise<AgentDraft[]> {
+  try {
+    const res = await notion.databases.query({
+      database_id: DB.agentDrafts,
+      filter: { property: "Status", select: { equals: statusFilter } },
+      sorts: [{ timestamp: "created_time", direction: "descending" }],
+      page_size: 20,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (res.results as any[]).map(page => ({
+      id:              page.id,
+      title:           text(prop(page, "Title")) || text(prop(page, "Name")) || "Untitled",
+      draftType:       select(prop(page, "Type")),
+      status:          select(prop(page, "Status")),
+      voice:           select(prop(page, "Voice")),
+      platform:        select(prop(page, "Platform")),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      draftText:       (prop(page, "Draft Text")?.rich_text ?? []).map((r: any) => r.plain_text).join(""),
+      relatedEntityId: relationFirst(prop(page, "Related Entity")),
+      createdDate:     date(prop(page, "Created Date")) ?? (page.created_time?.slice(0, 10) ?? null),
+      notionUrl:       page.url ?? "",
+    }));
+  } catch {
+    return [];
+  }
+}
+
+// ─── Hall v2 — Opportunities by scope ────────────────────────────────────────
+
+export type OpportunityItem = {
+  id: string;
+  name: string;
+  stage: string;               // New | Exploring | Qualifying | Active | Proposal Sent | Negotiation | Won | Lost | Archived
+  scope: string;               // CH | Portfolio | Both
+  followUpStatus: string;      // None | Needed | Sent | Waiting
+  type: string;                // CH Sale | Grant | Partnership | Investor Match
+  orgName: string;
+  lastEdited: string | null;
+  notionUrl: string;
+  score: number | null;        // 0–100 qualification score
+  qualificationStatus: string; // Qualified | Needs Review | Below Threshold | Not Scored
+};
+
+export async function getOpportunitiesByScope(): Promise<{ ch: OpportunityItem[]; portfolio: OpportunityItem[] }> {
+  try {
+    const res = await notion.databases.query({
+      database_id: DB.opportunities,
+      filter: {
+        and: [
+          { property: "Stage", select: { does_not_equal: "Won" } },
+          { property: "Stage", select: { does_not_equal: "Lost" } },
+          { property: "Stage", select: { does_not_equal: "Archived" } },
+        ],
+      },
+      sorts: [{ timestamp: "last_edited_time", direction: "descending" }],
+      page_size: 50,
+    });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const all = (res.results as any[]).map(page => ({
+      id:                   page.id,
+      name:                 text(prop(page, "Opportunity Name")) || text(prop(page, "Name")) || "Untitled",
+      stage:                select(prop(page, "Stage")),
+      scope:                select(prop(page, "Scope")),
+      followUpStatus:       select(prop(page, "Follow-up Status")),
+      type:                 select(prop(page, "Type")) || select(prop(page, "Opportunity Type")) || "",
+      orgName:              text(prop(page, "Organization")) || "",
+      lastEdited:           page.last_edited_time?.slice(0, 10) ?? null,
+      notionUrl:            page.url ?? "",
+      score:                num(prop(page, "Opportunity Score")),
+      qualificationStatus:  select(prop(page, "Qualification Status")) || "Not Scored",
+    }));
+
+    return {
+      ch:        all.filter(o => o.scope === "CH" || o.scope === "Both"),
+      portfolio: all.filter(o => o.scope === "Portfolio" || o.scope === "Both"),
+    };
+  } catch {
+    return { ch: [], portfolio: [] };
+  }
+}
+
+// Opportunities where follow-up is needed (opted-in, active pipeline)
+export async function getFollowUpOpportunities(): Promise<OpportunityItem[]> {
+  try {
+    const res = await notion.databases.query({
+      database_id: DB.opportunities,
+      filter: {
+        and: [
+          { property: "Follow-up Status", select: { equals: "Needed" } },
+          { property: "Stage", select: { does_not_equal: "Won" } },
+          { property: "Stage", select: { does_not_equal: "Lost" } },
+        ],
+      },
+      sorts: [{ timestamp: "last_edited_time", direction: "ascending" }],
+      page_size: 20,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (res.results as any[]).map(page => ({
+      id:                   page.id,
+      name:                 text(prop(page, "Opportunity Name")) || text(prop(page, "Name")) || "Untitled",
+      stage:                select(prop(page, "Stage")),
+      scope:                select(prop(page, "Scope")),
+      followUpStatus:       select(prop(page, "Follow-up Status")),
+      type:                 select(prop(page, "Type")) || select(prop(page, "Opportunity Type")) || "",
+      orgName:              text(prop(page, "Organization")) || "",
+      lastEdited:           page.last_edited_time?.slice(0, 10) ?? null,
+      notionUrl:            page.url ?? "",
+      score:                num(prop(page, "Opportunity Score")),
+      qualificationStatus:  select(prop(page, "Qualification Status")) || "Not Scored",
+    }));
+  } catch {
+    return [];
+  }
+}
+
+// ─── Hall v2 — Relationship warmth ───────────────────────────────────────────
+
+export type WarmthRecord = {
+  id: string;
+  name: string;
+  jobTitle: string;
+  email: string;
+  warmth: string;          // Hot | Warm | Cold | Dormant
+  lastContactDate: string | null;
+  notionUrl: string;
+};
+
+export async function getColdRelationships(): Promise<WarmthRecord[]> {
+  try {
+    const res = await notion.databases.query({
+      database_id: DB.people,
+      filter: {
+        or: [
+          { property: "Contact Warmth", select: { equals: "Cold" } },
+          { property: "Contact Warmth", select: { equals: "Dormant" } },
+        ],
+      },
+      sorts: [{ property: "Last Contact Date", direction: "ascending" }],
+      page_size: 20,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (res.results as any[])
+      .map(page => ({
+        id:              page.id,
+        name:            text(prop(page, "Full Name")),
+        jobTitle:        text(prop(page, "Job Title / Role")),
+        email:           page.properties?.["Email"]?.email ?? "",
+        warmth:          select(prop(page, "Contact Warmth")),
+        lastContactDate: date(prop(page, "Last Contact Date")),
+        notionUrl:       page.url ?? "",
+      }))
+      .filter(p => p.name.trim() !== "");
+  } catch {
+    return [];
+  }
+}
+
+// ─── Hall v2 — Content ready to publish ──────────────────────────────────────
+
+export type ReadyContent = {
+  id: string;
+  title: string;
+  platform: string;
+  contentType: string;
+  publishWindow: string;
+  notionUrl: string;
+};
+
+export async function getReadyContent(): Promise<ReadyContent[]> {
+  try {
+    const res = await notion.databases.query({
+      database_id: DB.contentPipeline,
+      filter: { property: "Status", select: { equals: "Ready to Publish" } },
+      sorts: [{ timestamp: "last_edited_time", direction: "descending" }],
+      page_size: 10,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (res.results as any[]).map(page => ({
+      id:            page.id,
+      title:         text(prop(page, "Title")) || text(prop(page, "Name")) || "Untitled",
+      platform:      select(prop(page, "Platform")) || select(prop(page, "Channel")) || "",
+      contentType:   select(prop(page, "Content Type")),
+      publishWindow: text(prop(page, "Publish Window")) || date(prop(page, "Publish Date")) || "",
+      notionUrl:     page.url ?? "",
     }));
   } catch {
     return [];
