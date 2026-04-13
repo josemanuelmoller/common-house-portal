@@ -242,25 +242,6 @@ export default async function InvestorsPage() {
                 </div>
               )}
 
-              {/* Cap table placeholder */}
-              <div className="mt-4 bg-white rounded-2xl border border-[#E0E0D8] px-4 py-4">
-                <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30 mb-2">Cap Table</p>
-                <p className="text-[11px] text-[#131218]/50 leading-snug mb-3">
-                  Cap table data is maintained in Notion. Entries added via the{" "}
-                  <code className="text-[10px] bg-[#EFEFEA] px-1 rounded">upsert-captable-entry</code> skill.
-                </p>
-                <a
-                  href="https://notion.so"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-block text-[9px] font-bold bg-[#131218] text-[#B2FF59] px-3 py-1.5 rounded-lg hover:opacity-90 transition-opacity"
-                >
-                  Open Cap Table in Notion →
-                </a>
-                <p className="text-[8.5px] text-[#131218]/25 mt-2">
-                  Investor-matching pipeline: deal-flow-agent
-                </p>
-              </div>
             </div>
 
           </div>
