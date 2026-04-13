@@ -929,8 +929,8 @@ export async function getDecisionItems(statusFilter?: string): Promise<DecisionI
       sourceAgent: select(prop(page, "Source Agent")),
       requiresExecute: checkbox(prop(page, "Requires Execute")),
       executeApproved: checkbox(prop(page, "Execute Approved")),
-      dueDate: date(prop(page, "Due Date")),
-      notes: text(prop(page, "Notes")),
+      dueDate: date(prop(page, "Decision Due Date")),
+      notes: text(prop(page, "Proposed Action")),
       notionUrl: page.url ?? "",
       category: page.properties["Decision Category"]?.select?.name ?? undefined,
     }); });
