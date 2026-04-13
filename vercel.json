@@ -11,5 +11,15 @@
         { "key": "X-Frame-Options", "value": "DENY" }
       ]
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/ingest-meetings",
+      "schedule": "0 18 * * 1-5"
+    },
+    {
+      "path": "/api/ingest-meetings",
+      "schedule": "0 0 * * 2-6"
+    }
   ]
 }

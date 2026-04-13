@@ -95,14 +95,11 @@ Output ONLY the email (Subject + body). Nothing else.`;
     draftPage = await notion.pages.create({
       parent: { database_id: AGENT_DRAFTS_DB },
       properties: {
-        "Title":        { title: [{ text: { content: `Follow-up: ${oppName} — ${today}` } }] },
-        "Type":         { select: { name: "Follow-up Email" } },
-        "Status":       { select: { name: "Pending Review" } },
-        "Voice":        { select: { name: "JMM" } },
-        "Platform":     { select: { name: "Email" } },
-        "Draft Text":   { rich_text: [{ text: { content: draftText.slice(0, 2000) } }] },
-        "Created Date": { date: { start: today } },
-        "Related Entity": { relation: [{ id: opportunityId }] },
+        "Draft Title":      { title: [{ text: { content: `Follow-up: ${oppName} — ${today}` } }] },
+        "Type":             { select: { name: "Follow-up Email" } },
+        "Status":           { select: { name: "Pending Review" } },
+        "Source Reference": { rich_text: [{ text: { content: `${oppName}${orgName ? ` · ${orgName}` : ""}` } }] },
+        "Content":          { rich_text: [{ text: { content: draftText.slice(0, 2000) } }] },
       },
     });
   } catch (e) {

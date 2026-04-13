@@ -5,6 +5,7 @@ import { getKnowledgeAssets, getReusableEvidence } from "@/lib/notion";
 import { ADMIN_NAV as NAV } from "@/lib/admin-nav";
 import { isAdminUser, isAdminEmail } from "@/lib/clients";
 import type { LibraryContentFamily } from "@/types/house";
+import { LibraryIngestPanel } from "@/components/LibraryIngestPanel";
 
 // Map Notion assetType → Library content family
 function toFamily(assetType: string): LibraryContentFamily {
@@ -118,6 +119,11 @@ export default async function LibraryPage() {
 
         <div className="px-8 py-6">
           <div className="max-w-4xl mx-auto space-y-10">
+
+            {/* Ingest panel — admin only */}
+            {isAdmin && (
+              <LibraryIngestPanel />
+            )}
 
             {/* Canonical — most authoritative, featured treatment */}
             {canonical.length > 0 && (

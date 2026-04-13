@@ -736,10 +736,9 @@ export async function createKnowledgeAssetDraft(opts: {
       ] : []),
       ...(sourceNote ? [{
         object: "block" as const,
-        type: "callout" as const,
-        callout: {
-          icon: { type: "emoji" as const, emoji: "📎" as string },
-          rich_text: [{ type: "text" as const, text: { content: `Source: ${sourceNote}` } }],
+        type: "paragraph" as const,
+        paragraph: {
+          rich_text: [{ type: "text" as const, text: { content: `📎 Source: ${sourceNote}` } }],
         },
       }] : []),
     ],
