@@ -478,16 +478,35 @@ function CapTableTab({ capTable }: { capTable: CapTableEntry[] }) {
 
 const DR_STATUS_ORDER = ["Missing", "Partial", "Complete"];
 
-function DataRoomTab({ dataRoom }: { dataRoom: DataRoomItem[] }) {
-  if (!dataRoom.length) return <EmptyState label="data room" />;
+function extractStoragePath(notes: string): string {
+  const match = notes.match(/Storage path:\s*(.+)/);
+  return match ? match[1].trim() : "";
+}
 
-  const complete = dataRoom.filter(d => d.status === "Complete").length;
-  const partial  = dataRoom.filter(d => d.status === "Partial").length;
-  const missing  = dataRoom.filter(d => d.status === "Missing").length;
-  const readinessPct = Math.round((complete / dataRoom.length) * 100);
+function DataRoomTab({
+  dataRoom,
+  onDelete,
+}: {
+  dataRoom: DataRoomItem[];
+  onDelete?: (notionId: string, storagePath: string) => Promise<void>;
+}) {
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const uploadedFiles = dataRoom.filter(d => d.fileUrl && d.notes.includes("Storage path:"));
+  const checklistItems = dataRoom.filter(d => !d.notes.includes("Storage path:") || !d.fileUrl || d.status === "Missing" || d.status === "Partial");
+
+  // For the checklist, show all items (Complete items from upload will also appear there, which is fine)
+  const allItems = dataRoom;
+
+  if (!allItems.length) return <EmptyState label="data room" />;
+
+  const complete = allItems.filter(d => d.status === "Complete").length;
+  const partial  = allItems.filter(d => d.status === "Partial").length;
+  const missing  = allItems.filter(d => d.status === "Missing").length;
+  const readinessPct = allItems.length ? Math.round((complete / allItems.length) * 100) : 0;
 
   // Group by category
-  const groups = dataRoom.reduce<Record<string, DataRoomItem[]>>((acc, item) => {
+  const groups = allItems.reduce<Record<string, DataRoomItem[]>>((acc, item) => {
     const key = item.category || "Other";
     if (!acc[key]) acc[key] = [];
     acc[key].push(item);
@@ -501,6 +520,59 @@ function DataRoomTab({ dataRoom }: { dataRoom: DataRoomItem[] }) {
 
   return (
     <div className="space-y-5">
+
+      {/* Uploaded files panel */}
+      {uploadedFiles.length > 0 && (
+        <div className="bg-white border border-[#E0E0D8] rounded-2xl overflow-hidden">
+          <div className="px-5 py-3.5 border-b border-[#EFEFEA] flex items-center justify-between">
+            <p className="text-[10px] font-bold tracking-widest uppercase text-[#131218]/40">Uploaded Files</p>
+            <span className="text-[9px] text-[#131218]/25">{uploadedFiles.length} stored</span>
+          </div>
+          <div className="divide-y divide-[#EFEFEA]">
+            {uploadedFiles.map(item => {
+              const storagePath = extractStoragePath(item.notes);
+              const isDeleting = deletingId === item.id;
+              return (
+                <div key={item.id} className="px-5 py-3 flex items-center gap-3">
+                  <div className="w-8 text-center shrink-0">
+                    <span className="text-[8px] font-bold text-[#131218]/25 uppercase">
+                      {item.documentType?.split(" ")[0]?.slice(0, 3) || "DOC"}
+                    </span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[12.5px] font-medium text-[#131218] truncate">{item.name}</p>
+                    <p className="text-[9.5px] text-[#131218]/35 mt-0.5">{item.documentType} · {item.category}</p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <a
+                      href={item.fileUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-[#EFEFEA] text-[#131218]/50 hover:bg-[#131218] hover:text-white transition-all"
+                    >
+                      ↓ Download
+                    </a>
+                    {onDelete && (
+                      <button
+                        onClick={async () => {
+                          if (!confirm("Delete this file from storage and Data Room?")) return;
+                          setDeletingId(item.id);
+                          await onDelete(item.id, storagePath);
+                          setDeletingId(null);
+                        }}
+                        disabled={isDeleting}
+                        className="text-[10px] font-bold px-2.5 py-1 rounded-lg text-red-400 hover:bg-red-50 hover:text-red-600 transition-all disabled:opacity-40"
+                      >
+                        {isDeleting ? "…" : "Delete"}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Summary bar */}
       <div className="bg-white border border-[#E0E0D8] rounded-2xl overflow-hidden">
@@ -604,21 +676,22 @@ function FundingTab({ orgData }: { orgData: StartupOrgData | null }) {
   );
 }
 
-// ─── Upload panel ─────────────────────────────────────────────────────────────
+// ─── Upload modal ─────────────────────────────────────────────────────────────
 
-type UploadResult = { name: string; category: string; documentType: string };
+type UploadResult = { name: string; url: string; category: string; documentType: string; storagePath: string; notionId?: string };
 
-function UploadPanel({ projectId, projectName, orgId, onClose }: {
+type UploadStatus = "idle" | "uploading" | "success" | "error";
+
+function UploadModal({ projectId, projectName, orgId, onDone }: {
   projectId: string;
   projectName: string;
   orgId?: string;
-  onClose: () => void;
+  onDone: (results: UploadResult[]) => void;
 }) {
-  const [dragging, setDragging]   = useState(false);
-  const [files, setFiles]         = useState<File[]>([]);
-  const [uploading, setUploading] = useState(false);
-  const [done, setDone]           = useState<UploadResult[]>([]);
-  const [errors, setErrors]       = useState<string[]>([]);
+  const [dragging, setDragging] = useState(false);
+  const [files, setFiles]       = useState<File[]>([]);
+  const [status, setStatus]     = useState<UploadStatus>("idle");
+  const [errors, setErrors]     = useState<string[]>([]);
 
   function addFiles(incoming: FileList | null) {
     if (!incoming) return;
@@ -630,7 +703,7 @@ function UploadPanel({ projectId, projectName, orgId, onClose }: {
 
   async function handleUpload() {
     if (!files.length) return;
-    setUploading(true);
+    setStatus("uploading");
     const fd = new FormData();
     fd.append("projectId", projectId);
     fd.append("projectName", projectName);
@@ -639,112 +712,96 @@ function UploadPanel({ projectId, projectName, orgId, onClose }: {
 
     try {
       const res = await fetch("/api/garage-upload", { method: "POST", body: fd });
+      if (!res.ok) throw new Error(`Server error ${res.status}`);
       const data = await res.json();
-      setDone(data.results ?? []);
-      setErrors(data.errors ?? []);
-    } catch {
-      setErrors(["Upload failed — check console"]);
-    } finally {
-      setUploading(false);
+      if (data.errors?.length) setErrors(data.errors);
+      setStatus("success");
+      // Auto-close after 1.5s and pass results up
+      setTimeout(() => onDone(data.results ?? []), 1500);
+    } catch (err) {
+      setErrors([err instanceof Error ? err.message : "Upload failed"]);
+      setStatus("error");
     }
   }
 
-  if (done.length > 0) {
-    return (
-      <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-        <div className="bg-white rounded-2xl border border-[#E0E0D8] p-8 w-full max-w-md">
-          <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30 mb-1">Upload complete</p>
-          <p className="text-lg font-bold text-[#131218] mb-5">{done.length} file{done.length > 1 ? "s" : ""} stored</p>
-          <div className="space-y-2 mb-6">
-            {done.map(r => (
-              <div key={r.name} className="flex items-center gap-3 bg-[#EFEFEA] rounded-xl px-4 py-2.5">
-                <span className="text-[10px] font-bold text-green-700 bg-green-100 px-2 py-0.5 rounded">✓</span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-[11px] font-semibold text-[#131218] truncate">{r.name}</p>
-                  <p className="text-[9px] text-[#131218]/40">{r.category} · {r.documentType}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-          {errors.length > 0 && (
-            <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3 mb-5">
-              {errors.map(e => <p key={e} className="text-[10px] text-red-600">{e}</p>)}
-            </div>
-          )}
-          <div className="bg-[#EFEFEA] rounded-xl px-4 py-3 mb-5">
-            <p className="text-[10px] font-semibold text-[#131218]/60">
-              Files saved to Data Room. Run <span className="font-bold text-[#131218]">ingest-garage-docs</span> in Claude Code to populate the full Garage profile from these documents.
-            </p>
-          </div>
-          <button onClick={onClose} className="w-full bg-[#131218] text-white text-[11px] font-bold py-2.5 rounded-xl">
-            Done
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={e => { if (e.target === e.currentTarget) onDone([]); }}>
       <div className="bg-white rounded-2xl border border-[#E0E0D8] p-8 w-full max-w-lg">
+
+        {/* Header */}
         <div className="flex items-start justify-between mb-5">
           <div>
             <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30 mb-1">Garage · {projectName}</p>
             <p className="text-lg font-bold text-[#131218]">Upload documents</p>
             <p className="text-xs text-[#131218]/40 mt-1">Pitch deck, financial model, cap table, one-pager…</p>
           </div>
-          <button onClick={onClose} className="text-[#131218]/30 hover:text-[#131218] text-xl leading-none">×</button>
+          <button onClick={() => onDone([])} className="text-[#131218]/30 hover:text-[#131218] text-xl leading-none mt-1">×</button>
         </div>
 
-        {/* Drop zone */}
-        <div
-          onDragOver={e => { e.preventDefault(); setDragging(true); }}
-          onDragLeave={() => setDragging(false)}
-          onDrop={e => { e.preventDefault(); setDragging(false); addFiles(e.dataTransfer.files); }}
-          className={`border-2 border-dashed rounded-xl px-6 py-10 text-center cursor-pointer transition-colors ${
-            dragging ? "border-[#131218] bg-[#EFEFEA]" : "border-[#E0E0D8] hover:border-[#131218]/30"
-          }`}
-          onClick={() => document.getElementById("garage-file-input")?.click()}
-        >
-          <p className="text-sm font-semibold text-[#131218]/40">Drop files here or click to browse</p>
-          <p className="text-[10px] text-[#131218]/25 mt-1">PDF · PPTX · XLSX · DOCX — up to 50 MB each</p>
-          <input
-            id="garage-file-input"
-            type="file"
-            multiple
-            accept=".pdf,.pptx,.xlsx,.docx,.xls,.ppt"
-            className="hidden"
-            onChange={e => addFiles(e.target.files)}
-          />
-        </div>
-
-        {/* File list */}
-        {files.length > 0 && (
-          <div className="mt-4 space-y-1.5 max-h-48 overflow-y-auto">
-            {files.map(f => (
-              <div key={f.name} className="flex items-center gap-2 bg-[#EFEFEA] rounded-lg px-3 py-2">
-                <span className="text-[9px] font-bold text-[#131218]/30 uppercase">{f.name.split(".").pop()}</span>
-                <span className="text-[11px] text-[#131218] font-medium flex-1 truncate">{f.name}</span>
-                <button
-                  onClick={() => setFiles(prev => prev.filter(x => x.name !== f.name))}
-                  className="text-[#131218]/20 hover:text-[#131218]/60 text-sm"
-                >×</button>
-              </div>
-            ))}
+        {/* Success state */}
+        {status === "success" && (
+          <div className="flex items-center gap-3 bg-green-50 border border-green-100 rounded-xl px-5 py-4 mb-4">
+            <span className="text-green-600 text-lg">✓</span>
+            <div>
+              <p className="text-[11.5px] font-bold text-green-800">{files.length} file{files.length > 1 ? "s" : ""} stored</p>
+              <p className="text-[10px] text-green-700/70 mt-0.5">Saved to Data Room. Closing…</p>
+            </div>
           </div>
         )}
 
-        <button
-          onClick={handleUpload}
-          disabled={!files.length || uploading}
-          className={`mt-5 w-full py-2.5 rounded-xl text-[11.5px] font-bold transition-all ${
-            files.length && !uploading
-              ? "bg-[#c8f55a] text-[#131218] hover:bg-[#b8e84a]"
-              : "bg-[#EFEFEA] text-[#131218]/30 cursor-not-allowed"
-          }`}
-        >
-          {uploading ? "Uploading…" : `Upload ${files.length ? `${files.length} file${files.length > 1 ? "s" : ""}` : "files"}`}
-        </button>
+        {/* Error state */}
+        {status === "error" && (
+          <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3 mb-4">
+            {errors.map(e => <p key={e} className="text-[10.5px] text-red-600">{e}</p>)}
+            <button onClick={() => setStatus("idle")} className="text-[10px] font-bold text-red-700 mt-2 hover:underline">Try again</button>
+          </div>
+        )}
+
+        {status !== "success" && (
+          <>
+            {/* Drop zone */}
+            <div
+              onDragOver={e => { e.preventDefault(); setDragging(true); }}
+              onDragLeave={() => setDragging(false)}
+              onDrop={e => { e.preventDefault(); setDragging(false); addFiles(e.dataTransfer.files); }}
+              className={`border-2 border-dashed rounded-xl px-6 py-9 text-center cursor-pointer transition-colors ${
+                dragging ? "border-[#131218] bg-[#EFEFEA]" : "border-[#E0E0D8] hover:border-[#131218]/30"
+              }`}
+              onClick={() => document.getElementById("garage-file-input")?.click()}
+            >
+              <p className="text-sm font-semibold text-[#131218]/40">Drop files here or click to browse</p>
+              <p className="text-[10px] text-[#131218]/25 mt-1">PDF · PPTX · XLSX · DOCX — up to 50 MB each</p>
+              <input id="garage-file-input" type="file" multiple accept=".pdf,.pptx,.xlsx,.docx,.xls,.ppt"
+                className="hidden" onChange={e => addFiles(e.target.files)} />
+            </div>
+
+            {/* File list */}
+            {files.length > 0 && (
+              <div className="mt-3 space-y-1.5 max-h-40 overflow-y-auto">
+                {files.map(f => (
+                  <div key={f.name} className="flex items-center gap-2 bg-[#EFEFEA] rounded-lg px-3 py-2">
+                    <span className="text-[9px] font-bold text-[#131218]/30 uppercase w-8 shrink-0">{f.name.split(".").pop()}</span>
+                    <span className="text-[11px] text-[#131218] font-medium flex-1 truncate">{f.name}</span>
+                    <button onClick={() => setFiles(prev => prev.filter(x => x.name !== f.name))}
+                      className="text-[#131218]/20 hover:text-[#131218]/60 text-base leading-none">×</button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <button
+              onClick={handleUpload}
+              disabled={!files.length || status === "uploading"}
+              className={`mt-4 w-full py-2.5 rounded-xl text-[11.5px] font-bold transition-all ${
+                files.length && status !== "uploading"
+                  ? "bg-[#c8f55a] text-[#131218] hover:bg-[#b8e84a]"
+                  : "bg-[#EFEFEA] text-[#131218]/30 cursor-not-allowed"
+              }`}
+            >
+              {status === "uploading" ? "Uploading…" : `Upload ${files.length ? `${files.length} file${files.length > 1 ? "s" : ""}` : "files"}`}
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
@@ -765,17 +822,49 @@ export function GarageDetailClient({
   project, evidence, sources, decisions,
   orgData, financials, valuations, capTable, dataRoom, orgId,
 }: Props) {
-  const [tab, setTab]         = useState<Tab>("pulse");
+  const [tab, setTab]               = useState<Tab>("pulse");
   const [showUpload, setShowUpload] = useState(false);
+  const [localDataRoom, setLocalDataRoom] = useState<DataRoomItem[]>(dataRoom);
+
+  function handleUploadDone(results: UploadResult[]) {
+    if (results.length) {
+      const newItems: DataRoomItem[] = results.map(r => ({
+        id:           r.notionId ?? `local-${Date.now()}-${r.name}`,
+        name:         r.name,
+        category:     r.category,
+        documentType: r.documentType,
+        fileUrl:      r.url,
+        status:       "Complete",
+        priority:     "",
+        vcRelevance:  "",
+        notes:        `Uploaded via portal. Storage path: ${r.storagePath}`,
+      }));
+      setLocalDataRoom(prev => [...newItems, ...prev]);
+    }
+    setShowUpload(false);
+  }
+
+  async function handleDelete(notionId: string, storagePath: string) {
+    try {
+      await fetch("/api/garage-upload", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notionId, storagePath }),
+      });
+      setLocalDataRoom(prev => prev.filter(d => d.id !== notionId));
+    } catch {
+      alert("Delete failed — please try again.");
+    }
+  }
 
   return (
     <>
       {showUpload && (
-        <UploadPanel
+        <UploadModal
           projectId={project.id}
           projectName={project.name}
           orgId={orgId}
-          onClose={() => setShowUpload(false)}
+          onDone={handleUploadDone}
         />
       )}
 
@@ -824,7 +913,7 @@ export function GarageDetailClient({
           <FundingTab orgData={orgData} />
         )}
         {tab === "dataroom" && (
-          <DataRoomTab dataRoom={dataRoom} />
+          <DataRoomTab dataRoom={localDataRoom} onDelete={handleDelete} />
         )}
       </div>
     </>

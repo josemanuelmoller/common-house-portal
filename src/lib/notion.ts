@@ -694,6 +694,60 @@ export async function getKnowledgeAssets(): Promise<KnowledgeAsset[]> {
   }));
 }
 
+// ─── Library ingest ───────────────────────────────────────────────────────────
+
+export async function createKnowledgeAssetDraft(opts: {
+  title: string;
+  summary: string;
+  keyPoints: string[];
+  assetType: string;
+  tags: string[];
+  sourceNote?: string;
+}): Promise<string> {
+  const { title, summary, keyPoints, assetType, tags, sourceNote } = opts;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const page = await notion.pages.create({
+    parent: { database_id: DB.knowledge },
+    properties: {
+      "Asset Name":        { title: [{ text: { content: title } }] },
+      "Asset Type":        { select: { name: assetType } },
+      "Domain / Theme":    { multi_select: tags.slice(0, 5).map(t => ({ name: t })) },
+      "Status":            { select: { name: "Draft" } },
+      "Portal Visibility": { select: { name: "admin-only" } },
+    } as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+    children: [
+      {
+        object: "block",
+        type: "paragraph",
+        paragraph: { rich_text: [{ type: "text", text: { content: summary } }] },
+      },
+      ...(keyPoints.length > 0 ? [
+        {
+          object: "block" as const,
+          type: "bulleted_list_item" as const,
+          bulleted_list_item: { rich_text: [{ type: "text" as const, text: { content: "Key points:" } }] },
+        },
+        ...keyPoints.slice(0, 8).map(pt => ({
+          object: "block" as const,
+          type: "bulleted_list_item" as const,
+          bulleted_list_item: { rich_text: [{ type: "text" as const, text: { content: pt } }] },
+        })),
+      ] : []),
+      ...(sourceNote ? [{
+        object: "block" as const,
+        type: "callout" as const,
+        callout: {
+          icon: { type: "emoji" as const, emoji: "📎" as string },
+          rich_text: [{ type: "text" as const, text: { content: `Source: ${sourceNote}` } }],
+        },
+      }] : []),
+    ],
+  });
+
+  return page.id;
+}
+
 // ─── Source Activity ──────────────────────────────────────────────────────────
 
 export type MeetingItem = {
@@ -1355,6 +1409,7 @@ export type DataRoomItem = {
   status: string;
   priority: string;
   vcRelevance: string;
+  notes: string;
 };
 
 export async function getDataRoomForProject(projectId: string): Promise<DataRoomItem[]> {
@@ -1377,6 +1432,7 @@ export async function getDataRoomForProject(projectId: string): Promise<DataRoom
       status:       select(prop(page, "Status")),
       priority:     select(prop(page, "Priority")),
       vcRelevance:  select(prop(page, "VC Relevance")),
+      notes:        text(prop(page, "Notes")),
     }));
   } catch {
     return [];
