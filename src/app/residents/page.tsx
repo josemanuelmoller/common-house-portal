@@ -1,4 +1,3 @@
-import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/Sidebar";
 import { getAllPeople, type PersonRecord } from "@/lib/notion";
 import { ADMIN_NAV as NAV } from "@/lib/admin-nav";
@@ -13,55 +12,104 @@ function initials(name: string): string {
   return name.slice(0, 2).toUpperCase();
 }
 
-const SURFACE_LABEL: Record<string, string> = {
-  hall: "Hall",
-  workroom: "Workroom",
-  garage: "Garage",
-  control_room: "Control Room",
-};
+// ─── Section bar ─────────────────────────────────────────────────────────────
 
-// ─── Human Resident Card ──────────────────────────────────────────────────────
+function ResSectionBar({
+  label,
+  count,
+}: {
+  label: string;
+  count: string | number;
+}) {
+  return (
+    <div className="flex items-center gap-3.5 mb-6 mt-10 first:mt-0">
+      <span className="text-[9px] font-bold tracking-[2px] uppercase text-black/30 whitespace-nowrap">
+        {label}
+      </span>
+      <div className="flex-1 h-px bg-[#d8d8d0]" />
+      <span className="text-[9px] font-bold text-black/20 whitespace-nowrap">{count}</span>
+    </div>
+  );
+}
+
+// ─── Human Person Card ────────────────────────────────────────────────────────
 
 type CardVariant = "cofounder" | "internal" | "eir";
 
 function PersonCard({ person, variant }: { person: PersonRecord; variant: CardVariant }) {
   const ini = initials(person.name);
-  const avatarStyle =
-    variant === "cofounder" || variant === "internal"
-      ? "bg-[#131218] text-[#B2FF59]"
-      : "bg-[#EFEFEA] text-[#131218]/50";
+  const isEir = variant === "eir";
+
+  const badgeLabel = variant === "cofounder" ? "Co-founder" : variant === "eir" ? "EIR" : "Core team";
 
   return (
-    <div className="bg-white rounded-2xl border border-[#E0E0D8] p-5 flex gap-4">
-      <div className={`w-11 h-11 rounded-xl flex items-center justify-center text-sm font-bold shrink-0 ${avatarStyle}`}>
-        {ini}
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <p className="text-sm font-bold text-[#131218] tracking-tight">{person.name}</p>
-            {person.jobTitle && (
-              <p className="text-xs text-[#131218]/40 mt-0.5">{person.jobTitle}</p>
-            )}
-          </div>
-          {variant === "cofounder" && (
-            <span className="text-[9px] font-bold text-[#B2FF59] bg-[#131218] px-2 py-0.5 rounded-full uppercase tracking-widest shrink-0">
-              Co-Founder
-            </span>
+    <div
+      className={`rounded-2xl overflow-hidden border-[1.5px] transition-all ${
+        isEir
+          ? "border-[#ccc] bg-white hover:border-[#aaa] hover:-translate-y-0.5"
+          : "border-[#d8d8d0] bg-white hover:border-[#aaa] hover:-translate-y-0.5"
+      }`}
+    >
+      {/* Card top */}
+      <div
+        className={`px-[22px] pt-[22px] pb-[18px] border-b flex items-center gap-3.5 ${
+          isEir
+            ? "bg-[#0e0e0e] border-b-white/8"
+            : "bg-white border-[#d8d8d0]"
+        }`}
+      >
+        <div
+          className={`w-[46px] h-[46px] rounded-full flex items-center justify-center text-[14px] font-extrabold shrink-0 tracking-[-0.5px] ${
+            isEir
+              ? "bg-white/10 border border-white/15 text-white"
+              : variant === "cofounder"
+              ? "bg-[#c8f55a] text-black"
+              : "bg-[#c8f55a] text-black"
+          }`}
+        >
+          {ini}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p
+            className={`text-[14px] font-extrabold tracking-[-0.3px] leading-[1.2] ${
+              isEir ? "text-white" : "text-[#0e0e0e]"
+            }`}
+          >
+            {person.name}
+          </p>
+          {person.jobTitle && (
+            <p
+              className={`text-[10.5px] font-medium mt-0.5 ${
+                isEir ? "text-white/45" : "text-[#6b6b6b]"
+              }`}
+            >
+              {person.jobTitle}
+            </p>
           )}
         </div>
+        <span
+          className={`text-[8px] font-bold tracking-[1px] uppercase rounded-full px-2 py-0.5 border shrink-0 self-start ml-auto ${
+            isEir
+              ? "bg-white/7 text-white/35 border-white/10"
+              : "bg-[#eeeee8] text-black/25 border-[#d8d8d0]"
+          }`}
+        >
+          {badgeLabel}
+        </span>
+      </div>
+
+      {/* Card body */}
+      <div className="px-[22px] pt-[18px] pb-5">
         {person.location && (
-          <p className="text-[10px] text-[#131218]/30 font-medium mt-1.5">
-            ◎ {person.location}
-          </p>
+          <p className="text-[10px] text-[#6b6b6b]/70 font-medium mb-2">◎ {person.location}</p>
         )}
-        <div className="flex items-center gap-3 mt-2 flex-wrap">
+        <div className="flex items-center gap-3 flex-wrap mt-1">
           {person.linkedin && (
             <a
               href={person.linkedin}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-[10px] font-bold text-[#131218]/30 hover:text-[#131218]/70 uppercase tracking-widest transition-colors"
+              className="text-[9.5px] font-bold text-[#0e0e0e] bg-[#eeeee8] border border-[#d8d8d0] rounded-lg px-[11px] py-1.5 no-underline hover:bg-black hover:text-white hover:border-black transition-all tracking-[0.2px]"
             >
               LinkedIn ↗
             </a>
@@ -69,7 +117,7 @@ function PersonCard({ person, variant }: { person: PersonRecord; variant: CardVa
           {person.email && !person.linkedin && (
             <a
               href={`mailto:${person.email}`}
-              className="text-[10px] text-[#131218]/20 hover:text-[#131218]/50 transition-colors font-medium"
+              className="text-[9.5px] font-medium text-[#6b6b6b] no-underline hover:text-[#0e0e0e] transition-colors"
             >
               {person.email}
             </a>
@@ -82,90 +130,59 @@ function PersonCard({ person, variant }: { person: PersonRecord; variant: CardVa
 
 // ─── Digital Resident Card ────────────────────────────────────────────────────
 
-function DigitalResidentCard({ resident }: { resident: DigitalResidentProfile }) {
-  const surfaces = resident.surfaces
-    .map((s) => SURFACE_LABEL[s] ?? s)
-    .join(" · ");
+const DIGITAL_ICONS: Record<string, React.ReactNode> = {
+  "information-coordinator": (
+    <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="#555" strokeWidth="1.8" strokeLinecap="round">
+      <path d="M2 2h12v8H2z" /><path d="M5 12h6M8 10v2" />
+    </svg>
+  ),
+  "intelligence-analyst": (
+    <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="#555" strokeWidth="1.8" strokeLinecap="round">
+      <circle cx="8" cy="8" r="6" /><path d="M8 5v3l2 1.5" />
+    </svg>
+  ),
+  "project-manager": (
+    <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="#555" strokeWidth="1.8" strokeLinecap="round">
+      <polyline points="3 6 8 10 13 6" /><rect x="2" y="3" width="12" height="10" rx="1" />
+    </svg>
+  ),
+  "internal-auditor": (
+    <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="#555" strokeWidth="1.8" strokeLinecap="round">
+      <path d="M8 14s-6-3-6-7.5A3.5 3.5 0 0 1 8 3a3.5 3.5 0 0 1 6 3.5C14 11 8 14 8 14z" />
+    </svg>
+  ),
+  "portfolio-director": (
+    <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="#555" strokeWidth="1.8" strokeLinecap="round">
+      <polyline points="1 4 8 10 15 4" /><path d="M1 4h14v9a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1z" />
+    </svg>
+  ),
+  "chief-of-staff": (
+    <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="#555" strokeWidth="1.8" strokeLinecap="round">
+      <line x1="15" y1="1" x2="8" y2="8" /><polygon points="15 1 11 15 8 8 1 5 15 1" />
+    </svg>
+  ),
+};
 
-  return (
-    <div className="bg-white rounded-2xl border border-[#E0E0D8] p-5">
-      {/* Name + visibility badge */}
-      <div className="flex items-start justify-between gap-2 mb-3">
-        <p className="text-sm font-bold text-[#131218] tracking-tight leading-snug">
-          {resident.displayName}
-        </p>
-        {resident.clientVisible ? (
-          <span className="text-[9px] font-bold text-[#131218] bg-[#B2FF59] px-2 py-0.5 rounded-full uppercase tracking-widest shrink-0">
-            Client-facing
-          </span>
-        ) : (
-          <span className="text-[9px] font-bold text-[#131218]/30 bg-[#EFEFEA] px-2 py-0.5 rounded-full uppercase tracking-widest shrink-0">
-            Internal
-          </span>
-        )}
-      </div>
-
-      {/* Tagline */}
-      <p className="text-xs text-[#131218]/50 leading-relaxed">
-        {resident.tagline}
-      </p>
-
-      {/* Signals */}
-      <div className="mt-3 pt-3 border-t border-[#EFEFEA]">
-        <p className="text-[10px] font-bold text-[#131218]/20 uppercase tracking-widest mb-1">
-          Reads from
-        </p>
-        <p className="text-[10px] text-[#131218]/35 leading-relaxed">
-          {resident.signals.join(" · ")}
-        </p>
-      </div>
-
-      {/* Surfaces */}
-      <p className="text-[10px] text-[#131218]/20 font-medium mt-2">
-        Active in: {surfaces}
-      </p>
-    </div>
+function DigitalCard({ resident }: { resident: DigitalResidentProfile }) {
+  const iconKey = resident.role.toLowerCase().replace(/\s+/g, "-");
+  const icon = DIGITAL_ICONS[iconKey] ?? (
+    <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="#555" strokeWidth="1.8" strokeLinecap="round">
+      <circle cx="8" cy="8" r="6" />
+    </svg>
   );
-}
 
-// ─── Section components ───────────────────────────────────────────────────────
-
-function SectionHeader({
-  label,
-  count,
-  descriptor,
-}: {
-  label: string;
-  count?: number;
-  descriptor?: string;
-}) {
   return (
-    <div className="mb-4">
-      <div className="flex items-center gap-3 mb-1">
-        <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">
-          {label}
-        </p>
-        {count !== undefined && (
-          <span className="text-[10px] font-bold text-[#131218] bg-[#B2FF59] px-2 py-0.5 rounded-full">
-            {count}
-          </span>
-        )}
+    <div className="bg-white border-[1.5px] border-dashed border-[#d8d8d0] rounded-2xl p-[22px] flex items-start gap-3.5">
+      <div className="w-10 h-10 rounded-full bg-[#eeeee8] border-[1.5px] border-[#d8d8d0] flex items-center justify-center shrink-0">
+        {icon}
       </div>
-      {descriptor && (
-        <p className="text-xs text-[#131218]/35 leading-relaxed">{descriptor}</p>
-      )}
-    </div>
-  );
-}
-
-/** Subtle horizontal rule separating the Human and Digital layers */
-function LayerDivider({ label }: { label: string }) {
-  return (
-    <div className="flex items-center gap-4 pt-2">
-      <p className="text-[10px] font-bold text-[#131218]/18 uppercase tracking-widest whitespace-nowrap">
-        {label}
-      </p>
-      <div className="flex-1 h-px bg-[#E0E0D8]" />
+      <div className="flex-1 min-w-0">
+        <p className="text-[12.5px] font-extrabold text-[#0e0e0e] tracking-[-0.2px] mb-0.5">{resident.displayName}</p>
+        <p className="text-[10.5px] text-[#6b6b6b] leading-[1.55] mb-2.5">{resident.tagline}</p>
+        <p className="text-[9px] font-semibold text-black/20 tracking-[0.5px]">
+          Feeds: {resident.signals.slice(0, 3).join(" · ")}
+        </p>
+      </div>
     </div>
   );
 }
@@ -194,151 +211,124 @@ export default async function ResidentsPage() {
     ...new Set(eirs.map((p) => p.location?.split(", ").pop() ?? "").filter(Boolean)),
   ];
 
-  // ── Digital sections ────────────────────────────────────────────────────────
-  // Admin view: show all 5 roles — client-facing + internal
-  const clientFacingDigital = DIGITAL_RESIDENTS.filter((r) => r.clientVisible);
-  const internalDigital = DIGITAL_RESIDENTS.filter((r) => !r.clientVisible);
-
   const humanCount = coFounders.length + coreTeam.length + eirs.length;
-  const digitalCount = DIGITAL_RESIDENTS.length;
 
   return (
-    <div className="flex min-h-screen bg-[#EFEFEA]">
+    <div className="flex min-h-screen bg-[#eeeee8]">
       <Sidebar items={NAV} isAdmin />
 
-      <main className="flex-1 overflow-auto">
+      <main className="flex-1 overflow-auto ml-[220px]">
 
-        {/* Header */}
-        <div className="bg-[#131218] px-8 py-8 border-b border-white/8">
-          <div className="max-w-4xl mx-auto">
-            <p className="text-[10px] font-bold text-white/25 uppercase tracking-widest mb-4">
-              The Residents
-            </p>
-            <h1 className="text-3xl font-bold text-white tracking-tight">
-              Who inhabits the House
-            </h1>
-            <p className="text-white/35 text-sm mt-2 max-w-xl leading-relaxed">
-              The people behind Common House and the capabilities that power it —
-              human residents and digital residents, in one layer.
-            </p>
-            <div className="flex items-center gap-2 mt-5">
-              <span className="text-[10px] font-bold text-white/40 border border-white/15 px-3 py-1.5 rounded-full uppercase tracking-widest">
-                {humanCount} human
-              </span>
-              <span className="text-[10px] font-bold text-white/40 border border-white/15 px-3 py-1.5 rounded-full uppercase tracking-widest">
-                {digitalCount} digital
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <div className="px-8 py-6">
-          <div className="max-w-4xl mx-auto space-y-8">
-
-            {/* ── HUMAN RESIDENTS ──────────────────────────────────────────── */}
-            <LayerDivider label="Human Residents" />
-
-            {/* Co-Founders */}
-            {coFounders.length > 0 && (
-              <section>
-                <SectionHeader
-                  label="Co-Founders"
-                  count={coFounders.length}
-                  descriptor="The people who built Common House."
-                />
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {coFounders.map((p) => (
-                    <PersonCard key={p.id} person={p} variant="cofounder" />
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {/* Core Team */}
-            {coreTeam.length > 0 && (
-              <section>
-                <SectionHeader
-                  label="Core Team"
-                  count={coreTeam.length}
-                  descriptor="The people running the work."
-                />
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {coreTeam.map((p) => (
-                    <PersonCard key={p.id} person={p} variant="internal" />
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {/* Entrepreneurs in Residence */}
-            {eirs.length > 0 && (
-              <section>
-                <SectionHeader
-                  label="Entrepreneurs in Residence"
-                  count={eirs.length}
-                  descriptor={
-                    eirCountries.length > 1
-                      ? `Founders building circular economy and reuse ventures within the Common House network — across ${eirCountries.join(", ")}.`
-                      : "Founders building circular economy and reuse ventures within the Common House network."
-                  }
-                />
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {eirs.map((p) => (
-                    <PersonCard key={p.id} person={p} variant="eir" />
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {humanCount === 0 && (
-              <div className="bg-white rounded-2xl border border-[#E0E0D8] p-8 text-center">
-                <p className="text-sm font-bold text-[#131218]">No human residents found</p>
-                <p className="text-xs text-[#131218]/40 mt-1">
-                  People are pulled from CH People [OS v2] in Notion.
-                </p>
-              </div>
-            )}
-
-            {/* ── DIGITAL RESIDENTS ────────────────────────────────────────── */}
-            <LayerDivider label="Digital Residents" />
-
-            <section>
-              <SectionHeader
-                label="Client-Facing Capabilities"
-                count={clientFacingDigital.length}
-                descriptor="The operational roles that are visible to clients in Hall and Workroom — the part of the OS they experience directly."
-              />
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {clientFacingDigital.map((r) => (
-                  <DigitalResidentCard key={r.role} resident={r} />
-                ))}
-              </div>
-            </section>
-
-            <section>
-              <SectionHeader
-                label="Internal Capabilities"
-                count={internalDigital.length}
-                descriptor="The operational roles that run inside the system — not visible to clients, but essential to how the House functions."
-              />
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {internalDigital.map((r) => (
-                  <DigitalResidentCard key={r.role} resident={r} />
-                ))}
-              </div>
-            </section>
-
-            {/* Footer note */}
-            <div className="pb-2">
-              <p className="text-[10px] text-[#131218]/20 leading-relaxed max-w-xl">
-                Digital residents are operational roles built from real project signals.
-                They support the work — they do not replace judgment, conversation,
-                or leadership. They also appear contextually in The Hall, The Workroom,
-                and the Control Room, but this page is their canonical home.
+        {/* ── Page header ──────────────────────────────────────────────────── */}
+        <header className="bg-black px-14 pt-12 pb-[52px]">
+          <p className="text-[8.5px] font-bold tracking-[2.5px] uppercase text-white/20 mb-3.5">
+            Directorio vivo de capacidades
+          </p>
+          <div className="flex items-end justify-between gap-6 flex-wrap">
+            <div>
+              <h1 className="text-[2.8rem] font-light text-white tracking-[-1.5px] leading-none">
+                Residents
+              </h1>
+              <p className="text-[13px] text-white/40 mt-3.5 max-w-[500px] leading-[1.65]">
+                Humans and digital agents that make the House run. Not a team page — a living directory of activatable capabilities.
               </p>
             </div>
-
+            <div className="flex gap-2 flex-wrap flex-shrink-0 self-end">
+              <span className="text-[10px] font-bold px-3.5 py-[7px] rounded-full border border-white/12 text-white/40">All</span>
+              <span className="text-[10px] font-bold px-3.5 py-[7px] rounded-full border border-white/12 text-white/40">Co-founders</span>
+              <span className="text-[10px] font-bold px-3.5 py-[7px] rounded-full border border-white/12 text-white/40">EIRs</span>
+              <span className="text-[10px] font-bold px-3.5 py-[7px] rounded-full border border-white/12 text-white/40">Core team</span>
+              <span className="text-[10px] font-bold px-3.5 py-[7px] rounded-full border border-white/12 text-white/40">Digital</span>
+            </div>
           </div>
+        </header>
+
+        {/* ── Content ──────────────────────────────────────────────────────── */}
+        <div className="px-14 py-10 pb-16">
+
+          {/* Co-founders */}
+          {coFounders.length > 0 && (
+            <>
+              <ResSectionBar label="Co-founders" count={coFounders.length} />
+              <div className="grid grid-cols-3 gap-4 mb-2">
+                {coFounders.map((p) => (
+                  <PersonCard key={p.id} person={p} variant="cofounder" />
+                ))}
+              </div>
+            </>
+          )}
+
+          {/* EIRs */}
+          {eirs.length > 0 && (
+            <>
+              <ResSectionBar
+                label="Entrepreneurs in Residence"
+                count={`${eirs.length} EIRs`}
+              />
+              <div className="bg-white border-[1.5px] border-[#ccc] rounded-2xl px-[22px] py-4 mb-4 flex items-center gap-3">
+                <div className="w-[7px] h-[7px] rounded-full bg-[#0e0e0e] shrink-0" />
+                <p className="text-[11.5px] text-[#444] leading-[1.6]">
+                  EIRs are senior operators embedded in the House. They bring deep domain expertise, active networks, and a track record that CH&apos;s clients can access directly — not just as advisors, but as strategic partners on specific engagements.
+                </p>
+              </div>
+              <div className="grid grid-cols-3 gap-4 mb-2">
+                {eirs.map((p) => (
+                  <PersonCard key={p.id} person={p} variant="eir" />
+                ))}
+              </div>
+            </>
+          )}
+
+          {/* Core team */}
+          {coreTeam.length > 0 && (
+            <>
+              <ResSectionBar label="Core team" count={coreTeam.length} />
+              <div className="grid grid-cols-3 gap-4 mb-2">
+                {coreTeam.map((p) => (
+                  <PersonCard key={p.id} person={p} variant="internal" />
+                ))}
+              </div>
+            </>
+          )}
+
+          {humanCount === 0 && (
+            <div className="bg-white rounded-2xl border border-[#d8d8d0] p-8 text-center mb-4">
+              <p className="text-sm font-bold text-[#0e0e0e]">No human residents found</p>
+              <p className="text-xs text-[#6b6b6b] mt-1">
+                People are pulled from CH People [OS v2] in Notion.
+              </p>
+            </div>
+          )}
+
+          {/* Digital Residents */}
+          <div className="mt-12">
+            <ResSectionBar
+              label="Digital Residents"
+              count={`${DIGITAL_RESIDENTS.length} agents · always on`}
+            />
+            <div className="bg-white border-[1.5px] border-dashed border-[#d8d8d0] rounded-2xl px-6 py-5 mb-5 flex items-center gap-3.5">
+              <div className="w-2 h-2 rounded-full bg-[#c8f55a] shrink-0" />
+              <p className="text-[12px] text-[#555] leading-[1.6]">
+                Digital residents operate continuously — capturing, classifying, auditing, and maintaining the OS while humans focus on strategy and output. They&apos;re listed here without gimmick: these are functional agents, each with a specific scope.
+              </p>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              {DIGITAL_RESIDENTS.map((r) => (
+                <DigitalCard key={r.role} resident={r} />
+              ))}
+            </div>
+          </div>
+
+          {/* Footer note */}
+          <div className="pt-10">
+            <p className="text-[10px] text-[#0e0e0e]/20 leading-relaxed max-w-xl">
+              Digital residents are operational roles built from real project signals.
+              They support the work — they do not replace judgment, conversation,
+              or leadership. They also appear contextually in The Hall, The Workroom,
+              and the Control Room, but this page is their canonical home.
+            </p>
+          </div>
+
         </div>
       </main>
     </div>

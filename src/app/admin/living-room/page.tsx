@@ -32,14 +32,84 @@ type DirtyState = {
   themes:     Record<string, boolean>;             // assetId → active
 };
 
-function CHIsotipo({ size = 16, className }: { size?: number; className?: string }) {
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function InfoNote({ children }: { children: React.ReactNode }) {
   return (
-    <svg width={size * 2} height={size} viewBox="0 0 120 60" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
-      <path d="M46 8 C26 8 12 18 12 30 C12 42 26 52 46 52" stroke="currentColor" strokeWidth="9" strokeLinecap="round" />
-      <circle cx="85" cy="30" r="20" stroke="currentColor" strokeWidth="9" />
-    </svg>
+    <div className="flex gap-2.5 items-start bg-[rgba(200,245,90,0.08)] border border-[rgba(200,245,90,0.3)] rounded-xl px-4 py-3 text-[11px] text-[#3a6600] leading-relaxed mb-6">
+      <span className="shrink-0 mt-0.5">ℹ</span>
+      <span>{children}</span>
+    </div>
   );
 }
+
+function StatPill({
+  label,
+  value,
+  sub,
+  color,
+}: {
+  label: string;
+  value: number | string;
+  sub: string;
+  color?: "lime" | "red" | "amber";
+}) {
+  const valCls =
+    color === "lime"
+      ? "text-[#3a8c00]"
+      : color === "red"
+      ? "text-red-500"
+      : color === "amber"
+      ? "text-amber-500"
+      : "text-[#131218]";
+  return (
+    <div className="bg-white border border-[#D8D8D0] rounded-xl p-4">
+      <div className="text-[8px] font-bold tracking-[2px] uppercase text-[#131218]/25 mb-1.5">
+        {label}
+      </div>
+      <div className={`text-[1.6rem] font-black tracking-tight leading-none ${valCls}`}>
+        {value}
+      </div>
+      <div className="text-[10px] text-[#6b6b6b] mt-1.5">{sub}</div>
+    </div>
+  );
+}
+
+function Toggle({ checked, onChange }: { checked: boolean; onChange: () => void }) {
+  return (
+    <button
+      onClick={onChange}
+      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors shrink-0 ${
+        checked ? "bg-[#3a8c00]" : "bg-[#D1D5DB]"
+      }`}
+      aria-checked={checked}
+      role="switch"
+    >
+      <span
+        className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
+          checked ? "translate-x-4" : "translate-x-0.5"
+        }`}
+      />
+    </button>
+  );
+}
+
+function ColHeader({ labels }: { labels: string[] }) {
+  return (
+    <div className="flex gap-3.5 pb-2.5 border-b border-[#D8D8D0] mb-0.5">
+      {labels.map((l) => (
+        <span
+          key={l}
+          className="text-[8px] font-bold tracking-[1.8px] uppercase text-[#131218]/22 flex-1 first:flex-[1.8]"
+        >
+          {l}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function LivingRoomAdminPage() {
   const [tab, setTab]       = useState<Tab>("people");
@@ -156,272 +226,457 @@ export default function LivingRoomAdminPage() {
     }
   }
 
-  const TABS: { id: Tab; label: string; count: number }[] = [
-    { id: "people",     label: "People Visibility",  count: people.length },
-    { id: "milestones", label: "Milestones",          count: milestones.length },
-    { id: "signals",    label: "Signals",             count: signals.length },
-    { id: "themes",     label: "Themes in Motion",    count: themes.length },
+  const TABS: { id: Tab; label: string; emoji: string; count: number }[] = [
+    { id: "people",     label: "People Visibility",  emoji: "👤", count: people.length },
+    { id: "milestones", label: "Milestones",          emoji: "🏆", count: milestones.length },
+    { id: "signals",    label: "Community Signals",   emoji: "📡", count: signals.length },
+    { id: "themes",     label: "Themes in Motion",    emoji: "🌊", count: themes.length },
   ];
 
   const VIS_OPTS = ["public-safe", "community", "private"] as const;
-  const VIS_COLORS: Record<string, string> = {
-    "public-safe": "bg-[#B2FF59] text-[#131218]",
-    "community":   "bg-blue-100 text-blue-700",
-    "private":     "bg-[#EFEFEA] text-[#131218]/40",
-  };
 
   return (
-    <div className="flex min-h-screen bg-[#EFEFEA]">
+    <div className="flex min-h-screen bg-[#EEEEE8]">
       <Sidebar items={ADMIN_NAV} isAdmin />
 
-      <main className="flex-1 overflow-auto">
+      <main className="flex-1 overflow-auto flex flex-col">
 
-        {/* Header */}
-        <div className="bg-white border-b border-[#E0E0D8] px-8 py-6">
-          <div className="flex items-end justify-between">
+        {/* ── Dark header ── */}
+        <header className="bg-black flex-shrink-0" style={{ padding: "40px 52px 44px" }}>
+          <p className="text-[8px] font-bold tracking-[2.5px] uppercase text-white/20 mb-3">
+            Living Room · Editorial Curator
+          </p>
+          <div className="flex items-end justify-between gap-5 flex-wrap">
             <div>
-              <div className="flex items-center gap-3 mb-3">
-                <CHIsotipo size={14} className="text-[#131218]" />
-                <p className="text-[10px] font-bold text-[#131218]/25 uppercase tracking-widest">
-                  Control Room · Living Room
-                </p>
-              </div>
-              <h1 className="text-2xl font-bold text-[#131218] tracking-tight">Living Room — Curation</h1>
-              <p className="text-xs text-[#131218]/40 font-medium mt-1">
-                Control what the community sees. Changes write directly to Notion.
+              <h1 className="text-[2.6rem] font-light text-white tracking-[-1.5px] leading-none">
+                Curate the{" "}
+                <em className="font-black not-italic text-[#B2FF59]">community</em>
+                <br />
+                layer.
+              </h1>
+              <p className="text-[12.5px] text-white/38 mt-3 max-w-xl leading-relaxed">
+                Control who appears, which milestones surface, which signals are shared,
+                and what themes are in motion — without touching Notion directly.
               </p>
             </div>
-            <a
-              href="/living-room"
-              className="text-[10px] font-bold text-[#131218]/30 bg-[#EFEFEA] hover:bg-[#E0E0D8] border border-[#E0E0D8] px-3 py-2 rounded-xl uppercase tracking-widest transition-colors"
-            >
-              Preview →
-            </a>
-          </div>
-
-          {/* Tabs */}
-          <div className="flex gap-1 mt-5">
-            {TABS.map(t => (
-              <button
-                key={t.id}
-                onClick={() => setTab(t.id)}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-                  tab === t.id
-                    ? "bg-[#131218] text-white"
-                    : "text-[#131218]/40 hover:text-[#131218]/80 hover:bg-[#EFEFEA]"
-                }`}
+            <div className="flex gap-2.5 flex-wrap items-end">
+              <a
+                href="/living-room"
+                className="text-[10.5px] font-bold px-4 py-2 rounded-lg border border-white/18 text-white/70 hover:text-white hover:border-white/35 transition-colors"
               >
-                {t.label}
-                <span className={`ml-1.5 text-[9px] px-1.5 py-0.5 rounded-full ${
-                  tab === t.id ? "bg-white/20 text-white" : "bg-[#EFEFEA] text-[#131218]/30"
-                }`}>{t.count}</span>
-              </button>
-            ))}
+                ↗ Preview Living Room
+              </a>
+              {dirtyCount > 0 && (
+                <button
+                  onClick={saveAll}
+                  disabled={saving}
+                  className="text-[10.5px] font-bold px-4 py-2 rounded-lg bg-[#B2FF59] text-black hover:bg-[#c8f55a] transition-colors disabled:opacity-50"
+                >
+                  {saving ? "Saving…" : "Save all changes"}
+                </button>
+              )}
+            </div>
           </div>
+        </header>
+
+        {/* ── White tab bar ── */}
+        <div className="bg-white border-b border-[#D8D8D0] flex gap-0 flex-shrink-0" style={{ padding: "0 52px" }}>
+          {TABS.map(t => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={`px-5 py-4 text-[11.5px] font-semibold border-b-2 transition-colors whitespace-nowrap ${
+                tab === t.id
+                  ? "text-[#131218] border-[#B2FF59]"
+                  : "text-[#131218]/38 border-transparent hover:text-[#131218]"
+              }`}
+            >
+              {t.emoji} {t.label}
+              <span className={`ml-1.5 text-[9px] px-1.5 py-0.5 rounded-full font-bold ${
+                tab === t.id ? "bg-[#EFEFEA] text-[#131218]/50" : "bg-[#EFEFEA] text-[#131218]/25"
+              }`}>
+                {t.count}
+              </span>
+            </button>
+          ))}
         </div>
 
-        {/* Content */}
-        <div className="px-8 py-6">
+        {/* ── Content ── */}
+        <div className="flex-1" style={{ padding: "36px 52px 60px" }}>
           {loading ? (
             <div className="flex items-center justify-center py-20">
               <p className="text-sm text-[#131218]/30 font-medium">Loading from Notion…</p>
             </div>
           ) : (
             <>
-              {/* Tab: People Visibility */}
-              {tab === "people" && (
-                <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-                  <div className="h-1 bg-[#131218]" />
-                  <div className="px-6 py-4 border-b border-[#EFEFEA]">
-                    <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">People visibility</p>
-                    <p className="text-sm font-bold text-[#131218] mt-0.5">Choose who appears in the Living Room</p>
-                  </div>
-                  {people.length === 0 ? (
-                    <div className="px-6 py-8 text-center">
-                      <p className="text-sm text-[#131218]/30">No people records found. Add people to CH People [OS v2] in Notion.</p>
-                    </div>
-                  ) : (
-                    <div className="divide-y divide-[#EFEFEA]">
-                      {people.map(p => (
-                        <div key={p.id} className="flex items-center gap-4 px-6 py-3.5">
-                          <div className="w-8 h-8 rounded-lg bg-[#EFEFEA] flex items-center justify-center text-[10px] font-bold text-[#131218]/40 shrink-0">
-                            {p.name.slice(0, 2).toUpperCase()}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold text-[#131218] truncate">{p.name}</p>
-                            <p className="text-[11px] text-[#131218]/30 font-medium truncate">{p.jobTitle || "—"}</p>
-                          </div>
-                          <div className="flex gap-1.5">
-                            {VIS_OPTS.map(v => (
-                              <button
-                                key={v}
-                                onClick={() => markPersonVisibility(p.id, v)}
-                                className={`text-[9px] font-bold px-2.5 py-1 rounded-full uppercase tracking-widest transition-all border ${
-                                  p.visibility === v
-                                    ? `${VIS_COLORS[v]} border-transparent`
-                                    : "bg-white text-[#131218]/25 border-[#E0E0D8] hover:border-[#131218]/20"
-                                }`}
-                              >
-                                {v}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
 
-              {/* Tab: Milestones */}
-              {tab === "milestones" && (
-                <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-                  <div className="h-1 bg-[#B2FF59]" />
-                  <div className="px-6 py-4 border-b border-[#EFEFEA]">
-                    <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Project milestones</p>
-                    <p className="text-sm font-bold text-[#131218] mt-0.5">Toggle which projects share to the Living Room</p>
+              {/* ── Tab: People ── */}
+              {tab === "people" && (
+                <div>
+                  <InfoNote>
+                    Set who is visible in Living Room.{" "}
+                    <strong>Public-safe</strong> members appear in Featured Members, Geography, and Hall teasers.{" "}
+                    <strong>Community</strong> members appear to authenticated users only.{" "}
+                    <strong>Private</strong> members are never shown.
+                  </InfoNote>
+
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
+                    <StatPill label="Total Members" value={people.length} sub="In CH People OS v2" />
+                    <StatPill
+                      label="Public-Safe"
+                      value={people.filter(p => p.visibility === "public-safe").length}
+                      sub="Visible externally"
+                      color="lime"
+                    />
+                    <StatPill
+                      label="Community"
+                      value={people.filter(p => p.visibility === "community").length}
+                      sub="Authenticated only"
+                    />
+                    <StatPill
+                      label="Private / Unset"
+                      value={people.filter(p => !p.visibility || p.visibility === "private").length}
+                      sub="Not surfaced"
+                      color="red"
+                    />
                   </div>
-                  {milestones.length === 0 ? (
-                    <div className="px-6 py-8 text-center">
-                      <p className="text-sm text-[#131218]/30">No active projects found.</p>
+
+                  <div className="bg-white rounded-2xl border border-[#D8D8D0] overflow-hidden">
+                    <div className="px-5 py-4 border-b border-[#D8D8D0] flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-lg bg-[#B2FF59] flex items-center justify-center text-[11px]">👤</div>
+                        <span className="text-[12px] font-extrabold text-[#131218] tracking-tight">People Visibility</span>
+                      </div>
                     </div>
-                  ) : (
-                    <div className="divide-y divide-[#EFEFEA]">
-                      {milestones.map(m => (
-                        <div key={m.id} className="flex items-center gap-4 px-6 py-3.5">
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold text-[#131218] truncate">{m.name}</p>
-                            <div className="flex items-center gap-2 mt-0.5">
-                              {m.stage && <span className="text-[10px] text-[#131218]/30 font-medium">{m.stage}</span>}
-                              {m.milestoneType && (
-                                <span className="text-[9px] font-bold text-[#131218]/40 bg-[#EFEFEA] px-1.5 py-0.5 rounded-full uppercase tracking-widest">
-                                  {m.milestoneType}
-                                </span>
-                              )}
+
+                    {people.length === 0 ? (
+                      <div className="px-6 py-10 text-center">
+                        <p className="text-sm text-[#131218]/30">
+                          No people records found. Add people to CH People [OS v2] in Notion.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="px-5 divide-y divide-[#EFEFEA]">
+                        {/* Header row */}
+                        <div className="grid gap-3.5 py-2.5 items-center" style={{ gridTemplateColumns: "1.8fr 1.2fr 1fr 160px" }}>
+                          {["Name", "Role", "Location", "Visibility"].map(l => (
+                            <span key={l} className="text-[8px] font-bold tracking-[1.8px] uppercase text-[#131218]/22">{l}</span>
+                          ))}
+                        </div>
+                        {people.map(p => (
+                          <div
+                            key={p.id}
+                            className="grid gap-3.5 py-3 items-center"
+                            style={{ gridTemplateColumns: "1.8fr 1.2fr 1fr 160px" }}
+                          >
+                            <div>
+                              <div className="text-[13px] font-bold text-[#131218] tracking-tight">{p.name}</div>
+                              <div className="text-[10px] text-[#6b6b6b] mt-0.5">{p.jobTitle || "—"}</div>
+                            </div>
+                            <div className="text-[10.5px] text-[#555]">
+                              {p.roles.slice(0, 1).join(", ") || "—"}
+                            </div>
+                            <div className="text-[10.5px] text-[#555]">{p.location || "—"}</div>
+                            <div className="flex gap-1">
+                              {VIS_OPTS.map(v => {
+                                const isActive = p.visibility === v;
+                                const activeCls =
+                                  v === "public-safe"
+                                    ? "bg-[rgba(200,245,90,0.25)] text-[#3a6600] border-[rgba(200,245,90,0.5)]"
+                                    : v === "community"
+                                    ? "bg-blue-50 text-blue-700 border-blue-200"
+                                    : "bg-[#f3f4f6] text-[#6b7280] border-[#e5e7eb]";
+                                return (
+                                  <button
+                                    key={v}
+                                    onClick={() => markPersonVisibility(p.id, v)}
+                                    className={`text-[8px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide border transition-all ${
+                                      isActive
+                                        ? activeCls
+                                        : "bg-white text-[#131218]/25 border-[#E0E0D8] hover:border-[#131218]/20"
+                                    }`}
+                                  >
+                                    {v === "public-safe" ? "Public" : v}
+                                  </button>
+                                );
+                              })}
                             </div>
                           </div>
-                          <button
-                            onClick={() => markMilestoneShare(m.id, !m.shareToLivingRoom)}
-                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                              m.shareToLivingRoom ? "bg-[#B2FF59]" : "bg-[#E0E0D8]"
-                            }`}
-                          >
-                            <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
-                              m.shareToLivingRoom ? "translate-x-4" : "translate-x-0.5"
-                            }`} />
-                          </button>
-                          <span className={`text-[10px] font-bold w-10 ${m.shareToLivingRoom ? "text-[#131218]" : "text-[#131218]/20"}`}>
-                            {m.shareToLivingRoom ? "Shared" : "Hidden"}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 
-              {/* Tab: Signals */}
-              {tab === "signals" && (
-                <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-                  <div className="h-1 bg-blue-400" />
-                  <div className="px-6 py-4 border-b border-[#EFEFEA]">
-                    <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Insight briefs</p>
-                    <p className="text-sm font-bold text-[#131218] mt-0.5">Toggle which briefs appear as community signals</p>
+              {/* ── Tab: Milestones ── */}
+              {tab === "milestones" && (
+                <div>
+                  <InfoNote>
+                    Toggle <strong>Share to Living Room</strong> to surface a project milestone in
+                    the community feed. Only items marked <em>Share = Yes</em> appear in Living Room
+                    Module C.
+                  </InfoNote>
+
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
+                    <StatPill label="Active Projects" value={milestones.length} sub="In CH Projects OS v2" />
+                    <StatPill
+                      label="Shared to LR"
+                      value={milestones.filter(m => m.shareToLivingRoom).length}
+                      sub="Live in community feed"
+                      color="lime"
+                    />
+                    <StatPill
+                      label="Not shared"
+                      value={milestones.filter(m => !m.shareToLivingRoom).length}
+                      sub="Hidden from feed"
+                    />
+                    <StatPill
+                      label="With milestone type"
+                      value={milestones.filter(m => m.milestoneType).length}
+                      sub="Typed entries"
+                    />
                   </div>
-                  {signals.length === 0 ? (
-                    <div className="px-6 py-8 text-center">
-                      <p className="text-sm text-[#131218]/30">No insight briefs found.</p>
+
+                  <div className="bg-white rounded-2xl border border-[#D8D8D0] overflow-hidden">
+                    <div className="px-5 py-4 border-b border-[#D8D8D0] flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-lg bg-[#B2FF59] flex items-center justify-center text-[11px]">🏆</div>
+                      <span className="text-[12px] font-extrabold text-[#131218] tracking-tight">Milestone Curator</span>
                     </div>
-                  ) : (
-                    <div className="divide-y divide-[#EFEFEA]">
-                      {signals.map(s => (
-                        <div key={s.id} className="flex items-center gap-4 px-6 py-3.5">
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold text-[#131218] truncate">{s.title}</p>
-                            <div className="flex items-center gap-2 mt-0.5">
+
+                    {milestones.length === 0 ? (
+                      <div className="px-6 py-10 text-center">
+                        <p className="text-sm text-[#131218]/30">No active projects found.</p>
+                      </div>
+                    ) : (
+                      <div className="px-5 divide-y divide-[#EFEFEA]">
+                        {/* Header */}
+                        <div className="grid gap-3.5 py-2.5 items-center" style={{ gridTemplateColumns: "2fr 110px 72px 80px" }}>
+                          {["Project", "Milestone type", "Share", "Status"].map(l => (
+                            <span key={l} className="text-[8px] font-bold tracking-[1.8px] uppercase text-[#131218]/22">{l}</span>
+                          ))}
+                        </div>
+                        {milestones.map(m => (
+                          <div
+                            key={m.id}
+                            className="grid gap-3.5 py-3 items-center"
+                            style={{ gridTemplateColumns: "2fr 110px 72px 80px" }}
+                          >
+                            <div>
+                              <div className="text-[13px] font-bold text-[#131218] tracking-tight">{m.name}</div>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                {m.stage && <span className="text-[10px] text-[#6b6b6b]">{m.stage}</span>}
+                                {m.geography.length > 0 && (
+                                  <span className="text-[9px] font-bold text-[#131218]/30">
+                                    {m.geography.join(", ")}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div>
+                              {m.milestoneType ? (
+                                <span className="text-[8.5px] font-bold text-[#131218]/40 bg-[#EFEFEA] px-2 py-0.5 rounded-full uppercase tracking-widest">
+                                  {m.milestoneType}
+                                </span>
+                              ) : (
+                                <span className="text-[10px] text-[#131218]/20">—</span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Toggle
+                                checked={!!m.shareToLivingRoom}
+                                onChange={() => markMilestoneShare(m.id, !m.shareToLivingRoom)}
+                              />
+                            </div>
+                            <span className={`text-[10px] font-bold ${m.shareToLivingRoom ? "text-[#3a8c00]" : "text-[#131218]/20"}`}>
+                              {m.shareToLivingRoom ? "Shared" : "Hidden"}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* ── Tab: Signals ── */}
+              {tab === "signals" && (
+                <div>
+                  <InfoNote>
+                    Mark Insight Briefs as <strong>Community Relevant</strong> to surface them in
+                    Living Room Module E (Community Signals). Only curated items appear — this is
+                    not automated scraping.
+                  </InfoNote>
+
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
+                    <StatPill label="Insight Briefs" value={signals.length} sub="Total in system" />
+                    <StatPill
+                      label="Community Relevant"
+                      value={signals.filter(s => s.communityRelevant).length}
+                      sub="Tagged for Living Room"
+                      color="lime"
+                    />
+                    <StatPill
+                      label="Showing in LR"
+                      value={signals.filter(s => s.communityRelevant && s.visibility !== "private").length}
+                      sub="Active in feed"
+                    />
+                    <StatPill
+                      label="Not classified"
+                      value={signals.filter(s => !s.communityRelevant).length}
+                      sub="Awaiting review"
+                      color="amber"
+                    />
+                  </div>
+
+                  <div className="bg-white rounded-2xl border border-[#D8D8D0] overflow-hidden">
+                    <div className="px-5 py-4 border-b border-[#D8D8D0] flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-lg bg-blue-100 flex items-center justify-center text-[11px]">📡</div>
+                      <span className="text-[12px] font-extrabold text-[#131218] tracking-tight">Signal Curator</span>
+                    </div>
+
+                    {signals.length === 0 ? (
+                      <div className="px-6 py-10 text-center">
+                        <p className="text-sm text-[#131218]/30">No insight briefs found.</p>
+                      </div>
+                    ) : (
+                      <div className="px-5 divide-y divide-[#EFEFEA]">
+                        {/* Header */}
+                        <div className="grid gap-3.5 py-2.5 items-center" style={{ gridTemplateColumns: "2.2fr 1fr 80px 80px" }}>
+                          {["Brief", "Theme", "Community", "Status"].map(l => (
+                            <span key={l} className="text-[8px] font-bold tracking-[1.8px] uppercase text-[#131218]/22">{l}</span>
+                          ))}
+                        </div>
+                        {signals.map(s => (
+                          <div
+                            key={s.id}
+                            className="grid gap-3.5 py-3 items-center"
+                            style={{ gridTemplateColumns: "2.2fr 1fr 80px 80px" }}
+                          >
+                            <div>
+                              <div className="text-[13px] font-bold text-[#131218] tracking-tight">{s.title}</div>
+                              <div className="flex items-center gap-1.5 mt-0.5">
+                                <span className="text-[10px] text-[#6b6b6b]">{s.status}</span>
+                              </div>
+                            </div>
+                            <div className="flex flex-wrap gap-1">
                               {s.theme.slice(0, 2).map(t => (
-                                <span key={t} className="text-[9px] font-bold text-[#131218]/35 bg-[#EFEFEA] px-1.5 py-0.5 rounded-full uppercase tracking-widest">
+                                <span key={t} className="text-[8.5px] font-bold text-[#131218]/35 bg-[#EFEFEA] px-1.5 py-0.5 rounded-full uppercase tracking-widest">
                                   {t}
                                 </span>
                               ))}
-                              <span className="text-[10px] text-[#131218]/25 font-medium">{s.status}</span>
                             </div>
+                            <div className="flex items-center">
+                              <Toggle
+                                checked={!!s.communityRelevant}
+                                onChange={() => markSignalRelevant(s.id, !s.communityRelevant)}
+                              />
+                            </div>
+                            <span className={`text-[10px] font-bold ${s.communityRelevant ? "text-blue-600" : "text-[#131218]/20"}`}>
+                              {s.communityRelevant ? "On" : "Off"}
+                            </span>
                           </div>
-                          <button
-                            onClick={() => markSignalRelevant(s.id, !s.communityRelevant)}
-                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                              s.communityRelevant ? "bg-blue-400" : "bg-[#E0E0D8]"
-                            }`}
-                          >
-                            <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
-                              s.communityRelevant ? "translate-x-4" : "translate-x-0.5"
-                            }`} />
-                          </button>
-                          <span className={`text-[10px] font-bold w-10 ${s.communityRelevant ? "text-blue-600" : "text-[#131218]/20"}`}>
-                            {s.communityRelevant ? "On" : "Off"}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 
-              {/* Tab: Themes */}
+              {/* ── Tab: Themes ── */}
               {tab === "themes" && (
-                <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-                  <div className="h-1 bg-amber-400" />
-                  <div className="px-6 py-4 border-b border-[#EFEFEA]">
-                    <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Knowledge assets</p>
-                    <p className="text-sm font-bold text-[#131218] mt-0.5">Activate or deactivate themes shown in the Living Room</p>
+                <div>
+                  <InfoNote>
+                    Activate or deactivate themes shown in the Living Room (Module D). Only{" "}
+                    <strong>Active</strong> themes surface in the community layer. Set a theme to{" "}
+                    <em>Off</em> to hide it without deleting the knowledge asset.
+                  </InfoNote>
+
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
+                    <StatPill label="Knowledge Assets" value={themes.length} sub="Total in system" />
+                    <StatPill
+                      label="Active Themes"
+                      value={themes.filter(t => t.active).length}
+                      sub="Shown in Living Room"
+                      color="lime"
+                    />
+                    <StatPill
+                      label="Inactive"
+                      value={themes.filter(t => !t.active).length}
+                      sub="Hidden from feed"
+                    />
+                    <StatPill
+                      label="With category"
+                      value={themes.filter(t => t.category).length}
+                      sub="Categorised"
+                    />
                   </div>
-                  {themes.length === 0 ? (
-                    <div className="px-6 py-8 text-center">
-                      <p className="text-sm text-[#131218]/30">No knowledge assets found.</p>
+
+                  <div className="bg-white rounded-2xl border border-[#D8D8D0] overflow-hidden">
+                    <div className="px-5 py-4 border-b border-[#D8D8D0] flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-lg bg-amber-100 flex items-center justify-center text-[11px]">🌊</div>
+                      <span className="text-[12px] font-extrabold text-[#131218] tracking-tight">Theme Curator</span>
                     </div>
-                  ) : (
-                    <div className="divide-y divide-[#EFEFEA]">
-                      {themes.map(t => (
-                        <div key={t.id} className="flex items-center gap-4 px-6 py-3.5">
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold text-[#131218] truncate">{t.name}</p>
-                            <p className="text-[11px] text-[#131218]/30 font-medium mt-0.5">{t.category || t.assetType || "—"}</p>
-                          </div>
-                          <button
-                            onClick={() => markThemeActive(t.id, !t.active)}
-                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                              t.active ? "bg-amber-400" : "bg-[#E0E0D8]"
-                            }`}
-                          >
-                            <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
-                              t.active ? "translate-x-4" : "translate-x-0.5"
-                            }`} />
-                          </button>
-                          <span className={`text-[10px] font-bold w-10 ${t.active ? "text-amber-600" : "text-[#131218]/20"}`}>
-                            {t.active ? "Active" : "Off"}
-                          </span>
+
+                    {themes.length === 0 ? (
+                      <div className="px-6 py-10 text-center">
+                        <p className="text-sm text-[#131218]/30">No knowledge assets found.</p>
+                      </div>
+                    ) : (
+                      <div className="px-5 divide-y divide-[#EFEFEA]">
+                        {/* Header */}
+                        <div className="grid gap-3.5 py-2.5 items-center" style={{ gridTemplateColumns: "2fr 1fr 72px 80px" }}>
+                          {["Theme", "Category", "Active", "Status"].map(l => (
+                            <span key={l} className="text-[8px] font-bold tracking-[1.8px] uppercase text-[#131218]/22">{l}</span>
+                          ))}
                         </div>
-                      ))}
-                    </div>
-                  )}
+                        {themes.map(t => (
+                          <div
+                            key={t.id}
+                            className="grid gap-3.5 py-3 items-center"
+                            style={{ gridTemplateColumns: "2fr 1fr 72px 80px" }}
+                          >
+                            <div>
+                              <div className="text-[13px] font-bold text-[#131218] tracking-tight">{t.name}</div>
+                              {t.assetType && (
+                                <div className="text-[10px] text-[#6b6b6b] mt-0.5">{t.assetType}</div>
+                              )}
+                            </div>
+                            <div className="text-[10.5px] text-[#555]">{t.category || "—"}</div>
+                            <div className="flex items-center">
+                              <Toggle
+                                checked={!!t.active}
+                                onChange={() => markThemeActive(t.id, !t.active)}
+                              />
+                            </div>
+                            <span className={`text-[10px] font-bold ${t.active ? "text-amber-600" : "text-[#131218]/20"}`}>
+                              {t.active ? "Active" : "Off"}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
+
             </>
           )}
         </div>
 
-        {/* Fixed save bar */}
+        {/* ── Fixed save bar ── */}
         {dirtyCount > 0 && (
-          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
-            <div className="bg-[#131218] text-white rounded-2xl px-6 py-3.5 flex items-center gap-4 shadow-2xl">
-              <span className="text-xs font-medium text-white/60">
-                {dirtyCount} unsaved change{dirtyCount !== 1 ? "s" : ""}
+          <div className="fixed bottom-7 left-1/2 -translate-x-1/2 z-50">
+            <div className="bg-black text-white rounded-xl px-6 py-3.5 flex items-center gap-4 shadow-2xl whitespace-nowrap">
+              <span className="text-[12px] font-semibold text-white/60">
+                <span className="text-[#B2FF59] font-extrabold">{dirtyCount}</span>{" "}
+                unsaved change{dirtyCount !== 1 ? "s" : ""}
               </span>
               {error && <span className="text-xs font-bold text-red-400">{error}</span>}
               <button
                 onClick={saveAll}
                 disabled={saving}
-                className="bg-[#B2FF59] text-[#131218] text-xs font-bold px-4 py-2 rounded-xl hover:bg-[#c8ff7a] transition-colors disabled:opacity-50"
+                className="bg-[#B2FF59] text-black text-xs font-bold px-4 py-2 rounded-lg hover:bg-[#c8f55a] transition-colors disabled:opacity-50"
               >
                 {saving ? "Saving…" : "Save to Notion →"}
               </button>
@@ -430,12 +685,13 @@ export default function LivingRoomAdminPage() {
         )}
 
         {saved && (
-          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
-            <div className="bg-[#B2FF59] text-[#131218] rounded-2xl px-6 py-3.5 text-xs font-bold shadow-2xl">
+          <div className="fixed bottom-7 left-1/2 -translate-x-1/2 z-50">
+            <div className="bg-[#B2FF59] text-black rounded-xl px-6 py-3.5 text-xs font-extrabold shadow-2xl">
               ✓ All changes saved to Notion
             </div>
           </div>
         )}
+
       </main>
     </div>
   );
