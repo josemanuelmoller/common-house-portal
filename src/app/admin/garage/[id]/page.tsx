@@ -39,19 +39,20 @@ function splitName(name: string): { prefix: string; em: string } {
 
 // ─── Page ──────────────────────────────────────────────────────────────────────
 
-export default async function GarageDetailPage({ params }: { params: { id: string } }) {
+export default async function GarageDetailPage({ params }: { params: Promise<{ id: string }> }) {
   await requireAdmin();
+  const { id } = await params;
 
   const [project, evidence, sources, allDecisions, orgData, financials, valuations, capTable, dataRoom] = await Promise.all([
-    getProjectById(params.id),
-    getEvidenceForProject(params.id),
-    getSourcesForProject(params.id),
+    getProjectById(id),
+    getEvidenceForProject(id),
+    getSourcesForProject(id),
     getDecisionItems("Open"),
-    getStartupOrgData(params.id),
-    getFinancialsForProject(params.id),
-    getValuationsForProject(params.id),
-    getCapTableForProject(params.id),
-    getDataRoomForProject(params.id),
+    getStartupOrgData(id),
+    getFinancialsForProject(id),
+    getValuationsForProject(id),
+    getCapTableForProject(id),
+    getDataRoomForProject(id),
   ]);
 
   if (!project) notFound();
