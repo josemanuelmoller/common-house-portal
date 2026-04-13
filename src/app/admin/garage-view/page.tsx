@@ -144,7 +144,7 @@ export default async function GarageViewPage() {
                 return (
                   <Link
                     key={p.id}
-                    href={`/admin/projects/${p.id}`}
+                    href={`/admin/garage/${p.id}`}
                     className="group bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden hover:border-[#131218]/25 hover:-translate-y-0.5 transition-all duration-200"
                   >
                     {/* Top accent bar */}
