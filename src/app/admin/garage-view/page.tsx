@@ -27,13 +27,6 @@ const STAGE_COLORS: Record<string, string> = {
   "On Hold":    "bg-gray-100 text-gray-400 border border-gray-200",
 };
 
-function readinessColor(score: number): string {
-  if (score >= 80) return "text-green-600";
-  if (score >= 60) return "text-amber-500";
-  if (score >= 40) return "text-orange-500";
-  return "text-red-500";
-}
-
 export default async function GarageViewPage() {
   await requireAdmin();
 
@@ -44,12 +37,6 @@ export default async function GarageViewPage() {
   const needsUpdate    = projects.filter(p => p.updateNeeded);
   const totalEvidence  = projects.reduce((sum, p) => sum + p.evidenceCount, 0);
   const totalValidated = projects.reduce((sum, p) => sum + p.validatedCount, 0);
-
-  // Readiness score proxy: validated / total evidence × 100, capped at 100
-  function readinessScore(p: typeof projects[0]): number {
-    if (!p.evidenceCount) return 0;
-    return Math.min(100, Math.round((p.validatedCount / p.evidenceCount) * 100));
-  }
 
   return (
     <div className="flex min-h-screen bg-[#EFEFEA]">
@@ -139,7 +126,6 @@ export default async function GarageViewPage() {
               {projects.map(p => {
                 const days    = daysSince(p.lastUpdate);
                 const warmth  = warmthLabel(days);
-                const score   = readinessScore(p);
 
                 return (
                   <Link
@@ -182,33 +168,28 @@ export default async function GarageViewPage() {
                         ))}
                       </div>
 
-                      {/* Stats grid + readiness */}
-                      <div className="grid grid-cols-5 gap-2 mb-4">
-                        {[
-                          { label: "Evidence",  val: p.evidenceCount  },
-                          { label: "Validated", val: p.validatedCount },
-                          { label: "Sources",   val: p.sourcesCount   },
-                          { label: "Decisions", val: p.decisionCount  },
-                          { label: "Outcomes",  val: p.outcomeCount   },
-                        ].map(s => (
-                          <div key={s.label}>
-                            <p className="text-[7.5px] font-bold tracking-wider uppercase text-[#131218]/25 mb-0.5">{s.label}</p>
-                            <p className="text-[13px] font-bold text-[#131218]">{s.val}</p>
-                          </div>
-                        ))}
-                      </div>
+                      {/* Status snapshot */}
+                      {p.statusSummary ? (
+                        <p className="text-[11px] text-[#131218]/55 leading-relaxed mb-4 line-clamp-2">
+                          {p.statusSummary}
+                        </p>
+                      ) : (
+                        <p className="text-[11px] text-[#131218]/20 italic mb-4">No status logged yet.</p>
+                      )}
 
-                      {/* Readiness bar */}
-                      <div className="mb-4">
-                        <div className="flex items-center justify-between mb-1">
-                          <p className="text-[8px] font-bold tracking-wider uppercase text-[#131218]/25">Readiness</p>
-                          <p className={`text-[10px] font-bold ${readinessColor(score)}`}>{score}%</p>
+                      {/* Current focus + next milestone */}
+                      <div className="grid grid-cols-2 gap-3 mb-4">
+                        <div className="bg-[#EFEFEA] rounded-xl px-3 py-2.5">
+                          <p className="text-[7.5px] font-bold tracking-wider uppercase text-[#131218]/30 mb-1">Current focus</p>
+                          <p className="text-[11px] font-medium text-[#131218] leading-snug line-clamp-2">
+                            {p.hallCurrentFocus || <span className="text-[#131218]/25 italic">—</span>}
+                          </p>
                         </div>
-                        <div className="h-1 bg-[#EFEFEA] rounded-full overflow-hidden">
-                          <div
-                            className={`h-full rounded-full transition-all ${score >= 80 ? "bg-[#B2FF59]" : score >= 60 ? "bg-amber-400" : score >= 40 ? "bg-orange-400" : "bg-red-400"}`}
-                            style={{ width: `${score}%` }}
-                          />
+                        <div className="bg-[#EFEFEA] rounded-xl px-3 py-2.5">
+                          <p className="text-[7.5px] font-bold tracking-wider uppercase text-[#131218]/30 mb-1">Next milestone</p>
+                          <p className="text-[11px] font-medium text-[#131218] leading-snug line-clamp-2">
+                            {p.hallNextMilestone || <span className="text-[#131218]/25 italic">—</span>}
+                          </p>
                         </div>
                       </div>
 
