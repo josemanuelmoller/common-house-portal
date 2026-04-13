@@ -17,6 +17,46 @@ import type {
 
 type Tab = "pulse" | "financials" | "valuation" | "captable" | "funding" | "dataroom";
 
+// Garage ingest types
+interface ExtractedData {
+  organization: {
+    description: string;
+    sector_tags: string[];
+    geography: string;
+    founding_year: number | null;
+    website: string;
+    team: { name: string; role: string }[];
+  };
+  evidence: { title: string; type: string; statement: string; date: string | null; confidence: string }[];
+  financials: { period: string; revenue: number | null; burn: number | null; gross_margin_pct: number | null; cash: number | null; runway_months: number | null; arr: number | null; mrr: number | null; confidence: string }[];
+  cap_table: { shareholder_name: string; type: string; share_class: string; ownership_pct: number | null; invested_amount: number | null; round: string; confidence: string }[];
+  valuations: { round: string; pre_money_min: number | null; pre_money_max: number | null; method: string; confidence: string }[];
+  knowledge_assets: { title: string; asset_type: string; summary: string; key_points: string[]; tags: string[]; confidence: string }[];
+  insight_briefs: { title: string; theme: string[]; summary: string; confidence: string }[];
+  decision_items: { title: string; category: string; priority: string; notes: string }[];
+  draft_status_update: string;
+}
+
+interface IngestResults {
+  evidence: number;
+  financials: number;
+  cap_table: number;
+  valuations: number;
+  knowledge_assets: number;
+  insight_briefs: number;
+  decision_items: number;
+  org_updated: boolean;
+  project_updated: boolean;
+  errors: string[];
+}
+
+type IngestState =
+  | { status: "idle" }
+  | { status: "processing"; fileId: string }
+  | { status: "preview"; fileId: string; extraction: ExtractedData }
+  | { status: "executing"; fileId: string }
+  | { status: "done"; fileId: string; results: IngestResults };
+
 type Props = {
   project: Project;
   evidence: EvidenceItem[];
@@ -486,9 +526,17 @@ function extractStoragePath(notes: string): string {
 function DataRoomTab({
   dataRoom,
   onDelete,
+  ingestState,
+  onIngest,
+  onIngestConfirm,
+  onIngestCancel,
 }: {
   dataRoom: DataRoomItem[];
   onDelete?: (notionId: string, storagePath: string) => Promise<void>;
+  ingestState: IngestState;
+  onIngest: (fileId: string, fileUrl: string, fileName: string) => void;
+  onIngestConfirm: (fileId: string, fileUrl: string, fileName: string) => void;
+  onIngestCancel: () => void;
 }) {
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -531,42 +579,153 @@ function DataRoomTab({
           <div className="divide-y divide-[#EFEFEA]">
             {uploadedFiles.map(item => {
               const storagePath = extractStoragePath(item.notes);
-              const isDeleting = deletingId === item.id;
+              const isDeleting  = deletingId === item.id;
+              const isPdf       = item.name?.toLowerCase().endsWith(".pdf");
+              const isThisProcessing = ingestState.status === "processing" && ingestState.fileId === item.id;
+              const isThisPreview    = ingestState.status === "preview"    && ingestState.fileId === item.id;
+              const isThisExecuting  = ingestState.status === "executing"  && ingestState.fileId === item.id;
+              const isThisDone       = ingestState.status === "done"       && ingestState.fileId === item.id;
+              const anyBusy = ingestState.status === "processing" || ingestState.status === "executing";
+
               return (
-                <div key={item.id} className="px-5 py-3 flex items-center gap-3">
-                  <div className="w-8 text-center shrink-0">
-                    <span className="text-[8px] font-bold text-[#131218]/25 uppercase">
-                      {item.documentType?.split(" ")[0]?.slice(0, 3) || "DOC"}
-                    </span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[12.5px] font-medium text-[#131218] truncate">{item.name}</p>
-                    <p className="text-[9.5px] text-[#131218]/35 mt-0.5">{item.documentType} · {item.category}</p>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <a
-                      href={item.fileUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-[#EFEFEA] text-[#131218]/50 hover:bg-[#131218] hover:text-white transition-all"
-                    >
-                      ↓ Download
-                    </a>
-                    {onDelete && (
-                      <button
-                        onClick={async () => {
-                          if (!confirm("Delete this file from storage and Data Room?")) return;
-                          setDeletingId(item.id);
-                          await onDelete(item.id, storagePath);
-                          setDeletingId(null);
-                        }}
-                        disabled={isDeleting}
-                        className="text-[10px] font-bold px-2.5 py-1 rounded-lg text-red-400 hover:bg-red-50 hover:text-red-600 transition-all disabled:opacity-40"
+                <div key={item.id}>
+                  {/* File row */}
+                  <div className="px-5 py-3 flex items-center gap-3">
+                    <div className="w-8 text-center shrink-0">
+                      <span className="text-[8px] font-bold text-[#131218]/25 uppercase">
+                        {item.documentType?.split(" ")[0]?.slice(0, 3) || "DOC"}
+                      </span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[12.5px] font-medium text-[#131218] truncate">{item.name}</p>
+                      <p className="text-[9.5px] text-[#131218]/35 mt-0.5">{item.documentType} · {item.category}</p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {/* Procesar button — PDF only */}
+                      {isPdf && !isThisDone && (
+                        <button
+                          onClick={() => onIngest(item.id, item.fileUrl!, item.name)}
+                          disabled={anyBusy || isThisPreview}
+                          className={`text-[10px] font-bold px-2.5 py-1 rounded-lg transition-all ${
+                            isThisProcessing
+                              ? "bg-[#EFEFEA] text-[#131218]/40 cursor-wait"
+                              : isThisPreview
+                              ? "bg-[#131218]/5 text-[#131218]/30 cursor-default"
+                              : anyBusy
+                              ? "bg-[#EFEFEA] text-[#131218]/20 cursor-not-allowed"
+                              : "bg-[#c8f55a] text-[#131218] hover:bg-[#b8e84a]"
+                          }`}
+                        >
+                          {isThisProcessing ? "Analizando…" : "Procesar"}
+                        </button>
+                      )}
+                      {/* Done badge */}
+                      {isThisDone && (
+                        <span className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-green-50 text-green-700 border border-green-200">
+                          ✓ Procesado
+                        </span>
+                      )}
+                      <a
+                        href={item.fileUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-[#EFEFEA] text-[#131218]/50 hover:bg-[#131218] hover:text-white transition-all"
                       >
-                        {isDeleting ? "…" : "Delete"}
-                      </button>
-                    )}
+                        ↓ Download
+                      </a>
+                      {onDelete && (
+                        <button
+                          onClick={async () => {
+                            if (!confirm("Delete this file from storage and Data Room?")) return;
+                            setDeletingId(item.id);
+                            await onDelete(item.id, storagePath);
+                            setDeletingId(null);
+                          }}
+                          disabled={isDeleting}
+                          className="text-[10px] font-bold px-2.5 py-1 rounded-lg text-red-400 hover:bg-red-50 hover:text-red-600 transition-all disabled:opacity-40"
+                        >
+                          {isDeleting ? "…" : "Delete"}
+                        </button>
+                      )}
+                    </div>
                   </div>
+
+                  {/* Inline preview panel */}
+                  {(isThisPreview || isThisExecuting || isThisDone) && (
+                    <div className={`mx-4 mb-4 rounded-xl border p-4 ${
+                      isThisDone
+                        ? "bg-green-50 border-green-200"
+                        : "bg-[#EFEFEA] border-[#E0E0D8]"
+                    }`}>
+                      {isThisPreview && ingestState.status === "preview" && (
+                        <>
+                          <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/40 mb-2">
+                            Extracción AI — Vista previa
+                          </p>
+                          <p className="text-[11.5px] text-[#131218]/70 mb-3">
+                            {[
+                              ingestState.extraction.evidence?.length ? `${ingestState.extraction.evidence.length} evidence` : null,
+                              ingestState.extraction.financials?.length ? `${ingestState.extraction.financials.length} financials` : null,
+                              ingestState.extraction.cap_table?.length ? `${ingestState.extraction.cap_table.length} cap table` : null,
+                              ingestState.extraction.valuations?.length ? `${ingestState.extraction.valuations.length} valuations` : null,
+                              ingestState.extraction.knowledge_assets?.length ? `${ingestState.extraction.knowledge_assets.length} knowledge assets` : null,
+                              ingestState.extraction.insight_briefs?.length ? `${ingestState.extraction.insight_briefs.length} insight briefs` : null,
+                              ingestState.extraction.decision_items?.length ? `${ingestState.extraction.decision_items.length} decisions` : null,
+                            ].filter(Boolean).join(" · ")}
+                          </p>
+                          {ingestState.extraction.draft_status_update && (
+                            <p className="text-[11px] text-[#131218]/50 italic mb-3 leading-relaxed border-l-2 border-[#131218]/15 pl-3">
+                              {ingestState.extraction.draft_status_update}
+                            </p>
+                          )}
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => onIngestConfirm(item.id, item.fileUrl!, item.name)}
+                              className="text-[10.5px] font-bold px-3 py-1.5 rounded-lg bg-[#c8f55a] text-[#131218] hover:bg-[#b8e84a] transition-all"
+                            >
+                              Confirmar y ejecutar
+                            </button>
+                            <button
+                              onClick={onIngestCancel}
+                              className="text-[10.5px] font-bold px-3 py-1.5 rounded-lg bg-white border border-[#E0E0D8] text-[#131218]/50 hover:text-[#131218] transition-all"
+                            >
+                              Cancelar
+                            </button>
+                          </div>
+                        </>
+                      )}
+                      {isThisExecuting && (
+                        <p className="text-[11px] font-medium text-[#131218]/60">
+                          Escribiendo en Notion…
+                        </p>
+                      )}
+                      {isThisDone && ingestState.status === "done" && (
+                        <>
+                          <p className="text-[9px] font-bold tracking-widest uppercase text-green-600/70 mb-2">
+                            Completado
+                          </p>
+                          <p className="text-[11.5px] text-green-800/80">
+                            {[
+                              ingestState.results.evidence ? `${ingestState.results.evidence} evidence` : null,
+                              ingestState.results.financials ? `${ingestState.results.financials} financials` : null,
+                              ingestState.results.cap_table ? `${ingestState.results.cap_table} cap table` : null,
+                              ingestState.results.valuations ? `${ingestState.results.valuations} valuations` : null,
+                              ingestState.results.knowledge_assets ? `${ingestState.results.knowledge_assets} knowledge assets` : null,
+                              ingestState.results.insight_briefs ? `${ingestState.results.insight_briefs} insight briefs` : null,
+                              ingestState.results.decision_items ? `${ingestState.results.decision_items} decisions` : null,
+                            ].filter(Boolean).join(" · ")}
+                          </p>
+                          {ingestState.results.errors?.length > 0 && (
+                            <div className="mt-2">
+                              {ingestState.results.errors.map((e, i) => (
+                                <p key={i} className="text-[10px] text-red-500">{e}</p>
+                              ))}
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -867,6 +1026,65 @@ export function GarageDetailClient({
   const [tab, setTab]               = useState<Tab>("pulse");
   const [showUpload, setShowUpload] = useState(false);
   const [localDataRoom, setLocalDataRoom] = useState<DataRoomItem[]>(dataRoom);
+  const [ingestState, setIngestState] = useState<IngestState>({ status: "idle" });
+
+  async function handleIngest(fileId: string, fileUrl: string, fileName: string) {
+    setIngestState({ status: "processing", fileId });
+    try {
+      const res = await fetch("/api/garage-ingest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fileUrl,
+          fileName,
+          projectId: project.id,
+          projectName: project.name,
+          orgId,
+          mode: "dry_run",
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error ?? `HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      setIngestState({ status: "preview", fileId, extraction: data.extraction });
+    } catch (err) {
+      setIngestState({ status: "idle" });
+      alert(`Extracción fallida: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  async function handleIngestConfirm(fileId: string, fileUrl: string, fileName: string) {
+    setIngestState({ status: "executing", fileId });
+    try {
+      const res = await fetch("/api/garage-ingest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fileUrl,
+          fileName,
+          projectId: project.id,
+          projectName: project.name,
+          orgId,
+          mode: "execute",
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error ?? `HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      setIngestState({ status: "done", fileId, results: data.results });
+    } catch (err) {
+      setIngestState({ status: "idle" });
+      alert(`Ejecución fallida: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  function handleIngestCancel() {
+    setIngestState({ status: "idle" });
+  }
 
   function handleUploadDone(results: UploadResult[]) {
     if (results.length) {
@@ -955,7 +1173,14 @@ export function GarageDetailClient({
           <FundingTab orgData={orgData} />
         )}
         {tab === "dataroom" && (
-          <DataRoomTab dataRoom={localDataRoom} onDelete={handleDelete} />
+          <DataRoomTab
+            dataRoom={localDataRoom}
+            onDelete={handleDelete}
+            ingestState={ingestState}
+            onIngest={handleIngest}
+            onIngestConfirm={handleIngestConfirm}
+            onIngestCancel={handleIngestCancel}
+          />
         )}
       </div>
     </>
