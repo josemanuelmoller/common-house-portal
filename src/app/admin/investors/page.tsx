@@ -65,15 +65,15 @@ export default async function InvestorsPage() {
         {/* Dark header */}
         <header className="bg-[#131218] px-12 pt-10 pb-11">
           <p className="text-[8px] font-bold tracking-[2.5px] uppercase text-white/20 mb-3">
-            Portfolio · Investor network
+            Commercial · Investor relations
           </p>
           <div className="flex items-end justify-between">
             <div>
               <h1 className="text-[2.6rem] font-light text-white tracking-[-1.5px] leading-none">
-                Investor <em className="font-black italic text-[#c8f55a]">Network</em>
+                Investor <em className="font-black italic text-[#c8f55a]">Match</em>
               </h1>
               <p className="text-sm text-white/40 mt-3">
-                Active investors, funders, and angels in the CH network. Matched to portfolio startups.
+                Active investors, funders y angels en la red CH — matched a portfolio startups.
               </p>
             </div>
             <div className="flex items-center gap-4 pb-1">

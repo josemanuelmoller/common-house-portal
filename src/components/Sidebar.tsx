@@ -43,8 +43,8 @@ export const ADMIN_NAV_V2: NavEntry[] = [
     kind: "group", label: "Portfolio", icon: "◧",
     items: [
       { label: "Workrooms", href: "/admin/workrooms" },
-      { label: "Garage",    href: "/admin/garage-view", disabled: true },
-      { label: "Investors", href: "/admin/investors",   disabled: true },
+      { label: "Garage",    href: "/admin/garage-view" },
+      { label: "Investors", href: "/admin/investors" },
     ],
   },
   {
@@ -53,7 +53,7 @@ export const ADMIN_NAV_V2: NavEntry[] = [
       { label: "Opportunities",  href: "/admin/opportunities" },
       { label: "Pipeline",       href: "/admin/pipeline" },
       { label: "Grants",         href: "/admin/grants" },
-      { label: "Investor Match", href: "/admin/deal-flow" },
+      { label: "Investor Match", href: "/admin/investors" },
     ],
   },
   {
