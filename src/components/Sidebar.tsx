@@ -11,6 +11,7 @@ type NavItem = {
   href: string;
   badge?: number;
   badgeRed?: boolean;
+  disabled?: boolean;
 };
 
 type NavGroup = {
@@ -41,17 +42,17 @@ export const ADMIN_NAV_V2: NavEntry[] = [
   {
     kind: "group", label: "Portfolio", icon: "◧",
     items: [
-      { label: "Workrooms", href: "/admin/workrooms", badge: 3 },
-      { label: "Garage",    href: "/admin/garage-view", badge: 5 },
-      { label: "Investors", href: "/admin/investors",  badge: 24 },
+      { label: "Workrooms", href: "/admin/workrooms" },
+      { label: "Garage",    href: "/admin/garage-view", disabled: true },
+      { label: "Investors", href: "/admin/investors",   disabled: true },
     ],
   },
   {
     kind: "group", label: "Commercial", icon: "◉",
     items: [
       { label: "Pipeline",  href: "/admin/pipeline" },
-      { label: "Deal Flow", href: "/admin/deal-flow" },
-      { label: "Grants",    href: "/admin/grants", badge: 2, badgeRed: true },
+      { label: "Deal Flow", href: "/admin/deal-flow", disabled: true },
+      { label: "Grants",    href: "/admin/grants" },
     ],
   },
   {
@@ -64,7 +65,7 @@ export const ADMIN_NAV_V2: NavEntry[] = [
   },
   { kind: "link",  label: "Library",      href: "/library",       icon: "▤" },
   {
-    kind: "group", label: "Control Room", icon: "◫", badge: 3, badgeRed: true,
+    kind: "group", label: "Control Room", icon: "◫",
     items: [
       { label: "Decisions",       href: "/admin/decisions" },
       { label: "Agents",          href: "/admin/agents" },
@@ -194,6 +195,20 @@ export function Sidebar({ items, projectName, isAdmin, adminNav }: Props) {
                   <div>
                     {entry.items.map((item) => {
                       const active = pathname === item.href || pathname.startsWith(item.href + "/");
+                      if (item.disabled) {
+                        return (
+                          <span
+                            key={item.href}
+                            className="flex items-center gap-2 pl-[34px] pr-[18px] py-1.5 text-[11px] font-medium border-l-2 border-transparent"
+                            style={{ opacity: 0.4, cursor: "default" }}
+                          >
+                            <span className="flex-1">{item.label}</span>
+                            <span className="text-[8px] font-bold px-1.5 py-0.5 rounded-lg bg-black/7 text-black/38 flex-shrink-0">
+                              Próximamente
+                            </span>
+                          </span>
+                        );
+                      }
                       return (
                         <Link
                           key={item.href}

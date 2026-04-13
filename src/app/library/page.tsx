@@ -1,8 +1,9 @@
+import { currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/Sidebar";
 import { getKnowledgeAssets, getReusableEvidence } from "@/lib/notion";
 import { ADMIN_NAV as NAV } from "@/lib/admin-nav";
-import { requireAdmin } from "@/lib/require-admin";
+import { isAdminUser, isAdminEmail } from "@/lib/clients";
 import type { LibraryContentFamily } from "@/types/house";
 
 // Map Notion assetType → Library content family
@@ -42,12 +43,24 @@ const FAMILY_META: Record<
 };
 
 export default async function LibraryPage() {
-  await requireAdmin();
+  const user = await currentUser();
+  if (!user) redirect("/sign-in");
 
-  const [assets, reusable] = await Promise.all([
+  const email = user.primaryEmailAddress?.emailAddress ?? "";
+  const isAdmin = isAdminUser(user.id) || isAdminEmail(email);
+
+  const [allAssets, reusable] = await Promise.all([
     getKnowledgeAssets(),
     getReusableEvidence(),
   ]);
+
+  // Role-based visibility filtering
+  const assets = isAdmin
+    ? allAssets
+    : allAssets.filter(
+        (a) => a.portalVisibility === "portfolio" || a.portalVisibility === "public"
+      );
+  const assetsFiltered = !isAdmin && assets.length < allAssets.length;
 
   // Group assets by family
   const byFamily: Record<LibraryContentFamily, typeof assets> = {
@@ -94,6 +107,11 @@ export default async function LibraryPage() {
                   </span>
                 )}
               </div>
+            )}
+            {assetsFiltered && (
+              <p className="text-[11px] text-white/25 mt-3">
+                Mostrando recursos disponibles para tu perfil
+              </p>
             )}
           </div>
         </div>

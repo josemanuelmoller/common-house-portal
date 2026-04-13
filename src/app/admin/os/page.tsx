@@ -343,7 +343,7 @@ export default async function OSPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#EFEFEA]">
-                {sources.slice(0, 15).map(s => (
+                {sources.slice(0, 50).map(s => (
                   <tr key={s.id} className="hover:bg-[#EFEFEA]/60 transition-colors">
                     <td className="px-6 py-3 font-semibold text-[#131218] text-sm max-w-xs">
                       <div className="flex items-center gap-2 min-w-0">
@@ -375,7 +375,9 @@ export default async function OSPage() {
             {sources.length > 0 && (
               <div className="px-6 py-3 border-t border-[#EFEFEA]">
                 <p className="text-[10px] text-[#131218]/25 font-bold uppercase tracking-widest">
-                  Showing {Math.min(15, sources.length)} of {sources.length}
+                  {sources.length <= 50
+                    ? `${sources.length} registro${sources.length !== 1 ? "s" : ""}`
+                    : `Últimos 50 de ${sources.length} registros`}
                 </p>
               </div>
             )}

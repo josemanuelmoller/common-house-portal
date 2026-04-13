@@ -20,7 +20,6 @@ import {
 } from "@/lib/notion";
 import { getProjectIdForUser, isAdminUser, isAdminEmail } from "@/lib/clients";
 import type {
-  HallMode,
   HallProject,
   HallMaterial,
   HallConversation,
@@ -129,13 +128,9 @@ export default async function HallPage() {
   // Primary Workspace = "garage" in CH Projects [OS v2].
 
   // ── Mode ─────────────────────────────────────────────────────────────────
-  // Derive from stage. Discovery/Scoping → explore; everything actively underway → live.
-  // TODO: override with "Hall Mode" select property on CH Projects [OS v2] once added.
-  const mode: HallMode =
-    project.stage === "Discovery" || project.stage === "Scoping"
-      ? "explore"
-      : "live";
-  const isLive = mode === "live";
+  // Driven by "Hall Mode" select property on CH Projects [OS v2].
+  const hallMode = project.hallMode ?? "explore";
+  const isLive = hallMode === "live";
 
   // ── HallProject ──────────────────────────────────────────────────────────
   // Real fields now: hallWelcomeNote, hallCurrentFocus, hallNextMilestone

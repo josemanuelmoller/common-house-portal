@@ -102,15 +102,15 @@ export default async function AdminPage() {
       <main className="flex-1 ml-60 overflow-auto">
 
         {/* ── Page header ─────────────────────────────────────────────── */}
-        <div className="border-b border-[#E0E0D8] bg-white px-8 py-6">
-          <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest mb-2">
-            Home · {dateLabel}
+        <div className="bg-[#131218] px-10 py-10">
+          <p className="text-[8px] font-bold uppercase tracking-[2.5px] text-white/20 mb-3">
+            HOME · {dateLabel.toUpperCase()}
           </p>
-          <h1 className="text-3xl font-bold text-[#131218] tracking-tight leading-tight">
+          <h1 className="text-[2.6rem] font-[300] text-white leading-[1] tracking-[-1.5px]">
             {greeting},<br />
-            <em className="not-italic text-[#131218]/50">Common House.</em>
+            <em className="font-[900] italic text-[#c8f55a]">Common House.</em>
           </h1>
-          <p className="text-sm text-[#131218]/40 font-medium mt-2">
+          <p className="text-[12.5px] text-white/40 mt-3 max-w-[520px] leading-[1.65]">
             Here is your day — what moves, what waits, and what needs your attention.
           </p>
         </div>

@@ -18,22 +18,11 @@ export default async function GrantsPage() {
     getDecisionItems(),
   ]);
 
-  // Projects that have grant-related themes
-  const grantProjects = allProjects.filter(p =>
-    p.themes.some(t => GRANT_THEMES.some(g => t.toLowerCase().includes(g.toLowerCase()))) ||
-    p.engagementModel?.toLowerCase().includes("grant")
-  );
+  // Projects explicitly marked as grant-eligible in Notion
+  const grantProjects = allProjects.filter(p => p.grantEligible === true);
 
-  // Decisions that are grant/funding related (open ones only)
-  const grantDecisions = decisions.filter(d => {
-    const combined = `${d.title} ${d.decisionType} ${d.notes}`.toLowerCase();
-    return (
-      d.status !== "Approved" && d.status !== "Rejected" && d.status !== "Executed" &&
-      (combined.includes("grant") || combined.includes("fund") || combined.includes("sufi") ||
-       combined.includes("fair4all") || combined.includes("life") || combined.includes("eligibility") ||
-       combined.includes("proposal") || combined.includes("application"))
-    );
-  });
+  // Decisions categorised as Grants in Notion
+  const grantDecisions = decisions.filter(d => d.category === "Grants");
 
   const urgentGrant = grantDecisions.filter(d =>
     d.priority === "P1" || d.priority === "P1 Critical" || d.priority === "Urgent"
@@ -176,7 +165,7 @@ export default async function GrantsPage() {
               ) : (
                 <div className="bg-white rounded-2xl border border-[#E0E0D8] p-8 text-center">
                   <p className="text-sm text-[#131218]/25">
-                    No projects with grant-related themes found. Add themes like &ldquo;Grant&rdquo;, &ldquo;Funding&rdquo;, or &ldquo;Innovation Fund&rdquo; in Notion.
+                    No grant-eligible projects found. Enable the &ldquo;Grant Eligible&rdquo; checkbox on a project in Notion to include it here.
                   </p>
                 </div>
               )}

@@ -1,6 +1,8 @@
 // Public marketing page — no auth required
 // Ported from hall-vitrina.html
 
+import { getLivingRoomPeople } from "@/lib/notion";
+
 export const metadata = {
   title: "Common House — The Hall",
   description:
@@ -93,7 +95,10 @@ function SectionBar({
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-export default function VitrinaPage() {
+export default async function VitrinaPage() {
+  const allPeople = await getLivingRoomPeople().catch(() => []);
+  const residents = allPeople.slice(0, 6);
+
   return (
     <div className="font-sans bg-[#eeeee8] text-[#0e0e0e]">
 
@@ -305,39 +310,49 @@ export default function VitrinaPage() {
             </a>
           </div>
 
-          <div className="grid grid-cols-4 gap-4">
-            {[
-              { initials: "JM", name: "José Manuel", role: "Co-founder · Project Lead", tags: ["Strategy", "Zero waste", "Operations"], lime: true },
-              { initials: "SC", name: "Sofía Castro", role: "Co-founder · Strategy", tags: ["Intelligence", "Policy", "Advocacy"], lime: true },
-              { initials: "AP", name: "Andrés Pérez", role: "Design & Comms Lead", tags: ["Design", "Brand", "Production"], lime: false },
-              { initials: "LV", name: "Laura Vargas", role: "Grants & Funding Advisor", tags: ["Grants", "Impact", "EU Policy"], lime: false },
-            ].map((r) => (
-              <div
-                key={r.initials}
-                className="bg-white/4 border border-white/8 rounded-2xl p-[22px] hover:bg-white/7 hover:border-[rgba(200,245,90,0.25)] transition-all"
-              >
-                <div className="w-11 h-11 rounded-full bg-[#c8f55a] text-black text-[13px] font-extrabold flex items-center justify-center mb-3.5 tracking-[-0.5px]">
-                  {r.initials}
-                </div>
-                <p className="text-[13px] font-bold text-white mb-0.5 tracking-[-0.2px]">{r.name}</p>
-                <p className="text-[10.5px] text-white/35 font-medium mb-3">{r.role}</p>
-                <div className="flex flex-wrap gap-1">
-                  {r.tags.map((tag, i) => (
-                    <span
-                      key={tag}
+          {residents.length > 0 && (
+            <div className="grid grid-cols-4 gap-4">
+              {residents.map((r, idx) => {
+                const firstLetter = r.name.trim().charAt(0).toUpperCase();
+                const isLime = idx < 2;
+                const roleChips = r.roles.slice(0, 3);
+                return (
+                  <div
+                    key={r.id}
+                    className="bg-white/4 border border-white/8 rounded-2xl p-[22px] hover:bg-white/7 hover:border-[rgba(200,245,90,0.25)] transition-all"
+                  >
+                    <div
                       className={
-                        i === 0
-                          ? "text-[9px] font-semibold text-[#c8f55a] bg-[rgba(200,245,90,0.07)] border border-[rgba(200,245,90,0.2)] rounded-full px-[7px] py-0.5 tracking-[0.3px]"
-                          : "text-[9px] font-semibold text-white/30 bg-white/5 border border-white/8 rounded-full px-[7px] py-0.5 tracking-[0.3px]"
+                        isLime
+                          ? "w-11 h-11 rounded-full bg-[#c8f55a] text-black text-[13px] font-extrabold flex items-center justify-center mb-3.5 tracking-[-0.5px]"
+                          : "w-11 h-11 rounded-full bg-white/10 text-white text-[13px] font-extrabold flex items-center justify-center mb-3.5 tracking-[-0.5px]"
                       }
                     >
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
+                      {firstLetter}
+                    </div>
+                    <p className="text-[13px] font-bold text-white mb-0.5 tracking-[-0.2px]">{r.name}</p>
+                    <p className="text-[10.5px] text-white/35 font-medium mb-3">{r.jobTitle || "Common House"}</p>
+                    {roleChips.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {roleChips.map((tag, i) => (
+                          <span
+                            key={tag}
+                            className={
+                              i === 0
+                                ? "text-[9px] font-semibold text-[#c8f55a] bg-[rgba(200,245,90,0.07)] border border-[rgba(200,245,90,0.2)] rounded-full px-[7px] py-0.5 tracking-[0.3px]"
+                                : "text-[9px] font-semibold text-white/30 bg-white/5 border border-white/8 rounded-full px-[7px] py-0.5 tracking-[0.3px]"
+                            }
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
 
           {/* Digital agents row */}
           <div className="mt-6 px-6 py-5 bg-[rgba(200,245,90,0.05)] border border-[rgba(200,245,90,0.15)] rounded-xl flex items-center justify-between flex-wrap gap-4">

@@ -106,8 +106,26 @@ export default async function WorkroomPage() {
   if (!project) redirect("/sign-in");
 
   // Workspace gate: only workroom projects enter here.
+  // Non-workroom projects or when workroom is not yet ready → show status screen.
   if (project.primaryWorkspace !== "workroom" || !WORKSPACE_READY.workroom) {
-    redirect("/hall");
+    return (
+      <div style={{ minHeight: "100vh", background: "var(--bg, #eeeee8)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ maxWidth: 480, textAlign: "center", padding: "2rem" }}>
+          <p style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(0,0,0,0.38)", marginBottom: "1rem" }}>
+            {project.name}
+          </p>
+          <h1 style={{ fontSize: "2rem", fontWeight: 300, marginBottom: "0.5rem" }}>
+            Tu <em style={{ fontWeight: 900, fontStyle: "italic" }}>Workroom</em> está en preparación
+          </h1>
+          <p style={{ color: "rgba(0,0,0,0.55)", marginBottom: "2rem" }}>
+            El equipo Common House está configurando tu espacio. Te avisaremos cuando esté listo.
+          </p>
+          <a href="/hall" style={{ display: "inline-block", background: "#B2FF59", color: "#000", fontWeight: 700, padding: "0.75rem 1.5rem", borderRadius: 8, textDecoration: "none", fontSize: 14 }}>
+            Volver al Hall
+          </a>
+        </div>
+      </div>
+    )
   }
 
   // ── WorkroomProject ──────────────────────────────────────────────────────

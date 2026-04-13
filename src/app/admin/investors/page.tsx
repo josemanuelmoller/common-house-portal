@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Sidebar } from "@/components/Sidebar";
-import { getAllPeople, getProjectsOverview } from "@/lib/notion";
+import { getAllPeople, getProjectsOverview, getDecisionItems } from "@/lib/notion";
 import { requireAdmin } from "@/lib/require-admin";
 
 function daysSince(dateStr: string | null): number {
@@ -21,9 +21,10 @@ const INVESTOR_ROLES = ["Investor", "Angel", "VC", "LP", "Fund", "Funder", "Back
 export default async function InvestorsPage() {
   await requireAdmin();
 
-  const [people, allProjects] = await Promise.all([
+  const [people, allProjects, decisions] = await Promise.all([
     getAllPeople(),
     getProjectsOverview(),
+    getDecisionItems(),
   ]);
 
   // Filter people with investor-type roles
@@ -37,6 +38,23 @@ export default async function InvestorsPage() {
   // Categorise investors
   const activeCount  = investors.filter(p => p.classification === "External").length;
   const internalInvestors = investors.filter(p => p.classification === "Internal");
+
+  // Investor-related open decisions (category or keyword match)
+  const investorDecisions = decisions.filter(d => {
+    const combined = `${d.title} ${d.notes} ${d.category ?? ""}`.toLowerCase();
+    return (
+      d.status !== "Approved" && d.status !== "Rejected" && d.status !== "Executed" &&
+      (d.category === "Investment" ||
+       combined.includes("investor") || combined.includes("cap table") ||
+       combined.includes("raise") || combined.includes("valuation") ||
+       combined.includes("term sheet") || combined.includes("safe") ||
+       combined.includes("pitch") || combined.includes("vc"))
+    );
+  });
+
+  const urgentInvestorDecisions = investorDecisions.filter(d =>
+    d.priority === "P1" || d.priority === "P1 Critical" || d.priority === "Urgent"
+  );
 
   return (
     <div className="flex min-h-screen bg-[#EFEFEA]">
@@ -223,8 +241,79 @@ export default async function InvestorsPage() {
                   ))}
                 </div>
               )}
+
+              {/* Cap table placeholder */}
+              <div className="mt-4 bg-white rounded-2xl border border-[#E0E0D8] px-4 py-4">
+                <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30 mb-2">Cap Table</p>
+                <p className="text-[11px] text-[#131218]/50 leading-snug mb-3">
+                  Cap table data is maintained in Notion. Entries added via the{" "}
+                  <code className="text-[10px] bg-[#EFEFEA] px-1 rounded">upsert-captable-entry</code> skill.
+                </p>
+                <a
+                  href="https://notion.so"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-block text-[9px] font-bold bg-[#131218] text-[#B2FF59] px-3 py-1.5 rounded-lg hover:opacity-90 transition-opacity"
+                >
+                  Open Cap Table in Notion →
+                </a>
+                <p className="text-[8.5px] text-[#131218]/25 mt-2">
+                  Investor-matching pipeline: deal-flow-agent
+                </p>
+              </div>
             </div>
 
+          </div>
+
+          {/* Investor decisions section */}
+          <div>
+            <div className="flex items-center gap-3 mb-3">
+              <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30">Investor decisions</p>
+              <div className="flex-1 h-px bg-[#E0E0D8]" />
+              {investorDecisions.length > 0 && (
+                <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${urgentInvestorDecisions.length > 0 ? "bg-red-100 text-red-600" : "bg-amber-100 text-amber-700"}`}>
+                  {investorDecisions.length}
+                </span>
+              )}
+            </div>
+
+            <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
+              <div className="divide-y divide-[#EFEFEA]">
+                {investorDecisions.slice(0, 6).map(d => (
+                  <Link key={d.id} href="/admin/decisions" className="flex items-start gap-3 px-5 py-3 hover:bg-[#EFEFEA]/40 transition-colors">
+                    <div className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 mt-0.5 ${
+                      d.priority === "P1" || d.priority === "P1 Critical" || d.priority === "Urgent"
+                        ? "bg-red-100" : "bg-[#EFEFEA]"
+                    }`}>
+                      <span className={`text-[8px] font-bold ${
+                        d.priority === "P1" || d.priority === "P1 Critical" || d.priority === "Urgent"
+                          ? "text-red-600" : "text-[#131218]/30"
+                      }`}>
+                        {d.priority?.startsWith("P1") || d.priority === "Urgent" ? "P1" : "·"}
+                      </span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[11px] font-semibold text-[#131218] leading-snug line-clamp-2">{d.title}</p>
+                      <p className="text-[9px] text-[#131218]/35 mt-0.5">
+                        {d.decisionType || "Decision"}
+                        {d.dueDate && ` · Due ${new Date(d.dueDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`}
+                      </p>
+                    </div>
+                  </Link>
+                ))}
+                {investorDecisions.length === 0 && (
+                  <div className="px-5 py-6 text-center">
+                    <p className="text-[11px] text-[#131218]/25 font-medium">No open investor decisions</p>
+                    <p className="text-[9px] text-[#131218]/20 mt-1">Decisions mentioning investors, raises, or cap table appear here</p>
+                  </div>
+                )}
+              </div>
+              <div className="px-5 py-2.5 border-t border-[#EFEFEA]">
+                <Link href="/admin/decisions" className="text-[9px] font-bold text-[#131218]/30 hover:text-[#131218]/60 transition-colors uppercase tracking-widest">
+                  All decisions →
+                </Link>
+              </div>
+            </div>
           </div>
 
         </div>
