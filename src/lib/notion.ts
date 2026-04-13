@@ -990,6 +990,53 @@ export async function getLivingRoomThemes(): Promise<LivingRoomTheme[]> {
   }
 }
 
+// ─── Content Pipeline ─────────────────────────────────────────────────────────
+
+export type ContentPipelineItem = {
+  id: string;
+  title: string;
+  status: string;       // Draft | Review | Approved | Published | Archived
+  contentType: string;  // Post | Newsletter | Article | Report | Investor Update | Proposal
+  channel: string;      // LinkedIn | Newsletter | Internal | etc.
+  projectId: string | null;
+  projectName: string;
+  draftDate: string | null;
+  publishDate: string | null;
+  notionUrl: string;
+};
+
+export async function getContentPipeline(statusFilter?: string): Promise<ContentPipelineItem[]> {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const filter: any = statusFilter
+      ? { property: "Status", select: { equals: statusFilter } }
+      : undefined;
+
+    const res = await notion.databases.query({
+      database_id: DB.contentPipeline,
+      filter,
+      sorts: [{ timestamp: "last_edited_time", direction: "descending" }],
+      page_size: 100,
+    });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (res.results as any[]).map(page => ({
+      id:          page.id,
+      title:       text(prop(page, "Title")) || text(prop(page, "Name")) || "Untitled",
+      status:      select(prop(page, "Status")),
+      contentType: select(prop(page, "Content Type")),
+      channel:     select(prop(page, "Channel")),
+      projectId:   relationFirst(prop(page, "Projects")) ?? relationFirst(prop(page, "Project")),
+      projectName: text(prop(page, "Project Name")) || "",
+      draftDate:   date(prop(page, "Draft Date")) ?? date(prop(page, "Created Date")),
+      publishDate: date(prop(page, "Publish Date")) ?? date(prop(page, "Published Date")),
+      notionUrl:   page.url ?? "",
+    }));
+  } catch {
+    return [];
+  }
+}
+
 // ─── Living Room admin writes ─────────────────────────────────────────────────
 
 export async function updatePersonVisibility(
