@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (deskType === "comms" && channel) {
-      properties["Channel"] = { select: { name: channel } };
+      properties["Platform"] = { select: { name: channel } };
     }
 
     // Add a note with source desk

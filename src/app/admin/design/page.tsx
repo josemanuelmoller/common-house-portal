@@ -3,7 +3,7 @@ import { Sidebar } from "@/components/Sidebar";
 import { getContentPipeline } from "@/lib/notion";
 import DeskRequestForm from "@/components/DeskRequestForm";
 
-const DESIGN_TYPES = ["Deck", "One-pager", "Propuesta", "Investor brief", "Informe"];
+const DESIGN_TYPES = ["Deck", "One-pager", "Proposal", "Exec Summary", "Internal Brief"];
 const DESIGN_PROJECTS = ["Auto Mercado", "Fair Cycle", "LATAM NGO", "CH Institucional"];
 
 const STATUS_DOT: Record<string, string> = {

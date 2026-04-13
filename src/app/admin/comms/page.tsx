@@ -3,8 +3,8 @@ import { Sidebar } from "@/components/Sidebar";
 import { getContentPipeline } from "@/lib/notion";
 import DeskRequestForm from "@/components/DeskRequestForm";
 
-const COMMS_TYPES = ["Post", "Newsletter", "Artículo", "Founder voice", "CH Institucional"];
-const COMMS_CHANNELS = ["LinkedIn CH", "Newsletter", "X / Twitter", "Founder personal"];
+const COMMS_TYPES = ["LinkedIn Post", "Newsletter Block", "Article Outline", "Commentary Note", "Instagram Caption"];
+const COMMS_CHANNELS = ["LinkedIn", "Newsletter", "Instagram", "Website / Article"];
 
 const STATUS_DOT: Record<string, string> = {
   "Draft":            "bg-[#131218]/20",
@@ -68,7 +68,7 @@ export default async function CommsPage() {
                 deskType="comms"
                 contentTypes={COMMS_TYPES}
                 channelOrProjectOptions={COMMS_CHANNELS}
-                channelOrProjectLabel="Canal"
+                channelOrProjectLabel="Plataforma"
               />
             </div>
 
