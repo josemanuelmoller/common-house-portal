@@ -31,7 +31,7 @@ export function DecisionActions({ id, requiresExecute, executeApproved, status }
       if (action === "dismiss") await dismissDecision(id)
       setDone(
         action === "approve" ? "Ejecución aprobada ✓" :
-        action === "resolve" ? "Resuelto ✓" :
+        action === "resolve" ? "Aceptado ✓" :
         "Descartado ✓"
       )
     } catch {
@@ -58,7 +58,7 @@ export function DecisionActions({ id, requiresExecute, executeApproved, status }
           disabled={loading !== null}
           className="text-[11px] text-[#131218]/55 border border-[#d4d4cc] rounded-md px-3 py-1 cursor-pointer disabled:opacity-50 hover:bg-[#EFEFEA] transition-colors"
         >
-          {loading === "resolve" ? "…" : "Resolver"}
+          {loading === "resolve" ? "…" : "Aceptar"}
         </button>
         <button
           onClick={() => handle("dismiss")}
