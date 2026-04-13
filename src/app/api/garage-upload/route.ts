@@ -8,7 +8,7 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_KEY!
 );
 
-function classifyFile(filename: string): { category: string; documentType: string; priority: string } {
+export function classifyFile(filename: string): { category: string; documentType: string; priority: string } {
   const name = filename.toLowerCase();
   if (name.includes("pitch") || name.includes("deck"))
     return { category: "Empresa", documentType: "Pitch Deck", priority: "Critical" };
@@ -29,72 +29,36 @@ function classifyFile(filename: string): { category: string; documentType: strin
   return { category: "Other", documentType: filename, priority: "Medium" };
 }
 
-// POST — upload files
+// POST — generate signed upload URLs so the browser uploads directly to Supabase
+// Body: { projectId, files: Array<{ name: string; type: string }> }
+// Returns: { results: Array<{ name, storagePath, signedUrl }> }
 export async function POST(req: NextRequest) {
   await requireAdmin();
 
-  const formData = await req.formData();
-  const projectId   = formData.get("projectId") as string;
-  const projectName = formData.get("projectName") as string;
-  const orgId       = formData.get("orgId") as string | null;
+  const { projectId, files } = await req.json() as {
+    projectId: string;
+    files: { name: string; type: string }[];
+  };
 
-  if (!projectId || !projectName)
-    return NextResponse.json({ error: "projectId and projectName required" }, { status: 400 });
+  if (!projectId || !files?.length)
+    return NextResponse.json({ error: "projectId and files required" }, { status: 400 });
 
-  const files = formData.getAll("files") as File[];
-  if (!files.length)
-    return NextResponse.json({ error: "No files provided" }, { status: 400 });
-
-  const results: { name: string; url: string; category: string; documentType: string; storagePath: string; notionId?: string }[] = [];
-  const errors: string[] = [];
+  const results: { name: string; storagePath: string; signedUrl: string; error?: string }[] = [];
 
   for (const file of files) {
-    try {
-      const storagePath = `${projectId}/${Date.now()}-${file.name}`;
-      const buffer = await file.arrayBuffer();
+    const storagePath = `${projectId}/${Date.now()}-${Math.random().toString(36).slice(2, 6)}-${file.name}`;
+    const { data, error } = await supabase.storage
+      .from("garage-docs")
+      .createSignedUploadUrl(storagePath);
 
-      const { error: uploadError } = await supabase.storage
-        .from("garage-docs")
-        .upload(storagePath, buffer, {
-          contentType: file.type || "application/octet-stream",
-          upsert: false,
-        });
-
-      if (uploadError) { errors.push(`${file.name}: ${uploadError.message}`); continue; }
-
-      const { data: signedData } = await supabase.storage
-        .from("garage-docs")
-        .createSignedUrl(storagePath, 60 * 60 * 24 * 365 * 10);
-
-      const fileUrl = signedData?.signedUrl ?? "";
-      const { category, documentType, priority } = classifyFile(file.name);
-      const itemName = `${projectName} — ${category} — ${documentType}`;
-
-      let notionId: string | undefined;
-      try {
-        const properties: Record<string, unknown> = {
-          "Item Name":     { title: [{ text: { content: itemName } }] },
-          "Category":      { select: { name: category } },
-          "Document Type": { rich_text: [{ text: { content: documentType } }] },
-          "Status":        { select: { name: "Complete" } },
-          "Priority":      { select: { name: priority } },
-          "File URL":      { url: fileUrl },
-          "Notes":         { rich_text: [{ text: { content: `Uploaded via portal. Storage path: ${storagePath}` } }] },
-        };
-        if (orgId) properties["Startup"] = { relation: [{ id: orgId }] };
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const page = await notion.pages.create({ parent: { database_id: DB.dataRoom }, properties: properties as any });
-        notionId = page.id;
-      } catch { /* Data Room record failed — file still stored */ }
-
-      results.push({ name: file.name, url: fileUrl, category, documentType, storagePath, notionId });
-    } catch (err) {
-      errors.push(`${file.name}: ${err instanceof Error ? err.message : "unknown error"}`);
+    if (error || !data) {
+      results.push({ name: file.name, storagePath, signedUrl: "", error: error?.message ?? "Failed to create upload URL" });
+    } else {
+      results.push({ name: file.name, storagePath, signedUrl: data.signedUrl });
     }
   }
 
-  return NextResponse.json({ uploaded: results.length, results, errors });
+  return NextResponse.json({ results });
 }
 
 // DELETE — remove a specific Data Room item (Notion record + Supabase file)
@@ -102,17 +66,14 @@ export async function DELETE(req: NextRequest) {
   await requireAdmin();
 
   const { notionId, storagePath } = await req.json();
-
   const errs: string[] = [];
 
-  // Delete Notion record
   if (notionId) {
     try {
       await notion.pages.update({ page_id: notionId, archived: true });
     } catch { errs.push("Failed to archive Notion record"); }
   }
 
-  // Delete from Supabase Storage
   if (storagePath) {
     const { error } = await supabase.storage.from("garage-docs").remove([storagePath]);
     if (error) errs.push(`Storage delete failed: ${error.message}`);

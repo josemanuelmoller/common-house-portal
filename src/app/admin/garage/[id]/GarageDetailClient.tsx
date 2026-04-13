@@ -704,22 +704,58 @@ function UploadModal({ projectId, projectName, orgId, onDone }: {
   async function handleUpload() {
     if (!files.length) return;
     setStatus("uploading");
-    const fd = new FormData();
-    fd.append("projectId", projectId);
-    fd.append("projectName", projectName);
-    if (orgId) fd.append("orgId", orgId);
-    files.forEach(f => fd.append("files", f));
+    setErrors([]);
 
     try {
-      const res = await fetch("/api/garage-upload", { method: "POST", body: fd });
-      if (!res.ok) throw new Error(`Server error ${res.status}`);
-      const data = await res.json();
-      if (data.errors?.length) setErrors(data.errors);
+      // Step 1 — get signed upload URLs (tiny JSON request, no file bytes)
+      const presignRes = await fetch("/api/garage-upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectId,
+          files: files.map(f => ({ name: f.name, type: f.type || "application/octet-stream" })),
+        }),
+      });
+      if (!presignRes.ok) throw new Error(`Presign error ${presignRes.status}`);
+      const { results: presigned } = await presignRes.json() as {
+        results: { name: string; storagePath: string; signedUrl: string; error?: string }[]
+      };
+
+      const failed = presigned.filter(r => r.error);
+      if (failed.length) setErrors(failed.map(r => `${r.name}: ${r.error ?? "failed"}`));
+
+      const ready = presigned.filter(r => !r.error && r.signedUrl);
+      if (!ready.length) throw new Error("No files could be prepared for upload");
+
+      // Step 2 — upload each file directly to Supabase (browser → Supabase, no Next.js limit)
+      await Promise.all(ready.map(async ({ name, signedUrl }) => {
+        const file = files.find(f => f.name === name)!;
+        const putRes = await fetch(signedUrl, {
+          method: "PUT",
+          headers: { "Content-Type": file.type || "application/octet-stream" },
+          body: file,
+        });
+        if (!putRes.ok) throw new Error(`${name}: upload failed (${putRes.status})`);
+      }));
+
+      // Step 3 — finalize: create signed read URLs + Notion Data Room records
+      const finalizeRes = await fetch("/api/garage-upload/finalize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectName,
+          orgId,
+          uploads: ready.map(r => ({ name: r.name, storagePath: r.storagePath })),
+        }),
+      });
+      if (!finalizeRes.ok) throw new Error(`Finalize error ${finalizeRes.status}`);
+      const data = await finalizeRes.json();
+      if (data.errors?.length) setErrors(prev => [...prev, ...data.errors]);
+
       setStatus("success");
-      // Auto-close after 1.5s and pass results up
       setTimeout(() => onDone(data.results ?? []), 1500);
     } catch (err) {
-      setErrors([err instanceof Error ? err.message : "Upload failed"]);
+      setErrors(prev => [...prev, err instanceof Error ? err.message : "Upload failed"]);
       setStatus("error");
     }
   }
