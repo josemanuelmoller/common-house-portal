@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import type {
   Project,
   EvidenceItem,
@@ -580,7 +581,10 @@ function DataRoomTab({
             {uploadedFiles.map(item => {
               const storagePath = extractStoragePath(item.notes);
               const isDeleting  = deletingId === item.id;
-              const isPdf       = item.name?.toLowerCase().endsWith(".pdf");
+              const processableExts = [".pdf", ".xlsx", ".xls", ".xlsm", ".xlsb", ".csv", ".docx", ".doc", ".pptx", ".ppt"];
+              // Check extension from storagePath or fileUrl (item.name is Notion-formatted, has no extension)
+              const checkStr = (storagePath || item.fileUrl || item.name || "").toLowerCase();
+              const isPdf    = processableExts.some(e => checkStr.includes(e));
               const isThisProcessing = ingestState.status === "processing" && ingestState.fileId === item.id;
               const isThisPreview    = ingestState.status === "preview"    && ingestState.fileId === item.id;
               const isThisExecuting  = ingestState.status === "executing"  && ingestState.fileId === item.id;
@@ -601,7 +605,7 @@ function DataRoomTab({
                       <p className="text-[9.5px] text-[#131218]/35 mt-0.5">{item.documentType} · {item.category}</p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      {/* Procesar button — PDF only */}
+                      {/* Procesar button — PDF, Excel, CSV */}
                       {isPdf && !isThisDone && (
                         <button
                           onClick={() => onIngest(item.id, item.fileUrl!, item.name)}
@@ -942,12 +946,20 @@ function UploadModal({ projectId, projectName, orgId, onDone }: {
 
         {/* Success state */}
         {status === "success" && (
-          <div className="flex items-center gap-3 bg-green-50 border border-green-100 rounded-xl px-5 py-4 mb-4">
-            <span className="text-green-600 text-lg">✓</span>
-            <div>
-              <p className="text-[11.5px] font-bold text-green-800">{files.length} file{files.length > 1 ? "s" : ""} stored</p>
-              <p className="text-[10px] text-green-700/70 mt-0.5">Saved to Data Room. Closing…</p>
+          <div>
+            <div className="flex items-center gap-3 bg-green-50 border border-green-100 rounded-xl px-5 py-4 mb-2">
+              <span className="text-green-600 text-lg">✓</span>
+              <div>
+                <p className="text-[11.5px] font-bold text-green-800">{files.length} file{files.length > 1 ? "s" : ""} stored</p>
+                <p className="text-[10px] text-green-700/70 mt-0.5">Saved to Data Room. Closing…</p>
+              </div>
             </div>
+            {errors.length > 0 && (
+              <div className="bg-amber-50 border border-amber-100 rounded-xl px-4 py-3 mb-2">
+                <p className="text-[9px] font-bold tracking-widest uppercase text-amber-700/60 mb-1">Partial errors</p>
+                {errors.map((e, i) => <p key={i} className="text-[10px] text-amber-700">{e}</p>)}
+              </div>
+            )}
           </div>
         )}
 
@@ -1026,6 +1038,7 @@ export function GarageDetailClient({
 }: Props) {
   const [tab, setTab]               = useState<Tab>("pulse");
   const [showUpload, setShowUpload] = useState(false);
+  const router = useRouter();
   const [localDataRoom, setLocalDataRoom] = useState<DataRoomItem[]>(dataRoom);
   const [ingestState, setIngestState] = useState<IngestState>({ status: "idle" });
 
@@ -1077,6 +1090,10 @@ export function GarageDetailClient({
       }
       const data = await res.json();
       setIngestState({ status: "done", fileId, results: data.results });
+      // Re-fetch server data so Evidence, Financials, Cap Table etc. reflect new Notion records
+      router.refresh();
+      // Reset to idle after 6s so the Procesar button reappears (allows re-processing)
+      setTimeout(() => setIngestState({ status: "idle" }), 6000);
     } catch (err) {
       setIngestState({ status: "idle" });
       alert(`Ejecución fallida: ${err instanceof Error ? err.message : String(err)}`);

@@ -2,8 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { adminGuardApi } from "@/lib/require-admin";
 import { notion, DB, createKnowledgeAssetDraft } from "@/lib/notion";
+import * as XLSX from "xlsx";
+import mammoth from "mammoth";
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const officeparser = require("officeparser") as { parseOfficeAsync: (input: Buffer) => Promise<string> };
 
-// PDF analysis + multi-DB writes can take up to 2 minutes
+// PDF/Excel analysis + multi-DB writes can take up to 2 minutes
 export const maxDuration = 120;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -116,7 +120,7 @@ Return this exact JSON schema:
   "evidence": [
     {
       "title": "factual statement max 120 chars",
-      "type": "Milestone|Traction|Risk|Assumption|Decision|Outcome",
+      "type": "Outcome|Milestone|Traction|Risk|Assumption|Decision|Requirement|Dependency|Blocker|Insight Candidate",
       "statement": "1-3 sentence elaboration",
       "date": "YYYY-MM or null",
       "confidence": "High|Medium|Low"
@@ -251,12 +255,11 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Step 1: Download the file ──────────────────────────────────────────────
-  let base64Data: string;
+  let fileBuffer: ArrayBuffer;
   try {
     const fileRes = await fetch(fileUrl);
     if (!fileRes.ok) throw new Error(`Download failed: ${fileRes.status}`);
-    const buffer = await fileRes.arrayBuffer();
-    base64Data = Buffer.from(buffer).toString("base64");
+    fileBuffer = await fileRes.arrayBuffer();
   } catch (err) {
     return NextResponse.json(
       { error: `Failed to download file: ${err instanceof Error ? err.message : String(err)}` },
@@ -264,26 +267,81 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // ── Step 2: Call Anthropic API ─────────────────────────────────────────────
+  // ── Step 2: Detect file type and build Anthropic message ───────────────────
+  const ext = fileName.split(".").pop()?.toLowerCase() ?? "";
+  const isExcel = ["xlsx", "xls", "xlsm", "xlsb"].includes(ext);
+  const isCsv   = ext === "csv";
+  const isPdf   = ext === "pdf";
+  const isWord  = ["docx", "doc"].includes(ext);
+  const isPptx  = ["pptx", "ppt"].includes(ext);
+
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
   let extraction: ExtractedData;
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const userContent: any[] = [
-      {
-        type: "document",
-        source: {
-          type: "base64",
-          media_type: "application/pdf",
-          data: base64Data,
+    let userContent: any[];
+
+    if (isPdf) {
+      // PDF: send as document block (native vision)
+      const base64Data = Buffer.from(fileBuffer).toString("base64");
+      userContent = [
+        {
+          type: "document",
+          source: { type: "base64", media_type: "application/pdf", data: base64Data },
         },
-      },
-      {
-        type: "text",
-        text: EXTRACTION_PROMPT,
-      },
-    ];
+        { type: "text", text: EXTRACTION_PROMPT },
+      ];
+    } else if (isExcel || isCsv) {
+      // Excel / CSV: parse with SheetJS, convert every sheet to markdown table
+      const workbook = XLSX.read(Buffer.from(fileBuffer), { type: "buffer", cellDates: true });
+      const sections: string[] = [];
+
+      for (const sheetName of workbook.SheetNames) {
+        const sheet = workbook.Sheets[sheetName];
+        // Convert to array of arrays (preserves empty cells better than json)
+        const rows: unknown[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+        if (rows.length === 0) continue;
+
+        // Build a compact markdown table (cap at 200 rows per sheet to stay within token limit)
+        const cappedRows = rows.slice(0, 200);
+        const tableLines = cappedRows.map((row) =>
+          "| " + (row as string[]).map(c => String(c ?? "").replace(/\|/g, "\\|").trim()).join(" | ") + " |"
+        );
+        sections.push(`## Sheet: ${sheetName}\n\n${tableLines.join("\n")}`);
+      }
+
+      const spreadsheetText = sections.join("\n\n");
+      userContent = [
+        {
+          type: "text",
+          text: `The following is the full content of the spreadsheet file "${fileName}", converted to markdown tables.\n\n${spreadsheetText}\n\n---\n\n${EXTRACTION_PROMPT}`,
+        },
+      ];
+    } else if (isWord) {
+      // Word DOCX: extract text with mammoth
+      const { value: docText } = await mammoth.extractRawText({ buffer: Buffer.from(fileBuffer) });
+      userContent = [
+        {
+          type: "text",
+          text: `The following is the full text content of the Word document "${fileName}".\n\n${docText}\n\n---\n\n${EXTRACTION_PROMPT}`,
+        },
+      ];
+    } else if (isPptx) {
+      // PowerPoint PPTX: extract text from all slides with officeparser
+      const pptxText: string = await officeparser.parseOfficeAsync(Buffer.from(fileBuffer));
+      userContent = [
+        {
+          type: "text",
+          text: `The following is the full text content of the PowerPoint file "${fileName}", extracted slide by slide.\n\n${pptxText}\n\n---\n\n${EXTRACTION_PROMPT}`,
+        },
+      ];
+    } else {
+      return NextResponse.json(
+        { error: `File type ".${ext}" is not supported. Supported types: PDF, XLSX, XLS, CSV, DOCX, PPTX.` },
+        { status: 400 }
+      );
+    }
 
     const msg = await anthropic.messages.create({
       model: "claude-sonnet-4-6",
@@ -326,11 +384,12 @@ export async function POST(req: NextRequest) {
   for (const ev of evidenceItems) {
     try {
       const props: Record<string, unknown> = {
-        "Evidence Title":    notionTitle(ev.title || "Untitled"),
-        "Validation Status": notionSelect("New"),
-        "Date Captured":     { date: { start: today } },
-        "Source Excerpt":    notionRichText(ev.statement || fileName),
-        "Project":           notionRelation(projectId),
+        "Evidence Title":     notionTitle(ev.title || "Untitled"),
+        "Evidence Statement": notionRichText(ev.statement || ""),
+        "Source Excerpt":     notionRichText(fileName),
+        "Validation Status":  notionSelect("New"),
+        "Date Captured":      { date: { start: today } },
+        "Project":            notionRelation(projectId),
       };
       if (ev.type)       props["Evidence Type"]    = notionSelect(ev.type);
       if (ev.confidence) props["Confidence Level"] = notionSelect(ev.confidence);

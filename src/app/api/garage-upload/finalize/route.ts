@@ -33,11 +33,18 @@ export async function POST(req: NextRequest) {
   for (const upload of uploads) {
     try {
       // Create a long-lived signed read URL
-      const { data: signedData } = await supabase.storage
+      const { data: signedData, error: urlError } = await supabase.storage
         .from("garage-docs")
         .createSignedUrl(upload.storagePath, 60 * 60 * 24 * 365 * 10);
 
-      const fileUrl = signedData?.signedUrl ?? "";
+      if (urlError || !signedData?.signedUrl) {
+        const msg = urlError?.message ?? "no signed URL returned";
+        console.error(`[finalize] createSignedUrl failed for ${upload.storagePath}:`, msg);
+        errors.push(`${upload.name}: Failed to create read URL — ${msg}`);
+        continue;
+      }
+
+      const fileUrl = signedData.signedUrl;
       const { category, documentType, priority } = classifyFile(upload.name);
       const itemName = `${projectName} — ${category} — ${documentType}`;
 
@@ -49,7 +56,7 @@ export async function POST(req: NextRequest) {
           "Document Type": { select: { name: documentType } },
           "Status":        { select: { name: "Complete" } },
           "Priority":      { select: { name: priority } },
-          "File URL":      { url: fileUrl },
+          "File URL":      { url: fileUrl || null },
           "Notes":         { rich_text: [{ text: { content: `Uploaded via portal. Project: ${projectName}${projectId ? ` (${projectId})` : ""}. Storage path: ${upload.storagePath}` } }] },
         };
         if (orgId) properties["Startup"] = { relation: [{ id: orgId }] };
@@ -57,7 +64,10 @@ export async function POST(req: NextRequest) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const page = await notion.pages.create({ parent: { database_id: DB.dataRoom }, properties: properties as any });
         notionId = page.id;
-      } catch { /* Notion failed — file still stored in Supabase */ }
+      } catch (notionErr) {
+        console.error("[finalize] Notion create failed:", notionErr instanceof Error ? notionErr.message : notionErr);
+        errors.push(`Notion: ${notionErr instanceof Error ? notionErr.message : "unknown error"}`);
+      }
 
       results.push({ name: upload.name, url: fileUrl, category, documentType, storagePath: upload.storagePath, notionId });
     } catch (err) {
