@@ -239,7 +239,7 @@ export default function LivingRoomAdminPage() {
     <div className="flex min-h-screen bg-[#EEEEE8]">
       <Sidebar adminNav />
 
-      <main className="flex-1 overflow-auto flex flex-col">
+      <main className="flex-1 ml-[228px] overflow-auto flex flex-col">
 
         {/* ── Dark header ── */}
         <header className="bg-black flex-shrink-0" style={{ padding: "40px 52px 44px" }}>

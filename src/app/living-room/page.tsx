@@ -466,7 +466,7 @@ export default async function LivingRoomPage() {
     <div className="flex min-h-screen bg-[#EEEEE8]">
       <Sidebar items={nav} isAdmin={isAdmin} />
 
-      <main className="flex-1 overflow-auto">
+      <main className="flex-1 ml-[228px] overflow-auto">
 
         {/* ── Dark header ── */}
         <header className="bg-black px-13 py-10 flex-shrink-0" style={{ padding: "40px 52px 44px" }}>
