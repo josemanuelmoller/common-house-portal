@@ -11,7 +11,7 @@ type StyleProfileOption = {
 };
 
 type DeskRequestFormProps = {
-  deskType: "design" | "comms";
+  deskType: "design" | "comms" | "commercial";
   contentTypes: string[];
   channelOrProjectOptions: string[];
   channelOrProjectLabel: string;
@@ -162,7 +162,7 @@ export default function DeskRequestForm({
     setSelectedFormato(CANAL_FORMAT_MAP[canal][0]); // auto-select first format
   }
 
-  const isVisual = ["Deck", "One-pager", "Proposal", "Exec Summary"].includes(selectedType);
+  const isVisual = ["Deck", "One-pager", "Proposal", "Offer Deck", "Exec Summary"].includes(selectedType);
 
   async function handleSubmit() {
     if (!description.trim()) return;
@@ -274,7 +274,7 @@ export default function DeskRequestForm({
       {/* Description / brief */}
       <div>
         <p className="text-[9px] font-bold tracking-[1.5px] uppercase text-[#131218]/30 mb-2">
-          {deskType === "comms" ? "Ángulo / contexto" : "Descripción"}
+          {deskType === "comms" ? "Ángulo / contexto" : deskType === "commercial" ? "Scope del cliente" : "Descripción"}
         </p>
         <textarea
           value={description}
@@ -283,13 +283,15 @@ export default function DeskRequestForm({
           placeholder={
             deskType === "comms"
               ? "Qué queremos decir, a quién y en qué tono..."
+              : deskType === "commercial"
+              ? "Para quién, qué alcance, entregables clave, presupuesto estimado..."
               : "Qué necesitas, para quién y cuándo..."
           }
         />
       </div>
 
-      {/* Project selector — Design Desk only */}
-      {deskType === "design" && (
+      {/* Project / Client selector — Design + Commercial Desks */}
+      {deskType !== "comms" && (
         <div>
           <p className="text-[9px] font-bold tracking-[1.5px] uppercase text-[#131218]/30 mb-2">
             {channelOrProjectLabel}
@@ -309,8 +311,8 @@ export default function DeskRequestForm({
         </div>
       )}
 
-      {/* Style profile selector — Design Desk only (generic) */}
-      {deskType === "design" && styleProfiles.length > 0 && (
+      {/* Style profile selector — Design + Commercial Desks */}
+      {deskType !== "comms" && styleProfiles.length > 0 && (
         <div>
           <p className="text-[9px] font-bold tracking-[1.5px] uppercase text-[#131218]/30 mb-2">
             Perfil de estilo
@@ -353,8 +355,8 @@ export default function DeskRequestForm({
         </div>
       )}
 
-      {/* Visual type hint (Design Desk) */}
-      {deskType === "design" && isVisual && (
+      {/* Visual type hint (Design + Commercial Desks) */}
+      {deskType !== "comms" && isVisual && (
         <div className="bg-purple-50 border border-purple-100 rounded-lg px-3 py-2.5">
           <p className="text-[9px] font-bold text-purple-600 uppercase tracking-wide mb-0.5">Generación visual</p>
           <p className="text-[10px] text-purple-700/70 leading-relaxed">
@@ -387,6 +389,8 @@ export default function DeskRequestForm({
           ? "Error — intenta de nuevo"
           : status === "loading"
           ? "Generando..."
+          : deskType === "commercial"
+          ? "Generar propuesta →"
           : isVisual
           ? "Generar slides →"
           : "Generar draft →"}

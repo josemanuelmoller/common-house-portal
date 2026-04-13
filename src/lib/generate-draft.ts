@@ -22,7 +22,7 @@ BRAND VOICE (default):
 
 // ─── Visual content types ─────────────────────────────────────────────────────
 
-const VISUAL_TYPES = new Set(["Deck", "One-pager", "Proposal", "Exec Summary"]);
+const VISUAL_TYPES = new Set(["Deck", "One-pager", "Proposal", "Offer Deck", "Exec Summary"]);
 
 // ─── Channel × Format instruction matrix ─────────────────────────────────────
 // Each combination produces genuinely different structure, length, and tone rules.
@@ -169,6 +169,7 @@ function buildHtmlDeckPrompt(brief: string, contentType: string, styleContext: s
     "One-pager": `Create a single-page document layout. Sections: headline, problem, solution, traction/impact (3 numbers), why now, CTA. Visually rich, scannable in 30 seconds.`,
     "Proposal": `Create a proposal presentation with 6–8 slides: title, context/problem, proposed approach (3 phases), deliverables, timeline/investment framing, next steps.`,
     "Exec Summary": `Create a 3–4 slide executive summary using Situation → Complication → Resolution structure. Clean, data-forward, decision-ready.`,
+    "Offer Deck": `Create a commercial offer deck with 6–8 slides: title + tagline, problem/opportunity, the offer (what we do + scope), delivery model (phases/timeline), investment range (tiers if applicable), why CH (credibility), next steps. Commercial and confident. Include specific numbers where given.`,
   };
 
   const instruction = typeInstructions[contentType] ?? typeInstructions["Deck"];
