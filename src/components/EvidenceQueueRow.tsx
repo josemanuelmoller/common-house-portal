@@ -17,18 +17,29 @@ type Props = {
 export function EvidenceQueueRow({ id, title, excerpt, projectName, type, validationStatus, dateCaptured }: Props) {
   const [isPending, startTransition] = useTransition();
   const [done, setDone] = useState<"reviewed" | "rejected" | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   function handleReview() {
+    setError(null);
     startTransition(async () => {
-      await markEvidenceReviewed(id);
-      setDone("reviewed");
+      try {
+        await markEvidenceReviewed(id);
+        setDone("reviewed");
+      } catch {
+        setError("Failed to mark as reviewed. Try again.");
+      }
     });
   }
 
   function handleReject() {
+    setError(null);
     startTransition(async () => {
-      await rejectEvidence(id);
-      setDone("rejected");
+      try {
+        await rejectEvidence(id);
+        setDone("rejected");
+      } catch {
+        setError("Failed to reject. Try again.");
+      }
     });
   }
 
@@ -50,6 +61,9 @@ export function EvidenceQueueRow({ id, title, excerpt, projectName, type, valida
         <p className="font-semibold text-[#131218] text-sm">{title}</p>
         {excerpt && (
           <p className="text-xs text-[#131218]/35 mt-0.5 line-clamp-1 max-w-sm">{excerpt}</p>
+        )}
+        {error && (
+          <p className="text-[10px] text-red-500 mt-1 font-medium">{error}</p>
         )}
       </td>
       <td className="px-4 py-3 text-xs font-medium text-[#131218]/50">
@@ -77,7 +91,7 @@ export function EvidenceQueueRow({ id, title, excerpt, projectName, type, valida
             disabled={isPending}
             className="inline-flex items-center gap-1 text-[10px] font-bold bg-[#131218]/8 text-[#131218]/50 px-2.5 py-1 rounded-full uppercase tracking-widest hover:bg-red-100 hover:text-red-600 transition-colors disabled:opacity-50"
           >
-            ✕
+            {isPending ? "..." : "✕"}
           </button>
         </div>
       </td>

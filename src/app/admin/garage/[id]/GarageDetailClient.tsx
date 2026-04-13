@@ -705,20 +705,25 @@ function DataRoomTab({
                     }`}>
                       {isThisPreview && ingestState.status === "preview" && (
                         <>
-                          <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/40 mb-2">
+                          <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/40 mb-3">
                             Extracción AI — Vista previa
                           </p>
-                          <p className="text-[11.5px] text-[#131218]/70 mb-3">
-                            {[
-                              ingestState.extraction.evidence?.length ? `${ingestState.extraction.evidence.length} evidence` : null,
-                              ingestState.extraction.financials?.length ? `${ingestState.extraction.financials.length} financials` : null,
-                              ingestState.extraction.cap_table?.length ? `${ingestState.extraction.cap_table.length} cap table` : null,
-                              ingestState.extraction.valuations?.length ? `${ingestState.extraction.valuations.length} valuations` : null,
-                              ingestState.extraction.knowledge_assets?.length ? `${ingestState.extraction.knowledge_assets.length} knowledge assets` : null,
-                              ingestState.extraction.insight_briefs?.length ? `${ingestState.extraction.insight_briefs.length} insight briefs` : null,
-                              ingestState.extraction.decision_items?.length ? `${ingestState.extraction.decision_items.length} decisions` : null,
-                            ].filter(Boolean).join(" · ")}
-                          </p>
+                          {/* Section breakdown grid */}
+                          <div className="grid grid-cols-3 gap-1.5 mb-3">
+                            {([
+                              { label: "Evidence",       count: ingestState.extraction.evidence?.length ?? 0 },
+                              { label: "Financials",     count: ingestState.extraction.financials?.length ?? 0 },
+                              { label: "Cap Table",      count: ingestState.extraction.cap_table?.length ?? 0 },
+                              { label: "Valuations",     count: ingestState.extraction.valuations?.length ?? 0 },
+                              { label: "Knowledge",      count: ingestState.extraction.knowledge_assets?.length ?? 0 },
+                              { label: "Decisions",      count: ingestState.extraction.decision_items?.length ?? 0 },
+                            ] as { label: string; count: number }[]).map(s => (
+                              <div key={s.label} className={`rounded-lg px-2.5 py-1.5 ${s.count > 0 ? "bg-white border border-[#c8f55a]/40" : "bg-[#131218]/5 border border-transparent"}`}>
+                                <p className={`text-[8px] font-bold tracking-widest uppercase ${s.count > 0 ? "text-[#131218]/50" : "text-[#131218]/20"}`}>{s.label}</p>
+                                <p className={`text-[13px] font-bold ${s.count > 0 ? "text-[#131218]" : "text-[#131218]/20"}`}>{s.count > 0 ? s.count : "—"}</p>
+                              </div>
+                            ))}
+                          </div>
                           {ingestState.extraction.draft_status_update && (
                             <p className="text-[11px] text-[#131218]/50 italic mb-3 leading-relaxed border-l-2 border-[#131218]/15 pl-3">
                               {ingestState.extraction.draft_status_update}
@@ -747,24 +752,29 @@ function DataRoomTab({
                       )}
                       {isThisDone && ingestState.status === "done" && (
                         <>
-                          <p className="text-[9px] font-bold tracking-widest uppercase text-green-600/70 mb-2">
-                            Completado
+                          <p className="text-[9px] font-bold tracking-widest uppercase text-green-600/70 mb-3">
+                            Escrito en Notion
                           </p>
-                          <p className="text-[11.5px] text-green-800/80">
-                            {[
-                              ingestState.results.evidence ? `${ingestState.results.evidence} evidence` : null,
-                              ingestState.results.financials ? `${ingestState.results.financials} financials` : null,
-                              ingestState.results.cap_table ? `${ingestState.results.cap_table} cap table` : null,
-                              ingestState.results.valuations ? `${ingestState.results.valuations} valuations` : null,
-                              ingestState.results.knowledge_assets ? `${ingestState.results.knowledge_assets} knowledge assets` : null,
-                              ingestState.results.insight_briefs ? `${ingestState.results.insight_briefs} insight briefs` : null,
-                              ingestState.results.decision_items ? `${ingestState.results.decision_items} decisions` : null,
-                            ].filter(Boolean).join(" · ")}
-                          </p>
+                          <div className="grid grid-cols-3 gap-1.5 mb-3">
+                            {([
+                              { label: "Evidence",   count: ingestState.results.evidence },
+                              { label: "Financials", count: ingestState.results.financials },
+                              { label: "Cap Table",  count: ingestState.results.cap_table },
+                              { label: "Valuations", count: ingestState.results.valuations },
+                              { label: "Knowledge",  count: ingestState.results.knowledge_assets },
+                              { label: "Decisions",  count: ingestState.results.decision_items },
+                            ] as { label: string; count: number }[]).map(s => (
+                              <div key={s.label} className={`rounded-lg px-2.5 py-1.5 ${s.count > 0 ? "bg-white border border-green-200" : "bg-green-50/50 border border-transparent"}`}>
+                                <p className={`text-[8px] font-bold tracking-widest uppercase ${s.count > 0 ? "text-green-700/60" : "text-green-600/30"}`}>{s.label}</p>
+                                <p className={`text-[13px] font-bold ${s.count > 0 ? "text-green-800" : "text-green-600/30"}`}>{s.count > 0 ? s.count : "—"}</p>
+                              </div>
+                            ))}
+                          </div>
                           {ingestState.results.errors?.length > 0 && (
-                            <div className="mt-2">
+                            <div className="bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                              <p className="text-[8px] font-bold tracking-widest uppercase text-amber-600/70 mb-1">Avisos</p>
                               {ingestState.results.errors.map((e, i) => (
-                                <p key={i} className="text-[10px] text-red-500">{e}</p>
+                                <p key={i} className="text-[10px] text-amber-700 leading-relaxed">{e}</p>
                               ))}
                             </div>
                           )}

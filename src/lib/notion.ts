@@ -25,6 +25,8 @@ export const DB = {
   contentPipeline:    "3bf5cf81f45c4db2840590f3878bfdc0",
   // Style Profiles [OS v2] — collection: 3119b5c0-3b8b-4c17-bde0-2772fc9ba4a6
   styleProfiles:      "606b1aafe63849a1a81ac6199683dc14",
+  // CH Organizations [OS v2] — collection: a0410f76-1f3e-4ec1-adc4-e47eb4132c3d
+  organizations:      "bef1bb86ab2b4cd280b6b33f9034b96c",
   // Garage financial layer — all relate to CH Organizations via "Startup" relation
   // Valuations [OS v2] — collection: 8f8d903b-6679-4fb0-bae8-16f7362d00d0
   valuations:         "37a3686ebe3f408ba92c7373b0f01d60",
@@ -42,6 +44,8 @@ export const DB = {
   // Opportunities [OS v2] — collection: 687caa98-594a-41b5-95c9-960c141be0c0
   // Scope: CH | Portfolio | Both  |  Follow-up Status: None | Needed | Sent | Waiting
   opportunities:      "687caa98594a41b595c9960c141be0c0",
+  // Grant Sources [OS v2] — collection: 722e19ee-be7b-442c-953d-5ebfef3c0eaf
+  grantSources:       "3f4f4ffc826e4832a3365c62544bd4f7",
   // Agent Drafts [OS v2] — collection: e41e1599-0c89-483f-b271-c078c33898ce
   // Types: LinkedIn Post | Follow-up Email | Check-in Email
   // Status: Pending Review | Approved | Revision Requested | Superseded
@@ -1248,7 +1252,35 @@ async function getPrimaryOrgIds(projectId: string): Promise<string[]> {
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const page: any = await notion.pages.retrieve({ page_id: projectId });
-    return relationIds(prop(page, "Primary Organization"));
+    const ids = relationIds(prop(page, "Primary Organization"));
+    if (ids.length) return ids;
+
+    // Fallback: if "Primary Organization" is not filled, search CH Organizations by
+    // project name. Normalise both sides (lowercase, strip spaces/hyphens) so
+    // "Way Out" matches "Wayout", "Fair Cycle" matches "faircycle", etc.
+    const projectName: string = text(prop(page, "Project Name")) ?? "";
+    if (!projectName) return [];
+
+    const normalize = (s: string) => s.toLowerCase().replace(/[\s\-_.]/g, "");
+    const needle = normalize(projectName);
+
+    // Notion title `contains` filter is case-insensitive — get candidates, then fuzzy-match
+    const res = await notion.databases.query({
+      database_id: DB.organizations,
+      filter: { property: "Name", title: { contains: projectName.split(" ")[0] } },
+      page_size: 10,
+    });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const org of res.results as any[]) {
+      const orgName = text(prop(org, "Name")) ?? "";
+      const hay = normalize(orgName);
+      if (hay === needle || hay.includes(needle) || needle.includes(hay)) {
+        return [org.id];
+      }
+    }
+
+    return [];
   } catch {
     return [];
   }

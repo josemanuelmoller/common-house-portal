@@ -197,7 +197,26 @@ Rules:
 - Cap decision_items at 3 items
 - For null numeric fields, use JSON null (not 0 or "")
 - For missing strings, use "" not null
-- Always return valid JSON — this will be parsed with JSON.parse()`;
+- Always return valid JSON — this will be parsed with JSON.parse()
+
+Financial extraction guidance (be thorough — pitch decks often include these):
+- Extract any revenue figures, even projected/forecasted ones (use confidence "Low" for projections)
+- "ARR", "MRR", "run-rate", "annualised revenue" → arr or mrr field
+- "burn rate", "monthly costs", "opex" → burn field
+- "runway", "months of runway" → runway_months field
+- "cash", "cash in bank", "raised" (if describes current cash) → cash field
+- Even a single period with partial data is worth extracting — leave other fields null
+- For the period field, use the snapshot date (e.g. last reported month) or the projection date if it's a forecast
+
+Cap table extraction guidance:
+- Extract any ownership percentages mentioned, e.g. "founders hold 70%", "investor X has 15%"
+- "SAFE", "convertible note" → share_class = "SAFE" or "Note"
+- Include even approximate/implied percentages if clearly stated
+
+Valuation extraction guidance:
+- Any mention of raise amount + valuation (e.g. "raising £500k at £2m pre-money") → extract as valuation
+- "post-money valuation", "pre-money valuation", "company valued at" → extract
+- If only one value is given (e.g. "£2m valuation"), put it in both pre_money_min and pre_money_max`;
 
 // ─── Notion write helpers ─────────────────────────────────────────────────────
 
@@ -400,6 +419,22 @@ export async function POST(req: NextRequest) {
   const errors: string[] = [];
   const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
 
+  // Resolve orgId from project's Primary Organization relation if not passed in request.
+  // Cap Table and Valuations are linked to CH Organizations (not CH Projects), so we need
+  // orgId to both write and later read them back. If the project has no linked org, those
+  // sections are skipped with a warning.
+  let resolvedOrgId = orgId;
+  if (!resolvedOrgId) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const projectPage: any = await notion.pages.retrieve({ page_id: projectId });
+      const orgRelation: { id: string }[] = projectPage.properties?.["Primary Organization"]?.relation ?? [];
+      resolvedOrgId = orgRelation[0]?.id;
+    } catch {
+      // Non-fatal — we'll warn below for cap table / valuations
+    }
+  }
+
   let evidenceCount = 0;
   let financialsCount = 0;
   let capTableCount = 0;
@@ -463,18 +498,23 @@ export async function POST(req: NextRequest) {
   }
 
   // 3. Cap Table
-  for (const ct of extraction.cap_table ?? []) {
+  const capTableItems = extraction.cap_table ?? [];
+  if (capTableItems.length > 0 && !resolvedOrgId) {
+    errors.push(`Cap Table: no CH Organization linked to this project — link a Primary Organization in Notion to enable Cap Table writes`);
+  }
+  for (const ct of capTableItems) {
+    if (!resolvedOrgId) break; // can't write without startup link (records would be unreadable)
     try {
       const props: Record<string, unknown> = {
-        "Entry Name":      notionTitle(`${ct.shareholder_name} — ${projectName}`),
+        "Entry Name":       notionTitle(`${ct.shareholder_name} — ${projectName}`),
         "Shareholder Name": notionRichText(ct.shareholder_name),
+        "Startup":          notionRelation(resolvedOrgId),
       };
-      if (orgId)            props["Startup"]          = notionRelation(orgId);
-      if (ct.type)          props["Shareholder Type"] = notionSelect(ct.type);
-      if (ct.share_class)   props["Share Class"]      = notionSelect(ct.share_class);
-      if (ct.round)         props["Round"]            = notionSelect(ct.round);
-      const own = notionNumber(ct.ownership_pct);   if (own)   props["Ownership Pct"]        = own;
-      const inv = notionNumber(ct.invested_amount); if (inv)   props["Invested Amount (£)"]  = inv;
+      if (ct.type)        props["Shareholder Type"] = notionSelect(ct.type);
+      if (ct.share_class) props["Share Class"]      = notionSelect(ct.share_class);
+      if (ct.round)       props["Round"]            = notionSelect(ct.round);
+      const own = notionNumber(ct.ownership_pct);   if (own) props["Ownership Pct"]       = own;
+      const inv = notionNumber(ct.invested_amount); if (inv) props["Invested Amount (£)"] = inv;
 
       await notion.pages.create({
         parent: { database_id: DB.capTable },
@@ -487,13 +527,18 @@ export async function POST(req: NextRequest) {
   }
 
   // 4. Valuations
-  for (const val of extraction.valuations ?? []) {
+  const valuationItems = extraction.valuations ?? [];
+  if (valuationItems.length > 0 && !resolvedOrgId) {
+    errors.push(`Valuations: no CH Organization linked to this project — link a Primary Organization in Notion to enable Valuation writes`);
+  }
+  for (const val of valuationItems) {
+    if (!resolvedOrgId) break; // can't write without startup link (records would be unreadable)
     try {
       const props: Record<string, unknown> = {
         "Valuation Name": notionTitle(`${projectName} — ${val.round}`),
+        "Startup":        notionRelation(resolvedOrgId),
       };
-      if (orgId)      props["Startup"]          = notionRelation(orgId);
-      if (val.method) props["Method"]           = notionSelect(val.method);
+      if (val.method) props["Method"] = notionSelect(val.method);
       const min = notionNumber(val.pre_money_min); if (min) props["Pre-money Min (£)"] = min;
       const max = notionNumber(val.pre_money_max); if (max) props["Pre-money Max (£)"] = max;
 
@@ -580,8 +625,8 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // 8. Org profile update (if orgId provided)
-  if (orgId) {
+  // 8. Org profile update (if org is resolvable)
+  if (resolvedOrgId) {
     try {
       const orgProps: Record<string, unknown> = {};
       const desc = extraction.organization?.description;
@@ -593,7 +638,7 @@ export async function POST(req: NextRequest) {
 
       if (Object.keys(orgProps).length > 0) {
         await notion.pages.update({
-          page_id: orgId,
+          page_id: resolvedOrgId,
           properties: orgProps as Parameters<typeof notion.pages.update>[0]["properties"],
         });
         orgUpdated = true;
