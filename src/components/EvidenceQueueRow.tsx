@@ -48,7 +48,7 @@ export function EvidenceQueueRow({ id, title, excerpt, projectName, type, valida
     return (
       <tr className="opacity-40 transition-opacity">
         <td className="px-6 py-3 text-sm text-[#131218]/40 italic">
-          {done === "reviewed" ? "✓ Reviewed" : "✕ Rejected"} — {title}
+          {done === "reviewed" ? "✓ Aceptado" : "✕ Rechazado"} — {title}
         </td>
         <td colSpan={4} />
       </tr>
@@ -84,7 +84,7 @@ export function EvidenceQueueRow({ id, title, excerpt, projectName, type, valida
             className="inline-flex items-center gap-1 text-[10px] font-bold bg-[#B2FF59] text-[#131218] px-2.5 py-1 rounded-full uppercase tracking-widest hover:bg-[#9ee84a] transition-colors disabled:opacity-50"
             title="Mark as Reviewed — engine validates from here"
           >
-            {isPending ? "..." : "✓ Reviewed"}
+            {isPending ? "..." : "✓ Aceptar"}
           </button>
           <button
             onClick={handleReject}
