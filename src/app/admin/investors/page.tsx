@@ -35,9 +35,6 @@ export default async function InvestorsPage() {
   // Garage projects = fundraising-relevant
   const garageProjects = allProjects.filter(p => p.primaryWorkspace === "garage");
 
-  // Categorise investors
-  const activeCount  = investors.filter(p => p.classification === "External").length;
-  const internalInvestors = investors.filter(p => p.classification === "Internal");
 
   // Investor-related open decisions (category or keyword match)
   const investorDecisions = decisions.filter(d => {
@@ -93,16 +90,11 @@ export default async function InvestorsPage() {
         <div className="px-12 py-9 max-w-7xl space-y-6">
 
           {/* Stats row */}
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 gap-4">
             <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-4">
-              <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30 mb-2">Network investors</p>
+              <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30 mb-2">Investors</p>
               <p className="text-3xl font-bold text-[#131218] tracking-tight">{investors.length}</p>
-              <p className="text-[11px] text-[#131218]/40 font-medium mt-1.5">Investors + funders in CH People</p>
-            </div>
-            <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-4">
-              <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30 mb-2">External investors</p>
-              <p className="text-3xl font-bold text-[#131218] tracking-tight">{activeCount}</p>
-              <p className="text-[11px] text-[#131218]/40 font-medium mt-1.5">Outside network</p>
+              <p className="text-[11px] text-[#131218]/40 font-medium mt-1.5">In CH People network</p>
             </div>
             <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-4">
               <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30 mb-2">Portfolio startups</p>
@@ -228,19 +220,6 @@ export default async function InvestorsPage() {
                 </div>
               </div>
 
-              {/* Internal investors note */}
-              {internalInvestors.length > 0 && (
-                <div className="mt-4 bg-white rounded-2xl border border-[#E0E0D8] px-4 py-3">
-                  <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30 mb-2">CH Internal</p>
-                  {internalInvestors.map(p => (
-                    <div key={p.id} className="flex items-center gap-2 py-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#B2FF59] shrink-0" />
-                      <p className="text-[11px] font-semibold text-[#131218]">{p.name}</p>
-                      <p className="text-[9px] text-[#131218]/40 truncate">{p.jobTitle}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
 
             </div>
 
