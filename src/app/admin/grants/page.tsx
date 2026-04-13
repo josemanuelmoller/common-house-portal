@@ -118,7 +118,11 @@ async function getGrantOpportunities(): Promise<GrantOpportunity[]> {
       priority: PRIORITY_SHORT[priority] ?? priority,
       orgId,
     };
-  });
+  }).filter(g =>
+    // Exclude legacy junk records: name was "{project} — Grant" so parser extracts "Grant" as startup
+    // Also require at least a linked org or a priority set — bare New + no funder = orphaned record
+    g.startup !== "Grant" && (g.orgId !== "" || g.priority !== "")
+  );
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
