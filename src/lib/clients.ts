@@ -124,6 +124,24 @@ export function isAdminEmail(email: string): boolean {
   return adminEmails.includes(email.toLowerCase());
 }
 
+// Super-admin gate — controls access to sensitive IP (Knowledge Assets, etc.)
+// Set SUPER_ADMIN_USER_IDS and/or SUPER_ADMIN_EMAILS in env to grant access.
+// Falls back to ADMIN_USER_IDS/ADMIN_EMAILS if no super-admin env vars are set,
+// so the system is non-breaking on existing deployments.
+export function isSuperAdminUser(userId: string): boolean {
+  const superIds = (process.env.SUPER_ADMIN_USER_IDS ?? "").split(",").map(s => s.trim()).filter(Boolean);
+  if (superIds.length > 0) return superIds.includes(userId);
+  // Fallback: if no SUPER_ADMIN_USER_IDS configured, treat all admins as super-admins
+  return isAdminUser(userId);
+}
+
+export function isSuperAdminEmail(email: string): boolean {
+  const superEmails = (process.env.SUPER_ADMIN_EMAILS ?? "").split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
+  if (superEmails.length > 0) return superEmails.includes(email.toLowerCase());
+  // Fallback: if no SUPER_ADMIN_EMAILS configured, treat all admins as super-admins
+  return isAdminEmail(email);
+}
+
 // ── Admin staff ownership registry ────────────────────────────────────────────
 //
 // Maps CH internal staff email → Notion project IDs they lead.

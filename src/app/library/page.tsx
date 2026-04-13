@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/Sidebar";
 import { getKnowledgeAssets, getReusableEvidence } from "@/lib/notion";
 import { ADMIN_NAV as NAV } from "@/lib/admin-nav";
-import { isAdminUser, isAdminEmail } from "@/lib/clients";
+import { isAdminUser, isAdminEmail, isSuperAdminUser, isSuperAdminEmail } from "@/lib/clients";
 import type { LibraryContentFamily } from "@/types/house";
 import { LibraryIngestPanel } from "@/components/LibraryIngestPanel";
 
@@ -49,6 +49,7 @@ export default async function LibraryPage() {
 
   const email = user.primaryEmailAddress?.emailAddress ?? "";
   const isAdmin = isAdminUser(user.id) || isAdminEmail(email);
+  const isSuperAdmin = isSuperAdminUser(user.id) || isSuperAdminEmail(email);
 
   const [allAssets, reusable] = await Promise.all([
     getKnowledgeAssets(),
@@ -56,12 +57,15 @@ export default async function LibraryPage() {
   ]);
 
   // Role-based visibility filtering
-  const assets = isAdmin
+  // Knowledge Assets (institutional IP) are super-admin only
+  const assets = isSuperAdmin
     ? allAssets
+    : isAdmin
+    ? [] // admin but not super-admin: no Knowledge Assets
     : allAssets.filter(
         (a) => a.portalVisibility === "portfolio" || a.portalVisibility === "public"
       );
-  const assetsFiltered = !isAdmin && assets.length < allAssets.length;
+  const assetsFiltered = !isSuperAdmin && allAssets.length > 0;
 
   // Group assets by family
   const byFamily: Record<LibraryContentFamily, typeof assets> = {
@@ -120,8 +124,8 @@ export default async function LibraryPage() {
         <div className="px-8 py-6">
           <div className="max-w-4xl mx-auto space-y-10">
 
-            {/* Ingest panel — admin only */}
-            {isAdmin && (
+            {/* Ingest panel — super-admin only */}
+            {isSuperAdmin && (
               <LibraryIngestPanel />
             )}
 
@@ -252,8 +256,22 @@ export default async function LibraryPage() {
               );
             })}
 
-            {/* Empty state */}
-            {totalItems === 0 && (
+            {/* Knowledge Assets locked — admin but not super-admin */}
+            {isAdmin && !isSuperAdmin && allAssets.length > 0 && (
+              <div className="bg-white rounded-2xl border border-[#E0E0D8] p-10 text-center">
+                <div className="w-10 h-10 bg-[#131218] rounded-full flex items-center justify-center mx-auto mb-3">
+                  <span className="text-white text-sm">⊘</span>
+                </div>
+                <p className="text-sm font-bold text-[#131218]">Knowledge Assets — acceso restringido</p>
+                <p className="text-xs text-[#131218]/40 mt-2 max-w-[320px] mx-auto leading-relaxed">
+                  Los Knowledge Assets contienen IP institucional de Common House y están disponibles
+                  solo para super-admins.
+                </p>
+              </div>
+            )}
+
+            {/* Empty state — no accessible content at all */}
+            {totalItems === 0 && !(isAdmin && !isSuperAdmin && allAssets.length > 0) && (
               <div className="bg-white rounded-2xl border border-[#E0E0D8] p-12 text-center">
                 <div className="w-12 h-12 bg-[#131218] rounded-full flex items-center justify-center mx-auto mb-4">
                   <span className="text-[#B2FF59] text-lg">◉</span>
