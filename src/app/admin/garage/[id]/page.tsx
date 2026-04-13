@@ -7,6 +7,11 @@ import {
   getEvidenceForProject,
   getSourcesForProject,
   getDecisionItems,
+  getStartupOrgData,
+  getFinancialsForProject,
+  getValuationsForProject,
+  getCapTableForProject,
+  getDataRoomForProject,
 } from "@/lib/notion";
 import { GarageDetailClient } from "./GarageDetailClient";
 
@@ -37,11 +42,16 @@ function splitName(name: string): { prefix: string; em: string } {
 export default async function GarageDetailPage({ params }: { params: { id: string } }) {
   await requireAdmin();
 
-  const [project, evidence, sources, allDecisions] = await Promise.all([
+  const [project, evidence, sources, allDecisions, orgData, financials, valuations, capTable, dataRoom] = await Promise.all([
     getProjectById(params.id),
     getEvidenceForProject(params.id),
     getSourcesForProject(params.id),
     getDecisionItems("Open"),
+    getStartupOrgData(params.id),
+    getFinancialsForProject(params.id),
+    getValuationsForProject(params.id),
+    getCapTableForProject(params.id),
+    getDataRoomForProject(params.id),
   ]);
 
   if (!project) notFound();
@@ -140,6 +150,11 @@ export default async function GarageDetailPage({ params }: { params: { id: strin
           evidence={evidence}
           sources={sources}
           decisions={decisions}
+          orgData={orgData}
+          financials={financials}
+          valuations={valuations}
+          capTable={capTable}
+          dataRoom={dataRoom}
         />
 
       </main>

@@ -1,7 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import type { Project, EvidenceItem, SourceItem, DecisionItem } from "@/lib/notion";
+import type {
+  Project,
+  EvidenceItem,
+  SourceItem,
+  DecisionItem,
+  StartupOrgData,
+  FinancialSnapshot,
+  ValuationRecord,
+  CapTableEntry,
+  DataRoomItem,
+} from "@/lib/notion";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -12,6 +22,11 @@ type Props = {
   evidence: EvidenceItem[];
   sources: SourceItem[];
   decisions: DecisionItem[];
+  orgData: StartupOrgData | null;
+  financials: FinancialSnapshot[];
+  valuations: ValuationRecord[];
+  capTable: CapTableEntry[];
+  dataRoom: DataRoomItem[];
 };
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
@@ -45,6 +60,18 @@ function fmtDate(d: string | null): string {
   return new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 }
 
+function fmtMoney(n: number | null, prefix = "£"): string {
+  if (n === null || n === undefined) return "—";
+  if (n >= 1_000_000) return `${prefix}${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000)     return `${prefix}${(n / 1_000).toFixed(0)}k`;
+  return `${prefix}${n.toLocaleString()}`;
+}
+
+function fmtPct(n: number | null): string {
+  if (n === null || n === undefined) return "—";
+  return `${(n * 100).toFixed(1)}%`;
+}
+
 const PRIORITY_COLORS: Record<string, string> = {
   "P1 Critical": "text-red-600 bg-red-50 border-red-200",
   "High":        "text-orange-600 bg-orange-50 border-orange-200",
@@ -52,30 +79,37 @@ const PRIORITY_COLORS: Record<string, string> = {
   "Low":         "text-[#131218]/40 bg-[#EFEFEA] border-[#E0E0D8]",
 };
 
-// ─── Placeholder card ──────────────────────────────────────────────────────────
+const STATUS_COLORS: Record<string, string> = {
+  "Complete": "text-green-700 bg-green-50 border-green-200",
+  "Partial":  "text-amber-700 bg-amber-50 border-amber-200",
+  "Missing":  "text-red-600   bg-red-50   border-red-200",
+};
 
-function PlaceholderCard({ title, dbHint }: { title: string; dbHint: string }) {
+const CONFIDENCE_COLORS: Record<string, string> = {
+  "High":   "text-green-700",
+  "Medium": "text-amber-600",
+  "Low":    "text-red-500",
+};
+
+// ─── Empty state ───────────────────────────────────────────────────────────────
+
+function EmptyState({ label }: { label: string }) {
   return (
-    <div className="bg-white border border-[#E0E0D8] rounded-2xl p-10 flex flex-col items-center gap-4 text-center">
-      <div className="w-12 h-12 rounded-full bg-[#EFEFEA] border border-[#E0E0D8] flex items-center justify-center">
-        <span className="text-[#131218]/25 text-xl">○</span>
-      </div>
-      <div>
-        <p className="text-sm font-bold text-[#131218]/60 mb-1">{title} data not yet connected</p>
-        <p className="text-xs text-[#131218]/35 max-w-xs leading-relaxed">
-          Connect the <strong className="font-semibold text-[#131218]/50">{dbHint}</strong> Notion database to this portal to surface {title.toLowerCase()} data here.
-        </p>
-      </div>
-      <div className="mt-2 px-4 py-2 rounded-lg bg-[#EFEFEA] border border-[#E0E0D8]">
-        <p className="text-[10px] font-mono text-[#131218]/30">Wire in <code>src/lib/notion.ts</code> → add DB ID + query fn</p>
-      </div>
+    <div className="bg-white border border-[#E0E0D8] rounded-2xl p-12 text-center">
+      <p className="text-sm font-bold text-[#131218]/25 mb-1">No {label} records yet</p>
+      <p className="text-xs text-[#131218]/20">Add entries in Notion to surface them here.</p>
     </div>
   );
 }
 
 // ─── Pulse tab ─────────────────────────────────────────────────────────────────
 
-function PulseTab({ project, evidence, sources, decisions }: Props) {
+function PulseTab({ project, evidence, sources, decisions }: {
+  project: Project;
+  evidence: EvidenceItem[];
+  sources: SourceItem[];
+  decisions: DecisionItem[];
+}) {
   const recent    = evidence.slice(0, 6);
   const openDecs  = decisions.filter(d => d.status === "Open");
 
@@ -234,6 +268,341 @@ function PulseTab({ project, evidence, sources, decisions }: Props) {
   );
 }
 
+// ─── Financials tab ────────────────────────────────────────────────────────────
+
+function FinancialsTab({ orgData, financials }: { orgData: StartupOrgData | null; financials: FinancialSnapshot[] }) {
+  const latest = financials[0] ?? null;
+
+  return (
+    <div className="space-y-5">
+
+      {/* Org-level metrics (from CH Organizations) */}
+      {orgData && (
+        <div className="grid grid-cols-4 gap-4">
+          {[
+            { label: "MRR",               value: orgData.mrr              || "—" },
+            { label: "Funding Round",     value: orgData.fundingRound     || "—" },
+            { label: "Investment Status", value: orgData.investmentStatus || "—" },
+            { label: "Team Size",         value: orgData.teamSize         || "—" },
+          ].map(s => (
+            <div key={s.label} className="bg-white border border-[#E0E0D8] rounded-2xl px-5 py-4">
+              <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30 mb-1">{s.label}</p>
+              <p className="text-[15px] font-bold text-[#131218] tracking-tight">{s.value}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Latest snapshot headline */}
+      {latest && (
+        <div className="bg-white border border-[#E0E0D8] rounded-2xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-[#EFEFEA] flex items-center justify-between">
+            <div>
+              <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30">Latest Snapshot</p>
+              <p className="text-sm font-bold text-[#131218] mt-0.5">{latest.name || fmtDate(latest.period)}</p>
+            </div>
+            {latest.period && (
+              <span className="text-[10px] font-medium text-[#131218]/40">{fmtDate(latest.period)}</span>
+            )}
+          </div>
+          <div className="grid grid-cols-4 divide-x divide-[#EFEFEA]">
+            {[
+              { label: "Revenue",      value: fmtMoney(latest.revenue)     },
+              { label: "Burn",         value: fmtMoney(latest.burn)        },
+              { label: "Cash",         value: fmtMoney(latest.cash)        },
+              { label: "Runway (mo)",  value: latest.runway !== null ? `${latest.runway}mo` : "—" },
+            ].map(s => (
+              <div key={s.label} className="px-5 py-4">
+                <p className="text-[8px] font-bold tracking-wider uppercase text-[#131218]/25 mb-0.5">{s.label}</p>
+                <p className="text-[15px] font-bold text-[#131218] tracking-tight">{s.value}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* All snapshots table */}
+      {financials.length > 0 ? (
+        <div className="bg-white border border-[#E0E0D8] rounded-2xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-[#EFEFEA]">
+            <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30">All Snapshots ({financials.length})</p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-[11.5px]">
+              <thead>
+                <tr className="border-b border-[#EFEFEA]">
+                  {["Period", "Revenue", "Cost", "Gross Margin", "Burn", "Cash", "Runway"].map(h => (
+                    <th key={h} className="text-left px-5 py-2.5 text-[8px] font-bold tracking-wider uppercase text-[#131218]/25">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#EFEFEA]">
+                {financials.map(snap => (
+                  <tr key={snap.id} className="hover:bg-[#EFEFEA]/40 transition-colors">
+                    <td className="px-5 py-3 font-medium text-[#131218]">{fmtDate(snap.period)}</td>
+                    <td className="px-5 py-3 text-[#131218]/70">{fmtMoney(snap.revenue)}</td>
+                    <td className="px-5 py-3 text-[#131218]/70">{fmtMoney(snap.cost)}</td>
+                    <td className="px-5 py-3 text-[#131218]/70">{fmtPct(snap.grossMargin)}</td>
+                    <td className="px-5 py-3 text-[#131218]/70">{fmtMoney(snap.burn)}</td>
+                    <td className="px-5 py-3 text-[#131218]/70">{fmtMoney(snap.cash)}</td>
+                    <td className="px-5 py-3 text-[#131218]/70">{snap.runway !== null ? `${snap.runway}mo` : "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : (
+        <EmptyState label="financial snapshot" />
+      )}
+    </div>
+  );
+}
+
+// ─── Valuation tab ─────────────────────────────────────────────────────────────
+
+function ValuationTab({ valuations }: { valuations: ValuationRecord[] }) {
+  if (!valuations.length) return <EmptyState label="valuation" />;
+
+  return (
+    <div className="space-y-4">
+      {valuations.map(v => (
+        <div key={v.id} className="bg-white border border-[#E0E0D8] rounded-2xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-[#EFEFEA] flex items-center justify-between">
+            <div>
+              <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30 mb-0.5">{v.method}</p>
+              <p className="text-sm font-bold text-[#131218]">{v.name || "Unnamed valuation"}</p>
+            </div>
+            <div className="flex items-center gap-3">
+              {v.status && (
+                <span className="text-[8.5px] font-bold px-2 py-0.5 rounded-full bg-[#EFEFEA] text-[#131218]/50 border border-[#E0E0D8]">
+                  {v.status}
+                </span>
+              )}
+              {v.confidence && (
+                <span className={`text-[10px] font-bold ${CONFIDENCE_COLORS[v.confidence] ?? "text-[#131218]/40"}`}>
+                  {v.confidence} confidence
+                </span>
+              )}
+            </div>
+          </div>
+          <div className="grid grid-cols-3 divide-x divide-[#EFEFEA]">
+            <div className="px-5 py-4">
+              <p className="text-[8px] font-bold tracking-wider uppercase text-[#131218]/25 mb-1">Pre-money Min</p>
+              <p className="text-[17px] font-bold text-[#131218] tracking-tight">{fmtMoney(v.preMoneyMin)}</p>
+            </div>
+            <div className="px-5 py-4">
+              <p className="text-[8px] font-bold tracking-wider uppercase text-[#131218]/25 mb-1">Pre-money Max</p>
+              <p className="text-[17px] font-bold text-[#131218] tracking-tight">{fmtMoney(v.preMoneyMax)}</p>
+            </div>
+            <div className="px-5 py-4">
+              <p className="text-[8px] font-bold tracking-wider uppercase text-[#131218]/25 mb-1">Period</p>
+              <p className="text-[13px] font-bold text-[#131218]">{fmtDate(v.period)}</p>
+            </div>
+          </div>
+          {v.keyAssumptions && (
+            <div className="px-5 py-4 border-t border-[#EFEFEA]">
+              <p className="text-[8px] font-bold tracking-wider uppercase text-[#131218]/25 mb-1">Key Assumptions</p>
+              <p className="text-[12px] text-[#131218]/65 leading-relaxed">{v.keyAssumptions}</p>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── Cap Table tab ─────────────────────────────────────────────────────────────
+
+function CapTableTab({ capTable }: { capTable: CapTableEntry[] }) {
+  if (!capTable.length) return <EmptyState label="cap table" />;
+
+  const totalInvested = capTable.reduce((sum, e) => sum + (e.investedAmount ?? 0), 0);
+
+  return (
+    <div className="space-y-5">
+
+      {/* Summary */}
+      <div className="grid grid-cols-3 gap-4">
+        <div className="bg-white border border-[#E0E0D8] rounded-2xl px-5 py-4">
+          <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30 mb-1">Shareholders</p>
+          <p className="text-3xl font-bold text-[#131218] tracking-tight">{capTable.length}</p>
+        </div>
+        <div className="bg-white border border-[#E0E0D8] rounded-2xl px-5 py-4">
+          <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30 mb-1">Total Invested</p>
+          <p className="text-3xl font-bold text-[#131218] tracking-tight">{fmtMoney(totalInvested || null)}</p>
+        </div>
+        <div className="bg-white border border-[#E0E0D8] rounded-2xl px-5 py-4">
+          <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30 mb-1">Share Classes</p>
+          <p className="text-3xl font-bold text-[#131218] tracking-tight">
+            {[...new Set(capTable.map(e => e.shareClass).filter(Boolean))].length || "—"}
+          </p>
+        </div>
+      </div>
+
+      {/* Table */}
+      <div className="bg-white border border-[#E0E0D8] rounded-2xl overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-[11.5px]">
+            <thead>
+              <tr className="border-b border-[#E0E0D8]">
+                {["Shareholder", "Type", "Class", "Round", "Shares", "Ownership", "Diluted", "Invested", "Date"].map(h => (
+                  <th key={h} className="text-left px-4 py-3 text-[8px] font-bold tracking-wider uppercase text-[#131218]/25">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#EFEFEA]">
+              {capTable.map(e => (
+                <tr key={e.id} className="hover:bg-[#EFEFEA]/40 transition-colors">
+                  <td className="px-4 py-3 font-semibold text-[#131218]">{e.shareholderName || e.name || "—"}</td>
+                  <td className="px-4 py-3 text-[#131218]/50">{e.shareholderType || "—"}</td>
+                  <td className="px-4 py-3 text-[#131218]/50">{e.shareClass || "—"}</td>
+                  <td className="px-4 py-3 text-[#131218]/50">{e.round || "—"}</td>
+                  <td className="px-4 py-3 text-[#131218]/70">{e.shares?.toLocaleString() ?? "—"}</td>
+                  <td className="px-4 py-3 font-medium text-[#131218]">{fmtPct(e.ownershipPct)}</td>
+                  <td className="px-4 py-3 text-[#131218]/60">{fmtPct(e.dilutedPct)}</td>
+                  <td className="px-4 py-3 font-medium text-[#131218]">{fmtMoney(e.investedAmount)}</td>
+                  <td className="px-4 py-3 text-[#131218]/40">{fmtDate(e.investmentDate)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Data Room tab ─────────────────────────────────────────────────────────────
+
+const DR_STATUS_ORDER = ["Missing", "Partial", "Complete"];
+
+function DataRoomTab({ dataRoom }: { dataRoom: DataRoomItem[] }) {
+  if (!dataRoom.length) return <EmptyState label="data room" />;
+
+  const complete = dataRoom.filter(d => d.status === "Complete").length;
+  const partial  = dataRoom.filter(d => d.status === "Partial").length;
+  const missing  = dataRoom.filter(d => d.status === "Missing").length;
+  const readinessPct = Math.round((complete / dataRoom.length) * 100);
+
+  // Group by category
+  const groups = dataRoom.reduce<Record<string, DataRoomItem[]>>((acc, item) => {
+    const key = item.category || "Other";
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(item);
+    return acc;
+  }, {});
+
+  // Sort items within each group by status order
+  Object.values(groups).forEach(items =>
+    items.sort((a, b) => DR_STATUS_ORDER.indexOf(a.status) - DR_STATUS_ORDER.indexOf(b.status))
+  );
+
+  return (
+    <div className="space-y-5">
+
+      {/* Summary bar */}
+      <div className="bg-white border border-[#E0E0D8] rounded-2xl overflow-hidden">
+        <div className="grid grid-cols-4 divide-x divide-[#EFEFEA]">
+          <div className="px-5 py-4">
+            <p className="text-[8px] font-bold tracking-wider uppercase text-[#131218]/25 mb-1">Readiness</p>
+            <p className="text-[17px] font-bold text-[#131218] tracking-tight">{readinessPct}%</p>
+            <div className="mt-2 h-1 bg-[#EFEFEA] rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full ${readinessPct >= 80 ? "bg-[#c8f55a]" : readinessPct >= 50 ? "bg-amber-400" : "bg-red-400"}`}
+                style={{ width: `${readinessPct}%` }}
+              />
+            </div>
+          </div>
+          <div className="px-5 py-4">
+            <p className="text-[8px] font-bold tracking-wider uppercase text-[#131218]/25 mb-1">Complete</p>
+            <p className="text-[17px] font-bold text-green-600 tracking-tight">{complete}</p>
+          </div>
+          <div className="px-5 py-4">
+            <p className="text-[8px] font-bold tracking-wider uppercase text-[#131218]/25 mb-1">Partial</p>
+            <p className="text-[17px] font-bold text-amber-500 tracking-tight">{partial}</p>
+          </div>
+          <div className="px-5 py-4">
+            <p className="text-[8px] font-bold tracking-wider uppercase text-[#131218]/25 mb-1">Missing</p>
+            <p className="text-[17px] font-bold text-red-500 tracking-tight">{missing}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Grouped items */}
+      {Object.entries(groups).map(([category, items]) => (
+        <div key={category} className="bg-white border border-[#E0E0D8] rounded-2xl overflow-hidden">
+          <div className="px-5 py-3.5 border-b border-[#EFEFEA] flex items-center justify-between">
+            <p className="text-[10px] font-bold tracking-widest uppercase text-[#131218]/40">{category}</p>
+            <span className="text-[9px] text-[#131218]/25">{items.length} items</span>
+          </div>
+          <div className="divide-y divide-[#EFEFEA]">
+            {items.map(item => (
+              <div key={item.id} className="px-5 py-3 flex items-center gap-3">
+                <span className={`text-[8.5px] font-bold px-2 py-0.5 rounded-full border shrink-0 ${STATUS_COLORS[item.status] ?? "bg-[#EFEFEA] text-[#131218]/40 border-[#E0E0D8]"}`}>
+                  {item.status || "—"}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[12.5px] font-medium text-[#131218] truncate">{item.name}</p>
+                  {item.documentType && (
+                    <p className="text-[9.5px] text-[#131218]/35 mt-0.5">{item.documentType}</p>
+                  )}
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  {item.vcRelevance && (
+                    <span className="text-[8.5px] font-medium text-[#131218]/30">{item.vcRelevance}</span>
+                  )}
+                  {item.fileUrl && (
+                    <a
+                      href={item.fileUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[10px] font-bold text-[#131218]/25 hover:text-[#131218]/70 transition-colors"
+                    >
+                      →
+                    </a>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── Funding tab (placeholder — no DB wired yet) ───────────────────────────────
+
+function FundingTab({ orgData }: { orgData: StartupOrgData | null }) {
+  return (
+    <div className="space-y-4">
+      {orgData && (orgData.fundingRound || orgData.investmentStatus) && (
+        <div className="grid grid-cols-2 gap-4">
+          {orgData.fundingRound && (
+            <div className="bg-white border border-[#E0E0D8] rounded-2xl px-5 py-4">
+              <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30 mb-1">Current Round</p>
+              <p className="text-xl font-bold text-[#131218]">{orgData.fundingRound}</p>
+            </div>
+          )}
+          {orgData.investmentStatus && (
+            <div className="bg-white border border-[#E0E0D8] rounded-2xl px-5 py-4">
+              <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30 mb-1">Investment Status</p>
+              <p className="text-xl font-bold text-[#131218]">{orgData.investmentStatus}</p>
+            </div>
+          )}
+        </div>
+      )}
+      <div className="bg-white border border-[#E0E0D8] rounded-2xl p-10 text-center">
+        <p className="text-sm font-bold text-[#131218]/25 mb-1">Funding rounds detail coming soon</p>
+        <p className="text-xs text-[#131218]/20">
+          A dedicated Funding Rounds DB will surface investor names, amounts, and closing dates.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main client component ─────────────────────────────────────────────────────
 
 const TABS: { id: Tab; label: string }[] = [
@@ -245,7 +614,10 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "dataroom",   label: "Data Room"  },
 ];
 
-export function GarageDetailClient({ project, evidence, sources, decisions }: Props) {
+export function GarageDetailClient({
+  project, evidence, sources, decisions,
+  orgData, financials, valuations, capTable, dataRoom,
+}: Props) {
   const [tab, setTab] = useState<Tab>("pulse");
 
   return (
@@ -275,19 +647,19 @@ export function GarageDetailClient({ project, evidence, sources, decisions }: Pr
           <PulseTab project={project} evidence={evidence} sources={sources} decisions={decisions} />
         )}
         {tab === "financials" && (
-          <PlaceholderCard title="Financials" dbHint="CH Financials [OS v2]" />
+          <FinancialsTab orgData={orgData} financials={financials} />
         )}
         {tab === "valuation" && (
-          <PlaceholderCard title="Valuation" dbHint="CH Valuations [OS v2]" />
+          <ValuationTab valuations={valuations} />
         )}
         {tab === "captable" && (
-          <PlaceholderCard title="Cap Table" dbHint="CH Cap Table [OS v2]" />
+          <CapTableTab capTable={capTable} />
         )}
         {tab === "funding" && (
-          <PlaceholderCard title="Funding" dbHint="CH Funding Rounds [OS v2]" />
+          <FundingTab orgData={orgData} />
         )}
         {tab === "dataroom" && (
-          <PlaceholderCard title="Data Room" dbHint="CH Data Room [OS v2]" />
+          <DataRoomTab dataRoom={dataRoom} />
         )}
       </div>
     </>

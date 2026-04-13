@@ -11,20 +11,34 @@ export const notion = new Client({ auth: process.env.NOTION_API_KEY });
 //   d88aff1b...   ↔  collection://6f804e20-834c-4de2-a746-f6343fc75451  (CH Sources [OS v2])
 //   0f4bfe95...   ↔  collection://e7d711a5-f441-4cc8-96c1-bd33151c09b8  (CH Knowledge Assets [OS v2])
 export const DB = {
-  projects:        "49d59b18095f46588960f2e717832c5f",
-  evidence:        "fa28124978d043039d8932ac9964ccf5",
-  sources:         "d88aff1b019d4110bcefab7f5bfbd0ae",
-  knowledge:       "0f4bfe95549d4710a3a9ab6e119a9b04",
+  projects:           "49d59b18095f46588960f2e717832c5f",
+  evidence:           "fa28124978d043039d8932ac9964ccf5",
+  sources:            "d88aff1b019d4110bcefab7f5bfbd0ae",
+  knowledge:          "0f4bfe95549d4710a3a9ab6e119a9b04",
   // CH People [OS v2] — collection: 6f4197dd-3597-4b00-a711-86d6fcf819ad
-  people:          "1bc0f96f33ca4a9e9ff26844377e81de",
+  people:             "1bc0f96f33ca4a9e9ff26844377e81de",
   // Decision Items [OS v2] — collection: 1cdf6499-0468-4e2c-abcc-21e2bd8a803f
-  decisions:       "6b801204c4de49c7b6179e04761a285a",
+  decisions:          "6b801204c4de49c7b6179e04761a285a",
   // Insight Briefs [OS v2] — collection: 839cafc7-d52d-442f-a784-197a5ea34810
-  insightBriefs:   "04bed3a3fd1a4b3a99643cd21562e08a",
+  insightBriefs:      "04bed3a3fd1a4b3a99643cd21562e08a",
   // Content Pipeline [OS v2] — collection: 29db8c9b-6738-41ab-bf0a-3a5f06c568a0
-  contentPipeline: "3bf5cf81f45c4db2840590f3878bfdc0",
+  contentPipeline:    "3bf5cf81f45c4db2840590f3878bfdc0",
   // Style Profiles [OS v2] — collection: 3119b5c0-3b8b-4c17-bde0-2772fc9ba4a6
-  styleProfiles:   "606b1aafe63849a1a81ac6199683dc14",
+  styleProfiles:      "606b1aafe63849a1a81ac6199683dc14",
+  // Garage financial layer — all relate to CH Organizations via "Startup" relation
+  // Valuations [OS v2] — collection: 8f8d903b-6679-4fb0-bae8-16f7362d00d0
+  valuations:         "37a3686ebe3f408ba92c7373b0f01d60",
+  // Cap Table [OS v2] — collection: f1571c77-f057-45c1-94c9-4a5447a736dc
+  capTable:           "cd3038b604b64c929dab6a33275393b7",
+  // Data Room [OS v2] — collection: f6ccdab4-779d-4d4f-9748-dba1c905e846
+  dataRoom:           "d3c56da93f604859a51c9a43a165f412",
+  // Financial Snapshots [OS v2] — collection: 21e074ea-cfc1-4535-87ec-e7fc84496afb
+  // Can filter by "Scope Project" (relation to CH Projects) OR "Scope Organization"
+  financialSnapshots: "fdaf8df89b804dedb976cc61aa1b7e09",
+  // Proposal Briefs [OS v2] — collection: 8f0fb3de-2a16-4b8b-a858-5ab068d2f2e4
+  proposalBriefs:     "76bfd50fa99143619b9b51de4b8eae67",
+  // Offers [OS v2] — collection: 10c7de04-8f71-45ff-9e37-32e683829232
+  offers:             "58b863e9c789465b82eb244674bc394f",
 };
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -1144,5 +1158,281 @@ export async function updateKnowledgeAssetTheme(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     properties: { "Living Room Theme": { checkbox: active } } as any,
   });
+}
+
+// ─── Garage financial layer ───────────────────────────────────────────────────
+//
+// Architecture: Valuations, Cap Table, and Data Room relate to CH Organizations
+// (not CH Projects) via a "Startup" relation field. Financial Snapshots can link
+// to CH Projects directly via "Scope Project". The bridge is the project's
+// "Primary Organization" relation field.
+
+async function getPrimaryOrgIds(projectId: string): Promise<string[]> {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const page: any = await notion.pages.retrieve({ page_id: projectId });
+    return relationIds(prop(page, "Primary Organization"));
+  } catch {
+    return [];
+  }
+}
+
+export type StartupOrgData = {
+  id: string;
+  name: string;
+  mrr: string;
+  fundingRound: string;
+  investmentStatus: string;
+  teamSize: string;
+  website: string;
+  stage: string;
+};
+
+export async function getStartupOrgData(projectId: string): Promise<StartupOrgData | null> {
+  try {
+    const orgIds = await getPrimaryOrgIds(projectId);
+    if (!orgIds.length) return null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const page: any = await notion.pages.retrieve({ page_id: orgIds[0] });
+    return {
+      id:               page.id,
+      name:             text(prop(page, "Name")),
+      mrr:              text(prop(page, "Startup MRR")),
+      fundingRound:     select(prop(page, "Startup Funding Round")),
+      investmentStatus: select(prop(page, "Startup Investment Status")),
+      teamSize:         text(prop(page, "Startup Team Size")),
+      website:          page.properties?.["Website"]?.url ?? "",
+      stage:            select(prop(page, "Startup Stage")),
+    };
+  } catch {
+    return null;
+  }
+}
+
+export type FinancialSnapshot = {
+  id: string;
+  name: string;
+  revenue: number | null;
+  cost: number | null;
+  grossMargin: number | null;
+  burn: number | null;
+  cash: number | null;
+  ar: number | null;
+  ap: number | null;
+  runway: number | null;
+  period: string | null;
+};
+
+export async function getFinancialsForProject(projectId: string): Promise<FinancialSnapshot[]> {
+  try {
+    const res = await notion.databases.query({
+      database_id: DB.financialSnapshots,
+      filter: { property: "Scope Project", relation: { contains: projectId } },
+      sorts: [{ property: "Period", direction: "descending" }],
+      page_size: 12,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (res.results as any[]).map(page => ({
+      id:          page.id,
+      name:        text(prop(page, "Snapshot Name")),
+      revenue:     prop(page, "Revenue")?.number ?? null,
+      cost:        prop(page, "Cost")?.number ?? null,
+      grossMargin: prop(page, "Gross Margin")?.number ?? null,
+      burn:        prop(page, "Burn")?.number ?? null,
+      cash:        prop(page, "Cash")?.number ?? null,
+      ar:          prop(page, "AR")?.number ?? null,
+      ap:          prop(page, "AP")?.number ?? null,
+      runway:      prop(page, "Runway")?.number ?? null,
+      period:      date(prop(page, "Period")),
+    }));
+  } catch {
+    return [];
+  }
+}
+
+export type ValuationRecord = {
+  id: string;
+  name: string;
+  method: string;
+  status: string;
+  preMoneyMin: number | null;
+  preMoneyMax: number | null;
+  confidence: string;
+  period: string | null;
+  keyAssumptions: string;
+};
+
+export async function getValuationsForProject(projectId: string): Promise<ValuationRecord[]> {
+  try {
+    const orgIds = await getPrimaryOrgIds(projectId);
+    if (!orgIds.length) return [];
+    const res = await notion.databases.query({
+      database_id: DB.valuations,
+      filter: { property: "Startup", relation: { contains: orgIds[0] } },
+      sorts: [{ property: "Period", direction: "descending" }],
+      page_size: 20,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (res.results as any[]).map(page => ({
+      id:             page.id,
+      name:           text(prop(page, "Valuation Name")),
+      method:         select(prop(page, "Method")),
+      status:         select(prop(page, "Status")),
+      preMoneyMin:    prop(page, "Pre-money Min (£)")?.number ?? null,
+      preMoneyMax:    prop(page, "Pre-money Max (£)")?.number ?? null,
+      confidence:     select(prop(page, "Confidence")),
+      period:         date(prop(page, "Period")),
+      keyAssumptions: text(prop(page, "Key Assumptions")),
+    }));
+  } catch {
+    return [];
+  }
+}
+
+export type CapTableEntry = {
+  id: string;
+  name: string;
+  shareholderName: string;
+  shareholderType: string;
+  shareClass: string;
+  round: string;
+  shares: number | null;
+  ownershipPct: number | null;
+  dilutedPct: number | null;
+  investedAmount: number | null;
+  investmentDate: string | null;
+};
+
+export async function getCapTableForProject(projectId: string): Promise<CapTableEntry[]> {
+  try {
+    const orgIds = await getPrimaryOrgIds(projectId);
+    if (!orgIds.length) return [];
+    const res = await notion.databases.query({
+      database_id: DB.capTable,
+      filter: { property: "Startup", relation: { contains: orgIds[0] } },
+      sorts: [{ property: "Investment Date", direction: "descending" }],
+      page_size: 50,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (res.results as any[]).map(page => ({
+      id:              page.id,
+      name:            text(prop(page, "Entry Name")),
+      shareholderName: text(prop(page, "Shareholder Name")),
+      shareholderType: select(prop(page, "Shareholder Type")),
+      shareClass:      select(prop(page, "Share Class")),
+      round:           select(prop(page, "Round")),
+      shares:          prop(page, "Shares")?.number ?? null,
+      ownershipPct:    prop(page, "Ownership Pct")?.number ?? null,
+      dilutedPct:      prop(page, "Diluted Pct")?.number ?? null,
+      investedAmount:  prop(page, "Invested Amount (£)")?.number ?? null,
+      investmentDate:  date(prop(page, "Investment Date")),
+    }));
+  } catch {
+    return [];
+  }
+}
+
+export type DataRoomItem = {
+  id: string;
+  name: string;
+  category: string;
+  documentType: string;
+  fileUrl: string;
+  status: string;
+  priority: string;
+  vcRelevance: string;
+};
+
+export async function getDataRoomForProject(projectId: string): Promise<DataRoomItem[]> {
+  try {
+    const orgIds = await getPrimaryOrgIds(projectId);
+    if (!orgIds.length) return [];
+    const res = await notion.databases.query({
+      database_id: DB.dataRoom,
+      filter: { property: "Startup", relation: { contains: orgIds[0] } },
+      sorts: [{ property: "Priority", direction: "ascending" }],
+      page_size: 50,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (res.results as any[]).map(page => ({
+      id:           page.id,
+      name:         text(prop(page, "Item Name")),
+      category:     select(prop(page, "Category")),
+      documentType: select(prop(page, "Document Type")),
+      fileUrl:      page.properties?.["File URL"]?.url ?? "",
+      status:       select(prop(page, "Status")),
+      priority:     select(prop(page, "Priority")),
+      vcRelevance:  select(prop(page, "VC Relevance")),
+    }));
+  } catch {
+    return [];
+  }
+}
+
+// ─── Commercial: Proposals & Offers ──────────────────────────────────────────
+
+export type ProposalBrief = {
+  id: string;
+  title: string;
+  status: string;        // Draft | In Review | Approved | Sent | Won | Lost | Archived
+  proposalType: string;  // Exploratory | Scoped | Phased | etc.
+  budgetRange: string;   // Under £5k | £5k–£15k | £30k–£75k | etc.
+  clientName: string;    // from related project or free text
+  geography: string;
+  createdDate: string | null;
+  notionUrl: string;
+};
+
+export type CommercialOffer = {
+  id: string;
+  title: string;
+  offerStatus: string;   // Active | In Development | Deprecated
+  offerCategory: string;
+  notionUrl: string;
+};
+
+export async function getProposalBriefs(): Promise<ProposalBrief[]> {
+  try {
+    const res = await notion.databases.query({
+      database_id: DB.proposalBriefs,
+      sorts: [{ timestamp: "last_edited_time", direction: "descending" }],
+      page_size: 50,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (res.results as any[]).map(page => ({
+      id:           page.id,
+      title:        text(prop(page, "Title")) || text(prop(page, "Name")) || "Untitled",
+      status:       select(prop(page, "Status")),
+      proposalType: select(prop(page, "Proposal Type")),
+      budgetRange:  select(prop(page, "Budget Range")),
+      clientName:   text(prop(page, "Client Name")) || text(prop(page, "Client")) || "",
+      geography:    select(prop(page, "Geography")) || select(prop(page, "Region")) || "",
+      createdDate:  date(prop(page, "Created Date")) ?? (page.created_time?.slice(0, 10) ?? null),
+      notionUrl:    page.url ?? "",
+    }));
+  } catch {
+    return [];
+  }
+}
+
+export async function getCommercialOffers(): Promise<CommercialOffer[]> {
+  try {
+    const res = await notion.databases.query({
+      database_id: DB.offers,
+      filter: { property: "Offer Status", select: { does_not_equal: "Deprecated" } },
+      sorts: [{ timestamp: "last_edited_time", direction: "descending" }],
+      page_size: 50,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (res.results as any[]).map(page => ({
+      id:           page.id,
+      title:        text(prop(page, "Offer Name")) || text(prop(page, "Name")) || "Untitled",
+      offerStatus:  select(prop(page, "Offer Status")),
+      offerCategory: select(prop(page, "Offer Category")),
+      notionUrl:    page.url ?? "",
+    }));
+  } catch {
+    return [];
+  }
 }
 
