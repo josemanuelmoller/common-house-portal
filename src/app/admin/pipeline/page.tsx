@@ -184,7 +184,7 @@ export default async function PipelinePage() {
                               {new Date(p.lastUpdate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
                             </p>
                           ) : <span className="text-[#131218]/20 text-xs">—</span>}
-                          {p.updateNeeded && <p className="text-[8px] font-bold text-amber-500">⚠ Due</p>}
+                          {p.updateNeeded && <p className="text-[8px] font-bold text-amber-500">! Due</p>}
                         </div>
                         <div className="text-[#131218]/20 group-hover:text-[#131218]/60 transition-colors text-sm text-right">→</div>
                       </Link>

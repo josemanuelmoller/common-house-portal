@@ -263,7 +263,7 @@ export function ContentCard({ item, onArchive }: { item: ContentCardItem; onArch
                         onClick={e => { e.stopPropagation(); setFullscreen(true); }}
                         className="text-[9px] font-bold px-2.5 py-1 rounded-md bg-[#131218] text-[#B2FF59] border border-[#131218] hover:bg-[#131218]/80 transition-all"
                       >
-                        ⛶ Presentar
+                        Expandir
                       </button>
                     )}
                     {!hasSlides && (

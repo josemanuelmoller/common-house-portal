@@ -1,11 +1,11 @@
 import type { DocumentItem } from "@/lib/notion";
 
 function platformIcon(platform: string): string {
-  if (platform === "Google Drive") return "📁";
-  if (platform === "Fireflies")    return "🎙";
-  if (platform === "Gmail")        return "✉️";
-  if (platform === "Upload")       return "📎";
-  return "📄";
+  if (platform === "Google Drive") return "▤";
+  if (platform === "Fireflies")    return "◷";
+  if (platform === "Gmail")        return "–";
+  if (platform === "Upload")       return "▲";
+  return "▤";
 }
 
 function platformLabel(platform: string): string {
@@ -39,7 +39,7 @@ export function DocumentsSection({ documents, folderUrl, folderLabel = "Project 
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 bg-[#131218] text-[#B2FF59] text-[10px] font-bold px-3 py-1.5 rounded-full uppercase tracking-widest hover:bg-[#131218]/80 transition-colors"
           >
-            📁 {folderLabel} →
+            {folderLabel} →
           </a>
         )}
       </div>

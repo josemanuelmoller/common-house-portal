@@ -70,7 +70,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
               <p className="text-sm font-semibold text-[#131218]/50 mt-0.5">{lastUpdated}</p>
               {project.updateNeeded && (
                 <span className="mt-2 inline-block text-[10px] font-bold text-amber-600 bg-amber-50 border border-amber-100 px-2 py-0.5 rounded-full">
-                  ⚠ Update needed
+                  ! Update needed
                 </span>
               )}
             </div>

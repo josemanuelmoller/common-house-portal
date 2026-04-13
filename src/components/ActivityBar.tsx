@@ -8,9 +8,9 @@ export function ActivityBar({ activity }: Props) {
   const { meetings, emailCount, documentCount, otherCount } = activity;
 
   const pills = [
-    { icon: "🎙", count: meetings.length, label: "Reuniones" },
-    { icon: "✉️", count: emailCount,      label: "Emails" },
-    { icon: "📄", count: documentCount,   label: "Documentos" },
+    { icon: "◷", count: meetings.length, label: "Reuniones" },
+    { icon: "–",  count: emailCount,      label: "Emails" },
+    { icon: "▤",  count: documentCount,   label: "Documentos" },
     ...(otherCount > 0 ? [{ icon: "◈", count: otherCount, label: "Otros" }] : []),
   ];
 

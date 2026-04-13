@@ -3,6 +3,7 @@ import { Sidebar } from "@/components/Sidebar";
 import { getDecisionItems, type DecisionItem } from "@/lib/notion";
 import { ADMIN_NAV as NAV } from "@/lib/admin-nav";
 import { requireAdmin } from "@/lib/require-admin";
+import { DecisionActions } from "@/components/DecisionActions";
 
 /**
  * /admin/decisions — Decision Center view.
@@ -68,7 +69,7 @@ function DecisionRow({ item }: { item: DecisionItem }) {
           <p className="text-sm font-semibold text-[#131218] leading-snug">{item.title}</p>
           {needsExecuteApproval && (
             <span className="text-[9px] font-bold bg-red-100 text-red-700 border border-red-200 px-2 py-0.5 rounded-full uppercase tracking-widest">
-              ⛔ Execute blocked
+              × Execute blocked
             </span>
           )}
           {item.executeApproved && (
@@ -87,7 +88,7 @@ function DecisionRow({ item }: { item: DecisionItem }) {
           )}
           {item.dueDate && (
             <span className={`text-[10px] font-bold ${overdue ? "text-red-500" : "text-[#131218]/25"}`}>
-              {overdue ? "⚠ Overdue · " : "Due "}
+              {overdue ? "! Overdue · " : "Due "}
               {formatDate(item.dueDate)}
             </span>
           )}
@@ -97,6 +98,12 @@ function DecisionRow({ item }: { item: DecisionItem }) {
             {item.notes}
           </p>
         )}
+        <DecisionActions
+          id={item.id}
+          requiresExecute={item.requiresExecute}
+          executeApproved={item.executeApproved}
+          status={item.status}
+        />
       </div>
 
       {/* Open in Notion */}
@@ -191,7 +198,7 @@ export default async function DecisionsPage() {
               <div className="h-1 bg-red-500" />
               <div className="px-6 py-4 border-b border-red-100 bg-red-50/30 flex items-center justify-between">
                 <div>
-                  <p className="text-[10px] font-bold text-red-600 uppercase tracking-widest">⛔ Execute Gate</p>
+                  <p className="text-[10px] font-bold text-red-600 uppercase tracking-widest">× Execute Gate</p>
                   <p className="text-sm font-bold text-[#131218] mt-0.5">Agents blocked — approve before running</p>
                 </div>
                 <span className="text-[10px] font-bold bg-red-100 text-red-700 border border-red-200 px-2.5 py-1 rounded-full uppercase tracking-widest">

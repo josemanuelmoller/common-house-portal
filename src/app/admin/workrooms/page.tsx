@@ -205,7 +205,7 @@ export default async function WorkroomsPage() {
                             <span className="text-[9px] font-bold text-red-500">↯ {p.blockerCount} blocker{p.blockerCount !== 1 ? "s" : ""}</span>
                           )}
                           {p.updateNeeded && (
-                            <span className="text-[9px] font-bold text-amber-500">⚠ Update needed</span>
+                            <span className="text-[9px] font-bold text-amber-500">! Update needed</span>
                           )}
                           {!p.blockerCount && !p.updateNeeded && (
                             <span className="text-[9px] font-medium text-[#131218]/25">

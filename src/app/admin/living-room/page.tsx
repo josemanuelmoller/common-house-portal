@@ -227,10 +227,10 @@ export default function LivingRoomAdminPage() {
   }
 
   const TABS: { id: Tab; label: string; emoji: string; count: number }[] = [
-    { id: "people",     label: "People Visibility",  emoji: "👤", count: people.length },
-    { id: "milestones", label: "Milestones",          emoji: "🏆", count: milestones.length },
-    { id: "signals",    label: "Community Signals",   emoji: "📡", count: signals.length },
-    { id: "themes",     label: "Themes in Motion",    emoji: "🌊", count: themes.length },
+    { id: "people",     label: "People Visibility",  emoji: "○", count: people.length },
+    { id: "milestones", label: "Milestones",          emoji: "◈", count: milestones.length },
+    { id: "signals",    label: "Community Signals",   emoji: "◎", count: signals.length },
+    { id: "themes",     label: "Themes in Motion",    emoji: "◦", count: themes.length },
   ];
 
   const VIS_OPTS = ["public-safe", "community", "private"] as const;
@@ -344,7 +344,7 @@ export default function LivingRoomAdminPage() {
                   <div className="bg-white rounded-2xl border border-[#D8D8D0] overflow-hidden">
                     <div className="px-5 py-4 border-b border-[#D8D8D0] flex items-center justify-between gap-3">
                       <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-lg bg-[#B2FF59] flex items-center justify-center text-[11px]">👤</div>
+                        <div className="w-6 h-6 rounded-lg bg-[#B2FF59] flex items-center justify-center text-[11px]">○</div>
                         <span className="text-[12px] font-extrabold text-[#131218] tracking-tight">People Visibility</span>
                       </div>
                     </div>
@@ -440,7 +440,7 @@ export default function LivingRoomAdminPage() {
 
                   <div className="bg-white rounded-2xl border border-[#D8D8D0] overflow-hidden">
                     <div className="px-5 py-4 border-b border-[#D8D8D0] flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-lg bg-[#B2FF59] flex items-center justify-center text-[11px]">🏆</div>
+                      <div className="w-6 h-6 rounded-lg bg-[#B2FF59] flex items-center justify-center text-[11px]">◈</div>
                       <span className="text-[12px] font-extrabold text-[#131218] tracking-tight">Milestone Curator</span>
                     </div>
 
@@ -531,7 +531,7 @@ export default function LivingRoomAdminPage() {
 
                   <div className="bg-white rounded-2xl border border-[#D8D8D0] overflow-hidden">
                     <div className="px-5 py-4 border-b border-[#D8D8D0] flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-lg bg-blue-100 flex items-center justify-center text-[11px]">📡</div>
+                      <div className="w-6 h-6 rounded-lg bg-blue-100 flex items-center justify-center text-[11px]">◎</div>
                       <span className="text-[12px] font-extrabold text-[#131218] tracking-tight">Signal Curator</span>
                     </div>
 
@@ -614,7 +614,7 @@ export default function LivingRoomAdminPage() {
 
                   <div className="bg-white rounded-2xl border border-[#D8D8D0] overflow-hidden">
                     <div className="px-5 py-4 border-b border-[#D8D8D0] flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-lg bg-amber-100 flex items-center justify-center text-[11px]">🌊</div>
+                      <div className="w-6 h-6 rounded-lg bg-amber-100 flex items-center justify-center text-[11px]">◦</div>
                       <span className="text-[12px] font-extrabold text-[#131218] tracking-tight">Theme Curator</span>
                     </div>
 

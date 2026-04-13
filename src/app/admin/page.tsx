@@ -12,7 +12,7 @@
 
 import Link from "next/link";
 import { Sidebar } from "@/components/Sidebar";
-import { getProjectsOverview, getAllSources, getDecisionItems } from "@/lib/notion";
+import { getProjectsOverview, getDecisionItems } from "@/lib/notion";
 import { ADMIN_NAV } from "@/lib/admin-nav";
 import { requireAdmin } from "@/lib/require-admin";
 
@@ -60,9 +60,8 @@ const STAGE_COLORS: Record<string, string> = {
 export default async function AdminPage() {
   await requireAdmin();
 
-  const [projects, , decisions] = await Promise.all([
+  const [projects, decisions] = await Promise.all([
     getProjectsOverview(),
-    getAllSources(),
     getDecisionItems(),
   ]);
 
@@ -186,28 +185,11 @@ export default async function AdminPage() {
           </div>
 
           {/* ── Agent pulse bar ─────────────────────────────────────────── */}
-          <div className="flex items-center gap-3 bg-white border border-[#E0E0D8] rounded-xl px-5 py-3 flex-wrap">
-            <span className="text-[8.5px] font-bold tracking-widest uppercase text-[#131218]/30">OS v2</span>
-            <div className="w-px h-3.5 bg-[#E0E0D8] shrink-0" />
-            <div className="flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block shrink-0 shadow-[0_0_0_2px_rgba(34,197,94,0.2)]" />
-              <span className="text-[11px] font-semibold text-[#131218]">os-runner</span>
-              <span className="text-[10px] text-[#131218]/35">last run</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block shrink-0" />
-              <span className="text-[11px] font-semibold text-[#131218]">source-intake</span>
-              <span className="text-[10px] text-[#131218]/35">active</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block shrink-0" />
-              <span className="text-[11px] font-semibold text-[#131218]">hygiene-agent</span>
-              <span className="text-[10px] text-amber-600">{staleProjects.length > 0 ? `${staleProjects.length} warning${staleProjects.length !== 1 ? "s" : ""}` : "OK"}</span>
-            </div>
-            <div className="ml-auto flex items-center gap-1.5">
-              <span className="text-[10px] text-[#131218]/35">Next scheduled:</span>
-              <span className="text-[10.5px] font-bold text-[#131218]">briefing-agent · Mon 07:00</span>
-            </div>
+          <div style={{ background: "rgba(0,0,0,0.04)", borderRadius: 10, padding: "1rem 1.25rem", display: "flex", alignItems: "center", gap: "0.75rem" }}>
+            <div style={{ width: 8, height: 8, borderRadius: "50%", background: "rgba(0,0,0,0.2)" }} />
+            <span style={{ fontSize: 13, color: "rgba(0,0,0,0.45)" }}>
+              Telemetría de agentes en configuración · <a href="/admin/agents" style={{ color: "rgba(0,0,0,0.55)", textDecoration: "underline" }}>Ver registro</a>
+            </span>
           </div>
 
           {/* ── Today's urgencies ───────────────────────────────────────── */}
@@ -353,7 +335,7 @@ export default async function AdminPage() {
                             <span className="text-[#131218]/15 text-xs">—</span>
                           )}
                           {p.updateNeeded && (
-                            <p className="text-[9px] font-bold text-amber-500 mt-0.5">⚠ Update</p>
+                            <p className="text-[9px] font-bold text-amber-500 mt-0.5">! Update</p>
                           )}
                           {p.blockerCount > 0 && (
                             <p className="text-[9px] font-bold text-red-500 mt-0.5">↯ Blocked</p>
@@ -383,7 +365,7 @@ export default async function AdminPage() {
                       <span className="text-[9px] font-bold text-red-500">↯ {blockerCount} blocker{blockerCount !== 1 ? "s" : ""}</span>
                     )}
                     {needsUpdate.length > 0 && (
-                      <span className="text-[9px] font-bold text-amber-500">⚠ {needsUpdate.length} need update</span>
+                      <span className="text-[9px] font-bold text-amber-500">! {needsUpdate.length} need update</span>
                     )}
                   </div>
                 </div>
@@ -447,7 +429,7 @@ export default async function AdminPage() {
                   {needsUpdate.slice(0, 2).map(p => (
                     <Link key={`upd-${p.id}`} href={`/admin/projects/${p.id}`} className="flex items-center gap-3 px-5 py-2.5 hover:bg-[#EFEFEA]/40 transition-colors">
                       <div className="w-5 h-5 rounded-md bg-[#EFEFEA] flex items-center justify-center shrink-0">
-                        <span className="text-[9px] font-bold text-amber-500">⚠</span>
+                        <span className="text-[9px] font-bold text-amber-500">!</span>
                       </div>
                       <p className="text-[11px] font-medium text-[#131218] flex-1 min-w-0 truncate">{p.name}</p>
                       <span className="text-[9px] font-bold text-[#131218]/30 shrink-0">Update</span>

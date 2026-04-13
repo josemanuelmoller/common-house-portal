@@ -14,10 +14,10 @@ type Props = {
 };
 
 const folderIcons: Record<string, string> = {
-  "💰 Finanzas":       "💰",
-  "📋 Documentación":  "📋",
-  "📊 Presentaciones": "📊",
-  "🎨 Multimedia":     "🎨",
+  "💰 Finanzas":       "$",
+  "📋 Documentación":  "▤",
+  "📊 Presentaciones": "◳",
+  "🎨 Multimedia":     "◈",
 };
 
 export function UploadZone({ onUploaded }: Props) {
@@ -150,7 +150,7 @@ export function UploadZone({ onUploaded }: Props) {
         {/* Success */}
         {uploaded && (
           <div className="flex items-center gap-3 bg-[#B2FF59]/20 border border-[#B2FF59] rounded-xl px-4 py-3">
-            <span className="text-lg">{folderIcons[uploaded.folder] ?? "📄"}</span>
+            <span className="text-lg">{folderIcons[uploaded.folder] ?? "▤"}</span>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-bold text-[#131218] truncate">✓ {uploaded.name}</p>
               <p className="text-xs text-[#131218]/40">Subido a {uploaded.folder}</p>
