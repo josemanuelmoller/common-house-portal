@@ -6,6 +6,7 @@ import { getProjectById, getEvidenceForProject, getSourcesForProject, getDashboa
 import { NAV } from "../../page";
 import { requireAdmin } from "@/lib/require-admin";
 import { DraftUpdateCard } from "@/components/DraftUpdateCard";
+import { ApproveProjectUpdateButton } from "@/components/ApproveProjectUpdateButton";
 import { ProjectPeople } from "@/components/ProjectPeople";
 import { DocumentsSection } from "@/components/DocumentsSection";
 import { ActivityBar } from "@/components/ActivityBar";
@@ -96,14 +97,10 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
                     </div>
                   )}
                 </div>
-                <a
-                  href={`https://www.notion.so/${project.id.replace(/-/g, "")}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="shrink-0 text-[10px] font-bold text-[#131218]/30 hover:text-[#131218]/70 uppercase tracking-widest transition-colors whitespace-nowrap mt-1"
-                >
-                  Edit in Notion ↗
-                </a>
+                <ApproveProjectUpdateButton
+                  projectId={project.id}
+                  draftText={project.draftUpdate || undefined}
+                />
               </div>
             </div>
           )}
