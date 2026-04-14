@@ -260,15 +260,29 @@ export async function getProjectById(id: string): Promise<Project | null> {
 }
 
 // Projects enriched with evidence + sources counts (for home cards)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function fetchAllEvidence(): Promise<any[]> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const all: any[] = [];
+  let cursor: string | undefined;
+  do {
+    const res = await notion.databases.query({
+      database_id: DB.evidence,
+      page_size: 100,
+      ...(cursor ? { start_cursor: cursor } : {}),
+    });
+    all.push(...res.results);
+    cursor = res.has_more ? (res.next_cursor ?? undefined) : undefined;
+  } while (cursor);
+  return all;
+}
+
 export async function getProjectsOverview(): Promise<ProjectCard[]> {
-  const [projects, evidenceRes, allSrcs] = await Promise.all([
+  const [projects, evidence, allSrcs] = await Promise.all([
     getAllProjects(),
-    notion.databases.query({ database_id: DB.evidence, page_size: 100 }),
+    fetchAllEvidence(),
     getAllSources(),
   ]);
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const evidence = evidenceRes.results as any[];
 
   return projects.map(project => {
     const projEvidence = evidence.filter(e =>
