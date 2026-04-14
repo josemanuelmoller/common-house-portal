@@ -124,6 +124,10 @@ function DecisionRow({ item }: { item: DecisionItem }) {
           entityCategory={item.entityCategory}
           contactName={item.contactName}
           contactEmail={item.contactEmail}
+          personName={item.personName}
+          personEmail={item.personEmail}
+          personOrgId={item.personOrgId}
+          personOrgName={item.personOrgName}
         />
       </div>
 

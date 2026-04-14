@@ -464,6 +464,59 @@ export async function approveEntityCreation(
   }
 }
 
+/**
+ * approvePersonCreation — creates a Person in CH People [OS v2], optionally linked to an existing org,
+ * then resolves the Decision Item that proposed the creation.
+ *
+ * DB IDs:
+ *   CH People [OS v2]: 1bc0f96f33ca4a9e9ff26844377e81de
+ */
+export async function approvePersonCreation(
+  decisionId: string,
+  personName: string,
+  personEmail?: string,
+  orgId?: string,
+  orgName?: string,
+): Promise<{ error?: string; personUrl?: string }> {
+  try {
+    await requireAdminAction()
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const personProps: Record<string, any> = {
+      "Full Name": { title: [{ type: "text", text: { content: personName } }] },
+      "Person Classification": { select: { name: "External" } },
+    }
+    if (personEmail) personProps["Email"] = { email: personEmail }
+    if (orgId) personProps["Primary Organization"] = { relation: [{ id: orgId }] }
+
+    const personPage = await notion.pages.create({
+      parent: { database_id: "1bc0f96f33ca4a9e9ff26844377e81de" },
+      properties: personProps,
+    })
+
+    try {
+      await notion.comments.create({
+        parent: { page_id: decisionId },
+        rich_text: [{ type: "text", text: { content: `Person created: ${personName} (${personPage.id})${orgName ? ` at ${orgName}` : ""}` } }],
+      })
+    } catch { /* comment permissions optional */ }
+
+    await notion.pages.update({
+      page_id: decisionId,
+      properties: { Status: { select: { name: "Resolved" } } },
+    })
+
+    revalidatePath("/admin/decisions")
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return { personUrl: (personPage as any).url ?? undefined }
+  } catch (err) {
+    console.error("[approvePersonCreation] error:", err)
+    const msg = err instanceof Error ? err.message
+      : (err as { message?: string })?.message ?? JSON.stringify(err)
+    return { error: msg }
+  }
+}
+
 export async function dismissDecision(id: string) {
   await requireAdminAction()
   await notion.pages.update({

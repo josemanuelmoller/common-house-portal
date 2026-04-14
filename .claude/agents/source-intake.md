@@ -149,6 +149,45 @@ When processing a batch, collect all organization names/domains that appear in i
 
 ---
 
+## Entity creation proposals — unknown people
+
+After org proposals are processed, scan ingested threads for named people who:
+1. Have a confirmed email address (identified in the thread)
+2. Belong to an organization that **already exists** in CH Organizations [OS v2]
+3. Do **not** already exist in CH People [OS v2] (search `notion-search` by full name before proposing)
+
+For each qualifying new person, create a Decision Item in CH Decision Items [OS v2] (`6b801204c4de49c7b6179e04761a285a`) using `notion-create-pages`:
+
+- `Name`: `[PersonName] ([OrgName]) — Nueva persona detectada`
+- `Decision Type`: `Approval`
+- `Priority`: `Low`
+- `Status`: `Open`
+- `Source Agent`: `source-intake`
+- `Proposed Action`:
+  ```
+  [ENTITY_ACTION:create_person]
+  [PERSON_NAME:<full name>]
+  [PERSON_EMAIL:<email>]
+  [PERSON_ORG_ID:<notion_page_id_of_the_org_record>]
+  [PERSON_ORG_NAME:<org name>]
+
+  "<PersonName>" aparece en fuentes recientes con email identificado pero no existe en CH People [OS v2].
+  Aprobando se creará la persona vinculada a <OrgName>.
+  ```
+
+**Rules:**
+- Only propose if the org already exists in CH Organizations [OS v2] — do not propose a person for an org that is itself pending creation.
+- Only propose if the person has a confirmed email in the thread (do not propose from name alone).
+- Dedup: skip if an Open Approval Decision Item already exists for this person name.
+- Cap at 3 person proposals per run (separate cap from org proposals).
+- If `[PERSON_ORG_ID:]` cannot be determined (org exists but page ID is unknown), omit the marker — the portal will still create the person, just without the org link.
+
+**When a user approves this Decision Item via the Decision Center:**
+- The portal creates the person in CH People [OS v2], linked to the org via `Primary Organization`
+- No further action needed from source-intake on that person
+
+---
+
 ## Decision Items for ambiguous project links
 
 Whenever a source record is created or updated with `Relevance Status = Needs Review` because the project linkage is ambiguous, create a Decision Item in CH Decision Items [OS v2] (`6b801204c4de49c7b6179e04761a285a`) using `notion-create-pages`:
