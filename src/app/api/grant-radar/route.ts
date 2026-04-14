@@ -128,13 +128,17 @@ async function createGrantOpportunity(opp: GrantOpportunity): Promise<string | n
       "Opportunity Name":  { title: [{ text: { content: opp.name.slice(0, 200) } }] },
       "Opportunity Type":  { select: { name: "Grant" } },
       "Opportunity Status":{ select: { name: "New" } },
+      "Scope":             { select: { name: opp.scope === "Common House" ? "CH" : "Portfolio" } },
       "Priority":          { select: { name: urgencyToPriority(opp.urgency) } },
       "Source URL":        { url: opp.sourceUrl || null },
+      "Why There Is Fit":  { rich_text: [{ text: { content: opp.summary.slice(0, 2000) } }] },
       "Notes":             { rich_text: [{ text: { content: buildNotes(opp) } }] },
+      "Trigger / Signal":  { rich_text: [{ text: { content: `Grant Radar — fit score ${opp.fitScore}/100${opp.amount ? ` · ${opp.amount}` : ""}` } }] },
     };
 
+    // Correct field name is "Expected Close Date", not "Deadline"
     if (opp.deadline) {
-      properties["Deadline"] = { date: { start: opp.deadline } };
+      properties["Expected Close Date"] = { date: { start: opp.deadline } };
     }
 
     const page = await notion.pages.create({

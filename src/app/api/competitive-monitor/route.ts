@@ -27,8 +27,9 @@ export const dynamic = "force-dynamic";
 const notion    = new Client({ auth: process.env.NOTION_API_KEY });
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-const DB_WATCHLIST     = "a7ba452a78f54c9fbc5a71a63e4e248a";
-const DB_INTEL         = "b3607003470c413e999e94788f7c1b7c";
+// Page IDs (from Notion URL) — NOT collection IDs
+const DB_WATCHLIST     = "d5fad9978ed0436baae4964a0ad0e211"; // CH Watchlist [OS v2]
+const DB_INTEL         = "af8d7edb750b4131b3b55ef5ee83556a"; // CH Competitive Intel [OS v2]
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
