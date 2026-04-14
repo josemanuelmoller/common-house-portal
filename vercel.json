@@ -56,6 +56,10 @@
     {
       "path": "/api/competitive-monitor",
       "schedule": "0 7 * * 1"
+    },
+    {
+      "path": "/api/grant-radar",
+      "schedule": "0 7 * * 3"
     }
   ]
 }
