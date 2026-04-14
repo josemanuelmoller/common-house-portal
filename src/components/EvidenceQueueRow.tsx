@@ -12,9 +12,13 @@ type Props = {
   type: string;
   validationStatus: string;
   dateCaptured: string | null;
+  // optional batch-select props (provided by EvidenceQueueTable)
+  isSelected?: boolean;
+  onToggleSelect?: (id: string) => void;
+  onDismiss?: (id: string) => void;
 };
 
-export function EvidenceQueueRow({ id, title, excerpt, projectName, type, validationStatus, dateCaptured }: Props) {
+export function EvidenceQueueRow({ id, title, excerpt, projectName, type, validationStatus, dateCaptured, isSelected, onToggleSelect, onDismiss }: Props) {
   const [isPending, startTransition] = useTransition();
   const [done, setDone] = useState<"reviewed" | "rejected" | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -25,8 +29,9 @@ export function EvidenceQueueRow({ id, title, excerpt, projectName, type, valida
       try {
         await markEvidenceReviewed(id);
         setDone("reviewed");
+        onDismiss?.(id);
       } catch {
-        setError("Failed to mark as reviewed. Try again.");
+        setError("Failed. Try again.");
       }
     });
   }
@@ -37,8 +42,9 @@ export function EvidenceQueueRow({ id, title, excerpt, projectName, type, valida
       try {
         await rejectEvidence(id);
         setDone("rejected");
+        onDismiss?.(id);
       } catch {
-        setError("Failed to reject. Try again.");
+        setError("Failed. Try again.");
       }
     });
   }
@@ -47,17 +53,29 @@ export function EvidenceQueueRow({ id, title, excerpt, projectName, type, valida
   if (done) {
     return (
       <tr className="opacity-40 transition-opacity">
-        <td className="px-6 py-3 text-sm text-[#131218]/40 italic">
+        {onToggleSelect && <td className="px-4 py-3 w-8" />}
+        <td className="px-2 py-3 text-sm text-[#131218]/40 italic">
           {done === "reviewed" ? "✓ Aceptado" : "✕ Rechazado"} — {title}
         </td>
-        <td colSpan={4} />
+        <td colSpan={onToggleSelect ? 5 : 4} />
       </tr>
     );
   }
 
   return (
-    <tr className={`transition-colors ${isPending ? "opacity-50" : "hover:bg-[#EFEFEA]/60"}`}>
-      <td className="px-6 py-3">
+    <tr className={`transition-colors ${isPending ? "opacity-50" : isSelected ? "bg-[#B2FF59]/10" : "hover:bg-[#EFEFEA]/60"}`}>
+      {/* Checkbox — only when used inside EvidenceQueueTable */}
+      {onToggleSelect && (
+        <td className="px-4 py-3 w-8">
+          <input
+            type="checkbox"
+            checked={!!isSelected}
+            onChange={() => onToggleSelect(id)}
+            className="rounded border-[#E0E0D8] accent-[#131218] cursor-pointer"
+          />
+        </td>
+      )}
+      <td className={onToggleSelect ? "px-2 py-3" : "px-6 py-3"}>
         <p className="font-semibold text-[#131218] text-sm">{title}</p>
         {excerpt && (
           <p className="text-xs text-[#131218]/35 mt-0.5 line-clamp-1 max-w-sm">{excerpt}</p>
@@ -82,9 +100,9 @@ export function EvidenceQueueRow({ id, title, excerpt, projectName, type, valida
             onClick={handleReview}
             disabled={isPending}
             className="inline-flex items-center gap-1 text-[10px] font-bold bg-[#B2FF59] text-[#131218] px-2.5 py-1 rounded-full uppercase tracking-widest hover:bg-[#9ee84a] transition-colors disabled:opacity-50"
-            title="Mark as Reviewed — engine validates from here"
+            title="Mark as Reviewed"
           >
-            {isPending ? "..." : "✓ Aceptar"}
+            {isPending ? "..." : "✓"}
           </button>
           <button
             onClick={handleReject}

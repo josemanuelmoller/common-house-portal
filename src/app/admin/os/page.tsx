@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/Sidebar";
 import { StatusBadge } from "@/components/StatusBadge";
 import { MetricCard } from "@/components/MetricCard";
-import { EvidenceQueueRow } from "@/components/EvidenceQueueRow";
+import { EvidenceQueueTable, EvidenceQueueReadOnlyTable } from "@/components/EvidenceQueueTable";
 import { getAllEvidence, getAllSources, getAllProjects } from "@/lib/notion";
 import { NAV } from "../page";
 import { requireAdmin } from "@/lib/require-admin";
@@ -127,60 +127,38 @@ export default async function OSPage() {
             </div>
           )}
 
-          {/* Review Queue — primary action area */}
+          {/* Needs Your Call — exceptions only */}
           <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
             <div className="h-1 bg-amber-400" />
             <div className="px-6 py-4 border-b border-[#EFEFEA] flex items-center justify-between">
               <div>
-                <h2 className="text-sm font-bold text-[#131218] tracking-tight">Review Queue</h2>
-                <p className="text-xs text-[#131218]/40 mt-0.5">Evidence pending validation — approve or reject each item</p>
+                <h2 className="text-sm font-bold text-[#131218] tracking-tight">Needs Your Call</h2>
+                <p className="text-xs text-[#131218]/40 mt-0.5">Exceptions the engine couldn&apos;t auto-validate — everything else already passed through</p>
               </div>
               {totalPending > 0 ? (
                 <span className="text-[10px] font-bold bg-amber-100 text-amber-700 px-2.5 py-1 rounded-full uppercase tracking-widest">
-                  {totalPending} to review
+                  {totalPending} flagged
                 </span>
               ) : (
                 <span className="text-[10px] font-bold bg-[#EFEFEA] text-[#131218]/30 px-2.5 py-1 rounded-full uppercase tracking-widest">
-                  Queue empty
+                  All clear
                 </span>
               )}
             </div>
 
-            {/* New — action required first */}
+            {/* Flagged — action required */}
             {newEvidence.length > 0 && (
-              <>
+              <div className="border-b border-[#EFEFEA]">
                 <div className="px-6 py-2 bg-amber-50/60 border-b border-amber-100">
                   <p className="text-[9px] font-bold text-amber-600 uppercase tracking-widest">
-                    New · {newEvidence.length} item{newEvidence.length !== 1 ? "s" : ""}
+                    Flagged · {newEvidence.length} item{newEvidence.length !== 1 ? "s" : ""}
                   </p>
                 </div>
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-[#EFEFEA]">
-                      <th className="text-left px-6 py-3 text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Evidence</th>
-                      <th className="text-left px-4 py-3 text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Project</th>
-                      <th className="text-left px-4 py-3 text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Type</th>
-                      <th className="text-left px-4 py-3 text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Status</th>
-                      <th className="text-left px-4 py-3 text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Captured</th>
-                      <th className="px-4 py-3" />
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[#EFEFEA]">
-                    {newEvidence.slice(0, 15).map(e => (
-                      <EvidenceQueueRow
-                        key={e.id}
-                        id={e.id}
-                        title={e.title}
-                        excerpt={e.excerpt}
-                        projectName={e.projectId ? (projectNames[e.projectId] ?? "—") : "—"}
-                        type={e.type}
-                        validationStatus={e.validationStatus}
-                        dateCaptured={e.dateCaptured}
-                      />
-                    ))}
-                  </tbody>
-                </table>
-              </>
+                <EvidenceQueueTable
+                  items={newEvidence.slice(0, 30)}
+                  projectNames={projectNames}
+                />
+              </div>
             )}
 
             {/* In Review — waiting for validation engine, no human action needed */}
@@ -188,45 +166,17 @@ export default async function OSPage() {
               <>
                 <div className="px-6 py-2 bg-[#EFEFEA]/60 border-y border-[#EFEFEA] flex items-center justify-between">
                   <p className="text-[9px] font-bold text-[#131218]/40 uppercase tracking-widest">
-                    Awaiting engine · {reviewEvidence.length} item{reviewEvidence.length !== 1 ? "s" : ""}
+                    Passing through · {reviewEvidence.length} item{reviewEvidence.length !== 1 ? "s" : ""}
                   </p>
-                  <p className="text-[9px] text-[#131218]/25 italic">Ya revisados — el validation-operator los validará automáticamente</p>
+                  <p className="text-[9px] text-[#131218]/25 italic">Engine validará automáticamente</p>
                 </div>
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-[#EFEFEA]">
-                      <th className="text-left px-6 py-3 text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Evidence</th>
-                      <th className="text-left px-4 py-3 text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Project</th>
-                      <th className="text-left px-4 py-3 text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Type</th>
-                      <th className="text-left px-4 py-3 text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Captured</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[#EFEFEA]">
-                    {reviewEvidence.slice(0, 10).map(e => (
-                      <tr key={e.id} className="opacity-50">
-                        <td className="px-6 py-3">
-                          <p className="font-medium text-[#131218] text-sm">{e.title}</p>
-                          {e.excerpt && <p className="text-xs text-[#131218]/35 mt-0.5 line-clamp-1 max-w-sm">{e.excerpt}</p>}
-                        </td>
-                        <td className="px-4 py-3 text-xs font-medium text-[#131218]/50">
-                          {e.projectId ? (projectNames[e.projectId] ?? "—") : "—"}
-                        </td>
-                        <td className="px-4 py-3"><StatusBadge value={e.type} /></td>
-                        <td className="px-4 py-3 text-xs text-[#131218]/35 font-medium">
-                          {e.dateCaptured
-                            ? new Date(e.dateCaptured).toLocaleDateString("en-GB", { day: "numeric", month: "short" })
-                            : "—"}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <EvidenceQueueReadOnlyTable items={reviewEvidence} projectNames={projectNames} />
               </>
             )}
 
             {totalPending === 0 && (
               <div className="px-6 py-10 text-center">
-                <p className="text-sm font-medium text-[#131218]/30">Queue is clear — all evidence reviewed ✓</p>
+                <p className="text-sm font-medium text-[#131218]/30">Nothing flagged — engine handled everything ✓</p>
               </div>
             )}
 

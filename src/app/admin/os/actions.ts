@@ -26,6 +26,23 @@ export async function markEvidenceReviewed(evidenceId: string) {
   revalidatePath("/admin");
 }
 
+export async function batchMarkReviewed(evidenceIds: string[]) {
+  await requireAdminAction();
+  if (!evidenceIds.length) return;
+
+  await Promise.all(
+    evidenceIds.map(id =>
+      notion.pages.update({
+        page_id: id,
+        properties: { "Validation Status": { select: { name: "Reviewed" } } },
+      })
+    )
+  );
+
+  revalidatePath("/admin/os");
+  revalidatePath("/admin");
+}
+
 // "Rejected" is safe to write from portal — both portal and engine use the same value
 // and rejection is a deliberate human decision that should not be deferred to the engine.
 export async function rejectEvidence(evidenceId: string) {

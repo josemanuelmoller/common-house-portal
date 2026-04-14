@@ -34,51 +34,71 @@ If evidence_ids is empty → return: `Validation Operator: no input — skipping
 
 ---
 
+## Design principle
+
+**Auto-validate is the default. Human review is the exception.**
+
+The system's job is to reduce Jose's workload, not create it. If evidence comes from a trusted source (Fireflies meeting transcript, direct email thread), has a Source Excerpt, and is linked to a project — it should flow through automatically. Only surface items where human judgment is genuinely required.
+
+---
+
 ## Classification tiers
 
 ### AUTO_VALIDATE → set Validation Status = Validated
 
-A record qualifies for AUTO_VALIDATE only if ALL of the following are true:
+A record qualifies for AUTO_VALIDATE if ALL of the following are true:
 
-1. `Validation Status` = New (skip if already at any other status)
+1. `Validation Status` = New
 2. `Source Excerpt` is populated (non-empty, 5+ characters)
-3. The Source Excerpt directly supports the specific claim in the Evidence Statement — not just the same topic, but the same fact/actor/commitment
-4. `Confidence Level` = High
+3. The Source Excerpt is plausibly related to the Evidence Statement (same source, same topic — does not need to be verbatim)
+4. `Confidence Level` = Medium OR High (Low → ESCALATE)
 5. `Project` relation is populated (at least one project linked)
-6. Evidence Type is one of: `Dependency`, `Requirement`, `Outcome`, `Blocker`, `Process Step`
-   — OR Evidence Type = `Stakeholder` with fully factual, directly stated content (no inference about intent or future state)
+6. Evidence Type is one of: `Process Step`, `Outcome`, `Dependency`, `Requirement`
+   — these are factual operational records and should always auto-validate when conditions 1–5 are met
 7. The Evidence Statement contains no speculative phrasing (`may`, `might`, `could`, `likely`, `appears to`, `suggests`, `seems`)
-8. The Evidence Statement does not construct a conclusion beyond what the excerpt directly states
 
-If any condition fails → fall through to AUTO_REVIEW or ESCALATE.
+**Additionally AUTO_VALIDATE if Evidence Type = `Decision`:**
+- All conditions 1–5 above
+- `Confidence Level` = High (Decisions require stronger grounding)
+- No speculative phrasing
+
+**Additionally AUTO_VALIDATE if Evidence Type = `Stakeholder`:**
+- All conditions 1–5 above
+- Content is purely factual: name, role, confirmed affiliation, stated commitment
+- No inference about intent, interest, or future behavior
+
+**Additionally AUTO_VALIDATE if Evidence Type = `Blocker`:**
+- All conditions 1–5 above
+- `Confidence Level` = High
+
+If any required condition fails → fall through to AUTO_REVIEW or ESCALATE.
 
 ### AUTO_REVIEW → set Validation Status = Reviewed
 
-A record qualifies for AUTO_REVIEW if it does NOT qualify for AUTO_VALIDATE but ALL of the following are true:
+AUTO_REVIEW is for genuinely ambiguous cases only — not a catch-all.
+
+A record qualifies for AUTO_REVIEW if it does NOT qualify for AUTO_VALIDATE AND:
 
 1. `Validation Status` = New
 2. `Source Excerpt` is populated
-3. The excerpt is plausibly related to the Evidence Statement (same general topic and source, even if not verbatim support for the exact claim)
-4. `Confidence Level` = Medium OR High with soft qualifier
-5. `Project` relation is populated
-6. Evidence Type is any valid schema value
-7. The Evidence Statement is not purely constructed inference with no grounding in the excerpt
+3. `Project` relation is populated
+4. Evidence Type = `Decision` with Confidence = Medium (not High — defer to human)
+5. OR Evidence Type = `Stakeholder` with intent/interest/future-behavior content
+6. OR Evidence Type = `Blocker` with Confidence = Medium
 
-If any of conditions 2, 3, or 5 fail → ESCALATE instead.
+If conditions 2 or 3 fail → ESCALATE instead.
 
 ### ESCALATE → no write; add to escalation queue
 
-A record must be ESCALATED if ANY of the following is true:
+ESCALATE only when human judgment is genuinely required:
 
-- `Source Excerpt` is empty
-- The excerpt does not support the specific claim (different fact, different actor, or different commitment)
-- `Confidence Level` = Low
-- `Project` relation is empty
-- The Evidence Statement is clearly constructed beyond the source (strategic framing, organizational inference, future projection)
-- Evidence Type = `Contradiction` or `Assumption` — always ESCALATE; these require human judgment
-- Ambiguity exists about which project the evidence belongs to
+- `Source Excerpt` is empty — agent cannot verify the claim
+- `Project` relation is empty — agent cannot determine which project this belongs to
+- `Confidence Level` = Low under any condition
+- Evidence Type = `Contradiction` or `Assumption` — always ESCALATE
+- The Evidence Statement constructs a strategic conclusion with no grounding in the excerpt (e.g. "This signals a pivot to X" when excerpt says nothing of the sort)
 
-Do not AUTO_VALIDATE or AUTO_REVIEW contradictions or assumptions. Always escalate them.
+Do not escalate just because confidence is Medium or the excerpt is paraphrased rather than verbatim. Trust the extraction.
 
 ---
 
@@ -145,14 +165,15 @@ Required properties for each Decision Item:
 
 ---
 
-## Conservative defaults
+## Defaults
 
-- When uncertain between AUTO_VALIDATE and AUTO_REVIEW → choose AUTO_REVIEW
-- When uncertain between AUTO_REVIEW and ESCALATE → choose ESCALATE
-- Never upgrade a record to Validated without a populated Source Excerpt that directly supports the claim
-- Never upgrade a record with Confidence = Low under any condition
-- Stakeholder records: default to AUTO_REVIEW unless the content is purely factual (name, role, confirmed affiliation) — if intent, interest, or future behavior is described, AUTO_REVIEW at most
-- Multi-project evidence (linked to 2+ projects): AUTO_VALIDATE only if both project links are clearly supported by the excerpt; if ambiguous, AUTO_REVIEW
+- When uncertain between AUTO_VALIDATE and AUTO_REVIEW → choose AUTO_VALIDATE (trust the source)
+- When uncertain between AUTO_REVIEW and ESCALATE → choose AUTO_REVIEW
+- Never validate a record with Confidence = Low — always ESCALATE
+- Never validate without a populated Source Excerpt — always ESCALATE
+- Never validate without a Project link — always ESCALATE
+- Stakeholder records: AUTO_VALIDATE if purely factual; AUTO_REVIEW if intent/future behavior described
+- Multi-project evidence (linked to 2+ projects): AUTO_VALIDATE — multiple project links are fine
 
 ---
 
