@@ -1,5 +1,7 @@
 # Architecture
 
+Last reviewed: 2026-04-14
+
 The portal is organized into three layers: client-facing Rooms, an internal Control Room, and a shared OS backbone. All three read from the same Notion data source.
 
 ---

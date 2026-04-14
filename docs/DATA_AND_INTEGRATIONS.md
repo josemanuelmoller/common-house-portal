@@ -1,5 +1,7 @@
 # Data and Integrations
 
+Last reviewed: 2026-04-14
+
 ---
 
 ## Notion
@@ -72,11 +74,9 @@ Known use cases:
 
 The Supabase client is initialized inline in the routes that use it (not centralized via `src/lib/`).
 
-Required env vars: `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_KEY`.
+Required env vars: `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_KEY`. Both are listed in `DEPLOY.md`.
 
-It is not yet confirmed whether `agent_runs` is the only Supabase table in use or whether there are others not visible from a surface read of the routes.
-
-Note: These env vars are not listed in `DEPLOY.md`. They must be added to Vercel environment variables manually.
+It is not confirmed whether `agent_runs` is the only Supabase table in use. A surface read of the routes found three use cases above; others may exist.
 
 ---
 
@@ -175,6 +175,7 @@ Setup route: `/api/create-project-folders` creates the standard folder structure
 | Client-project mapping | Hardcoded in `src/lib/clients.ts` |
 | Admin users | Env vars (`ADMIN_USER_IDS`, `ADMIN_EMAILS`) |
 | File attachments (library, garage) | Supabase storage |
+| Agent run logs | Supabase (`agent_runs` table) |
 | Meeting transcripts (raw) | Fireflies |
 | Email threads (raw) | Gmail |
 | Per-project documents | Google Drive |
@@ -190,4 +191,4 @@ Setup route: `/api/create-project-folders` creates the standard folder structure
 
 3. **PLATFORM-IA.md Section 10 is outdated**: It describes the portal as "not yet built, everything is static HTML." The portal is now built. That section should not be treated as a current description.
 
-4. **No `NEXT_PUBLIC_SUPABASE_URL` or `SUPABASE_SERVICE_KEY` in DEPLOY.md**: These are required for file upload features but missing from the deployment documentation.
+4. **Supabase role is partially unclear**: The `agent_runs` table in Supabase is read by `/api/hall-data` but was not initially documented. It is not yet confirmed whether additional Supabase tables exist beyond what a surface read of the API routes reveals.

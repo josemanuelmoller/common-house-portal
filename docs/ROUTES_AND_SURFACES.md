@@ -1,5 +1,7 @@
 # Routes and Surfaces
 
+Last reviewed: 2026-04-14
+
 Status tags used below:
 - **live** -- implemented, rendering real data, in active use
 - **partial** -- implemented but incomplete, missing data or features

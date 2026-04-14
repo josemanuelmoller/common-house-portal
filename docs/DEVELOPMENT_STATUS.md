@@ -1,5 +1,7 @@
 # Development Status
 
+Last reviewed: 2026-04-14
+
 A candid summary of what is live, what is partial, and where the risks sit.
 
 ---
@@ -44,7 +46,7 @@ These areas are built, handling real data, and appear actively maintained:
 
 **`PLATFORM-IA.md` Section 10**: This section says "common-house-app/ does not yet exist as a subdirectory. Every CH platform surface is currently a static HTML file." This is no longer true. Section 10 describes a pre-implementation state. It should not be consulted for current architecture.
 
-**`DEPLOY.md`**: Partially accurate but contains a stale status table that calls Workroom a "stub" and omits Supabase env vars.
+**`DEPLOY.md`**: Rewritten and accurate as of 2026-04-14. Workroom is correctly listed as live. All Supabase env vars are present.
 
 ---
 
@@ -66,8 +68,8 @@ Neither directory should be modified as part of portal development. Whether they
 **2. Clerk is likely on test keys**
 The comments in `clients.ts` flag `CLERK_SECRET_KEY` and `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` as `pk_test_*`/`sk_test_*` and mark Clerk key rotation as "PENDING." No real client should be onboarded until production Clerk keys are in place.
 
-**3. Supabase env vars missing from deployment docs**
-`NEXT_PUBLIC_SUPABASE_URL` and `SUPABASE_SERVICE_KEY` are required for garage document uploads and library ingestion. They are not listed in `DEPLOY.md`. A deployment without them would silently break file upload features.
+**3. Supabase scope is broader than file storage**
+`NEXT_PUBLIC_SUPABASE_URL` and `SUPABASE_SERVICE_KEY` are both listed in `DEPLOY.md`. Supabase is used for garage document uploads, library ingestion, and at least one structured table (`agent_runs`, read by `/api/hall-data`). It is not confirmed whether additional Supabase tables exist beyond what a surface read of the routes reveals.
 
 **4. Evidence pipeline has no reconciliation**
 The garage upload flow writes to Supabase (file storage) and then to Notion (Data Room record) in two separate HTTP calls. If the second call fails, the file is orphaned in Supabase with no Notion record. There is no cleanup or reconciliation mechanism.
@@ -92,8 +94,8 @@ There is no test infrastructure in the Next.js app (no Jest, no Playwright). The
 
 ## Immediate cleanup priorities
 
-1. Add `NEXT_PUBLIC_SUPABASE_URL` and `SUPABASE_SERVICE_KEY` to `DEPLOY.md`.
-2. Update the status table in `DEPLOY.md` -- Workroom is fully built, not a stub.
+1. ~~Add `NEXT_PUBLIC_SUPABASE_URL` and `SUPABASE_SERVICE_KEY` to `DEPLOY.md`.~~ Done.
+2. ~~Update the status table in `DEPLOY.md` -- Workroom is fully built, not a stub.~~ Done.
 3. Remove or annotate the outdated Section 10 in `.claude/PLATFORM-IA.md`.
 4. Clarify the role of `/dashboard` -- retire it or document it explicitly.
 5. Decide what to do with `backend/` and `frontend/` -- they are unrelated and should not be in this repo.
