@@ -250,5 +250,5 @@ Return ONLY valid JSON array — no markdown, no explanation:
   const flagged = items.filter(i => i.label !== "FYI");
   const output  = flagged.length > 0 ? flagged.slice(0, 10) : items.slice(0, 5);
 
-  return NextResponse.json({ ok: true, items: output, total_scanned: candidates.length, _classificationError: classificationError, _hasApiKey: !!process.env.ANTHROPIC_API_KEY });
+  return NextResponse.json({ ok: true, items: output, total_scanned: candidates.length });
 }
