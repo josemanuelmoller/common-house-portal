@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 export function DraftFollowupButton({
   opportunityId,
@@ -10,6 +11,7 @@ export function DraftFollowupButton({
   notionUrl: string;
 }) {
   const [state, setState] = useState<"idle" | "loading" | "done" | "error">("idle");
+  const router = useRouter();
 
   async function handleDraft() {
     setState("loading");
@@ -21,6 +23,7 @@ export function DraftFollowupButton({
       });
       if (res.ok) {
         setState("done");
+        router.refresh();
         setTimeout(() => setState("idle"), 3000);
       } else {
         setState("error");

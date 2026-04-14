@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import type { AgentDraft } from "@/lib/notion";
 
 const DRAFT_TYPE_ICON: Record<string, string> = {
@@ -18,6 +19,7 @@ export function AgentQueueSection({ drafts }: { drafts: AgentDraft[] }) {
   const [expandedId, setExpandedId]     = useState<string | null>(null);
   const [states, setStates]             = useState<Record<string, DraftState>>({});
   const [dismissed, setDismissed]       = useState<Set<string>>(new Set());
+  const router = useRouter();
 
   const visible = drafts.filter((d) => !dismissed.has(d.id));
 
@@ -42,6 +44,7 @@ export function AgentQueueSection({ drafts }: { drafts: AgentDraft[] }) {
             setTimeout(() => setDismissed((prev) => new Set(prev).add(draftId)), 1200);
           }
         }
+        router.refresh();
       }
     } catch {
       setStates((s) => ({ ...s, [draftId]: "pending" }));
@@ -59,6 +62,7 @@ export function AgentQueueSection({ drafts }: { drafts: AgentDraft[] }) {
       if (res.ok) {
         setStates((s) => ({ ...s, [draftId]: "sent" }));
         setTimeout(() => setDismissed((prev) => new Set(prev).add(draftId)), 1500);
+        router.refresh();
       } else {
         setStates((s) => ({ ...s, [draftId]: "send_error" }));
       }
