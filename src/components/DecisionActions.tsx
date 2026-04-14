@@ -328,12 +328,13 @@ export function DecisionActions({
             const fields = (relatedFields ?? []).map(f => ({ field: f.field, value: notes[f.field] ?? "" }))
             await resolveAndUpdateMulti(id, effectiveEntityId, fields)
           } else if (effectiveEntityId) {
-            // Single text field write to entity — returns error as value (not thrown) to bypass Next.js prod sanitization
+            // Single text field write to entity — returns error as value (not thrown)
             const result = await resolveAndUpdate(id, effectiveEntityId, note, relatedField ?? "Notes")
-            if (result?.error) { setError(result.error); setLoading(null); return }
+            if (result?.error) { setError(`[entity] ${result.error}`); setLoading(null); return }
           } else {
-            // No entity — comment only
-            await resolveWithNote(id, note)
+            // No entity — comment + resolve DI only
+            const result = await resolveWithNote(id, note)
+            if (result?.error) { setError(`[note] ${result.error}`); setLoading(null); return }
           }
         } else {
           await resolveDecision(id)

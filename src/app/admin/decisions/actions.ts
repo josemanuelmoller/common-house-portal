@@ -47,11 +47,11 @@ export async function resolveDecision(id: string) {
 export async function resolveAndUpdate(
   id: string, entityId: string, note: string, field = "Notes"
 ): Promise<{ error?: string }> {
-  await requireAdminAction()
   const trimmed = note.trim()
   if (!trimmed) return { error: "El texto no puede estar vacío." }
 
   try {
+    await requireAdminAction()
     // Read existing value of the target field so we append rather than overwrite
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const entityPage = await notion.pages.retrieve({ page_id: entityId }) as any
@@ -99,23 +99,29 @@ export async function resolveAndUpdate(
   }
 }
 
-export async function resolveWithNote(id: string, note: string) {
-  await requireAdminAction()
+export async function resolveWithNote(id: string, note: string): Promise<{ error?: string }> {
   const trimmed = note.trim()
-  if (!trimmed) throw new Error("Note is empty")
+  if (!trimmed) return { error: "El texto no puede estar vacío." }
   try {
-    await notion.comments.create({
-      parent: { page_id: id },
-      rich_text: [{ type: "text", text: { content: `Human input:\n${trimmed}` } }],
+    await requireAdminAction()
+    try {
+      await notion.comments.create({
+        parent: { page_id: id },
+        rich_text: [{ type: "text", text: { content: `Human input:\n${trimmed}` } }],
+      })
+    } catch { /* comment permissions optional */ }
+    await notion.pages.update({
+      page_id: id,
+      properties: { "Status": { select: { name: "Resolved" } } },
     })
-  } catch { /* comment permissions optional */ }
-  await notion.pages.update({
-    page_id: id,
-    properties: {
-      "Status": { select: { name: "Resolved" } },
-    },
-  })
-  revalidatePath("/admin/decisions")
+    revalidatePath("/admin/decisions")
+    return {}
+  } catch (err) {
+    console.error("[resolveWithNote] error:", err)
+    const msg = err instanceof Error ? err.message
+      : (err as { message?: string })?.message ?? JSON.stringify(err)
+    return { error: msg }
+  }
 }
 
 /**
