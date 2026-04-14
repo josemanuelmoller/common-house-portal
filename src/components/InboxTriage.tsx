@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 
 export type InboxItem = {
   threadId: string;
@@ -34,9 +34,11 @@ interface Props {
 }
 
 export function InboxTriage({ initialItems, initialScanned = 0 }: Props) {
+  // If server-side fetch succeeded, start with those items; otherwise start empty and auto-load
+  const serverHasData = initialItems !== undefined && initialItems.length > 0;
   const [items, setItems]       = useState<InboxItem[]>(initialItems ?? []);
-  const [loading, setLoading]   = useState(false);
-  const [error, setError]       = useState<string | null>(initialItems === undefined ? "Gmail not configured" : null);
+  const [loading, setLoading]   = useState(!serverHasData); // auto-load when no server data
+  const [error, setError]       = useState<string | null>(null);
   const [scanned, setScanned]   = useState<number>(initialScanned);
   const [dismissed, setDismiss] = useState<Set<string>>(new Set());
 
@@ -59,6 +61,12 @@ export function InboxTriage({ initialItems, initialScanned = 0 }: Props) {
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  // Auto-load on mount when the server didn't provide data
+  useEffect(() => {
+    if (!serverHasData) refresh();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const visible = items.filter(i => !dismissed.has(i.threadId));
