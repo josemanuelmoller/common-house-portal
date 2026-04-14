@@ -7,3 +7,5 @@ export * from "./insights";
 export * from "./knowledge";
 export * from "./decisions";
 export * from "./living-room";
+export * from "./evidence";
+export * from "./sources";
