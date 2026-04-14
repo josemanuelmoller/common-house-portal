@@ -124,7 +124,8 @@ export default async function GarageViewPage() {
           {projects.length > 0 ? (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               {projects.map(p => {
-                const days    = daysSince(p.lastUpdate);
+                const activityDate = [p.lastUpdate, p.lastEvidenceDate].filter(Boolean).sort().pop() ?? null;
+                const days    = daysSince(activityDate);
                 const warmth  = warmthLabel(days);
 
                 return (

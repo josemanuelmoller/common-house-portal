@@ -257,7 +257,8 @@ export default async function DealFlowPage() {
                   {/* Rows */}
                   <div>
                     {projects.map(p => {
-                      const days = daysSince(p.lastUpdate);
+                      const activityDate = [p.lastUpdate, p.lastEvidenceDate].filter(Boolean).sort().pop() ?? null;
+                      const days = daysSince(activityDate);
                       const w = warmth(days);
                       const stg = p.engagementStage || p.stage || "";
                       const stageStyle = STAGE_STYLE[stg] ?? { bg: "#f5f5f0", text: "rgba(10,10,10,0.5)", border: "#d4d4cc" };
