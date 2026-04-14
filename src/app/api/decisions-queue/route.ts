@@ -56,7 +56,8 @@ export async function GET() {
       page_size: 20,
     });
 
-    const PRIORITY_ORDER: Record<string, number> = { Urgent: 0, High: 1, Normal: 2, Low: 3 };
+    // Priority values in Decision Items [OS v2]: "P1 Critical" | "High" | "Medium" | "Low"
+    const PRIORITY_ORDER: Record<string, number> = { "P1 Critical": 0, High: 1, Medium: 2, Low: 3 };
 
     const items = (res.results as AnyPage[])
       .map(page => {

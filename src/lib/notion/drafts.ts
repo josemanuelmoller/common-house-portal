@@ -6,7 +6,10 @@ export type AgentDraft = {
   id: string;
   title: string;
   draftType: string;    // LinkedIn Post | Follow-up Email | Check-in Email
-  status: string;       // Pending Review | Approved | Revision Requested | Superseded
+  // Full lifecycle: Pending Review → Approved → Sent | Draft Created | Revision Requested | Superseded
+  // "Sent" and "Draft Created" are terminal statuses written by /api/send-draft after Gmail delivery.
+  // These drafts no longer appear in the default getAgentDrafts("Pending Review") queue.
+  status: string;
   voice: string;        // JMM | CH
   platform: string;     // LinkedIn | Email | Internal
   draftText: string;

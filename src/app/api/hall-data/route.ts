@@ -109,8 +109,9 @@ export async function GET() {
       }
     })
 
-    // Parse decision items — surface Urgent/High at top
-    const PRIORITY_ORDER: Record<string, number> = { Urgent: 0, High: 1, Normal: 2, Low: 3 }
+    // Parse decision items — surface P1 Critical/High at top.
+    // Priority values in Decision Items [OS v2]: "P1 Critical" | "High" | "Medium" | "Low"
+    const PRIORITY_ORDER: Record<string, number> = { "P1 Critical": 0, High: 1, Medium: 2, Low: 3 }
     const decisions = (decisionsRes.results as AnyPage[])
       .map(page => {
         const p = page.properties
