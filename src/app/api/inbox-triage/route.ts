@@ -85,14 +85,19 @@ async function handleGet(req: NextRequest) {
     return NextResponse.json({ error: "Gmail not configured" }, { status: 503 });
   }
 
-  const thresholdMs = THRESHOLD_DAYS * 24 * 60 * 60 * 1000;
+  // Support ?days=N for backlog scans (default 2)
+  const daysParam = parseInt(req.nextUrl.searchParams.get("days") ?? "", 10);
+  const thresholdDays = daysParam > 0 ? daysParam : THRESHOLD_DAYS;
+  const maxThreads    = thresholdDays > 7 ? 50 : MAX_THREADS;
+
+  const thresholdMs = thresholdDays * 24 * 60 * 60 * 1000;
   const nowMs = Date.now();
 
   // Fetch recent inbox threads — exclude promotions, social, updates
   const threadsRes = await gmail.users.threads.list({
     userId: "me",
     q: "in:inbox -category:promotions -category:social -category:updates",
-    maxResults: MAX_THREADS,
+    maxResults: maxThreads,
   });
 
   const threads = threadsRes.data.threads ?? [];
@@ -194,7 +199,7 @@ async function handleGet(req: NextRequest) {
 Classify each email as exactly one of: "Urgent", "Needs Reply", or "FYI".
 
 Rules:
-- "Urgent": sender is a partner, funder, investor, retailer, grant body, or government entity; OR email mentions a deadline, decision, contract, or explicit request. Max 3 Urgents.
+- "Urgent": sender is a partner, funder, investor, retailer, grant body, or government entity; OR email mentions a deadline, decision, contract, or explicit request.${thresholdDays <= 2 ? " Max 3 Urgents." : ""}
 - "Needs Reply": clear question, invitation, intro, or action requested. Jose should respond.
 - "FYI": newsletter, notification, auto-generated, low-stakes update.
 
