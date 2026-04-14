@@ -1,5 +1,6 @@
 import { currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
+import { unstable_cache } from "next/cache";
 import { Sidebar } from "@/components/Sidebar";
 import { HallHero } from "@/components/hall/HallHero";
 import { WhatsHappeningNow } from "@/components/hall/WhatsHappeningNow";
@@ -28,6 +29,24 @@ import type {
 } from "@/types/hall";
 import { WORKSPACE_READY } from "@/types/workroom";
 
+// Cache Notion data at the Data Cache layer — works even though the route is
+// dynamically rendered (Clerk auth uses cookies, which opts out of static ISR).
+// Keyed by projectId so each project gets its own cache slot. TTL: 30 min.
+const getHallData = unstable_cache(
+  async (projectId: string) => {
+    const [project, evidence, people, documents, activity] = await Promise.all([
+      getProjectById(projectId),
+      getEvidenceForProject(projectId),
+      getProjectPeople(projectId),
+      getDocumentsForProject(projectId),
+      getSourceActivity(projectId),
+    ]);
+    return { project, evidence, people, documents, activity };
+  },
+  ["hall-data"],
+  { revalidate: 1800 }
+);
+
 function formatHallDate(iso: string | null | undefined): string {
   if (!iso) return "";
   try {
@@ -48,12 +67,6 @@ function getInitials(name: string): string {
     : name.slice(0, 2).toUpperCase();
 }
 
-// Strips HTML line-break tags left by the Notion rich_text renderer
-// and trims to the first logical paragraph for use as a short status line.
-function firstParagraph(raw: string): string {
-  return raw.replace(/<br\s*\/?>/gi, "\n").split(/\n{2,}/)[0].trim();
-}
-
 // Strips internal prefixes from meeting titles for client display.
 // e.g. "[Meeting] Auto Mercado — Reunión TI" → "Reunión TI"
 function cleanConversationTitle(raw: string): string {
@@ -61,6 +74,24 @@ function cleanConversationTitle(raw: string): string {
     .replace(/^\[(?:Meeting|Email|Call|Workshop)\]\s*/i, "")
     .replace(/^[^—–-]+[—–-]\s*/, "")
     .trim() || raw;
+}
+
+// Splits a processed summary into a main body + optional takeaway.
+// If the summary has multiple paragraphs and the last one is concise (≤200 chars),
+// the last paragraph surfaces as the takeaway callout in Conversations.
+function splitSummary(raw: string): { summary: string; takeaway?: string } {
+  const paragraphs = raw.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
+  if (paragraphs.length < 2) return { summary: raw };
+  const last = paragraphs[paragraphs.length - 1];
+  if (last.length > 200) return { summary: raw };
+  return { summary: paragraphs.slice(0, -1).join("\n\n"), takeaway: last };
+}
+
+// Maps evidence confidence to a decision display status.
+function decisionStatus(confidence: string): HallDecision["status"] {
+  if (confidence === "High") return "confirmed";
+  if (confidence === "Low")  return "revisited";
+  return "pending";
 }
 
 export default async function HallPage() {
@@ -93,13 +124,7 @@ export default async function HallPage() {
     );
   }
 
-  const [project, evidence, people, documents, activity] = await Promise.all([
-    getProjectById(projectId),
-    getEvidenceForProject(projectId),
-    getProjectPeople(projectId),
-    getDocumentsForProject(projectId),
-    getSourceActivity(projectId),
-  ]);
+  const { project, evidence, people, documents, activity } = await getHallData(projectId);
 
   if (!project) redirect("/sign-in");
 
@@ -135,10 +160,7 @@ export default async function HallPage() {
   // ── HallProject ──────────────────────────────────────────────────────────
   // Real fields now: hallWelcomeNote, hallCurrentFocus, hallNextMilestone
   // Fallback chain: Hall field → statusSummary first paragraph → empty
-  const currentFocus =
-    project.hallCurrentFocus ||
-    firstParagraph(project.statusSummary) ||
-    "";
+  const currentFocus = project.hallCurrentFocus || "";
 
   const hallProject: HallProject = {
     id:           project.id,
@@ -174,13 +196,17 @@ export default async function HallPage() {
   // Only show meetings that have a processed summary — hide engine-only records.
   const conversations: HallConversation[] = activity.meetings
     .filter((m) => !!m.processedSummary)
-    .map((m) => ({
-      id:       m.id,
-      title:    cleanConversationTitle(m.title),
-      date:     formatHallDate(m.date) || "—",
-      summary:  m.processedSummary!,
-      takeaway: undefined,
-    }));
+    .slice(0, 5)
+    .map((m) => {
+      const { summary, takeaway } = splitSummary(m.processedSummary!);
+      return {
+        id:    m.id,
+        title: cleanConversationTitle(m.title),
+        date:  formatHallDate(m.date) || "—",
+        summary,
+        takeaway,
+      };
+    });
 
   // ── Decisions ────────────────────────────────────────────────────────────
   const decisions: HallDecision[] = evidence
@@ -190,7 +216,7 @@ export default async function HallPage() {
       title:   e.title,
       date:    formatHallDate(e.dateCaptured) || "—",
       context: e.excerpt || undefined,
-      status:  "confirmed" as const,
+      status:  decisionStatus(e.confidence),
     }));
 
   // ── Team ─────────────────────────────────────────────────────────────────
@@ -201,7 +227,7 @@ export default async function HallPage() {
     id:       p.id,
     name:     p.name,
     role:     p.jobTitle || "Common House",
-    bio:      "",
+    bio:      p.roles.length > 0 ? p.roles.join(" · ") : "",
     initials: getInitials(p.name),
   }));
 
@@ -226,6 +252,29 @@ export default async function HallPage() {
 
   // Digital Residents — show capability layer when project is live and has real signals.
   const showDigitalResidents = isLive;
+
+  // Live signal strings shown inside each Digital Resident row.
+  // Falls back to static tagline text if a role has no data yet.
+  const plural = (n: number, word: string) => `${n} ${word}${n !== 1 ? "s" : ""}`;
+  const blockerCount = evidence.filter(
+    (e) => e.type === "Blocker" && e.validationStatus === "Validated"
+  ).length;
+  const outcomeCount = evidence.filter(
+    (e) => e.type === "Outcome" && e.validationStatus === "Validated"
+  ).length;
+  const residentSignals = {
+    memory_keeper: [
+      conversations.length > 0 && `${plural(conversations.length, "session")} on record`,
+      materials.length > 0   && `${plural(materials.length, "document")} shared`,
+    ].filter(Boolean).join(" · ") || undefined,
+    decision_keeper: decisions.length > 0
+      ? `${plural(decisions.length, "decision")} captured`
+      : undefined,
+    progress_keeper: [
+      blockerCount > 0  && `${plural(blockerCount, "blocker")} flagged`,
+      outcomeCount > 0  && `${plural(outcomeCount, "outcome")} tracked`,
+    ].filter(Boolean).join(" · ") || undefined,
+  };
 
   return (
     <div className="flex min-h-screen bg-[#EFEFEA]">
@@ -286,7 +335,7 @@ export default async function HallPage() {
             )}
 
             {/* Digital Residents — capability layer, closes the Hall */}
-            {showDigitalResidents && <DigitalResidents />}
+            {showDigitalResidents && <DigitalResidents liveSignals={residentSignals} />}
 
           </div>
         </div>

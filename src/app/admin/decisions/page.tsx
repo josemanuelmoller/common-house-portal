@@ -110,20 +110,11 @@ function DecisionRow({ item }: { item: DecisionItem }) {
           requiresExecute={item.requiresExecute}
           executeApproved={item.executeApproved}
           status={item.status}
+          decisionType={item.decisionType}
+          notionUrl={item.notionUrl}
         />
       </div>
 
-      {/* Open in Notion */}
-      {item.notionUrl && (
-        <a
-          href={item.notionUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-[10px] font-bold text-[#131218]/20 hover:text-[#131218]/60 transition-colors shrink-0 mt-0.5"
-        >
-          Notion →
-        </a>
-      )}
     </div>
   );
 }
