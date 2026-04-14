@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 
-type InboxItem = {
+export type InboxItem = {
   threadId: string;
   subject: string;
   from: string;
@@ -27,26 +27,28 @@ const LABEL_DOT: Record<string, string> = {
   "FYI":         "bg-[#131218]/20",
 };
 
-export function InboxTriage() {
-  const [items, setItems]       = useState<InboxItem[] | null>(null);
-  const [loading, setLoading]   = useState(true);
-  const [error, setError]       = useState<string | null>(null);
-  const [scanned, setScanned]   = useState<number>(0);
+interface Props {
+  /** Pre-fetched server-side data. If provided, skips the initial client fetch. */
+  initialItems?: InboxItem[];
+  initialScanned?: number;
+}
+
+export function InboxTriage({ initialItems, initialScanned = 0 }: Props) {
+  const [items, setItems]       = useState<InboxItem[]>(initialItems ?? []);
+  const [loading, setLoading]   = useState(false);
+  const [error, setError]       = useState<string | null>(initialItems === undefined ? "Gmail not configured" : null);
+  const [scanned, setScanned]   = useState<number>(initialScanned);
   const [dismissed, setDismiss] = useState<Set<string>>(new Set());
 
-  const load = useCallback(async () => {
+  const refresh = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const res = await fetch("/api/inbox-triage", {
         headers: { "x-agent-key": "ch-os-agent-2024-secure" },
       });
-      if (res.status === 503) {
-        setError("Gmail not configured");
-        return;
-      }
       if (!res.ok) {
-        setError("Failed to load inbox");
+        setError("Failed to refresh inbox");
         return;
       }
       const data = await res.json();
@@ -59,22 +61,28 @@ export function InboxTriage() {
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
-
-  const visible = (items ?? []).filter(i => !dismissed.has(i.threadId));
+  const visible = items.filter(i => !dismissed.has(i.threadId));
 
   if (loading) {
     return (
       <div className="flex items-center gap-2 py-3">
         <span className="w-1.5 h-1.5 rounded-full bg-[#131218]/20 animate-pulse" />
-        <span className="text-[11px] text-[#131218]/30">Scanning inbox…</span>
+        <span className="text-[11px] text-[#131218]/30">Refreshing inbox…</span>
       </div>
     );
   }
 
   if (error) {
     return (
-      <p className="text-[11px] text-[#131218]/30 py-2">{error}</p>
+      <div className="flex items-center justify-between py-2">
+        <p className="text-[11px] text-[#131218]/30">{error}</p>
+        <button
+          onClick={refresh}
+          className="text-[9px] font-bold text-[#131218]/25 hover:text-[#131218] transition-colors uppercase tracking-widest"
+        >
+          Retry
+        </button>
+      </div>
     );
   }
 
@@ -83,7 +91,7 @@ export function InboxTriage() {
       <div className="flex items-center justify-between py-3">
         <p className="text-[12px] text-[#131218]/35">Inbox clear — no threads waiting 2+ days.</p>
         <button
-          onClick={load}
+          onClick={refresh}
           className="text-[9px] font-bold text-[#131218]/25 hover:text-[#131218] transition-colors uppercase tracking-widest"
         >
           Refresh
@@ -99,10 +107,8 @@ export function InboxTriage() {
           key={item.threadId}
           className="bg-white rounded-xl border border-[#E0E0D8] px-4 py-3 flex items-start gap-3"
         >
-          {/* Urgency dot */}
           <span className={`mt-[3px] w-2 h-2 rounded-full shrink-0 ${LABEL_DOT[item.label]}`} />
 
-          {/* Content */}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-0.5 flex-wrap">
               <span className="text-[12px] font-semibold text-[#131218] truncate max-w-[320px]">
@@ -128,7 +134,6 @@ export function InboxTriage() {
             )}
           </div>
 
-          {/* Right: label + actions */}
           <div className="flex flex-col items-end gap-1.5 shrink-0">
             <span className={`text-[8.5px] font-bold px-2 py-0.5 rounded-full ${LABEL_STYLE[item.label]}`}>
               {item.label}
@@ -154,13 +159,12 @@ export function InboxTriage() {
         </div>
       ))}
 
-      {/* Footer */}
       <div className="flex items-center justify-between pt-1">
         <p className="text-[9px] text-[#131218]/20">
           {scanned} thread{scanned !== 1 ? "s" : ""} scanned · {visible.length} flagged
         </p>
         <button
-          onClick={load}
+          onClick={refresh}
           className="text-[9px] font-bold text-[#131218]/25 hover:text-[#131218] transition-colors uppercase tracking-widest"
         >
           Refresh

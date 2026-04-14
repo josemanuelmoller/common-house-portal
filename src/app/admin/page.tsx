@@ -22,7 +22,7 @@
 import Link from "next/link";
 import { Sidebar } from "@/components/Sidebar";
 import { AgentQueueSection } from "@/components/AgentQueueSection";
-import { InboxTriage } from "@/components/InboxTriage";
+import { InboxTriage, type InboxItem } from "@/components/InboxTriage";
 import { DraftCheckinButton } from "@/components/DraftCheckinButton";
 import { DraftFollowupButton } from "@/components/DraftFollowupButton";
 import {
@@ -111,6 +111,22 @@ function SectionHeader({ label, count, action, href }: {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
+async function fetchInboxServer(): Promise<{ items: InboxItem[]; total_scanned: number }> {
+  try {
+    const base = process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : "http://localhost:3000";
+    const res = await fetch(`${base}/api/inbox-triage`, {
+      headers: { "x-agent-key": "ch-os-agent-2024-secure" },
+      cache: "no-store",
+    });
+    if (!res.ok) return { items: [], total_scanned: 0 };
+    return res.json();
+  } catch {
+    return { items: [], total_scanned: 0 };
+  }
+}
+
 export default async function AdminPage() {
   const adminUser = await requireAdmin();
 
@@ -123,6 +139,7 @@ export default async function AdminPage() {
     opportunities,
     coldRelationships,
     readyContent,
+    inboxData,
   ] = await Promise.all([
     getProjectsOverview(),
     getDecisionItems("Open"),
@@ -132,6 +149,7 @@ export default async function AdminPage() {
     getOpportunitiesByScope(),
     getColdRelationships(),
     getReadyContent(),
+    fetchInboxServer(),
   ]);
 
   // ── Derived state ────────────────────────────────────────────────────────────
@@ -331,7 +349,7 @@ export default async function AdminPage() {
           {/* ── 4b. Inbox Triage ──────────────────────────────────────────── */}
           <div>
             <SectionHeader label="Inbox — needs attention" />
-            <InboxTriage />
+            <InboxTriage initialItems={inboxData.items} initialScanned={inboxData.total_scanned} />
           </div>
 
           {/* ── Two-column main layout ─────────────────────────────────────── */}
