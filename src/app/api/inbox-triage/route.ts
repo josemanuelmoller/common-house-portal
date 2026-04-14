@@ -216,7 +216,8 @@ Return ONLY valid JSON array — no markdown, no explanation:
     const raw = (res.content[0] as { type: string; text: string }).text.trim();
     const jsonMatch = raw.match(/\[[\s\S]*\]/);
     classifications = JSON.parse(jsonMatch?.[0] ?? "[]");
-  } catch {
+  } catch (err) {
+    console.error("[inbox-triage] Claude classification error:", err instanceof Error ? err.message : String(err));
     // If Claude fails, return candidates with default label
     classifications = top.map((_, i) => ({ index: i + 1, label: "Needs Reply", reason: "Unable to classify" }));
   }
