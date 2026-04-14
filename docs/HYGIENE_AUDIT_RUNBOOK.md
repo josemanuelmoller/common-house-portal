@@ -2,7 +2,7 @@
 
 Common House Portal — code hygiene system, operational guide
 
-Last reviewed: 2026-04-15
+Last reviewed: 2026-04-14 (v2 upgrade)
 
 ---
 
@@ -28,7 +28,7 @@ That is the complete trigger. The skill loads its own reference documents and ru
 
 ---
 
-## What it scans (v1 scope)
+## What it scans (v2 scope)
 
 | Pass | What it looks for | Tier if found |
 |---|---|---|
@@ -39,8 +39,10 @@ That is the complete trigger. The skill loads its own reference documents and ru
 | 5 | Dead imports in `src/lib/notion.ts` after module extraction | A |
 | 6 | Refactor plan progress markers out of sync with existing files | A |
 | 7 | Stale inline comments contradicting current field contracts | A |
+| 8 | Read-path Notion field name aliases (`"Draft Text"` in Agent Drafts context; `"Title"`/`"Name"` near agentDrafts) | A (confirmed Agent Drafts) / B (ambiguous) |
+| 9 | Missing `router.refresh()` in `"use client"` components with mutating fetches | B |
 
-Passes NOT included in v1: API auth gaps, missing `router.refresh()` additions, Notion schema auditing, cross-file dependency analysis. See `docs/AUTO_MAINTENANCE_IMPLEMENTATION_PLAN.md` for the full v2+ roadmap.
+Passes NOT included in v2: API auth gaps, Notion schema auditing, cross-file dependency analysis, auto-adding `router.refresh()`. See `docs/AUTO_MAINTENANCE_IMPLEMENTATION_PLAN.md` for the full roadmap.
 
 ---
 

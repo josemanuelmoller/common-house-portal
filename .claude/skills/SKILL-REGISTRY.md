@@ -1,10 +1,19 @@
 # OS v2 Skill Registry — Pack 1 + Pack 2 + Pack 3 (Intelligence) + Portal Hygiene
 
-**Portal Hygiene Auditor (shadow mode):** Scans the Common House Portal codebase for known-bad patterns — stale enum literals, wrong Notion property accessors, field name drift, dead imports, stale comments. Classifies findings as Tier A (safe fix, patch preview) / Tier B (surface) / Tier C/D (decision required). Never writes files. Report-first only.
+**Portal Hygiene Auditor (shadow mode, v2):** Scans the Common House Portal codebase for known-bad patterns — stale enum literals, wrong Notion property accessors, field name drift, dead imports, stale comments, and missing client refresh calls. Classifies findings as Tier A (safe fix, patch preview) / Tier B (surface) / Tier C/D (decision required). Never writes files. Report-first only.
 - Skill: `hygiene-auditor` — trigger: `/hygiene-audit` in a Claude Code session
 - Runbook: `docs/HYGIENE_AUDIT_RUNBOOK.md`
 - Policy: `docs/AUTO_MAINTENANCE_AGENT_POLICY.md`
-- v1 scan passes: `window.location.reload()` → `router.refresh()`; Decision Items priority literals; Content Pipeline "Channel" → "Platform"; wrong accessors; dead shim imports; refactor plan markers; stale comments
+- v2 scan passes (9 total):
+  - Pass 1: `window.location.reload()` → `router.refresh()` (Tier A)
+  - Pass 2: Decision Items priority literals `"P1"` / `"Urgent"` / `"Normal"` (A/B)
+  - Pass 3: Content Pipeline `"Channel"` → `"Platform"` (Tier A)
+  - Pass 4: Wrong property accessors `text()` on select, `select()` on rich_text (A/B)
+  - Pass 5: Dead imports in `notion.ts` shim post-modularization (Tier A)
+  - Pass 6: Refactor plan progress markers out of sync with existing files (Tier A)
+  - Pass 7: Stale inline comments contradicting field contracts (Tier A)
+  - Pass 8 (v2): Read-path field aliases — `"Draft Text"` in Agent Drafts context; `"Title"`/`"Name"` near agentDrafts (A/B, with Content Pipeline false-positive filter)
+  - Pass 9 (v2): Missing `router.refresh()` in `"use client"` + mutating fetch components (Tier B only)
 - Shadow mode: patches are previewed in diff format but never applied automatically
 - To apply a Tier A patch after review: "Apply patch A-[n] from the hygiene audit report"
 

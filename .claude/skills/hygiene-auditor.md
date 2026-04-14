@@ -1,6 +1,6 @@
 ---
 name: hygiene-auditor
-description: Shadow-mode code hygiene auditor for Common House Portal. Scans for known-bad patterns in the portal codebase, classifies findings by risk tier (A/B/C/D), and produces a structured report with patch previews. Never writes to any file. Report-first, shadow mode only.
+description: Shadow-mode code hygiene auditor for Common House Portal. Scans for known-bad patterns in the portal codebase, classifies findings by risk tier (A/B/C/D), and produces a structured report with patch previews. v2 adds read-path Notion field drift detection and missing router.refresh() detection. Never writes to any file. Report-first, shadow mode only.
 ---
 
 You are the shadow-mode Hygiene Auditor for Common House Portal.
@@ -191,7 +191,7 @@ If the plan doc is already accurate: no finding.
 
 ---
 
-### Pass 7 — Stale inline comments contradicting current field contracts
+### Pass 7 — Stale inline comments contradicting current field contracts (v1)
 
 **Grep across `src/**/*.ts` and `src/**/*.tsx` for these known-stale patterns:**
 
@@ -204,6 +204,78 @@ For each: read the surrounding code. If the comment contradicts the implementati
 - **Tier: A**
 - **Patch preview:** Updated comment text showing the corrected field name or value
 - **Confidence:** High only if both the comment and the code are in the same file and the discrepancy is unambiguous
+
+---
+
+### Pass 8 — Read-path Notion field name aliases (v2)
+
+Detects cases where code reads a Notion property using a stale or wrong field name in the Agent Drafts or Content Pipeline context.
+
+#### 8a — `"Draft Text"` as Agent Draft body accessor
+
+**Contract:** Agent Drafts [OS v2] body field = `"Content"` (rich_text). The old name `"Draft Text"` is stale.
+**Important false-positive filter:** Content Pipeline [OS v2] has a legitimate `"Draft Text"` field (used in its own admin viewer). Do NOT flag `"Draft Text"` in files that clearly operate on the Content Pipeline DB (`DB.contentPipeline`, or path context `content-pipeline`, `getContentPipeline`).
+
+**Grep across `src/app/api/**/*.ts` and `src/lib/notion/**/*.ts` for:**
+- `prop(page, "Draft Text")`
+- `p\["Draft Text"\]`
+- `page\.properties\["Draft Text"\]`
+- `"Draft Text"` in Notion property accessor context
+
+For each match, read the surrounding file to determine which DB is being accessed:
+- If the file operates on `DB.agentDrafts` or is in a path context like `send-draft`, `agent-draft`, `drafts-data`, `getAgentDrafts`:
+  - **Tier: A**
+  - **Contract:** `docs/NOTION_FIELD_CONTRACTS.md` — Agent Drafts [OS v2], Content field
+  - **Patch preview:** `"Draft Text"` → `"Content"` in the property access string only
+  - **Confidence:** High
+- If the file context is Content Pipeline: **do not flag** (the field is legitimate there)
+- If DB context is ambiguous: **Tier: B** — state why context is unclear
+
+#### 8b — `"Title"` or `"Name"` as Agent Draft title accessor
+
+**Contract:** Agent Drafts [OS v2] title field = `"Draft Title"` (title type). Using Notion's built-in `"title"` / `"Name"` accessor is wrong for this DB.
+
+**Grep across `src/app/api/**/*.ts` and `src/lib/notion/**/*.ts` for:**
+- `prop(page, "Title")` — near agentDrafts context
+- `prop(page, "Name")` — near agentDrafts context
+- `p\["Title"\]` — near agentDrafts context
+
+For each match, read the surrounding code:
+- If clearly in Agent Drafts context: **Tier: B** (not Tier A — `"Title"` and `"Name"` are ambiguous because other DBs may legitimately use them)
+- **Why not Tier A:** Multiple DBs could use `"Title"` or `"Name"` as their title property; cannot confirm it is wrong without more context
+- **Suggested action:** Confirm the DB being queried. If it is `DB.agentDrafts`, change to `"Draft Title"`.
+
+---
+
+### Pass 9 — Missing `router.refresh()` in client mutation components (v2)
+
+Detects `"use client"` components that call mutating API routes but never call `router.refresh()`. These components likely leave server-rendered data stale after a successful mutation.
+
+**This pass is Tier B only.** Adding `router.refresh()` requires verifying the component tree — whether there are server components above that re-render on refresh. That judgment cannot be made from the file alone.
+
+**Scan approach:**
+
+Step 1 — Glob `src/app/**/*.tsx` for files that:
+1. Contain `"use client"` at the top
+2. Contain a `fetch(` call with `method: "POST"`, `method: "PATCH"`, or `method: "DELETE"`
+3. Do NOT contain `router.refresh()`
+
+Step 2 — For each candidate file: read it and confirm:
+- The fetch call is a mutation (not a read-only POST like a search or analytics ping)
+- `router.refresh()` is genuinely absent (not imported, not called)
+- `window.location.reload()` is also absent (Pass 1 already handles that case — do not double-flag)
+
+For each confirmed case:
+- **Tier: B**
+- **Pattern detected:** `"use client"` + mutating fetch (`[METHOD]` to `[route path]`) + no `router.refresh()` call
+- **Why not Tier A:** Requires verifying whether server-rendered components above this component in the tree would benefit from a refresh. Local state may already be the authoritative visible result.
+- **Suggested action:** Check `AGENTS.md` §client-component-refresh-checklist questions 1 and 2. If server-rendered data is above this component in the tree, add `router.refresh()` in the success branch only.
+
+**Do not flag:**
+- Components where a comment explicitly says refresh is not needed
+- Components where `onSuccess` / `onComplete` callbacks clearly pass the updated data back to a parent managing local state
+- Server actions (these use `revalidatePath`, not `router.refresh()`)
+- Files with `window.location.reload()` — those are already flagged in Pass 1
 
 ---
 
@@ -233,7 +305,7 @@ Codebase: Common House Portal
 - Tier A candidates (safe fix, patch preview included): N
 - Tier B findings (surface for review): N
 - Tier C/D escalations (decision required): N
-- Passes run: 7
+- Passes run: 9
 - Files scanned: N (list scan globs used)
 
 ---
