@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { adminGuardApi } from "@/lib/require-admin";
 import { Client } from "@notionhq/client";
 import Anthropic from "@anthropic-ai/sdk";
 
@@ -21,6 +22,9 @@ export async function OPTIONS() {
 }
 
 export async function POST(req: NextRequest) {
+  const guard = await adminGuardApi();
+  if (guard) return guard;
+
   const body = await req.json().catch(() => ({}));
   const topicHint: string = body.topic_hint ?? "";
 

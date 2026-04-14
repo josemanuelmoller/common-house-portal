@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { adminGuardApi } from "@/lib/require-admin";
 import { notion, DB } from "@/lib/notion";
 
 function corsHeaders() {
@@ -63,6 +64,9 @@ const PRIORITY_SHORT: Record<string, string> = {
 };
 
 export async function GET() {
+  const guard = await adminGuardApi();
+  if (guard) return guard;
+
   try {
     const res = await notion.databases.query({
       database_id: DB.opportunities,

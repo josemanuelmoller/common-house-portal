@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { notion, getAllEvidence, DB } from "@/lib/notion";
 
 export const maxDuration = 120;
@@ -10,9 +10,21 @@ export const maxDuration = 120;
 //   ESCALATE       → No Source Excerpt regardless of confidence → leave as "Reviewed"
 //
 // Called by Vercel cron daily at 03:00 UTC (weekdays).
-// Also callable manually via POST /api/validation-operator (no body required).
+// Also callable manually — requires x-agent-key or Authorization: Bearer <CRON_SECRET>.
 
-export async function POST() {
+function isAuthorized(req: NextRequest): boolean {
+  const agentKey = req.headers.get("x-agent-key");
+  const cronKey  = req.headers.get("authorization");
+  const expected = process.env.CRON_SECRET;
+  if (!expected) return false;
+  return agentKey === expected || cronKey === `Bearer ${expected}`;
+}
+
+export async function POST(req: NextRequest) {
+  if (!isAuthorized(req)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   if (!process.env.NOTION_TOKEN) {
     return NextResponse.json({ error: "NOTION_TOKEN not configured" }, { status: 500 });
   }
@@ -62,6 +74,6 @@ export async function POST() {
 }
 
 // Vercel cron calls GET
-export async function GET() {
-  return POST();
+export async function GET(req: NextRequest) {
+  return POST(req);
 }

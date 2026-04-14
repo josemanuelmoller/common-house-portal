@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { adminGuardApi } from "@/lib/require-admin";
 import { Client } from "@notionhq/client";
 import Anthropic from "@anthropic-ai/sdk";
 
@@ -33,6 +34,9 @@ function titleOf(page: any): string {
 }
 
 export async function POST(_req: NextRequest) {
+  const guard = await adminGuardApi();
+  if (guard) return guard;
+
   const today = new Date().toISOString().slice(0, 10);
 
   // 1. Pull signals from all relevant surfaces in parallel

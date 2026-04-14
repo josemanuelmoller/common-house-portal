@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { adminGuardApi } from "@/lib/require-admin";
 import { Client } from "@notionhq/client";
 import Anthropic from "@anthropic-ai/sdk";
 
@@ -8,6 +9,9 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const AGENT_DRAFTS_DB = "9844ece875ea4c618f616e8cc97d5a90";
 
 export async function POST(req: NextRequest) {
+  const guard = await adminGuardApi();
+  if (guard) return guard;
+
   const { personId } = await req.json();
   if (!personId) {
     return NextResponse.json({ error: "personId required" }, { status: 400 });

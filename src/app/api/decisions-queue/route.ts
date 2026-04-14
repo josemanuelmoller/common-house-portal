@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { adminGuardApi } from "@/lib/require-admin";
 import { notion, DB } from "@/lib/notion";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -44,6 +45,9 @@ export async function OPTIONS() {
 }
 
 export async function GET() {
+  const guard = await adminGuardApi();
+  if (guard) return guard;
+
   try {
     const res = await notion.databases.query({
       database_id: DB.decisions,

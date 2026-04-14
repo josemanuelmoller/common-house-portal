@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { adminGuardApi } from "@/lib/require-admin";
 import { notion } from "@/lib/notion";
 
 function corsHeaders() {
@@ -13,6 +14,9 @@ export async function OPTIONS() {
 }
 
 export async function POST(req: NextRequest) {
+  const guard = await adminGuardApi();
+  if (guard) return guard;
+
   const body = await req.json().catch(() => ({}));
   const id: string = body.id ?? "";
   const action: string = body.action ?? "resolve"; // "resolve" | "dismiss"

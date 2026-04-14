@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { adminGuardApi } from "@/lib/require-admin";
 import { notion, DB } from "@/lib/notion";
 
 const ORGS_DB = "bef1bb86ab2b4cd280b6b33f9034b96c";
@@ -29,6 +30,9 @@ export async function OPTIONS() {
 }
 
 export async function POST(req: NextRequest) {
+  const guard = await adminGuardApi();
+  if (guard) return guard;
+
   const body = await req.json().catch(() => ({}));
   const funderName: string = body.funder ?? "";
   const program: string = body.program ?? "";

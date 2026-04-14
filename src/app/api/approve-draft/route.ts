@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+import { adminGuardApi } from "@/lib/require-admin";
 import { Client } from "@notionhq/client";
 
 const notion = new Client({ auth: process.env.NOTION_API_KEY });
 
 export async function POST(req: NextRequest) {
+  const guard = await adminGuardApi();
+  if (guard) return guard;
+
   const { draftId, action } = await req.json();
 
   if (!draftId || !action) {
