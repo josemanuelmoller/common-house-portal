@@ -40,6 +40,14 @@
     {
       "path": "/api/validation-operator",
       "schedule": "0 3 * * 1-5"
+    },
+    {
+      "path": "/api/relationship-warmth",
+      "schedule": "0 6 * * 1,4"
+    },
+    {
+      "path": "/api/generate-daily-briefing",
+      "schedule": "30 7 * * 1-5"
     }
   ]
 }

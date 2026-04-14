@@ -22,6 +22,7 @@
 import Link from "next/link";
 import { Sidebar } from "@/components/Sidebar";
 import { AgentQueueSection } from "@/components/AgentQueueSection";
+import { InboxTriage } from "@/components/InboxTriage";
 import { DraftCheckinButton } from "@/components/DraftCheckinButton";
 import { DraftFollowupButton } from "@/components/DraftFollowupButton";
 import {
@@ -304,6 +305,12 @@ export default async function AdminPage() {
               <AgentQueueSection drafts={agentDrafts} />
             </div>
           )}
+
+          {/* ── 4b. Inbox Triage ──────────────────────────────────────────── */}
+          <div>
+            <SectionHeader label="Inbox — needs attention" />
+            <InboxTriage />
+          </div>
 
           {/* ── Two-column main layout ─────────────────────────────────────── */}
           <div className="grid grid-cols-[1fr_340px] gap-6 items-start">

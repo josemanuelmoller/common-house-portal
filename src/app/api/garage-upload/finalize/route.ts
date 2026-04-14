@@ -115,7 +115,10 @@ export async function POST(req: NextRequest) {
     r.name.toLowerCase().endsWith(".pdf") && r.notionId && r.storagePath
   );
   if (pdfUploads.length > 0 && projectId) {
-    const ingestUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/api/garage-ingest`;
+    // Derive base URL from the incoming request — avoids needing NEXT_PUBLIC_APP_URL env var
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL
+      ?? `${req.nextUrl.protocol}//${req.nextUrl.host}`;
+    const ingestUrl = `${appUrl}/api/garage-ingest`;
     const agentKey  = process.env.CRON_SECRET ?? "";
 
     for (const upload of pdfUploads) {
