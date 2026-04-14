@@ -364,91 +364,92 @@ export function DecisionActions({
   return (
     <div className="flex flex-col gap-2 mt-2">
 
-      {/* Fix 1 — entity search when no relatedEntityId on legacy items */}
-      {needsInput && !relatedEntityId && !selectedEntityId && (
-        <EntitySearch
-          onSelect={(eid, ename) => { setSelectedEntityId(eid); setSelectedEntityName(ename) }}
+      {/* Relation search (required — replaces textarea for relation fields) */}
+      {needsInput && isRelation && relatedSearchDb && relatedField && (
+        <RelationSearch
+          searchDb={relatedSearchDb}
+          fieldName={relatedField}
+          placeholder={cfg.searchPlaceholder}
+          disabled={loading !== null}
+          onConfirm={rid => setConfirmedRelationId(rid)}
         />
       )}
 
-      {/* Show selected entity badge (Fix 1) */}
-      {needsInput && !relatedEntityId && selectedEntityId && (
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1.5 px-2.5 py-1 bg-green-50 border border-green-200 rounded-lg">
-            <span className="text-[10px] text-green-600">✓</span>
-            <span className="text-[11px] font-medium text-[#131218]">{selectedEntityName}</span>
-          </div>
-          <button
-            onClick={() => { setSelectedEntityId(null); setSelectedEntityName(null) }}
-            className="text-[10px] text-[#131218]/30 hover:text-[#131218]/60 transition-colors"
-          >
-            Cambiar
-          </button>
-        </div>
-      )}
-
-      {/* Input area — only shown once entity is confirmed (or was already set) */}
-      {needsInput && (effectiveEntityId || relatedEntityId !== undefined) && (
-        <>
-          {isRelation && relatedSearchDb && relatedField ? (
-            /* Fix 2 — relation search with preview */
-            <RelationSearch
-              searchDb={relatedSearchDb}
-              fieldName={relatedField}
-              placeholder={cfg.searchPlaceholder}
-              disabled={loading !== null}
-              onConfirm={id => setConfirmedRelationId(id)}
-            />
-          ) : isMultiField && relatedFields ? (
-            /* Fix 4 — multiple labeled inputs */
-            <div className="flex flex-col gap-2">
-              {relatedFields.map(({ field, label }) => (
-                <div key={field} className="flex flex-col gap-0.5">
-                  <label className="text-[10px] font-bold text-[#131218]/50 uppercase tracking-widest">
-                    {label}
-                  </label>
-                  <textarea
-                    value={notes[field] ?? ""}
-                    onChange={e => setNotes(prev => ({ ...prev, [field]: e.target.value }))}
-                    placeholder={`${label}…`}
-                    rows={2}
-                    disabled={loading !== null}
-                    className="w-full text-[12px] text-[#131218] bg-[#FAFAF8] border border-[#d4d4cc] rounded-lg px-3 py-2 resize-y placeholder:text-[#131218]/30 focus:outline-none focus:border-[#131218]/40 disabled:opacity-50 leading-relaxed"
-                  />
-                </div>
-              ))}
-              {effectiveEntityId && (
-                <p className="text-[10px] text-[#131218]/35 leading-snug">
-                  Cada campo se escribirá directamente en el registro de Notion. El agente los usará en su próxima ejecución.
-                </p>
-              )}
-            </div>
-          ) : (
-            /* Default — single textarea */
-            <div className="flex flex-col gap-1">
+      {/* Multi-field inputs */}
+      {needsInput && !isRelation && isMultiField && relatedFields && (
+        <div className="flex flex-col gap-2">
+          {relatedFields.map(({ field, label }) => (
+            <div key={field} className="flex flex-col gap-0.5">
+              <label className="text-[10px] font-bold text-[#131218]/50 uppercase tracking-widest">
+                {label}
+              </label>
               <textarea
-                value={note}
-                onChange={e => setNote(e.target.value)}
-                placeholder={cfg.placeholder}
-                rows={3}
+                value={notes[field] ?? ""}
+                onChange={e => setNotes(prev => ({ ...prev, [field]: e.target.value }))}
+                placeholder={`${label}…`}
+                rows={2}
                 disabled={loading !== null}
                 className="w-full text-[12px] text-[#131218] bg-[#FAFAF8] border border-[#d4d4cc] rounded-lg px-3 py-2 resize-y placeholder:text-[#131218]/30 focus:outline-none focus:border-[#131218]/40 disabled:opacity-50 leading-relaxed"
               />
-              {effectiveEntityId && (
-                <p className="text-[10px] text-[#131218]/35 leading-snug">
-                  Tu respuesta se escribirá en{" "}
-                  <span className="font-mono">{relatedField ?? "Notes"}</span>{" "}
-                  del registro en Notion. El agente la usará en su próxima ejecución.
-                </p>
-              )}
-              {!effectiveEntityId && (
-                <p className="text-[10px] text-[#131218]/35 leading-snug">
-                  Tu respuesta se guardará como comentario en este item.
-                </p>
-              )}
             </div>
-          )}
-        </>
+          ))}
+          <p className="text-[10px] text-[#131218]/35 leading-snug">
+            {effectiveEntityId
+              ? "Se escribirá en el registro de Notion. El agente lo usará en su próxima ejecución."
+              : "Se guardará como respuesta en este item."}
+          </p>
+        </div>
+      )}
+
+      {/* Single textarea — always shown for text input types (legacy + structured) */}
+      {needsInput && !isRelation && !isMultiField && (
+        <div className="flex flex-col gap-1">
+          <textarea
+            value={note}
+            onChange={e => setNote(e.target.value)}
+            placeholder={cfg.placeholder}
+            rows={3}
+            disabled={loading !== null}
+            className="w-full text-[12px] text-[#131218] bg-[#FAFAF8] border border-[#d4d4cc] rounded-lg px-3 py-2 resize-y placeholder:text-[#131218]/30 focus:outline-none focus:border-[#131218]/40 disabled:opacity-50 leading-relaxed"
+          />
+          <p className="text-[10px] text-[#131218]/35 leading-snug">
+            {effectiveEntityId
+              ? <>Se escribirá en <span className="font-mono">{relatedField ?? "Notes"}</span> del registro. El agente lo usará en su próxima ejecución.</>
+              : "Se guardará como respuesta en este item. El agente lo leerá en su próxima ejecución."}
+          </p>
+        </div>
+      )}
+
+      {/* Optional entity linker — only for legacy items (no relatedEntityId) */}
+      {needsInput && !isRelation && !relatedEntityId && (
+        <details className="group">
+          <summary className="cursor-pointer text-[10px] text-[#131218]/30 hover:text-[#131218]/60 transition-colors list-none flex items-center gap-1 select-none">
+            <span className="group-open:rotate-90 inline-block transition-transform">›</span>
+            {selectedEntityId
+              ? <span className="text-[#131218]/50">Guardar también en registro de Notion</span>
+              : "Vincular a un registro de Notion (opcional)"}
+          </summary>
+          <div className="mt-1.5 flex flex-col gap-1.5">
+            {!selectedEntityId ? (
+              <EntitySearch
+                onSelect={(eid, ename) => { setSelectedEntityId(eid); setSelectedEntityName(ename) }}
+              />
+            ) : (
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 px-2.5 py-1 bg-green-50 border border-green-200 rounded-lg">
+                  <span className="text-[10px] text-green-600">✓</span>
+                  <span className="text-[11px] font-medium text-[#131218]">{selectedEntityName}</span>
+                </div>
+                <button
+                  onClick={() => { setSelectedEntityId(null); setSelectedEntityName(null) }}
+                  className="text-[10px] text-[#131218]/30 hover:text-[#131218]/60 transition-colors"
+                >
+                  Cambiar
+                </button>
+              </div>
+            )}
+          </div>
+        </details>
       )}
 
       {/* Action buttons */}
