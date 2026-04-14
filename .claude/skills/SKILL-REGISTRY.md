@@ -1,4 +1,12 @@
-# OS v2 Skill Registry — Pack 1 + Pack 2 + Pack 3 (Intelligence)
+# OS v2 Skill Registry — Pack 1 + Pack 2 + Pack 3 (Intelligence) + Portal Hygiene
+
+**Portal Hygiene Auditor (shadow mode):** Scans the Common House Portal codebase for known-bad patterns — stale enum literals, wrong Notion property accessors, field name drift, dead imports, stale comments. Classifies findings as Tier A (safe fix, patch preview) / Tier B (surface) / Tier C/D (decision required). Never writes files. Report-first only.
+- Skill: `hygiene-auditor` — trigger: `/hygiene-audit` in a Claude Code session
+- Runbook: `docs/HYGIENE_AUDIT_RUNBOOK.md`
+- Policy: `docs/AUTO_MAINTENANCE_AGENT_POLICY.md`
+- v1 scan passes: `window.location.reload()` → `router.refresh()`; Decision Items priority literals; Content Pipeline "Channel" → "Platform"; wrong accessors; dead shim imports; refactor plan markers; stale comments
+- Shadow mode: patches are previewed in diff format but never applied automatically
+- To apply a Tier A patch after review: "Apply patch A-[n] from the hygiene audit report"
 
 Pack 1 delivers the entity and commercial intelligence layer: resolve duplicates, upsert orgs and people, build pipeline, extract agreements, track financials, and audit automations.
 
