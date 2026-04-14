@@ -3,10 +3,12 @@ import { createClient } from "@supabase/supabase-js";
 import { requireAdmin } from "@/lib/require-admin";
 import { notion, DB } from "@/lib/notion";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_KEY!
-);
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_KEY!
+  );
+}
 
 // POST — generate signed upload URLs so the browser uploads directly to Supabase
 // Body: { projectId, files: Array<{ name: string; type: string }> }
@@ -22,6 +24,7 @@ export async function POST(req: NextRequest) {
   if (!projectId || !files?.length)
     return NextResponse.json({ error: "projectId and files required" }, { status: 400 });
 
+  const supabase = getSupabase();
   const results: { name: string; storagePath: string; signedUrl: string; error?: string }[] = [];
 
   for (const file of files) {
@@ -56,7 +59,7 @@ export async function DELETE(req: NextRequest) {
   }
 
   if (storagePath) {
-    const { error } = await supabase.storage.from("garage-docs").remove([storagePath]);
+    const { error } = await getSupabase().storage.from("garage-docs").remove([storagePath]);
     if (error) errs.push(`Storage delete failed: ${error.message}`);
   }
 

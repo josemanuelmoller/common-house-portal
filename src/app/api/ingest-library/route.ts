@@ -8,10 +8,12 @@ export const maxDuration = 120;
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_KEY!
-);
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_KEY!
+  );
+}
 
 const BUCKET = "library-docs";
 // Signed URL valid for 10 years
@@ -144,6 +146,7 @@ export async function POST(req: NextRequest) {
   let sourceFileUrl: string | undefined;
 
   if (fileBuffer && originalFileName) {
+    const supabase = getSupabase();
     const slug = Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 6);
     storagePath = `library/${slug}-${originalFileName}`;
 
@@ -183,7 +186,7 @@ export async function POST(req: NextRequest) {
     console.error("[ingest-library] Notion create error:", err);
     // If Notion fails but we uploaded the file, clean it up
     if (storagePath) {
-      await supabase.storage.from(BUCKET).remove([storagePath]);
+      await getSupabase().storage.from(BUCKET).remove([storagePath]);
     }
     return NextResponse.json({ error: "Notion create failed" }, { status: 500 });
   }
@@ -218,7 +221,7 @@ export async function DELETE(req: NextRequest) {
   }
 
   if (storagePath) {
-    const { error } = await supabase.storage.from(BUCKET).remove([storagePath]);
+    const { error } = await getSupabase().storage.from(BUCKET).remove([storagePath]);
     if (error) errs.push(`Storage delete failed: ${error.message}`);
   }
 

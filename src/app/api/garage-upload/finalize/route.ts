@@ -4,10 +4,12 @@ import { requireAdmin } from "@/lib/require-admin";
 import { notion, DB } from "@/lib/notion";
 import { classifyFile } from "../classify";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_KEY!
-);
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_KEY!
+  );
+}
 
 // POST — after direct browser→Supabase upload, create signed read URLs + Notion Data Room records
 // Body: { projectName, orgId?, uploads: Array<{ name, storagePath }> }
@@ -68,6 +70,7 @@ export async function POST(req: NextRequest) {
   for (const upload of uploads) {
     try {
       // Create a long-lived signed read URL
+      const supabase = getSupabase();
       const { data: signedData, error: urlError } = await supabase.storage
         .from("garage-docs")
         .createSignedUrl(upload.storagePath, 60 * 60 * 24 * 365 * 10);
