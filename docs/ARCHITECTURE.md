@@ -171,6 +171,23 @@ All cron routes authenticate via `Authorization: Bearer <CRON_SECRET>` or `x-age
 
 ---
 
+## API auth rule
+
+`src/middleware.ts` marks `/api/*` as public. No Clerk session is enforced at the middleware level. Every route under `src/app/api/` must implement its own local auth.
+
+Two patterns are in use:
+
+| Pattern | Used for | Implementation |
+|---|---|---|
+| `adminGuardApi()` | User-triggered admin routes | `src/lib/require-admin.ts` — checks Clerk session against `ADMIN_USER_IDS` / `ADMIN_EMAILS`. Returns 401 if not admin. |
+| `CRON_SECRET` header | Cron and agent pipeline routes | Checks `Authorization: Bearer <CRON_SECRET>` or `x-agent-key: <CRON_SECRET>`. Returns 401 if header does not match `process.env.CRON_SECRET`. |
+
+Read-only public routes (`/api/hall-data`, `/api/living-room/*`) are intentionally open and should be documented as such in `docs/ROUTES_AND_SURFACES.md`.
+
+No mutating API route should be created without one of the two patterns above.
+
+---
+
 ## How workspace routing works
 
 ```

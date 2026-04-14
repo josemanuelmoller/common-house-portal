@@ -61,6 +61,8 @@ All routes require admin auth via `requireAdmin()`.
 
 ## API routes
 
+> **Auth rule:** `src/middleware.ts` marks `/api/*` as public — no Clerk session is enforced at the middleware level. Every route implements its own local auth. User-triggered admin routes use `adminGuardApi()` (`src/lib/require-admin.ts`). Cron and agent routes check `Authorization: Bearer <CRON_SECRET>` or `x-agent-key: <CRON_SECRET>`. Read-only public routes (marked "Public" below) are intentionally open. No new mutating route should be created without one of the first two patterns.
+
 ### Data query routes
 
 | Route | Method | Auth | Description |

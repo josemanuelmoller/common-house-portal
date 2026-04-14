@@ -158,7 +158,10 @@ For production deployment, see `DEPLOY.md`.
 1. Unauthenticated requests to `/` redirect to `/sign-in`.
 2. Clerk handles sign-in. On success, users land on `/hall`.
 3. The Next.js middleware (`src/middleware.ts`) protects all routes except `/sign-in`, `/`, and `/api/*`.
-4. API routes handle their own auth (admin check or `x-agent-key`/`CRON_SECRET` header for cron/agent calls).
+4. `/api/*` is intentionally excluded from the global middleware — every API route must implement explicit local auth. Two patterns are in use:
+   - **User-triggered admin routes** use `adminGuardApi()` from `src/lib/require-admin.ts`. Returns 401 if the caller is not an authenticated admin.
+   - **Cron / agent routes** check `Authorization: Bearer <CRON_SECRET>` or `x-agent-key: <CRON_SECRET>`. Returns 401 if the header does not match.
+   No mutating API route should be added without one of these two patterns.
 5. Admin access is determined by matching the Clerk `userId` against `ADMIN_USER_IDS` or the user's email against `ADMIN_EMAILS`. Both checks are done via `src/lib/require-admin.ts`.
 6. Client-to-project mapping is in `src/lib/clients.ts` (CLIENT_REGISTRY). Each client email maps to a Notion project ID and optional Google Drive folder ID.
 
