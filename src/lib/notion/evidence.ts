@@ -2,6 +2,26 @@ import { notion, DB, prop, text, select, date, relationFirst } from "./core";
 
 // ─── Evidence queries ─────────────────────────────────────────────────────────
 
+// Internal: full evidence cursor scan — no filter, paginates until all records
+// are fetched. Used only by getProjectsOverview (projects.ts) to build per-project
+// evidence counts. Prefer getEvidenceForProject or getAllEvidence for filtered queries.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function fetchAllEvidence(): Promise<any[]> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const all: any[] = [];
+  let cursor: string | undefined;
+  do {
+    const res = await notion.databases.query({
+      database_id: DB.evidence,
+      page_size: 100,
+      ...(cursor ? { start_cursor: cursor } : {}),
+    });
+    all.push(...res.results);
+    cursor = res.has_more ? (res.next_cursor ?? undefined) : undefined;
+  } while (cursor);
+  return all;
+}
+
 export type EvidenceItem = {
   id: string;
   title: string;

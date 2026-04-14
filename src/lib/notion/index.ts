@@ -9,3 +9,5 @@ export * from "./decisions";
 export * from "./living-room";
 export * from "./evidence";
 export * from "./sources";
+export * from "./projects";
+export * from "./people";
