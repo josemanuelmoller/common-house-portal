@@ -168,7 +168,7 @@ export default async function AdminPage() {
   const garageCount     = projects.filter(p => p.primaryWorkspace === "garage").length;
 
   const openDecisions   = decisions; // pre-filtered to "Open" at DB level in getDecisionItems("Open")
-  const urgentDecisions = openDecisions.filter(d => d.priority === "P1" || d.priority === "Urgent");
+  const urgentDecisions = openDecisions.filter(d => d.priority === "P1 Critical");
   // Deadlines: open decisions with a due date within the next 14 days
   const in14days        = Date.now() + 14 * 86400000;
   const withDeadlines   = openDecisions.filter(d => d.dueDate && new Date(d.dueDate).getTime() <= in14days);
@@ -433,8 +433,8 @@ export default async function AdminPage() {
                     ) : null}
                     {openDecisions.slice(0, 5).map(d => (
                       <Link key={d.id} href="/admin/decisions" className="flex items-center gap-3 px-5 py-3.5 hover:bg-[#EFEFEA]/40 transition-colors border-b border-[#EFEFEA] last:border-0">
-                        <div className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 ${d.priority === "P1" || d.priority === "Urgent" ? "bg-red-100" : "bg-[#EFEFEA]"}`}>
-                          <span className={`text-[9px] font-bold ${d.priority === "P1" || d.priority === "Urgent" ? "text-red-600" : "text-[#131218]/35"}`}>!</span>
+                        <div className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 ${d.priority === "P1 Critical" ? "bg-red-100" : "bg-[#EFEFEA]"}`}>
+                          <span className={`text-[9px] font-bold ${d.priority === "P1 Critical" ? "text-red-600" : "text-[#131218]/35"}`}>!</span>
                         </div>
                         <p className="text-[11px] font-medium text-[#131218] flex-1 min-w-0 truncate">{d.title}</p>
                         <div className="flex items-center gap-2 shrink-0">
