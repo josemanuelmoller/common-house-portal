@@ -53,3 +53,27 @@ if (res.ok) {
 
 `router.refresh()` is a soft re-render: server components re-execute and re-render with fresh data; client component state is preserved.
 <!-- END:client-component-refresh-rules -->
+
+<!-- BEGIN:pre-merge-sanity-checklist -->
+## Pre-merge sanity checklist — hard rule
+
+Before declaring any coding task complete, mentally run every applicable item below. Skip items that are clearly irrelevant to the change; do not skip any item that might apply.
+
+| # | If I… | Did I verify… |
+|---|---|---|
+| 1 | created or changed a mutating API route | …that it calls `adminGuardApi()` or checks `CRON_SECRET`? (see api-auth-rules) |
+| 2 | changed a `"use client"` component that calls a mutating route | …whether server-rendered UI on the same route needs `router.refresh()`? (see client-component-refresh-rules) |
+| 3 | changed a Next.js server action | …whether `revalidatePath()` is needed, and that there is no redundant `router.refresh()` wrapping it? |
+| 4 | wrote to or read from a Notion property | …that the exact field name matches the current schema contract (not a legacy alias, not a guess)? |
+| 5 | used a Notion property accessor (`text()`, `select()`, `checkbox()`, etc.) | …that the accessor matches the actual Notion property type for that field? |
+| 6 | wrote or compared a status / type / priority / workspace string literal | …that the literal matches the real DB contract value end-to-end (read filter = write value = UI comparison)? |
+| 7 | changed any code | …that I re-read the changed files after editing to catch mechanical errors? |
+| 8 | changed code structure (new file, moved function, changed types) | …that `tsc --noEmit` passes clean? |
+
+**Failure modes this checklist targets** (recurring bugs already found in this repo):
+- Mutating routes with no auth guard
+- Stale server-rendered counters/lists after client mutations
+- Notion field read/write mismatches (e.g. `"Draft Text"` vs `"Content"`, `"Channel"` vs `"Platform"`)
+- Wrong accessor for property type (e.g. `text()` on a `select` field)
+- Enum drift: `"P1"` / `"Urgent"` instead of `"P1 Critical"`; `"Channel"` vs `"Platform"`
+<!-- END:pre-merge-sanity-checklist -->
