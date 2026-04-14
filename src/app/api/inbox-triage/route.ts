@@ -205,7 +205,7 @@ async function handleGet(req: NextRequest) {
 Classify each email as exactly one of: "Urgent", "Needs Reply", or "FYI".
 
 Rules:
-- "Urgent": sender is a partner, funder, investor, retailer, grant body, or government entity; OR email mentions a deadline, decision, contract, or explicit request.${thresholdDays <= 2 ? " Max 3 Urgents." : ""}
+- "Urgent": sender is a partner, funder, investor, retailer, grant body, or government entity; OR email mentions a deadline, decision, contract, or explicit request.${THRESHOLD_DAYS <= 2 ? " Max 3 Urgents." : ""}
 - "Needs Reply": clear question, invitation, intro, or action requested. Jose should respond.
 - "FYI": newsletter, notification, auto-generated, low-stakes update.
 
