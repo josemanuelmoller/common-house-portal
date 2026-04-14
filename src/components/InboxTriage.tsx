@@ -38,7 +38,9 @@ export function InboxTriage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/inbox-triage");
+      const res = await fetch("/api/inbox-triage", {
+        headers: { "x-agent-key": "ch-os-agent-2024-secure" },
+      });
       if (res.status === 503) {
         setError("Gmail not configured");
         return;
