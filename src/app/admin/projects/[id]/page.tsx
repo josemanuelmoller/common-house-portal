@@ -71,6 +71,48 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
 
         <div className="px-8 py-6 space-y-6">
 
+          {/* ── Review Banner — shown when OS flagged this project for update ── */}
+          {project.updateNeeded && (
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl overflow-hidden">
+              <div className="h-1 bg-amber-400" />
+              <div className="px-6 py-4 flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-[10px] font-bold text-amber-600 uppercase tracking-widest mb-1">
+                    Flagged for update
+                  </p>
+                  <p className="text-sm text-[#131218]/65 leading-relaxed">
+                    {project.draftUpdate
+                      ? "New validated evidence was recorded since the last status update. The OS drafted an update — review it below."
+                      : "New validated evidence was recorded since the last status update. No draft generated yet — run update-project-status to create one."}
+                  </p>
+                  {evidence.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-2 mt-3">
+                      <p className="text-[9px] font-bold text-amber-500/70 uppercase tracking-widest">Recent signals:</p>
+                      {evidence.slice(0, 3).map(e => (
+                        <span key={e.id} className="text-[10px] font-medium bg-white border border-amber-200 text-[#131218]/60 px-2.5 py-1 rounded-full">
+                          {e.title}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <a
+                  href={`https://www.notion.so/${project.id.replace(/-/g, "")}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="shrink-0 text-[10px] font-bold text-[#131218]/30 hover:text-[#131218]/70 uppercase tracking-widest transition-colors whitespace-nowrap mt-1"
+                >
+                  Edit in Notion ↗
+                </a>
+              </div>
+            </div>
+          )}
+
+          {/* Draft update — surfaced immediately when flagged, not buried below */}
+          {project.updateNeeded && project.draftUpdate && (
+            <DraftUpdateCard text={project.draftUpdate} />
+          )}
+
           {/* House Configuration — workspace assignment */}
           <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
             <div className="h-1 bg-[#131218]" />
@@ -184,21 +226,21 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
             />
           </CollapsibleSection>
 
-          {/* Status + draft — full width single column */}
-          <div className="space-y-4">
-            {project.statusSummary && (
-              <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-                <div className="h-1 bg-[#B2FF59]" />
-                <div className="px-6 py-5">
-                  <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest mb-3">Status Summary</p>
-                  <p className="text-[#131218]/70 text-sm leading-relaxed">{project.statusSummary}</p>
-                </div>
+          {/* Status Summary */}
+          {project.statusSummary && (
+            <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
+              <div className="h-1 bg-[#B2FF59]" />
+              <div className="px-6 py-5">
+                <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest mb-3">Status Summary</p>
+                <p className="text-[#131218]/70 text-sm leading-relaxed">{project.statusSummary}</p>
               </div>
-            )}
-            {project.draftUpdate && (
-              <DraftUpdateCard text={project.draftUpdate} />
-            )}
-          </div>
+            </div>
+          )}
+
+          {/* Draft update — shown here only when project is NOT flagged (not shown at top) */}
+          {!project.updateNeeded && project.draftUpdate && (
+            <DraftUpdateCard text={project.draftUpdate} />
+          )}
 
           {/* Documents */}
           <DocumentsSection documents={documents} />
