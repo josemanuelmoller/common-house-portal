@@ -141,10 +141,9 @@ export function AgentQueueSection({ drafts }: { drafts: AgentDraft[] }) {
                   <span className="text-[10px] font-bold text-emerald-600 shrink-0">✓ Aprobado</span>
                   <button
                     onClick={() => handleSend(draft.id)}
-                    disabled={state === "sending"}
-                    className="flex-1 text-center text-[10px] font-bold bg-[#131218] text-white rounded-lg py-1.5 hover:bg-[#2a2938] transition-colors disabled:opacity-50"
+                    className="flex-1 text-center text-[10px] font-bold bg-[#131218] text-white rounded-lg py-1.5 hover:bg-[#2a2938] transition-colors"
                   >
-                    {state === "sending" ? "…" : "Enviar →"}
+                    Enviar →
                   </button>
                   <a
                     href={draft.notionUrl}
