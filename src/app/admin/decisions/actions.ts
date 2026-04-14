@@ -390,6 +390,80 @@ export async function resolveWithRelationId(
   revalidatePath("/admin/decisions")
 }
 
+/**
+ * approveEntityCreation — creates an Organization (and optionally a Person) in Notion,
+ * then resolves the Decision Item that proposed the creation.
+ *
+ * DB IDs:
+ *   CH Organizations [OS v2]: bef1bb86ab2b4cd280b6b33f9034b96c
+ *   CH People [OS v2]:        1bc0f96f33ca4a9e9ff26844377e81de
+ */
+export async function approveEntityCreation(
+  decisionId: string,
+  orgName: string,
+  domain?: string,
+  category?: string,
+  contactName?: string,
+  contactEmail?: string,
+): Promise<{ error?: string; orgUrl?: string }> {
+  try {
+    await requireAdminAction()
+
+    // Build org properties
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const orgProps: Record<string, any> = {
+      "Name": { title: [{ type: "text", text: { content: orgName } }] },
+      "Relationship Stage": { select: { name: "Active" } },
+    }
+    if (category) orgProps["Organization Category"] = { select: { name: category } }
+    if (domain) orgProps["Website"] = { url: domain.startsWith("http") ? domain : `https://${domain}` }
+
+    // Create organization
+    const orgPage = await notion.pages.create({
+      parent: { database_id: "bef1bb86ab2b4cd280b6b33f9034b96c" },
+      properties: orgProps,
+    })
+    const orgId = orgPage.id
+
+    // Create person if contact info provided
+    if (contactName && contactEmail) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const personProps: Record<string, any> = {
+        "Full Name": { title: [{ type: "text", text: { content: contactName } }] },
+        "Email": { email: contactEmail },
+        "Person Classification": { select: { name: "External" } },
+        "Primary Organization": { relation: [{ id: orgId }] },
+      }
+      await notion.pages.create({
+        parent: { database_id: "1bc0f96f33ca4a9e9ff26844377e81de" },
+        properties: personProps,
+      })
+    }
+
+    // Resolve Decision Item
+    try {
+      await notion.comments.create({
+        parent: { page_id: decisionId },
+        rich_text: [{ type: "text", text: { content: `Org created: ${orgName} (${orgId})${contactName ? ` + contact ${contactName}` : ""}` } }],
+      })
+    } catch { /* comment permissions optional */ }
+
+    await notion.pages.update({
+      page_id: decisionId,
+      properties: { Status: { select: { name: "Resolved" } } },
+    })
+
+    revalidatePath("/admin/decisions")
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return { orgUrl: (orgPage as any).url ?? undefined }
+  } catch (err) {
+    console.error("[approveEntityCreation] error:", err)
+    const msg = err instanceof Error ? err.message
+      : (err as { message?: string })?.message ?? JSON.stringify(err)
+    return { error: msg }
+  }
+}
+
 export async function dismissDecision(id: string) {
   await requireAdminAction()
   await notion.pages.update({

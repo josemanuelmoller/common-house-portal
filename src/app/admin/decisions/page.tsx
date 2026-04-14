@@ -118,6 +118,12 @@ function DecisionRow({ item }: { item: DecisionItem }) {
           relatedResolutionType={item.relatedResolutionType}
           relatedSearchDb={item.relatedSearchDb}
           relatedFields={item.relatedFields}
+          entityAction={item.entityAction}
+          entityName={item.entityName}
+          entityDomain={item.entityDomain}
+          entityCategory={item.entityCategory}
+          contactName={item.contactName}
+          contactEmail={item.contactEmail}
         />
       </div>
 

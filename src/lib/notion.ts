@@ -927,7 +927,14 @@ export type DecisionItem = {
   relatedField?: string;          // Notion property name to write to (default: "Notes")
   relatedResolutionType?: string;              // "text" (default) | "relation"
   relatedSearchDb?: string;                    // DB ID for relation searches
-  relatedFields?: { field: string; label: string }[]; // Fix 4: multiple fields from [RESOLUTION_FIELDS:f1:l1|f2:l2]
+  relatedFields?: { field: string; label: string }[]; // multiple fields from [RESOLUTION_FIELDS:f1:l1|f2:l2]
+  // Entity creation proposal — from [ENTITY_ACTION:create_org] marker
+  entityAction?: "create_org";
+  entityName?: string;
+  entityDomain?: string;
+  entityCategory?: string;
+  contactName?: string;
+  contactEmail?: string;
 };
 
 export async function getDecisionItems(statusFilter?: string): Promise<DecisionItem[]> {
@@ -963,17 +970,29 @@ export async function getDecisionItems(statusFilter?: string): Promise<DecisionI
       ...(() => {
         const raw = text(prop(page, "Proposed Action")) ?? "";
         // Parse embedded agent metadata markers
-        const entityMatch  = raw.match(/\[ENTITY_ID:([^\]]+)\]/);
-        const fieldMatch   = raw.match(/\[RESOLUTION_FIELD:([^\]]+)\]/);
-        const fieldsMatch  = raw.match(/\[RESOLUTION_FIELDS:([^\]]+)\]/);
-        const typeMatch    = raw.match(/\[RESOLUTION_TYPE:([^\]]+)\]/);
-        const dbMatch      = raw.match(/\[RESOLUTION_DB:([^\]]+)\]/);
+        const entityMatch        = raw.match(/\[ENTITY_ID:([^\]]+)\]/);
+        const fieldMatch         = raw.match(/\[RESOLUTION_FIELD:([^\]]+)\]/);
+        const fieldsMatch        = raw.match(/\[RESOLUTION_FIELDS:([^\]]+)\]/);
+        const typeMatch          = raw.match(/\[RESOLUTION_TYPE:([^\]]+)\]/);
+        const dbMatch            = raw.match(/\[RESOLUTION_DB:([^\]]+)\]/);
+        const entityActionMatch  = raw.match(/\[ENTITY_ACTION:([^\]]+)\]/);
+        const orgNameMatch       = raw.match(/\[ORG_NAME:([^\]]+)\]/);
+        const orgDomainMatch     = raw.match(/\[ORG_DOMAIN:([^\]]+)\]/);
+        const orgCategoryMatch   = raw.match(/\[ORG_CATEGORY:([^\]]+)\]/);
+        const contactNameMatch   = raw.match(/\[CONTACT_NAME:([^\]]+)\]/);
+        const contactEmailMatch  = raw.match(/\[CONTACT_EMAIL:([^\]]+)\]/);
         const stripped = raw
           .replace(/\[ENTITY_ID:[^\]]+\]/g, "")
           .replace(/\[RESOLUTION_FIELD:[^\]]+\]/g, "")
           .replace(/\[RESOLUTION_FIELDS:[^\]]+\]/g, "")
           .replace(/\[RESOLUTION_TYPE:[^\]]+\]/g, "")
           .replace(/\[RESOLUTION_DB:[^\]]+\]/g, "")
+          .replace(/\[ENTITY_ACTION:[^\]]+\]/g, "")
+          .replace(/\[ORG_NAME:[^\]]+\]/g, "")
+          .replace(/\[ORG_DOMAIN:[^\]]+\]/g, "")
+          .replace(/\[ORG_CATEGORY:[^\]]+\]/g, "")
+          .replace(/\[CONTACT_NAME:[^\]]+\]/g, "")
+          .replace(/\[CONTACT_EMAIL:[^\]]+\]/g, "")
           .trimStart();
         // Parse RESOLUTION_FIELDS: "fieldName1:Label 1|fieldName2:Label 2"
         const relatedFields = fieldsMatch
@@ -986,11 +1005,17 @@ export async function getDecisionItems(statusFilter?: string): Promise<DecisionI
           : undefined;
         return {
           notes: stripped,
-          relatedEntityId:       entityMatch ? entityMatch[1] : undefined,
-          relatedField:          fieldMatch  ? fieldMatch[1]  : undefined,
-          relatedResolutionType: typeMatch   ? typeMatch[1]   : undefined,
-          relatedSearchDb:       dbMatch     ? dbMatch[1]     : undefined,
+          relatedEntityId:       entityMatch       ? entityMatch[1]       : undefined,
+          relatedField:          fieldMatch        ? fieldMatch[1]        : undefined,
+          relatedResolutionType: typeMatch         ? typeMatch[1]         : undefined,
+          relatedSearchDb:       dbMatch           ? dbMatch[1]           : undefined,
           relatedFields,
+          entityAction:   entityActionMatch ? (entityActionMatch[1] as "create_org") : undefined,
+          entityName:     orgNameMatch      ? orgNameMatch[1]      : undefined,
+          entityDomain:   orgDomainMatch    ? orgDomainMatch[1]    : undefined,
+          entityCategory: orgCategoryMatch  ? orgCategoryMatch[1]  : undefined,
+          contactName:    contactNameMatch  ? contactNameMatch[1]  : undefined,
+          contactEmail:   contactEmailMatch ? contactEmailMatch[1] : undefined,
         };
       })(),
       notionUrl: page.url ?? "",

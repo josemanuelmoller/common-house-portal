@@ -5,6 +5,7 @@ import {
   approveDecision, resolveDecision, resolveWithNote,
   resolveAndUpdate, resolveAndUpdateMulti,
   resolveWithRelationId, searchNotionEntities, previewRelationTarget,
+  approveEntityCreation,
   dismissDecision,
 } from "@/app/admin/decisions/actions"
 
@@ -22,6 +23,13 @@ interface Props {
   relatedResolutionType?: string
   relatedSearchDb?: string
   relatedFields?: { field: string; label: string }[]
+  // Entity creation proposal from [ENTITY_ACTION:create_org] markers
+  entityAction?: "create_org"
+  entityName?: string
+  entityDomain?: string
+  entityCategory?: string
+  contactName?: string
+  contactEmail?: string
 }
 
 // Types that render an inline input area
@@ -270,6 +278,7 @@ function RerunHint({ sourceAgent }: { sourceAgent?: string }) {
 export function DecisionActions({
   id, requiresExecute, executeApproved, status, decisionType, sourceAgent,
   notionUrl, relatedEntityId, relatedField, relatedResolutionType, relatedSearchDb, relatedFields,
+  entityAction, entityName, entityDomain, entityCategory, contactName, contactEmail,
 }: Props) {
   const [loading, setLoading] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -289,6 +298,7 @@ export function DecisionActions({
   if (status !== "Open") return null
 
   const cfg = TYPE_CFG[decisionType] ?? DEFAULT_CFG
+  const isEntityCreation = entityAction === "create_org"
   const needsInput = INLINE_INPUT_TYPES.has(decisionType)
   const isRelation = relatedResolutionType === "relation"
   const isMultiField = (relatedFields?.length ?? 0) > 1
@@ -296,7 +306,8 @@ export function DecisionActions({
   const hasInput = isMultiField
     ? Object.values(notes).some(v => v.trim())
     : note.trim().length > 0
-  const canResolve = !needsInput || (isRelation ? !!confirmedRelationId : hasInput)
+  const canResolve = isEntityCreation ? true
+    : !needsInput || (isRelation ? !!confirmedRelationId : hasInput)
 
   if (done) {
     return (
@@ -315,7 +326,14 @@ export function DecisionActions({
         await approveDecision(id)
 
       } else if (action === "resolve") {
-        if (needsInput) {
+        if (isEntityCreation && entityName) {
+          const result = await approveEntityCreation(
+            id, entityName, entityDomain, entityCategory, contactName, contactEmail
+          )
+          if (result?.error) { setError(result.error); setLoading(null); return }
+          setDone(`Organización "${entityName}" creada en Notion ✓`)
+          setLoading(null); return
+        } else if (needsInput) {
           if (isRelation) {
             // Fix 2: write the confirmed relation using the previewed page ID directly
             if (!confirmedRelationId || !relatedEntityId || !relatedField) {
@@ -363,6 +381,36 @@ export function DecisionActions({
 
   return (
     <div className="flex flex-col gap-2 mt-2">
+
+      {/* Entity creation proposal card */}
+      {isEntityCreation && entityName && (
+        <div className="flex flex-col gap-2 p-3 bg-[#FAFAF8] border border-[#E0E0D8] rounded-lg">
+          <p className="text-[10px] font-bold text-[#131218]/40 uppercase tracking-widest">
+            Nueva organización detectada
+          </p>
+          <div className="flex flex-col gap-1">
+            <p className="text-[13px] font-semibold text-[#131218]">{entityName}</p>
+            {entityDomain && (
+              <p className="text-[11px] text-[#131218]/45 font-mono">{entityDomain}</p>
+            )}
+            {entityCategory && (
+              <span className="self-start text-[9px] font-bold text-[#131218]/40 bg-[#EFEFEA] px-2 py-0.5 rounded-full uppercase tracking-widest">
+                {entityCategory}
+              </span>
+            )}
+          </div>
+          {(contactName || contactEmail) && (
+            <div className="pt-1.5 border-t border-[#E0E0D8] flex flex-col gap-0.5">
+              <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Contacto</p>
+              {contactName && <p className="text-[12px] text-[#131218]/70 font-medium">{contactName}</p>}
+              {contactEmail && <p className="text-[11px] text-[#131218]/40 font-mono">{contactEmail}</p>}
+            </div>
+          )}
+          <p className="text-[10px] text-[#131218]/35 leading-snug">
+            Al aprobar se creará la organización en CH Organizations [OS v2]{contactName ? " y el contacto en CH People [OS v2]" : ""}.
+          </p>
+        </div>
+      )}
 
       {/* Relation search (required — replaces textarea for relation fields) */}
       {needsInput && isRelation && relatedSearchDb && relatedField && (
