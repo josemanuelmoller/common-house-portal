@@ -448,6 +448,16 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); display: flex; m
   <!-- Content -->
   <div class="cr-content">
 
+    <!-- ── Agents panel ── -->
+    <div id="panel-agents" style="display:none;height:calc(100vh - 110px);">
+      <iframe src="diagrama-agentes.html"
+              style="width:100%;height:100%;border:none;background:#fff;"
+              title="Agent Architecture"></iframe>
+    </div>
+
+    <!-- ── Overview panel ── -->
+    <div id="panel-overview">
+
     <!-- P1 Banner -->
     <div class="p1-banner">
       <div class="p1-banner-left">
@@ -787,8 +797,34 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); display: flex; m
 
       </div>
     </div>
-  </div>
-</div>
+
+    </div><!-- /panel-overview -->
+  </div><!-- /cr-content -->
+</div><!-- /main -->
+
+<script>
+(function () {
+  const tabs = document.querySelectorAll('.subnav-item');
+  const panels = {
+    'Overview': document.getElementById('panel-overview'),
+    'Agents':   document.getElementById('panel-agents'),
+  };
+
+  tabs.forEach(tab => {
+    tab.addEventListener('click', e => {
+      e.preventDefault();
+      const label = tab.textContent.trim().replace(/\s*\d+$/, '').trim();
+      tabs.forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+
+      Object.entries(panels).forEach(([key, el]) => {
+        if (!el) return;
+        el.style.display = (key === label) ? '' : 'none';
+      });
+    });
+  });
+})();
+</script>
 
 </body>
 </html>

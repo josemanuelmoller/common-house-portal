@@ -258,6 +258,39 @@ export default async function AgentsPage() {
         <div className="flex-1 px-10 py-8">
           <div className="max-w-4xl">
 
+            {/* Architecture diagram */}
+            <div className="bg-white border border-[#E0E0D8] rounded-2xl overflow-hidden mb-6">
+              <div className="px-5 py-3.5 border-b border-[#E0E0D8] flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-md bg-[#131218] flex items-center justify-center">
+                    <svg viewBox="0 0 14 14" width="11" height="11" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round">
+                      <rect x="2" y="2" width="4" height="4" rx="1"/>
+                      <rect x="8" y="2" width="4" height="4" rx="1"/>
+                      <rect x="2" y="8" width="4" height="4" rx="1"/>
+                      <rect x="8" y="8" width="4" height="4" rx="1"/>
+                    </svg>
+                  </div>
+                  <span className="text-[11px] font-[800] text-[#131218] tracking-tight">
+                    Architecture map
+                  </span>
+                </div>
+                <a
+                  href="/portal/diagrama-agentes.html"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[9px] font-bold uppercase tracking-[1.5px] text-[#131218]/30 hover:text-[#131218]/60 transition-colors"
+                >
+                  Open full ↗
+                </a>
+              </div>
+              <iframe
+                src="/portal/diagrama-agentes.html"
+                className="w-full border-none"
+                style={{ height: 780 }}
+                title="Agent Architecture"
+              />
+            </div>
+
             {/* Summary metrics */}
             <div className="grid grid-cols-3 gap-3 mb-6">
               <div className="bg-white border border-[#E0E0D8] rounded-xl p-4">
