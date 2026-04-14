@@ -697,44 +697,47 @@ export default async function AdminPage() {
                 </div>
               )}
 
-              {/* Pending review queue */}
+              {/* On your desk — only things Jose can act on */}
               <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
                 <div className="px-5 py-3.5 border-b border-[#EFEFEA] flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-lg bg-amber-50 border border-amber-200 flex items-center justify-center shrink-0">
-                      <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="#92400e" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                    <div className="w-6 h-6 rounded-lg bg-[#131218] flex items-center justify-center shrink-0">
+                      <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
                       </svg>
                     </div>
-                    <p className="text-xs font-bold text-[#131218]">Pending review</p>
+                    <p className="text-xs font-bold text-[#131218]">On your desk</p>
                   </div>
                   {totalPending > 0 && (
-                    <span className="text-[10px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">{totalPending}</span>
+                    <span className="text-[10px] font-bold bg-[#131218] text-white px-2 py-0.5 rounded-full">{totalPending}</span>
                   )}
                 </div>
                 <div className="divide-y divide-[#EFEFEA]">
-                  {withBlockers.slice(0, 2).map(p => (
-                    <Link key={`blk-${p.id}`} href={`/admin/projects/${p.id}`} className="flex items-center gap-3 px-5 py-3.5 hover:bg-[#EFEFEA]/40 transition-colors">
-                      <div className="w-5 h-5 rounded-md bg-red-100 flex items-center justify-center shrink-0">
-                        <span className="text-[9px] font-bold text-red-600">!</span>
-                      </div>
-                      <p className="text-[11px] font-medium text-[#131218] flex-1 min-w-0 truncate">{p.name}</p>
-                      <span className="text-[9px] font-bold text-[#131218]/30 shrink-0">Blocker</span>
-                    </Link>
-                  ))}
-                  {urgentDecisions.slice(0, 2).map(d => (
-                    <Link key={`urg-${d.id}`} href="/admin/decisions" className="flex items-center gap-3 px-5 py-3.5 hover:bg-[#EFEFEA]/40 transition-colors">
-                      <div className="w-5 h-5 rounded-md bg-red-100 flex items-center justify-center shrink-0">
-                        <span className="text-[9px] font-bold text-red-600">!</span>
-                      </div>
-                      <p className="text-[11px] font-medium text-[#131218] flex-1 min-w-0 truncate">{d.title}</p>
-                      <span className="text-[9px] font-bold text-[#131218]/30 shrink-0">Decision</span>
-                    </Link>
-                  ))}
-                  {needsUpdate.slice(0, 3).map(p => (
+                  {/* Decision Items — things the system flagged for Jose's input */}
+                  {openDecisions.slice(0, 4).map(d => {
+                    const typeLabel =
+                      d.decisionType === "Missing Input"               ? "Input needed" :
+                      d.decisionType === "Approval"                    ? "Approve" :
+                      d.decisionType?.includes("Policy")               ? "Decide" :
+                      d.decisionType === "Ambiguity Resolution"        ? "Clarify" :
+                      d.decisionType === "Draft Review"                ? "Review" :
+                      "Action";
+                    const isUrgent = d.priority === "P1 Critical" || d.priority === "High";
+                    return (
+                      <Link key={`dec-${d.id}`} href="/admin/decisions" className="flex items-center gap-3 px-5 py-3.5 hover:bg-[#EFEFEA]/40 transition-colors">
+                        <div className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 ${isUrgent ? "bg-red-100" : "bg-[#EFEFEA]"}`}>
+                          <span className={`text-[9px] font-bold ${isUrgent ? "text-red-600" : "text-[#131218]/40"}`}>!</span>
+                        </div>
+                        <p className="text-[11px] font-medium text-[#131218] flex-1 min-w-0 truncate">{d.title}</p>
+                        <span className="text-[9px] font-bold text-[#131218]/30 shrink-0">{typeLabel}</span>
+                      </Link>
+                    );
+                  })}
+                  {/* Projects needing a status update — Jose writes the update */}
+                  {needsUpdate.slice(0, 2).map(p => (
                     <Link key={`upd-${p.id}`} href={`/admin/projects/${p.id}`} className="flex items-center gap-3 px-5 py-3.5 hover:bg-[#EFEFEA]/40 transition-colors">
-                      <div className="w-5 h-5 rounded-md bg-[#EFEFEA] flex items-center justify-center shrink-0">
-                        <span className="text-[9px] font-bold text-amber-500">!</span>
+                      <div className="w-5 h-5 rounded-md bg-amber-50 flex items-center justify-center shrink-0">
+                        <span className="text-[9px] font-bold text-amber-500">↑</span>
                       </div>
                       <p className="text-[11px] font-medium text-[#131218] flex-1 min-w-0 truncate">{p.name}</p>
                       <span className="text-[9px] font-bold text-[#131218]/30 shrink-0">Update</span>
@@ -742,7 +745,7 @@ export default async function AdminPage() {
                   ))}
                   {totalPending === 0 && (
                     <div className="px-5 py-5 text-center">
-                      <p className="text-[11px] text-[#131218]/25 font-medium">Queue clear</p>
+                      <p className="text-[11px] text-[#131218]/25 font-medium">Desk clear ✓</p>
                     </div>
                   )}
                 </div>
