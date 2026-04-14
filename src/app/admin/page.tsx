@@ -169,9 +169,16 @@ export default async function AdminPage() {
 
   const openDecisions   = decisions; // pre-filtered to "Open" at DB level in getDecisionItems("Open")
   const urgentDecisions = openDecisions.filter(d => d.priority === "P1" || d.priority === "Urgent");
-  const withDeadlines   = openDecisions.filter(d => d.dueDate);
+  // Deadlines: open decisions with a due date within the next 14 days
+  const in14days        = Date.now() + 14 * 86400000;
+  const withDeadlines   = openDecisions.filter(d => d.dueDate && new Date(d.dueDate).getTime() <= in14days);
   const blockerCount    = withBlockers.length;
   const deadlineCount   = withDeadlines.length;
+  // Banner: only show if there are P1 decisions OR imminent deadlines (≤7 days)
+  const in7days         = Date.now() + 7 * 86400000;
+  const imminentDeadlines = openDecisions.filter(d => d.dueDate && new Date(d.dueDate).getTime() <= in7days);
+  const p1Decisions     = openDecisions.filter(d => d.priority === "P1 Critical");
+  const showBanner      = p1Decisions.length > 0 || imminentDeadlines.length > 0;
   // Widget: only actionable by Jose directly — Missing Input (provide data) and Approval (say yes/no)
   const deskDecisions   = openDecisions.filter(d => d.decisionType === "Missing Input" || d.decisionType === "Approval");
   const totalPending    = deskDecisions.length;
@@ -245,21 +252,20 @@ export default async function AdminPage() {
             </div>
           )}
 
-          {/* ── 2. P1 Banner ──────────────────────────────────────────────── */}
-          {(blockerCount > 0 || deadlineCount > 0) && (
+          {/* ── 2. P1 Banner — only P1 Critical decisions or deadlines ≤7 days ── */}
+          {showBanner && (
             <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-xl px-5 py-3.5">
               <span className="w-2 h-2 rounded-full bg-red-500 shrink-0 animate-pulse" />
               <p className="text-sm text-[#131218] flex-1 min-w-0">
-                {blockerCount > 0 && (
-                  <><strong>{blockerCount} active blocker{blockerCount !== 1 ? "s" : ""}</strong>{" · "}</>
+                {p1Decisions.length > 0 && (
+                  <><strong>{p1Decisions.length} P1 decision{p1Decisions.length !== 1 ? "s" : ""}</strong>{" · "}{p1Decisions.slice(0, 2).map(d => d.title).join(" · ")}</>
                 )}
-                {withBlockers.slice(0, 2).map(p => p.name).join(" · ")}
-                {deadlineCount > 0 && (
-                  <>{blockerCount > 0 ? " · " : ""}<strong>{deadlineCount} deadline{deadlineCount !== 1 ? "s" : ""} this week</strong></>
+                {imminentDeadlines.length > 0 && (
+                  <>{p1Decisions.length > 0 ? " · " : ""}<strong>{imminentDeadlines.length} deadline{imminentDeadlines.length !== 1 ? "s" : ""} this week</strong>
+                  {imminentDeadlines.slice(0, 1).map(d => (
+                    <span key={d.id}>{" · "}{d.title}{d.dueDate ? ` — closes ${new Date(d.dueDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}` : ""}</span>
+                  ))}</>
                 )}
-                {withDeadlines.slice(0, 1).map(d => (
-                  <span key={d.id}>{" · "}{d.title}{d.dueDate ? ` — closes ${new Date(d.dueDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}` : ""}</span>
-                ))}
               </p>
               <Link href="/admin/decisions" className="text-[11px] font-bold text-red-600 shrink-0 hover:text-red-800 transition-colors whitespace-nowrap">
                 View decisions →

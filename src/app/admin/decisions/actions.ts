@@ -21,6 +21,7 @@ export async function approveDecision(id: string) {
     },
   })
   revalidatePath("/admin/decisions")
+  revalidatePath("/admin")
 }
 
 export async function resolveDecision(id: string) {
@@ -32,6 +33,7 @@ export async function resolveDecision(id: string) {
     },
   })
   revalidatePath("/admin/decisions")
+  revalidatePath("/admin")
 }
 
 /**
@@ -89,6 +91,7 @@ export async function resolveAndUpdate(
     })
 
     revalidatePath("/admin/decisions")
+  revalidatePath("/admin")
     return {}
   } catch (err) {
     console.error("[resolveAndUpdate] Notion error:", err)
@@ -115,6 +118,7 @@ export async function resolveWithNote(id: string, note: string): Promise<{ error
       properties: { "Status": { select: { name: "Resolved" } } },
     })
     revalidatePath("/admin/decisions")
+  revalidatePath("/admin")
     return {}
   } catch (err) {
     console.error("[resolveWithNote] error:", err)
@@ -210,6 +214,7 @@ export async function resolveWithSearch(
   })
 
   revalidatePath("/admin/decisions")
+  revalidatePath("/admin")
 }
 
 /**
@@ -334,6 +339,7 @@ export async function resolveAndUpdateMulti(
     properties: { Status: { select: { name: "Resolved" } } },
   })
   revalidatePath("/admin/decisions")
+  revalidatePath("/admin")
 }
 
 /**
@@ -388,6 +394,7 @@ export async function resolveWithRelationId(
   })
 
   revalidatePath("/admin/decisions")
+  revalidatePath("/admin")
 }
 
 /**
@@ -454,6 +461,7 @@ export async function approveEntityCreation(
     })
 
     revalidatePath("/admin/decisions")
+  revalidatePath("/admin")
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return { orgUrl: (orgPage as any).url ?? undefined }
   } catch (err) {
@@ -507,6 +515,7 @@ export async function approvePersonCreation(
     })
 
     revalidatePath("/admin/decisions")
+  revalidatePath("/admin")
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return { personUrl: (personPage as any).url ?? undefined }
   } catch (err) {
@@ -526,4 +535,5 @@ export async function dismissDecision(id: string) {
     },
   })
   revalidatePath("/admin/decisions")
+  revalidatePath("/admin")
 }
