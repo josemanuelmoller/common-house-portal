@@ -1,5 +1,6 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { notion, DB } from "@/lib/notion";
+import { adminGuardApi } from "@/lib/require-admin";
 
 // One-shot seed for Grant Sources [OS v2]
 // POST /api/seed-grant-sources
@@ -119,23 +120,9 @@ const SOURCES: {
   { name: "Candid / Foundation Directory (Grants)", url: "https://candid.org/", type: "Aggregator", geo: ["USA", "Global"], themes: ["Social Enterprise", "Innovation", "Financial Inclusion"] },
 ];
 
-function corsHeaders() {
-  return {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, x-seed-secret",
-  };
-}
-
-export async function OPTIONS() {
-  return new NextResponse(null, { status: 204, headers: corsHeaders() });
-}
-
-export async function POST(req: Request) {
-  const secret = req.headers.get("x-seed-secret");
-  if (secret !== process.env.SEED_SECRET && secret !== "ch-seed-2026") {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: corsHeaders() });
-  }
+export async function POST(req: NextRequest) {
+  const guard = await adminGuardApi();
+  if (guard) return guard;
 
   const results: { name: string; id: string }[] = [];
   const errors: { name: string; error: string }[] = [];
@@ -160,7 +147,6 @@ export async function POST(req: Request) {
   }
 
   return NextResponse.json(
-    { ok: true, seeded: results.length, errorCount: errors.length, results, errors },
-    { headers: corsHeaders() }
+    { ok: true, seeded: results.length, errorCount: errors.length, results, errors }
   );
 }
