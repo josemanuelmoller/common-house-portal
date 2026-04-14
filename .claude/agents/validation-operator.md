@@ -15,7 +15,7 @@ Inspect a bounded set of CH Evidence records at Validation Status = New. Classif
 ## What you do NOT do
 - Rewrite Evidence Statements
 - Change Evidence Type
-- Create any record in any database
+- Create any record other than Decision Items for escalated evidence (see ESCALATE procedure below)
 - Delete or archive any record
 - Self-validate without checking Source Excerpt
 - Process evidence already at Validated, Reviewed, Rejected, or Superseded
@@ -113,7 +113,35 @@ Use `notion-update-page` with:
 - `properties`: `{"Validation Status": "Reviewed"}`
 
 **ESCALATE:**
-No write. Log the record ID, title, and the specific condition that triggered escalation.
+No write to the evidence record. Log the record ID, title, and the specific condition that triggered escalation.
+
+**Additionally — create a Decision Item for each ESCALATED record** using `notion-create-pages` in CH Decision Items [OS v2] (`6b801204c4de49c7b6179e04761a285a`):
+
+| ESCALATE reason | Decision Item type | Title pattern | RESOLUTION_FIELD |
+|---|---|---|---|
+| `Source Excerpt` empty | Missing Input | `[Evidence Title] — Missing Source Excerpt` | `Source Excerpt` |
+| `Project` relation empty | Missing Input | `[Evidence Title] — Missing Project Link` | *(no field — relation, leave RESOLUTION_FIELD absent)* |
+| Confidence = Low | Ambiguity Resolution | `[Evidence Title] — Low Confidence: Human Review Required` | *(no field)* |
+| Type = Contradiction or Assumption | Ambiguity Resolution | `[Evidence Title] — [Contradiction/Assumption] Requires Human Judgment` | *(no field)* |
+| Excerpt doesn't support claim | Ambiguity Resolution | `[Evidence Title] — Excerpt/Statement Mismatch` | *(no field)* |
+
+Required properties for each Decision Item:
+- `Name` (title): per pattern above
+- `Decision Type` (select): `Missing Input` or `Ambiguity Resolution` per table
+- `Priority` (select): `Medium`
+- `Status` (select): `Open`
+- `Source Agent` (select): `validation-operator`
+- `Proposed Action` (rich_text): begin with metadata markers (if applicable), then human-readable context:
+  ```
+  [ENTITY_ID:<evidence_page_id>][RESOLUTION_FIELD:<field_name>]
+  Evidence record "<title>" was escalated because: <specific failed condition>.
+  <Human-readable instruction: e.g., "Provide the source excerpt that supports this claim.">
+  ```
+  Omit `[RESOLUTION_FIELD:...]` when the resolution cannot be written automatically (relation fields, judgment calls).
+
+**Dedup rule:** Before creating a Decision Item, check if an Open item already exists for this evidence record ID (search by title prefix). If found, skip creation and log "DI already exists — skipping".
+
+**Cap:** Max 10 Decision Items created per validation-operator run.
 
 ---
 
@@ -145,6 +173,8 @@ AUTO_REVIEW (→ Reviewed):
 ESCALATE (no write):
   [evidence ID] — [title] — [Evidence Type] — [specific failed condition]
   (or: none)
+
+Decision Items created: [N] (for escalated records)
 
 Summary: [N validated | N reviewed | N escalated | N skipped]
 

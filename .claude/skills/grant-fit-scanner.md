@@ -101,7 +101,20 @@ For each GRANT GAP (actionable):
 In execute mode: call `create-or-update-opportunity`.
 
 For each GRANT GAP — REVIEW NEEDED:
-- Create Decision Item (Ambiguity Resolution): name the funder + eligibility question
+- Create a Decision Item in CH Decision Items [OS v2] (`6b801204c4de49c7b6179e04761a285a`) using `notion-create-pages`:
+  - `Name`: `[Entity Name] × [Funder/Grant Name] — Eligibility Unclear`
+  - `Decision Type`: `Ambiguity Resolution`
+  - `Priority`: `Medium`
+  - `Status`: `Open`
+  - `Source Agent`: `grant-fit-scanner`
+  - `Proposed Action`:
+    ```
+    [ENTITY_ID:<grant_agreement_page_id>][RESOLUTION_FIELD:Notes]
+    Grant fit scanner flagged [Entity Name] as potentially eligible for [Grant/Funder Name], but eligibility criteria could not be confirmed from available records.
+    Question: Does [Entity Name] meet the stated eligibility criteria for this grant? If yes, confirm and the agent will create a Grant opportunity on its next run. If no, dismiss this item.
+    Eligibility criteria found in records: [summarise what criteria were extracted, or "none found — check grant agreement directly"].
+    ```
+- Dedup rule: check if an Open Decision Item already exists for this entity × funder pair (search by title). If found, skip.
 - Do NOT create Grant opportunity until Decision Item is resolved.
 
 For each EXPIRING or RENEWAL OVERDUE:

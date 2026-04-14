@@ -101,6 +101,7 @@ export type ProjectCard = Project & {
   outcomeCount: number;
   newEvidenceCount: number;
   reusableCount: number;
+  lastEvidenceDate: string | null;  // most recent evidence Date Captured for this project
   grantEligible?: boolean;
 };
 
@@ -312,6 +313,12 @@ export async function getProjectsOverview(): Promise<ProjectCard[]> {
          select(prop(e, "Reusability Level")) === "Canonical") &&
         select(prop(e, "Validation Status")) === "Validated"
       ).length,
+      lastEvidenceDate: projEvidence.reduce<string | null>((latest, e) => {
+        const d = date(prop(e, "Date Captured"));
+        if (!d) return latest;
+        if (!latest) return d;
+        return d > latest ? d : latest;
+      }, null),
     };
   });
 }
@@ -898,6 +905,13 @@ export type DecisionItem = {
   notes: string;
   notionUrl: string;
   category?: string;
+  // Structured metadata embedded by agents in Proposed Action
+  // Format: [ENTITY_ID:page_id][RESOLUTION_FIELD:PropertyName][RESOLUTION_TYPE:text|relation][RESOLUTION_DB:db_id]
+  relatedEntityId?: string;
+  relatedField?: string;          // Notion property name to write to (default: "Notes")
+  relatedResolutionType?: string;              // "text" (default) | "relation"
+  relatedSearchDb?: string;                    // DB ID for relation searches
+  relatedFields?: { field: string; label: string }[]; // Fix 4: multiple fields from [RESOLUTION_FIELDS:f1:l1|f2:l2]
 };
 
 export async function getDecisionItems(statusFilter?: string): Promise<DecisionItem[]> {
@@ -930,7 +944,39 @@ export async function getDecisionItems(statusFilter?: string): Promise<DecisionI
       requiresExecute: checkbox(prop(page, "Requires Execute")),
       executeApproved: checkbox(prop(page, "Execute Approved")),
       dueDate: date(prop(page, "Decision Due Date")),
-      notes: text(prop(page, "Proposed Action")),
+      ...(() => {
+        const raw = text(prop(page, "Proposed Action")) ?? "";
+        // Parse embedded agent metadata markers
+        const entityMatch  = raw.match(/\[ENTITY_ID:([^\]]+)\]/);
+        const fieldMatch   = raw.match(/\[RESOLUTION_FIELD:([^\]]+)\]/);
+        const fieldsMatch  = raw.match(/\[RESOLUTION_FIELDS:([^\]]+)\]/);
+        const typeMatch    = raw.match(/\[RESOLUTION_TYPE:([^\]]+)\]/);
+        const dbMatch      = raw.match(/\[RESOLUTION_DB:([^\]]+)\]/);
+        const stripped = raw
+          .replace(/\[ENTITY_ID:[^\]]+\]/g, "")
+          .replace(/\[RESOLUTION_FIELD:[^\]]+\]/g, "")
+          .replace(/\[RESOLUTION_FIELDS:[^\]]+\]/g, "")
+          .replace(/\[RESOLUTION_TYPE:[^\]]+\]/g, "")
+          .replace(/\[RESOLUTION_DB:[^\]]+\]/g, "")
+          .trimStart();
+        // Parse RESOLUTION_FIELDS: "fieldName1:Label 1|fieldName2:Label 2"
+        const relatedFields = fieldsMatch
+          ? fieldsMatch[1].split("|").map(pair => {
+              const sep = pair.indexOf(":");
+              return sep === -1
+                ? { field: pair, label: pair }
+                : { field: pair.slice(0, sep), label: pair.slice(sep + 1) };
+            })
+          : undefined;
+        return {
+          notes: stripped,
+          relatedEntityId:       entityMatch ? entityMatch[1] : undefined,
+          relatedField:          fieldMatch  ? fieldMatch[1]  : undefined,
+          relatedResolutionType: typeMatch   ? typeMatch[1]   : undefined,
+          relatedSearchDb:       dbMatch     ? dbMatch[1]     : undefined,
+          relatedFields,
+        };
+      })(),
       notionUrl: page.url ?? "",
       category: page.properties["Decision Category"]?.select?.name ?? undefined,
     }); });

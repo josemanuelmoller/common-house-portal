@@ -115,6 +115,7 @@ agent_run_summary:
   records_skipped: N     # startups skipped (existing opportunity)
   escalation_count: N    # borderline matches
   p1_count: N            # strong matches with score ≥ 70
+  decision_items_created: N  # Missing Input items created for data-sparse investor orgs
   blockers: [list or "none"]
   recommended_next_step: "one-line string"
 
@@ -175,6 +176,28 @@ Human actions required: [list or "none"]
 - Any match with score ≥ 70 → P1 escalation, named as priority introduction candidate
 - Borderline matches (40–59) → MEDIUM escalation, listed for human decision
 - Data quality gap: if > 50% of investor orgs have empty Notes → flag "low match quality due to sparse investor data"; recommend enriching investor records
+
+## Missing investor data — Decision Item creation
+
+For each Funder organization whose Notes field is empty (or contains fewer than 10 words), create a Decision Item in CH Decision Items [OS v2] (`6b801204c4de49c7b6179e04761a285a`) using `notion-create-pages`:
+
+**Required properties:**
+- `Name` (title): `[OrgName] — Missing Investment Thesis and Sector Data`
+- `Decision Type` (select): `Missing Input`
+- `Priority` (select): `Low`
+- `Status` (select): `Open`
+- `Source Agent` (select): `deal-flow-agent`
+- `Proposed Action` (rich_text): Begin with the entity marker on its own line, then the human-readable description:
+  ```
+  [ENTITY_ID:<org_notion_page_id>]
+  <OrgName> (Funder) has no sector data or investment thesis in their Notes field. deal-flow-agent cannot compute a matching score without focus areas. Please add sector keywords, stage preference, and investment thesis to resolve.
+  ```
+
+**Rules:**
+- Only create one Decision Item per org — check first if an Open "Missing Input" item already exists for that org name (search Decision Items DB by title prefix) before creating.
+- Cap at 5 Decision Items per run to avoid flooding the queue.
+- Do not block the rest of the run — continue scoring orgs that do have data. Skip orgs without data for scoring (they cannot score above 0 anyway).
+- Report how many Decision Items were created in the output summary.
 
 ---
 

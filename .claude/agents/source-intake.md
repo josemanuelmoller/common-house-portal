@@ -109,7 +109,35 @@ If likely missing entities appear, leave them unlinked and note them in the repo
 **Branded initiative as separate project**
 If a thread is primarily about a named platform, program, or workstream that has its own distinct stakeholders, deliverables, or timeline — treat it as a candidate separate project. Do not absorb it into the nearest familiar project.
 Trigger signals: distinct brand name, separate team, own platform or product, own timeline.
-Action: flag for entity creation; leave project link empty; set Relevance Status = Needs Review.
+Action: flag for entity creation; leave project link empty; set Relevance Status = Needs Review. **Create a Decision Item** (see "Decision Items for ambiguous project links" below).
+
+---
+
+## Decision Items for ambiguous project links
+
+Whenever a source record is created or updated with `Relevance Status = Needs Review` because the project linkage is ambiguous, create a Decision Item in CH Decision Items [OS v2] (`6b801204c4de49c7b6179e04761a285a`) using `notion-create-pages`:
+
+- `Name`: `[Source Title] — Project linkage unclear`
+- `Decision Type`: `Missing Input`
+- `Priority`: `Low`
+- `Status`: `Open`
+- `Source Agent`: `source-intake`
+- `Proposed Action`:
+  ```
+  [ENTITY_ID:<source_record_page_id>][RESOLUTION_FIELD:Linked Projects][RESOLUTION_TYPE:relation][RESOLUTION_DB:db_id_of_CH_Projects]
+  Source "[Source Title]" was ingested but could not be linked to a project automatically.
+  Reason: [one-line reason — e.g., "initiative name not found in active scopes", "could be new project or alias of existing one"]
+  Type the name of the project this source belongs to. The system will search CH Projects [OS v2] and link it automatically.
+  ```
+
+**CH Projects [OS v2] DB ID:** Use the DB ID returned when you search for the CH Projects database (search `notion-search` for "CH Projects OS v2"). This is needed for the `RESOLUTION_DB` marker so the Decision Center can search the right database.
+
+Dedup rule: check if an Open Decision Item already exists for this source record's page ID (search by entity ID in title or notes). Skip if found.
+
+**When a user resolves this Decision Item via the Decision Center:**
+- The portal writes the found project as a relation to `Linked Projects` on the source record
+- The portal also updates `Relevance Status` to `Relevant`
+- No further action needed from source-intake
 
 **Alias / previous name**
 If a thread references a name that appears to be a prior name of an existing initiative (same team, same platform, same deliverables), confirm the alias before linking. Use the canonical current name in OS v2. Do not create a duplicate project.

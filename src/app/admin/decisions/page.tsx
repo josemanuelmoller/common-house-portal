@@ -111,7 +111,13 @@ function DecisionRow({ item }: { item: DecisionItem }) {
           executeApproved={item.executeApproved}
           status={item.status}
           decisionType={item.decisionType}
+          sourceAgent={item.sourceAgent}
           notionUrl={item.notionUrl}
+          relatedEntityId={item.relatedEntityId}
+          relatedField={item.relatedField}
+          relatedResolutionType={item.relatedResolutionType}
+          relatedSearchDb={item.relatedSearchDb}
+          relatedFields={item.relatedFields}
         />
       </div>
 

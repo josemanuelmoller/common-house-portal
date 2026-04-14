@@ -99,8 +99,31 @@ If `status = blocked` → log "resolve-entities: BLOCKED". Continue to output as
 
 **Execute mode gate for entity writes:**
 - `merge-propose` (High confidence) → write provenance mark only in execute mode. Log every write.
-- `needs-review` (Medium confidence) → no write in any mode. Surface in escalation queue.
+- `needs-review` (Medium confidence) → no write in any mode. Surface in escalation queue. **Also create a Decision Item** (see below).
 - `keep-separate` and `no-match` → no write.
+
+**Decision Items for Medium-confidence duplicates:**
+
+For each `needs-review` pair from resolve-entities, create a Decision Item in CH Decision Items [OS v2] (`6b801204c4de49c7b6179e04761a285a`) using `notion-create-pages`:
+
+- `Name`: `[Name A] × [Name B] — Possible Duplicate`
+- `Decision Type`: `Ambiguity Resolution`
+- `Priority`: `Low`
+- `Status`: `Open`
+- `Source Agent`: `hygiene-agent`
+- `Proposed Action`:
+  ```
+  [ENTITY_ID:<non_canonical_page_id>][RESOLUTION_FIELD:Notes]
+  resolve-entities flagged these two records as possible duplicates (Medium confidence):
+  - Record A: [Name A] ([page_id_A]) — [one-line reason: what signals matched]
+  - Record B: [Name B] ([page_id_B]) — [one-line reason: what signals matched]
+
+  If they ARE duplicates: write which record to keep and why. hygiene-agent will apply the provenance mark on its next execute run.
+  If they are NOT duplicates: dismiss this item to teach the agent they are distinct.
+  ```
+
+Dedup rule: before creating, check if an Open Decision Item already exists for this name pair (search by title). Skip if found.
+Cap: max 5 duplicate Decision Items per hygiene-agent run.
 
 ### Step 3 — Compile output
 

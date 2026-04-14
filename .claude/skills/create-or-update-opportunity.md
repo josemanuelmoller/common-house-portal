@@ -101,16 +101,39 @@ Check the input for minimum qualification criteria (OPPORTUNITY-STANDARD.md):
 - **Trigger check:** `signal_text` or a `Trigger / Signal` note must be non-empty (Criterion 2 — Why Now)
 - **Buyer check:** `contact_name`, `contact_page_id`, or a `Buyer Probable` note must be non-empty (Criterion 3 — Buyer Path)
 
-**Both missing:**
-→ BLOCK. Do not proceed.
-→ Return: `action_taken: BLOCKED-QUALIFICATION`, `status: blocked`
-→ `next_step_hint: "Route to Decision Center (Missing Input) — provide Trigger/Signal and Buyer Probable before creating this Opportunity. Score cannot reach 50 without both."`
-
 **One missing (score likely 50–69 range):**
 → Proceed with creation at status `New`.
 → Set `Qualification Status` = `Needs Review`.
-→ Append to Notes: "Qualification incomplete — [missing field] absent. Decision Item recommended."
-→ Log: `QUALIFICATION WARNING — [missing field] absent. Created as Needs Review.`
+→ After creating the opportunity record, create a Decision Item in CH Decision Items [OS v2] (`6b801204c4de49c7b6179e04761a285a`) using `notion-create-pages`:
+  - `Name`: `[Org Name] — [Opp Type] — Missing [Trigger/Signal | Buyer Probable]`
+  - `Decision Type`: `Missing Input`
+  - `Priority`: `Medium`
+  - `Status`: `Open`
+  - `Source Agent`: `create-or-update-opportunity`
+  - `Proposed Action`:
+    ```
+    [ENTITY_ID:<new_opportunity_page_id>][RESOLUTION_FIELD:Notes]
+    Opportunity created with Qualification Status = Needs Review. Missing: [field name].
+    Provide the [Trigger/Signal describing why this opportunity is timely | Buyer Probable — who on the buyer side would champion or approve this deal].
+    ```
+→ Log: `QUALIFICATION WARNING — [missing field] absent. Created as Needs Review. Decision Item created.`
+
+**Both missing:**
+→ BLOCK. Do not proceed with opportunity creation.
+→ Create a Decision Item in CH Decision Items [OS v2]:
+  - `Name`: `[Org Name] — [Opp Type] — Missing Trigger and Buyer (opportunity blocked)`
+  - `Decision Type`: `Missing Input`
+  - `Priority`: `High`
+  - `Status`: `Open`
+  - `Source Agent`: `create-or-update-opportunity`
+  - `Proposed Action`:
+    ```
+    [ENTITY_ID:<org_page_id>][RESOLUTION_FIELD:Notes]
+    Opportunity creation for [Org Name] ([type]) was blocked: both Trigger/Signal and Buyer Probable are absent. Score cannot reach 50 without both.
+    Provide: (1) why this opportunity is timely — the trigger or signal, and (2) who is the likely buyer or champion.
+    Once resolved, re-run create-or-update-opportunity with this information.
+    ```
+→ Return: `action_taken: BLOCKED-QUALIFICATION`, `status: blocked`
 
 **Both present (score likely ≥ 50):**
 → Set `Qualification Status` = `Needs Review` by default (human confirms Qualified after full review).
