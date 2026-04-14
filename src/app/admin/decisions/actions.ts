@@ -225,7 +225,7 @@ export async function searchNotionEntities(query: string): Promise<{ id: string;
 
   const results = await notion.search({
     query: trimmed,
-    filter: { object: "page" },
+    filter: { value: "page", property: "object" },
     page_size: 8,
   })
 
