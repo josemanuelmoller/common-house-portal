@@ -12,6 +12,14 @@ function daysSince(dateStr: string | null): number {
   return Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000);
 }
 
+/** Best available activity signal across all date fields on a project */
+function bestActivity(p: { lastUpdate: string | null; lastEvidenceDate?: string | null; lastMeetingDate?: string | null }): string | null {
+  return [p.lastUpdate, p.lastEvidenceDate ?? null, p.lastMeetingDate ?? null]
+    .filter(Boolean)
+    .sort()
+    .pop() ?? null;
+}
+
 export default async function HealthPage() {
   await requireAdmin();
 
@@ -55,7 +63,7 @@ export default async function HealthPage() {
 
   // Project health
   const updateNeededProjects = projects.filter(p => p.updateNeeded);
-  const staleProjects        = projects.filter(p => daysSince(p.lastUpdate) > 30);
+  const staleProjects        = projects.filter(p => daysSince(bestActivity(p)) > 30);
 
   // Missing excerpts intentionally excluded from overallHealthy — it is a content quality
   // metric (tracked separately on the health page) not an operational blocker. Including it
@@ -358,7 +366,7 @@ export default async function HealthPage() {
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-[#131218] text-sm truncate">{p.name}</p>
                       <p className="text-[10px] text-amber-500 font-bold uppercase tracking-widest mt-0.5">
-                        Update needed · {daysSince(p.lastUpdate) < 999 ? `${daysSince(p.lastUpdate)}d ago` : "unknown"}
+                        Update needed · {daysSince(bestActivity(p)) < 999 ? `${daysSince(bestActivity(p))}d ago` : "unknown"}
                       </p>
                     </div>
                     <StatusBadge value={p.stage} />
@@ -372,7 +380,7 @@ export default async function HealthPage() {
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-[#131218] text-sm truncate">{p.name}</p>
                       <p className="text-[10px] text-red-400 font-bold uppercase tracking-widest mt-0.5">
-                        Stale · {daysSince(p.lastUpdate)}d since last update
+                        Stale · {daysSince(bestActivity(p))}d since last activity
                       </p>
                     </div>
                     <StatusBadge value={p.stage} />

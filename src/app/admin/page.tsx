@@ -48,6 +48,14 @@ function daysSince(dateStr: string | null): number {
   return Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000);
 }
 
+/** Best available activity signal: last status update OR last evidence OR last meeting */
+function bestActivity(p: { lastUpdate: string | null; lastEvidenceDate?: string | null; lastMeetingDate?: string | null }): string | null {
+  return [p.lastUpdate, p.lastEvidenceDate ?? null, p.lastMeetingDate ?? null]
+    .filter(Boolean)
+    .sort()
+    .pop() ?? null;
+}
+
 function warmthLabel(days: number): { label: string; dot: string; text: string } {
   if (days <= 3)  return { label: "Hot",     dot: "bg-red-500",    text: "text-red-600" };
   if (days <= 10) return { label: "Warm",    dot: "bg-amber-400",  text: "text-amber-600" };
@@ -155,7 +163,7 @@ export default async function AdminPage() {
   // ── Derived state ────────────────────────────────────────────────────────────
   const withBlockers    = projects.filter(p => p.blockerCount > 0);
   const needsUpdate     = projects.filter(p => p.updateNeeded);
-  const staleProjects   = projects.filter(p => !p.updateNeeded && daysSince(p.lastUpdate) > 30);
+  const staleProjects   = projects.filter(p => !p.updateNeeded && daysSince(bestActivity(p)) > 30);
   const workroomCount   = projects.filter(p => p.primaryWorkspace === "workroom").length;
   const garageCount     = projects.filter(p => p.primaryWorkspace === "garage").length;
 
@@ -758,7 +766,7 @@ export default async function AdminPage() {
                       <Link key={p.id} href={`/admin/projects/${p.id}`} className="flex items-center gap-3 px-5 py-3.5 hover:bg-[#EFEFEA]/40 transition-colors group">
                         <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" />
                         <p className="text-[11px] font-medium text-[#131218] flex-1 min-w-0 truncate">{p.name}</p>
-                        <span className="text-[10px] font-bold text-red-400 shrink-0">{daysSince(p.lastUpdate)}d</span>
+                        <span className="text-[10px] font-bold text-red-400 shrink-0">{daysSince(bestActivity(p))}d</span>
                       </Link>
                     ))}
                   </div>
