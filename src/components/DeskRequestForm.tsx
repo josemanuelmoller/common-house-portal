@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 type StyleProfileOption = {
   id: string;
@@ -136,6 +137,8 @@ export default function DeskRequestForm({
   channelOrProjectLabel,
   styleProfiles = [],
 }: DeskRequestFormProps) {
+  const router = useRouter();
+
   const [selectedCanal,   setSelectedCanal]   = useState(CANALES[0]);
   const [selectedFormato, setSelectedFormato] = useState(CANAL_FORMAT_MAP[CANALES[0]][0]);
 
@@ -195,6 +198,7 @@ export default function DeskRequestForm({
       if (!genRes.ok) throw new Error("Generation failed");
 
       setStatus("success");
+      router.refresh();
       setTimeout(() => setStatus("idle"), 5000);
     } catch {
       setStatus("error");
@@ -385,7 +389,7 @@ export default function DeskRequestForm({
             }`}
           >
             {status === "success"
-              ? "✓ Listo — recarga para ver"
+              ? "✓ Listo — actualizando lista…"
               : status === "error"
               ? "Error — intenta de nuevo"
               : status === "loading"

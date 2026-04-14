@@ -1,11 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 type State = "idle" | "loading" | "done" | "error";
 
 export function TriggerBriefingButton() {
   const [state, setState] = useState<State>("idle");
+  const router = useRouter();
 
   async function trigger() {
     setState("loading");
@@ -13,7 +15,7 @@ export function TriggerBriefingButton() {
       const res = await fetch("/api/generate-daily-briefing", { method: "POST" });
       if (res.ok) {
         setState("done");
-        setTimeout(() => window.location.reload(), 1500);
+        router.refresh();
       } else {
         setState("error");
       }
@@ -29,7 +31,7 @@ export function TriggerBriefingButton() {
       className="shrink-0 text-[11px] font-bold px-3 py-1.5 rounded-lg bg-[#c8f55a] text-[#131218] hover:bg-[#b8e54a] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
     >
       {state === "loading" ? "Generating…"
-        : state === "done"    ? "Done — reloading…"
+        : state === "done"    ? "Done — actualizando…"
         : state === "error"   ? "Error — retry"
         : "Generate briefing"}
     </button>
