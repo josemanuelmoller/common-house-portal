@@ -6,8 +6,8 @@
  *
  * - Only touches projects in Active / Executing / Validation / Discovery stages
  * - Only writes if ≥2 new validated evidence items exist since last status update
- * - Writes to "Draft Status Update" field only — never touches Status Summary
- * - Sets "Project Update Needed? = true" so admin sees it in the portal
+ * - Writes directly to "Status Summary" — no manual approval step
+ * - Clears "Draft Status Update" and sets "Project Update Needed? = false"
  * - Conservative: no stage changes, no narrative rewrites
  *
  * Auth: x-agent-key OR Vercel cron CRON_SECRET.
@@ -181,8 +181,9 @@ export async function POST(req: NextRequest) {
       await notion.pages.update({
         page_id: project.id,
         properties: {
-          "Draft Status Update":    { rich_text: [{ text: { content: draft } }] },
-          "Project Update Needed?": { checkbox: true },
+          "Status Summary":         { rich_text: [{ text: { content: draft } }] },
+          "Draft Status Update":    { rich_text: [] },
+          "Project Update Needed?": { checkbox: false },
         } as any, // eslint-disable-line @typescript-eslint/no-explicit-any
       });
 
