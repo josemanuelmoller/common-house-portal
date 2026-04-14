@@ -207,6 +207,7 @@ Return ONLY valid JSON array — no markdown, no explanation:
 [{"index": 1, "label": "Urgent"|"Needs Reply"|"FYI", "reason": "..."}]`;
 
   let classifications: { index: number; label: string; reason: string }[] = [];
+  let classificationError: string | undefined;
   try {
     const res = await anthropic.messages.create({
       model: "claude-haiku-4-5-20251001",
@@ -217,8 +218,8 @@ Return ONLY valid JSON array — no markdown, no explanation:
     const jsonMatch = raw.match(/\[[\s\S]*\]/);
     classifications = JSON.parse(jsonMatch?.[0] ?? "[]");
   } catch (err) {
-    console.error("[inbox-triage] Claude classification error:", err instanceof Error ? err.message : String(err));
-    // If Claude fails, return candidates with default label
+    classificationError = err instanceof Error ? err.message : String(err);
+    console.error("[inbox-triage] Claude classification error:", classificationError);
     classifications = top.map((_, i) => ({ index: i + 1, label: "Needs Reply", reason: "Unable to classify" }));
   }
 
@@ -249,5 +250,5 @@ Return ONLY valid JSON array — no markdown, no explanation:
   const flagged = items.filter(i => i.label !== "FYI");
   const output  = flagged.length > 0 ? flagged.slice(0, 10) : items.slice(0, 5);
 
-  return NextResponse.json({ ok: true, items: output, total_scanned: candidates.length });
+  return NextResponse.json({ ok: true, items: output, total_scanned: candidates.length, _classificationError: classificationError, _hasApiKey: !!process.env.ANTHROPIC_API_KEY });
 }
