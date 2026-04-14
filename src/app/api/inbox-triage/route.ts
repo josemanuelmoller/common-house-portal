@@ -59,6 +59,18 @@ function extractName(header: string): string {
 }
 
 export async function GET(req: NextRequest) {
+  try {
+    return await handleGet(req);
+  } catch (err) {
+    console.error("[inbox-triage] Unhandled error:", err);
+    return NextResponse.json(
+      { error: "Internal error", detail: err instanceof Error ? err.message : String(err) },
+      { status: 500 }
+    );
+  }
+}
+
+async function handleGet(req: NextRequest) {
   const ok = await authCheck(req);
   if (!ok) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
