@@ -25,7 +25,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { Client } from "@notionhq/client";
-import { currentUser } from "@clerk/nextjs/server";
+import { auth } from "@clerk/nextjs/server";
 import { isAdminUser } from "@/lib/clients";
 
 export const maxDuration = 120;
@@ -54,8 +54,8 @@ async function authCheck(req: NextRequest): Promise<boolean> {
   if (cronToken === `Bearer ${expected}`) return true;
   // Allow authenticated admin session (browser trigger)
   try {
-    const user = await currentUser();
-    if (user && isAdminUser(user.id)) return true;
+    const { userId } = await auth();
+    if (userId && isAdminUser(userId)) return true;
   } catch { /* no-op */ }
   return false;
 }
