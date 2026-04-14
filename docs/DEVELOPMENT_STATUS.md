@@ -12,7 +12,7 @@ These areas are built, handling real data, and appear actively maintained:
 
 **The Control Room (`/admin`)** is the primary internal interface. The Sprint A/B redesign gave it a clear 10-section layout with real data from multiple Notion databases. The P1 banner, agent queue, follow-up queue, and portfolio table are all rendering live data.
 
-**The OS pipeline** (cron jobs in `vercel.json`) is the most operationally significant part of the codebase. 11 Vercel cron jobs run Monday-Friday, moving data from Fireflies and Gmail through Claude into Notion. This pipeline is the core of the OS model.
+**The OS pipeline** (cron jobs in `vercel.json`) is the most operationally significant part of the codebase. 12 Vercel cron entries run Monday-Friday (or weekly/biweekly for competitive-monitor and grant-radar), moving data from Fireflies and Gmail through Claude into Notion. This pipeline is the core of the OS model.
 
 **The Workroom (`/workroom`)** is fully built. The Hall/Workroom split is well-designed -- both surfaces read the same Notion data but show different lenses. The `WORKSPACE_READY` flag model is clean.
 

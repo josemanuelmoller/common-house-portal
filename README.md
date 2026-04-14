@@ -56,7 +56,7 @@ Browser
 
 Data backbone:
   Notion  → primary source of truth for all project, evidence, and knowledge data (21 DBs)
-  Supabase → file storage only (library docs, garage document uploads)
+  Supabase → file storage (library docs, garage uploads) + agent_runs table
 
 Auth:
   Clerk → sign-in/sign-up, session management
@@ -74,7 +74,7 @@ External data sources:
 
 Deployment:
   Vercel → London region (lhr1)
-  Vercel Crons → 11 scheduled jobs (see docs/ROUTES_AND_SURFACES.md)
+  Vercel Crons → 12 scheduled jobs (see docs/ROUTES_AND_SURFACES.md)
 ```
 
 ---
@@ -138,7 +138,7 @@ Required for local development:
 | `ADMIN_EMAILS` | Comma-separated email addresses for admin access |
 | `ANTHROPIC_API_KEY` | Claude API key (used by AI pipeline routes) |
 | `CRON_SECRET` | Shared secret for Vercel cron + agent-key auth |
-| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL (used for file storage) |
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL (file storage + agent_runs table) |
 | `SUPABASE_SERVICE_KEY` | Supabase service role key |
 | `GOOGLE_SERVICE_ACCOUNT_EMAIL` | Google SA email (Drive access) |
 | `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY` | Google SA private key |
@@ -168,7 +168,7 @@ For production deployment, see `DEPLOY.md`.
 
 All project data -- status, evidence, decisions, people, knowledge -- lives in Notion. There are 21 Notion databases. Their IDs and types are defined in `src/lib/notion.ts`.
 
-Supabase is used only for file storage (library document ingestion and garage document uploads). It is not a primary database.
+Supabase is used for file storage (library document ingestion and garage document uploads) and for at least one structured table: `/api/hall-data` reads from the `agent_runs` table to surface an agent pulse on the admin dashboard. It is not the primary database for project data, but it is not storage-only.
 
 The automated pipeline pulls from Fireflies and Gmail daily, processes the content through Claude, and writes structured evidence back to Notion. See `docs/DATA_AND_INTEGRATIONS.md` for the full breakdown.
 

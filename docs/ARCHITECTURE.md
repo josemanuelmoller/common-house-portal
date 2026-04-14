@@ -18,7 +18,7 @@ LAYER 2 — CONTROL ROOM (internal staff)
 
 LAYER 3 — OS BACKBONE (data infrastructure)
   Notion (21 DBs)                    Source of truth for all project data.
-  Automated pipelines (11 crons)     Ingest → extract → validate → synthesize.
+  Automated pipelines (12 crons)     Ingest → extract → validate → synthesize.
   AI engine (Anthropic SDK)          Claude for synthesis tasks.
 ```
 
