@@ -81,8 +81,12 @@ export async function POST(req: NextRequest) {
 
   const draftType   = p("Type")?.select?.name ?? "";
   const status      = p("Status")?.select?.name ?? "";
-  const draftText   = (p("Draft Text")?.rich_text ?? []).map((r: any) => r.plain_text).join(""); // eslint-disable-line @typescript-eslint/no-explicit-any
-  const title       = (p("Title") ?? p("Name"))?.title?.map((r: any) => r.plain_text).join("") ?? ""; // eslint-disable-line @typescript-eslint/no-explicit-any
+  // "Content" is the canonical body field — all Agent Draft write paths use this name.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const draftText   = (p("Content")?.rich_text ?? []).map((r: any) => r.plain_text).join("");
+  // "Draft Title" is the canonical title property — all Agent Draft write paths use this name.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const title       = p("Draft Title")?.title?.map((r: any) => r.plain_text).join("") ?? "";
   const relatedId   = p("Related Entity")?.relation?.[0]?.id ?? null;
   const voice       = p("Voice")?.select?.name ?? "CH";
 

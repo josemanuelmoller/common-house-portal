@@ -67,7 +67,8 @@ export async function GET() {
           priority: sel(p["Priority"]) || "Normal",
           type: sel(p["Type"]) || "",
           status: sel(p["Status"]) || "Open",
-          agent: text(p["Source Agent"]) || text(p["Agent"]) || "",
+          // "Source Agent" is a select property — use sel(), not text()
+          agent: sel(p["Source Agent"]) || sel(p["Agent"]) || "",
           question: text(p["Question"]) || text(p["Description"]) || "",
           projectName: p["Project"]?.relation?.[0]?.id ? "linked" : "",
           createdAt: relDate(dt(p["Created"]) || page.created_time),

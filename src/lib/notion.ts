@@ -528,7 +528,9 @@ export async function getContentPipeline(statusFilter?: string): Promise<Content
       title:       text(prop(page, "Title")) || text(prop(page, "Name")) || "Untitled",
       status:      select(prop(page, "Status")),
       contentType: select(prop(page, "Content Type")),
-      channel:     select(prop(page, "Channel")),
+      // "Platform" is the canonical channel field in Content Pipeline [OS v2].
+      // desk-request, generate-draft, and getReadyContent() all use "Platform".
+      channel:     select(prop(page, "Platform")),
       desk:        select(prop(page, "Desk")),
       projectId:   relationFirst(prop(page, "Projects")) ?? relationFirst(prop(page, "Project")),
       projectName: text(prop(page, "Project Name")) || "",
