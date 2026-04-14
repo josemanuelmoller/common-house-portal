@@ -172,7 +172,9 @@ export default async function AdminPage() {
   const withDeadlines   = openDecisions.filter(d => d.dueDate);
   const blockerCount    = withBlockers.length;
   const deadlineCount   = withDeadlines.length;
-  const totalPending    = needsUpdate.length + openDecisions.length;
+  // Widget: only actionable by Jose directly — Missing Input (provide data) and Approval (say yes/no)
+  const deskDecisions   = openDecisions.filter(d => d.decisionType === "Missing Input" || d.decisionType === "Approval");
+  const totalPending    = deskDecisions.length;
 
   const dormantRelationships = coldRelationships.filter(r => r.warmth === "Dormant");
   const coldOnly             = coldRelationships.filter(r => r.warmth === "Cold");
@@ -713,36 +715,20 @@ export default async function AdminPage() {
                   )}
                 </div>
                 <div className="divide-y divide-[#EFEFEA]">
-                  {/* Decision Items — things the system flagged for Jose's input */}
-                  {openDecisions.slice(0, 4).map(d => {
-                    const typeLabel =
-                      d.decisionType === "Missing Input"               ? "Input needed" :
-                      d.decisionType === "Approval"                    ? "Approve" :
-                      d.decisionType?.includes("Policy")               ? "Decide" :
-                      d.decisionType === "Ambiguity Resolution"        ? "Clarify" :
-                      d.decisionType === "Draft Review"                ? "Review" :
-                      "Action";
-                    const isUrgent = d.priority === "P1 Critical" || d.priority === "High";
+                  {/* Only Missing Input + Approval — the two types where Jose is the bottleneck */}
+                  {deskDecisions.slice(0, 5).map(d => {
+                    const isApproval = d.decisionType === "Approval";
+                    const isUrgent   = d.priority === "P1 Critical" || d.priority === "High";
                     return (
                       <Link key={`dec-${d.id}`} href="/admin/decisions" className="flex items-center gap-3 px-5 py-3.5 hover:bg-[#EFEFEA]/40 transition-colors">
                         <div className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 ${isUrgent ? "bg-red-100" : "bg-[#EFEFEA]"}`}>
-                          <span className={`text-[9px] font-bold ${isUrgent ? "text-red-600" : "text-[#131218]/40"}`}>!</span>
+                          <span className={`text-[9px] font-bold ${isUrgent ? "text-red-600" : "text-[#131218]/40"}`}>{isApproval ? "✓" : "?"}</span>
                         </div>
                         <p className="text-[11px] font-medium text-[#131218] flex-1 min-w-0 truncate">{d.title}</p>
-                        <span className="text-[9px] font-bold text-[#131218]/30 shrink-0">{typeLabel}</span>
+                        <span className="text-[9px] font-bold text-[#131218]/30 shrink-0">{isApproval ? "Approve" : "Input needed"}</span>
                       </Link>
                     );
                   })}
-                  {/* Projects needing a status update — Jose writes the update */}
-                  {needsUpdate.slice(0, 2).map(p => (
-                    <Link key={`upd-${p.id}`} href={`/admin/projects/${p.id}`} className="flex items-center gap-3 px-5 py-3.5 hover:bg-[#EFEFEA]/40 transition-colors">
-                      <div className="w-5 h-5 rounded-md bg-amber-50 flex items-center justify-center shrink-0">
-                        <span className="text-[9px] font-bold text-amber-500">↑</span>
-                      </div>
-                      <p className="text-[11px] font-medium text-[#131218] flex-1 min-w-0 truncate">{p.name}</p>
-                      <span className="text-[9px] font-bold text-[#131218]/30 shrink-0">Update</span>
-                    </Link>
-                  ))}
                   {totalPending === 0 && (
                     <div className="px-5 py-5 text-center">
                       <p className="text-[11px] text-[#131218]/25 font-medium">Desk clear ✓</p>
