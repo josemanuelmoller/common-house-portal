@@ -125,7 +125,7 @@ export default async function AdminPage() {
     readyContent,
   ] = await Promise.all([
     getProjectsOverview(),
-    getDecisionItems(),
+    getDecisionItems("Open"),
     getDailyBriefing(),
     getAgentDrafts("Pending Review"),
     getFollowUpOpportunities(),
@@ -141,7 +141,7 @@ export default async function AdminPage() {
   const workroomCount   = projects.filter(p => p.primaryWorkspace === "workroom").length;
   const garageCount     = projects.filter(p => p.primaryWorkspace === "garage").length;
 
-  const openDecisions   = decisions.filter(d => d.status !== "Approved" && d.status !== "Rejected" && d.status !== "Executed");
+  const openDecisions   = decisions; // pre-filtered to "Open" at DB level in getDecisionItems("Open")
   const urgentDecisions = openDecisions.filter(d => d.priority === "P1" || d.priority === "Urgent");
   const withDeadlines   = openDecisions.filter(d => d.dueDate);
   const blockerCount    = withBlockers.length;
