@@ -85,19 +85,22 @@ async function handleGet(req: NextRequest) {
     return NextResponse.json({ error: "Gmail not configured" }, { status: 503 });
   }
 
-  // Support ?days=N for backlog scans (default 2)
-  const daysParam = parseInt(req.nextUrl.searchParams.get("days") ?? "", 10);
-  const thresholdDays = daysParam > 0 ? daysParam : THRESHOLD_DAYS;
-  const maxThreads    = thresholdDays > 7 ? 50 : MAX_THREADS;
+  // ?days=N sets the lookback window (default: no window limit, rely on maxResults)
+  // The minimum-waiting threshold stays at THRESHOLD_DAYS (2 days) always.
+  const windowDays = parseInt(req.nextUrl.searchParams.get("days") ?? "", 10);
 
-  const thresholdMs = thresholdDays * 24 * 60 * 60 * 1000;
+  const thresholdMs = THRESHOLD_DAYS * 24 * 60 * 60 * 1000;
   const nowMs = Date.now();
 
-  // Fetch recent inbox threads — exclude promotions, social, updates
+  // Build Gmail query — add newer_than filter when a window is requested
+  const windowFilter = windowDays > 0 ? ` newer_than:${windowDays}d` : "";
+  const gmailQuery = `in:inbox -category:promotions -category:social -category:updates${windowFilter}`;
+
+  // Fetch recent inbox threads
   const threadsRes = await gmail.users.threads.list({
     userId: "me",
-    q: "in:inbox -category:promotions -category:social -category:updates",
-    maxResults: maxThreads,
+    q: gmailQuery,
+    maxResults: MAX_THREADS,
   });
 
   const threads = threadsRes.data.threads ?? [];
