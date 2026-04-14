@@ -37,6 +37,7 @@ import {
 } from "@/lib/notion";
 import { ADMIN_NAV } from "@/lib/admin-nav";
 import { requireAdmin } from "@/lib/require-admin";
+import { TriggerBriefingButton } from "@/components/TriggerBriefingButton";
 
 export { ADMIN_NAV as NAV } from "@/lib/admin-nav";
 
@@ -206,12 +207,13 @@ export default async function AdminPage() {
               </div>
             </div>
           ) : (
-            <div className="bg-[#131218]/6 border border-dashed border-[#131218]/15 rounded-2xl px-7 py-5 flex items-center justify-between">
+            <div className="bg-[#131218]/6 border border-dashed border-[#131218]/15 rounded-2xl px-7 py-5 flex items-center justify-between gap-4">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-[2.5px] text-[#131218]/30 mb-1">Focus of the Day</p>
                 <p className="text-[13px] text-[#131218]/40">No briefing generated yet today.</p>
-                <p className="text-[11px] text-[#131218]/25 mt-0.5">Run <code className="bg-[#131218]/6 px-1 rounded">generate-daily-briefing</code> to synthesise Calendar + Gmail + Fireflies.</p>
+                <p className="text-[11px] text-[#131218]/25 mt-0.5">Synthesises active projects, decisions, and open signals into a daily focus.</p>
               </div>
+              <TriggerBriefingButton />
             </div>
           )}
 
@@ -277,23 +279,43 @@ export default async function AdminPage() {
             {/* Tile 3 — OS Layer */}
             <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-5">
               <p className="text-[9px] font-bold text-[#131218]/25 uppercase tracking-widest mb-3">OS activo</p>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] text-[#131218]/50">Borradores de agentes</span>
-                  <span className={`text-[13px] font-[800] ${agentDrafts.length > 0 ? "text-[#131218]" : "text-[#131218]/15"}`}>{agentDrafts.length}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] text-[#131218]/50">Follow-ups activos</span>
-                  <span className={`text-[13px] font-[800] ${followUpOpps.length > 0 ? "text-amber-500" : "text-[#131218]/15"}`}>{followUpOpps.length}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] text-[#131218]/50">Relaciones frías</span>
-                  <span className={`text-[13px] font-[800] ${coldRelationships.length > 0 ? "text-blue-500" : "text-[#131218]/15"}`}>{coldRelationships.length}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] text-[#131218]/50">Dormantes</span>
-                  <span className={`text-[13px] font-[800] ${dormantRelationships.length > 0 ? "text-[#131218]/40" : "text-[#131218]/15"}`}>{dormantRelationships.length}</span>
-                </div>
+              <div className="space-y-2.5">
+                {[
+                  {
+                    label: "Borradores de agentes",
+                    count: agentDrafts.length,
+                    activeColor: "text-[#131218]",
+                    hint: "Pending agent drafts needing your review",
+                  },
+                  {
+                    label: "Follow-ups activos",
+                    count: followUpOpps.length,
+                    activeColor: "text-amber-500",
+                    hint: "Mark an opportunity as interested to track it here",
+                  },
+                  {
+                    label: "Relaciones frías",
+                    count: coldOnly.length,
+                    activeColor: "text-blue-500",
+                    hint: "Populated by relationship warmth scan (Mon · Thu)",
+                  },
+                  {
+                    label: "Dormantes",
+                    count: dormantRelationships.length,
+                    activeColor: "text-[#131218]/40",
+                    hint: "No contact in 60+ days",
+                  },
+                ].map(({ label, count, activeColor, hint }) => (
+                  <div key={label}>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] text-[#131218]/50">{label}</span>
+                      <span className={`text-[13px] font-[800] ${count > 0 ? activeColor : "text-[#131218]/15"}`}>{count}</span>
+                    </div>
+                    {count === 0 && (
+                      <p className="text-[9px] text-[#131218]/20 mt-0.5 leading-snug">{hint}</p>
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
           </div>

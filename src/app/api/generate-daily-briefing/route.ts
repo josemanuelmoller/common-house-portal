@@ -25,6 +25,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { Client } from "@notionhq/client";
+import { currentUser } from "@clerk/nextjs/server";
+import { isAdminUser } from "@/lib/clients";
 
 export const maxDuration = 120;
 
@@ -44,12 +46,17 @@ const DB = {
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
-function authCheck(req: NextRequest): boolean {
+async function authCheck(req: NextRequest): Promise<boolean> {
   const agentKey  = req.headers.get("x-agent-key");
   const cronToken = req.headers.get("authorization");
   const expected  = process.env.CRON_SECRET;
   if (agentKey && agentKey === expected) return true;
   if (cronToken === `Bearer ${expected}`) return true;
+  // Allow authenticated admin session (browser trigger)
+  try {
+    const user = await currentUser();
+    if (user && isAdminUser(user.id)) return true;
+  } catch { /* no-op */ }
   return false;
 }
 
@@ -191,7 +198,7 @@ async function findExistingBriefing(dateStr: string): Promise<string | null> {
 // ─── Main handler ─────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
-  if (!authCheck(req)) {
+  if (!await authCheck(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
