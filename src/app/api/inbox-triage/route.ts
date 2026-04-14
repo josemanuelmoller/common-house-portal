@@ -16,7 +16,7 @@
  * Called on-demand from the Hall admin UI (client-side fetch).
  */
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { google } from "googleapis";
 import Anthropic from "@anthropic-ai/sdk";
 import { adminGuardApi } from "@/lib/require-admin";
@@ -26,6 +26,17 @@ export const maxDuration = 60;
 const JOSE_EMAIL = process.env.GMAIL_USER_EMAIL ?? "josemanuel@wearecommonhouse.com";
 const THRESHOLD_DAYS = 2;
 const MAX_THREADS = 25;
+
+async function authCheck(req: NextRequest): Promise<boolean> {
+  const agentKey  = req.headers.get("x-agent-key");
+  const cronToken = req.headers.get("authorization");
+  const expected  = process.env.CRON_SECRET;
+  if (expected && agentKey === expected) return true;
+  if (expected && cronToken === `Bearer ${expected}`) return true;
+  // Fall back to Clerk session auth
+  const guard = await adminGuardApi();
+  return guard === null;
+}
 
 function getGmailClient() {
   const clientId     = process.env.GMAIL_CLIENT_ID;
@@ -47,9 +58,9 @@ function extractName(header: string): string {
   return match ? match[1].trim() : header.split("@")[0];
 }
 
-export async function GET() {
-  const guard = await adminGuardApi();
-  if (guard) return guard;
+export async function GET(req: NextRequest) {
+  const ok = await authCheck(req);
+  if (!ok) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const gmail = getGmailClient();
   if (!gmail) {
