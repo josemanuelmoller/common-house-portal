@@ -9,6 +9,26 @@ import { notion, DB, prop, text, select, multiSelect, num, checkbox, date, relat
 // Extracted to src/lib/notion/drafts.ts per docs/NOTION_LAYER_REFACTOR_PLAN.md.
 export * from "./notion/drafts";
 
+// ─── Daily Briefings ──────────────────────────────────────────────────────────
+// Extracted to src/lib/notion/briefings.ts per docs/NOTION_LAYER_REFACTOR_PLAN.md.
+export * from "./notion/briefings";
+
+// ─── Insight Briefs ───────────────────────────────────────────────────────────
+// Extracted to src/lib/notion/insights.ts per docs/NOTION_LAYER_REFACTOR_PLAN.md.
+export * from "./notion/insights";
+
+// ─── Knowledge Assets ─────────────────────────────────────────────────────────
+// Extracted to src/lib/notion/knowledge.ts per docs/NOTION_LAYER_REFACTOR_PLAN.md.
+export * from "./notion/knowledge";
+
+// ─── Decision Items ───────────────────────────────────────────────────────────
+// Extracted to src/lib/notion/decisions.ts per docs/NOTION_LAYER_REFACTOR_PLAN.md.
+export * from "./notion/decisions";
+
+// ─── Living Room ──────────────────────────────────────────────────────────────
+// Extracted to src/lib/notion/living-room.ts per docs/NOTION_LAYER_REFACTOR_PLAN.md.
+export * from "./notion/living-room";
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export type Project = {
@@ -88,17 +108,6 @@ export type DocumentItem = {
   url: string;
   platform: string;
   sourceDate: string | null;
-};
-
-export type KnowledgeAsset = {
-  id: string;
-  name: string;
-  category: string;
-  assetType: string;
-  status: string;
-  lastUpdated: string | null;
-  portalVisibility?: string;
-  sourceFileUrl?: string;
 };
 
 export type DashboardStats = {
@@ -608,90 +617,6 @@ export async function getAllResidents(): Promise<ResidentRecord[]> {
     });
 }
 
-// ─── Knowledge queries ────────────────────────────────────────────────────────
-
-export async function getKnowledgeAssets(): Promise<KnowledgeAsset[]> {
-  const res = await notion.databases.query({
-    database_id: DB.knowledge,
-    sorts: [{ timestamp: "last_edited_time", direction: "descending" }],
-    page_size: 50,
-  });
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return res.results.map((page: any) => ({
-    id: page.id,
-    name: text(prop(page, "Asset Name")) || "Untitled",
-    // "Domain / Theme" is the canonical field (multi_select). "Category"/"Asset Category" don't exist in the schema.
-    category: multiSelect(prop(page, "Domain / Theme")).join(", "),
-    assetType: select(prop(page, "Asset Type")) || "",
-    status: select(prop(page, "Status")) || "",
-    lastUpdated: page.last_edited_time ?? null,
-    portalVisibility: page.properties["Portal Visibility"]?.select?.name ?? "admin-only",
-    sourceFileUrl: page.properties["Source File URL"]?.url ?? null,
-  }));
-}
-
-// ─── Library ingest ───────────────────────────────────────────────────────────
-
-export async function createKnowledgeAssetDraft(opts: {
-  title: string;
-  summary: string;
-  keyPoints: string[];
-  assetType: string;
-  tags: string[];
-  sourceNote?: string;
-  sourceFileUrl?: string;
-  storagePath?: string;
-}): Promise<string> {
-  const { title, summary, keyPoints, assetType, tags, sourceNote, sourceFileUrl, storagePath } = opts;
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const page = await notion.pages.create({
-    parent: { database_id: DB.knowledge },
-    properties: {
-      "Asset Name":        { title: [{ text: { content: title } }] },
-      "Asset Type":        { select: { name: assetType } },
-      "Domain / Theme":    { multi_select: tags.slice(0, 5).map(t => ({ name: t })) },
-      "Status":            { select: { name: "Draft" } },
-      "Portal Visibility": { select: { name: "admin-only" } },
-      ...(sourceFileUrl ? { "Source File URL": { url: sourceFileUrl } } : {}),
-    } as any, // eslint-disable-line @typescript-eslint/no-explicit-any
-    children: [
-      {
-        object: "block",
-        type: "paragraph",
-        paragraph: { rich_text: [{ type: "text", text: { content: summary } }] },
-      },
-      ...(keyPoints.length > 0 ? [
-        {
-          object: "block" as const,
-          type: "bulleted_list_item" as const,
-          bulleted_list_item: { rich_text: [{ type: "text" as const, text: { content: "Key points:" } }] },
-        },
-        ...keyPoints.slice(0, 8).map(pt => ({
-          object: "block" as const,
-          type: "bulleted_list_item" as const,
-          bulleted_list_item: { rich_text: [{ type: "text" as const, text: { content: pt } }] },
-        })),
-      ] : []),
-      ...(sourceNote || storagePath ? [{
-        object: "block" as const,
-        type: "paragraph" as const,
-        paragraph: {
-          rich_text: [{ type: "text" as const, text: {
-            content: [
-              sourceNote ? `📎 Source: ${sourceNote}` : null,
-              storagePath ? `🗂 storage: ${storagePath}` : null,
-            ].filter(Boolean).join("  ·  "),
-          }}],
-        },
-      }] : []),
-    ],
-  });
-
-  return page.id;
-}
-
 // ─── Source Activity ──────────────────────────────────────────────────────────
 
 export type MeetingItem = {
@@ -814,301 +739,6 @@ export async function getDashboardStats(projectId?: string): Promise<DashboardSt
   };
 }
 
-// ─── Decision Items ───────────────────────────────────────────────────────────
-
-export type DecisionItem = {
-  id: string;
-  title: string;
-  decisionType: string;   // "Approval" | "Missing Input" | "Ambiguity Resolution" | "Policy/Automation Decision" | "Draft Review"
-  priority: string;       // "P1 Critical" | "High" | "Medium" | "Low"
-  status: string;         // "Open" | "Resolved" | "Dismissed"
-  sourceAgent: string;
-  requiresExecute: boolean;
-  executeApproved: boolean;
-  dueDate: string | null;
-  notes: string;
-  notionUrl: string;
-  category?: string;
-  // Structured metadata embedded by agents in Proposed Action
-  // Format: [ENTITY_ID:page_id][RESOLUTION_FIELD:PropertyName][RESOLUTION_TYPE:text|relation][RESOLUTION_DB:db_id]
-  relatedEntityId?: string;
-  relatedField?: string;          // Notion property name to write to (default: "Notes")
-  relatedResolutionType?: string;              // "text" (default) | "relation"
-  relatedSearchDb?: string;                    // DB ID for relation searches
-  relatedFields?: { field: string; label: string }[]; // multiple fields from [RESOLUTION_FIELDS:f1:l1|f2:l2]
-  // Entity creation proposal — from [ENTITY_ACTION:create_org] or [ENTITY_ACTION:create_person] marker
-  entityAction?: "create_org" | "create_person";
-  // create_org fields
-  entityName?: string;
-  entityDomain?: string;
-  entityCategory?: string;
-  contactName?: string;
-  contactEmail?: string;
-  // create_person fields
-  personName?: string;
-  personEmail?: string;
-  personOrgId?: string;    // Notion page ID of existing CH Organizations record
-  personOrgName?: string;  // Human-readable org name for display
-};
-
-export async function getDecisionItems(statusFilter?: string): Promise<DecisionItem[]> {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const filter: any = statusFilter
-      ? { property: "Status", select: { equals: statusFilter } }
-      : undefined;
-
-    const res = await notion.databases.query({
-      database_id: DB.decisions,
-      filter,
-      sorts: [{ property: "Priority", direction: "ascending" }],
-      page_size: 100,
-    });
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return res.results.map((page: any) => {
-      // Notion title property can be named anything — find it by type
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const titleProp = Object.values(page.properties as Record<string, any>).find((p: any) => p.type === "title");
-      const pageTitle = titleProp?.title?.[0]?.plain_text ?? text(prop(page, "Decision Title")) ?? text(prop(page, "Name")) ?? "Untitled";
-      return ({
-      id: page.id,
-      title: pageTitle,
-      decisionType: select(prop(page, "Decision Type")),
-      priority: select(prop(page, "Priority")),
-      status: select(prop(page, "Status")),
-      sourceAgent: select(prop(page, "Source Agent")),
-      requiresExecute: checkbox(prop(page, "Requires Execute")),
-      executeApproved: checkbox(prop(page, "Execute Approved")),
-      dueDate: date(prop(page, "Decision Due Date")),
-      ...(() => {
-        const raw = text(prop(page, "Proposed Action")) ?? "";
-        // Parse embedded agent metadata markers
-        const entityMatch        = raw.match(/\[ENTITY_ID:([^\]]+)\]/);
-        const fieldMatch         = raw.match(/\[RESOLUTION_FIELD:([^\]]+)\]/);
-        const fieldsMatch        = raw.match(/\[RESOLUTION_FIELDS:([^\]]+)\]/);
-        const typeMatch          = raw.match(/\[RESOLUTION_TYPE:([^\]]+)\]/);
-        const dbMatch            = raw.match(/\[RESOLUTION_DB:([^\]]+)\]/);
-        const entityActionMatch  = raw.match(/\[ENTITY_ACTION:([^\]]+)\]/);
-        const orgNameMatch       = raw.match(/\[ORG_NAME:([^\]]+)\]/);
-        const orgDomainMatch     = raw.match(/\[ORG_DOMAIN:([^\]]+)\]/);
-        const orgCategoryMatch   = raw.match(/\[ORG_CATEGORY:([^\]]+)\]/);
-        const contactNameMatch   = raw.match(/\[CONTACT_NAME:([^\]]+)\]/);
-        const contactEmailMatch  = raw.match(/\[CONTACT_EMAIL:([^\]]+)\]/);
-        const personNameMatch    = raw.match(/\[PERSON_NAME:([^\]]+)\]/);
-        const personEmailMatch   = raw.match(/\[PERSON_EMAIL:([^\]]+)\]/);
-        const personOrgIdMatch   = raw.match(/\[PERSON_ORG_ID:([^\]]+)\]/);
-        const personOrgNameMatch = raw.match(/\[PERSON_ORG_NAME:([^\]]+)\]/);
-        const stripped = raw
-          .replace(/\[ENTITY_ID:[^\]]+\]/g, "")
-          .replace(/\[RESOLUTION_FIELD:[^\]]+\]/g, "")
-          .replace(/\[RESOLUTION_FIELDS:[^\]]+\]/g, "")
-          .replace(/\[RESOLUTION_TYPE:[^\]]+\]/g, "")
-          .replace(/\[RESOLUTION_DB:[^\]]+\]/g, "")
-          .replace(/\[ENTITY_ACTION:[^\]]+\]/g, "")
-          .replace(/\[ORG_NAME:[^\]]+\]/g, "")
-          .replace(/\[ORG_DOMAIN:[^\]]+\]/g, "")
-          .replace(/\[ORG_CATEGORY:[^\]]+\]/g, "")
-          .replace(/\[CONTACT_NAME:[^\]]+\]/g, "")
-          .replace(/\[CONTACT_EMAIL:[^\]]+\]/g, "")
-          .replace(/\[PERSON_NAME:[^\]]+\]/g, "")
-          .replace(/\[PERSON_EMAIL:[^\]]+\]/g, "")
-          .replace(/\[PERSON_ORG_ID:[^\]]+\]/g, "")
-          .replace(/\[PERSON_ORG_NAME:[^\]]+\]/g, "")
-          .trimStart();
-        // Parse RESOLUTION_FIELDS: "fieldName1:Label 1|fieldName2:Label 2"
-        const relatedFields = fieldsMatch
-          ? fieldsMatch[1].split("|").map(pair => {
-              const sep = pair.indexOf(":");
-              return sep === -1
-                ? { field: pair, label: pair }
-                : { field: pair.slice(0, sep), label: pair.slice(sep + 1) };
-            })
-          : undefined;
-        return {
-          notes: stripped,
-          relatedEntityId:       entityMatch       ? entityMatch[1]       : undefined,
-          relatedField:          fieldMatch        ? fieldMatch[1]        : undefined,
-          relatedResolutionType: typeMatch         ? typeMatch[1]         : undefined,
-          relatedSearchDb:       dbMatch           ? dbMatch[1]           : undefined,
-          relatedFields,
-          entityAction:   entityActionMatch ? (entityActionMatch[1] as "create_org" | "create_person") : undefined,
-          entityName:     orgNameMatch      ? orgNameMatch[1]      : undefined,
-          entityDomain:   orgDomainMatch    ? orgDomainMatch[1]    : undefined,
-          entityCategory: orgCategoryMatch  ? orgCategoryMatch[1]  : undefined,
-          contactName:    contactNameMatch  ? contactNameMatch[1]  : undefined,
-          contactEmail:   contactEmailMatch ? contactEmailMatch[1] : undefined,
-          personName:     personNameMatch   ? personNameMatch[1]   : undefined,
-          personEmail:    personEmailMatch  ? personEmailMatch[1]  : undefined,
-          personOrgId:    personOrgIdMatch  ? personOrgIdMatch[1]  : undefined,
-          personOrgName:  personOrgNameMatch ? personOrgNameMatch[1] : undefined,
-        };
-      })(),
-      notionUrl: page.url ?? "",
-      category: page.properties["Decision Category"]?.select?.name ?? undefined,
-    }); });
-  } catch {
-    return [];
-  }
-}
-
-// ─── Insight Briefs ───────────────────────────────────────────────────────────
-
-export type InsightBrief = {
-  id: string;
-  title: string;
-  theme: string[];
-  relevance: string[];
-  status: string;
-  communityRelevant: boolean;
-  visibility: string;
-  lastEdited: string | null;
-};
-
-export async function getInsightBriefs(communityOnly = false): Promise<InsightBrief[]> {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const filter: any = communityOnly
-      ? { property: "Community Relevant", checkbox: { equals: true } }
-      : undefined;
-
-    const res = await notion.databases.query({
-      database_id: DB.insightBriefs,
-      filter,
-      sorts: [{ timestamp: "last_edited_time", direction: "descending" }],
-      page_size: 50,
-    });
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return res.results.map((page: any) => ({
-      id: page.id,
-      title: text(prop(page, "Brief Title")) || text(prop(page, "Name")) || "Untitled",
-      theme: multiSelect(prop(page, "Theme")),
-      relevance: multiSelect(prop(page, "Relevance")),
-      status: select(prop(page, "Status")),
-      communityRelevant: checkbox(prop(page, "Community Relevant")),
-      visibility: select(prop(page, "Visibility")),
-      lastEdited: page.last_edited_time ?? null,
-    }));
-  } catch {
-    return [];
-  }
-}
-
-// ─── Living Room — community-safe queries ─────────────────────────────────────
-
-export type LivingRoomPerson = {
-  id: string;
-  name: string;
-  jobTitle: string;
-  location?: string;
-  roles: string[];
-  visibility: string;
-  linkedin?: string;
-};
-
-export type LivingRoomMilestone = {
-  id: string;
-  name: string;
-  stage: string;
-  milestoneType: string;
-  communityTheme: string;
-  geography: string[];
-  lastUpdate: string | null;
-};
-
-export type LivingRoomTheme = {
-  id: string;
-  name: string;
-  category: string;
-  assetType: string;
-};
-
-export async function getLivingRoomPeople(): Promise<LivingRoomPerson[]> {
-  try {
-    const res = await notion.databases.query({
-      database_id: DB.people,
-      filter: {
-        or: [
-          { property: "Visibility", select: { equals: "public-safe" } },
-          { property: "Visibility", select: { equals: "community" } },
-        ],
-      },
-      page_size: 50,
-    });
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (res.results as any[])
-      .map((page: any) => {
-        const country  = select(prop(page, "Country"));
-        const city     = text(prop(page, "City"));
-        const location = [city, country].filter(Boolean).join(", ");
-        return {
-          id:         page.id,
-          name:       text(prop(page, "Full Name")),
-          jobTitle:   text(prop(page, "Job Title / Role")),
-          location:   location || undefined,
-          roles:      multiSelect(prop(page, "Relationship Roles")),
-          visibility: select(prop(page, "Visibility")),
-          linkedin:   page.properties?.["LinkedIn"]?.url ?? undefined,
-        };
-      })
-      .filter(p => p.name.trim() !== "");
-  } catch {
-    return [];
-  }
-}
-
-export async function getLivingRoomMilestones(): Promise<LivingRoomMilestone[]> {
-  try {
-    const res = await notion.databases.query({
-      database_id: DB.projects,
-      filter: {
-        and: [
-          { property: "Project Status", select: { equals: "Active" } },
-          { property: "Share to Living Room", checkbox: { equals: true } },
-        ],
-      },
-      sorts: [{ property: "Last Status Update", direction: "descending" }],
-      page_size: 30,
-    });
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (res.results as any[]).map((page: any) => ({
-      id:             page.id,
-      name:           text(prop(page, "Project Name")),
-      stage:          select(prop(page, "Current Stage")),
-      milestoneType:  select(prop(page, "Milestone Type")),
-      communityTheme: text(prop(page, "Community Theme")),
-      geography:      multiSelect(prop(page, "Geography")),
-      lastUpdate:     date(prop(page, "Last Status Update")),
-    }));
-  } catch {
-    return [];
-  }
-}
-
-export async function getLivingRoomThemes(): Promise<LivingRoomTheme[]> {
-  try {
-    const res = await notion.databases.query({
-      database_id: DB.knowledge,
-      filter: { property: "Living Room Theme", checkbox: { equals: true } },
-      sorts: [{ timestamp: "last_edited_time", direction: "descending" }],
-      page_size: 20,
-    });
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (res.results as any[]).map((page: any) => ({
-      id:        page.id,
-      name:      text(prop(page, "Asset Name")) || "Untitled",
-      category:  multiSelect(prop(page, "Domain / Theme")).join(", "),
-      assetType: select(prop(page, "Asset Type")),
-    }));
-  } catch {
-    return [];
-  }
-}
-
 // ─── Content Pipeline ─────────────────────────────────────────────────────────
 
 export type StyleProfile = {
@@ -1207,51 +837,6 @@ export async function getStyleProfiles(): Promise<StyleProfile[]> {
   } catch {
     return [];
   }
-}
-
-// ─── Living Room admin writes ─────────────────────────────────────────────────
-
-export async function updatePersonVisibility(
-  personId: string,
-  visibility: "public-safe" | "community" | "private"
-): Promise<void> {
-  await notion.pages.update({
-    page_id: personId,
-    properties: { Visibility: { select: { name: visibility } } },
-  });
-}
-
-export async function updateProjectLivingRoom(
-  projectId: string,
-  share: boolean
-): Promise<void> {
-  await notion.pages.update({
-    page_id: projectId,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    properties: { "Share to Living Room": { checkbox: share } } as any,
-  });
-}
-
-export async function updateInsightBriefCommunityFlag(
-  briefId: string,
-  communityRelevant: boolean
-): Promise<void> {
-  await notion.pages.update({
-    page_id: briefId,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    properties: { "Community Relevant": { checkbox: communityRelevant } } as any,
-  });
-}
-
-export async function updateKnowledgeAssetTheme(
-  assetId: string,
-  active: boolean
-): Promise<void> {
-  await notion.pages.update({
-    page_id: assetId,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    properties: { "Living Room Theme": { checkbox: active } } as any,
-  });
 }
 
 // ─── Garage financial layer ───────────────────────────────────────────────────
@@ -1589,51 +1174,6 @@ export async function getCommercialOffers(): Promise<CommercialOffer[]> {
     }));
   } catch {
     return [];
-  }
-}
-
-// ─── Hall v2 — Daily Briefing ─────────────────────────────────────────────────
-
-export type DailyBriefing = {
-  id: string;
-  date: string | null;
-  focusOfDay: string;
-  meetingPrep: string;
-  myCommitments: string;
-  followUpQueue: string;
-  agentQueue: string;
-  marketSignals: string;
-  readyToPublish: string;
-  generatedAt: string | null;
-  status: string;  // Fresh | Stale | Generating
-};
-
-export async function getDailyBriefing(dateStr?: string): Promise<DailyBriefing | null> {
-  try {
-    const target = dateStr ?? new Date().toISOString().slice(0, 10);
-    const res = await notion.databases.query({
-      database_id: DB.dailyBriefings,
-      filter: { property: "Date", date: { equals: target } },
-      page_size: 1,
-    });
-    if (!res.results.length) return null;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const page: any = res.results[0];
-    return {
-      id:             page.id,
-      date:           date(prop(page, "Date")),
-      focusOfDay:     text(prop(page, "Focus of the Day")),
-      meetingPrep:    text(prop(page, "Meeting Prep")),
-      myCommitments:  text(prop(page, "My Commitments")),
-      followUpQueue:  text(prop(page, "Follow-up Queue")),
-      agentQueue:     text(prop(page, "Agent Queue")),
-      marketSignals:  text(prop(page, "Market Signals")),
-      readyToPublish: text(prop(page, "Ready to Publish")),
-      generatedAt:    date(prop(page, "Generated At")),
-      status:         select(prop(page, "Status")),
-    };
-  } catch {
-    return null;
   }
 }
 
