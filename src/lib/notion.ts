@@ -1755,13 +1755,15 @@ export async function getAgentDrafts(statusFilter = "Pending Review"): Promise<A
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return (res.results as any[]).map(page => ({
       id:              page.id,
-      title:           text(prop(page, "Title")) || text(prop(page, "Name")) || "Untitled",
+      // "Draft Title" is the canonical title property name — all write paths use this.
+      // "Content" is the canonical body field — all write paths use this.
+      title:           text(prop(page, "Draft Title")) || "Untitled",
       draftType:       select(prop(page, "Type")),
       status:          select(prop(page, "Status")),
       voice:           select(prop(page, "Voice")),
       platform:        select(prop(page, "Platform")),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      draftText:       (prop(page, "Draft Text")?.rich_text ?? []).map((r: any) => r.plain_text).join(""),
+      draftText:       (prop(page, "Content")?.rich_text ?? []).map((r: any) => r.plain_text).join(""),
       relatedEntityId: relationFirst(prop(page, "Related Entity")),
       createdDate:     date(prop(page, "Created Date")) ?? (page.created_time?.slice(0, 10) ?? null),
       notionUrl:       page.url ?? "",

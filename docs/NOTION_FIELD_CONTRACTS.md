@@ -317,12 +317,13 @@ Used by: Admin Hall agent queue, approve-draft route, all `run-skill/*` routes (
 
 | Field name | Required? | Used by | Purpose | Risk if renamed / removed / left empty |
 |---|---|---|---|---|
-| `Title` or `Name` | Yes | `getAgentDrafts()` — read path | Title property. Tries `"Title"` first, then `"Name"`. **Schema note — Not fully verified:** `run-skill/*` routes write to `"Draft Title"` (title type) and `"Content"` (rich text). `getAgentDrafts()` reads `"Title"` and `"Draft Text"`. If the actual DB title property is named `"Draft Title"`, then `getAgentDrafts()` silently returns `"Untitled"` for all skill-generated drafts. | All skill-generated drafts show "Untitled" in agent queue |
+| `Draft Title` | Yes | `getAgentDrafts()`, `fetchPendingDrafts()` | Title property (Notion type: title). Canonical field name used by all write paths: all 5 run-skill routes and ingest-meetings. | All drafts show "Untitled" in approval queue |
 | `Status` | Yes | Approve-draft route, queue filter | Select: `"Pending Review"` \| `"Approved"` \| `"Revision Requested"` \| `"Superseded"`. Primary filter. | Queue always empty or approve action writes to wrong field |
-| `Type` | Recommended | Admin queue — type badge | Select: `"LinkedIn Post"` \| `"Follow-up Email"` \| `"Check-in Email"` | Type badge blank |
+| `Type` | Recommended | Admin queue — type badge | Select: `"LinkedIn Post"` \| `"Follow-up Email"` \| `"Check-in Email"` \| `"Market Signal"` \| `"Delegation Brief"` \| `"Quick Wins Report"` | Type badge blank |
+| `Content` | Yes | `getAgentDrafts()` — body display | Rich text (multi-chunk). Canonical body field. All write paths use `"Content"`. Read as `draftText` in `AgentDraft` type. | Draft body absent in approval UI; expand/collapse section never renders |
 | `Voice` | Recommended | Admin queue | Select: `"JMM"` \| `"CH"` | Voice indicator blank |
 | `Platform` | Recommended | Admin queue | Select: `"LinkedIn"` \| `"Email"` \| `"Internal"` | Platform indicator blank |
-| `Draft Text` | Yes (read path) | `getAgentDrafts()` — body display | Rich text (multi-chunk). **Schema note — Not fully verified:** run-skill routes write to `"Content"`, not `"Draft Text"`. If these are different fields, draft body is blank in the approval UI for skill-generated drafts. | Draft body absent in approval UI |
+| `Source Reference` | Recommended | Notion record metadata | Rich text — context note written by skill routes (e.g. person name, opportunity name) | Source context absent in Notion record |
 | `Related Entity` | Recommended | Approval UI — entity linking | Relation — optional link to an org or person | Entity context absent in UI |
 | `Created Date` | Recommended | Queue sort | Date | Drafts appear in random order |
 
@@ -360,12 +361,10 @@ All three Garage financial databases are queried via `filter: { property: "Start
 
 The following areas were not fully verifiable from `src/lib/notion.ts` alone:
 
-1. **Agent Drafts title/body field name discrepancy** — `getAgentDrafts()` reads `"Title"` and `"Draft Text"`, but `run-skill/*` routes write `"Draft Title"` and `"Content"`. Whether the actual Notion schema property is named `"Title"` or `"Draft Title"` needs to be confirmed by inspecting the live DB schema.
+1. **Grant Sources [OS v2]** (`DB.grantSources`) — referenced in `seed-grant-sources` route but has no read-path in `notion.ts`. The schema used during seeding (fields: `Source Name`, `URL`, `Type`, `Geography`, `Themes`, `Active`) is not verified against any live read query.
 
-2. **Grant Sources [OS v2]** (`DB.grantSources`) — referenced in `seed-grant-sources` route but has no read-path in `notion.ts`. The schema used during seeding (fields: `Source Name`, `URL`, `Type`, `Geography`, `Themes`, `Active`) is not verified against any live read query.
+2. **Agreements & Obligations [OS v2]** — referenced in RUNBOOK.md and the grants system but not present in `DB` constants or `notion.ts`. Grant agreements may be read directly via agent skill files only. Not audited here.
 
-3. **Agreements & Obligations [OS v2]** — referenced in RUNBOOK.md and the grants system but not present in `DB` constants or `notion.ts`. Grant agreements may be read directly via agent skill files only. Not audited here.
+3. **Style Profiles [OS v2]** (`DB.styleProfiles`) — `getStyleProfiles()` is defined in `notion.ts` but the fields (`Master Prompt`, `Tone Summary`, `Structural Rules`, `Vocabulary Patterns`, `Forbidden Patterns`, `CTA Style`, `First Person Allowed`) are only confirmed as written in code, not verified against the actual live schema.
 
-4. **Style Profiles [OS v2]** (`DB.styleProfiles`) — `getStyleProfiles()` is defined in `notion.ts` but the fields (`Master Prompt`, `Tone Summary`, `Structural Rules`, `Vocabulary Patterns`, `Forbidden Patterns`, `CTA Style`, `First Person Allowed`) are only confirmed as written in code, not verified against the actual live schema.
-
-5. **Insight Briefs [OS v2]** (`DB.insightBriefs`) — used in `getInsightBriefs()` for Living Room signals. Fields `"Brief Title"` (with fallback to `"Name"`), `"Theme"`, `"Relevance"`, `"Status"`, `"Community Relevant"`, `"Visibility"` are read by code but the schema also has many agent-facing fields (`Executive Summary`, `Key Facts`, `Key Insights`, etc.) referenced in skill files that are not audited here.
+4. **Insight Briefs [OS v2]** (`DB.insightBriefs`) — used in `getInsightBriefs()` for Living Room signals. Fields `"Brief Title"` (with fallback to `"Name"`), `"Theme"`, `"Relevance"`, `"Status"`, `"Community Relevant"`, `"Visibility"` are read by code but the schema also has many agent-facing fields (`Executive Summary`, `Key Facts`, `Key Insights`, etc.) referenced in skill files that are not audited here.

@@ -125,7 +125,7 @@ async function fetchPendingDrafts() {
   });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (res.results as any[]).map(p => ({
-    title: text(prop(p, "Title")) || text(prop(p, "Name")),
+    title: text(prop(p, "Draft Title")),  // canonical title field for Agent Drafts DB
     type:  sel(prop(p, "Type")),
   }));
 }
