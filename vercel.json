@@ -48,6 +48,10 @@
     {
       "path": "/api/generate-daily-briefing",
       "schedule": "30 7 * * 1-5"
+    },
+    {
+      "path": "/api/fireflies-sync",
+      "schedule": "30 6 * * 1-5"
     }
   ]
 }

@@ -65,6 +65,7 @@ export type Project = {
   statusSummary: string;
   draftUpdate: string;
   lastUpdate: string | null;
+  lastMeetingDate: string | null;
   updateNeeded: boolean;
   geography: string[];
   themes: string[];
@@ -233,6 +234,7 @@ function parseProject(page: any): Project {
     workroomMode:      select(prop(page, "Workroom Mode")),
     hallMode:          page.properties["Hall Mode"]?.select?.name ?? "explore",
     grantEligible:     page.properties["Grant Eligible"]?.checkbox ?? false,
+    lastMeetingDate:   date(prop(page, "Last Meeting Date")),
   };
 }
 

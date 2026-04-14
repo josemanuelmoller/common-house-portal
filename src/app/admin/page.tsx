@@ -473,7 +473,7 @@ export default async function AdminPage() {
                   </div>
                   <div className="divide-y divide-[#EFEFEA]">
                     {projects.map(p => {
-                      const activityDate = [p.lastUpdate, p.lastEvidenceDate].filter(Boolean).sort().pop() ?? null;
+                      const activityDate = [p.lastUpdate, p.lastEvidenceDate, p.lastMeetingDate].filter(Boolean).sort().pop() ?? null;
                       const days    = daysSince(activityDate);
                       const warmth  = warmthLabel(days);
                       const typeLbl = projectTypeLabel(p.primaryWorkspace);
