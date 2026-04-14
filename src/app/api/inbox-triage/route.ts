@@ -25,7 +25,7 @@ export const maxDuration = 60;
 
 const JOSE_EMAIL = process.env.GMAIL_USER_EMAIL ?? "josemanuel@wearecommonhouse.com";
 const THRESHOLD_DAYS = 2;
-const MAX_THREADS = 25;
+const MAX_THREADS = 75;
 
 async function authCheck(req: NextRequest): Promise<boolean> {
   const agentKey  = req.headers.get("x-agent-key");
@@ -164,8 +164,11 @@ async function handleGet(req: NextRequest) {
         const lastSenderEmail  = extractEmail(lastSenderHeader);
         if (lastSenderEmail === JOSE_EMAIL.toLowerCase()) return;
 
-        // Skip if Jose has replied recently (within threshold)
-        if (hasMyReply && !isUnread) return;
+        // Skip only if Jose replied AND no new messages arrived after his last reply
+        // (i.e. the last message in the thread is from Jose — already handled above,
+        // OR all messages after Jose's last reply are also from Jose — impossible given above check)
+        // Removing the old "hasMyReply && !isUnread" filter which incorrectly skipped threads
+        // where someone replied AFTER Jose's message (e.g. Eunomia: Jose Apr 6 → Mike Apr 7)
 
         candidates.push({
           threadId: t.id!,
