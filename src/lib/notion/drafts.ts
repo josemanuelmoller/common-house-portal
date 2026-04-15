@@ -13,7 +13,8 @@ export type AgentDraft = {
   voice: string;        // JMM | CH
   platform: string;     // LinkedIn | Email | Internal
   draftText: string;
-  relatedEntityId: string | null;
+  relatedEntityId: string | null;   // People DB page ID — recipient for email drafts
+  opportunityId: string | null;     // Opportunities DB page ID — source opportunity for follow-ups
   createdDate: string | null;
   notionUrl: string;
 };
@@ -39,6 +40,7 @@ export async function getAgentDrafts(statusFilter = "Pending Review"): Promise<A
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       draftText:       (prop(page, "Content")?.rich_text ?? []).map((r: any) => r.plain_text).join(""),
       relatedEntityId: relationFirst(prop(page, "Related Entity")),
+      opportunityId:   relationFirst(prop(page, "Opportunity")),
       createdDate:     date(prop(page, "Created Date")) ?? (page.created_time?.slice(0, 10) ?? null),
       notionUrl:       page.url ?? "",
     }));

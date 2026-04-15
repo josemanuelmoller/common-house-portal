@@ -106,6 +106,7 @@ Output ONLY the email (Subject + body). Nothing else.`;
         "Source Reference": { rich_text: [{ text: { content: `${oppName}${orgName ? ` · ${orgName}` : ""}` } }] },
         "Content":          { rich_text: [{ text: { content: draftText.slice(0, 2000) } }] },
         "Related Entity":   { relation: contactId ? [{ id: contactId }] : [] },
+        "Opportunity":      { relation: [{ id: opportunityId }] },
       },
     });
   } catch (e) {
