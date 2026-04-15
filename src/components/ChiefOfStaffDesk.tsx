@@ -38,6 +38,29 @@ function urgencyTaskColor(urgency: CoSTask["urgency"]): string {
   return "text-[#131218]/80";
 }
 
+function loopBadge(loopType: CoSTask["loopType"]): { label: string; cls: string } {
+  switch (loopType) {
+    case "blocker":    return { label: "Blocker",    cls: "bg-red-50 text-red-600 border-red-200" };
+    case "commitment": return { label: "Commitment", cls: "bg-amber-50 text-amber-700 border-amber-200" };
+    case "decision":   return { label: "Decision",   cls: "bg-purple-50 text-purple-600 border-purple-200" };
+    case "prep":       return { label: "Prep needed", cls: "bg-blue-50 text-blue-600 border-blue-200" };
+    case "review":     return { label: "Review",      cls: "bg-sky-50 text-sky-600 border-sky-200" };
+    case "follow-up":  return { label: "Follow-up",   cls: "bg-green-50 text-green-700 border-green-200" };
+    default:           return { label: "Action",      cls: "bg-[#EFEFEA] text-[#131218]/50 border-[#E0E0D8]" };
+  }
+}
+
+function interventionHint(moment: CoSTask["interventionMoment"]): string {
+  switch (moment) {
+    case "urgent":           return "Handle today";
+    case "next_meeting":     return "Raise in next meeting";
+    case "email_this_week":  return "Send email this week";
+    case "review_this_week": return "Review doc this week";
+    case "this_week":        return "This week";
+    default:                 return "";
+  }
+}
+
 function signalBadge(signal: CoSTask["entrySignal"]): { label: string; cls: string } {
   switch (signal) {
     case "meeting_soon":     return { label: "Meeting soon",   cls: "bg-red-50 text-red-600 border-red-200" };
@@ -91,10 +114,11 @@ function TaskCard({
 }) {
   const [expanded, setExpanded] = useState(false);
   const isUpdating   = updating === task.id;
-  const badge        = signalBadge(task.entrySignal);
+  const lBadge       = loopBadge(task.loopType);
   const sBadge       = statusBadge(task.taskStatus);
   const dueDateStr   = dueDateLabel(task.dueDate);
   const dueDateCls   = dueDateColor(task.dueDate);
+  const hint         = interventionHint(task.interventionMoment);
 
   return (
     <div className={`divide-y divide-[#EFEFEA] ${urgencyBar(task.urgency)}`}>
@@ -106,17 +130,22 @@ function TaskCard({
 
           <div className="flex-1 min-w-0">
 
-            {/* Badges row */}
+            {/* Badges row — loopType is primary */}
             <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
-              <span className={`text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full border ${badge.cls}`}>
-                {badge.label}
+              <span className={`text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full border ${lBadge.cls}`}>
+                {lBadge.label}
               </span>
               {sBadge && (
                 <span className={`text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full border ${sBadge.cls}`}>
                   {sBadge.label}
                 </span>
               )}
-              {task.opportunityType && (
+              {hint && (
+                <span className="text-[8px] font-medium text-[#131218]/30 uppercase tracking-widest">
+                  · {hint}
+                </span>
+              )}
+              {task.opportunityType && task.opportunityType !== "Project" && (
                 <span className="text-[8px] font-bold text-[#131218]/20 uppercase tracking-widest">
                   · {task.opportunityType}
                 </span>

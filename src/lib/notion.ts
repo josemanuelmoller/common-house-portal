@@ -576,8 +576,14 @@ export async function getFollowUpOpportunities(): Promise<any[]> {
 
 // ─── CoS Task type ────────────────────────────────────────────────────────────
 //
-// Task-centric view: WHAT needs to happen, BY WHEN, FOR which opportunity.
-// Opportunity details are secondary context, not the primary display.
+// Open-loop model: CoS surfaces UNRESOLVED IMPORTANT ISSUES, not meetings.
+// A meeting is only a vehicle for intervention — it is never itself the task.
+//
+// loopType  = the nature of the work (blocker, commitment, decision, prep, follow-up, review)
+// interventionMoment = the best vehicle to resolve it (next_meeting, email, review doc, urgent)
+//
+// entrySignal is retained for internal classification and backwards-compat.
+// The component shows loopType as the primary badge.
 
 export type CoSTask = {
   // Identity
@@ -585,30 +591,35 @@ export type CoSTask = {
   notionUrl: string;
 
   // Task layer — primary display
-  taskTitle: string;          // WHAT TO DO (from Pending Action or computed)
+  taskTitle: string;          // WHAT TO DO — specific issue, not a meeting reminder
   taskStatus: "todo" | "in-progress" | "waiting" | "done" | "dropped";
-  dueDate: string | null;     // ISO date — Next Meeting Date used as proxy deadline
+  dueDate: string | null;     // ISO date — used for "raise in this meeting"
   urgency: "critical" | "high" | "normal";
 
-  // Opportunity context — secondary
+  // Loop classification — drives the primary badge and hint text
+  loopType: "blocker" | "commitment" | "decision" | "prep" | "follow-up" | "review";
+  interventionMoment: "urgent" | "next_meeting" | "email_this_week" | "review_this_week" | "this_week";
+
+  // Source context — secondary display
   opportunityName: string;
   opportunityStage: string;
   orgName: string;
   opportunityType: string;
 
-  // Action signals
+  // Action signals (internal)
   reviewUrl: string | null;
   entrySignal: "meeting_soon" | "proposal_pending" | "negotiation" | "manual" | "review_needed" | "inbound";
-  signalReason: string;       // "Meeting tomorrow" / "Proposal sent 5d ago"
+  signalReason: string;       // short hint shown under task title
   calendarBlockUrl: string | null;
 
-  // Raw pending action (for display in expanded view)
+  // Raw context (expanded view)
   pendingAction: string | null;
 
   // Source discriminator — controls which API is called on status change.
-  // "opportunity": writes Follow-up Status field via /api/followup-status (default)
-  // "project":     no Notion field to write; hides locally and refreshes
-  taskSource?: "opportunity" | "project";
+  // "opportunity": writes Follow-up Status field via /api/followup-status
+  // "project":     no Notion field; hides locally + refreshes on next load
+  // "evidence":    no Notion field; hides locally + refreshes on next load
+  taskSource?: "opportunity" | "project" | "evidence";
 };
 
 function mapFollowUpStatus(raw: string): CoSTask["taskStatus"] {
@@ -650,132 +661,162 @@ function computeCoSTask(opp: {
     : new Date(opp.nextMeetingDate).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })
     : null;
 
-  const daysSinceEdit = opp.lastEdited
-    ? Math.floor((now - new Date(opp.lastEdited).getTime()) / 86400000)
-    : null;
-
-  const isNew = opp.stage === "New";
+  const isNew   = opp.stage === "New";
   const isGrant = opp.type === "Grant";
-  const hasExplicitPending = !!opp.pendingAction &&
-    !opp.pendingAction.startsWith("SIGNALS:") &&
-    !opp.pendingAction.startsWith("Inbox signal:");
 
-  // Source URL can be a Gmail thread (from inbox candidate creation) or a real doc.
-  // These require different task types: email → "follow up", doc → "review document".
+  // An "explicit pending" is a human-written issue description — not scan-generated prefix.
+  // Must be at least 20 chars to carry meaningful content (filter out stub entries).
+  const hasExplicitPending = !!opp.pendingAction
+    && !opp.pendingAction.startsWith("SIGNALS:")
+    && !opp.pendingAction.startsWith("Inbox signal:")
+    && opp.pendingAction.trim().length >= 20;
+
+  // Source URL classification: Gmail thread (follow-up) vs real doc (review)
   const reviewIsGmail = !!opp.reviewUrl && opp.reviewUrl.includes("mail.google.com");
   const reviewIsDoc   = !!opp.reviewUrl && !reviewIsGmail;
 
-  // Stale-active: Active deal not touched in > 14 days, no explicit signal — safety-net check-in.
-  const isStaleActive = opp.stage === "Active" && !isGrant
-    && daysSinceEdit !== null && daysSinceEdit > 14
-    && !["Needed", "Waiting", "Sent"].includes(opp.followUpStatus)
-    && !opp.nextMeetingDate
-    && !opp.reviewUrl
-    && !hasExplicitPending;
+  // ─── Loop type + intervention moment ─────────────────────────────────────
+  // These drive the primary badge and hint text in the UI.
+  // Rule: a meeting is only the vehicle, never the loop itself.
+  // The loop is the SPECIFIC ISSUE being resolved through that meeting/email/doc.
+  let loopType: CoSTask["loopType"];
+  let interventionMoment: CoSTask["interventionMoment"];
 
-  // ─── Entry signal ────────────────────────────────────────────────────────
+  if (meetingImminent && hasExplicitPending) {
+    // Issue + upcoming meeting = raise this specific thing in the meeting
+    loopType            = "prep";
+    interventionMoment  = "next_meeting";
+  } else if (meetingImminent && reviewIsDoc) {
+    loopType            = "review";
+    interventionMoment  = "next_meeting";
+  } else if (reviewIsDoc) {
+    loopType            = "review";
+    interventionMoment  = "review_this_week";
+  } else if (reviewIsGmail && isNew) {
+    loopType            = "decision";
+    interventionMoment  = "this_week";
+  } else if (reviewIsGmail) {
+    loopType            = "follow-up";
+    interventionMoment  = "email_this_week";
+  } else if (isNew && isGrant) {
+    loopType            = "decision";
+    interventionMoment  = "this_week";
+  } else if (isNew) {
+    loopType            = "decision";
+    interventionMoment  = "this_week";
+  } else if (opp.stage === "Active" && hasExplicitPending) {
+    loopType            = "commitment";
+    interventionMoment  = "this_week";
+  } else if (opp.stage === "Qualifying" && opp.followUpStatus === "Waiting") {
+    loopType            = "follow-up";
+    interventionMoment  = "email_this_week";
+  } else if (opp.stage === "Qualifying") {
+    loopType            = "follow-up";
+    interventionMoment  = "email_this_week";
+  } else {
+    loopType            = "follow-up";
+    interventionMoment  = "this_week";
+  }
+
+  // ─── Entry signal (internal, drives calendar block) ───────────────────────
   let entrySignal: CoSTask["entrySignal"];
   let signalReason: string;
-  if (meetingImminent) {
+  if (meetingImminent && hasExplicitPending) {
     entrySignal  = "meeting_soon";
-    signalReason = `Meeting ${meetingLabel}`;
-  } else if (reviewIsDoc && isNew) {
-    entrySignal  = "review_needed";
-    signalReason = "Review document — inbound";
+    signalReason = `Raise in ${meetingLabel} meeting`;
+  } else if (meetingImminent && reviewIsDoc) {
+    entrySignal  = "meeting_soon";
+    signalReason = `Review before ${meetingLabel} meeting`;
   } else if (reviewIsDoc) {
     entrySignal  = "review_needed";
-    signalReason = `Review doc — ${opp.stage === "Active" ? "active deal" : opp.stage?.toLowerCase() ?? "pipeline"}`;
+    signalReason = "Document needs review";
   } else if (reviewIsGmail) {
-    // Gmail thread used as source — this is a follow-up signal, not a document review
     entrySignal  = "inbound";
-    signalReason = isNew ? "Inbound email — review and qualify" : "Email thread — follow up";
-  } else if (isNew && opp.type === "Grant") {
+    signalReason = isNew ? "Inbound — qualify or decline" : "Email thread — reply needed";
+  } else if (isNew && isGrant) {
     entrySignal  = "inbound";
-    signalReason = "Grant match — review fit and decide";
+    signalReason = "Grant match — decide fit";
   } else if (isNew) {
     entrySignal  = "inbound";
-    signalReason = hasExplicitPending ? "Action needed" : "Inbound — review and qualify";
+    signalReason = "Inbound — qualify or decline";
   } else if (opp.stage === "Active" && hasExplicitPending) {
     entrySignal  = "negotiation";
-    signalReason = "Action flagged on active deal";
-  } else if (isStaleActive) {
-    entrySignal  = "manual";
-    signalReason = `Stale — no update in ${daysSinceEdit}d`;
-  } else if (opp.stage === "Active") {
-    entrySignal  = "manual";
-    signalReason = `Active · follow-up flagged`;
+    signalReason = "Open action on active deal";
   } else if (opp.stage === "Qualifying" && opp.followUpStatus === "Waiting") {
     entrySignal  = "proposal_pending";
-    signalReason = "Waiting for reply";
+    signalReason = "Awaiting reply";
   } else if (opp.stage === "Qualifying") {
     entrySignal  = "proposal_pending";
-    signalReason = `Qualifying — follow-up needed`;
+    signalReason = "Follow-up due";
   } else {
     entrySignal  = "manual";
     signalReason = "Follow-up flagged";
   }
 
-  // ─── Task title (WHAT TO DO) ─────────────────────────────────────────────
+  // ─── Task title — ISSUE FIRST, meeting second ─────────────────────────────
+  // A title must describe the specific unresolved issue.
+  // If there's a specific pending action written by a human, use it verbatim.
+  // If the meeting provides the intervention vehicle, append it.
+  // Never produce "Prepare for meeting — {name}" without a specific issue.
   let taskTitle: string;
-  if (hasExplicitPending) {
-    // Explicit human-written pending action — use directly
+  if (hasExplicitPending && meetingImminent) {
+    taskTitle = `Raise in ${meetingLabel} meeting: ${opp.pendingAction!.slice(0, 100)}`;
+  } else if (hasExplicitPending) {
     taskTitle = opp.pendingAction!.slice(0, 140);
   } else if (meetingImminent && reviewIsDoc) {
-    taskTitle = `Review doc before meeting${meetingLabel ? ` — ${meetingLabel}` : ""}${opp.name ? ` · ${opp.name}` : ""}`;
-  } else if (meetingImminent) {
-    taskTitle = `Prepare for meeting${meetingLabel ? ` — ${meetingLabel}` : ""}${opp.name ? ` · ${opp.name}` : ""}`;
+    taskTitle = `Review doc before ${meetingLabel} meeting — ${opp.name}`;
   } else if (reviewIsDoc) {
     taskTitle = `Review document: ${opp.name}`;
   } else if (reviewIsGmail) {
-    taskTitle = `Follow up on ${opp.name}`;
-  } else if (isNew && opp.type === "Grant") {
+    taskTitle = isNew
+      ? `Qualify inbound: ${opp.name.slice(0, 90)}`
+      : `Reply to email thread: ${opp.name.slice(0, 90)}`;
+  } else if (isNew && isGrant) {
     const fitMatch = opp.pendingAction?.match(/fit score (\d+)\/100/);
     const fitScore = fitMatch ? ` — fit ${fitMatch[1]}/100` : "";
-    taskTitle = `Review grant match${fitScore}: ${opp.name.slice(0, 70)}`;
+    taskTitle = `Decide on grant match${fitScore}: ${opp.name.slice(0, 70)}`;
   } else if (isNew) {
-    taskTitle = `Review & qualify: ${opp.name.slice(0, 80)}`;
-  } else if (isStaleActive) {
-    taskTitle = `Check in — ${opp.name} (no update in ${daysSinceEdit}d)`;
-  } else if (opp.stage === "Active") {
-    taskTitle = `Advance deal — ${opp.name}`;
+    taskTitle = `Qualify or decline: ${opp.name.slice(0, 90)}`;
+  } else if (opp.stage === "Qualifying" && opp.followUpStatus === "Waiting") {
+    taskTitle = `Chase reply — ${opp.name}`;
   } else if (opp.stage === "Qualifying") {
-    taskTitle = `Follow up on ${opp.name}`;
+    taskTitle = `Send follow-up — ${opp.name}`;
   } else {
     taskTitle = `Follow up — ${opp.name}`;
   }
 
-  // ─── Urgency ─────────────────────────────────────────────────────────────
-  // Urgency reflects time pressure, not just pipeline stage.
-  // Active stage alone no longer inflates to "high" — that caused every stale
-  // pipeline record to show as high priority.
+  // ─── Urgency ──────────────────────────────────────────────────────────────
   let urgency: CoSTask["urgency"];
   if (daysToMeeting !== null && daysToMeeting >= 0 && daysToMeeting <= 1) urgency = "critical";
-  else if (meetingImminent) urgency = "high";
-  else if (opp.followUpStatus === "Needed") urgency = "high";
-  else if (hasExplicitPending && opp.stage === "Active") urgency = "high";
+  else if (meetingImminent && hasExplicitPending) urgency = "high";
+  else if (meetingImminent && reviewIsDoc)         urgency = "high";
+  else if (opp.followUpStatus === "Needed" && hasExplicitPending) urgency = "high";
   else urgency = "normal";
 
   // ─── Calendar block ───────────────────────────────────────────────────────
-  const calendarBlockUrl = (opp.reviewUrl || meetingImminent)
+  const calendarBlockUrl = (reviewIsDoc || (meetingImminent && hasExplicitPending))
     ? `https://calendar.google.com/calendar/r/eventedit?text=${encodeURIComponent(`Prep: ${opp.name}`)}&details=${encodeURIComponent(taskTitle)}&dur=0100`
     : null;
 
   return {
-    id:               opp.id,
-    notionUrl:        opp.notionUrl,
+    id:                 opp.id,
+    notionUrl:          opp.notionUrl,
     taskTitle,
-    taskStatus:       mapFollowUpStatus(opp.followUpStatus),
-    dueDate:          opp.nextMeetingDate,
+    taskStatus:         mapFollowUpStatus(opp.followUpStatus),
+    dueDate:            opp.nextMeetingDate,
     urgency,
-    opportunityName:  opp.name,
-    opportunityStage: opp.stage,
-    orgName:          opp.orgName,
-    opportunityType:  opp.type,
-    reviewUrl:        opp.reviewUrl,
+    loopType,
+    interventionMoment,
+    opportunityName:    opp.name,
+    opportunityStage:   opp.stage,
+    orgName:            opp.orgName,
+    opportunityType:    opp.type,
+    reviewUrl:          opp.reviewUrl,
     entrySignal,
     signalReason,
     calendarBlockUrl,
-    pendingAction:    opp.pendingAction,
+    pendingAction:      opp.pendingAction,
+    taskSource:         "opportunity",
   };
 }
 
@@ -793,49 +834,54 @@ function computeCoSTask(opp: {
 // Hall and Workroom projects are included.
 
 async function getProjectCoSTasks(): Promise<CoSTask[]> {
+  // Open-loop model: only surface projects where a human explicitly flagged
+  // "Project Update Needed?" = true. Stale-date logic removed — age alone is not a loop.
+  // The open issue is derived from hallObstacles or hallChallenge fields; without content
+  // in those fields the task title falls back to "Write project update".
   try {
     const res = await notion.databases.query({
       database_id: DB.projects,
-      filter: { property: "Project Status", select: { equals: "Active" } },
+      filter: {
+        and: [
+          { property: "Project Status", select: { equals: "Active" } },
+          { property: "Project Update Needed?", checkbox: { equals: true } },
+        ],
+      },
       sorts: [{ property: "Last Status Update", direction: "ascending" }],
-      page_size: 30,
+      page_size: 20,
     });
 
-    const now = Date.now();
     const tasks: CoSTask[] = [];
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     for (const page of res.results as any[]) {
-      const workspace  = select(prop(page, "Primary Workspace")) || "hall";
+      const workspace = select(prop(page, "Primary Workspace")) || "hall";
       if (workspace === "garage") continue;  // Garage has its own cadence
 
-      const name        = text(prop(page, "Project Name")) || "Untitled Project";
-      const updateNeeded = checkbox(prop(page, "Project Update Needed?"));
-      const lastUpdateStr = date(prop(page, "Last Status Update"));
-      const notionUrl   = page.url ?? "";
+      const name       = text(prop(page, "Project Name")) || "Untitled Project";
+      const notionUrl  = page.url ?? "";
 
-      const daysSinceUpdate = lastUpdateStr
-        ? Math.floor((now - new Date(lastUpdateStr).getTime()) / 86400000)
-        : null;
-
-      const isStaleStatus = daysSinceUpdate === null || daysSinceUpdate > 14;
-
-      // Surface only when there's a concrete pending signal
-      if (!updateNeeded && !isStaleStatus) continue;
+      // Use obstacle / challenge content as the specific issue if available.
+      // hallObstacles and hallChallenge are rich_text fields (confirmed in projects.ts).
+      const obstacle = text(prop(page, "Hall Obstacles")) || "";
+      const challenge = text(prop(page, "Hall Challenge")) || "";
+      const issueContent = obstacle || challenge;
 
       let taskTitle: string;
-      let urgency: CoSTask["urgency"];
       let signalReason: string;
+      let loopType: CoSTask["loopType"];
 
-      if (updateNeeded) {
-        taskTitle    = `Write project update — ${name}`;
-        urgency      = "high";
-        signalReason = "Update flagged";
+      if (issueContent && issueContent.length >= 15) {
+        // Surface the specific unresolved issue — not just "write an update"
+        taskTitle    = issueContent.slice(0, 140);
+        signalReason = `Flagged update needed — ${name}`;
+        loopType     = issueContent.toLowerCase().includes("block")
+          ? "blocker"
+          : "commitment";
       } else {
-        const dStr   = daysSinceUpdate !== null ? `${daysSinceUpdate}d` : "never";
-        taskTitle    = `Check in — ${name} (no update in ${dStr})`;
-        urgency      = "normal";
-        signalReason = `Stale — no status update in ${dStr}`;
+        taskTitle    = `Write project update — ${name}`;
+        signalReason = "Project update flagged";
+        loopType     = "commitment";
       }
 
       tasks.push({
@@ -844,7 +890,9 @@ async function getProjectCoSTasks(): Promise<CoSTask[]> {
         taskTitle,
         taskStatus:       "todo",
         dueDate:          null,
-        urgency,
+        urgency:          "high",
+        loopType,
+        interventionMoment: "this_week",
         opportunityName:  name,
         opportunityStage: "Project",
         orgName:          "",
@@ -853,8 +901,88 @@ async function getProjectCoSTasks(): Promise<CoSTask[]> {
         entrySignal:      "manual",
         signalReason,
         calendarBlockUrl: null,
-        pendingAction:    null,
+        pendingAction:    issueContent || null,
         taskSource:       "project",
+      });
+    }
+
+    return tasks;
+  } catch {
+    return [];
+  }
+}
+
+// ─── Evidence-derived open loops ─────────────────────────────────────────────
+// Surfaces CH Evidence records of type Blocker or Commitment that are Validated
+// and were captured recently (Blockers: 30d window; Commitments: 14d window).
+// These represent concrete unresolved issues extracted from real conversations —
+// the strongest signal that something needs Jose's attention.
+async function getEvidenceOpenLoops(): Promise<CoSTask[]> {
+  try {
+    const now = Date.now();
+    const THIRTY_DAYS_MS = 30 * 86400000;
+    const FOURTEEN_DAYS_MS = 14 * 86400000;
+
+    const res = await notion.databases.query({
+      database_id: DB.evidence,
+      filter: {
+        and: [
+          { property: "Validation Status", select: { equals: "Validated" } },
+          {
+            or: [
+              { property: "Evidence Type", select: { equals: "Blocker" } },
+              { property: "Evidence Type", select: { equals: "Commitment" } },
+            ],
+          },
+        ],
+      },
+      sorts: [{ property: "Date Captured", direction: "descending" }],
+      page_size: 20,
+    });
+
+    const tasks: CoSTask[] = [];
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const page of res.results as any[]) {
+      const evidenceType = select(prop(page, "Evidence Type")) || "";
+      const dateCaptured = date(prop(page, "Date Captured"));
+      if (!dateCaptured) continue;
+
+      const ageMs = now - new Date(dateCaptured).getTime();
+      const windowMs = evidenceType === "Blocker" ? THIRTY_DAYS_MS : FOURTEEN_DAYS_MS;
+      if (ageMs > windowMs) continue;
+
+      const title   = text(prop(page, "Evidence Title")) || "Untitled evidence";
+      const excerpt = text(prop(page, "Source Excerpt")) || "";
+      const notionUrl = page.url ?? "";
+
+      const loopType: CoSTask["loopType"]           = evidenceType === "Blocker" ? "blocker" : "commitment";
+      const interventionMoment: CoSTask["interventionMoment"] =
+        evidenceType === "Blocker" ? "urgent" : "this_week";
+
+      const taskTitle = excerpt && excerpt.length >= 20
+        ? excerpt.slice(0, 140)
+        : title.slice(0, 140);
+
+      tasks.push({
+        id:               page.id,
+        notionUrl,
+        taskTitle,
+        taskStatus:       "todo",
+        dueDate:          null,
+        urgency:          evidenceType === "Blocker" ? "critical" : "high",
+        loopType,
+        interventionMoment,
+        opportunityName:  title,
+        opportunityStage: "Evidence",
+        orgName:          "",
+        opportunityType:  evidenceType,
+        reviewUrl:        null,
+        entrySignal:      "review_needed",
+        signalReason:     `Validated ${evidenceType.toLowerCase()} — ${dateCaptured}`,
+        calendarBlockUrl: null,
+        pendingAction:    excerpt || null,
+        taskSource:       "evidence",
       });
     }
 
@@ -931,7 +1059,6 @@ export async function getCoSTasks(): Promise<CoSTask[]> {
       if (TERMINAL_STATUSES.has(opp.followUpStatus)) return false;
 
       const hasExplicitStatus = ["Needed", "Waiting", "Sent"].includes(opp.followUpStatus);
-      const hasMeeting        = !!opp.nextMeetingDate;
       const hasReview         = !!opp.reviewUrl;
 
       // Pending action is only valid when human-written (not scan-generated),
@@ -947,25 +1074,30 @@ export async function getCoSTasks(): Promise<CoSTask[]> {
         && !isGrant
         && daysSinceEdit <= 30;
 
-      // Safety net: Active deal not touched in > 14 days — surface as stale check-in.
-      // This is the fallback for opportunities like Neil/COP that exist in the pipeline
-      // but drift invisible because no explicit signal was ever set or re-set after completion.
-      const isStaleActive = opp.stage === "Active" && !isGrant && daysSinceEdit > 14;
+      // A meeting date alone is NOT a task — it is only a vehicle.
+      // The task must be the specific issue being resolved through that meeting.
+      // Require an explicit pending action or status alongside the meeting.
+      const hasMeetingWithTopic = !!opp.nextMeetingDate && (hasActionablePending || hasExplicitStatus);
 
-      return hasExplicitStatus || hasMeeting || hasReview || hasActionablePending || isStaleActive;
+      // isStaleActive removed: "haven't touched in 14 days" is not an open loop.
+      // Stale records with no issue content should not surface as tasks.
+
+      return hasExplicitStatus || hasMeetingWithTopic || hasReview || hasActionablePending;
     });
 
-    const oppTasks     = filtered.map(computeCoSTask);
-    const projectTasks = await getProjectCoSTasks();
+    const oppTasks      = filtered.map(computeCoSTask);
+    const [projectTasks, evidenceTasks] = await Promise.all([
+      getProjectCoSTasks(),
+      getEvidenceOpenLoops(),
+    ]);
 
-    // Merge — opportunity tasks first (they have richer action context),
-    // then project tasks. Dedup by Notion page ID so a project that also
-    // has a linked Opportunity doesn't appear twice (rare but defensive).
-    const seen = new Set<string>(oppTasks.map(t => t.id));
-    const merged = [
-      ...oppTasks,
-      ...projectTasks.filter(t => !seen.has(t.id)),
-    ];
+    // Merge — blockers / evidence first (highest signal), then opportunity tasks,
+    // then project update flags. Dedup by Notion page ID.
+    const seen = new Set<string>();
+    const merged: CoSTask[] = [];
+    for (const t of [...evidenceTasks, ...oppTasks, ...projectTasks]) {
+      if (!seen.has(t.id)) { seen.add(t.id); merged.push(t); }
+    }
 
     // Sort: critical → high → normal; within tier by due date proximity
     const TIER: Record<string, number> = { critical: 0, high: 1, normal: 2 };
