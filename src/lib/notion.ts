@@ -718,6 +718,50 @@ export async function getFollowUpDeskItems(): Promise<FollowUpDeskItem[]> {
   }
 }
 
+// ─── Opportunity Candidates — signals-detected, not yet promoted ─────────────
+//
+// Candidates are Opportunities with Stage = "Candidate".
+// Created by:
+//   1. /api/scan-opportunity-candidates  — automatic Gmail scan + Claude
+//   2. /api/create-candidate             — quick-create from an inbox item
+// Actions: Promote → Active, Ignore → Archived.
+// Stored in the same Opportunities [OS v2] DB — no new schema needed.
+
+export type CandidateItem = {
+  id: string;
+  name: string;
+  orgName: string;
+  type: string;
+  notionUrl: string;
+  signalContext: string | null;  // from "Pending Action" field (signal summary)
+  sourceUrl: string | null;      // from "Review URL" field (Gmail thread URL or doc)
+  createdTime: string | null;
+};
+
+export async function getCandidateOpportunities(): Promise<CandidateItem[]> {
+  try {
+    const res = await notion.databases.query({
+      database_id: DB.opportunities,
+      filter: { property: "Stage", select: { equals: "Candidate" } },
+      sorts: [{ timestamp: "created_time", direction: "descending" }],
+      page_size: 15,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (res.results as any[]).map(page => ({
+      id:             page.id,
+      name:           text(prop(page, "Opportunity Name")) || text(prop(page, "Name")) || "Untitled",
+      orgName:        text(prop(page, "Organization")) || "",
+      type:           select(prop(page, "Type")) || "",
+      notionUrl:      page.url ?? "",
+      signalContext:  text(prop(page, "Pending Action")) || null,
+      sourceUrl:      page.properties["Review URL"]?.url ?? null,
+      createdTime:    page.created_time?.slice(0, 10) ?? null,
+    }));
+  } catch {
+    return [];
+  }
+}
+
 // ─── Commercial Pipeline — active pursuit only ───────────────────────────────
 // Stages shown: Active | Proposal Sent | Negotiation
 // Won/Lost/Archived are excluded (Won → Workroom, Lost/Archived → done)

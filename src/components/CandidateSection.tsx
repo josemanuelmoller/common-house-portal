@@ -1,0 +1,195 @@
+"use client";
+
+/**
+ * CandidateSection — Opportunity Candidate Deck
+ *
+ * Shows unreviewed opportunity candidates (Stage = "Candidate") with
+ * three actions per item:
+ *   • Create Opportunity  — promotes to Stage = "Active"
+ *   • Ignore              — moves to Stage = "Archived"
+ *   • View in Notion      — open record directly
+ *
+ * Also includes a "Scan for new candidates" button that triggers the
+ * Gmail scan + Claude classification pipeline on demand.
+ */
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import type { CandidateItem } from "@/lib/notion";
+
+function typeColor(type: string): string {
+  if (type === "Grant")       return "bg-green-50 text-green-600 border-green-200";
+  if (type === "Investment")  return "bg-purple-50 text-purple-600 border-purple-200";
+  if (type === "Consulting")  return "bg-blue-50 text-blue-600 border-blue-200";
+  if (type === "Partnership") return "bg-amber-50 text-amber-600 border-amber-200";
+  return "bg-[#EFEFEA] text-[#131218]/40 border-[#E0E0D8]";
+}
+
+interface Props {
+  candidates: CandidateItem[];
+}
+
+export function CandidateSection({ candidates }: Props) {
+  const router = useRouter();
+  const [acting, setActing]     = useState<string | null>(null);
+  const [scanning, setScanning] = useState(false);
+  const [scanResult, setScanResult] = useState<{ found: number; created: number } | null>(null);
+  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+
+  async function handleAction(candidateId: string, action: "promote" | "ignore") {
+    setActing(candidateId);
+    try {
+      await fetch("/api/promote-candidate", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ candidateId, action }),
+      });
+      // Optimistic: remove from view immediately
+      setDismissed(prev => new Set(prev).add(candidateId));
+      router.refresh(); // re-fetch server data in background
+    } catch { /* silent */ } finally {
+      setActing(null);
+    }
+  }
+
+  async function handleScan() {
+    setScanning(true);
+    setScanResult(null);
+    try {
+      const res = await fetch("/api/scan-opportunity-candidates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "execute", lookback_days: 14 }),
+      });
+      const data = await res.json();
+      setScanResult({ found: data.candidates?.length ?? 0, created: data.created ?? 0 });
+      if ((data.created ?? 0) > 0) router.refresh();
+    } catch {
+      setScanResult({ found: 0, created: 0 });
+    } finally {
+      setScanning(false);
+    }
+  }
+
+  const visible = candidates.filter(c => !dismissed.has(c.id));
+
+  return (
+    <div className="space-y-2">
+      {/* Scan trigger */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          {scanResult !== null && (
+            <span className="text-[9px] text-[#131218]/35 font-medium">
+              {scanResult.created > 0
+                ? `${scanResult.created} new candidate${scanResult.created !== 1 ? "s" : ""} found`
+                : scanResult.found > 0
+                  ? `${scanResult.found} signal${scanResult.found !== 1 ? "s" : ""} detected — already tracked`
+                  : "No new candidates found"}
+            </span>
+          )}
+        </div>
+        <button
+          onClick={handleScan}
+          disabled={scanning}
+          className="text-[9px] font-bold text-[#131218]/30 hover:text-[#131218] transition-colors uppercase tracking-widest disabled:opacity-40 flex items-center gap-1.5"
+        >
+          {scanning ? (
+            <>
+              <span className="w-1.5 h-1.5 rounded-full bg-[#131218]/30 animate-pulse" />
+              Scanning…
+            </>
+          ) : "Scan inbox →"}
+        </button>
+      </div>
+
+      {/* Empty state */}
+      {visible.length === 0 && !scanning && (
+        <div className="bg-white/50 border border-dashed border-[#E0E0D8] rounded-xl px-4 py-6 text-center">
+          <p className="text-[11.5px] text-[#131218]/25 font-medium">No unreviewed candidates</p>
+          <p className="text-[10px] text-[#131218]/18 mt-1">
+            Scan inbox to detect new opportunities, or use the &ldquo;+&rdquo; button on inbox items
+          </p>
+        </div>
+      )}
+
+      {/* Candidate cards */}
+      {visible.map(c => {
+        const isActing = acting === c.id;
+        return (
+          <div
+            key={c.id}
+            className="bg-white rounded-xl border border-amber-200 px-4 py-3.5 flex items-start gap-3"
+          >
+            {/* Indicator */}
+            <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0 mt-1.5" />
+
+            <div className="flex-1 min-w-0">
+              {/* Badges */}
+              <div className="flex items-center gap-1.5 mb-1">
+                <span className="text-[8px] font-bold uppercase tracking-widest text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full">
+                  Candidate
+                </span>
+                {c.type && (
+                  <span className={`text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full border ${typeColor(c.type)}`}>
+                    {c.type}
+                  </span>
+                )}
+              </div>
+
+              {/* Name */}
+              <p className="text-[12.5px] font-semibold text-[#131218] leading-snug">{c.name}</p>
+              {c.orgName && (
+                <p className="text-[10.5px] text-[#131218]/40 mt-0.5">{c.orgName}</p>
+              )}
+
+              {/* Signal context */}
+              {c.signalContext && (
+                <p className="text-[10px] text-[#131218]/45 mt-1.5 leading-snug italic">
+                  {c.signalContext.slice(0, 200)}
+                </p>
+              )}
+
+              {/* Source link */}
+              {c.sourceUrl && (
+                <a
+                  href={c.sourceUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[9.5px] text-blue-600 hover:text-blue-800 font-medium mt-1 inline-block transition-colors"
+                >
+                  View source →
+                </a>
+              )}
+
+              {/* Actions */}
+              <div className="flex items-center gap-2 mt-2.5">
+                <button
+                  onClick={() => handleAction(c.id, "promote")}
+                  disabled={isActing}
+                  className="text-[9px] font-bold text-white bg-[#131218] hover:bg-[#131218]/80 px-2.5 py-1.5 rounded-lg transition-colors disabled:opacity-40"
+                >
+                  {isActing ? "…" : "✓ Create Opportunity"}
+                </button>
+                <button
+                  onClick={() => handleAction(c.id, "ignore")}
+                  disabled={isActing}
+                  className="text-[9px] font-bold text-[#131218]/40 hover:text-[#131218] bg-[#EFEFEA] hover:bg-[#E0E0D8] px-2.5 py-1.5 rounded-lg transition-colors disabled:opacity-40"
+                >
+                  Ignore
+                </button>
+                <a
+                  href={c.notionUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[9px] font-bold text-[#131218]/25 hover:text-[#131218]/60 transition-colors ml-auto"
+                >
+                  Notion →
+                </a>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}

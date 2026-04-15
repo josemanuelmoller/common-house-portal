@@ -25,12 +25,14 @@ import { AgentQueueSection } from "@/components/AgentQueueSection";
 import { InboxTriage, type InboxItem } from "@/components/InboxTriage";
 import { DraftCheckinButton } from "@/components/DraftCheckinButton";
 import { FollowUpDesk } from "@/components/FollowUpDesk";
+import { CandidateSection } from "@/components/CandidateSection";
 import {
   getProjectsOverview,
   getDecisionItems,
   getDailyBriefing,
   getAgentDrafts,
   getFollowUpDeskItems,
+  getCandidateOpportunities,
   getOpportunitiesByScope,
   getColdRelationships,
   getReadyContent,
@@ -145,6 +147,7 @@ export default async function AdminPage() {
     dailyBriefing,
     agentDrafts,
     followUpItems,
+    candidates,
     opportunities,
     coldRelationships,
     readyContent,
@@ -155,6 +158,7 @@ export default async function AdminPage() {
     getDailyBriefing(),
     getAgentDrafts("Pending Review"),
     getFollowUpDeskItems(),
+    getCandidateOpportunities(),
     getOpportunitiesByScope(),
     getColdRelationships(),
     getReadyContent(),
@@ -403,6 +407,12 @@ export default async function AdminPage() {
                     hint: "Active / Proposal Sent / Negotiation — detected automatically",
                   },
                   {
+                    label: "Candidatos sin revisar",
+                    count: candidates.length,
+                    activeColor: "text-amber-400",
+                    hint: "Use Scan inbox to detect new candidates",
+                  },
+                  {
                     label: "Relaciones frías",
                     count: coldOnly.length,
                     activeColor: "text-blue-500",
@@ -449,7 +459,18 @@ export default async function AdminPage() {
             {/* ── LEFT COLUMN ───────────────────────────────────────────────── */}
             <div className="space-y-6">
 
-              {/* ── 5. Follow-up Desk (Chief-of-Staff) ───────────────────── */}
+              {/* ── 5a. Opportunity Candidates — unreviewed signals ───────── */}
+              {candidates.length > 0 && (
+                <div>
+                  <SectionHeader
+                    label="Unreviewed signals"
+                    count={candidates.length}
+                  />
+                  <CandidateSection candidates={candidates} />
+                </div>
+              )}
+
+              {/* ── 5b. Follow-up Desk (Chief-of-Staff) ──────────────────── */}
               <div>
                 <SectionHeader
                   label="Follow-up desk"

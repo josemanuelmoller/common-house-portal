@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 export type InboxItem = {
   threadId: string;
@@ -36,11 +37,14 @@ interface Props {
 export function InboxTriage({ initialItems, initialScanned = 0 }: Props) {
   // If server-side fetch succeeded, start with those items; otherwise start empty and auto-load
   const serverHasData = initialItems !== undefined && initialItems.length > 0;
-  const [items, setItems]       = useState<InboxItem[]>(initialItems ?? []);
-  const [loading, setLoading]   = useState(!serverHasData); // auto-load when no server data
-  const [error, setError]       = useState<string | null>(null);
-  const [scanned, setScanned]   = useState<number>(initialScanned);
-  const [dismissed, setDismiss] = useState<Set<string>>(new Set());
+  const [items, setItems]             = useState<InboxItem[]>(initialItems ?? []);
+  const [loading, setLoading]         = useState(!serverHasData); // auto-load when no server data
+  const [error, setError]             = useState<string | null>(null);
+  const [scanned, setScanned]         = useState<number>(initialScanned);
+  const [dismissed, setDismiss]       = useState<Set<string>>(new Set());
+  const [creating, setCreating]       = useState<string | null>(null); // threadId being created
+  const [created, setCreated]         = useState<Set<string>>(new Set()); // threadIds already created
+  const router = useRouter();
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -68,6 +72,29 @@ export function InboxTriage({ initialItems, initialScanned = 0 }: Props) {
     if (!serverHasData) refresh();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  async function createCandidate(item: InboxItem) {
+    setCreating(item.threadId);
+    try {
+      const res = await fetch("/api/create-candidate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fromName: item.fromName,
+          from:     item.from,
+          subject:  item.subject,
+          snippet:  item.snippet,
+          gmailUrl: item.gmailUrl,
+        }),
+      });
+      if (res.ok) {
+        setCreated(prev => new Set(prev).add(item.threadId));
+        router.refresh();
+      }
+    } catch { /* silent */ } finally {
+      setCreating(null);
+    }
+  }
 
   const visible = items.filter(i => !dismissed.has(i.threadId));
 
@@ -147,6 +174,19 @@ export function InboxTriage({ initialItems, initialScanned = 0 }: Props) {
               {item.label}
             </span>
             <div className="flex items-center gap-2">
+              {/* Quick-create opportunity candidate */}
+              {created.has(item.threadId) ? (
+                <span className="text-[9px] font-bold text-green-600">✓ Candidate</span>
+              ) : (
+                <button
+                  onClick={() => createCandidate(item)}
+                  disabled={creating === item.threadId}
+                  title="Create opportunity candidate from this email"
+                  className="text-[9px] font-bold text-amber-500 hover:text-amber-700 transition-colors disabled:opacity-40"
+                >
+                  {creating === item.threadId ? "…" : "+ Opp"}
+                </button>
+              )}
               <a
                 href={item.gmailUrl}
                 target="_blank"
