@@ -105,9 +105,15 @@ type ExistingCandidate = {
   signalOrigins: string[];
 };
 
+// Active/Qualifying opportunities that can be enriched with new signals.
+// When a meeting or email matches one of these, we update Trigger/Signal AND
+// set Follow-up Status = "Needed" so the opp surfaces in the CoS desk automatically.
+type ActivePipelineOpp = ExistingCandidate & { stage: string };
+
 async function getExistingOpportunityData(): Promise<{
-  activeTokens: Set<string>;        // non-candidate opps → full dedup
-  candidates: ExistingCandidate[];  // existing candidates → enrich instead of dup
+  activeTokens: Set<string>;            // all non-terminal opps → block new-candidate creation
+  candidates: ExistingCandidate[];      // Status="New" → enrich Trigger/Signal only
+  activePipelineOpps: ActivePipelineOpp[]; // Status="Active"|"Qualifying" → enrich + set Follow-up=Needed
 }> {
   try {
     // Verified field names: "Opportunity Status" (not "Stage") — schema 2026-04-13
@@ -125,6 +131,7 @@ async function getExistingOpportunityData(): Promise<{
 
     const activeTokens = new Set<string>();
     const candidates: ExistingCandidate[] = [];
+    const activePipelineOpps: ActivePipelineOpp[] = [];
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     for (const page of res.results as any[]) {
@@ -132,25 +139,27 @@ async function getExistingOpportunityData(): Promise<{
       const name  = (page.properties["Opportunity Name"]?.title?.[0]?.plain_text ?? "").toLowerCase();
       // "Account / Organization" is a relation — use opportunity name tokens only for dedup
       const tokens = name.split(/[\s,·\-–]+/).filter((w: string) => w.length >= 4);
+      tokens.forEach((t: string) => activeTokens.add(t));
+
+      const triggerSignal = page.properties["Trigger / Signal"]?.rich_text?.[0]?.plain_text ?? "";
+      const existingOrigins: string[] = [];
+      if (triggerSignal.startsWith("SIGNALS:")) {
+        const signalPart = triggerSignal.split("|")[0].slice("SIGNALS:".length);
+        existingOrigins.push(...signalPart.split(",").map((s: string) => s.trim()));
+      }
 
       if (stage === "New") {
-        // "New" = unreviewed candidate — enrich instead of creating duplicate
-        const triggerSignal = page.properties["Trigger / Signal"]?.rich_text?.[0]?.plain_text ?? "";
-        const existingOrigins: string[] = [];
-        if (triggerSignal.startsWith("SIGNALS:")) {
-          const signalPart = triggerSignal.split("|")[0].slice("SIGNALS:".length);
-          existingOrigins.push(...signalPart.split(",").map((s: string) => s.trim()));
-        }
+        // Unreviewed candidate — enrich Trigger/Signal (no status change)
         candidates.push({ id: page.id, orgTokens: tokens, pendingAction: triggerSignal, signalOrigins: existingOrigins });
-        tokens.forEach((t: string) => activeTokens.add(t));
-      } else {
-        // Non-candidate active opportunities → hard dedup
-        tokens.forEach((t: string) => activeTokens.add(t));
+      } else if (stage === "Active" || stage === "Qualifying") {
+        // Live pipeline opportunity — enrich + auto-set Follow-up=Needed so it surfaces in CoS
+        activePipelineOpps.push({ id: page.id, orgTokens: tokens, pendingAction: triggerSignal, signalOrigins: existingOrigins, stage });
       }
+      // Other stages (e.g. "Proposal Sent", "Negotiation") — dedup only, no enrichment
     }
-    return { activeTokens, candidates };
+    return { activeTokens, candidates, activePipelineOpps };
   } catch {
-    return { activeTokens: new Set(), candidates: [] };
+    return { activeTokens: new Set(), candidates: [], activePipelineOpps: [] };
   }
 }
 
@@ -266,6 +275,24 @@ async function createCandidate(
   }
 }
 
+function buildEnrichedPendingAction(
+  existingPendingAction: string,
+  existingOrigins: string[],
+  newOrigin: SignalOrigin,
+  newRef: string,
+  newDate: string,
+  newReason: string,
+): string {
+  const mergedOrigins = Array.from(new Set([...existingOrigins, newOrigin])) as SignalOrigin[];
+  let baseContext = existingPendingAction;
+  if (existingPendingAction.startsWith("SIGNALS:")) {
+    const pipeIdx = existingPendingAction.lastIndexOf("|");
+    baseContext = existingPendingAction.slice(pipeIdx + 1).trim();
+  }
+  const enrichedContext = `${baseContext} + [${newOrigin}] ${newReason}`;
+  return buildSignalPrefix(mergedOrigins, newRef, newDate, enrichedContext);
+}
+
 async function enrichCandidate(
   candidateId: string,
   existingPendingAction: string,
@@ -275,19 +302,7 @@ async function enrichCandidate(
   newDate: string,
   newReason: string,
 ): Promise<boolean> {
-  // Merge origins — add new one if not already present
-  const mergedOrigins = Array.from(new Set([...existingOrigins, newOrigin])) as SignalOrigin[];
-
-  // Strip existing prefix if present, then rebuild with merged origins
-  let baseContext = existingPendingAction;
-  if (existingPendingAction.startsWith("SIGNALS:")) {
-    const pipeIdx = existingPendingAction.lastIndexOf("|");
-    // The last pipe-segment is the plain context
-    baseContext = existingPendingAction.slice(pipeIdx + 1).trim();
-  }
-  const enrichedContext = `${baseContext} + [${newOrigin}] ${newReason}`;
-  const newPendingAction = buildSignalPrefix(mergedOrigins, newRef, newDate, enrichedContext);
-
+  const newPendingAction = buildEnrichedPendingAction(existingPendingAction, existingOrigins, newOrigin, newRef, newDate, newReason);
   try {
     await notion.pages.update({
       page_id: candidateId,
@@ -299,6 +314,38 @@ async function enrichCandidate(
     return true;
   } catch (err) {
     console.error("[scan-candidates] enrich failed:", err);
+    return false;
+  }
+}
+
+/**
+ * Enrich an existing Active/Qualifying opportunity with a new signal.
+ * Unlike candidate enrichment, this also sets Follow-up Status = "Needed" so the
+ * opportunity surfaces automatically in the Chief of Staff desk — no manual Flag required.
+ */
+async function enrichActiveOpportunity(
+  oppId: string,
+  existingPendingAction: string,
+  existingOrigins: string[],
+  newOrigin: SignalOrigin,
+  newRef: string,
+  newDate: string,
+  newReason: string,
+): Promise<boolean> {
+  const newPendingAction = buildEnrichedPendingAction(existingPendingAction, existingOrigins, newOrigin, newRef, newDate, newReason);
+  try {
+    await notion.pages.update({
+      page_id: oppId,
+      properties: {
+        "Trigger / Signal": { rich_text: [{ text: { content: newPendingAction.slice(0, 2000) } }] },
+        // KEY: set Follow-up Status = Needed so the opp passes the CoS signal gate automatically.
+        // This is what makes Neil/COP/Zero Waste Districts surface without a manual Flag click.
+        "Follow-up Status": { select: { name: "Needed" } },
+      },
+    });
+    return true;
+  } catch (err) {
+    console.error("[scan-candidates] enrich-active failed:", err);
     return false;
   }
 }
@@ -351,36 +398,26 @@ export async function POST(req: NextRequest) {
     })(),
   ]);
 
-  const { activeTokens, candidates: existingCandidates } = existingData;
+  const { activeTokens, candidates: existingCandidates, activePipelineOpps } = existingData;
 
   // ── Build unified signal list ─────────────────────────────────────────────
 
   const signals: SignalItem[] = [];
 
-  // Email signals — dedup by sender name/domain
+  // Email signals — include ALL (dedup happens at the matching stage below)
   for (const t of gmailResult.threads) {
-    const nameTokens = t.fromName.toLowerCase().split(/\s+/).filter((w: string) => w.length >= 4);
-    const domain     = t.from.split("@")[1]?.split(".")[0] ?? "";
-    const alreadyTracked = nameTokens.some(tok => activeTokens.has(tok)) || (domain.length >= 4 && activeTokens.has(domain));
-    if (!alreadyTracked) {
-      signals.push({ source: "email", ref: t.subject, fromName: t.fromName, from: t.from, content: t.snippet, gmailUrl: t.gmailUrl });
-    }
+    signals.push({ source: "email", ref: t.subject, fromName: t.fromName, from: t.from, content: t.snippet, gmailUrl: t.gmailUrl });
   }
 
-  // Meeting signals — dedup by title tokens
+  // Meeting signals — include ALL
   for (const m of meetingSources) {
-    const titleTokens = m.title.toLowerCase().split(/[\s,·\-–()/]+/).filter((w: string) => w.length >= 4);
-    // Skip if every meaningful title token is already in an active opp
-    const alreadyTracked = titleTokens.length > 0 && titleTokens.every(tok => activeTokens.has(tok));
-    if (!alreadyTracked) {
-      signals.push({
-        source: "meeting",
-        ref: m.title,
-        content: m.processedSummary,
-        meetingUrl: m.url ?? undefined,
-        meetingDate: m.sourceDate ?? undefined,
-      });
-    }
+    signals.push({
+      source: "meeting",
+      ref: m.title,
+      content: m.processedSummary,
+      meetingUrl: m.url ?? undefined,
+      meetingDate: m.sourceDate ?? undefined,
+    });
   }
 
   if (signals.length === 0) {
@@ -409,9 +446,10 @@ export async function POST(req: NextRequest) {
 
   let created = 0;
   let enriched = 0;
+  let pipelineEnriched = 0;
   const proposed: {
     name: string; orgName: string; type: string; confidence: number;
-    reason: string; source: string; action: "create" | "enrich";
+    reason: string; source: string; action: "create" | "enrich" | "enrich-pipeline";
   }[] = [];
 
   const today = new Date().toISOString().slice(0, 10);
@@ -420,14 +458,39 @@ export async function POST(req: NextRequest) {
     const signal = signals[c.index - 1];
     if (!signal) continue;
 
-    // Check if an existing Candidate already covers this org
+    // Org tokens — used to match against existing opps and candidates
     const orgTokens = c.orgName.toLowerCase().split(/[\s,·\-–]+/).filter((w: string) => w.length >= 4);
-    const matchingCandidate = existingCandidates.find(ec =>
-      orgTokens.length > 0 && orgTokens.some(tok => ec.orgTokens.includes(tok))
-    );
+
+    // Priority 1: Does this signal match an Active/Qualifying pipeline opportunity?
+    // If so, enrich it AND set Follow-up=Needed so it appears in CoS automatically.
+    const matchingPipelineOpp = orgTokens.length > 0
+      ? activePipelineOpps.find(op => orgTokens.some(tok => op.orgTokens.includes(tok)))
+      : undefined;
+
+    if (matchingPipelineOpp) {
+      proposed.push({ name: c.name, orgName: c.orgName, type: c.type, confidence: c.confidence, reason: c.reason, source: signal.source, action: "enrich-pipeline" });
+      if (mode === "execute") {
+        const ok = await enrichActiveOpportunity(
+          matchingPipelineOpp.id,
+          matchingPipelineOpp.pendingAction,
+          matchingPipelineOpp.signalOrigins,
+          signal.source,
+          signal.ref,
+          signal.meetingDate ?? today,
+          c.reason,
+        );
+        if (ok) pipelineEnriched++;
+      }
+      continue;
+    }
+
+    // Priority 2: Does this signal match an existing unreviewed Candidate (Status=New)?
+    const matchingCandidate = orgTokens.length > 0
+      ? existingCandidates.find(ec => orgTokens.some(tok => ec.orgTokens.includes(tok)))
+      : undefined;
 
     if (matchingCandidate) {
-      // Enrich — add new signal origin to existing Candidate
+      // Enrich candidate — add new signal origin
       proposed.push({ name: c.name, orgName: c.orgName, type: c.type, confidence: c.confidence, reason: c.reason, source: signal.source, action: "enrich" });
       if (mode === "execute") {
         const ok = await enrichCandidate(
@@ -442,7 +505,11 @@ export async function POST(req: NextRequest) {
         if (ok) enriched++;
       }
     } else {
-      // Create new Candidate
+      // Priority 3: No existing record — create new Candidate (Status=New)
+      // Guard: skip if org tokens overlap with any non-terminal opp (already tracked)
+      const alreadyTracked = orgTokens.length > 0 && orgTokens.some(tok => activeTokens.has(tok));
+      if (alreadyTracked) continue; // covered by a stage we don't enrich (e.g. Proposal Sent)
+
       proposed.push({ name: c.name, orgName: c.orgName, type: c.type, confidence: c.confidence, reason: c.reason, source: signal.source, action: "create" });
       if (mode === "execute") {
         const id = await createCandidate(c, signal);
@@ -452,15 +519,16 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json({
-    ok:                true,
+    ok:                  true,
     mode,
-    lookback_days:     lookbackDays,
-    gmail_scanned:     gmailResult.threads.length,
-    calendar_filtered: gmailResult.calendarFiltered,
-    meetings_scanned:  meetingSources.length,
-    total_signals:     signals.length,
-    candidates:        proposed,
-    enriched:          mode === "execute" ? enriched : 0,
-    created:           mode === "execute" ? created  : 0,
+    lookback_days:       lookbackDays,
+    gmail_scanned:       gmailResult.threads.length,
+    calendar_filtered:   gmailResult.calendarFiltered,
+    meetings_scanned:    meetingSources.length,
+    total_signals:       signals.length,
+    candidates:          proposed,
+    enriched:            mode === "execute" ? enriched          : 0,
+    pipeline_enriched:   mode === "execute" ? pipelineEnriched  : 0,
+    created:             mode === "execute" ? created           : 0,
   });
 }

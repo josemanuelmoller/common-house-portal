@@ -650,6 +650,7 @@ function computeCoSTask(opp: {
     : null;
 
   const isNew = opp.stage === "New";
+  const isGrant = opp.type === "Grant";
   const hasExplicitPending = !!opp.pendingAction &&
     !opp.pendingAction.startsWith("SIGNALS:") &&
     !opp.pendingAction.startsWith("Inbox signal:");
@@ -658,6 +659,14 @@ function computeCoSTask(opp: {
   // These require different task types: email → "follow up", doc → "review document".
   const reviewIsGmail = !!opp.reviewUrl && opp.reviewUrl.includes("mail.google.com");
   const reviewIsDoc   = !!opp.reviewUrl && !reviewIsGmail;
+
+  // Stale-active: Active deal not touched in > 14 days, no explicit signal — safety-net check-in.
+  const isStaleActive = opp.stage === "Active" && !isGrant
+    && daysSinceEdit !== null && daysSinceEdit > 14
+    && !["Needed", "Waiting", "Sent"].includes(opp.followUpStatus)
+    && !opp.nextMeetingDate
+    && !opp.reviewUrl
+    && !hasExplicitPending;
 
   // ─── Entry signal ────────────────────────────────────────────────────────
   let entrySignal: CoSTask["entrySignal"];
@@ -684,6 +693,9 @@ function computeCoSTask(opp: {
   } else if (opp.stage === "Active" && hasExplicitPending) {
     entrySignal  = "negotiation";
     signalReason = "Action flagged on active deal";
+  } else if (isStaleActive) {
+    entrySignal  = "manual";
+    signalReason = `Stale — no update in ${daysSinceEdit}d`;
   } else if (opp.stage === "Active") {
     entrySignal  = "manual";
     signalReason = `Active · follow-up flagged`;
@@ -717,6 +729,8 @@ function computeCoSTask(opp: {
     taskTitle = `Review grant match${fitScore}: ${opp.name.slice(0, 70)}`;
   } else if (isNew) {
     taskTitle = `Review & qualify: ${opp.name.slice(0, 80)}`;
+  } else if (isStaleActive) {
+    taskTitle = `Check in — ${opp.name} (no update in ${daysSinceEdit}d)`;
   } else if (opp.stage === "Active") {
     taskTitle = `Advance deal — ${opp.name}`;
   } else if (opp.stage === "Qualifying") {
@@ -810,12 +824,16 @@ export async function getCoSTasks(): Promise<CoSTask[]> {
     // as "tasks to do" just because they exist in the pipeline.
     //
     // Valid signals:
-    //   1. Explicit Follow-up Status = Needed / Waiting / Sent (human flag)
+    //   1. Explicit Follow-up Status = Needed / Waiting / Sent (human flag, OR auto-set by scan)
     //   2. Next Meeting Date is set (time-bound prep action)
     //   3. Source URL set (document to review)
     //   4. Trigger/Signal text, recently edited, on a non-Grant record
     //      — Grant records use this field for sourcing context, not actions.
     //      — 30-day recency gate prevents stale context from surfacing.
+    //   5. (Safety net) Active opportunity with no edit in > 14 days — stale, needs check.
+    //      This catches deals that drift without action and have no other signal set.
+    //      Qualifying stage is intentionally excluded: those are in active correspondence
+    //      and usually surface through Follow-up Status.
     const TERMINAL_STAGES  = new Set(["Closed Won", "Closed Lost", "Stalled"]);
     const TERMINAL_STATUSES = new Set(["Done", "Dropped"]);
     const filtered = raw.filter(opp => {
@@ -839,7 +857,12 @@ export async function getCoSTasks(): Promise<CoSTask[]> {
         && !isGrant
         && daysSinceEdit <= 30;
 
-      return hasExplicitStatus || hasMeeting || hasReview || hasActionablePending;
+      // Safety net: Active deal not touched in > 14 days — surface as stale check-in.
+      // This is the fallback for opportunities like Neil/COP that exist in the pipeline
+      // but drift invisible because no explicit signal was ever set or re-set after completion.
+      const isStaleActive = opp.stage === "Active" && !isGrant && daysSinceEdit > 14;
+
+      return hasExplicitStatus || hasMeeting || hasReview || hasActionablePending || isStaleActive;
     });
 
     const tasks = filtered.map(computeCoSTask);
