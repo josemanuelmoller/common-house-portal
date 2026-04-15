@@ -26,6 +26,7 @@ import { InboxTriage, type InboxItem } from "@/components/InboxTriage";
 import { DraftCheckinButton } from "@/components/DraftCheckinButton";
 import { ChiefOfStaffDesk } from "@/components/ChiefOfStaffDesk";
 import { CandidateSection } from "@/components/CandidateSection";
+import OpportunityExplorer from "@/components/OpportunityExplorer";
 import {
   getProjectsOverview,
   getDecisionItems,
@@ -630,83 +631,7 @@ export default async function AdminPage() {
               {(opportunities.ch.length > 0 || opportunities.portfolio.length > 0) && (
                 <div>
                   <SectionHeader label="Opportunities — explore" count={opportunities.ch.length + opportunities.portfolio.length} />
-                  <div className="grid grid-cols-2 gap-4">
-
-                    {/* CH Opportunities */}
-                    <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-                      <div className="px-4 py-3 border-b border-[#EFEFEA]">
-                        <p className="text-[9px] font-bold uppercase tracking-widest text-[#131218]/30">Common House</p>
-                      </div>
-                      <div className="divide-y divide-[#EFEFEA]">
-                        {opportunities.ch.slice(0, 6).map(o => (
-                          <a
-                            key={o.id}
-                            href={o.notionUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-3 px-4 py-2.5 hover:bg-[#EFEFEA]/40 transition-colors"
-                          >
-                            <div className="flex-1 min-w-0">
-                              <p className="text-[11.5px] font-semibold text-[#131218] truncate">{o.name}</p>
-                              <p className="text-[10px] text-[#131218]/35 mt-0.5">{o.stage}{o.type ? ` · ${o.type}` : ""}</p>
-                            </div>
-                            {o.followUpStatus !== "None" && o.followUpStatus !== "" && (
-                              <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wide shrink-0 ${
-                                o.followUpStatus === "Needed" ? "bg-amber-50 text-amber-600 border border-amber-200" :
-                                o.followUpStatus === "Waiting" ? "bg-blue-50 text-blue-600 border border-blue-200" :
-                                "bg-[#EFEFEA] text-[#131218]/30"
-                              }`}>
-                                {o.followUpStatus}
-                              </span>
-                            )}
-                          </a>
-                        ))}
-                        {opportunities.ch.length === 0 && (
-                          <div className="px-4 py-5 text-center">
-                            <p className="text-[11px] text-[#131218]/25">No CH opportunities</p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Portfolio Opportunities */}
-                    <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-                      <div className="px-4 py-3 border-b border-[#EFEFEA]">
-                        <p className="text-[9px] font-bold uppercase tracking-widest text-[#131218]/30">Portfolio</p>
-                      </div>
-                      <div className="divide-y divide-[#EFEFEA]">
-                        {opportunities.portfolio.slice(0, 6).map(o => (
-                          <a
-                            key={o.id}
-                            href={o.notionUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-3 px-4 py-2.5 hover:bg-[#EFEFEA]/40 transition-colors"
-                          >
-                            <div className="flex-1 min-w-0">
-                              <p className="text-[11.5px] font-semibold text-[#131218] truncate">{o.name}</p>
-                              <p className="text-[10px] text-[#131218]/35 mt-0.5">{o.stage}{o.orgName ? ` · ${o.orgName}` : ""}</p>
-                            </div>
-                            {o.followUpStatus !== "None" && o.followUpStatus !== "" && (
-                              <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wide shrink-0 ${
-                                o.followUpStatus === "Needed" ? "bg-amber-50 text-amber-600 border border-amber-200" :
-                                o.followUpStatus === "Waiting" ? "bg-blue-50 text-blue-600 border border-blue-200" :
-                                "bg-[#EFEFEA] text-[#131218]/30"
-                              }`}>
-                                {o.followUpStatus}
-                              </span>
-                            )}
-                          </a>
-                        ))}
-                        {opportunities.portfolio.length === 0 && (
-                          <div className="px-4 py-5 text-center">
-                            <p className="text-[11px] text-[#131218]/25">No portfolio opportunities</p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                  </div>
+                  <OpportunityExplorer ch={opportunities.ch} portfolio={opportunities.portfolio} />
                 </div>
               )}
 

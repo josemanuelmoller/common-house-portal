@@ -654,18 +654,27 @@ function computeCoSTask(opp: {
     !opp.pendingAction.startsWith("SIGNALS:") &&
     !opp.pendingAction.startsWith("Inbox signal:");
 
+  // Source URL can be a Gmail thread (from inbox candidate creation) or a real doc.
+  // These require different task types: email → "follow up", doc → "review document".
+  const reviewIsGmail = !!opp.reviewUrl && opp.reviewUrl.includes("mail.google.com");
+  const reviewIsDoc   = !!opp.reviewUrl && !reviewIsGmail;
+
   // ─── Entry signal ────────────────────────────────────────────────────────
   let entrySignal: CoSTask["entrySignal"];
   let signalReason: string;
   if (meetingImminent) {
     entrySignal  = "meeting_soon";
     signalReason = `Meeting ${meetingLabel}`;
-  } else if (opp.reviewUrl && isNew) {
+  } else if (reviewIsDoc && isNew) {
     entrySignal  = "review_needed";
     signalReason = "Review document — inbound";
-  } else if (opp.reviewUrl) {
+  } else if (reviewIsDoc) {
     entrySignal  = "review_needed";
     signalReason = `Review doc — ${opp.stage === "Active" ? "active deal" : opp.stage?.toLowerCase() ?? "pipeline"}`;
+  } else if (reviewIsGmail) {
+    // Gmail thread used as source — this is a follow-up signal, not a document review
+    entrySignal  = "inbound";
+    signalReason = isNew ? "Inbound email — review and qualify" : "Email thread — follow up";
   } else if (isNew && opp.type === "Grant") {
     entrySignal  = "inbound";
     signalReason = "Grant match — review fit and decide";
@@ -694,12 +703,14 @@ function computeCoSTask(opp: {
   if (hasExplicitPending) {
     // Explicit human-written pending action — use directly
     taskTitle = opp.pendingAction!.slice(0, 140);
-  } else if (meetingImminent && opp.reviewUrl) {
+  } else if (meetingImminent && reviewIsDoc) {
     taskTitle = `Review doc before meeting${meetingLabel ? ` — ${meetingLabel}` : ""}${opp.name ? ` · ${opp.name}` : ""}`;
   } else if (meetingImminent) {
     taskTitle = `Prepare for meeting${meetingLabel ? ` — ${meetingLabel}` : ""}${opp.name ? ` · ${opp.name}` : ""}`;
-  } else if (opp.reviewUrl) {
+  } else if (reviewIsDoc) {
     taskTitle = `Review document: ${opp.name}`;
+  } else if (reviewIsGmail) {
+    taskTitle = `Follow up on ${opp.name}`;
   } else if (isNew && opp.type === "Grant") {
     const fitMatch = opp.pendingAction?.match(/fit score (\d+)\/100/);
     const fitScore = fitMatch ? ` — fit ${fitMatch[1]}/100` : "";
