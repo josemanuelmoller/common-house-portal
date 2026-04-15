@@ -102,7 +102,7 @@ type UpsertLoopInput = Omit<Loop,
   "last_action_at" | "created_at" | "updated_at"
 >;
 
-type Stats = { upserted: number; skipped: number; signals_added: number; errors: string[] };
+type Stats = { upserted: number; skipped: number; signals_added: number; errors: string[]; debug_active: Array<{ name: string; score: number | null; rawSignal: string | null; passed: boolean }> };
 
 async function upsertLoop(
   input: UpsertLoopInput,
@@ -359,6 +359,16 @@ async function syncOpportunityLoops(stats: Stats): Promise<void> {
       daysSinceEdit,
     });
 
+    // Diagnostic: record all Active/Qualifying candidates for the fallback gate
+    if ((stage === "Active" || stage === "Qualifying") && !isGrant(oppType) && daysSinceEdit <= 30) {
+      stats.debug_active.push({
+        name:      name,
+        score:     opportunityScore,
+        rawSignal: pendingAction ? pendingAction.slice(0, 60) : null,
+        passed:    classification !== null && classification.variant === "active",
+      });
+    }
+
     if (!classification) continue; // no valid signal — skip
 
     const { loopType, interventionMoment, variant } = classification;
@@ -505,7 +515,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const stats: Stats = { upserted: 0, skipped: 0, signals_added: 0, errors: [] };
+  const stats: Stats = { upserted: 0, skipped: 0, signals_added: 0, errors: [], debug_active: [] };
 
   try {
     // Run all three source syncs in sequence (Notion rate limits)
@@ -518,11 +528,12 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       ok: true,
-      upserted:     stats.upserted,
-      skipped:      stats.skipped,
+      upserted:      stats.upserted,
+      skipped:       stats.skipped,
       signals_added: stats.signals_added,
       auto_resolved: autoResolved,
-      errors:       stats.errors,
+      errors:        stats.errors,
+      debug_active:  stats.debug_active,
     });
   } catch (err) {
     console.error("[sync-loops] Fatal error:", err);
