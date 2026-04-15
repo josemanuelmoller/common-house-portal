@@ -1,7 +1,42 @@
 import Link from "next/link";
 import { Sidebar } from "@/components/Sidebar";
-import { getOpportunitiesByScope, OpportunityItem } from "@/lib/notion";
 import { requireAdmin } from "@/lib/require-admin";
+import {
+  fetchCleanOpportunitiesFromSupabase,
+  OpportunityRowFull,
+} from "@/lib/supabase-server";
+
+// ── Local display type (decoupled from Notion) ────────────────────────────────
+
+type OppDisplayItem = {
+  id: string;
+  name: string;
+  orgName: string | null;
+  type: string | null;
+  stage: string;
+  scope: string;
+  followUpStatus: string;
+  score: number | null;
+  qualificationStatus: string;
+  lastEdited: string;
+  notionUrl: string;
+};
+
+function rowToDisplay(r: OpportunityRowFull): OppDisplayItem {
+  return {
+    id:                 r.notion_id,
+    name:               r.title,
+    orgName:            r.org_name ?? null,
+    type:               r.opportunity_type ?? null,
+    stage:              r.status ?? "New",
+    scope:              r.scope ?? "CH",
+    followUpStatus:     r.follow_up_status ?? "",
+    score:              r.opportunity_score ?? null,
+    qualificationStatus: r.qualification_status ?? "",
+    lastEdited:         r.updated_at ? r.updated_at.slice(0, 10) : "",
+    notionUrl:          r.review_url ?? "",
+  };
+}
 
 // ── Score badge ───────────────────────────────────────────────────────────────
 
@@ -51,15 +86,15 @@ function StagePill({ stage }: { stage: string }) {
 }
 
 function FollowUpDot({ status }: { status: string }) {
-  if (status === "Needed") return <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" title="Follow-up needed" />;
-  if (status === "Sent")   return <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" title="Follow-up sent" />;
+  if (status === "Needed")  return <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" title="Follow-up needed" />;
+  if (status === "Sent")    return <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" title="Follow-up sent" />;
   if (status === "Waiting") return <span className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" title="Waiting for reply" />;
   return null;
 }
 
 // ── Opp list ──────────────────────────────────────────────────────────────────
 
-function OppList({ items, emptyMsg }: { items: OpportunityItem[]; emptyMsg: string }) {
+function OppList({ items, emptyMsg }: { items: OppDisplayItem[]; emptyMsg: string }) {
   if (items.length === 0) {
     return (
       <div className="bg-white rounded-2xl border border-[#E0E0D8] px-6 py-10 text-center">
@@ -102,45 +137,19 @@ function OppList({ items, emptyMsg }: { items: OpportunityItem[]; emptyMsg: stri
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
-// ── Dummy data for UI testing ─────────────────────────────────────────────────
-const DUMMY_CH: OpportunityItem[] = [
-  { id: "1", name: "Retail Refill Implementation — Co-op", orgName: "Co-op", type: "CH Sale", stage: "Qualifying", scope: "CH", followUpStatus: "Needed", score: 59, qualificationStatus: "Needs Review", lastEdited: "2026-04-10", notionUrl: "#" },
-  { id: "2", name: "Circular Economy Strategy — Tesco", orgName: "Tesco", type: "CH Sale", stage: "New", scope: "CH", followUpStatus: "None", score: 43, qualificationStatus: "Below Threshold", lastEdited: "2026-04-08", notionUrl: "#" },
-  { id: "3", name: "ZWF Forum 2026 — Keynote + Workshop", orgName: "Zero Waste Forum", type: "Partnership", stage: "Active", scope: "CH", followUpStatus: "Waiting", score: 74, qualificationStatus: "Qualified", lastEdited: "2026-04-11", notionUrl: "#" },
-  { id: "4", name: "Waitrose Refill Pilot Scoping", orgName: "Waitrose", type: "CH Sale", stage: "Qualifying", scope: "CH", followUpStatus: "Sent", score: 53, qualificationStatus: "Needs Review", lastEdited: "2026-04-09", notionUrl: "#" },
-  { id: "5", name: "LIFE Programme — ENV-CIR Call", orgName: "European Commission", type: "Grant", stage: "Active", scope: "CH", followUpStatus: "Needed", score: 82, qualificationStatus: "Qualified", lastEdited: "2026-04-12", notionUrl: "#" },
-];
-const DUMMY_PORTFOLIO: OpportunityItem[] = [
-  { id: "6", name: "Yenxa — Seed Round Intro (Molten Ventures)", orgName: "Yenxa", type: "Investor Match", stage: "Active", scope: "Portfolio", followUpStatus: "Waiting", score: 78, qualificationStatus: "Qualified", lastEdited: "2026-04-11", notionUrl: "#" },
-  { id: "7", name: "iRefill — Innovate UK Smart Grant", orgName: "iRefill", type: "Grant", stage: "Qualifying", scope: "Portfolio", followUpStatus: "Needed", score: 65, qualificationStatus: "Needs Review", lastEdited: "2026-04-10", notionUrl: "#" },
-  { id: "8", name: "Moss Solutions — Pre-Seed (Fair By Design)", orgName: "Moss Solutions", type: "Investor Match", stage: "New", scope: "Portfolio", followUpStatus: "None", score: 55, qualificationStatus: "Needs Review", lastEdited: "2026-04-07", notionUrl: "#" },
-  { id: "9", name: "Beeok — Series A Intro (Circularity Capital)", orgName: "Beeok", type: "Investor Match", stage: "Proposal Sent", scope: "Portfolio", followUpStatus: "Sent", score: 88, qualificationStatus: "Qualified", lastEdited: "2026-04-12", notionUrl: "#" },
-  { id: "10", name: "SUFI — Fair4All Finance Application", orgName: "SUFI", type: "Grant", stage: "Active", scope: "Portfolio", followUpStatus: "Needed", score: 71, qualificationStatus: "Qualified", lastEdited: "2026-04-12", notionUrl: "#" },
-];
-
 export default async function OpportunitiesPage() {
   await requireAdmin();
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { ch: _ch, portfolio: _portfolio } = await getOpportunitiesByScope();
-  // TODO: replace with live data once Opportunity Score field is populated in Notion
-  const ch = DUMMY_CH;
-  const portfolio = DUMMY_PORTFOLIO;
+  const { rows, error } = await fetchCleanOpportunitiesFromSupabase();
+  const all = rows.map(rowToDisplay);
 
-  // Sort by score descending (null scores last)
-  const sortByScore = (a: OpportunityItem, b: OpportunityItem) => {
-    if (a.score === null && b.score === null) return 0;
-    if (a.score === null) return 1;
-    if (b.score === null) return -1;
-    return b.score - a.score;
-  };
+  // Scope split: anything not explicitly "Portfolio" falls into CH
+  const chSorted        = all.filter(o => o.scope !== "Portfolio");
+  const portfolioSorted = all.filter(o => o.scope === "Portfolio");
 
-  const chSorted        = [...ch].sort(sortByScore);
-  const portfolioSorted = [...portfolio].sort(sortByScore);
-
-  const qualified = [...ch, ...portfolio].filter(o => (o.score ?? 0) >= 70).length;
-  const needsReview = [...ch, ...portfolio].filter(o => (o.score ?? -1) >= 50 && (o.score ?? 0) < 70).length;
-  const followUpNeeded = [...ch, ...portfolio].filter(o => o.followUpStatus === "Needed").length;
+  const qualified      = all.filter(o => (o.score ?? 0) >= 70).length;
+  const needsReview    = all.filter(o => (o.score ?? -1) >= 50 && (o.score ?? 0) < 70).length;
+  const followUpNeeded = all.filter(o => o.followUpStatus === "Needed").length;
 
   return (
     <div className="flex min-h-screen bg-[#EFEFEA]">
@@ -187,6 +196,14 @@ export default async function OpportunitiesPage() {
 
         <div className="px-12 py-9 max-w-6xl space-y-8">
 
+          {/* Error state */}
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-xl px-5 py-4">
+              <p className="text-[10px] font-bold text-red-700 uppercase tracking-wider mb-1">Supabase error</p>
+              <p className="text-[10.5px] text-red-600 font-mono">{error}</p>
+            </div>
+          )}
+
           {/* Score legend */}
           <div className="flex items-center gap-4 text-[9px] font-bold text-[#131218]/30 uppercase tracking-widest">
             <span className="flex items-center gap-1.5">
@@ -216,7 +233,7 @@ export default async function OpportunitiesPage() {
               </div>
               <OppList
                 items={chSorted}
-                emptyMsg="No active CH opportunities ≥ 50. Cues below threshold sit in the Offer System."
+                emptyMsg="No active CH opportunities. Legacy and archived records excluded."
               />
             </div>
 
@@ -229,11 +246,16 @@ export default async function OpportunitiesPage() {
               </div>
               <OppList
                 items={portfolioSorted}
-                emptyMsg="No active portfolio opportunities ≥ 50. Use Deal Flow or Grant Desk to identify new ones."
+                emptyMsg="No active portfolio opportunities. Use Deal Flow or Grant Desk to identify new ones."
               />
             </div>
 
           </div>
+
+          {/* Footer meta */}
+          <p className="text-[8.5px] text-[#131218]/20 font-medium text-right">
+            {all.length} rows · Supabase · legacy + archived excluded
+          </p>
 
         </div>
       </main>
