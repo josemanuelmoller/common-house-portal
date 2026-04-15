@@ -1,5 +1,5 @@
 /**
- * POST /api/sync-loops
+ * POST /api/sync-loops  [Loop Engine v1]
  *
  * Loop Engine sync — reads from three Notion sources and upserts into the
  * Supabase `loops` + `loop_signals` tables.
