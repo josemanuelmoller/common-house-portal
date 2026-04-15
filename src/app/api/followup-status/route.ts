@@ -2,8 +2,10 @@
  * PATCH /api/followup-status
  *
  * Updates the "Follow-up Status" select on an Opportunity [OS v2] record.
- * Called by ChiefOfStaffDesk (and legacy FollowUpDesk) when the user changes
- * a task's status.
+ * Called by ChiefOfStaffDesk when the user changes a task's status.
+ *
+ * Also writes a loop_action to the Loop Engine when a matching loop exists
+ * (normalized_key LIKE 'opportunity:{opportunityId}:%').
  *
  * Body: { opportunityId: string, status: TaskStatus }
  *
@@ -22,10 +24,62 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Client } from "@notionhq/client";
 import { adminGuardApi } from "@/lib/require-admin";
+import { getSupabaseServerClient } from "@/lib/supabase-server";
+import type { ActionType, LoopStatus } from "@/lib/loops";
 
 const notion = new Client({ auth: process.env.NOTION_API_KEY });
 const VALID_STATUSES = ["Needed", "In Progress", "Waiting", "Done", "Dropped", "Sent", "None"] as const;
 type FollowUpStatus = (typeof VALID_STATUSES)[number];
+
+const STATUS_TO_LOOP: Record<string, { status: LoopStatus; action: ActionType } | null> = {
+  "In Progress": { status: "in_progress", action: "marked_in_progress" },
+  "Done":        { status: "resolved",    action: "resolved" },
+  "Dropped":     { status: "dismissed",   action: "dismissed" },
+  "Waiting":     { status: "open",        action: "updated" },
+  "Needed":      { status: "open",        action: "updated" },
+  "Sent":        { status: "open",        action: "updated" },
+  "None":        null,
+};
+
+/** Write a loop_action (and optionally transition loop status) for the matching loop. Fire-and-forget. */
+async function syncLoopAction(opportunityId: string, newStatus: string): Promise<void> {
+  const transition = STATUS_TO_LOOP[newStatus];
+  if (!transition) return;
+
+  try {
+    const sb = getSupabaseServerClient();
+
+    // Find the loop(s) linked to this opportunity
+    const { data: loops } = await sb
+      .from("loops")
+      .select("id, status")
+      .eq("linked_entity_id", opportunityId)
+      .eq("linked_entity_type", "opportunity");
+
+    if (!loops || loops.length === 0) return;
+
+    for (const loop of loops) {
+      // Transition status if changed
+      if (loop.status !== transition.status) {
+        await sb.from("loops").update({
+          status:         transition.status,
+          last_action_at: new Date().toISOString(),
+          updated_at:     new Date().toISOString(),
+        }).eq("id", loop.id);
+      }
+
+      // Record action
+      await sb.from("loop_actions").insert({
+        loop_id:     loop.id,
+        action_type: transition.action,
+        actor:       "jose",
+        note:        `Follow-up status set to "${newStatus}"`,
+      });
+    }
+  } catch {
+    // Loop Engine is best-effort — never fail the Notion write because of it
+  }
+}
 
 export async function PATCH(req: NextRequest) {
   const guard = await adminGuardApi();
@@ -54,6 +108,9 @@ export async function PATCH(req: NextRequest) {
         "Follow-up Status": { select: { name: status } },
       },
     });
+
+    // Fire-and-forget: sync to Loop Engine (never blocks the response)
+    syncLoopAction(opportunityId, status).catch(() => {});
 
     return NextResponse.json({ ok: true, opportunityId, status });
   } catch (err) {

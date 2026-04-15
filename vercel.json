@@ -60,6 +60,10 @@
     {
       "path": "/api/grant-radar",
       "schedule": "0 7 * * 3"
+    },
+    {
+      "path": "/api/sync-loops",
+      "schedule": "*/30 * * * *"
     }
   ]
 }

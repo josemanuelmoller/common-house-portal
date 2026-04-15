@@ -992,7 +992,48 @@ async function getEvidenceOpenLoops(): Promise<CoSTask[]> {
   }
 }
 
+// ─── Supabase-first read ──────────────────────────────────────────────────────
+// Reads from the loops table (populated by /api/sync-loops). Falls back to the
+// Notion-derived path if Supabase is unavailable or the table is empty (cold start).
+
+async function getCoSTasksFromLoops(): Promise<CoSTask[] | null> {
+  try {
+    const { getSupabaseServerClient } = await import("@/lib/supabase-server");
+    const { mapLoopToCoSTask } = await import("@/lib/loops");
+    const sb = getSupabaseServerClient();
+
+    const { data, error } = await sb
+      .from("loops")
+      .select("*")
+      .in("status", ["open", "in_progress"])
+      .order("priority_score", { ascending: false })
+      .order("first_seen_at",  { ascending: true })
+      .limit(50);
+
+    if (error) {
+      console.warn("[getCoSTasks] Supabase unavailable, falling back to Notion:", error.message);
+      return null;
+    }
+
+    if (!data || data.length === 0) {
+      // Empty table = cold start before first sync. Fall through to Notion path.
+      return null;
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (data as any[]).map(mapLoopToCoSTask);
+  } catch (err) {
+    console.warn("[getCoSTasks] Supabase error, falling back to Notion:", String(err));
+    return null;
+  }
+}
+
 export async function getCoSTasks(): Promise<CoSTask[]> {
+  // ── Supabase-first (Loop Engine) ────────────────────────────────────────────
+  const fromLoops = await getCoSTasksFromLoops();
+  if (fromLoops !== null) return fromLoops;
+
+  // ── Notion fallback (heuristic path) ───────────────────────────────────────
   try {
     const res = await notion.databases.query({
       database_id: DB.opportunities,

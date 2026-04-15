@@ -325,10 +325,47 @@ export function ChiefOfStaffDesk({ tasks }: { tasks: CoSTask[] }) {
 
     const task = tasks.find(t => t.id === taskId);
 
-    if (task?.taskSource === "project") {
-      // Project tasks have no Follow-up Status field in Notion.
-      // Hiding is purely local — the task re-appears on next load if the project
-      // is still stale. The user resolves it by updating the project in Notion.
+    // Detect UUID format (Loop Engine tasks have UUID ids from Supabase)
+    const isLoopEngineTask = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(taskId);
+
+    if (isLoopEngineTask) {
+      // Loop Engine task — write to /api/cos-loops (status transitions + loop_action)
+      // Also write to /api/followup-status if the loop is opportunity-sourced (keeps Notion in sync)
+      try {
+        await fetch("/api/cos-loops", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ loopId: taskId, status }),
+        });
+
+        // If this loop maps to a Notion opportunity, also update Follow-up Status there
+        if (task?.taskSource === "opportunity" && task.pendingAction) {
+          // notionUrl contains the Notion page URL; extract the page ID from it
+          const notionPageId = task.notionUrl.split("/").pop()?.replace(/-/g, "");
+          if (notionPageId && notionPageId.length === 32) {
+            // Fire-and-forget — don't block on Notion
+            fetch("/api/followup-status", {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ opportunityId: notionPageId, status }),
+            }).catch(() => {});
+          }
+        }
+
+        router.refresh();
+      } catch {
+        if (status === "Done" || status === "Dropped") {
+          setLocalDone(prev => { const s = new Set(prev); s.delete(taskId); return s; });
+        }
+      } finally {
+        setUpdating(null);
+      }
+      return;
+    }
+
+    // Notion-fallback task (Notion page ID, not UUID)
+    if (task?.taskSource === "project" || task?.taskSource === "evidence") {
+      // No Notion field to update — hide locally only
       router.refresh();
       setUpdating(null);
       return;
