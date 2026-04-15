@@ -63,7 +63,7 @@
     },
     {
       "path": "/api/sync-loops",
-      "schedule": "*/30 * * * *"
+      "schedule": "0 * * * *"
     }
   ]
 }
