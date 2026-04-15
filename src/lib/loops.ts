@@ -141,7 +141,8 @@ export type NormalizedKeyVariant =
   | "followup"
   | "pending"
   | "new"
-  | "obstacle";
+  | "obstacle"
+  | "active";   // recently-edited opportunity with no explicit signal
 
 export function buildNormalizedKey(
   entityType: LinkedEntityType,
@@ -246,6 +247,7 @@ export type OpportunityLoopInput = {
   nextMeetingDate: string | null;
   reviewUrl: string | null;
   pendingAction: string | null;
+  daysSinceEdit?: number;  // used for recently-active fallback gate
 };
 
 export function classifyOpportunityLoop(opp: OpportunityLoopInput): {
@@ -324,6 +326,20 @@ export function classifyOpportunityLoop(opp: OpportunityLoopInput): {
     interventionMoment  = "this_week";
     variant             = "pending";
     title               = `Follow up`;
+  } else if (
+    (stage === "Active" || stage === "Qualifying") &&
+    !oppIsGrant &&
+    (opp.daysSinceEdit ?? 999) <= 30
+  ) {
+    // Recently-edited opportunity with no explicit signal.
+    // Surfaces Active/Qualifying work where the operator hasn't set any signal
+    // fields — a check-in loop forces the conversation back into focus.
+    // Distinct from the old isStaleActive gate (which triggered on OLD records);
+    // this fires on RECENTLY touched records with no signal captured yet.
+    loopType            = "follow_up";
+    interventionMoment  = "this_week";
+    variant             = "active";
+    title               = `No active signal — check in needed`;
   } else {
     // No valid loop signal — caller must skip this opportunity
     return null;

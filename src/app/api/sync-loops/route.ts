@@ -71,6 +71,30 @@ function dt(prop: any): string | null { return prop?.date?.start ?? null; }
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function chk(prop: any): boolean { return prop?.checkbox ?? false; }
 
+// ─── Operator actionability filter ───────────────────────────────────────────
+//
+// Returns false if the evidence title or excerpt clearly assigns the action
+// to someone OTHER than the operator (Jose / Jose Manuel). Typical pattern:
+// "[Name] to [verb]" — e.g. "Neil to follow up on speaker flights."
+// This prevents non-actionable delegated tasks from surfacing in CoS.
+
+const OPERATOR_NAMES = new Set(["jose", "jose manuel", "jm"]);
+const ACTION_VERBS = "follow|send|confirm|schedule|review|prepare|check|book|arrange|coordinate|present|attend|reach|write|draft|submit";
+const ASSIGNED_TO_PATTERN = new RegExp(`\\b([a-záéíóúñ]+)\\s+to\\s+(?:${ACTION_VERBS})`, "gi");
+
+function isOperatorActionable(title: string, excerpt: string | null): boolean {
+  const haystack = `${title} ${excerpt ?? ""}`;
+  let match: RegExpExecArray | null;
+  ASSIGNED_TO_PATTERN.lastIndex = 0;
+  while ((match = ASSIGNED_TO_PATTERN.exec(haystack)) !== null) {
+    const assignedName = match[1].toLowerCase();
+    if (!OPERATOR_NAMES.has(assignedName)) {
+      return false; // delegated to someone else — not Jose's direct action
+    }
+  }
+  return true;
+}
+
 // ─── Upsert helpers ───────────────────────────────────────────────────────────
 
 type UpsertLoopInput = Omit<Loop,
@@ -240,6 +264,10 @@ async function syncEvidenceLoops(stats: Stats): Promise<void> {
     const loopType: LoopType = "blocker";
     const taskTitle = excerpt && excerpt.length >= 20 ? excerpt.slice(0, 140) : title.slice(0, 140);
 
+    // Skip evidence that is clearly delegated to someone other than the operator.
+    // e.g. "Neil to follow up on speaker flights" → not Jose's direct action.
+    if (!isOperatorActionable(title, excerpt || null)) continue;
+
     const normalizedKey = buildNormalizedKey("evidence", page.id);
     const score = computePriorityScore(loopType, { signalCount: 1 });
 
@@ -325,11 +353,28 @@ async function syncOpportunityLoops(stats: Stats): Promise<void> {
       nextMeetingDate: nextMeeting,
       reviewUrl,
       pendingAction:  effectivePending,
+      daysSinceEdit,
     });
 
     if (!classification) continue; // no valid signal — skip
 
-    const { loopType, interventionMoment, variant, title } = classification;
+    const { loopType, interventionMoment, variant } = classification;
+
+    // Enrich generic titles with opportunity name so every task reads as a real action.
+    // The classifier returns template titles; the sync route has the actual name.
+    const nameSlug = name.slice(0, 80);
+    const title = (() => {
+      switch (classification.title) {
+        case "Follow up":                          return `Follow up — ${nameSlug}`;
+        case "Send follow-up reply":               return `Reply to ${nameSlug}`;
+        case "Review doc":                         return `Review proposal — ${nameSlug}`;
+        case "Review doc before meeting":          return `Review before meeting — ${nameSlug}`;
+        case "Qualify or decide on new opportunity": return `Qualify or decide — ${nameSlug}`;
+        case "Decide on inbound from email thread": return `Decide on inbound — ${nameSlug}`;
+        case "No active signal — check in needed": return `Check in on — ${nameSlug}`;
+        default: return classification.title; // already specific (pendingAction text)
+      }
+    })();
     const normalizedKey = buildNormalizedKey("opportunity", page.id, variant);
 
     const score = computePriorityScore(loopType, {
