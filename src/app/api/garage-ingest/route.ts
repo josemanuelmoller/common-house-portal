@@ -663,6 +663,26 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // 10. Create CH Sources [OS v2] record so the file appears in the Sources panel
+  // This links the ingested document to the project for traceability.
+  try {
+    const sourceProps: Record<string, unknown> = {
+      "Source Title":    { title: [{ text: { content: fileName } }] },
+      "Source Type":     notionSelect("Document"),
+      "Processing Status": notionSelect("Processed"),
+      "Linked Projects": { relation: [{ id: projectId }] },
+    };
+    if (fileUrl) sourceProps["Source URL"] = { url: fileUrl };
+
+    await notion.pages.create({
+      parent: { database_id: DB.sources },
+      properties: sourceProps as Parameters<typeof notion.pages.create>[0]["properties"],
+    });
+  } catch (err) {
+    // Non-fatal — evidence and financials already written; don't fail the whole response
+    errors.push(`CH Sources record: ${err instanceof Error ? err.message : String(err)}`);
+  }
+
   return NextResponse.json({
     mode: "execute",
     results: {

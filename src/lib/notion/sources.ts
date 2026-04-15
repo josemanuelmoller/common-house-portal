@@ -68,16 +68,22 @@ export async function getSourcesForProject(projectPageId: string): Promise<Sourc
 
 export async function getAllSources(): Promise<SourceItem[]> {
   try {
-    const res = await notion.databases.query({
-      database_id: DB.sources,
-      sorts: [{ timestamp: "created_time", direction: "descending" }],
-      page_size: 100,
-    });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return res.results.map((page: any) => ({
-      ...parseSource(page),
-      projectId: relationFirst(prop(page, "Linked Projects")),
-    }));
+    const all: SourceItem[] = [];
+    let cursor: string | undefined;
+    do {
+      const res = await notion.databases.query({
+        database_id: DB.sources,
+        sorts: [{ timestamp: "created_time", direction: "descending" }],
+        page_size: 100,
+        ...(cursor ? { start_cursor: cursor } : {}),
+      });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      for (const page of res.results as any[]) {
+        all.push({ ...parseSource(page), projectId: relationFirst(prop(page, "Linked Projects")) });
+      }
+      cursor = res.has_more ? (res.next_cursor ?? undefined) : undefined;
+    } while (cursor);
+    return all;
   } catch {
     return [];
   }

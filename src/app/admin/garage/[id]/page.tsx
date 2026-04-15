@@ -13,6 +13,7 @@ import {
   getCapTableForProject,
   getDataRoomForProject,
   getPortfolioOpportunities,
+  getSourceActivity,
 } from "@/lib/notion";
 import { GarageDetailClient } from "./GarageDetailClient";
 
@@ -44,7 +45,7 @@ export default async function GarageDetailPage({ params }: { params: Promise<{ i
   await requireAdmin();
   const { id } = await params;
 
-  const [project, evidence, sources, allDecisions, orgData, financials, valuations, capTable, dataRoom] = await Promise.all([
+  const [project, evidence, sources, allDecisions, orgData, financials, valuations, capTable, dataRoom, activity] = await Promise.all([
     getProjectById(id),
     getEvidenceForProject(id),
     getSourcesForProject(id),
@@ -54,6 +55,7 @@ export default async function GarageDetailPage({ params }: { params: Promise<{ i
     getValuationsForProject(id),
     getCapTableForProject(id),
     getDataRoomForProject(id),
+    getSourceActivity(id),
   ]);
 
   // Fetch portfolio opportunities after project resolves so we can filter by org name
@@ -69,7 +71,7 @@ export default async function GarageDetailPage({ params }: { params: Promise<{ i
   });
 
   // Stats derived from evidence
-  const validatedCount = evidence.filter(e => e.validationStatus === "Validated").length;
+  const validatedCount = evidence.filter(e => e.validationStatus === "Validated" || e.validationStatus === "Reviewed").length;
 
   const days   = daysSince(project.lastUpdate);
   const warmth = warmthLabel(days);
@@ -135,7 +137,7 @@ export default async function GarageDetailPage({ params }: { params: Promise<{ i
               { label: "Stage",       value: project.stage    || "—"                                    },
               { label: "Evidence",    value: evidence.length                                            },
               { label: "Validated",   value: validatedCount                                             },
-              { label: "Decisions",   value: decisions.length                                           },
+              { label: "Meetings",    value: activity.meetings.length                                   },
               { label: "Sources",     value: sources.length                                             },
               { label: "Last update", value: project.lastUpdate
                   ? new Date(project.lastUpdate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })
@@ -162,6 +164,7 @@ export default async function GarageDetailPage({ params }: { params: Promise<{ i
           dataRoom={dataRoom}
           orgId={orgData?.id}
           opportunities={opportunities}
+          meetings={activity.meetings}
         />
 
       </main>

@@ -14,6 +14,7 @@ import type {
   CapTableEntry,
   DataRoomItem,
   OpportunityItem,
+  MeetingItem,
 } from "@/lib/notion";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
@@ -72,6 +73,7 @@ type Props = {
   dataRoom: DataRoomItem[];
   orgId?: string;
   opportunities: OpportunityItem[];
+  meetings: MeetingItem[];
 };
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
@@ -97,6 +99,7 @@ function validationDot(status: string) {
   if (status === "Validated") return "bg-green-400";
   if (status === "New")       return "bg-amber-400";
   if (status === "Rejected")  return "bg-red-400";
+  if (status === "Reviewed")  return "bg-blue-400";
   return "bg-[#131218]/15";
 }
 
@@ -149,11 +152,12 @@ function EmptyState({ label }: { label: string }) {
 
 // ─── Pulse tab ─────────────────────────────────────────────────────────────────
 
-function PulseTab({ project, evidence, sources, decisions }: {
+function PulseTab({ project, evidence, sources, decisions, meetings }: {
   project: Project;
   evidence: EvidenceItem[];
   sources: SourceItem[];
   decisions: DecisionItem[];
+  meetings: MeetingItem[];
 }) {
   const recent    = evidence.slice(0, 6);
   const openDecs  = decisions.filter(d => d.status === "Open");
@@ -276,6 +280,58 @@ function PulseTab({ project, evidence, sources, decisions }: {
             </div>
           </div>
         )}
+
+        {/* Sessions / meetings */}
+        <div className="bg-white border border-[#E0E0D8] rounded-2xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-[#EFEFEA]">
+            <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30">Sessions</p>
+            <p className="text-sm font-bold text-[#131218] mt-0.5">{meetings.length} meeting{meetings.length !== 1 ? "s" : ""}</p>
+          </div>
+          {meetings.length > 0 ? (
+            <div className="divide-y divide-[#EFEFEA]">
+              {meetings.slice(0, 5).map(m => (
+                <div key={m.id} className="px-5 py-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-[12px] font-medium text-[#131218] leading-snug line-clamp-2 flex-1">{m.title}</p>
+                    {m.url && (
+                      <a
+                        href={m.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[#131218]/20 hover:text-[#131218]/60 transition-colors text-sm shrink-0"
+                      >
+                        →
+                      </a>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    {m.platform && (
+                      <span className="text-[9px] text-[#131218]/30 font-medium">{m.platform}</span>
+                    )}
+                    {m.platform && m.date && <span className="text-[#131218]/15">·</span>}
+                    {m.date && (
+                      <span className="text-[9px] text-[#131218]/25">{fmtDate(m.date)}</span>
+                    )}
+                  </div>
+                  {m.processedSummary && (
+                    <p className="text-[10.5px] text-[#131218]/50 mt-1.5 leading-snug line-clamp-3 italic">
+                      {m.processedSummary}
+                    </p>
+                  )}
+                </div>
+              ))}
+              {meetings.length > 5 && (
+                <div className="px-5 py-2.5">
+                  <p className="text-[10px] text-[#131218]/30">+{meetings.length - 5} more sessions</p>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="px-5 py-6 text-center">
+              <p className="text-xs text-[#131218]/25">No meetings linked</p>
+            </div>
+          )}
+        </div>
 
         {/* Sources breakdown */}
         <div className="bg-white border border-[#E0E0D8] rounded-2xl overflow-hidden">
@@ -1451,7 +1507,7 @@ const TABS: { id: Tab; label: string }[] = [
 
 export function GarageDetailClient({
   project, evidence, sources, decisions,
-  orgData, financials, valuations, capTable, dataRoom, orgId, opportunities,
+  orgData, financials, valuations, capTable, dataRoom, orgId, opportunities, meetings,
 }: Props) {
   const [tab, setTab]               = useState<Tab>("pulse");
   const [showUpload, setShowUpload] = useState(false);
@@ -1596,7 +1652,7 @@ export function GarageDetailClient({
       {/* Tab content */}
       <div className="px-12 py-8">
         {tab === "pulse" && (
-          <PulseTab project={project} evidence={evidence} sources={sources} decisions={decisions} />
+          <PulseTab project={project} evidence={evidence} sources={sources} decisions={decisions} meetings={meetings} />
         )}
         {tab === "financials" && (
           <FinancialsTab orgData={orgData} financials={financials} onUpload={() => setShowUpload(true)} />
