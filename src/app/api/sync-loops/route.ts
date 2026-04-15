@@ -210,20 +210,17 @@ async function upsertLoop(
 async function syncEvidenceLoops(stats: Stats): Promise<void> {
   const now = Date.now();
   const THIRTY_DAYS  = 30 * 86400000;
-  const FOURTEEN_DAYS = 14 * 86400000;
 
+  // Evidence Type "Commitment" does not exist in this Notion DB.
+  // Available types: Blocker, Decision, Requirement, Dependency, Outcome, etc.
+  // Only surface Blockers from Evidence — commitment loops come from Opportunities.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const res = await notion.databases.query({
     database_id: DB.evidence,
     filter: {
       and: [
         { property: "Validation Status", select: { equals: "Validated" } },
-        {
-          or: [
-            { property: "Evidence Type", select: { equals: "Blocker" } },
-            { property: "Evidence Type", select: { equals: "Commitment" } },
-          ],
-        },
+        { property: "Evidence Type", select: { equals: "Blocker" } },
       ],
     },
     sorts: [{ property: "Date Captured", direction: "descending" }],
@@ -232,17 +229,15 @@ async function syncEvidenceLoops(stats: Stats): Promise<void> {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   for (const page of res.results as any[]) {
-    const evidenceType  = sel(page.properties["Evidence Type"]);
     const dateCaptured  = dt(page.properties["Date Captured"]);
     if (!dateCaptured) continue;
 
-    const ageMs     = now - new Date(dateCaptured).getTime();
-    const windowMs  = evidenceType === "Blocker" ? THIRTY_DAYS : FOURTEEN_DAYS;
-    if (ageMs > windowMs) continue;
+    const ageMs = now - new Date(dateCaptured).getTime();
+    if (ageMs > THIRTY_DAYS) continue;
 
     const title    = text(page.properties["Evidence Title"]) || "Untitled evidence";
     const excerpt  = text(page.properties["Source Excerpt"]);
-    const loopType: LoopType = evidenceType === "Blocker" ? "blocker" : "commitment";
+    const loopType: LoopType = "blocker";
     const taskTitle = excerpt && excerpt.length >= 20 ? excerpt.slice(0, 140) : title.slice(0, 140);
 
     const normalizedKey = buildNormalizedKey("evidence", page.id);
@@ -253,7 +248,7 @@ async function syncEvidenceLoops(stats: Stats): Promise<void> {
         normalized_key:      normalizedKey,
         title:               taskTitle,
         loop_type:           loopType,
-        intervention_moment: loopType === "blocker" ? "urgent" : "this_week",
+        intervention_moment: "urgent",
         priority_score:      score,
         linked_entity_type:  "evidence",
         linked_entity_id:    page.id,
@@ -262,7 +257,7 @@ async function syncEvidenceLoops(stats: Stats): Promise<void> {
         review_url:          null,
         due_at:              null,
       },
-      evidenceType === "Blocker" ? "evidence_blocker" : "evidence_commitment",
+      "evidence_blocker",
       page.id,
       title,
       excerpt || null,
