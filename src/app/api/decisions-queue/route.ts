@@ -66,11 +66,11 @@ export async function GET() {
           id: page.id,
           title: titleOf(page),
           priority: sel(p["Priority"]) || "Normal",
-          type: sel(p["Type"]) || "",
+          type: sel(p["Decision Type"]) || "",
           status: sel(p["Status"]) || "Open",
           // "Source Agent" is a select property — use sel(), not text()
           agent: sel(p["Source Agent"]) || sel(p["Agent"]) || "",
-          question: text(p["Question"]) || text(p["Description"]) || "",
+          question: text(p["Proposed Action"]) || text(p["Suggested Value / Draft Text"]) || "",
           projectName: p["Project"]?.relation?.[0]?.id ? "linked" : "",
           createdAt: relDate(dt(p["Created"]) || page.created_time),
           notionUrl: page.url ?? "",

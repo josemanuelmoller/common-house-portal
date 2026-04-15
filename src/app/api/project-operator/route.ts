@@ -99,7 +99,7 @@ async function fetchProjectEvidence(projectId: string, since: string | null): Pr
         id:               page.id,
         title:            p("Evidence Title")?.title?.map((r: any) => r.plain_text).join("") ?? "",
         type:             p("Evidence Type")?.select?.name ?? "",
-        statement:        p("Statement")?.rich_text?.map((r: any) => r.plain_text).join("") ?? "",
+        statement:        p("Evidence Statement")?.rich_text?.map((r: any) => r.plain_text).join("") ?? "",
         validationStatus: p("Validation Status")?.select?.name ?? "",
         dateCaptured:     p("Date Captured")?.date?.start ?? null,
       };

@@ -76,10 +76,10 @@ async function fetchActiveProjects() {
   const res = await notion.databases.query({ database_id: DB.projects, page_size: 30 });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (res.results as any[])
-    .filter(p => ACTIVE.has(sel(prop(p, "Stage"))))
+    .filter(p => ACTIVE.has(sel(prop(p, "Current Stage"))))
     .map(p => ({
       name:   text(prop(p, "Project Name")),
-      stage:  sel(prop(p, "Stage")),
+      stage:  sel(prop(p, "Current Stage")),
       status: text(prop(p, "Status Summary")),
     }));
 }
@@ -93,7 +93,7 @@ async function fetchFollowUpOpportunities() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (res.results as any[]).map(p => ({
     name:   text(prop(p, "Opportunity Name")),
-    stage:  sel(prop(p, "Stage")),
+    stage:  sel(prop(p, "Opportunity Status")),
     org:    p.properties?.["Organization"]?.relation?.[0]?.id ?? null,
   }));
 }
@@ -178,7 +178,7 @@ async function fetchRecentEvidence() {
   return (res.results as any[]).map(p => ({
     title:     text(prop(p, "Title")) || text(prop(p, "Name")),
     type:      sel(prop(p, "Evidence Type")),
-    statement: (p.properties?.["Statement"]?.rich_text ?? [])
+    statement: (p.properties?.["Evidence Statement"]?.rich_text ?? [])
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .map((r: any) => r.plain_text).join("").slice(0, 200),
   }));

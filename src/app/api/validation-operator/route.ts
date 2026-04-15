@@ -25,10 +25,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  if (!process.env.NOTION_TOKEN) {
-    return NextResponse.json({ error: "NOTION_TOKEN not configured" }, { status: 500 });
-  }
-
   const reviewed = await getAllEvidence("Reviewed");
 
   const results = {
