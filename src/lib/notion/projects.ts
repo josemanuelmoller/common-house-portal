@@ -140,9 +140,10 @@ export async function getProjectsOverview(): Promise<ProjectCard[]> {
     return {
       ...project,
       evidenceCount: projEvidence.length,
-      validatedCount: projEvidence.filter(e =>
-        select(prop(e, "Validation Status")) === "Validated"
-      ).length,
+      validatedCount: projEvidence.filter(e => {
+        const vs = select(prop(e, "Validation Status"));
+        return vs === "Validated" || vs === "Reviewed";
+      }).length,
       blockerCount: projEvidence.filter(e =>
         select(prop(e, "Evidence Type")) === "Blocker" &&
         select(prop(e, "Validation Status")) === "Validated"
