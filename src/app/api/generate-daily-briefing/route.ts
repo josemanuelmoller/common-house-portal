@@ -104,7 +104,7 @@ async function fetchPendingDecisions() {
     filter: {
       and: [
         { property: "Status", select: { equals: "Open" } },
-        { property: "Priority", select: { equals: "P1" } },
+        { property: "Priority", select: { equals: "P1 Critical" } },
       ],
     },
     page_size: 10,
