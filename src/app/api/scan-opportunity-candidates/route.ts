@@ -80,6 +80,10 @@ const CALENDAR_SUBJECT_PREFIXES = [
   // Spanish (Google Calendar in Spanish locale)
   "aceptado:", "rechazado:", "cancelado:", "invitación:", "invitacion:",
   "tentativa:", "actualización de invitación:", "actualizacion de invitacion:",
+  // Out-of-office / absence
+  "ausencia por vacaciones", "ausencia:",
+  // Cancelled events with trailing note
+  "cancelled event with note:", "canceled event with note:",
 ];
 const CALENDAR_SENDER_PATTERNS = [
   "noreply@", "no-reply@", "calendar-notification@", "calendar@", "notifications-noreply@",
@@ -337,7 +341,7 @@ export async function POST(req: NextRequest) {
             const subject  = firstMsg.payload?.headers?.find(h => h.name === "Subject")?.value ?? "(no subject)";
             const snippet  = firstMsg.snippet ?? "";
             if (isCalendarNoise(subject, from)) { calendarFiltered++; return; }
-            threads.push({ fromName, from, subject, snippet, gmailUrl: `https://mail.google.com/mail/u/0/#inbox/${t.id}` });
+            threads.push({ fromName, from, subject, snippet, gmailUrl: `https://mail.google.com/mail/u/0/#inbox/${t.id}?authuser=josemanuel@wearecommonhouse.com` });
           } catch { /* skip */ }
         }));
         return { threads, calendarFiltered };

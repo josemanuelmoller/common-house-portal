@@ -220,6 +220,12 @@ async function handleGet(req: NextRequest) {
     "re: invitacion:",
     "actualización de invitación:",
     "actualizacion de invitacion:",
+    // Out-of-office / absence notifications
+    "ausencia por vacaciones",
+    "ausencia:",
+    // Cancelled events with trailing note (e.g. "Cancelled event with note: ...")
+    "cancelled event with note:",
+    "canceled event with note:",
   ];
   const CALENDAR_SENDER_PATTERNS = [
     "noreply@",
@@ -289,7 +295,8 @@ Return ONLY valid JSON array — no markdown, no explanation:
       isUnread:    c.isUnread,
       label:       cl?.label ?? "Needs Reply",
       reason:      cl?.reason ?? "",
-      gmailUrl:    `https://mail.google.com/mail/u/0/#inbox/${c.threadId}`,
+      // authuser pins to CH account regardless of which Google account is slot 0 in the browser
+      gmailUrl:    `https://mail.google.com/mail/u/0/#inbox/${c.threadId}?authuser=josemanuel@wearecommonhouse.com`,
     };
   });
 
