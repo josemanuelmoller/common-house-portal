@@ -44,6 +44,7 @@ function signalBadge(signal: CoSTask["entrySignal"]): { label: string; cls: stri
     case "review_needed":    return { label: "Review needed",  cls: "bg-blue-50 text-blue-600 border-blue-200" };
     case "negotiation":      return { label: "Negotiation",    cls: "bg-purple-50 text-purple-600 border-purple-200" };
     case "proposal_pending": return { label: "Proposal sent",  cls: "bg-amber-50 text-amber-600 border-amber-200" };
+    case "inbound":          return { label: "Inbound",        cls: "bg-green-50 text-green-700 border-green-200" };
     default:                 return { label: "Follow-up",      cls: "bg-[#EFEFEA] text-[#131218]/50 border-[#E0E0D8]" };
   }
 }
@@ -315,7 +316,7 @@ export function ChiefOfStaffDesk({ tasks }: { tasks: CoSTask[] }) {
       <div className="bg-white/50 border border-dashed border-[#E0E0D8] rounded-2xl px-5 py-10 text-center">
         <p className="text-[12px] text-[#131218]/25 font-medium">No active tasks</p>
         <p className="text-[10.5px] text-[#131218]/18 mt-1">
-          Tasks appear here when opportunities have a meeting scheduled, a pending review, or an explicit action
+          Tasks appear when there is inbound work to review, a meeting to prep for, or an explicit action on any opportunity
         </p>
       </div>
     );

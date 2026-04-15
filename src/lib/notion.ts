@@ -598,7 +598,7 @@ export type CoSTask = {
 
   // Action signals
   reviewUrl: string | null;
-  entrySignal: "meeting_soon" | "proposal_pending" | "negotiation" | "manual" | "review_needed";
+  entrySignal: "meeting_soon" | "proposal_pending" | "negotiation" | "manual" | "review_needed" | "inbound";
   signalReason: string;       // "Meeting tomorrow" / "Proposal sent 5d ago"
   calendarBlockUrl: string | null;
 
@@ -649,15 +649,29 @@ function computeCoSTask(opp: {
     ? Math.floor((now - new Date(opp.lastEdited).getTime()) / 86400000)
     : null;
 
+  const isNew = opp.stage === "New";
+  const hasExplicitPending = !!opp.pendingAction &&
+    !opp.pendingAction.startsWith("SIGNALS:") &&
+    !opp.pendingAction.startsWith("Inbox signal:");
+
   // ─── Entry signal ────────────────────────────────────────────────────────
   let entrySignal: CoSTask["entrySignal"];
   let signalReason: string;
   if (meetingImminent) {
     entrySignal  = "meeting_soon";
     signalReason = `Meeting ${meetingLabel}`;
-  } else if (opp.reviewUrl && (opp.stage === "Qualifying" || opp.stage === "Active")) {
+  } else if (opp.reviewUrl && isNew) {
     entrySignal  = "review_needed";
-    signalReason = `Review doc — ${opp.stage === "Active" ? "active deal" : "qualifying stage"}`;
+    signalReason = "Review document — inbound";
+  } else if (opp.reviewUrl) {
+    entrySignal  = "review_needed";
+    signalReason = `Review doc — ${opp.stage === "Active" ? "active deal" : opp.stage?.toLowerCase() ?? "pipeline"}`;
+  } else if (isNew && opp.type === "Grant") {
+    entrySignal  = "inbound";
+    signalReason = "Grant match — review fit and decide";
+  } else if (isNew) {
+    entrySignal  = "inbound";
+    signalReason = hasExplicitPending ? "Action needed" : "Inbound — review and qualify";
   } else if (opp.stage === "Active") {
     entrySignal  = "negotiation";
     signalReason = `Active${daysSinceEdit !== null ? ` · ${daysSinceEdit}d since last update` : ""}`;
@@ -671,15 +685,21 @@ function computeCoSTask(opp: {
 
   // ─── Task title (WHAT TO DO) ─────────────────────────────────────────────
   let taskTitle: string;
-  if (opp.pendingAction && !opp.pendingAction.startsWith("SIGNALS:") && !opp.pendingAction.startsWith("Inbox signal:")) {
-    // Explicit pending action = use directly as task title
-    taskTitle = opp.pendingAction.slice(0, 140);
+  if (hasExplicitPending) {
+    // Explicit human-written pending action — use directly
+    taskTitle = opp.pendingAction!.slice(0, 140);
   } else if (meetingImminent && opp.reviewUrl) {
     taskTitle = `Review doc before meeting${meetingLabel ? ` — ${meetingLabel}` : ""}${opp.name ? ` · ${opp.name}` : ""}`;
   } else if (meetingImminent) {
     taskTitle = `Prepare for meeting${meetingLabel ? ` — ${meetingLabel}` : ""}${opp.name ? ` · ${opp.name}` : ""}`;
-  } else if (opp.reviewUrl && opp.stage === "Qualifying") {
-    taskTitle = `Review document for ${opp.name}`;
+  } else if (opp.reviewUrl) {
+    taskTitle = `Review document: ${opp.name}`;
+  } else if (isNew && opp.type === "Grant") {
+    const fitMatch = opp.pendingAction?.match(/fit score (\d+)\/100/);
+    const fitScore = fitMatch ? ` — fit ${fitMatch[1]}/100` : "";
+    taskTitle = `Review grant match${fitScore}: ${opp.name.slice(0, 70)}`;
+  } else if (isNew) {
+    taskTitle = `Review & qualify: ${opp.name.slice(0, 80)}`;
   } else if (opp.stage === "Active") {
     taskTitle = `Advance deal — ${opp.name}`;
   } else if (opp.stage === "Qualifying") {
@@ -692,6 +712,7 @@ function computeCoSTask(opp: {
   let urgency: CoSTask["urgency"];
   if (daysToMeeting !== null && daysToMeeting >= 0 && daysToMeeting <= 1) urgency = "critical";
   else if (meetingImminent || opp.stage === "Active") urgency = "high";
+  else if (isNew && ["Needed", "In Progress", "Waiting", "Sent"].includes(opp.followUpStatus)) urgency = "high";
   else urgency = "normal";
 
   // ─── Calendar block ───────────────────────────────────────────────────────
@@ -728,7 +749,7 @@ export async function getCoSTasks(): Promise<CoSTask[]> {
           { property: "Opportunity Status", select: { does_not_equal: "Closed Won"  } },
           { property: "Opportunity Status", select: { does_not_equal: "Closed Lost" } },
           { property: "Opportunity Status", select: { does_not_equal: "Stalled"     } },
-          { property: "Opportunity Status", select: { does_not_equal: "New"         } },
+          // "New" is intentionally included — inbound signals at New stage are real tasks
           // Exclude explicitly closed tasks
           { property: "Follow-up Status", select: { does_not_equal: "Done"    } },
           { property: "Follow-up Status", select: { does_not_equal: "Dropped" } },
