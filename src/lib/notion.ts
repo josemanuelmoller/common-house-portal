@@ -753,20 +753,20 @@ export async function getCoSTasks(): Promise<CoSTask[]> {
           // Exclude explicitly closed tasks
           { property: "Follow-up Status", select: { does_not_equal: "Done"    } },
           { property: "Follow-up Status", select: { does_not_equal: "Dropped" } },
-          // Must have at least one task signal
+          // Must be in an actionable stage or have an explicit flag
+          // Signal-gating (Source URL / Trigger / Signal content) is handled client-side
+          // to avoid fragile rich_text / url filter operators.
           {
             or: [
               // Explicit follow-up flag
               { property: "Follow-up Status", select: { equals: "Needed"      } },
               { property: "Follow-up Status", select: { equals: "In Progress" } },
               { property: "Follow-up Status", select: { equals: "Waiting"     } },
-              // Source URL exists (proposal / doc to review)
-              { property: "Source URL", url: { is_not_empty: true } },
-              // Explicit signal context written
-              { property: "Trigger / Signal", rich_text: { is_not_empty: true } },
-              // High-priority stages (implicit task: advance the deal)
+              { property: "Follow-up Status", select: { equals: "Sent"        } },
+              // Actionable pipeline stages — review & advance the deal, or review inbound
               { property: "Opportunity Status", select: { equals: "Active"     } },
               { property: "Opportunity Status", select: { equals: "Qualifying" } },
+              { property: "Opportunity Status", select: { equals: "New"        } },
             ],
           },
         ],
@@ -793,15 +793,16 @@ export async function getCoSTasks(): Promise<CoSTask[]> {
       pendingAction:       text(prop(page, "Trigger / Signal")) || null, // verified field name
     }));
 
-    // Client-side: exclude Active/Qualifying opportunities with no concrete task signal
-    // (Active / Qualifying always qualify; others only if have an explicit signal)
+    // Client-side signal gate: Active/Qualifying always qualify; New items only if
+    // they have a concrete signal (pending action, review URL, meeting, or explicit flag).
     const filtered = raw.filter(opp => {
       const hasExplicitStatus = ["Needed", "In Progress", "Waiting", "Sent"].includes(opp.followUpStatus);
       const hasMeeting = !!opp.nextMeetingDate;
       const hasReview  = !!opp.reviewUrl;
       const hasPending = !!opp.pendingAction;
       const isHighStage = opp.stage === "Active" || opp.stage === "Qualifying";
-      return hasExplicitStatus || hasMeeting || hasReview || hasPending || isHighStage;
+      const isNewWithSignal = opp.stage === "New" && (hasExplicitStatus || hasMeeting || hasReview || hasPending);
+      return hasExplicitStatus || hasMeeting || hasReview || hasPending || isHighStage || isNewWithSignal;
     });
 
     const tasks = filtered.map(computeCoSTask);
