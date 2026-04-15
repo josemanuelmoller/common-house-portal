@@ -547,34 +547,172 @@ export async function getOpportunitiesByScope(): Promise<{ ch: OpportunityItem[]
 }
 
 // Opportunities where follow-up is needed (opted-in, active pipeline)
+// Kept for backwards compat — new callers should use getFollowUpDeskItems()
 export async function getFollowUpOpportunities(): Promise<OpportunityItem[]> {
+  return getFollowUpDeskItems();
+}
+
+// ─── Chief-of-Staff Follow-up Desk ───────────────────────────────────────────
+//
+// Replaces the narrow manual-flag queue with signals-based detection.
+// Entry signals (OR):
+//   1. Follow-up Status = "Needed"  (manual)
+//   2. Stage = Active / Proposal Sent / Negotiation  (auto)
+//
+// Enrichment fields on Opportunities [OS v2] — add these in Notion if not present:
+//   • "Next Meeting Date"  — Date
+//   • "Review URL"         — URL
+//   • "Pending Action"     — Text (rich_text)
+// All three are optional; graceful null if the field is not yet in the schema.
+
+export type FollowUpDeskItem = OpportunityItem & {
+  // From Notion (optional fields — null until added to schema + populated)
+  nextMeetingDate: string | null;   // "Next Meeting Date" — date field
+  reviewUrl: string | null;         // "Review URL" — url field
+  pendingAction: string | null;     // "Pending Action" — rich_text field
+  // Computed
+  entrySignal: "manual" | "active_stale" | "proposal_stale" | "negotiation_stale" | "has_meeting";
+  entryReason: string;              // "Meeting in 3 days" / "Proposal sent · 12d no reply"
+  pendingActionLabel: string;       // "Review proposal before Fri 18 Apr"
+  urgencyLevel: "urgent" | "high" | "normal";
+  recommendedMove: "review_doc" | "draft_followup" | "schedule_meeting" | "advance_negotiation";
+  calendarBlockUrl: string | null;  // parameterized Google Calendar link for 1-hour block
+};
+
+function computeDeskItem(raw: OpportunityItem & {
+  nextMeetingDate: string | null;
+  reviewUrl: string | null;
+  pendingAction: string | null;
+}): FollowUpDeskItem {
+  const now = Date.now();
+
+  const daysSinceEdit = raw.lastEdited
+    ? Math.floor((now - new Date(raw.lastEdited).getTime()) / 86400000)
+    : null;
+
+  const meetingMs      = raw.nextMeetingDate ? new Date(raw.nextMeetingDate).getTime() : null;
+  const daysToMeeting  = meetingMs !== null ? Math.floor((meetingMs - now) / 86400000) : null;
+  const meetingImminent = daysToMeeting !== null && daysToMeeting >= 0 && daysToMeeting <= 7;
+  const meetingLabel   = raw.nextMeetingDate && daysToMeeting !== null
+    ? daysToMeeting === 0 ? "Today"
+    : daysToMeeting === 1 ? "Tomorrow"
+    : new Date(raw.nextMeetingDate).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })
+    : null;
+
+  // Entry signal — first match wins in priority order
+  let entrySignal: FollowUpDeskItem["entrySignal"];
+  let entryReason: string;
+  if (meetingImminent) {
+    entrySignal = "has_meeting";
+    entryReason = `Meeting ${meetingLabel}`;
+  } else if (raw.followUpStatus === "Needed") {
+    entrySignal = "manual";
+    entryReason = "Follow-up flagged";
+  } else if (raw.stage === "Negotiation") {
+    entrySignal = "negotiation_stale";
+    entryReason = `In negotiation${daysSinceEdit !== null ? ` · ${daysSinceEdit}d since last update` : ""}`;
+  } else if (raw.stage === "Proposal Sent") {
+    entrySignal = "proposal_stale";
+    entryReason = `Proposal sent${daysSinceEdit !== null ? ` · ${daysSinceEdit}d no reply recorded` : ""}`;
+  } else {
+    entrySignal = "active_stale";
+    entryReason = `Active${daysSinceEdit !== null ? ` · ${daysSinceEdit}d since last update` : ""}`;
+  }
+
+  // Pending action label
+  let pendingActionLabel: string;
+  if (raw.pendingAction) {
+    pendingActionLabel = raw.pendingAction;
+  } else if (meetingImminent && raw.reviewUrl) {
+    pendingActionLabel = `Review before meeting — ${meetingLabel}`;
+  } else if (raw.reviewUrl) {
+    pendingActionLabel = "Review shared document";
+  } else if (raw.stage === "Proposal Sent") {
+    pendingActionLabel = `Follow up on proposal${raw.orgName ? ` with ${raw.orgName}` : ""}`;
+  } else if (raw.stage === "Negotiation") {
+    pendingActionLabel = "Advance negotiation — check for reply or update";
+  } else {
+    pendingActionLabel = `Follow up${raw.orgName ? ` with ${raw.orgName}` : ""}`;
+  }
+
+  // Urgency
+  let urgencyLevel: FollowUpDeskItem["urgencyLevel"];
+  if (daysToMeeting !== null && daysToMeeting >= 0 && daysToMeeting <= 2) urgencyLevel = "urgent";
+  else if (meetingImminent || raw.stage === "Negotiation") urgencyLevel = "high";
+  else urgencyLevel = "normal";
+
+  // Recommended move
+  let recommendedMove: FollowUpDeskItem["recommendedMove"];
+  if (raw.reviewUrl && (meetingImminent || raw.stage === "Proposal Sent")) recommendedMove = "review_doc";
+  else if (raw.stage === "Negotiation") recommendedMove = "advance_negotiation";
+  else if (!raw.nextMeetingDate) recommendedMove = "schedule_meeting";
+  else recommendedMove = "draft_followup";
+
+  // Calendar block URL — 1-hour review block, pre-populated
+  const calendarBlockUrl = (raw.reviewUrl || meetingImminent)
+    ? `https://calendar.google.com/calendar/r/eventedit?text=${encodeURIComponent(`Review: ${raw.name}`)}&details=${encodeURIComponent(pendingActionLabel)}&dur=0100`
+    : null;
+
+  return { ...raw, entrySignal, entryReason, pendingActionLabel, urgencyLevel, recommendedMove, calendarBlockUrl };
+}
+
+export async function getFollowUpDeskItems(): Promise<FollowUpDeskItem[]> {
   try {
     const res = await notion.databases.query({
       database_id: DB.opportunities,
       filter: {
         and: [
-          { property: "Follow-up Status", select: { equals: "Needed" } },
           { property: "Stage", select: { does_not_equal: "Won" } },
           { property: "Stage", select: { does_not_equal: "Lost" } },
+          { property: "Stage", select: { does_not_equal: "Archived" } },
+          {
+            or: [
+              { property: "Follow-up Status", select: { equals: "Needed" } },
+              { property: "Stage",            select: { equals: "Active" } },
+              { property: "Stage",            select: { equals: "Proposal Sent" } },
+              { property: "Stage",            select: { equals: "Negotiation" } },
+            ],
+          },
         ],
       },
       sorts: [{ timestamp: "last_edited_time", direction: "ascending" }],
-      page_size: 20,
+      page_size: 30,
     });
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (res.results as any[]).map(page => ({
-      id:                   page.id,
-      name:                 text(prop(page, "Opportunity Name")) || text(prop(page, "Name")) || "Untitled",
-      stage:                select(prop(page, "Stage")),
-      scope:                select(prop(page, "Scope")),
-      followUpStatus:       select(prop(page, "Follow-up Status")),
-      type:                 select(prop(page, "Type")) || select(prop(page, "Opportunity Type")) || "",
-      orgName:              text(prop(page, "Organization")) || "",
-      lastEdited:           page.last_edited_time?.slice(0, 10) ?? null,
-      notionUrl:            page.url ?? "",
-      score:                num(prop(page, "Opportunity Score")),
-      qualificationStatus:  select(prop(page, "Qualification Status")) || "Not Scored",
+    const raw = (res.results as any[]).map(page => ({
+      id:                  page.id,
+      name:                text(prop(page, "Opportunity Name")) || text(prop(page, "Name")) || "Untitled",
+      stage:               select(prop(page, "Stage")),
+      scope:               select(prop(page, "Scope")),
+      followUpStatus:      select(prop(page, "Follow-up Status")),
+      type:                select(prop(page, "Type")) || select(prop(page, "Opportunity Type")) || "",
+      orgName:             text(prop(page, "Organization")) || "",
+      lastEdited:          page.last_edited_time?.slice(0, 10) ?? null,
+      notionUrl:           page.url ?? "",
+      score:               num(prop(page, "Opportunity Score")),
+      qualificationStatus: select(prop(page, "Qualification Status")) || "Not Scored",
+      // Enrichment fields — gracefully null if not yet in Notion schema
+      nextMeetingDate:     date(prop(page, "Next Meeting Date")),
+      reviewUrl:           page.properties["Review URL"]?.url ?? null,
+      pendingAction:       text(prop(page, "Pending Action")) || null,
     }));
+
+    const items = raw.map(computeDeskItem);
+
+    // Sort: urgent first, then high, then normal; within tier by meeting date proximity
+    const TIER: Record<string, number> = { urgent: 0, high: 1, normal: 2 };
+    items.sort((a, b) => {
+      const tierDiff = (TIER[a.urgencyLevel] ?? 2) - (TIER[b.urgencyLevel] ?? 2);
+      if (tierDiff !== 0) return tierDiff;
+      // Earlier meeting date wins
+      if (a.nextMeetingDate && b.nextMeetingDate) return a.nextMeetingDate.localeCompare(b.nextMeetingDate);
+      if (a.nextMeetingDate) return -1;
+      if (b.nextMeetingDate) return 1;
+      return 0;
+    });
+
+    return items;
   } catch {
     return [];
   }

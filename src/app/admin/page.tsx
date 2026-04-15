@@ -24,13 +24,13 @@ import { Sidebar } from "@/components/Sidebar";
 import { AgentQueueSection } from "@/components/AgentQueueSection";
 import { InboxTriage, type InboxItem } from "@/components/InboxTriage";
 import { DraftCheckinButton } from "@/components/DraftCheckinButton";
-import { DraftFollowupButton } from "@/components/DraftFollowupButton";
+import { FollowUpDesk } from "@/components/FollowUpDesk";
 import {
   getProjectsOverview,
   getDecisionItems,
   getDailyBriefing,
   getAgentDrafts,
-  getFollowUpOpportunities,
+  getFollowUpDeskItems,
   getOpportunitiesByScope,
   getColdRelationships,
   getReadyContent,
@@ -144,7 +144,7 @@ export default async function AdminPage() {
     decisions,
     dailyBriefing,
     agentDrafts,
-    followUpOpps,
+    followUpItems,
     opportunities,
     coldRelationships,
     readyContent,
@@ -154,7 +154,7 @@ export default async function AdminPage() {
     getDecisionItems("Open"),
     getDailyBriefing(),
     getAgentDrafts("Pending Review"),
-    getFollowUpOpportunities(),
+    getFollowUpDeskItems(),
     getOpportunitiesByScope(),
     getColdRelationships(),
     getReadyContent(),
@@ -186,6 +186,14 @@ export default async function AdminPage() {
 
   const dormantRelationships = coldRelationships.filter(r => r.warmth === "Dormant");
   const coldOnly             = coldRelationships.filter(r => r.warmth === "Cold");
+
+  // ── Focus suggestion — top follow-up desk item with meeting ≤7 days + review doc
+  // Injected into Focus of the Day section as a recommended action.
+  const focusSuggestion = followUpItems.find(item => {
+    if (!item.nextMeetingDate) return false;
+    const msToMeeting = new Date(item.nextMeetingDate).getTime() - Date.now();
+    return msToMeeting >= 0 && msToMeeting <= 7 * 86400000 && (!!item.reviewUrl || !!item.pendingAction);
+  }) ?? null;
 
   // ── Date + greeting ──────────────────────────────────────────────────────────
   const today = new Date();
@@ -241,6 +249,52 @@ export default async function AdminPage() {
                   )}
                 </div>
               </div>
+
+              {/* Focus suggestion — injected when a follow-up item has meeting ≤7d */}
+              {focusSuggestion && (
+                <div className="mt-4 pt-4 border-t border-white/8">
+                  <p className="text-[8px] font-bold uppercase tracking-[2px] text-[#c8f55a]/40 mb-2">
+                    Recommended focus
+                  </p>
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] font-semibold text-white/90 leading-snug">
+                        {focusSuggestion.pendingActionLabel}
+                      </p>
+                      <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+                        {focusSuggestion.nextMeetingDate && (
+                          <span className="text-[10px] text-white/40 font-medium">
+                            📅 Meeting: {new Date(focusSuggestion.nextMeetingDate).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "short" })}
+                          </span>
+                        )}
+                        <span className="text-[10px] text-white/30 font-medium">Suggested: 1h review block</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {focusSuggestion.reviewUrl && (
+                        <a
+                          href={focusSuggestion.reviewUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[10px] font-bold text-[#c8f55a] hover:text-white border border-[#c8f55a]/30 hover:border-white/30 px-2.5 py-1.5 rounded-lg transition-colors"
+                        >
+                          Open doc →
+                        </a>
+                      )}
+                      {focusSuggestion.calendarBlockUrl && (
+                        <a
+                          href={focusSuggestion.calendarBlockUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[10px] font-bold text-white/60 hover:text-white border border-white/10 hover:border-white/30 px-2.5 py-1.5 rounded-lg transition-colors"
+                        >
+                          Block 1h
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <div className="bg-[#131218]/6 border border-dashed border-[#131218]/15 rounded-2xl px-7 py-5 flex items-center justify-between gap-4">
@@ -249,6 +303,26 @@ export default async function AdminPage() {
                 <p className="text-[13px] text-[#131218]/40">No briefing generated yet today.</p>
                 <p className="text-[11px] text-[#131218]/25 mt-0.5">Synthesises active projects, decisions, and open signals into a daily focus.</p>
               </div>
+              {/* Focus suggestion even without a briefing — strong signal shows immediately */}
+              {focusSuggestion && (
+                <div className="flex-1 min-w-0 border-l border-[#131218]/10 pl-5 ml-5">
+                  <p className="text-[8px] font-bold uppercase tracking-[2px] text-[#131218]/30 mb-1">Recommended focus</p>
+                  <p className="text-[12px] font-semibold text-[#131218]/70 leading-snug">{focusSuggestion.pendingActionLabel}</p>
+                  <div className="flex items-center gap-2 mt-1.5">
+                    {focusSuggestion.nextMeetingDate && (
+                      <span className="text-[9px] text-[#131218]/35">
+                        📅 {new Date(focusSuggestion.nextMeetingDate).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}
+                      </span>
+                    )}
+                    {focusSuggestion.calendarBlockUrl && (
+                      <a href={focusSuggestion.calendarBlockUrl} target="_blank" rel="noopener noreferrer"
+                        className="text-[9px] font-bold text-[#131218]/50 hover:text-[#131218] transition-colors">
+                        Block 1h →
+                      </a>
+                    )}
+                  </div>
+                </div>
+              )}
               <TriggerBriefingButton />
             </div>
           )}
@@ -324,9 +398,9 @@ export default async function AdminPage() {
                   },
                   {
                     label: "Follow-ups activos",
-                    count: followUpOpps.length,
+                    count: followUpItems.length,
                     activeColor: "text-amber-500",
-                    hint: "Mark an opportunity as interested to track it here",
+                    hint: "Active / Proposal Sent / Negotiation — detected automatically",
                   },
                   {
                     label: "Relaciones frías",
@@ -375,48 +449,15 @@ export default async function AdminPage() {
             {/* ── LEFT COLUMN ───────────────────────────────────────────────── */}
             <div className="space-y-6">
 
-              {/* ── 5. Follow-up Queue ────────────────────────────────────── */}
+              {/* ── 5. Follow-up Desk (Chief-of-Staff) ───────────────────── */}
               <div>
                 <SectionHeader
-                  label="Follow-up queue"
-                  count={followUpOpps.length}
-                  action={followUpOpps.length > 0 ? "All opportunities" : undefined}
-                  href="/admin"
+                  label="Follow-up desk"
+                  count={followUpItems.length}
+                  action={followUpItems.length > 0 ? "All opportunities →" : undefined}
+                  href="/admin/opportunities"
                 />
-                {followUpOpps.length > 0 ? (
-                  <div className="bg-white rounded-2xl border border-[#E0E0D8] divide-y divide-[#EFEFEA] overflow-hidden">
-                    {followUpOpps.map(opp => {
-                      const lastEditDays = opp.lastEdited ? daysSince(opp.lastEdited) : null;
-                      const isUrgent = lastEditDays !== null && lastEditDays > 14;
-                      return (
-                        <div key={opp.id} className="flex items-center gap-3 px-5 py-3">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-0.5">
-                              {isUrgent && (
-                                <span className="text-[8px] font-bold text-red-600 bg-red-50 border border-red-200 px-1.5 rounded-full uppercase tracking-wide">Urgent</span>
-                              )}
-                              <span className="text-[8px] font-bold uppercase tracking-widest text-[#131218]/25">{opp.scope}</span>
-                            </div>
-                            <p className="text-[12.5px] font-semibold text-[#131218] truncate">{opp.name}</p>
-                            <p className="text-[10px] text-[#131218]/40 mt-0.5">
-                              {opp.stage}{opp.orgName ? ` · ${opp.orgName}` : ""}
-                              {lastEditDays !== null ? ` · ${lastEditDays}d silent` : ""}
-                            </p>
-                          </div>
-                          <DraftFollowupButton
-                            opportunityId={opp.id}
-                            notionUrl={opp.notionUrl}
-                          />
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="bg-white/50 border border-dashed border-[#E0E0D8] rounded-2xl px-5 py-10 text-center">
-                    <p className="text-[12px] text-[#131218]/25 font-medium">Sin follow-ups activos</p>
-                    <p className="text-[10.5px] text-[#131218]/18 mt-1">Marca &quot;Me interesa&quot; en una oportunidad para trackearlo aquí</p>
-                  </div>
-                )}
+                <FollowUpDesk items={followUpItems} />
               </div>
 
               {/* ── 6. My Commitments (from briefing + decisions) ─────────── */}
