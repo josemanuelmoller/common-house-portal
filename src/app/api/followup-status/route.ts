@@ -39,10 +39,10 @@ export async function GET(req: NextRequest) {
       database_id: DB.opportunities,
       filter: {
         or: [
-          { property: "Follow-up Status", select: { equals: "Needed"      } },
-          { property: "Follow-up Status", select: { equals: "In Progress" } },
-          { property: "Follow-up Status", select: { equals: "Waiting"     } },
-          { property: "Follow-up Status", select: { equals: "Sent"        } },
+          // "In Progress" excluded — not a valid Notion select option yet
+          { property: "Follow-up Status", select: { equals: "Needed"  } },
+          { property: "Follow-up Status", select: { equals: "Waiting" } },
+          { property: "Follow-up Status", select: { equals: "Sent"    } },
           { property: "Opportunity Status", select: { equals: "Active"     } },
           { property: "Opportunity Status", select: { equals: "Qualifying" } },
           { property: "Opportunity Status", select: { equals: "New"        } },
