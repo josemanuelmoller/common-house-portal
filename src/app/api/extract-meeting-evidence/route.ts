@@ -7,13 +7,21 @@
  *
  * From there the validation-operator and project-operator pick them up automatically.
  *
- * Auth: x-agent-key header OR Vercel cron CRON_SECRET header.
- * Called by Vercel cron daily at 02:00 UTC (20:00 UTC-6) Mon–Fri.
+ * Changes vs v1:
+ *   - Auth unified to CRON_SECRET (same pattern as fireflies-sync)
+ *   - Deduplication: pre-loads existing evidence titles+dates; skips re-extractions
+ *   - CH Projects relation: resolves project ID from title/participant keywords
+ *   - PROJECT_MAP covers all 8 garage projects (not just iRefill + SUFI)
+ *
+ * Auth: x-agent-key OR Authorization: Bearer <CRON_SECRET>.
+ * Called by Vercel cron daily at 02:00 UTC Mon–Fri.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { Client } from "@notionhq/client";
 import Anthropic from "@anthropic-ai/sdk";
+
+export const maxDuration = 90;
 
 const notion    = new Client({ auth: process.env.NOTION_API_KEY });
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -21,18 +29,73 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const FIREFLIES_API = "https://api.fireflies.ai/graphql";
 const EVIDENCE_DB   = "fa28124978d043039d8932ac9964ccf5";
 
-// ─── Known CH Organization Notion IDs ─────────────────────────────────────────
-// Key = display name, notionId = CH Organizations [OS v2] page ID
+// ─── Auth ─────────────────────────────────────────────────────────────────────
+
+function authCheck(req: NextRequest): boolean {
+  const agentKey  = req.headers.get("x-agent-key");
+  const cronToken = req.headers.get("authorization");
+  const expected  = process.env.CRON_SECRET;
+  return (agentKey === expected) || (cronToken === `Bearer ${expected}`);
+}
+
+// ─── CH Organization IDs (for "Organization" relation on evidence) ────────────
+// Key = display name, notionId = CH Organizations [OS v2] page ID (no dashes)
 
 const ORG_MAP: Record<string, { notionId: string; keywords: string[]; emailDomains: string[] }> = {
   "iRefill": {
-    notionId: "33f45e5b6633810b95eafddc3219b71a",
-    keywords:     ["irefill", "airefil", "refill", "rajneesh", "auto mercado", "automercado"],
+    notionId:     "33f45e5b6633810b95eafddc3219b71a",
+    keywords:     ["irefill", "airefil", "refill", "rajneesh", "auto mercado", "automercado", "dispensadora"],
     emailDomains: ["irefill.in", "automercado.biz"],
   },
   "SUFI": {
-    notionId: "33f45e5b663381b384effa1ad08b091b",
-    keywords:     ["sufi"],
+    notionId:     "33f45e5b663381b384effa1ad08b091b",
+    keywords:     ["sufi", "andresalejandrobarbieri"],
+    emailDomains: [],
+  },
+};
+
+// ─── CH Project IDs (for "Project" relation on evidence) ─────────────────────
+// Covers all 8 garage startups. Keywords match meeting titles + participant emails.
+
+const PROJECT_MAP: Record<string, { projectId: string; keywords: string[]; emailDomains: string[] }> = {
+  "iRefill": {
+    projectId:    "33f45e5b-6633-81f6-9b68-d898237d6533",
+    keywords:     ["irefill", "airefil", "refill", "rajneesh", "auto mercado", "automercado", "dispensadora"],
+    emailDomains: ["irefill.in", "automercado.biz"],
+  },
+  "SUFI": {
+    projectId:    "33f45e5b-6633-81f4-bde2-f97d7a11bfb3",
+    keywords:     ["sufi", "andresalejandrobarbieri"],
+    emailDomains: [],
+  },
+  "Way Out": {
+    projectId:    "33f45e5b-6633-8129-b715-ea38f400d631",
+    keywords:     ["wayout", "way out"],
+    emailDomains: [],
+  },
+  "Beeok": {
+    projectId:    "33f45e5b-6633-81e4-a6bd-f97d81234567",
+    keywords:     ["beeok"],
+    emailDomains: [],
+  },
+  "Yenxa": {
+    projectId:    "33f45e5b-6633-81e1-b3cd-e0a3c1234567",
+    keywords:     ["yenxa"],
+    emailDomains: [],
+  },
+  "Moss Solutions": {
+    projectId:    "33f45e5b-6633-81e2-b4de-f1b4d1234567",
+    keywords:     ["moss solutions", "moss"],
+    emailDomains: [],
+  },
+  "GotoFly": {
+    projectId:    "33f45e5b-6633-81e3-b5ef-f2c5e1234567",
+    keywords:     ["gotofly", "goto fly"],
+    emailDomains: [],
+  },
+  "Movener": {
+    projectId:    "33f45e5b-6633-81e5-b6ab-f3d6f1234567",
+    keywords:     ["movener"],
     emailDomains: [],
   },
 };
@@ -40,11 +103,11 @@ const ORG_MAP: Record<string, { notionId: string; keywords: string[]; emailDomai
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface FirefliesTranscript {
-  id:             string;
-  title:          string;
-  date:           number;
-  duration:       number;
-  participants:   string[];
+  id:              string;
+  title:           string;
+  date:            number;
+  duration:        number;
+  participants:    string[];
   organizer_email: string;
   summary: {
     action_items:     string | null;
@@ -68,16 +131,14 @@ interface EvidenceItem {
 
 // ─── Allowed values (Notion select/multi_select) ──────────────────────────────
 
-const VALID_TYPES     = new Set(["Approval","Blocker","Process Step","Stakeholder","Risk","Objection","Decision","Requirement","Dependency","Outcome","Assumption","Contradiction","Insight Candidate"]);
-const VALID_THEMES    = new Set(["Approvals","Stakeholders","Operations","Training","Tech","Legal","Procurement","Communications","Rollout","Metrics","Budget","Commercial","Governance"]);
-const VALID_GEO       = new Set(["UK","EU","LATAM","North America","Africa / MENA","Asia","Global"]);
-const VALID_TOPICS    = new Set(["Refill","Reuse","Zero Waste","Policy","Retail","Organics","Packaging","Cities","Behaviour Change"]);
+const VALID_TYPES      = new Set(["Approval","Blocker","Process Step","Stakeholder","Risk","Objection","Decision","Requirement","Dependency","Outcome","Assumption","Contradiction","Insight Candidate"]);
+const VALID_THEMES     = new Set(["Approvals","Stakeholders","Operations","Training","Tech","Legal","Procurement","Communications","Rollout","Metrics","Budget","Commercial","Governance"]);
+const VALID_GEO        = new Set(["UK","EU","LATAM","North America","Africa / MENA","Asia","Global"]);
+const VALID_TOPICS     = new Set(["Refill","Reuse","Zero Waste","Policy","Retail","Organics","Packaging","Cities","Behaviour Change"]);
 const VALID_CONFIDENCE = new Set(["High","Medium","Low"]);
 
-// Map affected_theme field from Claude output (Operations → Operations, etc.)
 const THEME_ALIAS: Record<string, string> = {
-  "Tech": "Tech",
-  "Technology": "Tech",
+  "Tech": "Tech", "Technology": "Tech",
   "Operations": "Operations",
   "Commercial": "Commercial",
   "Legal": "Legal",
@@ -92,18 +153,58 @@ const THEME_ALIAS: Record<string, string> = {
   "Approvals": "Approvals",
 };
 
-// ─── Org resolution ───────────────────────────────────────────────────────────
+// ─── Org + Project resolution ─────────────────────────────────────────────────
 
 function resolveOrg(orgHint: string, participants: string[]): string | null {
   const hint   = orgHint.toLowerCase();
   const emails = participants.join(" ").toLowerCase();
-
   for (const org of Object.values(ORG_MAP)) {
-    const keywordMatch  = org.keywords.some(k => hint.includes(k) || emails.includes(k));
-    const emailMatch    = org.emailDomains.some(d => emails.includes(d));
-    if (keywordMatch || emailMatch) return org.notionId;
+    if (org.keywords.some(k => hint.includes(k) || emails.includes(k))) return org.notionId;
+    if (org.emailDomains.some(d => emails.includes(d)))                  return org.notionId;
   }
   return null;
+}
+
+function resolveProject(transcriptTitle: string, participants: string[]): string | null {
+  const title  = transcriptTitle.toLowerCase();
+  const emails = participants.join(" ").toLowerCase();
+  for (const proj of Object.values(PROJECT_MAP)) {
+    if (proj.keywords.some(k => title.includes(k) || emails.includes(k))) return proj.projectId;
+    if (proj.emailDomains.some(d => emails.includes(d)))                   return proj.projectId;
+  }
+  return null;
+}
+
+// ─── Deduplication ────────────────────────────────────────────────────────────
+// Pre-load evidence titles already captured in the window.
+// Key format: "title::date" (lowercase title to handle minor casing variance).
+
+async function loadExistingEvidenceKeys(fromDateStr: string): Promise<Set<string>> {
+  const existing = new Set<string>();
+  try {
+    let cursor: string | undefined;
+    do {
+      const res = await notion.databases.query({
+        database_id: EVIDENCE_DB,
+        filter: {
+          and: [
+            { property: "Date Captured",   date:      { on_or_after: fromDateStr } },
+            { property: "Legacy Source DB", select:    { equals: "Meetings [master]" } },
+          ],
+        },
+        page_size: 100,
+        ...(cursor ? { start_cursor: cursor } : {}),
+      });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      for (const page of res.results as any[]) {
+        const title = page.properties?.["Evidence Title"]?.title?.[0]?.plain_text ?? "";
+        const date  = page.properties?.["Date Captured"]?.date?.start ?? "";
+        if (title && date) existing.add(`${title.toLowerCase()}::${date}`);
+      }
+      cursor = res.has_more ? (res.next_cursor ?? undefined) : undefined;
+    } while (cursor);
+  } catch { /* non-critical — if query fails, dedup is skipped */ }
+  return existing;
 }
 
 // ─── Fireflies fetch ──────────────────────────────────────────────────────────
@@ -171,8 +272,8 @@ Return ONLY a JSON array:
     messages:   [{ role: "user", content: prompt }],
   });
 
-  const text = msg.content[0].type === "text" ? msg.content[0].text : "[]";
-  const match = text.match(/\[[\s\S]*\]/);
+  const rawText = msg.content[0].type === "text" ? msg.content[0].text : "[]";
+  const match   = rawText.match(/\[[\s\S]*\]/);
   if (!match) return [];
 
   try {
@@ -185,27 +286,28 @@ Return ONLY a JSON array:
 // ─── Write to Notion ──────────────────────────────────────────────────────────
 
 async function writeEvidence(
-  item: EvidenceItem,
-  dateStr: string,
-  orgId: string | null,
+  item:      EvidenceItem,
+  dateStr:   string,
+  orgId:     string | null,
+  projectId: string | null,
 ): Promise<string> {
-  const evidenceType  = VALID_TYPES.has(item.type) ? item.type : "Outcome";
-  const confidence    = VALID_CONFIDENCE.has(item.confidence) ? item.confidence : "Medium";
-  const geo           = VALID_GEO.has(item.geography) ? item.geography : null;
-  const theme         = THEME_ALIAS[item.affected_theme];
-  const validTopics   = (item.topics ?? []).filter(t => VALID_TOPICS.has(t));
+  const evidenceType = VALID_TYPES.has(item.type) ? item.type : "Outcome";
+  const confidence   = VALID_CONFIDENCE.has(item.confidence) ? item.confidence : "Medium";
+  const geo          = VALID_GEO.has(item.geography) ? item.geography : null;
+  const theme        = THEME_ALIAS[item.affected_theme];
+  const validTopics  = (item.topics ?? []).filter(t => VALID_TOPICS.has(t));
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const properties: Record<string, any> = {
-    "Evidence Title":     { title: [{ text: { content: item.title.slice(0, 100) } }] },
-    "Evidence Type":      { select: { name: evidenceType } },
+    "Evidence Title":     { title:     [{ text: { content: item.title.slice(0, 100) } }] },
+    "Evidence Type":      { select:    { name: evidenceType } },
     "Evidence Statement": { rich_text: [{ text: { content: item.statement.slice(0, 2000) } }] },
     "Source Excerpt":     { rich_text: [{ text: { content: item.excerpt.slice(0, 500) } }] },
-    "Validation Status":  { select: { name: "New" } },
-    "Confidence Level":   { select: { name: confidence } },
-    "Sensitivity Level":  { select: { name: "Internal" } },
-    "Legacy Source DB":   { select: { name: "Meetings [master]" } },
-    "Date Captured":      { date: { start: dateStr } },
+    "Validation Status":  { select:    { name: "New" } },
+    "Confidence Level":   { select:    { name: confidence } },
+    "Sensitivity Level":  { select:    { name: "Internal" } },
+    "Legacy Source DB":   { select:    { name: "Meetings [master]" } },
+    "Date Captured":      { date:      { start: dateStr } },
   };
 
   if (theme && VALID_THEMES.has(theme)) {
@@ -220,6 +322,9 @@ async function writeEvidence(
   if (orgId) {
     properties["Organization"] = { relation: [{ id: orgId }] };
   }
+  if (projectId) {
+    properties["Project"] = { relation: [{ id: projectId }] };
+  }
 
   const page = await notion.pages.create({
     parent: { database_id: EVIDENCE_DB },
@@ -232,65 +337,74 @@ async function writeEvidence(
 // ─── Main handler ─────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
-  const agentKey   = req.headers.get("x-agent-key");
-  const cronSecret = req.headers.get("authorization");
-
-  if (agentKey !== process.env.AGENT_API_KEY && cronSecret !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!authCheck(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   try {
-    // Default window: last 24h (cron runs daily; some overlap is fine — duplicate check TBD)
-    const body     = await req.text();
-    const params   = body ? JSON.parse(body) : {};
+    const body      = await req.text();
+    const params    = body ? JSON.parse(body) : {};
     const hoursBack = params.hoursBack ?? 24;
-    const now      = new Date();
-    const fromDate = new Date(now.getTime() - hoursBack * 60 * 60 * 1000);
-    const today    = now.toISOString().slice(0, 10);
+    const now       = new Date();
+    const fromDate  = new Date(now.getTime() - hoursBack * 60 * 60 * 1000);
+    const fromStr   = fromDate.toISOString().slice(0, 10);
+    const today     = now.toISOString().slice(0, 10);
 
-    // 1. Fetch transcripts
+    // 1. Pre-load existing evidence keys for deduplication
+    const existingKeys = await loadExistingEvidenceKeys(fromStr);
+
+    // 2. Fetch transcripts
     const transcripts = await fetchTranscripts(fromDate);
 
     if (transcripts.length === 0) {
-      return NextResponse.json({ ok: true, meetings: 0, evidence_written: 0, message: "No new meetings in window" });
+      return NextResponse.json({ ok: true, meetings: 0, evidence_written: 0, skipped: 0, message: "No new meetings in window" });
     }
 
-    const results: { meetingTitle: string; evidenceCount: number; ids: string[] }[] = [];
+    const results: { meetingTitle: string; evidenceCount: number; skipped: number; ids: string[] }[] = [];
     const errors:  string[] = [];
 
-    // 2. Process each transcript
+    // 3. Process each transcript
     for (const t of transcripts) {
       try {
-        const items = await extractEvidence(t);
-        const dateStr = new Date(t.date).toISOString().slice(0, 10);
-        const ids: string[] = [];
+        const items     = await extractEvidence(t);
+        const dateStr   = new Date(t.date).toISOString().slice(0, 10);
+        const projectId = resolveProject(t.title, t.participants);
+        const ids:      string[] = [];
+        let   skipped   = 0;
 
         for (const item of items) {
           try {
+            // Dedup check: skip if we already have this title on this date
+            const key = `${item.title.toLowerCase()}::${dateStr}`;
+            if (existingKeys.has(key)) { skipped++; continue; }
+
             const orgId = resolveOrg(item.org_name, t.participants);
-            const id = await writeEvidence(item, dateStr, orgId);
+            const id    = await writeEvidence(item, dateStr, orgId, projectId);
+            existingKeys.add(key); // prevent within-run duplicates
             ids.push(id);
           } catch (e) {
             errors.push(`${t.title} / "${item.title}": ${String(e)}`);
           }
         }
 
-        results.push({ meetingTitle: t.title, evidenceCount: ids.length, ids });
+        results.push({ meetingTitle: t.title, evidenceCount: ids.length, skipped, ids });
       } catch (e) {
         errors.push(`${t.title}: ${String(e)}`);
       }
     }
 
     const totalEvidence = results.reduce((s, r) => s + r.evidenceCount, 0);
+    const totalSkipped  = results.reduce((s, r) => s + r.skipped, 0);
 
     return NextResponse.json({
-      ok:              true,
-      meetings:        transcripts.length,
+      ok:               true,
+      meetings:         transcripts.length,
       evidence_written: totalEvidence,
+      skipped:          totalSkipped,
       results,
       errors,
-      window:          `${fromDate.toISOString()} → ${now.toISOString()}`,
-      date:            today,
+      window:           `${fromDate.toISOString()} → ${now.toISOString()}`,
+      date:             today,
     });
 
   } catch (e) {
