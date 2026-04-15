@@ -7,8 +7,8 @@ import { getAllEvidence, getAllSources, getAllProjects } from "@/lib/notion";
 import { NAV } from "../page";
 import { requireAdmin } from "@/lib/require-admin";
 
-function daysSince(dateStr: string | null): number {
-  if (!dateStr) return 999;
+function daysSince(dateStr: string | null): number | null {
+  if (!dateStr) return null;
   return Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000);
 }
 
@@ -63,7 +63,7 @@ export default async function HealthPage() {
 
   // Project health
   const updateNeededProjects = projects.filter(p => p.updateNeeded);
-  const staleProjects        = projects.filter(p => daysSince(bestActivity(p)) > 30);
+  const staleProjects        = projects.filter(p => { const d = daysSince(bestActivity(p)); return d !== null && d > 30; });
 
   // Missing excerpts intentionally excluded from overallHealthy — it is a content quality
   // metric (tracked separately on the health page) not an operational blocker. Including it
@@ -366,7 +366,7 @@ export default async function HealthPage() {
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-[#131218] text-sm truncate">{p.name}</p>
                       <p className="text-[10px] text-amber-500 font-bold uppercase tracking-widest mt-0.5">
-                        Update needed · {daysSince(bestActivity(p)) < 999 ? `${daysSince(bestActivity(p))}d ago` : "unknown"}
+                        Update needed · {daysSince(bestActivity(p)) !== null ? `${daysSince(bestActivity(p))}d ago` : "no activity recorded"}
                       </p>
                     </div>
                     <StatusBadge value={p.stage} />
@@ -380,7 +380,7 @@ export default async function HealthPage() {
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-[#131218] text-sm truncate">{p.name}</p>
                       <p className="text-[10px] text-red-400 font-bold uppercase tracking-widest mt-0.5">
-                        Stale · {daysSince(bestActivity(p))}d since last activity
+                        Stale · {daysSince(bestActivity(p)) ?? "—"}d since last activity
                       </p>
                     </div>
                     <StatusBadge value={p.stage} />

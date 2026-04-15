@@ -194,9 +194,39 @@ async function handleGet(req: NextRequest) {
     return NextResponse.json({ ok: true, items: [] });
   }
 
+  // ── Rule-based pre-filter: drop calendar noise before Claude ─────────────
+  // Calendar auto-updates (invites, RSVPs, recurring updates) are never
+  // actionable inbox items — they clutter the triage and inflate Urgent count.
+  const CALENDAR_SUBJECT_PREFIXES = [
+    "invitation:",
+    "updated invitation:",
+    "accepted:",
+    "declined:",
+    "tentative:",
+    "re: invitation:",
+    "re: updated invitation:",
+    "canceled:",
+    "cancelled:",
+    "rsvp",
+  ];
+  const CALENDAR_SENDER_PATTERNS = [
+    "noreply@",
+    "no-reply@",
+    "calendar-notification@",
+    "calendar@",
+    "notifications-noreply@",
+  ];
+  const isCalendarNoise = (c: (typeof candidates)[0]): boolean => {
+    const subjectLower = c.subject.toLowerCase();
+    if (CALENDAR_SUBJECT_PREFIXES.some(pfx => subjectLower.startsWith(pfx))) return true;
+    if (CALENDAR_SENDER_PATTERNS.some(pat => c.from.toLowerCase().includes(pat))) return true;
+    return false;
+  };
+  const actionable = candidates.filter(c => !isCalendarNoise(c));
+
   // Sort by days waiting descending before sending to Claude
-  candidates.sort((a, b) => b.daysWaiting - a.daysWaiting);
-  const top = candidates.slice(0, 15);
+  actionable.sort((a, b) => b.daysWaiting - a.daysWaiting);
+  const top = actionable.slice(0, 15);
 
   // Claude Haiku classifies urgency
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -261,5 +291,5 @@ Return ONLY valid JSON array — no markdown, no explanation:
   const flagged = items.filter(i => i.label !== "FYI");
   const output  = flagged.length > 0 ? flagged.slice(0, 10) : items.slice(0, 5);
 
-  return NextResponse.json({ ok: true, items: output, total_scanned: candidates.length });
+  return NextResponse.json({ ok: true, items: output, total_scanned: candidates.length, calendar_filtered: candidates.length - actionable.length });
 }

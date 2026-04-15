@@ -23,9 +23,17 @@ import { getStaffProjectIds } from "@/lib/clients";
 import { NAV } from "../page";
 import { requireAdmin } from "@/lib/require-admin";
 
-function daysSince(dateStr: string | null): number {
-  if (!dateStr) return 999;
+function daysSince(dateStr: string | null): number | null {
+  if (!dateStr) return null;
   return Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000);
+}
+
+/** Best available activity signal: last status update OR last evidence OR last meeting */
+function bestActivity(p: { lastUpdate: string | null; lastEvidenceDate?: string | null; lastMeetingDate?: string | null }): string | null {
+  return [p.lastUpdate, p.lastEvidenceDate ?? null, p.lastMeetingDate ?? null]
+    .filter(Boolean)
+    .sort()
+    .pop() ?? null;
 }
 
 function sourceIcon(type: string): string {
@@ -55,17 +63,18 @@ export default async function MyRoomsPage() {
   const queueSource    = ownershipReady ? myProjects : projects;
   const withBlockers   = queueSource.filter(p => p.blockerCount > 0);
   const needsUpdate    = queueSource.filter(p => p.updateNeeded && p.blockerCount === 0);
-  const staleProjects  = queueSource.filter(p => !p.updateNeeded && p.blockerCount === 0 && daysSince(p.lastUpdate) > 30);
-  const healthyInMine  = myProjects.filter(
-    p => p.blockerCount === 0 && !p.updateNeeded && daysSince(p.lastUpdate) <= 30
-  );
+  const staleProjects  = queueSource.filter(p => { const d = daysSince(bestActivity(p)); return !p.updateNeeded && p.blockerCount === 0 && d !== null && d > 30; });
+  const healthyInMine  = myProjects.filter(p => {
+    const d = daysSince(bestActivity(p));
+    return p.blockerCount === 0 && !p.updateNeeded && d !== null && d <= 30;
+  });
 
   const queueCount = withBlockers.length + needsUpdate.length + staleProjects.length;
 
   // ── What's moving: sources from last 14 days ─────────────────────────────
   const projectById = Object.fromEntries(projects.map(p => [p.id, p.name]));
   const recentSources = allSources
-    .filter(s => s.dateIngested && daysSince(s.dateIngested) <= 14)
+    .filter(s => s.dateIngested && (daysSince(s.dateIngested) ?? Infinity) <= 14)
     .slice(0, 12)
     .map(s => ({ ...s, projectName: (s.projectId && projectById[s.projectId]) || "—" }));
 
@@ -204,7 +213,7 @@ export default async function MyRoomsPage() {
 
                 {/* Needs update */}
                 {needsUpdate.map(p => {
-                  const days = daysSince(p.lastUpdate);
+                  const days = daysSince(bestActivity(p));
                   return (
                     <Link
                       key={`u-${p.id}`}
@@ -215,7 +224,7 @@ export default async function MyRoomsPage() {
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-[#131218] truncate">{p.name}</p>
                         <p className="text-[10px] text-amber-500 font-bold uppercase tracking-widest mt-0.5">
-                          Status update needed · {days < 999 ? `${days}d ago` : "no recent update"}
+                          Status update needed · {days !== null ? `${days}d ago` : "no activity recorded"}
                         </p>
                       </div>
                       <StatusBadge value={p.stage} />
@@ -226,7 +235,7 @@ export default async function MyRoomsPage() {
 
                 {/* Stale */}
                 {staleProjects.map(p => {
-                  const days = daysSince(p.lastUpdate);
+                  const days = daysSince(bestActivity(p));
                   return (
                     <Link
                       key={`s-${p.id}`}
@@ -237,7 +246,7 @@ export default async function MyRoomsPage() {
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-[#131218] truncate">{p.name}</p>
                         <p className="text-[10px] text-[#131218]/35 font-bold uppercase tracking-widest mt-0.5">
-                          No activity · {days < 999 ? `${days}d ago` : "unknown"}
+                          No activity · {days !== null ? `${days}d ago` : "unknown"}
                         </p>
                       </div>
                       <StatusBadge value={p.stage} />
