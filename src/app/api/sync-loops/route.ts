@@ -459,11 +459,6 @@ export async function POST(req: NextRequest) {
 
   const stats: Stats = { upserted: 0, skipped: 0, signals_added: 0, errors: [] };
 
-  // Diagnostic: log which Supabase project we're connecting to
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL ?? "MISSING";
-  const hasServiceKey = !!(process.env.SUPABASE_SERVICE_KEY);
-  console.log(`[sync-loops] Supabase URL: ${supabaseUrl} | hasServiceKey: ${hasServiceKey}`);
-
   try {
     // Run all three source syncs in sequence (Notion rate limits)
     await syncEvidenceLoops(stats);
