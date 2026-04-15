@@ -743,32 +743,18 @@ export async function getCoSTasks(): Promise<CoSTask[]> {
   try {
     const res = await notion.databases.query({
       database_id: DB.opportunities,
+      // Fetch all actionable stages — terminal state exclusion is handled client-side.
+      // A flat OR is used because Notion's compound AND+OR filter with does_not_equal
+      // returns 0 results in practice (confirmed in production 2026-04-15).
       filter: {
-        and: [
-          // Exclude terminal states — verified field name: "Opportunity Status" (schema 2026-04-13)
-          { property: "Opportunity Status", select: { does_not_equal: "Closed Won"  } },
-          { property: "Opportunity Status", select: { does_not_equal: "Closed Lost" } },
-          { property: "Opportunity Status", select: { does_not_equal: "Stalled"     } },
-          // "New" is intentionally included — inbound signals at New stage are real tasks
-          // Exclude explicitly closed tasks
-          { property: "Follow-up Status", select: { does_not_equal: "Done"    } },
-          { property: "Follow-up Status", select: { does_not_equal: "Dropped" } },
-          // Must be in an actionable stage or have an explicit flag
-          // Signal-gating (Source URL / Trigger / Signal content) is handled client-side
-          // to avoid fragile rich_text / url filter operators.
-          {
-            or: [
-              // Explicit follow-up flag
-              { property: "Follow-up Status", select: { equals: "Needed"      } },
-              { property: "Follow-up Status", select: { equals: "In Progress" } },
-              { property: "Follow-up Status", select: { equals: "Waiting"     } },
-              { property: "Follow-up Status", select: { equals: "Sent"        } },
-              // Actionable pipeline stages — review & advance the deal, or review inbound
-              { property: "Opportunity Status", select: { equals: "Active"     } },
-              { property: "Opportunity Status", select: { equals: "Qualifying" } },
-              { property: "Opportunity Status", select: { equals: "New"        } },
-            ],
-          },
+        or: [
+          { property: "Follow-up Status", select: { equals: "Needed"      } },
+          { property: "Follow-up Status", select: { equals: "In Progress" } },
+          { property: "Follow-up Status", select: { equals: "Waiting"     } },
+          { property: "Follow-up Status", select: { equals: "Sent"        } },
+          { property: "Opportunity Status", select: { equals: "Active"     } },
+          { property: "Opportunity Status", select: { equals: "Qualifying" } },
+          { property: "Opportunity Status", select: { equals: "New"        } },
         ],
       },
       sorts: [{ timestamp: "last_edited_time", direction: "ascending" }],
@@ -793,16 +779,22 @@ export async function getCoSTasks(): Promise<CoSTask[]> {
       pendingAction:       text(prop(page, "Trigger / Signal")) || null, // verified field name
     }));
 
-    // Client-side signal gate: Active/Qualifying always qualify; New items only if
-    // they have a concrete signal (pending action, review URL, meeting, or explicit flag).
+    // Client-side filters:
+    // 1. Exclude terminal stages (Done/Dropped follow-up, Closed/Stalled opp status)
+    // 2. Signal-gate New items — only include if they have a concrete action signal
+    const TERMINAL_STAGES  = new Set(["Closed Won", "Closed Lost", "Stalled"]);
+    const TERMINAL_STATUSES = new Set(["Done", "Dropped"]);
     const filtered = raw.filter(opp => {
+      if (TERMINAL_STAGES.has(opp.stage))          return false;
+      if (TERMINAL_STATUSES.has(opp.followUpStatus)) return false;
       const hasExplicitStatus = ["Needed", "In Progress", "Waiting", "Sent"].includes(opp.followUpStatus);
       const hasMeeting = !!opp.nextMeetingDate;
       const hasReview  = !!opp.reviewUrl;
       const hasPending = !!opp.pendingAction;
       const isHighStage = opp.stage === "Active" || opp.stage === "Qualifying";
-      const isNewWithSignal = opp.stage === "New" && (hasExplicitStatus || hasMeeting || hasReview || hasPending);
-      return hasExplicitStatus || hasMeeting || hasReview || hasPending || isHighStage || isNewWithSignal;
+      // New items only surface if they have at least one action signal
+      if (opp.stage === "New") return hasExplicitStatus || hasMeeting || hasReview || hasPending;
+      return isHighStage || hasExplicitStatus || hasMeeting || hasReview || hasPending;
     });
 
     const tasks = filtered.map(computeCoSTask);
