@@ -672,12 +672,18 @@ function computeCoSTask(opp: {
   } else if (isNew) {
     entrySignal  = "inbound";
     signalReason = hasExplicitPending ? "Action needed" : "Inbound — review and qualify";
-  } else if (opp.stage === "Active") {
+  } else if (opp.stage === "Active" && hasExplicitPending) {
     entrySignal  = "negotiation";
-    signalReason = `Active${daysSinceEdit !== null ? ` · ${daysSinceEdit}d since last update` : ""}`;
+    signalReason = "Action flagged on active deal";
+  } else if (opp.stage === "Active") {
+    entrySignal  = "manual";
+    signalReason = `Active · follow-up flagged`;
+  } else if (opp.stage === "Qualifying" && opp.followUpStatus === "Waiting") {
+    entrySignal  = "proposal_pending";
+    signalReason = "Waiting for reply";
   } else if (opp.stage === "Qualifying") {
     entrySignal  = "proposal_pending";
-    signalReason = `Qualifying${daysSinceEdit !== null ? ` · ${daysSinceEdit}d — check for reply` : ""}`;
+    signalReason = `Qualifying — follow-up needed`;
   } else {
     entrySignal  = "manual";
     signalReason = "Follow-up flagged";
@@ -709,10 +715,14 @@ function computeCoSTask(opp: {
   }
 
   // ─── Urgency ─────────────────────────────────────────────────────────────
+  // Urgency reflects time pressure, not just pipeline stage.
+  // Active stage alone no longer inflates to "high" — that caused every stale
+  // pipeline record to show as high priority.
   let urgency: CoSTask["urgency"];
   if (daysToMeeting !== null && daysToMeeting >= 0 && daysToMeeting <= 1) urgency = "critical";
-  else if (meetingImminent || opp.stage === "Active") urgency = "high";
-  else if (isNew && ["Needed", "In Progress", "Waiting", "Sent"].includes(opp.followUpStatus)) urgency = "high";
+  else if (meetingImminent) urgency = "high";
+  else if (opp.followUpStatus === "Needed") urgency = "high";
+  else if (hasExplicitPending && opp.stage === "Active") urgency = "high";
   else urgency = "normal";
 
   // ─── Calendar block ───────────────────────────────────────────────────────
@@ -782,22 +792,43 @@ export async function getCoSTasks(): Promise<CoSTask[]> {
       pendingAction:       text(prop(page, "Trigger / Signal")) || null, // verified field name
     }));
 
-    // Client-side filters:
-    // 1. Exclude terminal stages (Done/Dropped follow-up, Closed/Stalled opp status)
-    // 2. Signal-gate New items — only include if they have a concrete action signal
+    // ── Client-side signal gate ────────────────────────────────────────────────
+    // RULE: stage alone (Active, Qualifying, New) is NOT a sufficient condition.
+    // Every CoS task must have at least one concrete, verifiable action signal.
+    // This prevents long-running projects and stale pipeline records from showing
+    // as "tasks to do" just because they exist in the pipeline.
+    //
+    // Valid signals:
+    //   1. Explicit Follow-up Status = Needed / Waiting / Sent (human flag)
+    //   2. Next Meeting Date is set (time-bound prep action)
+    //   3. Source URL set (document to review)
+    //   4. Trigger/Signal text, recently edited, on a non-Grant record
+    //      — Grant records use this field for sourcing context, not actions.
+    //      — 30-day recency gate prevents stale context from surfacing.
     const TERMINAL_STAGES  = new Set(["Closed Won", "Closed Lost", "Stalled"]);
     const TERMINAL_STATUSES = new Set(["Done", "Dropped"]);
     const filtered = raw.filter(opp => {
-      if (TERMINAL_STAGES.has(opp.stage))          return false;
+      if (TERMINAL_STAGES.has(opp.stage))            return false;
       if (TERMINAL_STATUSES.has(opp.followUpStatus)) return false;
-      const hasExplicitStatus = ["Needed", "In Progress", "Waiting", "Sent"].includes(opp.followUpStatus);
-      const hasMeeting = !!opp.nextMeetingDate;
-      const hasReview  = !!opp.reviewUrl;
-      const hasPending = !!opp.pendingAction;
-      const isHighStage = opp.stage === "Active" || opp.stage === "Qualifying";
-      // New items only surface if they have at least one action signal
-      if (opp.stage === "New") return hasExplicitStatus || hasMeeting || hasReview || hasPending;
-      return isHighStage || hasExplicitStatus || hasMeeting || hasReview || hasPending;
+
+      const hasExplicitStatus = ["Needed", "Waiting", "Sent"].includes(opp.followUpStatus);
+      const hasMeeting        = !!opp.nextMeetingDate;
+      const hasReview         = !!opp.reviewUrl;
+
+      // Pending action is only valid when human-written (not scan-generated),
+      // on a non-Grant record (grant-radar fills this with sourcing context),
+      // and the record has been touched recently (< 30 days).
+      const daysSinceEdit = opp.lastEdited
+        ? Math.floor((Date.now() - new Date(opp.lastEdited).getTime()) / 86400000)
+        : 999;
+      const isGrant = opp.type === "Grant";
+      const hasActionablePending = !!opp.pendingAction
+        && !opp.pendingAction.startsWith("SIGNALS:")
+        && !opp.pendingAction.startsWith("Inbox signal:")
+        && !isGrant
+        && daysSinceEdit <= 30;
+
+      return hasExplicitStatus || hasMeeting || hasReview || hasActionablePending;
     });
 
     const tasks = filtered.map(computeCoSTask);
