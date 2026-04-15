@@ -9,7 +9,29 @@
  * CoSTask adapter. No Notion or Supabase I/O here — those live in the route files.
  */
 
-import type { CoSTask } from "@/lib/notion";
+// CoSTask shape — duplicated here to avoid circular import with notion.ts.
+// notion.ts dynamically imports loops.ts; loops.ts must NOT import notion.ts.
+// The two types are kept in sync manually. Structural typing ensures compatibility.
+type CoSTask = {
+  id: string;
+  notionUrl: string;
+  taskTitle: string;
+  taskStatus: "todo" | "in-progress" | "waiting" | "done" | "dropped";
+  dueDate: string | null;
+  urgency: "critical" | "high" | "normal";
+  loopType: "blocker" | "commitment" | "decision" | "prep" | "follow-up" | "review";
+  interventionMoment: "urgent" | "next_meeting" | "email_this_week" | "review_this_week" | "this_week";
+  opportunityName: string;
+  opportunityStage: string;
+  orgName: string;
+  opportunityType: string;
+  reviewUrl: string | null;
+  entrySignal: "meeting_soon" | "proposal_pending" | "negotiation" | "manual" | "review_needed" | "inbound";
+  signalReason: string;
+  calendarBlockUrl: string | null;
+  pendingAction: string | null;
+  taskSource?: "opportunity" | "project" | "evidence";
+};
 
 // ─── DB row shapes ────────────────────────────────────────────────────────────
 
