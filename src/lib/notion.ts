@@ -748,10 +748,13 @@ export async function getCoSTasks(): Promise<CoSTask[]> {
       // returns 0 results in practice (confirmed in production 2026-04-15).
       filter: {
         or: [
-          { property: "Follow-up Status", select: { equals: "Needed"      } },
-          { property: "Follow-up Status", select: { equals: "In Progress" } },
-          { property: "Follow-up Status", select: { equals: "Waiting"     } },
-          { property: "Follow-up Status", select: { equals: "Sent"        } },
+          // Note: "In Progress" omitted — that select option does not yet exist in Notion.
+          // Notion's databases.query throws if a filter references a non-existent select value.
+          // Once a record is set to "In Progress" via pages.update (which auto-creates the option),
+          // this filter can be extended to include it.
+          { property: "Follow-up Status", select: { equals: "Needed"  } },
+          { property: "Follow-up Status", select: { equals: "Waiting" } },
+          { property: "Follow-up Status", select: { equals: "Sent"    } },
           { property: "Opportunity Status", select: { equals: "Active"     } },
           { property: "Opportunity Status", select: { equals: "Qualifying" } },
           { property: "Opportunity Status", select: { equals: "New"        } },
