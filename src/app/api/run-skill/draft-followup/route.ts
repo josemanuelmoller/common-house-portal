@@ -43,6 +43,7 @@ export async function POST(req: NextRequest) {
   const oppType   = sel(prop("Type"));
   const lastEdit  = dateVal(prop("Last Edited")) ?? opp.last_edited_time?.slice(0, 10) ?? null;
   const orgId     = relationFirst(prop("Organisation"));
+  const contactId = relationFirst(prop("Key Contacts"));
 
   const lastEditDays = lastEdit
     ? Math.floor((Date.now() - new Date(lastEdit).getTime()) / 86400000)
@@ -104,6 +105,7 @@ Output ONLY the email (Subject + body). Nothing else.`;
         "Status":           { select: { name: "Pending Review" } },
         "Source Reference": { rich_text: [{ text: { content: `${oppName}${orgName ? ` · ${orgName}` : ""}` } }] },
         "Content":          { rich_text: [{ text: { content: draftText.slice(0, 2000) } }] },
+        "Related Entity":   { relation: contactId ? [{ id: contactId }] : [] },
       },
     });
   } catch (e) {

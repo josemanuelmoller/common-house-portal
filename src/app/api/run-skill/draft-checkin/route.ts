@@ -90,6 +90,7 @@ Output ONLY the email (Subject + body). Nothing else.`;
         "Status":           { select: { name: "Pending Review" } },
         "Source Reference": { rich_text: [{ text: { content: `${name}${email ? ` <${email}>` : ""}` } }] },
         "Content":          { rich_text: [{ text: { content: draftText.slice(0, 2000) } }] },
+        "Related Entity":   { relation: [{ id: personId }] },
       },
     });
   } catch (e) {
