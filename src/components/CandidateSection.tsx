@@ -72,7 +72,11 @@ export function CandidateSection({ candidates }: Props) {
       await fetch("/api/promote-candidate", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ candidateId, action }),
+        body: JSON.stringify({
+          candidateId,
+          action,
+          ...(action === "ignore" ? { reason: "Ignored via Hall review" } : {}),
+        }),
       });
       // Optimistic: remove from view immediately
       setDismissed(prev => new Set(prev).add(candidateId));
