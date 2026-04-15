@@ -156,9 +156,10 @@ function TaskCard({
               </div>
             )}
 
-            {/* Opportunity context — SECONDARY */}
+            {/* Source context — SECONDARY */}
             <p className="text-[9.5px] text-[#131218]/30 font-medium mt-0.5">
-              Opportunity: <span className="font-semibold text-[#131218]/50">{task.opportunityName}</span>
+              {task.taskSource === "project" ? "Project" : "Opportunity"}:{" "}
+              <span className="font-semibold text-[#131218]/50">{task.opportunityName}</span>
               {task.orgName && task.orgName !== task.opportunityName && (
                 <span className="text-[#131218]/30"> · {task.orgName}</span>
               )}
@@ -292,6 +293,18 @@ export function ChiefOfStaffDesk({ tasks }: { tasks: CoSTask[] }) {
     if (status === "Done" || status === "Dropped") {
       setLocalDone(prev => new Set(prev).add(taskId));
     }
+
+    const task = tasks.find(t => t.id === taskId);
+
+    if (task?.taskSource === "project") {
+      // Project tasks have no Follow-up Status field in Notion.
+      // Hiding is purely local — the task re-appears on next load if the project
+      // is still stale. The user resolves it by updating the project in Notion.
+      router.refresh();
+      setUpdating(null);
+      return;
+    }
+
     try {
       await fetch("/api/followup-status", {
         method: "PATCH",

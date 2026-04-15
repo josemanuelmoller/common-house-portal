@@ -604,6 +604,11 @@ export type CoSTask = {
 
   // Raw pending action (for display in expanded view)
   pendingAction: string | null;
+
+  // Source discriminator — controls which API is called on status change.
+  // "opportunity": writes Follow-up Status field via /api/followup-status (default)
+  // "project":     no Notion field to write; hides locally and refreshes
+  taskSource?: "opportunity" | "project";
 };
 
 function mapFollowUpStatus(raw: string): CoSTask["taskStatus"] {
@@ -774,6 +779,91 @@ function computeCoSTask(opp: {
   };
 }
 
+// ─── Project-derived CoS tasks ────────────────────────────────────────────────
+//
+// Projects with Status="Active" that have drifted without an update are surfaced
+// as CoS tasks, exactly like Opportunity tasks. This ensures work tracked as
+// Projects (e.g. COP31, ZWF Forum — Neil) appears in the desk without manual flags.
+//
+// Rules:
+//   1. updateNeeded = true         → "Write project update" (high urgency)
+//   2. lastUpdate > 14d or null    → "Check in — {name}" (normal urgency)
+//
+// Garage-workspace projects are excluded — those surface through Garage agent cadence.
+// Hall and Workroom projects are included.
+
+async function getProjectCoSTasks(): Promise<CoSTask[]> {
+  try {
+    const res = await notion.databases.query({
+      database_id: DB.projects,
+      filter: { property: "Project Status", select: { equals: "Active" } },
+      sorts: [{ property: "Last Status Update", direction: "ascending" }],
+      page_size: 30,
+    });
+
+    const now = Date.now();
+    const tasks: CoSTask[] = [];
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const page of res.results as any[]) {
+      const workspace  = select(prop(page, "Primary Workspace")) || "hall";
+      if (workspace === "garage") continue;  // Garage has its own cadence
+
+      const name        = text(prop(page, "Project Name")) || "Untitled Project";
+      const updateNeeded = checkbox(prop(page, "Project Update Needed?"));
+      const lastUpdateStr = date(prop(page, "Last Status Update"));
+      const notionUrl   = page.url ?? "";
+
+      const daysSinceUpdate = lastUpdateStr
+        ? Math.floor((now - new Date(lastUpdateStr).getTime()) / 86400000)
+        : null;
+
+      const isStaleStatus = daysSinceUpdate === null || daysSinceUpdate > 14;
+
+      // Surface only when there's a concrete pending signal
+      if (!updateNeeded && !isStaleStatus) continue;
+
+      let taskTitle: string;
+      let urgency: CoSTask["urgency"];
+      let signalReason: string;
+
+      if (updateNeeded) {
+        taskTitle    = `Write project update — ${name}`;
+        urgency      = "high";
+        signalReason = "Update flagged";
+      } else {
+        const dStr   = daysSinceUpdate !== null ? `${daysSinceUpdate}d` : "never";
+        taskTitle    = `Check in — ${name} (no update in ${dStr})`;
+        urgency      = "normal";
+        signalReason = `Stale — no status update in ${dStr}`;
+      }
+
+      tasks.push({
+        id:               page.id,
+        notionUrl,
+        taskTitle,
+        taskStatus:       "todo",
+        dueDate:          null,
+        urgency,
+        opportunityName:  name,
+        opportunityStage: "Project",
+        orgName:          "",
+        opportunityType:  "Project",
+        reviewUrl:        null,
+        entrySignal:      "manual",
+        signalReason,
+        calendarBlockUrl: null,
+        pendingAction:    null,
+        taskSource:       "project",
+      });
+    }
+
+    return tasks;
+  } catch {
+    return [];
+  }
+}
+
 export async function getCoSTasks(): Promise<CoSTask[]> {
   try {
     const res = await notion.databases.query({
@@ -865,11 +955,21 @@ export async function getCoSTasks(): Promise<CoSTask[]> {
       return hasExplicitStatus || hasMeeting || hasReview || hasActionablePending || isStaleActive;
     });
 
-    const tasks = filtered.map(computeCoSTask);
+    const oppTasks     = filtered.map(computeCoSTask);
+    const projectTasks = await getProjectCoSTasks();
+
+    // Merge — opportunity tasks first (they have richer action context),
+    // then project tasks. Dedup by Notion page ID so a project that also
+    // has a linked Opportunity doesn't appear twice (rare but defensive).
+    const seen = new Set<string>(oppTasks.map(t => t.id));
+    const merged = [
+      ...oppTasks,
+      ...projectTasks.filter(t => !seen.has(t.id)),
+    ];
 
     // Sort: critical → high → normal; within tier by due date proximity
     const TIER: Record<string, number> = { critical: 0, high: 1, normal: 2 };
-    tasks.sort((a, b) => {
+    merged.sort((a, b) => {
       const td = (TIER[a.urgency] ?? 2) - (TIER[b.urgency] ?? 2);
       if (td !== 0) return td;
       if (a.dueDate && b.dueDate) return a.dueDate.localeCompare(b.dueDate);
@@ -878,7 +978,7 @@ export async function getCoSTasks(): Promise<CoSTask[]> {
       return 0;
     });
 
-    return tasks;
+    return merged;
   } catch {
     return [];
   }
