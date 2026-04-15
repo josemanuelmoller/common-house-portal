@@ -324,12 +324,13 @@ async function syncOpportunityLoops(stats: Stats): Promise<void> {
     if (TERMINAL_STAGES.has(stage))    continue;
     if (TERMINAL_STATUSES.has(followStatus)) continue;
 
-    const oppType      = sel(page.properties["Opportunity Type"]) || "";
-    const name         = text(page.properties["Opportunity Name"]) || text(page.properties["Name"]) || "Untitled";
-    const pendingAction = text(page.properties["Trigger / Signal"]) || null;
-    const nextMeeting  = dt(page.properties["Next Meeting Date"]);
-    const reviewUrl    = page.properties["Source URL"]?.url ?? null;
-    const lastEdited   = page.last_edited_time?.slice(0, 10) ?? null;
+    const oppType        = sel(page.properties["Opportunity Type"]) || "";
+    const name           = text(page.properties["Opportunity Name"]) || text(page.properties["Name"]) || "Untitled";
+    const pendingAction  = text(page.properties["Trigger / Signal"]) || null;  // raw field value
+    const nextMeeting    = dt(page.properties["Next Meeting Date"]);
+    const reviewUrl      = page.properties["Source URL"]?.url ?? null;
+    const lastEdited     = page.last_edited_time?.slice(0, 10) ?? null;
+    const opportunityScore: number | null = page.properties["Opportunity Score"]?.number ?? null;
 
     // Grant records: pending action is sourcing context, not a task
     if (isGrant(oppType)) {
@@ -348,11 +349,13 @@ async function syncOpportunityLoops(stats: Stats): Promise<void> {
 
     const classification = classifyOpportunityLoop({
       stage,
-      followUpStatus: followStatus,
-      type:           oppType,
-      nextMeetingDate: nextMeeting,
+      followUpStatus:   followStatus,
+      type:             oppType,
+      nextMeetingDate:  nextMeeting,
       reviewUrl,
-      pendingAction:  effectivePending,
+      pendingAction:    effectivePending,   // human-actionable only
+      rawTriggerSignal: pendingAction,       // raw field — may include SIGNALS: prefixed content
+      opportunityScore,
       daysSinceEdit,
     });
 

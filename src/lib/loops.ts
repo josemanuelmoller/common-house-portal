@@ -246,8 +246,10 @@ export type OpportunityLoopInput = {
   type: string;
   nextMeetingDate: string | null;
   reviewUrl: string | null;
-  pendingAction: string | null;
-  daysSinceEdit?: number;  // used for recently-active fallback gate
+  pendingAction: string | null;       // human-actionable only (post-filter)
+  rawTriggerSignal?: string | null;   // raw Trigger/Signal field value, before actionability filter
+  opportunityScore?: number | null;   // 0–100 Opportunity Score
+  daysSinceEdit?: number;             // used for recently-active fallback gate
 };
 
 export function classifyOpportunityLoop(opp: OpportunityLoopInput): {
@@ -329,13 +331,18 @@ export function classifyOpportunityLoop(opp: OpportunityLoopInput): {
   } else if (
     (stage === "Active" || stage === "Qualifying") &&
     !oppIsGrant &&
-    (opp.daysSinceEdit ?? 999) <= 30
+    (opp.daysSinceEdit ?? 999) <= 30 &&
+    (
+      // At least one business-significance signal must exist beyond recency alone.
+      // rawTriggerSignal: any content in Trigger/Signal field (even auto-generated
+      //   "SIGNALS:..." from inbox scan) — means some activity has been logged.
+      // opportunityScore >= 40: opportunity has been assessed and scored as meaningful.
+      (!!opp.rawTriggerSignal && opp.rawTriggerSignal.trim().length > 0) ||
+      (opp.opportunityScore != null && opp.opportunityScore >= 40)
+    )
   ) {
-    // Recently-edited opportunity with no explicit signal.
-    // Surfaces Active/Qualifying work where the operator hasn't set any signal
-    // fields — a check-in loop forces the conversation back into focus.
-    // Distinct from the old isStaleActive gate (which triggered on OLD records);
-    // this fires on RECENTLY touched records with no signal captured yet.
+    // Recently-edited opportunity with business-significance signal but no explicit action.
+    // Surfaces Active/Qualifying work where a signal exists but no follow-up has been set.
     loopType            = "follow_up";
     interventionMoment  = "this_week";
     variant             = "active";
