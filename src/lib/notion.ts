@@ -513,9 +513,10 @@ export async function getOpportunitiesByScope(): Promise<{ ch: OpportunityItem[]
       database_id: DB.opportunities,
       filter: {
         and: [
-          { property: "Stage", select: { does_not_equal: "Won" } },
-          { property: "Stage", select: { does_not_equal: "Lost" } },
-          { property: "Stage", select: { does_not_equal: "Archived" } },
+          // Verified field name: "Opportunity Status" (not "Stage") — schema 2026-04-13
+          { property: "Opportunity Status", select: { does_not_equal: "Closed Won" } },
+          { property: "Opportunity Status", select: { does_not_equal: "Closed Lost" } },
+          { property: "Opportunity Status", select: { does_not_equal: "Stalled" } },
         ],
       },
       sorts: [{ timestamp: "last_edited_time", direction: "descending" }],
@@ -526,11 +527,11 @@ export async function getOpportunitiesByScope(): Promise<{ ch: OpportunityItem[]
     const all = (res.results as any[]).map(page => ({
       id:                   page.id,
       name:                 text(prop(page, "Opportunity Name")) || text(prop(page, "Name")) || "Untitled",
-      stage:                select(prop(page, "Stage")),
+      stage:                select(prop(page, "Opportunity Status")),
       scope:                select(prop(page, "Scope")),
       followUpStatus:       select(prop(page, "Follow-up Status")),
-      type:                 select(prop(page, "Type")) || select(prop(page, "Opportunity Type")) || "",
-      orgName:              text(prop(page, "Organization")) || "",
+      type:                 select(prop(page, "Opportunity Type")) || "",
+      orgName:              "",  // "Account / Organization" is a relation — not readable as plain text
       lastEdited:           page.last_edited_time?.slice(0, 10) ?? null,
       notionUrl:            page.url ?? "",
       score:                num(prop(page, "Opportunity Score")),
@@ -547,130 +548,204 @@ export async function getOpportunitiesByScope(): Promise<{ ch: OpportunityItem[]
 }
 
 // Opportunities where follow-up is needed (opted-in, active pipeline)
-// Kept for backwards compat — new callers should use getFollowUpDeskItems()
-export async function getFollowUpOpportunities(): Promise<OpportunityItem[]> {
-  return getFollowUpDeskItems();
+// Kept for backwards compat — new callers should use getCoSTasks()
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function getFollowUpOpportunities(): Promise<any[]> {
+  return getCoSTasks();
 }
 
-// ─── Chief-of-Staff Follow-up Desk ───────────────────────────────────────────
+// ─── Chief-of-Staff Task Layer ───────────────────────────────────────────────
 //
-// Replaces the narrow manual-flag queue with signals-based detection.
-// Entry signals (OR):
-//   1. Follow-up Status = "Needed"  (manual)
-//   2. Stage = Active / Proposal Sent / Negotiation  (auto)
+// ARCHITECTURE: Two distinct layers.
 //
-// Enrichment fields on Opportunities [OS v2] — add these in Notion if not present:
+//   Opportunities [OS v2] = strategic/commercial pipeline layer.
+//     Records: grants, partnerships, funders, startup matches, collaborations.
+//     Stage: Candidate → Active → Proposal Sent → Negotiation → Won / Lost / Archived.
+//
+//   CoS Tasks = derived action layer (no new DB — derived from Opportunities).
+//     A task is generated from an Opportunity ONLY when there is a concrete next
+//     action: explicit Pending Action text, an imminent meeting, or a review URL.
+//     A single Opportunity can generate 0 or 1 task in v1; future: 1-to-many.
+//     Task status stored in Follow-up Status field (extended values).
+//
+// Required Notion fields on Opportunities [OS v2] (add if not present):
 //   • "Next Meeting Date"  — Date
 //   • "Review URL"         — URL
 //   • "Pending Action"     — Text (rich_text)
 // All three are optional; graceful null if the field is not yet in the schema.
 
-export type FollowUpDeskItem = OpportunityItem & {
-  // From Notion (optional fields — null until added to schema + populated)
-  nextMeetingDate: string | null;   // "Next Meeting Date" — date field
-  reviewUrl: string | null;         // "Review URL" — url field
-  pendingAction: string | null;     // "Pending Action" — rich_text field
-  // Computed
-  entrySignal: "manual" | "active_stale" | "proposal_stale" | "negotiation_stale" | "has_meeting";
-  entryReason: string;              // "Meeting in 3 days" / "Proposal sent · 12d no reply"
-  pendingActionLabel: string;       // "Review proposal before Fri 18 Apr"
-  urgencyLevel: "urgent" | "high" | "normal";
-  recommendedMove: "review_doc" | "draft_followup" | "schedule_meeting" | "advance_negotiation";
-  calendarBlockUrl: string | null;  // parameterized Google Calendar link for 1-hour block
+// ─── CoS Task type ────────────────────────────────────────────────────────────
+//
+// Task-centric view: WHAT needs to happen, BY WHEN, FOR which opportunity.
+// Opportunity details are secondary context, not the primary display.
+
+export type CoSTask = {
+  // Identity
+  id: string;
+  notionUrl: string;
+
+  // Task layer — primary display
+  taskTitle: string;          // WHAT TO DO (from Pending Action or computed)
+  taskStatus: "todo" | "in-progress" | "waiting" | "done" | "dropped";
+  dueDate: string | null;     // ISO date — Next Meeting Date used as proxy deadline
+  urgency: "critical" | "high" | "normal";
+
+  // Opportunity context — secondary
+  opportunityName: string;
+  opportunityStage: string;
+  orgName: string;
+  opportunityType: string;
+
+  // Action signals
+  reviewUrl: string | null;
+  entrySignal: "meeting_soon" | "proposal_pending" | "negotiation" | "manual" | "review_needed";
+  signalReason: string;       // "Meeting tomorrow" / "Proposal sent 5d ago"
+  calendarBlockUrl: string | null;
+
+  // Raw pending action (for display in expanded view)
+  pendingAction: string | null;
 };
 
-function computeDeskItem(raw: OpportunityItem & {
+function mapFollowUpStatus(raw: string): CoSTask["taskStatus"] {
+  switch (raw) {
+    case "In Progress": return "in-progress";
+    case "Waiting":
+    case "Sent":        return "waiting";
+    case "Done":        return "done";
+    case "Dropped":     return "dropped";
+    case "Needed":
+    default:            return "todo";
+  }
+}
+
+function computeCoSTask(opp: {
+  id: string;
+  name: string;
+  stage: string;
+  scope: string;
+  followUpStatus: string;
+  type: string;
+  orgName: string;
+  lastEdited: string | null;
+  notionUrl: string;
+  score: number | null;
+  qualificationStatus: string;
   nextMeetingDate: string | null;
   reviewUrl: string | null;
   pendingAction: string | null;
-}): FollowUpDeskItem {
+}): CoSTask {
   const now = Date.now();
 
-  const daysSinceEdit = raw.lastEdited
-    ? Math.floor((now - new Date(raw.lastEdited).getTime()) / 86400000)
-    : null;
-
-  const meetingMs      = raw.nextMeetingDate ? new Date(raw.nextMeetingDate).getTime() : null;
-  const daysToMeeting  = meetingMs !== null ? Math.floor((meetingMs - now) / 86400000) : null;
+  const meetingMs       = opp.nextMeetingDate ? new Date(opp.nextMeetingDate).getTime() : null;
+  const daysToMeeting   = meetingMs !== null ? Math.floor((meetingMs - now) / 86400000) : null;
   const meetingImminent = daysToMeeting !== null && daysToMeeting >= 0 && daysToMeeting <= 7;
-  const meetingLabel   = raw.nextMeetingDate && daysToMeeting !== null
-    ? daysToMeeting === 0 ? "Today"
-    : daysToMeeting === 1 ? "Tomorrow"
-    : new Date(raw.nextMeetingDate).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })
+  const meetingLabel    = opp.nextMeetingDate && daysToMeeting !== null
+    ? daysToMeeting === 0 ? "today"
+    : daysToMeeting === 1 ? "tomorrow"
+    : new Date(opp.nextMeetingDate).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })
     : null;
 
-  // Entry signal — first match wins in priority order
-  let entrySignal: FollowUpDeskItem["entrySignal"];
-  let entryReason: string;
+  const daysSinceEdit = opp.lastEdited
+    ? Math.floor((now - new Date(opp.lastEdited).getTime()) / 86400000)
+    : null;
+
+  // ─── Entry signal ────────────────────────────────────────────────────────
+  let entrySignal: CoSTask["entrySignal"];
+  let signalReason: string;
   if (meetingImminent) {
-    entrySignal = "has_meeting";
-    entryReason = `Meeting ${meetingLabel}`;
-  } else if (raw.followUpStatus === "Needed") {
-    entrySignal = "manual";
-    entryReason = "Follow-up flagged";
-  } else if (raw.stage === "Negotiation") {
-    entrySignal = "negotiation_stale";
-    entryReason = `In negotiation${daysSinceEdit !== null ? ` · ${daysSinceEdit}d since last update` : ""}`;
-  } else if (raw.stage === "Proposal Sent") {
-    entrySignal = "proposal_stale";
-    entryReason = `Proposal sent${daysSinceEdit !== null ? ` · ${daysSinceEdit}d no reply recorded` : ""}`;
+    entrySignal  = "meeting_soon";
+    signalReason = `Meeting ${meetingLabel}`;
+  } else if (opp.reviewUrl && (opp.stage === "Qualifying" || opp.stage === "Active")) {
+    entrySignal  = "review_needed";
+    signalReason = `Review doc — ${opp.stage === "Active" ? "active deal" : "qualifying stage"}`;
+  } else if (opp.stage === "Active") {
+    entrySignal  = "negotiation";
+    signalReason = `Active${daysSinceEdit !== null ? ` · ${daysSinceEdit}d since last update` : ""}`;
+  } else if (opp.stage === "Qualifying") {
+    entrySignal  = "proposal_pending";
+    signalReason = `Qualifying${daysSinceEdit !== null ? ` · ${daysSinceEdit}d — check for reply` : ""}`;
   } else {
-    entrySignal = "active_stale";
-    entryReason = `Active${daysSinceEdit !== null ? ` · ${daysSinceEdit}d since last update` : ""}`;
+    entrySignal  = "manual";
+    signalReason = "Follow-up flagged";
   }
 
-  // Pending action label
-  let pendingActionLabel: string;
-  if (raw.pendingAction) {
-    pendingActionLabel = raw.pendingAction;
-  } else if (meetingImminent && raw.reviewUrl) {
-    pendingActionLabel = `Review before meeting — ${meetingLabel}`;
-  } else if (raw.reviewUrl) {
-    pendingActionLabel = "Review shared document";
-  } else if (raw.stage === "Proposal Sent") {
-    pendingActionLabel = `Follow up on proposal${raw.orgName ? ` with ${raw.orgName}` : ""}`;
-  } else if (raw.stage === "Negotiation") {
-    pendingActionLabel = "Advance negotiation — check for reply or update";
+  // ─── Task title (WHAT TO DO) ─────────────────────────────────────────────
+  let taskTitle: string;
+  if (opp.pendingAction && !opp.pendingAction.startsWith("SIGNALS:") && !opp.pendingAction.startsWith("Inbox signal:")) {
+    // Explicit pending action = use directly as task title
+    taskTitle = opp.pendingAction.slice(0, 140);
+  } else if (meetingImminent && opp.reviewUrl) {
+    taskTitle = `Review doc before meeting${meetingLabel ? ` — ${meetingLabel}` : ""}${opp.name ? ` · ${opp.name}` : ""}`;
+  } else if (meetingImminent) {
+    taskTitle = `Prepare for meeting${meetingLabel ? ` — ${meetingLabel}` : ""}${opp.name ? ` · ${opp.name}` : ""}`;
+  } else if (opp.reviewUrl && opp.stage === "Qualifying") {
+    taskTitle = `Review document for ${opp.name}`;
+  } else if (opp.stage === "Active") {
+    taskTitle = `Advance deal — ${opp.name}`;
+  } else if (opp.stage === "Qualifying") {
+    taskTitle = `Follow up on ${opp.name}`;
   } else {
-    pendingActionLabel = `Follow up${raw.orgName ? ` with ${raw.orgName}` : ""}`;
+    taskTitle = `Follow up — ${opp.name}`;
   }
 
-  // Urgency
-  let urgencyLevel: FollowUpDeskItem["urgencyLevel"];
-  if (daysToMeeting !== null && daysToMeeting >= 0 && daysToMeeting <= 2) urgencyLevel = "urgent";
-  else if (meetingImminent || raw.stage === "Negotiation") urgencyLevel = "high";
-  else urgencyLevel = "normal";
+  // ─── Urgency ─────────────────────────────────────────────────────────────
+  let urgency: CoSTask["urgency"];
+  if (daysToMeeting !== null && daysToMeeting >= 0 && daysToMeeting <= 1) urgency = "critical";
+  else if (meetingImminent || opp.stage === "Active") urgency = "high";
+  else urgency = "normal";
 
-  // Recommended move
-  let recommendedMove: FollowUpDeskItem["recommendedMove"];
-  if (raw.reviewUrl && (meetingImminent || raw.stage === "Proposal Sent")) recommendedMove = "review_doc";
-  else if (raw.stage === "Negotiation") recommendedMove = "advance_negotiation";
-  else if (!raw.nextMeetingDate) recommendedMove = "schedule_meeting";
-  else recommendedMove = "draft_followup";
-
-  // Calendar block URL — 1-hour review block, pre-populated
-  const calendarBlockUrl = (raw.reviewUrl || meetingImminent)
-    ? `https://calendar.google.com/calendar/r/eventedit?text=${encodeURIComponent(`Review: ${raw.name}`)}&details=${encodeURIComponent(pendingActionLabel)}&dur=0100`
+  // ─── Calendar block ───────────────────────────────────────────────────────
+  const calendarBlockUrl = (opp.reviewUrl || meetingImminent)
+    ? `https://calendar.google.com/calendar/r/eventedit?text=${encodeURIComponent(`Prep: ${opp.name}`)}&details=${encodeURIComponent(taskTitle)}&dur=0100`
     : null;
 
-  return { ...raw, entrySignal, entryReason, pendingActionLabel, urgencyLevel, recommendedMove, calendarBlockUrl };
+  return {
+    id:               opp.id,
+    notionUrl:        opp.notionUrl,
+    taskTitle,
+    taskStatus:       mapFollowUpStatus(opp.followUpStatus),
+    dueDate:          opp.nextMeetingDate,
+    urgency,
+    opportunityName:  opp.name,
+    opportunityStage: opp.stage,
+    orgName:          opp.orgName,
+    opportunityType:  opp.type,
+    reviewUrl:        opp.reviewUrl,
+    entrySignal,
+    signalReason,
+    calendarBlockUrl,
+    pendingAction:    opp.pendingAction,
+  };
 }
 
-export async function getFollowUpDeskItems(): Promise<FollowUpDeskItem[]> {
+export async function getCoSTasks(): Promise<CoSTask[]> {
   try {
     const res = await notion.databases.query({
       database_id: DB.opportunities,
       filter: {
         and: [
-          { property: "Stage", select: { does_not_equal: "Won" } },
-          { property: "Stage", select: { does_not_equal: "Lost" } },
-          { property: "Stage", select: { does_not_equal: "Archived" } },
+          // Exclude terminal states — verified field name: "Opportunity Status" (schema 2026-04-13)
+          { property: "Opportunity Status", select: { does_not_equal: "Closed Won"  } },
+          { property: "Opportunity Status", select: { does_not_equal: "Closed Lost" } },
+          { property: "Opportunity Status", select: { does_not_equal: "Stalled"     } },
+          { property: "Opportunity Status", select: { does_not_equal: "New"         } },
+          // Exclude explicitly closed tasks
+          { property: "Follow-up Status", select: { does_not_equal: "Done"    } },
+          { property: "Follow-up Status", select: { does_not_equal: "Dropped" } },
+          // Must have at least one task signal
           {
             or: [
-              { property: "Follow-up Status", select: { equals: "Needed" } },
-              { property: "Stage",            select: { equals: "Active" } },
-              { property: "Stage",            select: { equals: "Proposal Sent" } },
-              { property: "Stage",            select: { equals: "Negotiation" } },
+              // Explicit follow-up flag
+              { property: "Follow-up Status", select: { equals: "Needed"      } },
+              { property: "Follow-up Status", select: { equals: "In Progress" } },
+              { property: "Follow-up Status", select: { equals: "Waiting"     } },
+              // Source URL exists (proposal / doc to review)
+              { property: "Source URL", url: { is_not_empty: true } },
+              // Explicit signal context written
+              { property: "Trigger / Signal", rich_text: { is_not_empty: true } },
+              // High-priority stages (implicit task: advance the deal)
+              { property: "Opportunity Status", select: { equals: "Active"     } },
+              { property: "Opportunity Status", select: { equals: "Qualifying" } },
             ],
           },
         ],
@@ -683,39 +758,59 @@ export async function getFollowUpDeskItems(): Promise<FollowUpDeskItem[]> {
     const raw = (res.results as any[]).map(page => ({
       id:                  page.id,
       name:                text(prop(page, "Opportunity Name")) || text(prop(page, "Name")) || "Untitled",
-      stage:               select(prop(page, "Stage")),
+      stage:               select(prop(page, "Opportunity Status")),  // verified field name
       scope:               select(prop(page, "Scope")),
       followUpStatus:      select(prop(page, "Follow-up Status")),
-      type:                select(prop(page, "Type")) || select(prop(page, "Opportunity Type")) || "",
-      orgName:             text(prop(page, "Organization")) || "",
+      type:                select(prop(page, "Opportunity Type")) || "",
+      orgName:             "",  // "Account / Organization" is a relation — not plain text
       lastEdited:          page.last_edited_time?.slice(0, 10) ?? null,
       notionUrl:           page.url ?? "",
       score:               num(prop(page, "Opportunity Score")),
       qualificationStatus: select(prop(page, "Qualification Status")) || "Not Scored",
-      // Enrichment fields — gracefully null if not yet in Notion schema
-      nextMeetingDate:     date(prop(page, "Next Meeting Date")),
-      reviewUrl:           page.properties["Review URL"]?.url ?? null,
-      pendingAction:       text(prop(page, "Pending Action")) || null,
+      nextMeetingDate:     date(prop(page, "Next Meeting Date")),      // optional; null if field absent
+      reviewUrl:           page.properties["Source URL"]?.url ?? null, // verified field name
+      pendingAction:       text(prop(page, "Trigger / Signal")) || null, // verified field name
     }));
 
-    const items = raw.map(computeDeskItem);
+    // Client-side: exclude Active/Qualifying opportunities with no concrete task signal
+    // (Active / Qualifying always qualify; others only if have an explicit signal)
+    const filtered = raw.filter(opp => {
+      const hasExplicitStatus = ["Needed", "In Progress", "Waiting", "Sent"].includes(opp.followUpStatus);
+      const hasMeeting = !!opp.nextMeetingDate;
+      const hasReview  = !!opp.reviewUrl;
+      const hasPending = !!opp.pendingAction;
+      const isHighStage = opp.stage === "Active" || opp.stage === "Qualifying";
+      return hasExplicitStatus || hasMeeting || hasReview || hasPending || isHighStage;
+    });
 
-    // Sort: urgent first, then high, then normal; within tier by meeting date proximity
-    const TIER: Record<string, number> = { urgent: 0, high: 1, normal: 2 };
-    items.sort((a, b) => {
-      const tierDiff = (TIER[a.urgencyLevel] ?? 2) - (TIER[b.urgencyLevel] ?? 2);
-      if (tierDiff !== 0) return tierDiff;
-      // Earlier meeting date wins
-      if (a.nextMeetingDate && b.nextMeetingDate) return a.nextMeetingDate.localeCompare(b.nextMeetingDate);
-      if (a.nextMeetingDate) return -1;
-      if (b.nextMeetingDate) return 1;
+    const tasks = filtered.map(computeCoSTask);
+
+    // Sort: critical → high → normal; within tier by due date proximity
+    const TIER: Record<string, number> = { critical: 0, high: 1, normal: 2 };
+    tasks.sort((a, b) => {
+      const td = (TIER[a.urgency] ?? 2) - (TIER[b.urgency] ?? 2);
+      if (td !== 0) return td;
+      if (a.dueDate && b.dueDate) return a.dueDate.localeCompare(b.dueDate);
+      if (a.dueDate) return -1;
+      if (b.dueDate) return 1;
       return 0;
     });
 
-    return items;
+    return tasks;
   } catch {
     return [];
   }
+}
+
+// ─── Backward compat shims ────────────────────────────────────────────────────
+// FollowUpDeskItem and getFollowUpDeskItems are superseded by CoSTask/getCoSTasks.
+// Kept so any remaining callers compile without changes.
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type FollowUpDeskItem = CoSTask & Record<string, any>;
+
+export async function getFollowUpDeskItems(): Promise<CoSTask[]> {
+  return getCoSTasks();
 }
 
 // ─── Opportunity Candidates — signals-detected, not yet promoted ─────────────
@@ -733,30 +828,84 @@ export type CandidateItem = {
   orgName: string;
   type: string;
   notionUrl: string;
-  signalContext: string | null;  // from "Pending Action" field (signal summary)
-  sourceUrl: string | null;      // from "Review URL" field (Gmail thread URL or doc)
+  signalContext: string | null;                           // human-readable context (after prefix stripped)
+  sourceUrl: string | null;                              // from "Review URL" field (Gmail thread or doc)
   createdTime: string | null;
+  // Parsed from structured "SIGNALS:|REF:|DATE:|" prefix in "Pending Action"
+  signalOrigins: ("meeting" | "email" | "doc")[];       // all sources that contributed
+  signalRef: string | null;                              // meeting title / email subject / doc name
+  signalDate: string | null;                             // ISO date of most recent signal
 };
+
+/**
+ * Parse the structured signal prefix stored in "Pending Action":
+ *   SIGNALS:meeting,email|REF:Title|DATE:2026-04-15|Plain context text here
+ * Returns null for all parsed fields when the prefix is absent (legacy records).
+ */
+function parseSignalPrefix(raw: string | null): {
+  origins: ("meeting" | "email" | "doc")[];
+  ref: string | null;
+  signalDate: string | null;
+  context: string | null;
+} {
+  if (!raw) return { origins: [], ref: null, signalDate: null, context: null };
+  if (!raw.startsWith("SIGNALS:")) {
+    // Legacy format — no prefix, use raw as context
+    return { origins: [], ref: null, signalDate: null, context: raw || null };
+  }
+  // Split on | — first segment is "SIGNALS:...", then REF:..., DATE:..., then plain text
+  const parts = raw.split("|");
+  const origins: ("meeting" | "email" | "doc")[] = [];
+  let ref: string | null = null;
+  let signalDate: string | null = null;
+  let contextParts: string[] = [];
+
+  for (const part of parts) {
+    if (part.startsWith("SIGNALS:")) {
+      const signalStr = part.slice("SIGNALS:".length);
+      for (const s of signalStr.split(",")) {
+        const t = s.trim() as "meeting" | "email" | "doc";
+        if (t === "meeting" || t === "email" || t === "doc") origins.push(t);
+      }
+    } else if (part.startsWith("REF:")) {
+      ref = part.slice("REF:".length).trim() || null;
+    } else if (part.startsWith("DATE:")) {
+      signalDate = part.slice("DATE:".length).trim() || null;
+    } else {
+      contextParts.push(part);
+    }
+  }
+
+  return { origins, ref, signalDate, context: contextParts.join(" ").trim() || null };
+}
 
 export async function getCandidateOpportunities(): Promise<CandidateItem[]> {
   try {
+    // Verified field name: "Opportunity Status" = "New" maps to unreviewed candidates (schema 2026-04-13)
     const res = await notion.databases.query({
       database_id: DB.opportunities,
-      filter: { property: "Stage", select: { equals: "Candidate" } },
+      filter: { property: "Opportunity Status", select: { equals: "New" } },
       sorts: [{ timestamp: "created_time", direction: "descending" }],
       page_size: 15,
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (res.results as any[]).map(page => ({
-      id:             page.id,
-      name:           text(prop(page, "Opportunity Name")) || text(prop(page, "Name")) || "Untitled",
-      orgName:        text(prop(page, "Organization")) || "",
-      type:           select(prop(page, "Type")) || "",
-      notionUrl:      page.url ?? "",
-      signalContext:  text(prop(page, "Pending Action")) || null,
-      sourceUrl:      page.properties["Review URL"]?.url ?? null,
-      createdTime:    page.created_time?.slice(0, 10) ?? null,
-    }));
+    return (res.results as any[]).map(page => {
+      const rawSignal = text(prop(page, "Trigger / Signal")) || null; // verified field name
+      const { origins, ref, signalDate, context } = parseSignalPrefix(rawSignal);
+      return {
+        id:             page.id,
+        name:           text(prop(page, "Opportunity Name")) || text(prop(page, "Name")) || "Untitled",
+        orgName:        "",  // "Account / Organization" is a relation — not plain text
+        type:           select(prop(page, "Opportunity Type")) || "",
+        notionUrl:      page.url ?? "",
+        signalContext:  context,
+        sourceUrl:      page.properties["Source URL"]?.url ?? null, // verified field name
+        createdTime:    page.created_time?.slice(0, 10) ?? null,
+        signalOrigins:  origins,
+        signalRef:      ref,
+        signalDate,
+      };
+    });
   } catch {
     return [];
   }

@@ -117,6 +117,56 @@ export async function getDocumentsForProject(projectPageId: string): Promise<Doc
   }
 }
 
+// ─── Meeting Sources for candidate scanning ───────────────────────────────────
+// Used by /api/scan-opportunity-candidates to detect opportunity signals in
+// recent meeting summaries (Fireflies + manually ingested meetings).
+
+export type MeetingSourceRaw = {
+  id: string;
+  title: string;
+  sourceDate: string | null;       // ISO date from "Source Date" field
+  processedSummary: string;        // non-empty by filter
+  url: string | null;              // Fireflies or recording URL
+  projectId: string | null;        // first linked project (if any)
+};
+
+export async function getRecentMeetingSources(lookbackDays: number): Promise<MeetingSourceRaw[]> {
+  try {
+    const cutoff = new Date(Date.now() - lookbackDays * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const res = await notion.databases.query({
+      database_id: DB.sources,
+      filter: {
+        and: [
+          // Meeting or Fireflies source type/platform
+          {
+            or: [
+              { property: "Source Type",     select: { equals: "Meeting" }    },
+              { property: "Source Platform", select: { equals: "Fireflies" }  },
+            ],
+          },
+          // Must have a processed summary (means OS engine has run on it)
+          { property: "Processed Summary", rich_text: { is_not_empty: true } },
+          // Within lookback window (Source Date)
+          { property: "Source Date", date: { on_or_after: cutoff } },
+        ],
+      },
+      sorts: [{ property: "Source Date", direction: "descending" }],
+      page_size: 30,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (res.results as any[]).map(page => ({
+      id:               page.id,
+      title:            text(prop(page, "Source Title")) || "Untitled meeting",
+      sourceDate:       date(prop(page, "Source Date")),
+      processedSummary: text(prop(page, "Processed Summary")) || "",
+      url:              page.properties?.["Source URL"]?.url ?? null,
+      projectId:        relationFirst(prop(page, "Linked Projects")),
+    })).filter(m => m.processedSummary.length > 0);
+  } catch {
+    return [];
+  }
+}
+
 export async function getSourceActivity(projectId: string): Promise<SourceActivity> {
   try {
     const res = await notion.databases.query({

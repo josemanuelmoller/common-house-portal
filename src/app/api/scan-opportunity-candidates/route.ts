@@ -1,11 +1,16 @@
 /**
  * POST /api/scan-opportunity-candidates
  *
- * Scans Gmail inbox for threads that look like untracked business opportunities
- * (partnerships, consulting inquiries, grants, collaboration requests).
+ * Scans two signal sources for untracked business opportunities:
+ *   1. Gmail inbox threads (email signals)
+ *   2. CH Sources [OS v2] meeting summaries (meeting signals — Fireflies / manual)
+ *
  * Cross-references against existing Opportunities to avoid duplicates.
- * Uses Claude Haiku to batch-classify threads.
- * In execute mode, writes Stage="Candidate" records to Opportunities [OS v2].
+ * Where a Candidate already exists for the same org, enriches it instead of
+ * creating a duplicate (appends the new signal origin + updates Pending Action).
+ * Uses Claude Haiku to batch-classify threads and meeting summaries.
+ * In execute mode, writes Opportunity Status="New" records to Opportunities [OS v2].
+ * Field names verified against Notion schema 2026-04-13.
  *
  * Body:
  *   { mode?: "dry_run" | "execute", lookback_days?: number }
@@ -20,6 +25,7 @@ import { google } from "googleapis";
 import Anthropic from "@anthropic-ai/sdk";
 import { Client } from "@notionhq/client";
 import { adminGuardApi } from "@/lib/require-admin";
+import { getRecentMeetingSources } from "@/lib/notion/sources";
 
 export const maxDuration = 120;
 export const dynamic = "force-dynamic";
@@ -65,77 +71,143 @@ function extractName(header: string): string {
   return m ? m[1].trim() : header.split("@")[0];
 }
 
+// ─── Calendar noise pre-filter ────────────────────────────────────────────────
+
+const CALENDAR_SUBJECT_PREFIXES = [
+  // English
+  "invitation:", "updated invitation:", "accepted:", "declined:", "tentative:",
+  "re: invitation:", "re: updated invitation:", "canceled:", "cancelled:", "rsvp",
+  // Spanish (Google Calendar in Spanish locale)
+  "aceptado:", "rechazado:", "cancelado:", "invitación:", "invitacion:",
+  "tentativa:", "actualización de invitación:", "actualizacion de invitacion:",
+];
+const CALENDAR_SENDER_PATTERNS = [
+  "noreply@", "no-reply@", "calendar-notification@", "calendar@", "notifications-noreply@",
+];
+
+function isCalendarNoise(subject: string, from: string): boolean {
+  const subLower = subject.toLowerCase();
+  if (CALENDAR_SUBJECT_PREFIXES.some(pfx => subLower.startsWith(pfx))) return true;
+  if (CALENDAR_SENDER_PATTERNS.some(pat => from.includes(pat))) return true;
+  return false;
+}
+
 // ─── Existing opportunities — for dedup ───────────────────────────────────────
 
-async function getExistingOrgTokens(): Promise<Set<string>> {
+type ExistingCandidate = {
+  id: string;
+  orgTokens: string[];
+  pendingAction: string;
+  signalOrigins: string[];
+};
+
+async function getExistingOpportunityData(): Promise<{
+  activeTokens: Set<string>;        // non-candidate opps → full dedup
+  candidates: ExistingCandidate[];  // existing candidates → enrich instead of dup
+}> {
   try {
+    // Verified field names: "Opportunity Status" (not "Stage") — schema 2026-04-13
     const res = await notion.databases.query({
       database_id: DB_OPPORTUNITIES,
       filter: {
         and: [
-          { property: "Stage", select: { does_not_equal: "Won" } },
-          { property: "Stage", select: { does_not_equal: "Lost" } },
+          { property: "Opportunity Status", select: { does_not_equal: "Closed Won"  } },
+          { property: "Opportunity Status", select: { does_not_equal: "Closed Lost" } },
+          { property: "Opportunity Status", select: { does_not_equal: "Stalled"     } },
         ],
       },
-      page_size: 100,
+      page_size: 150,
     });
-    const tokens = new Set<string>();
+
+    const activeTokens = new Set<string>();
+    const candidates: ExistingCandidate[] = [];
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     for (const page of res.results as any[]) {
-      const name = (page.properties["Opportunity Name"]?.title?.[0]?.plain_text ?? "").toLowerCase();
-      const org  = (page.properties["Organization"]?.rich_text?.[0]?.plain_text ?? "").toLowerCase();
-      // Add all word tokens ≥4 chars so partial matches still dedup
-      for (const str of [name, org]) {
-        str.split(/[\s,·\-–]+/).filter((w: string) => w.length >= 4).forEach((w: string) => tokens.add(w));
+      const stage = (page.properties["Opportunity Status"]?.select?.name ?? "") as string;
+      const name  = (page.properties["Opportunity Name"]?.title?.[0]?.plain_text ?? "").toLowerCase();
+      // "Account / Organization" is a relation — use opportunity name tokens only for dedup
+      const tokens = name.split(/[\s,·\-–]+/).filter((w: string) => w.length >= 4);
+
+      if (stage === "New") {
+        // "New" = unreviewed candidate — enrich instead of creating duplicate
+        const triggerSignal = page.properties["Trigger / Signal"]?.rich_text?.[0]?.plain_text ?? "";
+        const existingOrigins: string[] = [];
+        if (triggerSignal.startsWith("SIGNALS:")) {
+          const signalPart = triggerSignal.split("|")[0].slice("SIGNALS:".length);
+          existingOrigins.push(...signalPart.split(",").map((s: string) => s.trim()));
+        }
+        candidates.push({ id: page.id, orgTokens: tokens, pendingAction: triggerSignal, signalOrigins: existingOrigins });
+        tokens.forEach((t: string) => activeTokens.add(t));
+      } else {
+        // Non-candidate active opportunities → hard dedup
+        tokens.forEach((t: string) => activeTokens.add(t));
       }
     }
-    return tokens;
+    return { activeTokens, candidates };
   } catch {
-    return new Set();
+    return { activeTokens: new Set(), candidates: [] };
   }
 }
 
-// ─── Claude Haiku classification ─────────────────────────────────────────────
+// ─── Signal types ─────────────────────────────────────────────────────────────
 
-interface ThreadSummary {
-  fromName: string;
-  from: string;
-  subject: string;
-  snippet: string;
-  gmailUrl: string;
+type SignalOrigin = "meeting" | "email" | "doc";
+
+interface SignalItem {
+  source: SignalOrigin;
+  ref: string;           // meeting title / email subject
+  fromName?: string;     // email only
+  from?: string;         // email only
+  content: string;       // snippet or processedSummary
+  gmailUrl?: string;     // email only
+  meetingUrl?: string;   // meeting only
+  meetingDate?: string;  // ISO date
 }
+
+// ─── Classification ───────────────────────────────────────────────────────────
 
 interface Classification {
   index: number;
   isOpportunity: boolean;
-  confidence: number;        // 0–100
-  name: string;              // short opportunity name
-  orgName: string;           // org / municipality / company
+  confidence: number;   // 0–100
+  name: string;
+  orgName: string;
   type: "Partnership" | "Grant" | "Consulting" | "Investment" | "Other";
-  reason: string;            // 1 sentence
+  reason: string;
 }
 
-async function classifyThreads(threads: ThreadSummary[]): Promise<Classification[]> {
-  const prompt = `You are scanning Jose's Gmail for untracked business opportunities.
+async function classifySignals(signals: SignalItem[]): Promise<Classification[]> {
+  const prompt = `You are scanning Jose's inbox and meeting notes for untracked business opportunities.
 Jose runs Common House — a UK circular economy consultancy + startup accelerator.
 Opportunities include: consulting engagements, partnerships, grants, collaborations,
-proposals requiring review, and meetings with decision-makers.
+proposals requiring review, and meetings with decision-makers discussing commercial topics.
 
 NOT opportunities: newsletters, automated notifications, calendar confirmations,
-internal team messages, mass mailings, or promotional content.
+internal team messages, mass mailings, promotional content, status updates,
+or operational check-ins with no commercial intent.
 
-For each email below, output a JSON object. Threshold: only flag as opportunity if
-there is clear human intent AND commercial/collaborative signal.
+STRONG meeting signals: partnership intent, proposal language, funding discussion,
+next steps agreed, intro to decision-maker, collaboration framework discussed.
 
-Emails:
-${threads.map((t, i) => `${i + 1}. From: ${t.fromName} <${t.from}>\n   Subject: ${t.subject}\n   Preview: ${t.snippet.slice(0, 200)}`).join("\n\n")}
+For each signal below, output a JSON object.
+Threshold: only flag as opportunity if there is clear human intent AND commercial/collaborative signal.
+
+Signals:
+${signals.map((s, i) => {
+  const sourceLabel = s.source === "meeting" ? "Meeting" : s.source === "email" ? "Email" : "Doc";
+  const who = s.source === "email" && s.fromName
+    ? `From: ${s.fromName}${s.from ? ` <${s.from}>` : ""}\n   `
+    : "";
+  return `${i + 1}. [${sourceLabel}] ${who}Ref: ${s.ref}\n   Preview: ${s.content.slice(0, 250)}`;
+}).join("\n\n")}
 
 Return ONLY a valid JSON array — no markdown:
 [{"index":1,"isOpportunity":true/false,"confidence":0-100,"name":"short name","orgName":"org name","type":"Partnership|Grant|Consulting|Investment|Other","reason":"1 sentence"}]`;
 
   const res = await anthropic.messages.create({
     model: "claude-haiku-4-5-20251001",
-    max_tokens: 1200,
+    max_tokens: 1500,
     messages: [{ role: "user", content: prompt }],
   });
   const raw = (res.content[0] as { type: string; text: string }).text.trim();
@@ -143,32 +215,87 @@ Return ONLY a valid JSON array — no markdown:
   return JSON.parse(jsonMatch?.[0] ?? "[]") as Classification[];
 }
 
-// ─── Notion write ─────────────────────────────────────────────────────────────
+// ─── Signal prefix builder ─────────────────────────────────────────────────────
+
+function buildSignalPrefix(
+  origins: SignalOrigin[],
+  ref: string,
+  date: string,
+  context: string,
+): string {
+  return `SIGNALS:${origins.join(",")}|REF:${ref.slice(0, 120)}|DATE:${date}|${context.slice(0, 500)}`;
+}
+
+// ─── Notion writes ────────────────────────────────────────────────────────────
 
 async function createCandidate(
   c: Classification,
-  thread: ThreadSummary,
+  signal: SignalItem,
 ): Promise<string | null> {
+  const today = new Date().toISOString().slice(0, 10);
+  const pendingAction = buildSignalPrefix(
+    [signal.source],
+    signal.ref,
+    signal.meetingDate ?? today,
+    c.reason + (signal.fromName ? ` — ${signal.source} from ${signal.fromName}` : ` — ${signal.source}`),
+  );
   try {
+    // Verified field names — schema 2026-04-13
     const page = await notion.pages.create({
       parent: { database_id: DB_OPPORTUNITIES },
       properties: {
-        "Opportunity Name": { title:     [{ text: { content: c.name.slice(0, 100) } }] },
-        "Stage":            { select:    { name: "Candidate" } },
-        "Follow-up Status": { select:    { name: "Needed" } },
-        "Scope":            { select:    { name: "CH" } },
-        "Type":             { select:    { name: c.type } },
-        "Organization":     { rich_text: [{ text: { content: (c.orgName || thread.fromName).slice(0, 200) } }] },
-        // Pending Action = signal context (graceful if field doesn't exist in schema yet)
-        ...(c.reason ? { "Pending Action": { rich_text: [{ text: { content: `${c.reason} — email from ${thread.fromName}` } }] } } : {}),
-        // Review URL = Gmail thread link (graceful if field doesn't exist in schema yet)
-        ...(thread.gmailUrl ? { "Review URL": { url: thread.gmailUrl } } : {}),
+        "Opportunity Name":   { title:  [{ text: { content: c.name.slice(0, 100) } }] },
+        "Opportunity Status": { select: { name: "New" } },
+        "Follow-up Status":   { select: { name: "Needed" } },
+        "Scope":              { select: { name: "CH" } },
+        "Opportunity Type":   { select: { name: c.type } },
+        // "Account / Organization" is a relation — org context encoded in Trigger / Signal
+        "Trigger / Signal":   { rich_text: [{ text: { content: pendingAction } }] },
+        ...(signal.gmailUrl   ? { "Source URL": { url: signal.gmailUrl   } } : {}),
+        ...(signal.meetingUrl ? { "Source URL": { url: signal.meetingUrl } } : {}),
       },
     });
     return page.id;
   } catch (err) {
     console.error("[scan-candidates] create failed:", err);
     return null;
+  }
+}
+
+async function enrichCandidate(
+  candidateId: string,
+  existingPendingAction: string,
+  existingOrigins: string[],
+  newOrigin: SignalOrigin,
+  newRef: string,
+  newDate: string,
+  newReason: string,
+): Promise<boolean> {
+  // Merge origins — add new one if not already present
+  const mergedOrigins = Array.from(new Set([...existingOrigins, newOrigin])) as SignalOrigin[];
+
+  // Strip existing prefix if present, then rebuild with merged origins
+  let baseContext = existingPendingAction;
+  if (existingPendingAction.startsWith("SIGNALS:")) {
+    const pipeIdx = existingPendingAction.lastIndexOf("|");
+    // The last pipe-segment is the plain context
+    baseContext = existingPendingAction.slice(pipeIdx + 1).trim();
+  }
+  const enrichedContext = `${baseContext} + [${newOrigin}] ${newReason}`;
+  const newPendingAction = buildSignalPrefix(mergedOrigins, newRef, newDate, enrichedContext);
+
+  try {
+    await notion.pages.update({
+      page_id: candidateId,
+      properties: {
+        // Verified field name: "Trigger / Signal" (not "Pending Action") — schema 2026-04-13
+        "Trigger / Signal": { rich_text: [{ text: { content: newPendingAction.slice(0, 2000) } }] },
+      },
+    });
+    return true;
+  } catch (err) {
+    console.error("[scan-candidates] enrich failed:", err);
+    return false;
   }
 }
 
@@ -181,84 +308,155 @@ export async function POST(req: NextRequest) {
   const mode         = body.mode          ?? "dry_run";
   const lookbackDays = body.lookback_days ?? 14;
 
-  const gmail = getGmailClient();
-  if (!gmail) return NextResponse.json({ error: "Gmail not configured" }, { status: 503 });
+  // ── Gather all signals in parallel ────────────────────────────────────────
+  const [existingData, meetingSources, gmailResult] = await Promise.all([
+    getExistingOpportunityData(),
+    getRecentMeetingSources(lookbackDays),
+    (async () => {
+      const gmail = getGmailClient();
+      if (!gmail) return { threads: [], calendarFiltered: 0 };
+      try {
+        const threadsRes = await gmail.users.threads.list({
+          userId: "me",
+          q: `in:inbox -category:promotions -category:social -category:updates newer_than:${lookbackDays}d`,
+          maxResults: 25,
+        });
+        const rawThreads = threadsRes.data.threads ?? [];
+        const threads: { fromName: string; from: string; subject: string; snippet: string; gmailUrl: string }[] = [];
+        let calendarFiltered = 0;
+        await Promise.all(rawThreads.map(async t => {
+          try {
+            const thread = await gmail.users.threads.get({ userId: "me", id: t.id!, format: "metadata", metadataHeaders: ["From", "Subject"] });
+            const msgs = thread.data.messages ?? [];
+            if (!msgs.length) return;
+            const firstMsg = msgs[0];
+            const fromHeader = firstMsg.payload?.headers?.find(h => h.name === "From")?.value ?? "";
+            const from = extractEmail(fromHeader);
+            if (from.includes("noreply") || from.includes("no-reply") || from.includes("notifications@") || from === JOSE_EMAIL.toLowerCase()) return;
+            const fromName = extractName(fromHeader);
+            const subject  = firstMsg.payload?.headers?.find(h => h.name === "Subject")?.value ?? "(no subject)";
+            const snippet  = firstMsg.snippet ?? "";
+            if (isCalendarNoise(subject, from)) { calendarFiltered++; return; }
+            threads.push({ fromName, from, subject, snippet, gmailUrl: `https://mail.google.com/mail/u/0/#inbox/${t.id}` });
+          } catch { /* skip */ }
+        }));
+        return { threads, calendarFiltered };
+      } catch {
+        return { threads: [], calendarFiltered: 0 };
+      }
+    })(),
+  ]);
 
-  // 1. Fetch inbox threads
-  const threadsRes = await gmail.users.threads.list({
-    userId: "me",
-    q: `in:inbox -category:promotions -category:social -category:updates newer_than:${lookbackDays}d`,
-    maxResults: 25,
-  });
-  const rawThreads = threadsRes.data.threads ?? [];
-  if (rawThreads.length === 0) return NextResponse.json({ ok: true, mode, total_scanned: 0, candidates: [], created: 0 });
+  const { activeTokens, candidates: existingCandidates } = existingData;
 
-  // 2. Existing org tokens for dedup
-  const existingTokens = await getExistingOrgTokens();
+  // ── Build unified signal list ─────────────────────────────────────────────
 
-  // 3. Fetch metadata for each thread
-  const threads: ThreadSummary[] = [];
-  await Promise.all(rawThreads.map(async t => {
-    try {
-      const thread = await gmail.users.threads.get({ userId: "me", id: t.id!, format: "metadata", metadataHeaders: ["From", "Subject"] });
-      const msgs = thread.data.messages ?? [];
-      if (!msgs.length) return;
-      const firstMsg = msgs[0];
-      const fromHeader = firstMsg.payload?.headers?.find(h => h.name === "From")?.value ?? "";
-      const from = extractEmail(fromHeader);
-      // Skip automated senders
-      if (from.includes("noreply") || from.includes("no-reply") || from.includes("notifications@") || from === JOSE_EMAIL.toLowerCase()) return;
-      const fromName = extractName(fromHeader);
-      const subject  = firstMsg.payload?.headers?.find(h => h.name === "Subject")?.value ?? "(no subject)";
-      const snippet  = firstMsg.snippet ?? "";
-      threads.push({ fromName, from, subject, snippet, gmailUrl: `https://mail.google.com/mail/u/0/#inbox/${t.id}` });
-    } catch { /* skip failed thread */ }
-  }));
+  const signals: SignalItem[] = [];
 
-  if (threads.length === 0) return NextResponse.json({ ok: true, mode, total_scanned: 0, candidates: [], created: 0 });
-
-  // 4. Dedup: skip threads where sender name/domain already appears in existing opps
-  const toDedupCheck = threads.filter(t => {
-    const nameTokens = t.fromName.toLowerCase().split(/\s+/).filter(w => w.length >= 4);
+  // Email signals — dedup by sender name/domain
+  for (const t of gmailResult.threads) {
+    const nameTokens = t.fromName.toLowerCase().split(/\s+/).filter((w: string) => w.length >= 4);
     const domain     = t.from.split("@")[1]?.split(".")[0] ?? "";
-    const alreadyTracked = nameTokens.some(tok => existingTokens.has(tok)) || (domain.length >= 4 && existingTokens.has(domain));
-    return !alreadyTracked;
-  });
+    const alreadyTracked = nameTokens.some(tok => activeTokens.has(tok)) || (domain.length >= 4 && activeTokens.has(domain));
+    if (!alreadyTracked) {
+      signals.push({ source: "email", ref: t.subject, fromName: t.fromName, from: t.from, content: t.snippet, gmailUrl: t.gmailUrl });
+    }
+  }
 
-  if (toDedupCheck.length === 0) return NextResponse.json({ ok: true, mode, total_scanned: threads.length, deduped: threads.length, candidates: [], created: 0 });
+  // Meeting signals — dedup by title tokens
+  for (const m of meetingSources) {
+    const titleTokens = m.title.toLowerCase().split(/[\s,·\-–()/]+/).filter((w: string) => w.length >= 4);
+    // Skip if every meaningful title token is already in an active opp
+    const alreadyTracked = titleTokens.length > 0 && titleTokens.every(tok => activeTokens.has(tok));
+    if (!alreadyTracked) {
+      signals.push({
+        source: "meeting",
+        ref: m.title,
+        content: m.processedSummary,
+        meetingUrl: m.url ?? undefined,
+        meetingDate: m.sourceDate ?? undefined,
+      });
+    }
+  }
 
-  // 5. Classify with Claude Haiku
+  if (signals.length === 0) {
+    return NextResponse.json({
+      ok: true, mode, lookback_days: lookbackDays,
+      gmail_scanned: gmailResult.threads.length,
+      calendar_filtered: gmailResult.calendarFiltered,
+      meetings_scanned: meetingSources.length,
+      deduped: 0, candidates: [], enriched: 0, created: 0,
+    });
+  }
+
+  // ── Claude classification ─────────────────────────────────────────────────
+
   let classifications: Classification[] = [];
   try {
-    classifications = await classifyThreads(toDedupCheck);
+    classifications = await classifySignals(signals);
   } catch (err) {
     console.error("[scan-candidates] classification failed:", err);
     return NextResponse.json({ error: "Classification failed", detail: String(err) }, { status: 502 });
   }
 
-  const opportunityCandidates = classifications.filter(c => c.isOpportunity && c.confidence >= 65);
+  const opportunitySignals = classifications.filter(c => c.isOpportunity && c.confidence >= 65);
 
-  // 6. Create Notion records (execute mode only)
+  // ── Write / enrich in execute mode ────────────────────────────────────────
+
   let created = 0;
-  const proposed: { name: string; orgName: string; type: string; confidence: number; reason: string }[] = [];
+  let enriched = 0;
+  const proposed: {
+    name: string; orgName: string; type: string; confidence: number;
+    reason: string; source: string; action: "create" | "enrich";
+  }[] = [];
 
-  for (const c of opportunityCandidates) {
-    const thread = toDedupCheck[c.index - 1];
-    if (!thread) continue;
-    proposed.push({ name: c.name, orgName: c.orgName, type: c.type, confidence: c.confidence, reason: c.reason });
-    if (mode === "execute") {
-      const id = await createCandidate(c, thread);
-      if (id) created++;
+  const today = new Date().toISOString().slice(0, 10);
+
+  for (const c of opportunitySignals) {
+    const signal = signals[c.index - 1];
+    if (!signal) continue;
+
+    // Check if an existing Candidate already covers this org
+    const orgTokens = c.orgName.toLowerCase().split(/[\s,·\-–]+/).filter((w: string) => w.length >= 4);
+    const matchingCandidate = existingCandidates.find(ec =>
+      orgTokens.length > 0 && orgTokens.some(tok => ec.orgTokens.includes(tok))
+    );
+
+    if (matchingCandidate) {
+      // Enrich — add new signal origin to existing Candidate
+      proposed.push({ name: c.name, orgName: c.orgName, type: c.type, confidence: c.confidence, reason: c.reason, source: signal.source, action: "enrich" });
+      if (mode === "execute") {
+        const ok = await enrichCandidate(
+          matchingCandidate.id,
+          matchingCandidate.pendingAction,
+          matchingCandidate.signalOrigins,
+          signal.source,
+          signal.ref,
+          signal.meetingDate ?? today,
+          c.reason,
+        );
+        if (ok) enriched++;
+      }
+    } else {
+      // Create new Candidate
+      proposed.push({ name: c.name, orgName: c.orgName, type: c.type, confidence: c.confidence, reason: c.reason, source: signal.source, action: "create" });
+      if (mode === "execute") {
+        const id = await createCandidate(c, signal);
+        if (id) created++;
+      }
     }
   }
 
   return NextResponse.json({
-    ok:            true,
+    ok:                true,
     mode,
-    lookback_days: lookbackDays,
-    total_scanned: threads.length,
-    deduped:       threads.length - toDedupCheck.length,
-    candidates:    proposed,
-    created:       mode === "execute" ? created : 0,
+    lookback_days:     lookbackDays,
+    gmail_scanned:     gmailResult.threads.length,
+    calendar_filtered: gmailResult.calendarFiltered,
+    meetings_scanned:  meetingSources.length,
+    total_signals:     signals.length,
+    candidates:        proposed,
+    enriched:          mode === "execute" ? enriched : 0,
+    created:           mode === "execute" ? created  : 0,
   });
 }

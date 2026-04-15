@@ -44,6 +44,7 @@ export function InboxTriage({ initialItems, initialScanned = 0 }: Props) {
   const [dismissed, setDismiss]       = useState<Set<string>>(new Set());
   const [creating, setCreating]       = useState<string | null>(null); // threadId being created
   const [created, setCreated]         = useState<Set<string>>(new Set()); // threadIds already created
+  const [failed, setFailed]           = useState<Set<string>>(new Set()); // threadIds that failed
   const router = useRouter();
 
   const refresh = useCallback(async () => {
@@ -89,9 +90,14 @@ export function InboxTriage({ initialItems, initialScanned = 0 }: Props) {
       });
       if (res.ok) {
         setCreated(prev => new Set(prev).add(item.threadId));
+        setFailed(prev => { const s = new Set(prev); s.delete(item.threadId); return s; });
         router.refresh();
+      } else {
+        setFailed(prev => new Set(prev).add(item.threadId));
       }
-    } catch { /* silent */ } finally {
+    } catch {
+      setFailed(prev => new Set(prev).add(item.threadId));
+    } finally {
       setCreating(null);
     }
   }
@@ -177,6 +183,15 @@ export function InboxTriage({ initialItems, initialScanned = 0 }: Props) {
               {/* Quick-create opportunity candidate */}
               {created.has(item.threadId) ? (
                 <span className="text-[9px] font-bold text-green-600">✓ Candidate</span>
+              ) : failed.has(item.threadId) ? (
+                <button
+                  onClick={() => createCandidate(item)}
+                  disabled={creating === item.threadId}
+                  title="Failed — click to retry"
+                  className="text-[9px] font-bold text-red-500 hover:text-red-700 transition-colors disabled:opacity-40"
+                >
+                  {creating === item.threadId ? "…" : "✕ Retry"}
+                </button>
               ) : (
                 <button
                   onClick={() => createCandidate(item)}

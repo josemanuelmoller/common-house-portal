@@ -198,6 +198,7 @@ async function handleGet(req: NextRequest) {
   // Calendar auto-updates (invites, RSVPs, recurring updates) are never
   // actionable inbox items — they clutter the triage and inflate Urgent count.
   const CALENDAR_SUBJECT_PREFIXES = [
+    // English calendar subjects
     "invitation:",
     "updated invitation:",
     "accepted:",
@@ -208,6 +209,17 @@ async function handleGet(req: NextRequest) {
     "canceled:",
     "cancelled:",
     "rsvp",
+    // Spanish calendar subjects (Google Calendar in Spanish locale)
+    "invitación:",
+    "invitacion:",
+    "aceptado:",
+    "rechazado:",
+    "cancelado:",
+    "tentativa:",
+    "re: invitación:",
+    "re: invitacion:",
+    "actualización de invitación:",
+    "actualizacion de invitacion:",
   ];
   const CALENDAR_SENDER_PATTERNS = [
     "noreply@",

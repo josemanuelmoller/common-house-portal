@@ -24,14 +24,14 @@ import { Sidebar } from "@/components/Sidebar";
 import { AgentQueueSection } from "@/components/AgentQueueSection";
 import { InboxTriage, type InboxItem } from "@/components/InboxTriage";
 import { DraftCheckinButton } from "@/components/DraftCheckinButton";
-import { FollowUpDesk } from "@/components/FollowUpDesk";
+import { ChiefOfStaffDesk } from "@/components/ChiefOfStaffDesk";
 import { CandidateSection } from "@/components/CandidateSection";
 import {
   getProjectsOverview,
   getDecisionItems,
   getDailyBriefing,
   getAgentDrafts,
-  getFollowUpDeskItems,
+  getCoSTasks,
   getCandidateOpportunities,
   getOpportunitiesByScope,
   getColdRelationships,
@@ -146,7 +146,7 @@ export default async function AdminPage() {
     decisions,
     dailyBriefing,
     agentDrafts,
-    followUpItems,
+    cosTasks,
     candidates,
     opportunities,
     coldRelationships,
@@ -157,7 +157,7 @@ export default async function AdminPage() {
     getDecisionItems("Open"),
     getDailyBriefing(),
     getAgentDrafts("Pending Review"),
-    getFollowUpDeskItems(),
+    getCoSTasks(),
     getCandidateOpportunities(),
     getOpportunitiesByScope(),
     getColdRelationships(),
@@ -171,6 +171,7 @@ export default async function AdminPage() {
   const staleProjects   = projects.filter(p => { const d = daysSince(bestActivity(p)); return !p.updateNeeded && d !== null && d > 30; });
   const workroomCount   = projects.filter(p => p.primaryWorkspace === "workroom").length;
   const garageCount     = projects.filter(p => p.primaryWorkspace === "garage").length;
+  const untypedCount    = projects.filter(p => !p.primaryWorkspace || (p.primaryWorkspace !== "workroom" && p.primaryWorkspace !== "garage")).length;
 
   const openDecisions   = decisions; // pre-filtered to "Open" at DB level in getDecisionItems("Open")
   const urgentDecisions = openDecisions.filter(d => d.priority === "P1 Critical");
@@ -191,13 +192,13 @@ export default async function AdminPage() {
   const dormantRelationships = coldRelationships.filter(r => r.warmth === "Dormant");
   const coldOnly             = coldRelationships.filter(r => r.warmth === "Cold");
 
-  // ── Focus suggestion — top follow-up desk item with meeting ≤7 days + review doc
-  // Injected into Focus of the Day section as a recommended action.
-  const focusSuggestion = followUpItems.find(item => {
-    if (!item.nextMeetingDate) return false;
-    const msToMeeting = new Date(item.nextMeetingDate).getTime() - Date.now();
-    return msToMeeting >= 0 && msToMeeting <= 7 * 86400000 && (!!item.reviewUrl || !!item.pendingAction);
-  }) ?? null;
+  // ── Focus suggestion — top CoS Task with a meeting ≤7 days
+  // Injected into Focus of the Day section as the recommended action.
+  const focusSuggestion = cosTasks.find(task => {
+    if (!task.dueDate) return false;
+    const msTo = new Date(task.dueDate).getTime() - Date.now();
+    return msTo >= 0 && msTo <= 7 * 86400000;
+  }) ?? cosTasks[0] ?? null; // fall back to top task if none has a meeting
 
   // ── Date + greeting ──────────────────────────────────────────────────────────
   const today = new Date();
@@ -217,7 +218,7 @@ export default async function AdminPage() {
         {/* ── 0. Header ─────────────────────────────────────────────────── */}
         <div className="bg-[#131218] px-10 py-10">
           <p className="text-[8px] font-bold uppercase tracking-[2.5px] text-white/20 mb-3">
-            HOME · {dateLabel.toUpperCase()}
+            HOME · {dateLabel.toUpperCase()} · v2
           </p>
           <h1 className="text-[2.6rem] font-[300] text-white leading-[1] tracking-[-1.5px]">
             {greeting},<br />
@@ -254,7 +255,7 @@ export default async function AdminPage() {
                 </div>
               </div>
 
-              {/* Focus suggestion — injected when a follow-up item has meeting ≤7d */}
+              {/* Focus suggestion — top CoS task with imminent meeting */}
               {focusSuggestion && (
                 <div className="mt-4 pt-4 border-t border-white/8">
                   <p className="text-[8px] font-bold uppercase tracking-[2px] text-[#c8f55a]/40 mb-2">
@@ -263,15 +264,15 @@ export default async function AdminPage() {
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 min-w-0">
                       <p className="text-[13px] font-semibold text-white/90 leading-snug">
-                        {focusSuggestion.pendingActionLabel}
+                        {focusSuggestion.taskTitle}
                       </p>
                       <div className="flex items-center gap-3 mt-1.5 flex-wrap">
-                        {focusSuggestion.nextMeetingDate && (
+                        {focusSuggestion.dueDate && (
                           <span className="text-[10px] text-white/40 font-medium">
-                            📅 Meeting: {new Date(focusSuggestion.nextMeetingDate).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "short" })}
+                            📅 {new Date(focusSuggestion.dueDate).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "short" })}
                           </span>
                         )}
-                        <span className="text-[10px] text-white/30 font-medium">Suggested: 1h review block</span>
+                        <span className="text-[10px] text-white/30 font-medium">{focusSuggestion.signalReason}</span>
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
@@ -311,11 +312,11 @@ export default async function AdminPage() {
               {focusSuggestion && (
                 <div className="flex-1 min-w-0 border-l border-[#131218]/10 pl-5 ml-5">
                   <p className="text-[8px] font-bold uppercase tracking-[2px] text-[#131218]/30 mb-1">Recommended focus</p>
-                  <p className="text-[12px] font-semibold text-[#131218]/70 leading-snug">{focusSuggestion.pendingActionLabel}</p>
+                  <p className="text-[12px] font-semibold text-[#131218]/70 leading-snug">{focusSuggestion.taskTitle}</p>
                   <div className="flex items-center gap-2 mt-1.5">
-                    {focusSuggestion.nextMeetingDate && (
+                    {focusSuggestion.dueDate && (
                       <span className="text-[9px] text-[#131218]/35">
-                        📅 {new Date(focusSuggestion.nextMeetingDate).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}
+                        📅 {new Date(focusSuggestion.dueDate).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}
                       </span>
                     )}
                     {focusSuggestion.calendarBlockUrl && (
@@ -360,7 +361,9 @@ export default async function AdminPage() {
               <p className="text-[9px] font-bold text-[#131218]/25 uppercase tracking-widest mb-2">Portfolio activo</p>
               <p className="text-3xl font-[800] text-[#131218] tracking-tight leading-none mb-2">{projects.length}</p>
               <div className="flex items-center gap-2">
-                <span className="text-[10px] font-semibold text-[#131218]/40">{workroomCount} Workroom · {garageCount} Garage</span>
+                <span className="text-[10px] font-semibold text-[#131218]/40">
+                  {workroomCount} Workroom · {garageCount} Garage{untypedCount > 0 ? ` · ${untypedCount} sin tipo` : ""}
+                </span>
               </div>
               {blockerCount > 0 && (
                 <div className="mt-2.5 flex items-center gap-1.5">
@@ -373,12 +376,12 @@ export default async function AdminPage() {
             {/* Tile 2 — Cola de trabajo */}
             <Link href="/admin/decisions" className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-5 hover:bg-[#EFEFEA]/40 transition-colors block">
               <p className="text-[9px] font-bold text-[#131218]/25 uppercase tracking-widest mb-2">Decisiones + updates</p>
-              <p className={`text-3xl font-[800] tracking-tight leading-none mb-2 ${totalPending > 0 ? "text-amber-500" : "text-[#131218]/15"}`}>
-                {totalPending}
+              <p className={`text-3xl font-[800] tracking-tight leading-none mb-2 ${openDecisions.length > 0 ? "text-amber-500" : "text-[#131218]/15"}`}>
+                {openDecisions.length}
               </p>
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-semibold text-[#131218]/40">
-                  {urgentDecisions.length} urgentes · {needsUpdate.length} proyectos por actualizar
+                  {totalPending > 0 ? `${totalPending} requieren acción · ` : ""}{urgentDecisions.length} urgentes · {needsUpdate.length} por actualizar
                 </span>
               </div>
               {withDeadlines.length > 0 && (
@@ -401,10 +404,10 @@ export default async function AdminPage() {
                     hint: "Pending agent drafts needing your review",
                   },
                   {
-                    label: "Follow-ups activos",
-                    count: followUpItems.length,
+                    label: "CoS tasks activas",
+                    count: cosTasks.length,
                     activeColor: "text-amber-500",
-                    hint: "Active / Proposal Sent / Negotiation — detected automatically",
+                    hint: "Tasks with meetings, pending reviews, or explicit actions",
                   },
                   {
                     label: "Candidatos sin revisar",
@@ -459,26 +462,24 @@ export default async function AdminPage() {
             {/* ── LEFT COLUMN ───────────────────────────────────────────────── */}
             <div className="space-y-6">
 
-              {/* ── 5a. Opportunity Candidates — unreviewed signals ───────── */}
-              {candidates.length > 0 && (
-                <div>
-                  <SectionHeader
-                    label="Unreviewed signals"
-                    count={candidates.length}
-                  />
-                  <CandidateSection candidates={candidates} />
-                </div>
-              )}
-
-              {/* ── 5b. Follow-up Desk (Chief-of-Staff) ──────────────────── */}
+              {/* ── 5a. Opportunity Candidates — always visible so Scan button is accessible */}
               <div>
                 <SectionHeader
-                  label="Follow-up desk"
-                  count={followUpItems.length}
-                  action={followUpItems.length > 0 ? "All opportunities →" : undefined}
+                  label="Unreviewed signals"
+                  count={candidates.length}
+                />
+                <CandidateSection candidates={candidates} />
+              </div>
+
+              {/* ── 5b. Chief of Staff — Tasks ───────────────────────────── */}
+              <div>
+                <SectionHeader
+                  label="Chief of Staff · Tasks"
+                  count={cosTasks.length}
+                  action={cosTasks.length > 0 ? "All opportunities →" : undefined}
                   href="/admin/opportunities"
                 />
-                <FollowUpDesk items={followUpItems} />
+                <ChiefOfStaffDesk tasks={cosTasks} />
               </div>
 
               {/* ── 6. My Commitments (from briefing + decisions) ─────────── */}

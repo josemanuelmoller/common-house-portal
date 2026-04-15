@@ -54,6 +54,75 @@ if (res.ok) {
 `router.refresh()` is a soft re-render: server components re-execute and re-render with fresh data; client component state is preserved.
 <!-- END:client-component-refresh-rules -->
 
+<!-- BEGIN:end-to-end-verification-rule -->
+## End-to-end verification — hard rule
+
+A fix is NOT done just because:
+- code changed
+- TypeScript passes
+- the route looks correct in a code review
+- a commit was pushed
+
+**A fix is only done when the user-visible platform behavior has been validated end to end.**
+
+### Required verification loop for every user-facing change
+
+After any change that affects what a user sees or clicks:
+
+1. Start the dev server (or confirm the staging/prod deployment is live)
+2. Open the affected page in a real browser — use `mcp__Claude_in_Chrome__navigate` or `mcp__Claude_Preview__preview_start`
+3. Reproduce the exact user flow that was broken or changed
+4. Confirm the visible result is correct: correct data, correct UI, no empty sections, no noisy entries, no regressions
+5. If the result is wrong, incomplete, empty, or not meaningfully improved → continue debugging. Do NOT declare success.
+
+### Verification must use browser interaction — not static inspection
+
+Valid verification:
+- `mcp__Claude_in_Chrome__navigate` → screenshot/page text
+- `mcp__Claude_Preview__preview_start` → `preview_screenshot` + `preview_snapshot`
+- Checking actual network responses for the relevant API route
+- Confirming data visible in the UI matches what Notion / the DB contains
+
+Not valid as final verification:
+- Reading the fixed code and concluding it "should work"
+- Running `tsc --noEmit` and calling it done
+- Checking a route file without confirming the UI renders correctly
+
+### Applied to the Chief-of-Staff / Hall / Inbox fixes
+
+Any change to: admin page, inbox triage, follow-up desk, candidate section, candidate scan, focus of day, or any Hall section — must be verified by loading `/admin` in the browser after the fix and confirming the affected section renders correctly with real data.
+
+### When verification reveals the fix is incomplete
+
+Keep the loop open. Debug, fix, deploy, verify again. Do not stop until the user-visible behavior is correct. Intermediate states like "the code looks right but I haven't checked" are not stopping points.
+<!-- END:end-to-end-verification-rule -->
+
+<!-- BEGIN:runtime-verification-rule -->
+## Runtime verification — production requirement (hard rule)
+
+User-visible validation MUST be performed in the production environment:
+
+https://portal.wearecommonhouse.com
+
+Localhost validation is NOT sufficient to declare a fix complete.
+
+### Completion rule
+
+A user-facing fix is ONLY considered complete if:
+
+1. It is deployed
+2. It is verified in production (portal.wearecommonhouse.com)
+3. The visible UI behavior is confirmed there
+
+Claude MUST explicitly state where verification was performed:
+- "Verified in localhost" → NOT sufficient
+- "Verified in production" → REQUIRED for completion
+
+If localhost and production differ:
+→ production is the source of truth
+→ continue debugging until production matches expected behavior
+<!-- END:runtime-verification-rule -->
+
 <!-- BEGIN:pre-merge-sanity-checklist -->
 ## Pre-merge sanity checklist — hard rule
 

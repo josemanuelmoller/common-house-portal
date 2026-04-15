@@ -17,6 +17,28 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { CandidateItem } from "@/lib/notion";
 
+const ORIGIN_LABEL: Record<string, string> = {
+  meeting: "📋 Meeting",
+  email:   "📧 Email",
+  doc:     "📄 Doc",
+};
+
+function OriginBadges({ origins }: { origins: ("meeting" | "email" | "doc")[] }) {
+  if (!origins || origins.length === 0) return null;
+  return (
+    <div className="flex items-center gap-1 flex-wrap mt-0.5 mb-1">
+      {origins.map(o => (
+        <span
+          key={o}
+          className="text-[8px] font-semibold px-1.5 py-0.5 rounded-full bg-[#EFEFEA] text-[#131218]/50 border border-[#E0E0D8]"
+        >
+          {ORIGIN_LABEL[o] ?? o}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function typeColor(type: string): string {
   if (type === "Grant")       return "bg-green-50 text-green-600 border-green-200";
   if (type === "Investment")  return "bg-purple-50 text-purple-600 border-purple-200";
@@ -29,11 +51,19 @@ interface Props {
   candidates: CandidateItem[];
 }
 
+type ScanResult = {
+  found: number;
+  created: number;
+  enriched: number;
+  gmailScanned: number;
+  meetingsScanned: number;
+};
+
 export function CandidateSection({ candidates }: Props) {
   const router = useRouter();
   const [acting, setActing]     = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
-  const [scanResult, setScanResult] = useState<{ found: number; created: number } | null>(null);
+  const [scanResult, setScanResult] = useState<ScanResult | null>(null);
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
 
   async function handleAction(candidateId: string, action: "promote" | "ignore") {
@@ -62,10 +92,16 @@ export function CandidateSection({ candidates }: Props) {
         body: JSON.stringify({ mode: "execute", lookback_days: 14 }),
       });
       const data = await res.json();
-      setScanResult({ found: data.candidates?.length ?? 0, created: data.created ?? 0 });
-      if ((data.created ?? 0) > 0) router.refresh();
+      setScanResult({
+        found:           data.candidates?.length ?? 0,
+        created:         data.created   ?? 0,
+        enriched:        data.enriched  ?? 0,
+        gmailScanned:    data.gmail_scanned    ?? 0,
+        meetingsScanned: data.meetings_scanned ?? 0,
+      });
+      if ((data.created ?? 0) > 0 || (data.enriched ?? 0) > 0) router.refresh();
     } catch {
-      setScanResult({ found: 0, created: 0 });
+      setScanResult({ found: 0, created: 0, enriched: 0, gmailScanned: 0, meetingsScanned: 0 });
     } finally {
       setScanning(false);
     }
@@ -80,11 +116,21 @@ export function CandidateSection({ candidates }: Props) {
         <div className="flex items-center gap-2">
           {scanResult !== null && (
             <span className="text-[9px] text-[#131218]/35 font-medium">
-              {scanResult.created > 0
-                ? `${scanResult.created} new candidate${scanResult.created !== 1 ? "s" : ""} found`
+              {scanResult.created > 0 || scanResult.enriched > 0
+                ? [
+                    scanResult.created  > 0 && `${scanResult.created} new`,
+                    scanResult.enriched > 0 && `${scanResult.enriched} enriched`,
+                  ].filter(Boolean).join(", ") + " · scanned " +
+                  [
+                    scanResult.gmailScanned    > 0 && `${scanResult.gmailScanned} emails`,
+                    scanResult.meetingsScanned > 0 && `${scanResult.meetingsScanned} meetings`,
+                  ].filter(Boolean).join(" + ")
                 : scanResult.found > 0
-                  ? `${scanResult.found} signal${scanResult.found !== 1 ? "s" : ""} detected — already tracked`
-                  : "No new candidates found"}
+                  ? `${scanResult.found} signal${scanResult.found !== 1 ? "s" : ""} — already tracked`
+                  : `No new candidates · scanned ${[
+                      scanResult.gmailScanned    > 0 && `${scanResult.gmailScanned} emails`,
+                      scanResult.meetingsScanned > 0 && `${scanResult.meetingsScanned} meetings`,
+                    ].filter(Boolean).join(" + ") || "0 sources"}`}
             </span>
           )}
         </div>
@@ -141,10 +187,18 @@ export function CandidateSection({ candidates }: Props) {
               {c.orgName && (
                 <p className="text-[10.5px] text-[#131218]/40 mt-0.5">{c.orgName}</p>
               )}
+              {c.signalRef && c.signalRef !== c.orgName && (
+                <p className="text-[9.5px] text-[#131218]/30 mt-0.5 truncate max-w-[360px]" title={c.signalRef}>
+                  {c.signalRef}
+                </p>
+              )}
+
+              {/* Signal origins */}
+              <OriginBadges origins={c.signalOrigins} />
 
               {/* Signal context */}
               {c.signalContext && (
-                <p className="text-[10px] text-[#131218]/45 mt-1.5 leading-snug italic">
+                <p className="text-[10px] text-[#131218]/45 mt-1 leading-snug italic">
                   {c.signalContext.slice(0, 200)}
                 </p>
               )}

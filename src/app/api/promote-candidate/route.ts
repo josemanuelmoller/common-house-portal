@@ -1,12 +1,14 @@
 /**
  * PATCH /api/promote-candidate
  *
- * Promotes or ignores an Opportunity Candidate (Stage = "Candidate").
- *   action "promote" → Stage = "Active", Follow-up Status = "Needed"
- *   action "ignore"  → Stage = "Archived", Follow-up Status = "None"
+ * Promotes or ignores an Opportunity Candidate (Opportunity Status = "New").
+ *   action "promote" → Opportunity Status = "Qualifying", Follow-up Status = "Needed"
+ *   action "ignore"  → Opportunity Status = "Stalled",   Follow-up Status = "None"
  *
  * Body: { candidateId: string, action: "promote" | "ignore" }
  * Auth: adminGuardApi()
+ *
+ * Field names verified against Notion schema 2026-04-13.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -27,8 +29,8 @@ export async function PATCH(req: NextRequest) {
   if (action !== "promote" && action !== "ignore") return NextResponse.json({ error: "action must be promote or ignore" }, { status: 400 });
 
   const properties = action === "promote"
-    ? { "Stage": { select: { name: "Active" } }, "Follow-up Status": { select: { name: "Needed" } } }
-    : { "Stage": { select: { name: "Archived" } }, "Follow-up Status": { select: { name: "None" } } };
+    ? { "Opportunity Status": { select: { name: "Qualifying" } }, "Follow-up Status": { select: { name: "Needed" } } }
+    : { "Opportunity Status": { select: { name: "Stalled" } },   "Follow-up Status": { select: { name: "None" } } };
 
   try {
     await notion.pages.update({ page_id: candidateId, properties });

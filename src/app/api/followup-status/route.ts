@@ -2,10 +2,19 @@
  * PATCH /api/followup-status
  *
  * Updates the "Follow-up Status" select on an Opportunity [OS v2] record.
- * Called by the FollowUpDesk client component when the user marks an item
- * as handled, waiting, or resets it.
+ * Called by ChiefOfStaffDesk (and legacy FollowUpDesk) when the user changes
+ * a task's status.
  *
- * Body: { opportunityId: string, status: "Needed" | "Sent" | "Waiting" | "None" }
+ * Body: { opportunityId: string, status: TaskStatus }
+ *
+ * Valid statuses (maps to Follow-up Status select in Notion):
+ *   "Needed"      → Todo (task is pending)
+ *   "In Progress" → In Progress (actively working)
+ *   "Waiting"     → Waiting on them (sent, awaiting reply)
+ *   "Done"        → Done (task complete — item disappears from desk)
+ *   "Dropped"     → Dropped (no longer pursuing — item disappears from desk)
+ *   "Sent"        → Legacy alias for Waiting
+ *   "None"        → Legacy: no status set
  *
  * Auth: adminGuardApi() — must be an authenticated admin session.
  */
@@ -15,7 +24,7 @@ import { Client } from "@notionhq/client";
 import { adminGuardApi } from "@/lib/require-admin";
 
 const notion = new Client({ auth: process.env.NOTION_API_KEY });
-const VALID_STATUSES = ["Needed", "Sent", "Waiting", "None"] as const;
+const VALID_STATUSES = ["Needed", "In Progress", "Waiting", "Done", "Dropped", "Sent", "None"] as const;
 type FollowUpStatus = (typeof VALID_STATUSES)[number];
 
 export async function PATCH(req: NextRequest) {

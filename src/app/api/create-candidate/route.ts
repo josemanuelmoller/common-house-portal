@@ -7,12 +7,17 @@
  * Body:
  *   { fromName: string, from: string, subject: string, snippet?: string, gmailUrl?: string }
  *
- * Creates Stage="Candidate" in Opportunities [OS v2] with:
+ * Creates Opportunity Status="New" in Opportunities [OS v2] with:
  *   - Opportunity Name: derived from subject + fromName
- *   - Organization: fromName
- *   - Pending Action: snippet summary (as signal context)
- *   - Review URL: Gmail thread URL
- *   - Stage: Candidate, Follow-up Status: Needed, Scope: CH
+ *   - Trigger / Signal: inbox context (fromName, email, snippet)
+ *   - Source URL: Gmail thread URL
+ *   - Opportunity Status: New, Follow-up Status: Needed, Scope: CH
+ *
+ * Field names verified against Notion schema 2026-04-13:
+ *   "Opportunity Status" (select: New|Qualifying|Active|Stalled|Closed Won|Closed Lost)
+ *   "Opportunity Type"   (select)
+ *   "Trigger / Signal"   (rich_text) — replaces old "Pending Action"
+ *   "Source URL"         (url)       — replaces old "Review URL"
  *
  * Auth: adminGuardApi()
  */
@@ -44,13 +49,14 @@ export async function POST(req: NextRequest) {
     const page = await notion.pages.create({
       parent: { database_id: DB_OPPORTUNITIES },
       properties: {
-        "Opportunity Name": { title:     [{ text: { content: oppName } }] },
-        "Stage":            { select:    { name: "Candidate" } },
-        "Follow-up Status": { select:    { name: "Needed" } },
-        "Scope":            { select:    { name: "CH" } },
-        "Organization":     { rich_text: [{ text: { content: fromName.slice(0, 200) } }] },
-        ...(signalContext ? { "Pending Action": { rich_text: [{ text: { content: signalContext.slice(0, 2000) } }] } } : {}),
-        ...(gmailUrl ? { "Review URL": { url: gmailUrl } } : {}),
+        "Opportunity Name":   { title:  [{ text: { content: oppName } }] },
+        "Opportunity Status": { select: { name: "New" } },
+        "Follow-up Status":   { select: { name: "Needed" } },
+        "Scope":              { select: { name: "CH" } },
+        // "Account / Organization" is a relation — cannot set as free text from inbox signal.
+        // Org context is encoded in Trigger / Signal instead.
+        ...(signalContext ? { "Trigger / Signal": { rich_text: [{ text: { content: signalContext.slice(0, 2000) } }] } } : {}),
+        ...(gmailUrl ? { "Source URL": { url: gmailUrl } } : {}),
       },
     });
     return NextResponse.json({ ok: true, candidateId: page.id, notionUrl: (page as { url?: string }).url ?? "" });
