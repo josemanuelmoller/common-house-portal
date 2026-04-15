@@ -22,10 +22,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Client } from "@notionhq/client";
 import { adminGuardApi } from "@/lib/require-admin";
+import { getCoSTasks } from "@/lib/notion";
 
 const notion = new Client({ auth: process.env.NOTION_API_KEY });
 const VALID_STATUSES = ["Needed", "In Progress", "Waiting", "Done", "Dropped", "Sent", "None"] as const;
 type FollowUpStatus = (typeof VALID_STATUSES)[number];
+
+// Temporary debug endpoint — returns raw CoS tasks + any error detail
+export async function GET(req: NextRequest) {
+  const guard = await adminGuardApi();
+  if (guard) return guard;
+  try {
+    const tasks = await getCoSTasks();
+    return NextResponse.json({ ok: true, count: tasks.length, tasks: tasks.slice(0, 5) });
+  } catch (err) {
+    return NextResponse.json({ error: String(err) }, { status: 500 });
+  }
+}
 
 export async function PATCH(req: NextRequest) {
   const guard = await adminGuardApi();
