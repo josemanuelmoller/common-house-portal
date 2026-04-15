@@ -41,15 +41,15 @@ const PROJECT_KEYWORD_OVERRIDES: Record<string, string[]> = {
   // Way Out — various spellings
   "33f45e5b-6633-8129-b715-ea38f400d631": ["wayout", "way out", "wayout"],
   // Beeok
-  "33f45e5b-6633-81e4-a6bd-f97d81234567": ["beeok"],
+  "33f45e5b-6633-8124-b2b8-c79d18a4d46a": ["beeok"],
   // Yenxa
-  "33f45e5b-6633-81e1-b3cd-e0a3c1234567": ["yenxa"],
+  "33f45e5b-6633-812a-9b42-faf1f0b2518b": ["yenxa"],
   // Moss Solutions
-  "33f45e5b-6633-81e2-b4de-f1b4d1234567": ["moss solutions", "moss"],
+  "33f45e5b-6633-8138-937a-f600fc992756": ["moss solutions", "moss"],
   // GotoFly
-  "33f45e5b-6633-81e3-b5ef-f2c5e1234567": ["gotofly", "goto fly"],
+  "33f45e5b-6633-814e-8d18-e3c96a8d20ca": ["gotofly", "goto fly"],
   // Movener
-  "33f45e5b-6633-81e5-b6ab-f3d6f1234567": ["movener"],
+  "33f45e5b-6633-810b-81d1-e22915da2506": ["movener"],
 };
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────

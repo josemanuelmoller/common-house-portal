@@ -43,13 +43,43 @@ function authCheck(req: NextRequest): boolean {
 
 const ORG_MAP: Record<string, { notionId: string; keywords: string[]; emailDomains: string[] }> = {
   "iRefill": {
-    notionId:     "33f45e5b6633810b95eafddc3219b71a",
+    notionId:     "33f45e5b-6633-810b-95ea-fddc3219b71a",
     keywords:     ["irefill", "airefil", "refill", "rajneesh", "auto mercado", "automercado", "dispensadora"],
     emailDomains: ["irefill.in", "automercado.biz"],
   },
   "SUFI": {
-    notionId:     "33f45e5b663381b384effa1ad08b091b",
+    notionId:     "33f45e5b-6633-81b3-84ef-fa1ad08b091b",
     keywords:     ["sufi", "andresalejandrobarbieri"],
+    emailDomains: [],
+  },
+  "Way Out": {
+    notionId:     "33f45e5b-6633-81cd-9e1b-df610a9ff5dc",
+    keywords:     ["wayout", "way out"],
+    emailDomains: [],
+  },
+  "Beeok": {
+    notionId:     "33f45e5b-6633-818a-ad5b-c387eac4dff7",
+    keywords:     ["beeok"],
+    emailDomains: [],
+  },
+  "Yenxa": {
+    notionId:     "33f45e5b-6633-8110-8260-dfe9a94ef4e8",
+    keywords:     ["yenxa"],
+    emailDomains: [],
+  },
+  "Moss Solutions": {
+    notionId:     "33f45e5b-6633-811a-ab3d-ea9e39d97a11",
+    keywords:     ["moss solutions", "moss"],
+    emailDomains: [],
+  },
+  "GotoFly": {
+    notionId:     "33f45e5b-6633-81df-8654-cc715a5bb81e",
+    keywords:     ["gotofly", "goto fly"],
+    emailDomains: [],
+  },
+  "Movener": {
+    notionId:     "33f45e5b-6633-8153-93d1-f86985420a9e",
+    keywords:     ["movener"],
     emailDomains: [],
   },
 };
@@ -74,27 +104,27 @@ const PROJECT_MAP: Record<string, { projectId: string; keywords: string[]; email
     emailDomains: [],
   },
   "Beeok": {
-    projectId:    "33f45e5b-6633-81e4-a6bd-f97d81234567",
+    projectId:    "33f45e5b-6633-8124-b2b8-c79d18a4d46a",
     keywords:     ["beeok"],
     emailDomains: [],
   },
   "Yenxa": {
-    projectId:    "33f45e5b-6633-81e1-b3cd-e0a3c1234567",
+    projectId:    "33f45e5b-6633-812a-9b42-faf1f0b2518b",
     keywords:     ["yenxa"],
     emailDomains: [],
   },
   "Moss Solutions": {
-    projectId:    "33f45e5b-6633-81e2-b4de-f1b4d1234567",
+    projectId:    "33f45e5b-6633-8138-937a-f600fc992756",
     keywords:     ["moss solutions", "moss"],
     emailDomains: [],
   },
   "GotoFly": {
-    projectId:    "33f45e5b-6633-81e3-b5ef-f2c5e1234567",
+    projectId:    "33f45e5b-6633-814e-8d18-e3c96a8d20ca",
     keywords:     ["gotofly", "goto fly"],
     emailDomains: [],
   },
   "Movener": {
-    projectId:    "33f45e5b-6633-81e5-b6ab-f3d6f1234567",
+    projectId:    "33f45e5b-6633-810b-81d1-e22915da2506",
     keywords:     ["movener"],
     emailDomains: [],
   },
