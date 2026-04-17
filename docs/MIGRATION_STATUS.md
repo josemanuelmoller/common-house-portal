@@ -443,6 +443,91 @@ No new tables created. Write paths unchanged.
 
 ---
 
+## Dual-Write Sprint — Live Operational Mirror (2026-04-17)
+
+Implemented 3 dual-write moves that make Supabase the live operational mirror
+for the most important state changes, eliminating noon-sync lag for key fields.
+
+### Move 1 — People fields (relationship-warmth + ingest-meetings)
+
+After each Notion `pages.update` that writes `Contact Warmth` or `Last Contact Date`,
+the route now also calls:
+```typescript
+await sb.from("people")
+  .update({ contact_warmth, last_contact_date, updated_at })
+  .eq("notion_id", person.id);
+```
+
+Fields now live in Supabase immediately (not waiting for noon sync):
+- `people.contact_warmth`
+- `people.last_contact_date`
+- `people.updated_at`
+
+### Move 2 — Opportunity status fields (flag-opportunity + followup-status + promote-candidate)
+
+After each Notion write that changes `Follow-up Status` or `Opportunity Status`,
+the route now also calls:
+```typescript
+await sb.from("opportunities")
+  .update({ follow_up_status, [status], updated_at })
+  .eq("notion_id", opportunityId);
+```
+
+Fields now live in Supabase immediately:
+- `opportunities.follow_up_status` (all 3 routes)
+- `opportunities.status` (promote-candidate only: Qualifying or Stalled)
+- `opportunities.updated_at`
+
+### Move 3 — Evidence validation status (validation-operator)
+
+After each Notion write that sets `Validation Status = Validated`,
+the route now also calls:
+```typescript
+await sb.from("evidence")
+  .update({ validation_status: "Validated", updated_at })
+  .eq("notion_id", item.id);
+```
+
+Fields now live in Supabase immediately (not waiting for 7:30am sync-evidence):
+- `evidence.validation_status`
+- `evidence.updated_at`
+
+This closes the residual 30-minute gap for `sync-loops` (8am) — by the time
+sync-loops runs, all evidence validated that night (3am) is already in Supabase.
+
+### Dual-writes are fire-and-forget
+
+All Supabase writes are wrapped in `try/catch`. If Supabase is unavailable,
+the Notion write already succeeded — the dual-write failure is non-fatal.
+The next noon sync (or 7:30am sync-evidence) will restore consistency.
+
+### Production verification (2026-04-17)
+
+- Deployment: `https://portal.wearecommonhouse.com` — commit `a78555a`, status Ready
+- `ingest-meetings` triggered manually: returned `{ok: true, meetings: 3, people_updated: 1}` ✅
+- Direct Supabase UPDATE by `notion_id` confirmed working for all 3 tables:
+  - `UPDATE people SET contact_warmth WHERE notion_id = ?` → 1 row affected ✅
+  - `UPDATE evidence SET validation_status WHERE notion_id = ?` → 1 row affected ✅
+  - `UPDATE opportunities SET follow_up_status WHERE notion_id = ?` → 1 row affected ✅
+- TypeScript: `tsc --noEmit` clean ✅
+
+### Files changed
+
+| File | Change |
+|---|---|
+| `src/app/api/relationship-warmth/route.ts` | Add sbDual update after `notion.pages.update` inside for loop |
+| `src/app/api/ingest-meetings/route.ts` | Add sb update after `notion.pages.update` inside `updatePeopleLastContact` |
+| `src/app/api/flag-opportunity/route.ts` | Add import + sb update after Notion write |
+| `src/app/api/followup-status/route.ts` | Add sb update after Notion write, before loop engine sync |
+| `src/app/api/promote-candidate/route.ts` | Add import + sb update after Notion write |
+| `src/app/api/validation-operator/route.ts` | Add import + `const sb` before loop + sb update after each Notion validate |
+
+### No schema changes required
+
+All fields already existed in their respective Supabase tables.
+
+---
+
 ## Migration backbone status: COMPLETE — Phase closed 2026-04-17
 
 All tables with active read/write pressure are now in Supabase. All safe internal
