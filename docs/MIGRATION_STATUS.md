@@ -337,6 +337,58 @@ synced since last noon run), the route falls back to the original Notion call.
 
 ---
 
+## Cron Timing Cleanup Sprint 4 — Evidence Gap Closed (2026-04-17)
+
+### Problem
+
+`sync-loops` (8am) read evidence directly from Notion because `sync-evidence`
+ran at 11am — 3 hours AFTER `sync-loops`. Supabase evidence was always stale at
+the time sync-loops ran.
+
+### Fix
+
+**`vercel.json`**: moved `sync-evidence` from `0 11 * * 1-5` (11am) to `30 7 * * 1-5` (7:30am).
+`sync-sources` stays at 11am — no consumer depends on it being earlier.
+
+**`sync-loops syncEvidenceLoops()`**: switched evidence read from Notion
+`databases.query` to Supabase `evidence WHERE validation_status=Validated AND evidence_type=Blocker
+ORDER BY date_captured DESC LIMIT 30`. Notion URL reconstructed from `notion_id` (standard pattern).
+Notion fallback preserved.
+
+### Updated cron chain
+
+```
+02:00  extract-meeting-evidence  (Tue–Sat)
+03:00  validation-operator       (Mon–Fri)
+04:00  evidence-to-knowledge     (Mon–Fri)
+05:00  project-operator          (Mon–Fri)
+06:00  relationship-warmth       (Mon, Thu)
+06:30  fireflies-sync            (Mon–Fri)
+07:00  ingest-gmail              (Mon–Fri)
+07:30  generate-daily-briefing   (Mon–Fri)
+07:30  sync-evidence             (Mon–Fri)  ← moved from 11am
+08:00  sync-loops                (Mon–Fri)  ← now reads evidence from Supabase ✅
+09:00  sync-opportunities        (Mon–Fri)
+10:00  sync-projects             (Mon–Fri)
+11:00  sync-sources              (Mon–Fri)
+12:00  sync-organizations        (Mon–Fri)
+12:00  sync-people               (Mon–Fri)
+18:00  ingest-meetings           (Mon–Fri)
+```
+
+### Routes re-evaluated but NOT switched
+
+| Route | Why still Notion |
+|---|---|
+| `validation-operator` (3am) | Reads "Reviewed" evidence created by extract-meeting-evidence at 2am — 1 hour old, not yet in Supabase at 3am regardless of when sync-evidence runs |
+| `project-operator` (5am) | Reads "Validated" evidence just classified by validation-operator at 3am — not yet in Supabase at 5am for the same reason |
+
+These two routes are structurally inside the nightly evidence pipeline. They must
+read from Notion until either (a) they are rescheduled to run after 7:30am, or
+(b) the pipeline writes directly to Supabase instead of Notion.
+
+---
+
 ## Read-Path Switching Sprint 3 — Final Wave (2026-04-17)
 
 Two more internal cron routes switched. Backbone migration phase closed after this.
@@ -432,8 +484,8 @@ Routes needing full Notion rich-text:
 ### What comes next
 
 Not more migration. The backbone is stable. Useful next phases:
-1. **Cron timing cleanup** — move `sync-evidence` earlier (e.g. 7:30am) to close the
-   gap that blocks `sync-loops`, `validation-operator`, and `project-operator` from switching
+1. ~~**Cron timing cleanup**~~ — **DONE 2026-04-17**: `sync-evidence` moved to 7:30am.
+   `sync-loops` evidence read switched to Supabase-first. See Sprint 4 below.
 2. **Supabase write paths** — `relationship-warmth` and `ingest-meetings` write
    `contact_warmth` / `last_contact_date` directly to Supabase, eliminating the noon
    sync lag for warmth data
