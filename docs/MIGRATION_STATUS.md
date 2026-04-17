@@ -337,6 +337,32 @@ synced since last noon run), the route falls back to the original Notion call.
 
 ---
 
+## Read-Path Switching Sprint 2 (2026-04-17)
+
+Two more admin-only routes switched from Notion opportunity reads to Supabase-first.
+No new tables created. Write paths unchanged.
+
+### Routes switched
+
+| Route | Old path | New path | Notes |
+|---|---|---|---|
+| `POST /api/scan-opportunity-candidates` | `notion.databases.query(150 pages, all non-terminal opps)` | `opportunities WHERE status NOT IN (Closed Won, Closed Lost, Stalled)` | Notion fallback preserved. Removes costliest per-invocation Notion call in the admin surface. Also fixes latent bug: was reading `props["Stage"]` (empty field); now reads correct `status` column. |
+| `POST /api/run-skill/identify-quick-win` | `notion.databases.query(Active/Qualifying opps, 8 items)` | `opportunities WHERE status IN (Active, Qualifying) ORDER BY updated_at DESC LIMIT 8` | No fallback (AI context — staleness acceptable). Decisions/Content/People stay Notion. `Follow-up Status` not in Supabase `people` table so People query cannot switch yet. |
+
+### Routes audited but NOT switched
+
+| Route | Why deferred |
+|---|---|
+| `POST /api/ingest-gmail` | Creates sources at 7am; sync-sources at 11am — Supabase dedup would miss same-day creates on any re-run |
+| `POST /api/extract-meeting-evidence` | Evidence dedup check: sync-evidence at 11am is stale relative to 2am cron |
+| `POST /api/fireflies-sync` | Reads People + Sources + Projects and WRITES back last_contact_date — stays Notion-write |
+| `POST /api/relationship-warmth` | WRITES contact_warmth + last_contact_date to Notion — stays Notion-write |
+| `POST /api/mark-grant-interest` | Low invocation frequency; org name search not critical path |
+| `POST /api/grant-radar` | Project context for AI prompt; runs at 7am Wed, before sync-projects 10am |
+| `POST /api/evidence-to-knowledge` | Evidence read for AI prompt; 4am cron, sync-evidence 11am — stale |
+
+---
+
 ## Migration backbone status: COMPLETE for current operational needs
 
 All tables with active read/write pressure are now in Supabase. No remaining migration
