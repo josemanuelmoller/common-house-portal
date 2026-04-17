@@ -10,11 +10,15 @@
  *
  * Body: { draftId: string, personId: string }
  * Auth: admin session (Clerk).
+ *
+ * Person lookup: Supabase-first since Wave 5 (2026-04-17).
+ * Falls back to Notion pages.retrieve if person not yet synced.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { adminGuardApi } from "@/lib/require-admin";
 import { Client } from "@notionhq/client";
+import { getSupabaseServerClient } from "@/lib/supabase-server";
 
 const notion = new Client({ auth: process.env.NOTION_API_KEY });
 
@@ -28,22 +32,42 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "draftId and personId required" }, { status: 400 });
   }
 
-  // 1. Fetch the draft to get the linked Opportunity (if any)
+  // 1. Fetch person name + email — Supabase-first, Notion fallback
+  let personName = "Unknown";
+  let personEmail = "";
+
+  try {
+    const sb = getSupabaseServerClient();
+    const { data: person } = await sb
+      .from("people")
+      .select("full_name, email")
+      .eq("notion_id", personId)
+      .single();
+
+    if (person) {
+      personName  = person.full_name  ?? "Unknown";
+      personEmail = person.email      ?? "";
+    } else {
+      // Fallback: person not yet synced to Supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const personPage = await notion.pages.retrieve({ page_id: personId }) as any;
+      const pp = personPage.properties;
+      personName =
+        pp["Full Name"]?.title?.[0]?.plain_text ??
+        pp["Full Name"]?.rich_text?.[0]?.plain_text ??
+        pp["Name"]?.title?.[0]?.plain_text ??
+        "Unknown";
+      personEmail = pp["Email"]?.email ?? "";
+    }
+  } catch {
+    // If both paths fail, proceed with defaults — the draft write is more important
+  }
+
+  // 2. Fetch the draft to get the linked Opportunity (if any)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const draft = await notion.pages.retrieve({ page_id: draftId }) as any;
   const opportunityId: string | null =
     draft.properties?.["Opportunity"]?.relation?.[0]?.id ?? null;
-
-  // 2. Fetch person name + email to return to the UI
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const personPage = await notion.pages.retrieve({ page_id: personId }) as any;
-  const pp = personPage.properties;
-  const personName =
-    pp["Full Name"]?.title?.[0]?.plain_text ??
-    pp["Full Name"]?.rich_text?.[0]?.plain_text ??
-    pp["Name"]?.title?.[0]?.plain_text ??
-    "Unknown";
-  const personEmail: string = pp["Email"]?.email ?? "";
 
   // 3. Write Related Entity on the draft
   await notion.pages.update({
@@ -73,7 +97,6 @@ export async function POST(req: NextRequest) {
       }
     } catch {
       // Non-fatal — the draft is now sendable even if the opp update fails.
-      // Log nothing: the caller gets ok:true and can proceed.
     }
   }
 

@@ -1,7 +1,18 @@
+/**
+ * POST /api/run-skill/draft-checkin
+ *
+ * Generates a check-in email draft for a given person and saves it to
+ * Agent Drafts [OS v2].
+ *
+ * Person lookup: Supabase-first since Wave 5 (2026-04-17).
+ * Falls back to Notion pages.retrieve if person not yet synced.
+ */
+
 import { NextRequest, NextResponse } from "next/server";
 import { adminGuardApi } from "@/lib/require-admin";
 import { Client } from "@notionhq/client";
 import Anthropic from "@anthropic-ai/sdk";
+import { getSupabaseServerClient } from "@/lib/supabase-server";
 
 const notion = new Client({ auth: process.env.NOTION_API_KEY });
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -17,28 +28,60 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "personId required" }, { status: 400 });
   }
 
-  // 1. Fetch person from Notion
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let person: any;
+  // 1. Fetch person — Supabase-first, Notion fallback
+  let name      = "this person";
+  let jobTitle  = "";
+  let email     = "";
+  let warmth    = "";
+  let lastDate: string | null = null;
+  let notes     = "";
+  let personFound = false;
+
   try {
-    person = await notion.pages.retrieve({ page_id: personId });
+    const sb = getSupabaseServerClient();
+    const { data: sbPerson } = await sb
+      .from("people")
+      .select("full_name, job_title, email, contact_warmth, last_contact_date, notes")
+      .eq("notion_id", personId)
+      .single();
+
+    if (sbPerson) {
+      name      = sbPerson.full_name        ?? "this person";
+      jobTitle  = sbPerson.job_title        ?? "";
+      email     = sbPerson.email            ?? "";
+      warmth    = sbPerson.contact_warmth   ?? "";
+      lastDate  = sbPerson.last_contact_date ?? null;
+      notes     = sbPerson.notes            ?? "";
+      personFound = true;
+    }
   } catch {
-    return NextResponse.json({ error: "Person not found" }, { status: 404 });
+    // Supabase lookup failed — fall through to Notion
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const prop = (name: string) => (person as any).properties?.[name];
-  const richText = (p: { rich_text?: { plain_text: string }[] } | undefined) =>
-    p?.rich_text?.map((r) => r.plain_text).join("") ?? "";
-  const sel = (p: { select?: { name: string } } | undefined) => p?.select?.name ?? "";
-  const dateVal = (p: { date?: { start: string } } | undefined) => p?.date?.start ?? null;
+  if (!personFound) {
+    // Fallback: person not yet synced to Supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let person: any;
+    try {
+      person = await notion.pages.retrieve({ page_id: personId });
+    } catch {
+      return NextResponse.json({ error: "Person not found" }, { status: 404 });
+    }
 
-  const name      = richText(prop("Full Name")) || richText(prop("Name")) || "this person";
-  const jobTitle  = richText(prop("Job Title / Role"));
-  const email     = prop("Email")?.email ?? "";
-  const warmth    = sel(prop("Contact Warmth"));
-  const lastDate  = dateVal(prop("Last Contact Date"));
-  const notes     = richText(prop("Notes"));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const prop = (n: string) => (person as any).properties?.[n];
+    const richText = (p: { rich_text?: { plain_text: string }[] } | undefined) =>
+      p?.rich_text?.map((r) => r.plain_text).join("") ?? "";
+    const sel = (p: { select?: { name: string } } | undefined) => p?.select?.name ?? "";
+    const dateVal = (p: { date?: { start: string } } | undefined) => p?.date?.start ?? null;
+
+    name     = richText(prop("Full Name")) || richText(prop("Name")) || "this person";
+    jobTitle = richText(prop("Job Title / Role"));
+    email    = prop("Email")?.email ?? "";
+    warmth   = sel(prop("Contact Warmth"));
+    lastDate = dateVal(prop("Last Contact Date"));
+    notes    = richText(prop("Notes"));
+  }
 
   const lastContactDays = lastDate
     ? Math.floor((Date.now() - new Date(lastDate).getTime()) / 86400000)

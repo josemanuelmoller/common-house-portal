@@ -1,7 +1,17 @@
+/**
+ * POST /api/run-skill/delegate-to-desk
+ *
+ * Generates a structured delegation brief and saves it to Agent Drafts [OS v2].
+ *
+ * Assignee lookup: Supabase-first since Wave 5 (2026-04-17).
+ * Falls back to Notion databases.query if assignee not yet synced.
+ */
+
 import { NextRequest, NextResponse } from "next/server";
 import { adminGuardApi } from "@/lib/require-admin";
 import { Client } from "@notionhq/client";
 import Anthropic from "@anthropic-ai/sdk";
+import { getSupabaseServerClient } from "@/lib/supabase-server";
 
 const notion = new Client({ auth: process.env.NOTION_API_KEY });
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -45,26 +55,51 @@ export async function POST(req: NextRequest) {
   let assigneePageId = "";
 
   if (assigneeName) {
+    // Supabase-first person search
+    let sbHit = false;
     try {
-      const peopleRes = await notion.databases.query({
-        database_id: PEOPLE_DB,
-        filter: { property: "Full Name", rich_text: { contains: assigneeName } },
-        page_size: 1,
-      });
-      if (peopleRes.results.length > 0) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const person = peopleRes.results[0] as any;
-        const props = person.properties;
-        resolvedAssignee =
-          props["Full Name"]?.rich_text?.[0]?.plain_text ??
-          props["Name"]?.title?.[0]?.plain_text ??
-          assigneeName;
-        assigneeRole  = props["Job Title / Role"]?.rich_text?.[0]?.plain_text ?? "";
-        assigneeEmail = props["Email"]?.email ?? "";
-        assigneePageId = person.id;
+      const sb = getSupabaseServerClient();
+      const { data: sbPerson } = await sb
+        .from("people")
+        .select("notion_id, full_name, job_title, email")
+        .ilike("full_name", `%${assigneeName}%`)
+        .limit(1)
+        .single();
+
+      if (sbPerson) {
+        resolvedAssignee = sbPerson.full_name  ?? assigneeName;
+        assigneeRole     = sbPerson.job_title  ?? "";
+        assigneeEmail    = sbPerson.email      ?? "";
+        assigneePageId   = sbPerson.notion_id  ?? "";
+        sbHit = true;
       }
     } catch {
-      // People lookup failed — proceed with name as-is
+      // Supabase lookup failed or no match — fall through to Notion
+    }
+
+    if (!sbHit) {
+      // Fallback: person not yet synced to Supabase
+      try {
+        const peopleRes = await notion.databases.query({
+          database_id: PEOPLE_DB,
+          filter: { property: "Full Name", rich_text: { contains: assigneeName } },
+          page_size: 1,
+        });
+        if (peopleRes.results.length > 0) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const person = peopleRes.results[0] as any;
+          const props = person.properties;
+          resolvedAssignee =
+            props["Full Name"]?.rich_text?.[0]?.plain_text ??
+            props["Name"]?.title?.[0]?.plain_text ??
+            assigneeName;
+          assigneeRole   = props["Job Title / Role"]?.rich_text?.[0]?.plain_text ?? "";
+          assigneeEmail  = props["Email"]?.email ?? "";
+          assigneePageId = person.id;
+        }
+      } catch {
+        // People lookup failed — proceed with name as-is
+      }
     }
   }
 
