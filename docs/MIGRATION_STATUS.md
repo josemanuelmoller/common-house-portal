@@ -337,6 +337,34 @@ synced since last noon run), the route falls back to the original Notion call.
 
 ---
 
+## Read-Path Switching Sprint 3 — Final Wave (2026-04-17)
+
+Two more internal cron routes switched. Backbone migration phase closed after this.
+
+### Routes switched
+
+| Route | Old path | New path | Notes |
+|---|---|---|---|
+| `POST /api/relationship-warmth` | `notion.databases.query(200 pages, Status != Archived)` | `SELECT notion_id, full_name, email, contact_warmth, last_contact_date FROM people` | Notion fallback if Supabase empty. Write path (Contact Warmth + Last Contact Date → Notion) unchanged. Status filter dropped — 30 rows, processing archived people is benign. |
+| `POST /api/ingest-meetings` (people lookup) | `notion.databases.query(PEOPLE_DB, Email = email)` × up to 20 per run | `SELECT notion_id FROM people WHERE email = ?` × up to 20 per run | Notion fallback per email if not yet synced. Write path (Last Contact Date → notion.pages.update) unchanged. Removes up to 20 Notion DB queries per run (2× daily cron). |
+
+### Routes audited but NOT switched — final state
+
+| Route | Why stays on Notion |
+|---|---|
+| `POST /api/ingest-gmail` | Creates sources at 7am, sync-sources 11am — Supabase dedup misses same-day creates |
+| `POST /api/extract-meeting-evidence` | Evidence dedup at 2am, sync-evidence 11am — 9h gap |
+| `POST /api/fireflies-sync` | Writes last_contact_date back to Notion — Notion-write route |
+| `POST /api/sync-loops` | Reads evidence at 8am, sync-evidence 11am — stale window |
+| `POST /api/validation-operator` | Runs at 3am, sync-evidence 11am — 8h gap |
+| `POST /api/project-operator` | Runs at 5am, sync-evidence 11am — 6h gap |
+| `GET /api/generate-daily-briefing` | Needs full Notion rich-text for AI context quality |
+| `POST /api/grant-radar` | Reads projects at 7am Wed, sync-projects 10am — stale |
+| `POST /api/evidence-to-knowledge` | Runs at 4am, sync-evidence 11am — 7h gap |
+| `POST /api/mark-grant-interest` | Admin-only, low invocation frequency — not worth complexity |
+
+---
+
 ## Read-Path Switching Sprint 2 (2026-04-17)
 
 Two more admin-only routes switched from Notion opportunity reads to Supabase-first.
@@ -363,12 +391,56 @@ No new tables created. Write paths unchanged.
 
 ---
 
-## Migration backbone status: COMPLETE for current operational needs
+## Migration backbone status: COMPLETE — Phase closed 2026-04-17
 
-All tables with active read/write pressure are now in Supabase. No remaining migration
-waves have a concrete defect (latency, rate limit, data drift) driving them.
+All tables with active read/write pressure are now in Supabase. All safe internal
+read-path switches have been executed across 3 sprints. No remaining Notion reads
+have a safe, valuable switch that doesn't hit a cron timing gap or write dependency.
 
-Cron chain: sync-loops 8am → sync-opportunities 9am → sync-projects 10am → sync-sources + sync-evidence 11am (weekdays).
+### Complete list of switched routes (all sprints)
+
+| Route | Switched field(s) | Table |
+|---|---|---|
+| `GET /api/people-list` | Full list read | `people` |
+| `POST /api/assign-draft-contact` | Person name + email by notion_id | `people` |
+| `POST /api/run-skill/draft-checkin` | Full person profile by notion_id | `people` |
+| `POST /api/run-skill/delegate-to-desk` | Person search by full_name ILIKE | `people` |
+| `POST /api/scan-opportunity-candidates` | All non-terminal opps for dedup | `opportunities` |
+| `POST /api/run-skill/identify-quick-win` | Active/Qualifying opps for AI context | `opportunities` |
+| `POST /api/relationship-warmth` | All people for warmth compute | `people` |
+| `POST /api/ingest-meetings` | Person page ID lookup by email | `people` |
+
+### Remaining Notion reads — why they stay
+
+Routes with cron timing gaps (cron fires before sync completes):
+- `ingest-gmail` (7am, sync-sources 11am)
+- `extract-meeting-evidence` (2am, sync-evidence 11am)
+- `sync-loops` (8am, sync-evidence 11am)
+- `validation-operator` (3am, sync-evidence 11am)
+- `project-operator` (5am, sync-evidence 11am)
+- `grant-radar` (7am Wed, sync-projects 10am)
+- `evidence-to-knowledge` (4am, sync-evidence 11am)
+
+Routes with Notion write dependencies (read + write same session):
+- `relationship-warmth` write side
+- `ingest-meetings` write side
+- `fireflies-sync`
+
+Routes needing full Notion rich-text:
+- `generate-daily-briefing`
+
+### What comes next
+
+Not more migration. The backbone is stable. Useful next phases:
+1. **Cron timing cleanup** — move `sync-evidence` earlier (e.g. 7:30am) to close the
+   gap that blocks `sync-loops`, `validation-operator`, and `project-operator` from switching
+2. **Supabase write paths** — `relationship-warmth` and `ingest-meetings` write
+   `contact_warmth` / `last_contact_date` directly to Supabase, eliminating the noon
+   sync lag for warmth data
+3. **Observability** — query latency logging, sync health dashboard
+
+Cron chain: sync-loops 8am → sync-opportunities 9am → sync-projects 10am →
+sync-sources + sync-evidence 11am → sync-organizations + sync-people noon (weekdays).
 
 ---
 
