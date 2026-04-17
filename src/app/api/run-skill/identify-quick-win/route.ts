@@ -1,16 +1,26 @@
+/**
+ * POST /api/run-skill/identify-quick-win
+ *
+ * Scans OS v2 surfaces for quick-win actions and generates a draft report.
+ *
+ * Opportunities read: Supabase-first since Wave 5 follow-on (2026-04-17).
+ * Decisions, Content, People: still read from Notion (not in Supabase or
+ * missing required fields — Follow-up Status not synced to people table).
+ */
+
 import { NextRequest, NextResponse } from "next/server";
 import { adminGuardApi } from "@/lib/require-admin";
 import { Client } from "@notionhq/client";
 import Anthropic from "@anthropic-ai/sdk";
+import { getSupabaseServerClient } from "@/lib/supabase-server";
 
 const notion = new Client({ auth: process.env.NOTION_API_KEY });
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-const AGENT_DRAFTS_DB = "9844ece875ea4c618f616e8cc97d5a90";
-const DECISIONS_DB    = "6b801204c4de49c7b6179e04761a285a";
-const OPPORTUNITIES_DB = "687caa98594a41b595c9960c141be0c0";
-const CONTENT_DB      = "3bf5cf81f45c4db2840590f3878bfdc0";
-const PEOPLE_DB       = "1bc0f96f33ca4a9e9ff26844377e81de";
+const AGENT_DRAFTS_DB  = "9844ece875ea4c618f616e8cc97d5a90";
+const DECISIONS_DB     = "6b801204c4de49c7b6179e04761a285a";
+const CONTENT_DB       = "3bf5cf81f45c4db2840590f3878bfdc0";
+const PEOPLE_DB        = "1bc0f96f33ca4a9e9ff26844377e81de";
 
 function corsHeaders() {
   return {
@@ -40,23 +50,13 @@ export async function POST(_req: NextRequest) {
   const today = new Date().toISOString().slice(0, 10);
 
   // 1. Pull signals from all relevant surfaces in parallel
-  const [decisionsRes, oppsRes, contentRes, peopleRes] = await Promise.all([
+  //    Opportunities: Supabase-first (synced 9am weekdays)
+  //    Decisions / Content / People: Notion (not in Supabase or missing Follow-up Status field)
+  const [decisionsRes, contentRes, peopleRes, sbOpps] = await Promise.all([
     notion.databases.query({
       database_id: DECISIONS_DB,
       filter: { property: "Status", select: { equals: "Open" } },
       sorts: [{ property: "Priority", direction: "ascending" }],
-      page_size: 8,
-    }).catch(() => ({ results: [], has_more: false })),
-
-    notion.databases.query({
-      database_id: OPPORTUNITIES_DB,
-      filter: {
-        or: [
-          { property: "Opportunity Status", select: { equals: "Qualifying" } },
-          { property: "Opportunity Status", select: { equals: "Active" } },
-        ],
-      },
-      sorts: [{ timestamp: "last_edited_time", direction: "descending" }],
       page_size: 8,
     }).catch(() => ({ results: [], has_more: false })),
 
@@ -82,6 +82,17 @@ export async function POST(_req: NextRequest) {
       },
       page_size: 5,
     }).catch(() => ({ results: [] })),
+
+    (async () => {
+      const sb = getSupabaseServerClient();
+      const { data } = await sb
+        .from("opportunities")
+        .select("title, status, org_notion_id")
+        .in("status", ["Active", "Qualifying"])
+        .order("updated_at", { ascending: false })
+        .limit(8);
+      return data ?? [];
+    })().catch(() => []),
   ]);
 
   // 2. Build context strings
@@ -94,14 +105,9 @@ export async function POST(_req: NextRequest) {
     return `[${priority}] ${title}${type ? ` (${type})` : ""}`;
   });
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const opportunities = oppsRes.results.map((p: any) => {
-    const props = p.properties;
-    const name  = titleOf(p);
-    const stage = props["Stage"]?.select?.name ?? "";
-    const orgRel = props["Organisation"]?.relation?.[0]?.id;
-    return `${name} · ${stage}${orgRel ? " · org linked" : ""}`;
-  });
+  const opportunities = sbOpps.map(o =>
+    `${o.title} · ${o.status}${o.org_notion_id ? " · org linked" : ""}`
+  );
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const content = contentRes.results.map((p: any) => {

@@ -26,6 +26,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { Client } from "@notionhq/client";
 import { adminGuardApi } from "@/lib/require-admin";
 import { getRecentMeetingSources } from "@/lib/notion/sources";
+import { getSupabaseServerClient } from "@/lib/supabase-server";
 
 export const maxDuration = 120;
 export const dynamic = "force-dynamic";
@@ -115,6 +116,54 @@ async function getExistingOpportunityData(): Promise<{
   candidates: ExistingCandidate[];      // Status="New" → enrich Trigger/Signal only
   activePipelineOpps: ActivePipelineOpp[]; // Status="Active"|"Qualifying" → enrich + set Follow-up=Needed
 }> {
+  // ── Supabase-first (opportunities synced 9am weekdays) ────────────────────
+  try {
+    const sb = getSupabaseServerClient();
+    const { data, error } = await sb
+      .from("opportunities")
+      .select("notion_id, title, status, trigger_signal")
+      .not("status", "in", `("Closed Won","Closed Lost","Stalled")`);
+
+    if (!error && data && data.length > 0) {
+      const activeTokens    = new Set<string>();
+      const candidates: ExistingCandidate[]       = [];
+      const activePipelineOpps: ActivePipelineOpp[] = [];
+
+      for (const opp of data) {
+        const stage  = opp.status ?? "";
+        const name   = (opp.title ?? "").toLowerCase();
+        const tokens = name.split(/[\s,·\-–]+/).filter((w: string) => w.length >= 4);
+        tokens.forEach((t: string) => activeTokens.add(t));
+
+        const triggerSignal    = opp.trigger_signal ?? "";
+        const existingOrigins: string[] = [];
+        if (triggerSignal.startsWith("SIGNALS:")) {
+          const signalPart = triggerSignal.split("|")[0].slice("SIGNALS:".length);
+          existingOrigins.push(...signalPart.split(",").map((s: string) => s.trim()));
+        }
+
+        const entry = {
+          id:            opp.notion_id,
+          orgTokens:     tokens,
+          pendingAction: triggerSignal,
+          signalOrigins: existingOrigins,
+        };
+
+        if (stage === "New") {
+          candidates.push(entry);
+        } else if (stage === "Active" || stage === "Qualifying") {
+          activePipelineOpps.push({ ...entry, stage });
+        }
+        // Other stages (Proposal Sent, Negotiation, etc.) — dedup only via activeTokens
+      }
+
+      return { activeTokens, candidates, activePipelineOpps };
+    }
+  } catch {
+    // Supabase unavailable — fall through to Notion
+  }
+
+  // ── Notion fallback ────────────────────────────────────────────────────────
   try {
     // Verified field names: "Opportunity Status" (not "Stage") — schema 2026-04-13
     const res = await notion.databases.query({
@@ -129,8 +178,8 @@ async function getExistingOpportunityData(): Promise<{
       page_size: 150,
     });
 
-    const activeTokens = new Set<string>();
-    const candidates: ExistingCandidate[] = [];
+    const activeTokens    = new Set<string>();
+    const candidates: ExistingCandidate[]       = [];
     const activePipelineOpps: ActivePipelineOpp[] = [];
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
