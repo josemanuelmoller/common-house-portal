@@ -16,6 +16,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Client } from "@notionhq/client";
 import { adminGuardApi } from "@/lib/require-admin";
 import { prop, text } from "@/lib/notion/core";
+import { getSupabaseServerClient } from "@/lib/supabase-server";
 
 const notion = new Client({ auth: process.env.NOTION_API_KEY });
 
@@ -50,6 +51,17 @@ export async function PATCH(req: NextRequest) {
 
   try {
     await notion.pages.update({ page_id: candidateId, properties });
+
+    // Dual-write to Supabase — makes status / follow_up_status live immediately
+    try {
+      const sb = getSupabaseServerClient();
+      const sbStatus    = action === "promote" ? "Qualifying" : "Stalled";
+      const sbFollowUp  = action === "promote" ? "Needed"     : "None";
+      await sb.from("opportunities")
+        .update({ status: sbStatus, follow_up_status: sbFollowUp, updated_at: new Date().toISOString() })
+        .eq("notion_id", candidateId);
+    } catch { /* non-critical */ }
+
     return NextResponse.json({ ok: true, candidateId, action });
   } catch (err) {
     return NextResponse.json({ error: "Notion update failed", detail: String(err) }, { status: 502 });

@@ -21,6 +21,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Client } from "@notionhq/client";
 import { adminGuardApi } from "@/lib/require-admin";
 import { prop, text } from "@/lib/notion/core";
+import { getSupabaseServerClient } from "@/lib/supabase-server";
 
 const notion = new Client({ auth: process.env.NOTION_API_KEY });
 
@@ -58,6 +59,15 @@ export async function PATCH(req: NextRequest) {
     }
 
     await notion.pages.update({ page_id: opportunityId, properties });
+
+    // Dual-write to Supabase — makes follow_up_status live immediately
+    try {
+      const sb = getSupabaseServerClient();
+      await sb.from("opportunities")
+        .update({ follow_up_status: "Needed", updated_at: new Date().toISOString() })
+        .eq("notion_id", opportunityId);
+    } catch { /* non-critical */ }
+
     return NextResponse.json({ ok: true, opportunityId });
   } catch (err) {
     return NextResponse.json({ error: "Notion update failed", detail: String(err) }, { status: 502 });

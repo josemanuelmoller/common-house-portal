@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { notion, getAllEvidence, DB } from "@/lib/notion";
+import { getSupabaseServerClient } from "@/lib/supabase-server";
 
 export const maxDuration = 120;
 
@@ -26,6 +27,7 @@ export async function POST(req: NextRequest) {
   }
 
   const reviewed = await getAllEvidence("Reviewed");
+  const sb = getSupabaseServerClient();
 
   const results = {
     total: reviewed.length,
@@ -59,6 +61,14 @@ export async function POST(req: NextRequest) {
           "Validation Status": { select: { name: "Validated" } },
         },
       });
+
+      // Dual-write to Supabase — makes validation_status live immediately (no 7:30am sync lag)
+      try {
+        await sb.from("evidence")
+          .update({ validation_status: "Validated", updated_at: new Date().toISOString() })
+          .eq("notion_id", item.id);
+      } catch { /* non-critical */ }
+
       results.validated++;
     } catch {
       results.errors++;

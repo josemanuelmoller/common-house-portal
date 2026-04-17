@@ -188,6 +188,14 @@ async function updatePeopleLastContact(
           "Last Contact Date": { date: { start: dateStr } },
         } as any,
       });
+
+      // Dual-write to Supabase — makes last_contact_date live immediately
+      try {
+        await sb.from("people")
+          .update({ last_contact_date: dateStr, updated_at: new Date().toISOString() })
+          .eq("notion_id", pageId);
+      } catch { /* non-critical */ }
+
       updated++;
     } catch {
       // skip on error — non-critical

@@ -212,6 +212,17 @@ export async function POST(req: NextRequest) {
       }
 
       await notion.pages.update({ page_id: person.id, properties });
+
+      // Dual-write to Supabase — makes contact_warmth / last_contact_date live immediately
+      try {
+        const sbDual = getSupabaseServerClient();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const sbFields: Record<string, any> = { updated_at: new Date().toISOString() };
+        if (warmthChanged) sbFields.contact_warmth = newWarmth;
+        if (dateChanged && newDateStr) sbFields.last_contact_date = newDateStr;
+        await sbDual.from("people").update(sbFields).eq("notion_id", person.id);
+      } catch { /* non-critical — Notion write already succeeded */ }
+
       results.updated++;
     } catch {
       results.errors++;

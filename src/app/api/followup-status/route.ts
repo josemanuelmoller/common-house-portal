@@ -109,6 +109,14 @@ export async function PATCH(req: NextRequest) {
       },
     });
 
+    // Dual-write to Supabase — makes follow_up_status live immediately
+    try {
+      const sb = getSupabaseServerClient();
+      await sb.from("opportunities")
+        .update({ follow_up_status: status, updated_at: new Date().toISOString() })
+        .eq("notion_id", opportunityId);
+    } catch { /* non-critical */ }
+
     // Fire-and-forget: sync to Loop Engine (never blocks the response)
     syncLoopAction(opportunityId, status).catch(() => {});
 
