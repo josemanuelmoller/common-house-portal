@@ -13,9 +13,19 @@
  * Auth: x-agent-key header OR Vercel cron CRON_SECRET header.
  */
 
+/**
+ * POST /api/ingest-meetings
+ * (updated 2026-04-17: people email lookup switched to Supabase-first)
+ *
+ * People lookup in updatePeopleLastContact: Supabase-first since Wave 5
+ * follow-on. Removes up to 20 Notion DB queries per run. Write path
+ * (Last Contact Date → Notion) unchanged.
+ */
+
 import { NextRequest, NextResponse } from "next/server";
 import { Client } from "@notionhq/client";
 import Anthropic from "@anthropic-ai/sdk";
+import { getSupabaseServerClient } from "@/lib/supabase-server";
 
 const notion    = new Client({ auth: process.env.NOTION_API_KEY });
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -131,6 +141,8 @@ ${meetingBlocks}`;
 }
 
 // ─── Update CH People Last Contact Date ───────────────────────────────────────
+// Supabase-first: look up page ID by email, then write to Notion.
+// Notion fallback per email if not yet synced (noon sync may lag).
 
 async function updatePeopleLastContact(
   emails: string[],
@@ -138,17 +150,37 @@ async function updatePeopleLastContact(
 ): Promise<number> {
   if (emails.length === 0) return 0;
 
+  const sb = getSupabaseServerClient();
   let updated = 0;
+
   for (const email of emails.slice(0, 20)) {
     try {
-      const res = await notion.databases.query({
-        database_id: PEOPLE_DB,
-        filter: { property: "Email", email: { equals: email } },
-        page_size: 1,
-      });
-      if (res.results.length === 0) continue;
+      let pageId: string | null = null;
 
-      const pageId = res.results[0].id;
+      // Supabase lookup — faster than Notion DB query per email
+      try {
+        const { data: sbPerson } = await sb
+          .from("people")
+          .select("notion_id")
+          .eq("email", email)
+          .single();
+        if (sbPerson?.notion_id) pageId = sbPerson.notion_id;
+      } catch {
+        // PGRST116 (no rows) or network error — fall through to Notion
+      }
+
+      // Notion fallback: person not yet synced to Supabase
+      if (!pageId) {
+        const res = await notion.databases.query({
+          database_id: PEOPLE_DB,
+          filter: { property: "Email", email: { equals: email } },
+          page_size: 1,
+        });
+        if (res.results.length > 0) pageId = res.results[0].id;
+      }
+
+      if (!pageId) continue;
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await notion.pages.update({
         page_id: pageId,

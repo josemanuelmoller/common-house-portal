@@ -21,10 +21,20 @@
  * Called by Vercel cron bi-weekly: Mon + Thu at 06:00 UTC.
  */
 
+/**
+ * POST /api/relationship-warmth
+ * (header updated 2026-04-17: people read switched to Supabase-first)
+ *
+ * People read: Supabase-first since Wave 5 follow-on (2026-04-17).
+ * Notion fallback preserved. Write path (Contact Warmth + Last Contact Date)
+ * unchanged — still writes to Notion. Noon sync picks up new values.
+ */
+
 import { NextRequest, NextResponse } from "next/server";
 import { google } from "googleapis";
 import type { gmail_v1 } from "googleapis";
 import { Client } from "@notionhq/client";
+import { getSupabaseServerClient } from "@/lib/supabase-server";
 
 export const maxDuration = 120;
 
@@ -111,24 +121,49 @@ export async function POST(req: NextRequest) {
   const gmail      = getGmailClient();
   const gmailReady = gmail !== null;
 
-  // Load all active people
+  // Load all people — Supabase-first (synced noon weekdays; 18h stale at most on Mon/Thu 6am run)
+  // Note: Supabase read has no "Status != Archived" filter — the people table has ~30 rows and
+  // processing archived people is benign (warmth/date write to archived Notion pages works fine).
   let allPeople: { id: string; name: string; email: string; currentWarmth: string | null; lastContactDate: string | null }[] = [];
+
   try {
-    const res = await notion.databases.query({
-      database_id: PEOPLE_DB,
-      page_size: 200,
-      filter: { property: "Status", status: { does_not_equal: "Archived" } },
-    });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    allPeople = (res.results as any[]).map((page: any) => ({
-      id:              page.id,
-      name:            page.properties?.["Full Name"]?.title?.[0]?.plain_text ?? "",
-      email:           page.properties?.["Email"]?.email ?? "",
-      currentWarmth:   page.properties?.["Contact Warmth"]?.select?.name ?? null,
-      lastContactDate: page.properties?.["Last Contact Date"]?.date?.start ?? null,
-    })).filter(p => p.name.trim() !== "");
-  } catch (err) {
-    return NextResponse.json({ error: "Failed to load people", detail: String(err) }, { status: 500 });
+    const sb = getSupabaseServerClient();
+    const { data, error } = await sb
+      .from("people")
+      .select("notion_id, full_name, email, contact_warmth, last_contact_date");
+
+    if (!error && data && data.length > 0) {
+      allPeople = data.map(p => ({
+        id:              p.notion_id,
+        name:            p.full_name      ?? "",
+        email:           p.email          ?? "",
+        currentWarmth:   p.contact_warmth ?? null,
+        lastContactDate: p.last_contact_date ?? null,
+      })).filter(p => p.name.trim() !== "");
+    }
+  } catch {
+    // Supabase unavailable — fall through to Notion
+  }
+
+  if (allPeople.length === 0) {
+    // Notion fallback
+    try {
+      const res = await notion.databases.query({
+        database_id: PEOPLE_DB,
+        page_size: 200,
+        filter: { property: "Status", status: { does_not_equal: "Archived" } },
+      });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      allPeople = (res.results as any[]).map((page: any) => ({
+        id:              page.id,
+        name:            page.properties?.["Full Name"]?.title?.[0]?.plain_text ?? "",
+        email:           page.properties?.["Email"]?.email ?? "",
+        currentWarmth:   page.properties?.["Contact Warmth"]?.select?.name ?? null,
+        lastContactDate: page.properties?.["Last Contact Date"]?.date?.start ?? null,
+      })).filter(p => p.name.trim() !== "");
+    } catch (err) {
+      return NextResponse.json({ error: "Failed to load people", detail: String(err) }, { status: 500 });
+    }
   }
 
   const afterTimestamp = Math.floor((Date.now() - LOOKBACK_DAYS * 24 * 60 * 60 * 1000) / 1000);
