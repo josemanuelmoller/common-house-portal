@@ -230,45 +230,94 @@ async function upsertLoop(
 }
 
 // ─── Source 1: Evidence ───────────────────────────────────────────────────────
+// Supabase-first since 2026-04-17: sync-evidence now runs at 7:30am,
+// 30 minutes before sync-loops at 8am. Notion fallback preserved.
 
 async function syncEvidenceLoops(stats: Stats): Promise<void> {
   const now = Date.now();
-  const THIRTY_DAYS  = 30 * 86400000;
+  const THIRTY_DAYS = 30 * 86400000;
 
-  // Evidence Type "Commitment" does not exist in this Notion DB.
-  // Available types: Blocker, Decision, Requirement, Dependency, Outcome, etc.
-  // Only surface Blockers from Evidence — commitment loops come from Opportunities.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const res = await notion.databases.query({
-    database_id: DB.evidence,
-    filter: {
-      and: [
-        { property: "Validation Status", select: { equals: "Validated" } },
-        { property: "Evidence Type", select: { equals: "Blocker" } },
-      ],
-    },
-    sorts: [{ property: "Date Captured", direction: "descending" }],
-    page_size: 30,
-  });
+  type EvidenceItem = {
+    id: string;
+    notion_url: string;
+    dateCaptured: string | null;
+    title: string;
+    excerpt: string | null;
+  };
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  for (const page of res.results as any[]) {
-    const dateCaptured  = dt(page.properties["Date Captured"]);
-    if (!dateCaptured) continue;
+  let evidenceItems: EvidenceItem[] = [];
+  let usedSupabase = false;
 
-    const ageMs = now - new Date(dateCaptured).getTime();
+  // ── Supabase path ────────────────────────────────────────────────────────
+  try {
+    const sb = getSupabaseServerClient();
+    const { data, error } = await sb
+      .from("evidence")
+      .select("notion_id, title, source_excerpt, date_captured")
+      .eq("validation_status", "Validated")
+      .eq("evidence_type", "Blocker")
+      .order("date_captured", { ascending: false })
+      .limit(30);
+
+    if (!error && data && data.length > 0) {
+      evidenceItems = data.map(e => ({
+        id:           e.notion_id,
+        // Reconstruct Notion URL from ID — redirects correctly, no slug needed
+        notion_url:   `https://www.notion.so/${e.notion_id.replace(/-/g, "")}`,
+        dateCaptured: e.date_captured,
+        title:        e.title ?? "Untitled evidence",
+        excerpt:      e.source_excerpt ?? null,
+      }));
+      usedSupabase = true;
+    }
+  } catch {
+    // Supabase unavailable — fall through to Notion
+  }
+
+  // ── Notion fallback ──────────────────────────────────────────────────────
+  if (!usedSupabase) {
+    // Evidence Type "Commitment" does not exist in this Notion DB.
+    // Only surface Blockers — commitment loops come from Opportunities.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const res = await notion.databases.query({
+      database_id: DB.evidence,
+      filter: {
+        and: [
+          { property: "Validation Status", select: { equals: "Validated" } },
+          { property: "Evidence Type",     select: { equals: "Blocker"   } },
+        ],
+      },
+      sorts: [{ property: "Date Captured", direction: "descending" }],
+      page_size: 30,
+    });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    evidenceItems = (res.results as any[]).map(page => ({
+      id:           page.id,
+      notion_url:   page.url ?? "",
+      dateCaptured: dt(page.properties["Date Captured"]),
+      title:        text(page.properties["Evidence Title"]) || "Untitled evidence",
+      excerpt:      text(page.properties["Source Excerpt"]) || null,
+    }));
+  }
+
+  // ── Process items ────────────────────────────────────────────────────────
+  for (const item of evidenceItems) {
+    if (!item.dateCaptured) continue;
+
+    const ageMs = now - new Date(item.dateCaptured).getTime();
     if (ageMs > THIRTY_DAYS) continue;
 
-    const title    = text(page.properties["Evidence Title"]) || "Untitled evidence";
-    const excerpt  = text(page.properties["Source Excerpt"]);
     const loopType: LoopType = "blocker";
-    const taskTitle = excerpt && excerpt.length >= 20 ? excerpt.slice(0, 140) : title.slice(0, 140);
+    const taskTitle = item.excerpt && item.excerpt.length >= 20
+      ? item.excerpt.slice(0, 140)
+      : item.title.slice(0, 140);
 
-    // Skip evidence that is clearly delegated to someone other than the operator.
+    // Skip evidence clearly delegated to someone other than the operator.
     // e.g. "Neil to follow up on speaker flights" → not Jose's direct action.
-    if (!isOperatorActionable(title, excerpt || null)) continue;
+    if (!isOperatorActionable(item.title, item.excerpt)) continue;
 
-    const normalizedKey = buildNormalizedKey("evidence", page.id);
+    const normalizedKey = buildNormalizedKey("evidence", item.id);
     const score = computePriorityScore(loopType, { signalCount: 1 });
 
     await upsertLoop(
@@ -279,16 +328,16 @@ async function syncEvidenceLoops(stats: Stats): Promise<void> {
         intervention_moment: "urgent",
         priority_score:      score,
         linked_entity_type:  "evidence",
-        linked_entity_id:    page.id,
-        linked_entity_name:  title,
-        notion_url:          page.url ?? "",
+        linked_entity_id:    item.id,
+        linked_entity_name:  item.title,
+        notion_url:          item.notion_url,
         review_url:          null,
         due_at:              null,
       },
       "evidence_blocker",
-      page.id,
-      title,
-      excerpt || null,
+      item.id,
+      item.title,
+      item.excerpt,
       stats,
     );
   }

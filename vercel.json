@@ -64,6 +64,30 @@
     {
       "path": "/api/sync-loops",
       "schedule": "0 8 * * 1-5"
+    },
+    {
+      "path": "/api/sync-opportunities",
+      "schedule": "0 9 * * 1-5"
+    },
+    {
+      "path": "/api/sync-projects",
+      "schedule": "0 10 * * 1-5"
+    },
+    {
+      "path": "/api/sync-evidence",
+      "schedule": "30 7 * * 1-5"
+    },
+    {
+      "path": "/api/sync-sources",
+      "schedule": "0 11 * * 1-5"
+    },
+    {
+      "path": "/api/sync-organizations",
+      "schedule": "0 12 * * 1-5"
+    },
+    {
+      "path": "/api/sync-people",
+      "schedule": "0 12 * * 1-5"
     }
   ]
 }
