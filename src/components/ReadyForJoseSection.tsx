@@ -103,7 +103,15 @@ export function ReadyForJoseSection({
     ...approvedDrafts.map((d) => ({ ...d, source: "approved" as const })),
   ].filter((d) => !dismissed.has(d.id));
 
-  if (allItems.length === 0) return null;
+  if (allItems.length === 0) {
+    return (
+      <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-4">
+        <p className="text-[11px] text-[#131218]/30">
+          No ready work yet — approve a draft or send one to Gmail to see it here.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="grid grid-cols-3 gap-3">

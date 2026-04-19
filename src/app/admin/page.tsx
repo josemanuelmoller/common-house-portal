@@ -133,8 +133,13 @@ function computeFocusRecommendation(
     const hasExplicitPending = !!task.pendingAction
       && !task.pendingAction.startsWith("SIGNALS:")
       && !task.pendingAction.startsWith("Inbox signal:")
+      && !task.pendingAction.startsWith("Grant Radar")   // auto-generated scan metadata
+      && !task.pendingAction.startsWith("Radar match")   // auto-generated scan metadata
       && task.pendingAction.trim().length >= 20;
     const reviewIsDoc      = !!task.reviewUrl && !task.reviewUrl.includes("mail.google.com");
+
+    // Suppress: auto-generated Grant Radar scan results — never founder-initiated
+    if (task.pendingAction?.startsWith("Grant Radar") || task.pendingAction?.startsWith("Radar match")) continue;
 
     // Suppress: grants without explicit interest
     if (isGrant && task.opportunityStage !== "Active" && !hasExplicitPending) continue;
@@ -647,18 +652,16 @@ export default async function AdminPage() {
           )}
 
           {/* ── 4c. Ready for Jose — prepared work already done ───────────── */}
-          {(gmailDrafts.length > 0 || approvedDrafts.length > 0) && (
-            <div>
-              <SectionHeader
-                label="Ready for Jose"
-                count={gmailDrafts.length + approvedDrafts.length}
-              />
-              <ReadyForJoseSection
-                gmailDrafts={gmailDrafts}
-                approvedDrafts={approvedDrafts}
-              />
-            </div>
-          )}
+          <div>
+            <SectionHeader
+              label="Ready for Jose"
+              count={gmailDrafts.length + approvedDrafts.length}
+            />
+            <ReadyForJoseSection
+              gmailDrafts={gmailDrafts}
+              approvedDrafts={approvedDrafts}
+            />
+          </div>
 
           {/* ── 4b. Inbox Triage ──────────────────────────────────────────── */}
           <div>
