@@ -1123,6 +1123,10 @@ export async function getCoSTasks(): Promise<CoSTask[]> {
       // isStaleActive removed: "haven't touched in 14 days" is not an open loop.
       // Stale records with no issue content should not surface as tasks.
 
+      // Grants: only surface when there is real user signal (review URL or meeting).
+      // hasExplicitStatus is excluded because grant-radar auto-sets Follow-up = "Needed"
+      // without any founder intent — surfacing those creates noise not tasks.
+      if (isGrant) return hasReview || hasMeetingWithTopic;
       return hasExplicitStatus || hasMeetingWithTopic || hasReview || hasActionablePending;
     });
 

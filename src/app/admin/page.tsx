@@ -186,9 +186,20 @@ export default async function AdminPage() {
   const imminentDeadlines = openDecisions.filter(d => d.dueDate && new Date(d.dueDate).getTime() <= in7days);
   const p1Decisions     = openDecisions.filter(d => d.priority === "P1 Critical");
   const showBanner      = p1Decisions.length > 0 || imminentDeadlines.length > 0;
-  // Widget: only actionable by Jose directly — Missing Input (provide data) and Approval (say yes/no)
-  const deskDecisions   = openDecisions.filter(d => d.decisionType === "Missing Input" || d.decisionType === "Approval");
+  // Widget: all open decisions Jose needs to act on directly
+  const deskDecisions   = openDecisions.filter(d =>
+    d.decisionType === "Missing Input" ||
+    d.decisionType === "Approval" ||
+    d.decisionType === "Policy / Automation Decision"
+  );
   const totalPending    = deskDecisions.length;
+
+  // Dedup: filter Opportunities Explorer to exclude items already shown in CoS Tasks
+  const cosTaskIds        = new Set(cosTasks.map(t => t.id));
+  const filteredOpps      = {
+    ch:        opportunities.ch.filter(o => !cosTaskIds.has(o.id)),
+    portfolio: opportunities.portfolio.filter(o => !cosTaskIds.has(o.id)),
+  };
 
   const dormantRelationships = coldRelationships.filter(r => r.warmth === "Dormant");
   const coldOnly             = coldRelationships.filter(r => r.warmth === "Cold");
@@ -486,7 +497,7 @@ export default async function AdminPage() {
               {/* ── 6. My Commitments (from briefing + decisions) ─────────── */}
               {(dailyBriefing?.myCommitments || openDecisions.length > 0) && (
                 <div>
-                  <SectionHeader label="My commitments" count={openDecisions.length} action="Decisions" href="/admin/decisions" />
+                  <SectionHeader label="Open decisions" count={openDecisions.length} action="Decisions" href="/admin/decisions" />
                   <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
                     {dailyBriefing?.myCommitments ? (
                       <div className="px-5 py-4 border-b border-[#EFEFEA]">
@@ -628,10 +639,10 @@ export default async function AdminPage() {
               </div>
 
               {/* ── 9. Opportunities Explorer ─────────────────────────────── */}
-              {(opportunities.ch.length > 0 || opportunities.portfolio.length > 0) && (
+              {(filteredOpps.ch.length > 0 || filteredOpps.portfolio.length > 0) && (
                 <div>
-                  <SectionHeader label="Opportunities — explore" count={opportunities.ch.length + opportunities.portfolio.length} />
-                  <OpportunityExplorer ch={opportunities.ch} portfolio={opportunities.portfolio} />
+                  <SectionHeader label="Opportunities — explore" count={filteredOpps.ch.length + filteredOpps.portfolio.length} />
+                  <OpportunityExplorer ch={filteredOpps.ch} portfolio={filteredOpps.portfolio} />
                 </div>
               )}
 

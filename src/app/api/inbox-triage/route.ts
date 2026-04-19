@@ -249,13 +249,18 @@ async function handleGet(req: NextRequest) {
   // Claude Haiku classifies urgency
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
+  const todayFormatted = new Date().toLocaleDateString("en-GB", {
+    weekday: "long", day: "numeric", month: "long", year: "numeric",
+  });
+
   const prompt = `You are triaging emails for Jose, founder of Common House (circular economy accelerator).
+Today's date is: ${todayFormatted}.
 Classify each email as exactly one of: "Urgent", "Needs Reply", or "FYI".
 
 Rules:
 - "Urgent": sender is a partner, funder, investor, retailer, grant body, or government entity; OR email mentions a deadline, decision, contract, or explicit request.${THRESHOLD_DAYS <= 2 ? " Max 3 Urgents." : ""}
 - "Needs Reply": clear question, invitation, intro, or action requested. Jose should respond.
-- "FYI": newsletter, notification, auto-generated, low-stakes update.
+- "FYI": newsletter, notification, auto-generated, low-stakes update, OR a confirmed meeting/event whose date has already passed (based on today's date above).
 
 For each item, also write a 1-sentence reason (max 12 words).
 
