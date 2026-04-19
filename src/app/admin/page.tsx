@@ -158,7 +158,7 @@ function computeFocusRecommendation(
       !hasExplicitPending
     ) continue;
 
-    let score = 0;
+    let score = 1; // base: every non-suppressed task qualifies; scoring picks the best
     const reasons: string[] = [];
 
     // Urgency
