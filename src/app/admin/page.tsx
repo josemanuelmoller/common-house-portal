@@ -144,18 +144,20 @@ function computeFocusRecommendation(
     // Suppress: grants without explicit interest
     if (isGrant && task.opportunityStage !== "Active" && !hasExplicitPending) continue;
 
-    // Suppress: vague follow-ups — no specific action described
+    // Suppress: vague follow-ups — no link to act on and no specific action
+    // (a Gmail thread URL counts — it IS something to open and reply to)
     if (
       task.loopType === "follow-up" &&
       !hasExplicitPending &&
-      !reviewIsDoc
+      !task.reviewUrl
     ) continue;
 
-    // Suppress: generic "Follow up" title with no context
+    // Suppress: generic "Follow up" title with no URL and no context
     const titleLower = task.taskTitle.toLowerCase();
     if (
       (titleLower.startsWith("follow up") || titleLower.startsWith("follow-up")) &&
-      !hasExplicitPending
+      !hasExplicitPending &&
+      !task.reviewUrl
     ) continue;
 
     let score = 1; // base: every non-suppressed task qualifies; scoring picks the best
@@ -183,16 +185,12 @@ function computeFocusRecommendation(
       if (msTo >= 0 && msTo <= 7 * 86400000) { score += 10; reasons.push("prep needed"); }
     }
 
-    // Prepared work
+    // Prepared work — doc > gmail thread (both are actionable, doc is higher signal)
     if (reviewIsDoc)          { score += 15; reasons.push("doc ready"); }
+    else if (task.reviewUrl)  { score += 5;  reasons.push("thread to reply"); }
     if (hasExplicitPending)   { score += 10; reasons.push("specific action described"); }
 
-    // Penalise passive inbound with no action
-    if (task.entrySignal === "inbound" && !hasExplicitPending) score -= 15;
-
-    if (score > 0) {
-      candidates.push({ task, score, winReason: reasons.join(" · ") });
-    }
+    candidates.push({ task, score, winReason: reasons.join(" · ") });
   }
 
   if (candidates.length === 0) {
@@ -267,6 +265,15 @@ function computeFocusRecommendation(
     }
   } else if (task.loopType === "commitment") {
     action = `Spend ${timeEstimate} delivering on your ${task.opportunityName} commitment to ${task.orgName}.`;
+  } else if (task.loopType === "follow-up") {
+    const reviewIsGmail = !!task.reviewUrl && task.reviewUrl.includes("mail.google.com");
+    if (pendingSnippet) {
+      action = `Spend ${timeEstimate} on ${pendingSnippet} with ${task.orgName}.`;
+    } else if (reviewIsGmail) {
+      action = `Spend ${timeEstimate} replying to the ${task.orgName} thread — ${task.opportunityName}.`;
+    } else {
+      action = `Spend ${timeEstimate} following up with ${task.orgName} on ${task.opportunityName}.`;
+    }
   } else {
     action = `Spend ${timeEstimate} on ${pendingSnippet ?? task.taskTitle} with ${task.orgName}.`;
   }
