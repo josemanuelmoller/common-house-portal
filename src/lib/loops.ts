@@ -110,6 +110,8 @@ export type Loop = {
   // Track A: interest gate
   is_passive_discovery: boolean;
   founder_interest: string | null;    // null | 'watching' | 'interested' | 'dropped'
+  // Track F: founder ownership
+  founder_owned: boolean;             // true = strategic founder-led item; gets +20 score bonus
 };
 
 export type LoopSignal = {
@@ -182,6 +184,7 @@ export type ScoringContext = {
   signalCount?: number;             // number of corroborating signals
   linkedEntityType?: LinkedEntityType;
   opportunityStage?: string | null; // "Active" | "Qualifying" | "New" | ...
+  founderOwned?: boolean;           // Track F: +20 bonus for strategic founder-led items
 };
 
 export function computePriorityScore(
@@ -209,6 +212,11 @@ export function computePriorityScore(
   // Multiple corroborating signals bonus (+5 per extra signal, max +15)
   if (ctx.signalCount && ctx.signalCount > 1) {
     score += Math.min((ctx.signalCount - 1) * 5, 15);
+  }
+
+  // Founder-owned bonus: strategic items Jose leads directly (+20)
+  if (ctx.founderOwned) {
+    score += 20;
   }
 
   return Math.min(Math.max(score, 0), 100);
@@ -466,7 +474,7 @@ export function mapLoopToCoSTask(loop: Loop): CoSTask {
                            : "",
     reviewUrl:           loop.review_url,
     entrySignal:         mapEntrySignal(loop),
-    signalReason:        `${loop.signal_count > 1 ? `${loop.signal_count} signals` : "1 signal"} · score ${loop.priority_score}`,
+    signalReason:        `${loop.founder_owned ? "Founder-owned · " : ""}${loop.signal_count > 1 ? `${loop.signal_count} signals` : "1 signal"} · score ${loop.priority_score}`,
     calendarBlockUrl:    null,
     pendingAction:       loop.title,
     taskSource:          mapTaskSource(loop.linked_entity_type),

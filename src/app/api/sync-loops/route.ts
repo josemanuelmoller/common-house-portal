@@ -72,6 +72,26 @@ function dt(prop: any): string | null { return prop?.date?.start ?? null; }
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function chk(prop: any): boolean { return prop?.checkbox ?? false; }
 
+// ─── Track F: Founder-owned entity detection ──────────────────────────────────
+//
+// Hardcoded map of strategic tracks that Jose leads directly.
+// Matched against entity names at sync time; matched loops get +20 score bonus.
+// Extend this list as new strategic areas are confirmed.
+
+const FOUNDER_OWNED_PATTERNS: RegExp[] = [
+  /\bcop\s*31\b/i,                    // COP31 project
+  /zero\s*waste\s*forum/i,            // Zero Waste Forum
+  /\bzwf\b/i,                         // ZWF Forum 2026
+  /zero\s*waste\s*districts?/i,       // Zero Waste Districts (+ Malaysia)
+  /china\s*zero\s*waste/i,            // China Zero Waste
+  /egypt.*reuse|reuse.*egypt/i,       // Egypt Program Reuse
+  /reuse\s*for\s*all/i,               // Reuse for All project
+];
+
+function isFounderOwned(entityName: string): boolean {
+  return FOUNDER_OWNED_PATTERNS.some(p => p.test(entityName));
+}
+
 // ─── Operator actionability filter ───────────────────────────────────────────
 //
 // Returns false if the evidence title or excerpt clearly assigns the action
@@ -170,6 +190,7 @@ async function upsertLoop(
         review_url:           input.review_url,
         due_at:               input.due_at,
         is_passive_discovery: input.is_passive_discovery,
+        founder_owned:        input.founder_owned,
         last_seen_at:         new Date().toISOString(),
         updated_at:           new Date().toISOString(),
       };
@@ -320,7 +341,8 @@ async function syncEvidenceLoops(stats: Stats): Promise<void> {
     if (!isOperatorActionable(item.title, item.excerpt)) continue;
 
     const normalizedKey = buildNormalizedKey("evidence", item.id);
-    const score = computePriorityScore(loopType, { signalCount: 1 });
+    const founderOwned = isFounderOwned(item.title);
+    const score = computePriorityScore(loopType, { signalCount: 1, founderOwned });
 
     await upsertLoop(
       {
@@ -336,6 +358,7 @@ async function syncEvidenceLoops(stats: Stats): Promise<void> {
         review_url:           null,
         due_at:               null,
         is_passive_discovery: false,
+        founder_owned:        founderOwned,
       },
       "evidence_blocker",
       item.id,
@@ -438,11 +461,13 @@ async function syncOpportunityLoops(stats: Stats): Promise<void> {
       // Grants with only a status trigger (no meeting, no review doc)
       (isGrant(oppType) && !nextMeeting && !reviewUrl);
 
+    const founderOwned = isFounderOwned(name);
     const score = computePriorityScore(loopType, {
       dueAt:            nextMeeting,
       signalCount:      1,
       linkedEntityType: "opportunity",
       opportunityStage: stage,
+      founderOwned,
     });
 
     await upsertLoop(
@@ -459,6 +484,7 @@ async function syncOpportunityLoops(stats: Stats): Promise<void> {
         review_url:           reviewUrl && !reviewUrl.includes("mail.google.com") ? reviewUrl : null,
         due_at:               nextMeeting ? new Date(nextMeeting).toISOString() : null,
         is_passive_discovery: passive,
+        founder_owned:        founderOwned,
       },
       "opportunity_signal",
       page.id,
@@ -500,7 +526,8 @@ async function syncProjectLoops(stats: Stats): Promise<void> {
 
     const loopType: LoopType = issueContent.toLowerCase().includes("block") ? "blocker" : "commitment";
     const normalizedKey = buildNormalizedKey("project", page.id, "obstacle");
-    const score = computePriorityScore(loopType, { signalCount: 1 });
+    const founderOwned = isFounderOwned(name);
+    const score = computePriorityScore(loopType, { signalCount: 1, founderOwned });
 
     await upsertLoop(
       {
@@ -516,6 +543,7 @@ async function syncProjectLoops(stats: Stats): Promise<void> {
         review_url:           null,
         due_at:               null,
         is_passive_discovery: false,
+        founder_owned:        founderOwned,
       },
       "project_obstacle",
       page.id,
