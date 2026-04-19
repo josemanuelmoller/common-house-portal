@@ -29,6 +29,7 @@ import {
   computePriorityScore,
   isActionablePendingAction,
   isGrant,
+  isPassiveDiscovery,
   type Loop,
   type LoopType,
   type SignalType,
@@ -99,7 +100,7 @@ function isOperatorActionable(title: string, excerpt: string | null): boolean {
 
 type UpsertLoopInput = Omit<Loop,
   "id" | "status" | "signal_count" | "first_seen_at" | "last_seen_at" |
-  "last_action_at" | "created_at" | "updated_at"
+  "last_action_at" | "created_at" | "updated_at" | "founder_interest"
 >;
 
 type Stats = { upserted: number; skipped: number; signals_added: number; errors: string[] };
@@ -162,14 +163,15 @@ async function upsertLoop(
       // Update mutable fields (priority score may have changed; reopen if dismissed/resolved and new signal)
       const shouldReopen = existing.status === "resolved" || existing.status === "dismissed";
       const updatePayload: Record<string, unknown> = {
-        title:               input.title,
-        priority_score:      input.priority_score,
-        intervention_moment: input.intervention_moment,
-        notion_url:          input.notion_url,
-        review_url:          input.review_url,
-        due_at:              input.due_at,
-        last_seen_at:        new Date().toISOString(),
-        updated_at:          new Date().toISOString(),
+        title:                input.title,
+        priority_score:       input.priority_score,
+        intervention_moment:  input.intervention_moment,
+        notion_url:           input.notion_url,
+        review_url:           input.review_url,
+        due_at:               input.due_at,
+        is_passive_discovery: input.is_passive_discovery,
+        last_seen_at:         new Date().toISOString(),
+        updated_at:           new Date().toISOString(),
       };
 
       if (shouldReopen) {
@@ -322,17 +324,18 @@ async function syncEvidenceLoops(stats: Stats): Promise<void> {
 
     await upsertLoop(
       {
-        normalized_key:      normalizedKey,
-        title:               taskTitle,
-        loop_type:           loopType,
-        intervention_moment: "urgent",
-        priority_score:      score,
-        linked_entity_type:  "evidence",
-        linked_entity_id:    item.id,
-        linked_entity_name:  item.title,
-        notion_url:          item.notion_url,
-        review_url:          null,
-        due_at:              null,
+        normalized_key:       normalizedKey,
+        title:                taskTitle,
+        loop_type:            loopType,
+        intervention_moment:  "urgent",
+        priority_score:       score,
+        linked_entity_type:   "evidence",
+        linked_entity_id:     item.id,
+        linked_entity_name:   item.title,
+        notion_url:           item.notion_url,
+        review_url:           null,
+        due_at:               null,
+        is_passive_discovery: false,
       },
       "evidence_blocker",
       item.id,
@@ -428,6 +431,12 @@ async function syncOpportunityLoops(stats: Stats): Promise<void> {
       }
     })();
     const normalizedKey = buildNormalizedKey("opportunity", page.id, variant);
+    const passive =
+      isPassiveDiscovery(normalizedKey, "opportunity") ||
+      // :followup + decision = Gmail inbound on a New-stage opp (no prior engagement)
+      (variant === "followup" && loopType === "decision") ||
+      // Grants with only a status trigger (no meeting, no review doc)
+      (isGrant(oppType) && !nextMeeting && !reviewUrl);
 
     const score = computePriorityScore(loopType, {
       dueAt:            nextMeeting,
@@ -438,17 +447,18 @@ async function syncOpportunityLoops(stats: Stats): Promise<void> {
 
     await upsertLoop(
       {
-        normalized_key:      normalizedKey,
+        normalized_key:       normalizedKey,
         title,
-        loop_type:           loopType,
-        intervention_moment: interventionMoment,
-        priority_score:      score,
-        linked_entity_type:  "opportunity",
-        linked_entity_id:    page.id,
-        linked_entity_name:  name,
-        notion_url:          page.url ?? "",
-        review_url:          reviewUrl && !reviewUrl.includes("mail.google.com") ? reviewUrl : null,
-        due_at:              nextMeeting ? new Date(nextMeeting).toISOString() : null,
+        loop_type:            loopType,
+        intervention_moment:  interventionMoment,
+        priority_score:       score,
+        linked_entity_type:   "opportunity",
+        linked_entity_id:     page.id,
+        linked_entity_name:   name,
+        notion_url:           page.url ?? "",
+        review_url:           reviewUrl && !reviewUrl.includes("mail.google.com") ? reviewUrl : null,
+        due_at:               nextMeeting ? new Date(nextMeeting).toISOString() : null,
+        is_passive_discovery: passive,
       },
       "opportunity_signal",
       page.id,
@@ -494,17 +504,18 @@ async function syncProjectLoops(stats: Stats): Promise<void> {
 
     await upsertLoop(
       {
-        normalized_key:      normalizedKey,
-        title:               taskTitle,
-        loop_type:           loopType,
-        intervention_moment: "this_week",
-        priority_score:      score,
-        linked_entity_type:  "project",
-        linked_entity_id:    page.id,
-        linked_entity_name:  name,
-        notion_url:          page.url ?? "",
-        review_url:          null,
-        due_at:              null,
+        normalized_key:       normalizedKey,
+        title:                taskTitle,
+        loop_type:            loopType,
+        intervention_moment:  "this_week",
+        priority_score:       score,
+        linked_entity_type:   "project",
+        linked_entity_id:     page.id,
+        linked_entity_name:   name,
+        notion_url:           page.url ?? "",
+        review_url:           null,
+        due_at:               null,
+        is_passive_discovery: false,
       },
       "project_obstacle",
       page.id,

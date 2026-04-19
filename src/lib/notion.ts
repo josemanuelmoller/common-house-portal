@@ -626,6 +626,13 @@ export type CoSTask = {
   // The component uses this — not the UUID regex — to decide whether to call
   // /api/cos-loops (loop engine) vs /api/followup-status (Notion).
   loopEngineId?: string;
+
+  // Notion page ID of the linked opportunity (opportunity-type loops only).
+  // Used by the Opportunities Explorer dedup: when the loop engine is active,
+  // task.id is a Supabase UUID — not a Notion page ID — so dedup must use this field.
+  linkedEntityId?: string;
+  // Track A: true when this loop was classified as passive discovery at sync time
+  isPassiveDiscovery?: boolean;
 };
 
 function mapFollowUpStatus(raw: string): CoSTask["taskStatus"] {
@@ -1012,6 +1019,8 @@ async function getCoSTasksFromLoops(): Promise<CoSTask[] | null> {
       .from("loops")
       .select("*")
       .in("status", ["open", "in_progress"])
+      // Track A: only include active loops; passive discovery only enters CoS when founder is interested
+      .or("is_passive_discovery.eq.false,founder_interest.eq.interested")
       .order("priority_score", { ascending: false })
       .order("first_seen_at",  { ascending: true })
       .limit(50);
@@ -1022,7 +1031,6 @@ async function getCoSTasksFromLoops(): Promise<CoSTask[] | null> {
     }
 
     if (!data || data.length === 0) {
-      // Empty table = cold start before first sync. Fall through to Notion path.
       return null;
     }
 
@@ -1031,6 +1039,41 @@ async function getCoSTasksFromLoops(): Promise<CoSTask[] | null> {
   } catch (err) {
     console.warn("[getCoSTasks] Supabase error, falling back to Notion:", String(err));
     return null;
+  }
+}
+
+// ─── Radar loops — passive discovery items not yet dismissed ─────────────────
+
+export type RadarLoop = {
+  id: string;
+  title: string;
+  loop_type: string;
+  linked_entity_name: string;
+  notion_url: string;
+  founder_interest: string | null;
+  priority_score: number;
+};
+
+export async function getRadarLoops(): Promise<RadarLoop[]> {
+  try {
+    const { getSupabaseServerClient } = await import("@/lib/supabase-server");
+    const sb = getSupabaseServerClient();
+
+    const { data, error } = await sb
+      .from("loops")
+      .select("id, title, loop_type, linked_entity_name, notion_url, founder_interest, priority_score")
+      .eq("is_passive_discovery", true)
+      .in("status", ["open", "in_progress"])
+      .neq("founder_interest", "dropped")
+      // Also surface 'watching' loops — they stay in Radar until marked interested/dropped
+      .order("priority_score", { ascending: false })
+      .order("first_seen_at",  { ascending: true })
+      .limit(30);
+
+    if (error || !data) return [];
+    return data as RadarLoop[];
+  } catch {
+    return [];
   }
 }
 

@@ -32,6 +32,12 @@ type CoSTask = {
   pendingAction: string | null;
   taskSource?: "opportunity" | "project" | "evidence";
   loopEngineId?: string;
+  isPassiveDiscovery?: boolean;
+
+  // Notion page ID of the linked opportunity (opportunity-type loops only).
+  // Used by the Opportunities Explorer dedup: when the loop engine is active,
+  // task.id is a Supabase UUID — not a Notion page ID — so dedup must use this field.
+  linkedEntityId?: string;
 };
 
 // ─── DB row shapes ────────────────────────────────────────────────────────────
@@ -101,6 +107,9 @@ export type Loop = {
   last_action_at: string | null;
   created_at: string;
   updated_at: string;
+  // Track A: interest gate
+  is_passive_discovery: boolean;
+  founder_interest: string | null;    // null | 'watching' | 'interested' | 'dropped'
 };
 
 export type LoopSignal = {
@@ -222,6 +231,37 @@ export function isActionablePendingAction(pendingAction: string | null): boolean
 /** Returns true if the opportunity is a Grant record (pending action is sourcing context, not a task). */
 export function isGrant(opportunityType: string): boolean {
   return opportunityType === "Grant";
+}
+
+/**
+ * Returns true when a loop was created from passive discovery signals —
+ * i.e. no founder intent or engagement has been recorded yet.
+ *
+ * Passive = any of:
+ *   - New opportunity needing qualification (variant :new)
+ *   - Fallback "check in needed" with no explicit signal (variant :active)
+ *   - Grant with only a Follow-up Status trigger (no meeting, no review) —
+ *     detected at sync time and stored as is_passive_discovery=true in DB
+ *
+ * NOT passive = evidence blockers, project obstacles, active commitments,
+ *               prep loops, review loops with a real document,
+ *               or active Gmail reply threads (:followup + follow_up type).
+ *
+ * Note: :followup variant is NOT automatically passive — that variant covers
+ * both "decide on inbound for new opp" (passive, decision type) AND "reply
+ * to active thread" (not passive, follow_up type). Sync-loops handles this
+ * distinction by computing is_passive_discovery with full oppType context.
+ */
+export function isPassiveDiscovery(
+  normalizedKey: string,
+  linkedEntityType: LinkedEntityType,
+): boolean {
+  if (linkedEntityType === "evidence") return false;
+  if (linkedEntityType === "project")  return false;
+  return (
+    normalizedKey.endsWith(":new") ||
+    normalizedKey.endsWith(":active")
+  );
 }
 
 /** Returns true if a meeting + topic together justify a loop. Meeting alone does not. */
@@ -430,6 +470,8 @@ export function mapLoopToCoSTask(loop: Loop): CoSTask {
     calendarBlockUrl:    null,
     pendingAction:       loop.title,
     taskSource:          mapTaskSource(loop.linked_entity_type),
-    loopEngineId:        loop.id,   // real Supabase UUID — used by ChiefOfStaffDesk to route to /api/cos-loops
+    loopEngineId:        loop.id,
+    linkedEntityId:      loop.linked_entity_type === "opportunity" ? loop.linked_entity_id : undefined,
+    isPassiveDiscovery:  loop.is_passive_discovery,
   };
 }

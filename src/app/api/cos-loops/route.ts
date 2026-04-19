@@ -56,27 +56,60 @@ export async function PATCH(req: NextRequest) {
   const guard = await adminGuardApi();
   if (guard) return guard;
 
-  let body: { loopId?: string; status?: string; note?: string };
+  let body: { loopId?: string; status?: string; founderInterest?: string; note?: string };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { loopId, status, note } = body;
+  const { loopId, status, founderInterest, note } = body;
   if (!loopId) return NextResponse.json({ error: "loopId required" }, { status: 400 });
-  if (!status) return NextResponse.json({ error: "status required" }, { status: 400 });
-
-  const transition = STATUS_TO_ACTION[status];
-  if (!transition) {
-    return NextResponse.json(
-      { error: `Unknown status "${status}". Valid: ${Object.keys(STATUS_TO_ACTION).join(", ")}` },
-      { status: 400 },
-    );
-  }
 
   try {
     const sb = getSupabaseServerClient();
+
+    // ── Branch A: founder_interest update (Watch / Interested / Drop) ──────────
+    if (founderInterest !== undefined) {
+      const VALID_INTEREST = new Set(["watching", "interested", "dropped", null]);
+      if (!VALID_INTEREST.has(founderInterest)) {
+        return NextResponse.json(
+          { error: `Invalid founderInterest "${founderInterest}". Valid: watching, interested, dropped` },
+          { status: 400 },
+        );
+      }
+
+      const { error: updateErr } = await sb
+        .from("loops")
+        .update({
+          founder_interest: founderInterest,
+          last_action_at:   new Date().toISOString(),
+          updated_at:       new Date().toISOString(),
+        })
+        .eq("id", loopId);
+
+      if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 502 });
+
+      await sb.from("loop_actions").insert({
+        loop_id:     loopId,
+        action_type: "updated",
+        actor:       "jose",
+        note:        `founder_interest → ${founderInterest ?? "null"}`,
+      });
+
+      return NextResponse.json({ ok: true, loopId, founderInterest });
+    }
+
+    // ── Branch B: status transition ────────────────────────────────────────────
+    if (!status) return NextResponse.json({ error: "status or founderInterest required" }, { status: 400 });
+
+    const transition = STATUS_TO_ACTION[status];
+    if (!transition) {
+      return NextResponse.json(
+        { error: `Unknown status "${status}". Valid: ${Object.keys(STATUS_TO_ACTION).join(", ")}` },
+        { status: 400 },
+      );
+    }
 
     const { error: updateErr } = await sb
       .from("loops")
@@ -87,9 +120,7 @@ export async function PATCH(req: NextRequest) {
       })
       .eq("id", loopId);
 
-    if (updateErr) {
-      return NextResponse.json({ error: updateErr.message }, { status: 502 });
-    }
+    if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 502 });
 
     await sb.from("loop_actions").insert({
       loop_id:     loopId,

@@ -26,6 +26,7 @@ import { InboxTriage, type InboxItem } from "@/components/InboxTriage";
 import { DraftCheckinButton } from "@/components/DraftCheckinButton";
 import { ChiefOfStaffDesk } from "@/components/ChiefOfStaffDesk";
 import { CandidateSection } from "@/components/CandidateSection";
+import { RadarSection } from "@/components/RadarSection";
 import OpportunityExplorer from "@/components/OpportunityExplorer";
 import {
   getProjectsOverview,
@@ -33,6 +34,7 @@ import {
   getDailyBriefing,
   getAgentDrafts,
   getCoSTasks,
+  getRadarLoops,
   getCandidateOpportunities,
   getOpportunitiesByScope,
   getColdRelationships,
@@ -122,6 +124,9 @@ function computeFocusRecommendation(
 
   for (const task of cosTasks) {
     if (task.taskStatus === "done" || task.taskStatus === "dropped") continue;
+
+    // Track A: passive discovery items are never eligible for Focus
+    if (task.isPassiveDiscovery) continue;
 
     const isGrant          = task.opportunityType === "Grant";
     const hasExplicitPending = !!task.pendingAction
@@ -365,6 +370,7 @@ export default async function AdminPage() {
     gmailDrafts,
     approvedDrafts,
     cosTasks,
+    radarLoops,
     candidates,
     opportunities,
     coldRelationships,
@@ -378,6 +384,7 @@ export default async function AdminPage() {
     getAgentDrafts("Draft Created"),
     getAgentDrafts("Approved"),
     getCoSTasks(),
+    getRadarLoops(),
     getCandidateOpportunities(),
     getOpportunitiesByScope(),
     getColdRelationships(),
@@ -682,6 +689,20 @@ export default async function AdminPage() {
                   href="/admin/opportunities"
                 />
                 <ChiefOfStaffDesk tasks={cosTasks} />
+              </div>
+
+              {/* ── 5c. Radar — passive discovery, not yet acted on ──────── */}
+              <div>
+                <SectionHeader
+                  label="Radar"
+                  count={radarLoops.length}
+                />
+                <div className="mb-1.5">
+                  <p className="text-[9px] text-[#131218]/30 leading-snug">
+                    Grants, new inbounds, and low-signal opportunities — not in CoS until you mark them Interested.
+                  </p>
+                </div>
+                <RadarSection initialLoops={radarLoops} />
               </div>
 
               {/* ── 6. My Commitments (from briefing + decisions) ─────────── */}
