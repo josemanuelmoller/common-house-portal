@@ -123,6 +123,50 @@ If localhost and production differ:
 → continue debugging until production matches expected behavior
 <!-- END:runtime-verification-rule -->
 
+<!-- BEGIN:production-domain-and-env-verification-rule -->
+## Production domain and environment verification — hard rule
+
+Do not assume the locally linked Vercel project is the same project that serves the production domain.
+
+Before treating any production deploy, environment-variable change, or runtime diagnosis as valid, verify all three of these explicitly:
+
+1. **Which Vercel project actually serves the production domain?**
+   — Confirm which project is assigned to `portal.wearecommonhouse.com`
+   — Do not assume the current working directory is linked to the correct project
+
+2. **Is the deploy target the same project that serves production?**
+   — A successful deploy to the wrong Vercel project is a non-event
+   — Production verification must happen on the actual production domain, not just on a preview or on the CLI-linked project
+
+3. **Are the runtime environment variables present under the exact names the code reads?**
+   — Verify required vars exist in the real production project
+   — Verify server-side vars use the exact names expected by runtime code, not legacy aliases
+   — After env changes, verify from the production runtime whenever possible
+
+### Secret piping rule
+
+When adding env vars through the Vercel CLI, use `printf "%s"` rather than `echo`.
+`echo` adds a trailing newline, which can silently corrupt URLs, keys, and other secrets.
+
+### Supabase verification rule
+
+After any deploy or env change that affects Supabase:
+- call the production API route that depends on that data source directly
+- confirm it returns the expected records, not just `200 OK`
+- treat `200 OK` with empty data as a failure condition until the expected dataset is confirmed
+
+### Fallback observability rule
+
+Any code path that falls back from a primary data source to a secondary one must:
+- emit a visible warning in runtime logs
+- make the fallback detectable during debugging
+- avoid looking like a healthy primary-path success when it is actually degraded
+
+For critical Hall surfaces, prefer a visible source indicator when feasible, for example:
+- `Source: loop-engine`
+- `Source: notion-fallback`
+<!-- END:production-domain-and-env-verification-rule -->
+
 <!-- BEGIN:pre-merge-sanity-checklist -->
 ## Pre-merge sanity checklist — hard rule
 
@@ -138,6 +182,8 @@ Before declaring any coding task complete, mentally run every applicable item be
 | 6 | wrote or compared a status / type / priority / workspace string literal | …that the literal matches the real DB contract value end-to-end (read filter = write value = UI comparison)? |
 | 7 | changed any code | …that I re-read the changed files after editing to catch mechanical errors? |
 | 8 | changed code structure (new file, moved function, changed types) | …that `tsc --noEmit` passes clean? |
+| 9 | changed a deploy target, production env var, Supabase config, or runtime data source | …which Vercel project serves `portal.wearecommonhouse.com`, that the change was made there, and that production runtime values were verified? (see production-domain-and-env-verification-rule) |
+| 10 | relied on a fallback path after a primary read failed | …that the fallback is observable in runtime logs and cannot silently masquerade as a healthy primary path? (see production-domain-and-env-verification-rule) |
 
 **Failure modes this checklist targets** (recurring bugs already found in this repo):
 - Mutating routes with no auth guard
@@ -145,4 +191,8 @@ Before declaring any coding task complete, mentally run every applicable item be
 - Notion field read/write mismatches (e.g. `"Draft Text"` vs `"Content"`, `"Channel"` vs `"Platform"`)
 - Wrong accessor for property type (e.g. `text()` on a `select` field)
 - Enum drift: `"P1"` / `"Urgent"` instead of `"P1 Critical"`; `"Channel"` vs `"Platform"`
+- Deploying to the wrong Vercel project
+- Updating env vars in the wrong project or under the wrong variable name
+- Treating `200 OK` with empty Supabase data as a healthy result
+- Silent fallback masking a degraded primary data path
 <!-- END:pre-merge-sanity-checklist -->
