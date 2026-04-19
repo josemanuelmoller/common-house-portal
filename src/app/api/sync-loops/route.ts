@@ -240,6 +240,7 @@ async function upsertLoop(
         signalCount:       count,
         linkedEntityType:  input.linked_entity_type,
         opportunityStage:  input.linked_entity_type === "opportunity" ? input.linked_entity_name : undefined,
+        founderOwned:      input.founder_owned,
       });
       await sb.from("loops").update({ signal_count: count, priority_score: Math.min(newScore, 100) }).eq("id", loopId);
     }
