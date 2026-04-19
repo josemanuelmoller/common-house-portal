@@ -37,10 +37,12 @@ import {
   getOpportunitiesByScope,
   getColdRelationships,
   getReadyContent,
+  type CoSTask,
 } from "@/lib/notion";
 import { ADMIN_NAV } from "@/lib/admin-nav";
 import { requireAdmin } from "@/lib/require-admin";
 import { TriggerBriefingButton } from "@/components/TriggerBriefingButton";
+import { ReadyForJoseSection } from "@/components/ReadyForJoseSection";
 
 export { ADMIN_NAV as NAV } from "@/lib/admin-nav";
 
@@ -96,6 +98,219 @@ const STAGE_COLORS: Record<string, string> = {
   "Paused":     "bg-gray-100 text-gray-400 border border-gray-200",
 };
 
+// ─── Focus of the Day — recommendation engine ─────────────────────────────────
+
+type FocusLink = { label: string; url: string; style: "primary" | "secondary" };
+
+type FocusRecommendation = {
+  action: string;
+  timeEstimate: string;
+  whyToday: string;
+  links: FocusLink[];
+  winReason: string;
+};
+
+function computeFocusRecommendation(
+  cosTasks: CoSTask[],
+  inboxItems: InboxItem[],
+  agentDrafts: { id: string; title: string; notionUrl: string; opportunityId: string | null }[],
+): FocusRecommendation | null {
+  const now = Date.now();
+
+  type Candidate = { task: CoSTask; score: number; winReason: string };
+  const candidates: Candidate[] = [];
+
+  for (const task of cosTasks) {
+    if (task.taskStatus === "done" || task.taskStatus === "dropped") continue;
+
+    const isGrant          = task.opportunityType === "Grant";
+    const hasExplicitPending = !!task.pendingAction
+      && !task.pendingAction.startsWith("SIGNALS:")
+      && !task.pendingAction.startsWith("Inbox signal:")
+      && task.pendingAction.trim().length >= 20;
+    const reviewIsDoc      = !!task.reviewUrl && !task.reviewUrl.includes("mail.google.com");
+
+    // Suppress: grants without explicit interest
+    if (isGrant && task.opportunityStage !== "Active" && !hasExplicitPending) continue;
+
+    // Suppress: vague follow-ups — no specific action described
+    if (
+      task.loopType === "follow-up" &&
+      !hasExplicitPending &&
+      !reviewIsDoc
+    ) continue;
+
+    // Suppress: generic "Follow up" title with no context
+    const titleLower = task.taskTitle.toLowerCase();
+    if (
+      (titleLower.startsWith("follow up") || titleLower.startsWith("follow-up")) &&
+      !hasExplicitPending
+    ) continue;
+
+    let score = 0;
+    const reasons: string[] = [];
+
+    // Urgency
+    if (task.urgency === "critical")  { score += 30; reasons.push("critical urgency"); }
+    else if (task.urgency === "high") { score += 20; reasons.push("high urgency"); }
+
+    if (task.dueDate) {
+      const msTo = new Date(task.dueDate).getTime() - now;
+      if (msTo >= 0 && msTo <= 2 * 86400000)      { score += 25; reasons.push("due in ≤2 days"); }
+      else if (msTo >= 0 && msTo <= 7 * 86400000)  { score += 15; reasons.push("due this week"); }
+    }
+
+    if (task.interventionMoment === "urgent" || task.interventionMoment === "next_meeting") {
+      score += 10; reasons.push("imminent meeting");
+    }
+
+    // Leverage
+    if (task.loopType === "blocker")  { score += 20; reasons.push("unblocks progress"); }
+    if (task.loopType === "decision") { score += 15; reasons.push("decision open"); }
+    if (task.loopType === "prep" && task.dueDate) {
+      const msTo = new Date(task.dueDate).getTime() - now;
+      if (msTo >= 0 && msTo <= 7 * 86400000) { score += 10; reasons.push("prep needed"); }
+    }
+
+    // Prepared work
+    if (reviewIsDoc)          { score += 15; reasons.push("doc ready"); }
+    if (hasExplicitPending)   { score += 10; reasons.push("specific action described"); }
+
+    // Penalise passive inbound with no action
+    if (task.entrySignal === "inbound" && !hasExplicitPending) score -= 15;
+
+    if (score > 0) {
+      candidates.push({ task, score, winReason: reasons.join(" · ") });
+    }
+  }
+
+  if (candidates.length === 0) {
+    // Fallback: urgent inbox item
+    const urgentInbox = inboxItems.find(i => i.label === "Urgent");
+    if (urgentInbox) {
+      return {
+        action:       `Spend 20 minutes replying to "${urgentInbox.subject}" from ${urgentInbox.fromName}.`,
+        timeEstimate: "20 min",
+        whyToday:     urgentInbox.daysWaiting >= 2
+          ? `${urgentInbox.daysWaiting} days waiting — needs a reply today.`
+          : "Marked urgent in your inbox.",
+        links:  [{ label: "Open thread", url: urgentInbox.gmailUrl, style: "primary" }],
+        winReason: "inbox fallback — no actionable CoS tasks",
+      };
+    }
+    return null;
+  }
+
+  candidates.sort((a, b) => b.score - a.score);
+  const { task, winReason } = candidates[0];
+
+  const hasExplicitPending = !!task.pendingAction
+    && !task.pendingAction.startsWith("SIGNALS:")
+    && !task.pendingAction.startsWith("Inbox signal:")
+    && task.pendingAction.trim().length >= 20;
+  const reviewIsDoc      = !!task.reviewUrl && !task.reviewUrl.includes("mail.google.com");
+
+  // Time estimate
+  const timeMap: Record<CoSTask["loopType"], string> = {
+    blocker:     "30 min",
+    decision:    "30 min",
+    prep:        reviewIsDoc || hasExplicitPending ? "45 min" : "30 min",
+    review:      reviewIsDoc ? "1 hour" : "30 min",
+    commitment:  "45 min",
+    "follow-up": "30 min",
+  };
+  const timeEstimate = timeMap[task.loopType] ?? "30 min";
+
+  // Meeting label for due date
+  const meetingLabel = task.dueDate
+    ? (() => {
+        const msTo = new Date(task.dueDate).getTime() - now;
+        const days = Math.floor(msTo / 86400000);
+        if (days === 0) return "today";
+        if (days === 1) return "tomorrow";
+        return new Date(task.dueDate).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "short" });
+      })()
+    : null;
+
+  // Action sentence
+  let action: string;
+  const pendingSnippet = hasExplicitPending
+    ? task.pendingAction!.trim().replace(/\.$/, "").slice(0, 80)
+    : null;
+
+  if (task.loopType === "blocker") {
+    action = `Spend ${timeEstimate} resolving ${pendingSnippet ?? `the ${task.opportunityName} blocker`} with ${task.orgName}.`;
+  } else if (task.loopType === "decision") {
+    action = `Spend ${timeEstimate} making the call on ${pendingSnippet ?? task.taskTitle} — ${task.orgName} is waiting.`;
+  } else if (task.loopType === "prep") {
+    if (pendingSnippet) {
+      action = `Spend ${timeEstimate} on ${pendingSnippet}${meetingLabel ? ` before the ${task.orgName} meeting ${meetingLabel}` : ""}.`;
+    } else {
+      action = `Spend ${timeEstimate} preparing for the ${task.orgName} meeting${meetingLabel ? ` ${meetingLabel}` : ""}.`;
+    }
+  } else if (task.loopType === "review") {
+    if (reviewIsDoc) {
+      action = `Spend ${timeEstimate} reviewing the ${task.opportunityName} document${pendingSnippet ? ` — ${pendingSnippet}` : ""}.`;
+    } else {
+      action = `Spend ${timeEstimate} clearing the ${task.orgName} thread${pendingSnippet ? ` — ${pendingSnippet}` : ""}.`;
+    }
+  } else if (task.loopType === "commitment") {
+    action = `Spend ${timeEstimate} delivering on your ${task.opportunityName} commitment to ${task.orgName}.`;
+  } else {
+    action = `Spend ${timeEstimate} on ${pendingSnippet ?? task.taskTitle} with ${task.orgName}.`;
+  }
+
+  // Why today
+  let whyToday: string;
+  if (task.dueDate) {
+    const msTo = new Date(task.dueDate).getTime() - now;
+    const days = Math.floor(msTo / 86400000);
+    if (days <= 1) {
+      whyToday = task.loopType === "prep"
+        ? `Meeting ${meetingLabel} — prepare now or it's too late.`
+        : `Deadline ${meetingLabel} — last window to act.`;
+    } else if (days <= 7) {
+      whyToday = task.loopType === "prep"
+        ? `Meeting with ${task.orgName} ${meetingLabel}${reviewIsDoc ? " — document ready." : "."}`
+        : `Due ${meetingLabel}.`;
+    } else {
+      whyToday = task.loopType === "blocker"
+        ? `Unblocks ${task.opportunityName}.`
+        : `Top item in your action queue.`;
+    }
+  } else if (task.loopType === "blocker") {
+    whyToday = `Unblocks ${task.opportunityName} progress.`;
+  } else if (task.loopType === "decision") {
+    whyToday = "Decision open — needs your call to move forward.";
+  } else if (reviewIsDoc) {
+    whyToday = "Document is ready to review — no waiting on others.";
+  } else {
+    whyToday = "Top item in your action queue.";
+  }
+
+  // Check if there's a matching draft for this task
+  const linkedDraft = agentDrafts.find(d =>
+    d.opportunityId && task.linkedEntityId && d.opportunityId === task.linkedEntityId
+  );
+  if (linkedDraft) {
+    whyToday += " Draft is ready.";
+  }
+
+  // Links
+  const links: FocusLink[] = [];
+  if (reviewIsDoc && task.reviewUrl) {
+    links.push({ label: "Open doc", url: task.reviewUrl, style: "primary" });
+  } else if (task.reviewUrl) {
+    links.push({ label: "Open thread", url: task.reviewUrl, style: "primary" });
+  }
+  if (linkedDraft) {
+    links.push({ label: "Review draft", url: linkedDraft.notionUrl, style: "primary" });
+  }
+  links.push({ label: "Notion", url: task.notionUrl, style: "secondary" });
+
+  return { action, timeEstimate, whyToday, links, winReason };
+}
+
 // Section header — consistent across all Hall sections
 function SectionHeader({ label, count, action, href }: {
   label: string;
@@ -147,6 +362,8 @@ export default async function AdminPage() {
     decisions,
     dailyBriefing,
     agentDrafts,
+    gmailDrafts,
+    approvedDrafts,
     cosTasks,
     candidates,
     opportunities,
@@ -158,6 +375,8 @@ export default async function AdminPage() {
     getDecisionItems("Open"),
     getDailyBriefing(),
     getAgentDrafts("Pending Review"),
+    getAgentDrafts("Draft Created"),
+    getAgentDrafts("Approved"),
     getCoSTasks(),
     getCandidateOpportunities(),
     getOpportunitiesByScope(),
@@ -194,8 +413,10 @@ export default async function AdminPage() {
   );
   const totalPending    = deskDecisions.length;
 
-  // Dedup: filter Opportunities Explorer to exclude items already shown in CoS Tasks
-  const cosTaskIds        = new Set(cosTasks.map(t => t.id));
+  // Dedup: filter Opportunities Explorer to exclude items already shown in CoS Tasks.
+  // When the loop engine is active, t.id is a Supabase UUID — not a Notion page ID.
+  // Use linkedEntityId (Notion page ID of the linked opportunity) for dedup when available.
+  const cosTaskIds        = new Set(cosTasks.map(t => t.linkedEntityId ?? t.id));
   const filteredOpps      = {
     ch:        opportunities.ch.filter(o => !cosTaskIds.has(o.id)),
     portfolio: opportunities.portfolio.filter(o => !cosTaskIds.has(o.id)),
@@ -204,13 +425,14 @@ export default async function AdminPage() {
   const dormantRelationships = coldRelationships.filter(r => r.warmth === "Dormant");
   const coldOnly             = coldRelationships.filter(r => r.warmth === "Cold");
 
-  // ── Focus suggestion — top CoS Task with a meeting ≤7 days
-  // Injected into Focus of the Day section as the recommended action.
+  // ── Focus recommendation — scored selection from CoS tasks + inbox fallback
+  const focusRec = computeFocusRecommendation(cosTasks, inboxData.items, agentDrafts);
+  // focusSuggestion: top CoS task with imminent meeting (≤7 days), used in Focus of the Day section
   const focusSuggestion = cosTasks.find(task => {
     if (!task.dueDate) return false;
     const msTo = new Date(task.dueDate).getTime() - Date.now();
     return msTo >= 0 && msTo <= 7 * 86400000;
-  }) ?? cosTasks[0] ?? null; // fall back to top task if none has a meeting
+  }) ?? cosTasks[0] ?? null;
 
   // ── Date + greeting ──────────────────────────────────────────────────────────
   const today = new Date();
@@ -244,102 +466,56 @@ export default async function AdminPage() {
         <div className="px-8 py-6 space-y-6 max-w-7xl">
 
           {/* ── 1. Focus of the Day ───────────────────────────────────────── */}
-          {dailyBriefing ? (
-            <div className="bg-[#131218] rounded-2xl px-7 py-5 border border-[#131218]">
-              <div className="flex items-start justify-between gap-4">
+          {focusRec ? (
+            <div className="bg-[#131218] rounded-2xl px-7 py-6 border border-[#131218]">
+              <div className="flex items-start justify-between gap-6">
                 <div className="flex-1 min-w-0">
-                  <p className="text-[9px] font-bold uppercase tracking-[2.5px] text-[#c8f55a]/70 mb-2">
-                    Focus of the Day
+                  <div className="flex items-center gap-2.5 mb-3">
+                    <p className="text-[9px] font-bold uppercase tracking-[2.5px] text-[#c8f55a]/60">
+                      Focus of the Day
+                    </p>
+                    <span className="text-[9px] font-bold text-[#131218] bg-[#c8f55a]/90 px-2 py-0.5 rounded-full">
+                      {focusRec.timeEstimate}
+                    </span>
+                  </div>
+                  <p className="text-[15px] font-semibold text-white leading-[1.6] max-w-[640px]">
+                    {focusRec.action}
                   </p>
-                  <p className="text-[14px] text-white/85 leading-[1.65] max-w-[680px]">
-                    {dailyBriefing.focusOfDay || "No focus set for today — run generate-daily-briefing."}
+                  <p className="text-[11px] text-white/45 mt-2 leading-snug">
+                    {focusRec.whyToday}
                   </p>
                 </div>
-                <div className="shrink-0 text-right">
-                  <span className="inline-block text-[9px] font-bold text-[#c8f55a]/50 uppercase tracking-widest border border-[#c8f55a]/20 rounded-full px-2.5 py-1">
-                    {dailyBriefing.status || "Fresh"}
-                  </span>
-                  {dailyBriefing.generatedAt && (
-                    <p className="text-[9px] text-white/20 mt-1">
-                      {new Date(dailyBriefing.generatedAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
-                    </p>
-                  )}
+                <div className="flex flex-col items-end gap-2 shrink-0">
+                  {focusRec.links.map(link => (
+                    <a
+                      key={link.url}
+                      href={link.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={
+                        link.style === "primary"
+                          ? "text-[10px] font-bold text-[#131218] bg-[#c8f55a] hover:bg-white px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap"
+                          : "text-[10px] font-bold text-white/50 hover:text-white border border-white/10 hover:border-white/30 px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap"
+                      }
+                    >
+                      {link.label} →
+                    </a>
+                  ))}
                 </div>
               </div>
-
-              {/* Focus suggestion — top CoS task with imminent meeting */}
-              {focusSuggestion && (
-                <div className="mt-4 pt-4 border-t border-white/8">
-                  <p className="text-[8px] font-bold uppercase tracking-[2px] text-[#c8f55a]/40 mb-2">
-                    Recommended focus
-                  </p>
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[13px] font-semibold text-white/90 leading-snug">
-                        {focusSuggestion.taskTitle}
-                      </p>
-                      <div className="flex items-center gap-3 mt-1.5 flex-wrap">
-                        {focusSuggestion.dueDate && (
-                          <span className="text-[10px] text-white/40 font-medium">
-                            📅 {new Date(focusSuggestion.dueDate).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "short" })}
-                          </span>
-                        )}
-                        <span className="text-[10px] text-white/30 font-medium">{focusSuggestion.signalReason}</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      {focusSuggestion.reviewUrl && (
-                        <a
-                          href={focusSuggestion.reviewUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-[10px] font-bold text-[#c8f55a] hover:text-white border border-[#c8f55a]/30 hover:border-white/30 px-2.5 py-1.5 rounded-lg transition-colors"
-                        >
-                          Open doc →
-                        </a>
-                      )}
-                      {focusSuggestion.calendarBlockUrl && (
-                        <a
-                          href={focusSuggestion.calendarBlockUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-[10px] font-bold text-white/60 hover:text-white border border-white/10 hover:border-white/30 px-2.5 py-1.5 rounded-lg transition-colors"
-                        >
-                          Block 1h
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                </div>
+              {dailyBriefing?.generatedAt && (
+                <p className="text-[8px] text-white/15 mt-4 pt-3 border-t border-white/5">
+                  Briefing generated at {new Date(dailyBriefing.generatedAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
+                </p>
               )}
             </div>
           ) : (
             <div className="bg-[#131218]/6 border border-dashed border-[#131218]/15 rounded-2xl px-7 py-5 flex items-center justify-between gap-4">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-[2.5px] text-[#131218]/30 mb-1">Focus of the Day</p>
-                <p className="text-[13px] text-[#131218]/40">No briefing generated yet today.</p>
-                <p className="text-[11px] text-[#131218]/25 mt-0.5">Synthesises active projects, decisions, and open signals into a daily focus.</p>
+                <p className="text-[13px] text-[#131218]/40">Nothing actionable in queue right now.</p>
+                <p className="text-[11px] text-[#131218]/25 mt-0.5">Focus appears when CoS tasks, inbox, or drafts have a clear next action.</p>
               </div>
-              {/* Focus suggestion even without a briefing — strong signal shows immediately */}
-              {focusSuggestion && (
-                <div className="flex-1 min-w-0 border-l border-[#131218]/10 pl-5 ml-5">
-                  <p className="text-[8px] font-bold uppercase tracking-[2px] text-[#131218]/30 mb-1">Recommended focus</p>
-                  <p className="text-[12px] font-semibold text-[#131218]/70 leading-snug">{focusSuggestion.taskTitle}</p>
-                  <div className="flex items-center gap-2 mt-1.5">
-                    {focusSuggestion.dueDate && (
-                      <span className="text-[9px] text-[#131218]/35">
-                        📅 {new Date(focusSuggestion.dueDate).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}
-                      </span>
-                    )}
-                    {focusSuggestion.calendarBlockUrl && (
-                      <a href={focusSuggestion.calendarBlockUrl} target="_blank" rel="noopener noreferrer"
-                        className="text-[9px] font-bold text-[#131218]/50 hover:text-[#131218] transition-colors">
-                        Block 1h →
-                      </a>
-                    )}
-                  </div>
-                </div>
-              )}
               <TriggerBriefingButton />
             </div>
           )}
@@ -459,6 +635,20 @@ export default async function AdminPage() {
             <div>
               <SectionHeader label="Agent queue" count={agentDrafts.length} />
               <AgentQueueSection drafts={agentDrafts} />
+            </div>
+          )}
+
+          {/* ── 4c. Ready for Jose — prepared work already done ───────────── */}
+          {(gmailDrafts.length > 0 || approvedDrafts.length > 0) && (
+            <div>
+              <SectionHeader
+                label="Ready for Jose"
+                count={gmailDrafts.length + approvedDrafts.length}
+              />
+              <ReadyForJoseSection
+                gmailDrafts={gmailDrafts}
+                approvedDrafts={approvedDrafts}
+              />
             </div>
           )}
 
