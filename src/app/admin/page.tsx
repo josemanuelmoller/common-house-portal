@@ -47,6 +47,7 @@ import { TriggerBriefingButton } from "@/components/TriggerBriefingButton";
 import { ReadyForJoseSection } from "@/components/ReadyForJoseSection";
 
 export { ADMIN_NAV as NAV } from "@/lib/admin-nav";
+export const dynamic = "force-dynamic";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

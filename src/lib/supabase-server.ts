@@ -11,29 +11,24 @@
 
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
-let _client: SupabaseClient | null = null;
-
-/** Returns a cached server-side Supabase client. Throws if env vars are missing. */
+/** Returns a server-side Supabase client. Throws if env vars are missing. */
 export function getSupabaseServerClient(): SupabaseClient {
-  if (_client) return _client;
-
-  // Use the same env var names already configured in Vercel production.
-  // NEXT_PUBLIC_SUPABASE_URL is the project URL (not a secret).
-  // SUPABASE_SERVICE_KEY is the service role key — server-only, never bundled.
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL;
+  // Server-only: never read NEXT_PUBLIC_* vars here.
+  // NEXT_PUBLIC_ variables are inlined at build time by Next.js and can carry
+  // stale values across deployments. SUPABASE_URL and SUPABASE_SERVICE_KEY are
+  // runtime-only env vars and are always read fresh from the process environment.
+  const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_KEY ?? process.env.SUPABASE_ANON_KEY;
 
   if (!url || !key) {
     throw new Error(
-      "NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_KEY not set. Check .env.local or Vercel env vars."
+      "SUPABASE_URL / SUPABASE_SERVICE_KEY (or SUPABASE_ANON_KEY) not set. Check .env.local or Vercel env vars."
     );
   }
 
-  _client = createClient(url, key, {
+  return createClient(url, key, {
     auth: { persistSession: false }, // server-side: never persist sessions
   });
-
-  return _client;
 }
 
 /** Typed row shape for the opportunities table (read path only). */

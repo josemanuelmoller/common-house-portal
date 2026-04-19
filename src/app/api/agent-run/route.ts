@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
+import { getSupabaseServerClient } from "@/lib/supabase-server"
 
 const AGENT_API_KEY = process.env.AGENT_API_KEY
 
@@ -17,10 +17,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "agent_name and status required" }, { status: 400 })
   }
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_KEY! // service key for server-side writes
-  )
+  const supabase = getSupabaseServerClient()
 
   const { error } = await supabase.from("agent_runs").insert({
     agent_name,
