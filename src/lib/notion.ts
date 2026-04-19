@@ -620,6 +620,12 @@ export type CoSTask = {
   // "project":     no Notion field; hides locally + refreshes on next load
   // "evidence":    no Notion field; hides locally + refreshes on next load
   taskSource?: "opportunity" | "project" | "evidence";
+
+  // Loop Engine discriminator. Set ONLY when the task came from the Supabase loops
+  // table (mapLoopToCoSTask). Undefined for Notion-fallback tasks.
+  // The component uses this — not the UUID regex — to decide whether to call
+  // /api/cos-loops (loop engine) vs /api/followup-status (Notion).
+  loopEngineId?: string;
 };
 
 function mapFollowUpStatus(raw: string): CoSTask["taskStatus"] {

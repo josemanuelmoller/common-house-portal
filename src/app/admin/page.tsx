@@ -721,17 +721,19 @@ export default async function AdminPage() {
                   )}
                 </div>
                 <div className="divide-y divide-[#EFEFEA]">
-                  {/* Only Missing Input + Approval — the two types where Jose is the bottleneck */}
+                  {/* All open decisions Jose needs to act on */}
                   {deskDecisions.slice(0, 5).map(d => {
                     const isApproval = d.decisionType === "Approval";
+                    const isPolicy   = d.decisionType === "Policy / Automation Decision";
                     const isUrgent   = d.priority === "P1 Critical" || d.priority === "High";
+                    const actionLabel = isApproval ? "Approve" : isPolicy ? "Decide" : "Input needed";
                     return (
                       <Link key={`dec-${d.id}`} href="/admin/decisions" className="flex items-center gap-3 px-5 py-3.5 hover:bg-[#EFEFEA]/40 transition-colors">
                         <div className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 ${isUrgent ? "bg-red-100" : "bg-[#EFEFEA]"}`}>
                           <span className={`text-[9px] font-bold ${isUrgent ? "text-red-600" : "text-[#131218]/40"}`}>{isApproval ? "✓" : "?"}</span>
                         </div>
                         <p className="text-[11px] font-medium text-[#131218] flex-1 min-w-0 truncate">{d.title}</p>
-                        <span className="text-[9px] font-bold text-[#131218]/30 shrink-0">{isApproval ? "Approve" : "Input needed"}</span>
+                        <span className="text-[9px] font-bold text-[#131218]/30 shrink-0">{actionLabel}</span>
                       </Link>
                     );
                   })}

@@ -325,8 +325,9 @@ export function ChiefOfStaffDesk({ tasks }: { tasks: CoSTask[] }) {
 
     const task = tasks.find(t => t.id === taskId);
 
-    // Detect UUID format (Loop Engine tasks have UUID ids from Supabase)
-    const isLoopEngineTask = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(taskId);
+    // Reliable Loop Engine detection: use loopEngineId field set only by mapLoopToCoSTask.
+    // Do NOT use UUID regex — Notion page IDs are also UUID format and would false-positive.
+    const isLoopEngineTask = !!task?.loopEngineId;
 
     if (isLoopEngineTask) {
       // Loop Engine task — write to /api/cos-loops (status transitions + loop_action)
@@ -335,7 +336,7 @@ export function ChiefOfStaffDesk({ tasks }: { tasks: CoSTask[] }) {
         await fetch("/api/cos-loops", {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ loopId: taskId, status }),
+          body: JSON.stringify({ loopId: task.loopEngineId, status }),
         });
 
         // If this loop maps to a Notion opportunity, also update Follow-up Status there

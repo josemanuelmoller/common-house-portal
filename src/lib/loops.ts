@@ -31,6 +31,7 @@ type CoSTask = {
   calendarBlockUrl: string | null;
   pendingAction: string | null;
   taskSource?: "opportunity" | "project" | "evidence";
+  loopEngineId?: string;
 };
 
 // ─── DB row shapes ────────────────────────────────────────────────────────────
@@ -429,5 +430,6 @@ export function mapLoopToCoSTask(loop: Loop): CoSTask {
     calendarBlockUrl:    null,
     pendingAction:       loop.title,
     taskSource:          mapTaskSource(loop.linked_entity_type),
+    loopEngineId:        loop.id,   // real Supabase UUID — used by ChiefOfStaffDesk to route to /api/cos-loops
   };
 }
