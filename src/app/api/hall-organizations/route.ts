@@ -23,6 +23,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { currentUser } from "@clerk/nextjs/server";
 import { adminGuardApi } from "@/lib/require-admin";
+
+export const dynamic = "force-dynamic";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { getSelfEmails } from "@/lib/hall-self";
 import {
