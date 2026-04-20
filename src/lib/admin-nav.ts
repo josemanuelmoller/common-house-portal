@@ -29,6 +29,7 @@ export const ADMIN_NAV = [
   { label: "Content Pipeline",    href: "/admin/content",        icon: "◫", section: "Control Room" },
   { label: "Knowledge Assets",    href: "/admin/knowledge",      icon: "◉", section: "Control Room" },
   { label: "System Health",       href: "/admin/health",         icon: "◎", section: "Control Room" },
+  { label: "Routine Runs",        href: "/admin/routines",       icon: "⟳", section: "Control Room" },
 
   // ── House Layers ──────────────────────────────────────────────────────────
   { label: "Living Room",         href: "/living-room",          icon: "◐", section: "House Layers" },

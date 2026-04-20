@@ -71,9 +71,9 @@ export function SuggestedTimeBlocks() {
       const data = (await res.json()) as ApiResponse;
       if ("error" in data) {
         if (data.error === "calendar_scope_missing") {
-          setError("Deployed — waiting on Google Calendar consent. Re-authorise with calendar.events scope and suggestions will activate automatically.");
+          setError("__consent_needed__");
         } else if (data.error === "calendar_auth_revoked") {
-          setError("Deployed — Google refresh token was revoked or expired. Re-run the OAuth flow to restore suggestions.");
+          setError("__consent_needed__");
         } else {
           setError(data.message || data.error);
         }
@@ -148,6 +148,24 @@ export function SuggestedTimeBlocks() {
   }
 
   if (error) {
+    if (error === "__consent_needed__") {
+      // Soft, non-alarming state — feature is deployed, just needs the one-time
+      // Google consent. Doesn't read like something is broken.
+      return (
+        <div className="flex items-center gap-3 bg-white/50 border border-dashed border-[#E0E0D8] rounded-xl px-4 py-2">
+          <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+          <p className="text-[11px] text-[#131218]/50 flex-1 min-w-0 truncate">
+            Waiting on Google Calendar consent — activates as soon as the refresh token has calendar scope.
+          </p>
+          <a
+            href="/api/google/auth"
+            className="text-[9px] font-bold text-[#131218]/50 hover:text-[#131218] uppercase tracking-widest shrink-0"
+          >
+            Re-authorise →
+          </a>
+        </div>
+      );
+    }
     return (
       <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-xl px-4 py-2">
         <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" />

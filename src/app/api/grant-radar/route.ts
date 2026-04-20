@@ -20,6 +20,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { Client } from "@notionhq/client";
 import { auth } from "@clerk/nextjs/server";
 import { isAdminUser } from "@/lib/clients";
+import { withRoutineLog } from "@/lib/routine-log";
 
 export const maxDuration = 300;
 export const dynamic = "force-dynamic";
@@ -293,7 +294,7 @@ After the JSON, write a human-readable report with:
 
 // ─── Main handler ─────────────────────────────────────────────────────────────
 
-export async function POST(req: NextRequest) {
+async function _POST(req: NextRequest) {
   if (!await authCheck(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -361,11 +362,19 @@ export async function POST(req: NextRequest) {
   });
 }
 
-// Vercel cron calls GET
-export async function GET(req: NextRequest) {
-  return POST(new Request(req.url, {
-    method:  "POST",
-    headers: req.headers,
-    body:    JSON.stringify({ mode: "execute" }),
-  }) as NextRequest);
+// Vercel cron calls GET — inject mode:"execute" and delegate via the same
+// observability wrapper so both manual POST and cron GET log runs identically.
+async function _handler(req: NextRequest): Promise<Response> {
+  if (req.method === "GET") {
+    const cronReq = new Request(req.url, {
+      method: "POST",
+      headers: req.headers,
+      body:    JSON.stringify({ mode: "execute" }),
+    }) as NextRequest;
+    return _POST(cronReq);
+  }
+  return _POST(req);
 }
+
+export const POST = withRoutineLog("grant-radar", _handler);
+export const GET = POST;

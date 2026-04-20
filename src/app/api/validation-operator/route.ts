@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { notion, getAllEvidence, DB } from "@/lib/notion";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
+import { withRoutineLog } from "@/lib/routine-log";
 
 export const maxDuration = 120;
 
@@ -21,7 +22,7 @@ function isAuthorized(req: NextRequest): boolean {
   return agentKey === expected || cronKey === `Bearer ${expected}`;
 }
 
-export async function POST(req: NextRequest) {
+async function _POST(req: NextRequest) {
   if (!isAuthorized(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -79,7 +80,6 @@ export async function POST(req: NextRequest) {
   return NextResponse.json(results);
 }
 
-// Vercel cron calls GET
-export async function GET(req: NextRequest) {
-  return POST(req);
-}
+export const POST = withRoutineLog("validation-operator", _POST);
+// Vercel cron calls GET — delegate to the same wrapped handler
+export const GET = POST;

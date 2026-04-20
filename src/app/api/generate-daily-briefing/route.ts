@@ -27,6 +27,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { Client } from "@notionhq/client";
 import { auth } from "@clerk/nextjs/server";
 import { isAdminUser } from "@/lib/clients";
+import { withRoutineLog } from "@/lib/routine-log";
 
 export const maxDuration = 120;
 
@@ -197,7 +198,7 @@ async function findExistingBriefing(dateStr: string): Promise<string | null> {
 
 // ─── Main handler ─────────────────────────────────────────────────────────────
 
-export async function POST(req: NextRequest) {
+async function _POST(req: NextRequest) {
   if (!await authCheck(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -320,3 +321,6 @@ Return EXACTLY this JSON (no extra keys, no markdown):
     },
   });
 }
+
+export const POST = withRoutineLog("generate-daily-briefing", _POST);
+export const GET = POST;

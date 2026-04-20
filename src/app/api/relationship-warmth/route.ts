@@ -31,6 +31,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { withRoutineLog } from "@/lib/routine-log";
 import { google } from "googleapis";
 import type { gmail_v1 } from "googleapis";
 import { Client } from "@notionhq/client";
@@ -113,7 +114,7 @@ async function getLastContactDate(
 
 // ─── Handler ──────────────────────────────────────────────────────────────────
 
-export async function POST(req: NextRequest) {
+async function _POST(req: NextRequest) {
   if (!authCheck(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -231,3 +232,6 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ ok: true, ...results });
 }
+
+export const POST = withRoutineLog("relationship-warmth", _POST);
+export const GET = POST;

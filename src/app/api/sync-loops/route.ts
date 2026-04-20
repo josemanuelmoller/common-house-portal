@@ -23,6 +23,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Client } from "@notionhq/client";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
+import { withRoutineLog } from "@/lib/routine-log";
 import {
   buildNormalizedKey,
   buildIntentKey,
@@ -777,7 +778,7 @@ async function autoResolveStaleLoops(): Promise<number> {
 
 // ─── Handler ──────────────────────────────────────────────────────────────────
 
-export async function POST(req: NextRequest) {
+async function _POST(req: NextRequest) {
   if (!authCheck(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -818,3 +819,6 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
+export const POST = withRoutineLog("sync-loops", _POST);
+export const GET = POST;

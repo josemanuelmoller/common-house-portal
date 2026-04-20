@@ -17,6 +17,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { Client } from "@notionhq/client";
+import { withRoutineLog } from "@/lib/routine-log";
 
 const notion    = new Client({ auth: process.env.NOTION_API_KEY });
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -151,7 +152,7 @@ Return only the paragraph text, no labels, no markdown.`;
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
-export async function POST(req: NextRequest) {
+async function _POST(req: NextRequest) {
   const agentKey = req.headers.get("x-agent-key");
   const cronKey  = req.headers.get("authorization");
   const validKey = agentKey === process.env.CRON_SECRET ||
@@ -196,8 +197,12 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({
     ok: true,
     projectsChecked: projects.length,
+    checked: projects.length,
     updated,
     skipped,
     errors,
   });
 }
+
+export const POST = withRoutineLog("project-operator", _POST);
+export const GET = POST;

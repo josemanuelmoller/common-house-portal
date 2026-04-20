@@ -17,6 +17,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { google } from "googleapis";
 import { Client } from "@notionhq/client";
+import { withRoutineLog } from "@/lib/routine-log";
 
 const notion = new Client({ auth: process.env.NOTION_API_KEY });
 
@@ -73,7 +74,7 @@ async function threadAlreadyIngested(threadId: string): Promise<boolean> {
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
-export async function POST(req: NextRequest) {
+async function _POST(req: NextRequest) {
   const agentKey  = req.headers.get("x-agent-key");
   const cronKey   = req.headers.get("authorization");
   const validKey  = agentKey === process.env.CRON_SECRET ||
@@ -157,3 +158,6 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ ok: true, checked: threadIds.length, created, skipped, errors });
 }
+
+export const POST = withRoutineLog("ingest-gmail", _POST);
+export const GET = POST;
