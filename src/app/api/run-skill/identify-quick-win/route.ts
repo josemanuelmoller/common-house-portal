@@ -64,7 +64,7 @@ export async function POST(_req: NextRequest) {
       database_id: CONTENT_DB,
       filter: {
         or: [
-          { property: "Status", select: { equals: "In Review" } },
+          { property: "Status", select: { equals: "Review" } },
           { property: "Status", select: { equals: "Approved" } },
         ],
       },

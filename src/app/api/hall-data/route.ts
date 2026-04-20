@@ -96,7 +96,7 @@ export async function GET() {
       }),
       safeQuery("contentPipeline", {
         database_id: DB.contentPipeline,
-        filter: { property: "Status", select: { equals: "In Review" } },
+        filter: { property: "Status", select: { equals: "Review" } },
         page_size: 5,
       }),
       safeQuery("agentDrafts", {
