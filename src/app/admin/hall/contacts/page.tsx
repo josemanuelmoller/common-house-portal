@@ -2,6 +2,7 @@ import { Sidebar } from "@/components/Sidebar";
 import { requireAdmin } from "@/lib/require-admin";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { HallContactRow } from "@/components/HallContactRow";
+import { HallContactsAutoRefresh } from "@/components/HallContactsAutoRefresh";
 
 export const dynamic = "force-dynamic";
 
@@ -77,6 +78,14 @@ export default async function HallContactsPage() {
         </header>
 
         <div className="px-12 py-9 max-w-5xl space-y-8">
+          {/* Auto-sync status */}
+          <div className="flex items-center justify-between">
+            <p className="text-[10px] font-bold tracking-widest uppercase text-[#131218]/40">
+              Live view — syncs your calendar on load
+            </p>
+            <HallContactsAutoRefresh />
+          </div>
+
           {/* Activation rule */}
           <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-3.5">
             <p className="text-[11px] text-[#131218]/60 leading-snug">

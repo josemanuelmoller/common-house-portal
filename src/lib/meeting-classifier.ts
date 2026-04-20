@@ -236,37 +236,105 @@ export function classifyMeeting(
 }
 
 /**
- * Upsert observations of every non-self non-declined attendee seen in the meeting
- * set. Increments meeting_count and bumps last_seen_at / last_meeting_title for
- * already-known rows. Does NOT change relationship_class (that stays human-owned).
+ * Dedup-aware observation: for each calendar event, increment meeting_count
+ * only when the event_id has never been observed before. Attendees added or
+ * removed mid-flight (e.g. someone accepts late, host swaps invitees) are
+ * accounted for on subsequent passes.
+ *
+ * Source of dedup truth: hall_calendar_events (event_id PK). This keeps STB
+ * runs, the /admin/hall/contacts auto-refresh, and the cron sync safe to call
+ * redundantly — the meeting_count never inflates.
  */
 export async function observeAttendees(meetings: UpcomingMeeting[]): Promise<void> {
-  const byEmail = new Map<string, { display_name: string | null; last_meeting_title: string; last_seen_at: string }>();
+  if (meetings.length === 0) return;
   const nowIso = new Date().toISOString();
 
+  const sb = getSupabaseServerClient();
+
+  // 1) Load prior state for these event_ids so we know what was already credited.
+  const eventIds = meetings.map(m => m.id);
+  type EventRow = { event_id: string; attendee_emails: string[] | null; is_cancelled: boolean | null };
+  const { data: priorRows } = await sb
+    .from("hall_calendar_events")
+    .select("event_id, attendee_emails, is_cancelled")
+    .in("event_id", eventIds);
+  const priorByEvent = new Map<string, EventRow>();
+  for (const r of (priorRows ?? []) as EventRow[]) priorByEvent.set(r.event_id, r);
+
+  // 2) Compute per-email delta.
+  const net = new Map<string, number>();
+  const bump = (email: string, d: number) => {
+    if (!email) return;
+    net.set(email, (net.get(email) ?? 0) + d);
+  };
+
+  const eventRows: Array<Record<string, unknown>> = [];
+  const meta = new Map<string, { display_name: string | null; last_meeting_title: string; last_seen_at: string }>();
+
   for (const m of meetings) {
+    const countable = [...new Set(
+      (m.attendees ?? [])
+        .filter(a => !a.self && a.responseStatus !== "declined" && a.email)
+        .map(a => a.email),
+    )];
+
+    const prior = priorByEvent.get(m.id);
+    const priorSet = new Set(prior?.attendee_emails ?? []);
+    const wasNew = !prior;
+    const wasCancelled = prior?.is_cancelled === true;
+
+    if (wasNew || wasCancelled) {
+      for (const email of countable) bump(email, +1);
+    } else {
+      for (const email of countable)   if (!priorSet.has(email))  bump(email, +1);
+      for (const email of priorSet)    if (!countable.includes(email)) bump(email, -1);
+    }
+
+    const attendee_statuses: Record<string, string> = {};
+    for (const a of m.attendees ?? []) if (a.email) attendee_statuses[a.email] = a.responseStatus;
+
+    eventRows.push({
+      event_id:         m.id,
+      event_start:      m.start.toISOString(),
+      event_end:        m.end.toISOString(),
+      event_title:      (m.title ?? "").slice(0, 500),
+      organizer_email:  m.organizerEmail,
+      html_link:        m.htmlLink,
+      attendee_emails:  countable,
+      attendee_statuses,
+      is_cancelled:     false,
+      last_observed_at: nowIso,
+      updated_at:       nowIso,
+    });
+
+    // Pick latest displayName + title per email for hall_attendees metadata.
     for (const a of m.attendees ?? []) {
-      if (a.self) continue;
-      if (a.responseStatus === "declined") continue;
-      if (!a.email) continue;
-      const prev = byEmail.get(a.email);
-      // Keep the latest meeting title per attendee across the batch
-      if (!prev || m.start.toISOString() > prev.last_seen_at) {
-        byEmail.set(a.email, {
-          display_name:        a.displayName,
-          last_meeting_title:  m.title,
-          last_seen_at:        m.start.toISOString(),
+      if (a.self || !a.email) continue;
+      const prev = meta.get(a.email);
+      const iso = m.start.toISOString();
+      if (!prev || iso > prev.last_seen_at) {
+        meta.set(a.email, {
+          display_name:       a.displayName,
+          last_meeting_title: m.title,
+          last_seen_at:       iso,
         });
       }
     }
   }
 
-  if (byEmail.size === 0) return;
+  // 3) Persist event rows.
+  try {
+    if (eventRows.length > 0) {
+      await sb.from("hall_calendar_events").upsert(eventRows, { onConflict: "event_id" });
+    }
+  } catch { /* best-effort */ }
+
+  // 4) Apply attendee delta (only non-zero).
+  const emailsAffected = [...net.entries()].filter(([, d]) => d !== 0);
+  if (emailsAffected.length === 0) return;
 
   try {
-    const sb = getSupabaseServerClient();
-    // Fetch existing rows to compute meeting_count increment atomically-enough.
-    const emails = [...byEmail.keys()];
+    const emails = emailsAffected.map(([e]) => e);
     const { data: existing } = await sb
       .from("hall_attendees")
       .select("email, meeting_count")
@@ -276,18 +344,24 @@ export async function observeAttendees(meetings: UpcomingMeeting[]): Promise<voi
       countByEmail.set(r.email, r.meeting_count ?? 0);
     }
 
-    const rows = [...byEmail.entries()].map(([email, v]) => ({
-      email,
-      display_name:       v.display_name,
-      last_meeting_title: v.last_meeting_title,
-      last_seen_at:       v.last_seen_at,
-      meeting_count:      (countByEmail.get(email) ?? 0) + 1,
-      updated_at:         nowIso,
-      // first_seen_at preserved by upsert (default only on insert)
-    }));
+    const rows = emailsAffected.map(([email, delta]) => {
+      const next = Math.max(0, (countByEmail.get(email) ?? 0) + delta);
+      const m = meta.get(email);
+      const row: Record<string, unknown> = {
+        email,
+        meeting_count: next,
+        updated_at:    nowIso,
+      };
+      if (m) {
+        row.display_name       = m.display_name;
+        row.last_meeting_title = m.last_meeting_title;
+        row.last_seen_at       = m.last_seen_at;
+      }
+      return row;
+    });
 
     await sb
       .from("hall_attendees")
       .upsert(rows, { onConflict: "email", ignoreDuplicates: false });
-  } catch { /* non-critical — observation is best-effort */ }
+  } catch { /* best-effort */ }
 }
