@@ -17,6 +17,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { google } from "googleapis";
 import { Client } from "@notionhq/client";
+import { currentUser } from "@clerk/nextjs/server";
+import { isAdminUser, isAdminEmail } from "@/lib/clients";
 import { withRoutineLog } from "@/lib/routine-log";
 
 const notion = new Client({ auth: process.env.NOTION_API_KEY });
@@ -74,12 +76,23 @@ async function threadAlreadyIngested(threadId: string): Promise<boolean> {
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
-async function _POST(req: NextRequest) {
+async function authCheck(req: NextRequest): Promise<boolean> {
+  const expected = process.env.CRON_SECRET;
   const agentKey  = req.headers.get("x-agent-key");
   const cronKey   = req.headers.get("authorization");
-  const validKey  = agentKey === process.env.CRON_SECRET ||
-                    cronKey  === `Bearer ${process.env.CRON_SECRET}`;
-  if (!validKey) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (expected && agentKey === expected)              return true;
+  if (expected && cronKey  === `Bearer ${expected}`)  return true;
+  try {
+    const user = await currentUser();
+    if (!user) return false;
+    const email = user.primaryEmailAddress?.emailAddress ?? "";
+    if (isAdminUser(user.id) || isAdminEmail(email)) return true;
+  } catch { /* noop */ }
+  return false;
+}
+
+async function _POST(req: NextRequest) {
+  if (!(await authCheck(req))) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const gmail = getGmailClient();
   if (!gmail) {

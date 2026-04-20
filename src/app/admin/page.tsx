@@ -49,6 +49,7 @@ import { requireAdmin } from "@/lib/require-admin";
 import { TriggerBriefingButton } from "@/components/TriggerBriefingButton";
 import { ReadyForJoseSection } from "@/components/ReadyForJoseSection";
 import { SuggestedTimeBlocks } from "@/components/SuggestedTimeBlocks";
+import { HallManualTriggers } from "@/components/HallManualTriggers";
 
 export { ADMIN_NAV as NAV } from "@/lib/admin-nav";
 export const dynamic = "force-dynamic";
@@ -789,6 +790,11 @@ export default async function AdminPage() {
           <div>
             <SectionHeader label="Suggested time blocks" />
             <SuggestedTimeBlocks />
+          </div>
+
+          {/* ── 4c. Manual refresh triggers ─────────────────────────────── */}
+          <div>
+            <HallManualTriggers />
           </div>
 
           {/* ── 4c. Inbox only on the left; drafts moved into CoS ─── */}

@@ -20,6 +20,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { Client } from "@notionhq/client";
+import { currentUser } from "@clerk/nextjs/server";
+import { isAdminUser, isAdminEmail } from "@/lib/clients";
 
 export const maxDuration = 90;
 
@@ -54,11 +56,19 @@ const PROJECT_KEYWORD_OVERRIDES: Record<string, string[]> = {
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
-function authCheck(req: NextRequest): boolean {
+async function authCheck(req: NextRequest): Promise<boolean> {
+  const expected = process.env.CRON_SECRET;
   const agentKey  = req.headers.get("x-agent-key");
   const cronToken = req.headers.get("authorization");
-  const expected  = process.env.CRON_SECRET;
-  return (agentKey === expected) || (cronToken === `Bearer ${expected}`);
+  if (expected && agentKey  === expected)              return true;
+  if (expected && cronToken === `Bearer ${expected}`)  return true;
+  try {
+    const user = await currentUser();
+    if (!user) return false;
+    const email = user.primaryEmailAddress?.emailAddress ?? "";
+    if (isAdminUser(user.id) || isAdminEmail(email)) return true;
+  } catch { /* noop */ }
+  return false;
 }
 
 // ─── Fireflies ────────────────────────────────────────────────────────────────
@@ -198,7 +208,7 @@ async function updatePeopleLastContact(emails: string[], dateStr: string): Promi
 // ─── Handler ──────────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
-  if (!authCheck(req)) {
+  if (!(await authCheck(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
