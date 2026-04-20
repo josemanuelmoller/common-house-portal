@@ -1,0 +1,188 @@
+import Link from "next/link";
+import { getSupabaseServerClient } from "@/lib/supabase-server";
+
+/**
+ * Portfolio pulse — for every Garage project (CH portfolio startup),
+ * cross-reference meetings / transcripts / calendar events from the last
+ * 21 days by substring-matching the project name in titles.
+ *
+ * Heat buckets:
+ *   hot      3+ events in last 7d
+ *   warm     1-2 events in last 14d
+ *   cold     0 events in last 21d  ← surfaced as "check-in needed"
+ */
+
+type Project = {
+  notion_id:     string;
+  name:          string;
+  current_stage: string | null;
+  updated_at:    string;
+};
+
+type PortfolioEntry = {
+  project:       Project;
+  events7d:      number;
+  events14d:     number;
+  events21d:     number;
+  lastEventAt:   string | null;
+  lastEventTitle: string | null;
+  heat:          "hot" | "warm" | "cold";
+};
+
+async function loadPortfolio(): Promise<PortfolioEntry[]> {
+  const sb = getSupabaseServerClient();
+
+  const { data: projects } = await sb
+    .from("projects")
+    .select("notion_id, name, current_stage, updated_at")
+    .eq("primary_workspace", "garage")
+    .eq("project_status", "Active");
+
+  const projs = (projects ?? []) as Project[];
+  if (projs.length === 0) return [];
+
+  // Pull 21-day window of transcripts + calendar events once; match in memory.
+  const since21d = new Date(Date.now() - 21 * 86400_000).toISOString();
+  const [txRes, calRes] = await Promise.all([
+    sb.from("hall_transcript_observations")
+      .select("transcript_id, title, meeting_at")
+      .gte("meeting_at", since21d)
+      .order("meeting_at", { ascending: false }),
+    sb.from("hall_calendar_events")
+      .select("event_id, event_title, event_start, is_cancelled")
+      .gte("event_start", since21d)
+      .eq("is_cancelled", false)
+      .order("event_start", { ascending: false }),
+  ]);
+
+  const now = Date.now();
+  const out: PortfolioEntry[] = [];
+
+  for (const p of projs) {
+    const needle = p.name.toLowerCase().trim();
+    if (!needle || needle.length < 3) continue;
+
+    // Collect hits across both sources with their timestamps.
+    type Hit = { at: string; title: string };
+    const hits: Hit[] = [];
+    for (const r of (txRes.data ?? []) as { title: string; meeting_at: string }[]) {
+      if (r.title && r.title.toLowerCase().includes(needle)) hits.push({ at: r.meeting_at, title: r.title });
+    }
+    for (const r of (calRes.data ?? []) as { event_title: string; event_start: string }[]) {
+      if (r.event_title && r.event_title.toLowerCase().includes(needle)) hits.push({ at: r.event_start, title: r.event_title });
+    }
+    hits.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+
+    const ms7  = 7  * 86400_000;
+    const ms14 = 14 * 86400_000;
+    const ms21 = 21 * 86400_000;
+    let e7 = 0, e14 = 0, e21 = 0;
+    for (const h of hits) {
+      const age = now - new Date(h.at).getTime();
+      if (age <= ms7)  e7++;
+      if (age <= ms14) e14++;
+      if (age <= ms21) e21++;
+    }
+    const last = hits[0] ?? null;
+
+    let heat: PortfolioEntry["heat"];
+    if (e7 >= 3)       heat = "hot";
+    else if (e14 >= 1) heat = "warm";
+    else               heat = "cold";
+
+    out.push({
+      project: p,
+      events7d:       e7,
+      events14d:      e14,
+      events21d:      e21,
+      lastEventAt:    last?.at ?? null,
+      lastEventTitle: last?.title ?? null,
+      heat,
+    });
+  }
+
+  // Sort: cold first (most actionable), then warm, then hot.
+  const order = { cold: 0, warm: 1, hot: 2 } as const;
+  out.sort((a, b) => order[a.heat] - order[b.heat] || (b.events14d - a.events14d));
+  return out;
+}
+
+function timeAgo(iso: string | null): string {
+  if (!iso) return "never";
+  const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86400_000);
+  if (d === 0) return "today";
+  if (d === 1) return "1d ago";
+  if (d < 30)  return `${d}d ago`;
+  return `${Math.floor(d / 30)}mo ago`;
+}
+
+export async function HallPortfolioPulse() {
+  const rows = await loadPortfolio();
+  const cold = rows.filter(r => r.heat === "cold").length;
+  const warm = rows.filter(r => r.heat === "warm").length;
+  const hot  = rows.filter(r => r.heat === "hot").length;
+
+  return (
+    <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
+      <div className="flex items-center justify-between px-5 py-3 border-b border-[#EFEFEA]">
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-bold tracking-widest uppercase text-[#131218]/50">Portfolio pulse</span>
+          {cold > 0 && (
+            <span className="text-[9px] font-bold bg-red-50 text-red-700 px-1.5 py-0.5 rounded-full">{cold} cold</span>
+          )}
+          {warm > 0 && (
+            <span className="text-[9px] font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">{warm} warm</span>
+          )}
+          {hot > 0 && (
+            <span className="text-[9px] font-bold bg-[#B2FF59]/40 text-green-900 px-1.5 py-0.5 rounded-full">{hot} hot</span>
+          )}
+        </div>
+        <Link href="/admin/garage-view" className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/40 hover:text-[#131218]/80">
+          Garage →
+        </Link>
+      </div>
+      {rows.length === 0 ? (
+        <div className="px-5 py-6 text-center">
+          <p className="text-[11px] text-[#131218]/35">No active portfolio startups.</p>
+        </div>
+      ) : (
+        <div className="divide-y divide-[#EFEFEA]">
+          {rows.map(r => <PulseRow key={r.project.notion_id} entry={r} />)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PulseRow({ entry }: { entry: PortfolioEntry }) {
+  const { project: p, heat } = entry;
+  const dot = heat === "hot" ? "bg-[#B2FF59]" : heat === "warm" ? "bg-amber-400" : "bg-red-500";
+  const dotLabel = heat === "cold" ? "check-in" : heat === "warm" ? "warm" : "hot";
+  const dotLabelColor = heat === "cold" ? "text-red-700" : heat === "warm" ? "text-amber-700" : "text-green-800";
+
+  return (
+    <a
+      href={`https://www.notion.so/${p.notion_id.replace(/-/g, "")}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex items-center gap-3 px-5 py-2.5 hover:bg-[#EFEFEA]/40 transition-colors"
+    >
+      <span className={`w-2 h-2 rounded-full ${dot} shrink-0`} />
+      <div className="flex-1 min-w-0">
+        <p className="text-[11px] font-bold text-[#131218] truncate">{p.name}</p>
+        <p className="text-[9px] text-[#131218]/45 mt-0.5">
+          {p.current_stage ?? "—"}
+          {" · "}
+          {entry.events14d > 0
+            ? `${entry.events14d} event${entry.events14d === 1 ? "" : "s"} · last ${timeAgo(entry.lastEventAt)}`
+            : entry.lastEventAt
+              ? `last activity ${timeAgo(entry.lastEventAt)}`
+              : "no recent activity"}
+        </p>
+      </div>
+      <span className={`text-[9px] font-bold shrink-0 uppercase tracking-wide ${dotLabelColor}`}>
+        {dotLabel}
+      </span>
+    </a>
+  );
+}

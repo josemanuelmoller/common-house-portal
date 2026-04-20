@@ -28,6 +28,10 @@ import { ChiefOfStaffDesk, ParkedLoopsSection } from "@/components/ChiefOfStaffD
 import { DiscoverySection } from "@/components/DiscoverySection";
 import { MarketSignalsPanel } from "@/components/MarketSignalsPanel";
 import { HallOrgsColdRelations, HallOrgsClassMix } from "@/components/HallOrgsWidgets";
+import { HallOppFreshnessRadar } from "@/components/HallOppFreshnessRadar";
+import { HallPortfolioPulse } from "@/components/HallPortfolioPulse";
+import { HallAskQueue } from "@/components/HallAskQueue";
+import { HallTimeAllocation } from "@/components/HallTimeAllocation";
 import OpportunityExplorer from "@/components/OpportunityExplorer";
 import {
   getProjectsOverview,
@@ -829,6 +833,10 @@ export default async function AdminPage() {
                 briefs={marketSignalBriefs}
               />
 
+              <HallPortfolioPulse />
+              <HallOppFreshnessRadar />
+              <HallAskQueue />
+              <HallTimeAllocation />
               <HallOrgsColdRelations />
               <HallOrgsClassMix />
 
