@@ -103,7 +103,10 @@ async function _POST(req: NextRequest) {
     });
   }
 
-  const userEmail = process.env.GMAIL_USER_EMAIL ?? "me";
+  // Always use "me" — the Gmail API alias for the OAuth-token owner. Prevents
+  // "Delegation denied" when GMAIL_USER_EMAIL is stale or points to a mailbox
+  // the token does not own. The OAuth token already pins the identity.
+  const userEmail = "me";
 
   // Fetch threads modified in the last 24h
   const after = Math.floor((Date.now() - 86_400_000) / 1000);
