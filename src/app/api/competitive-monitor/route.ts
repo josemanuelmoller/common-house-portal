@@ -12,7 +12,14 @@
  * Uses Anthropic API with web search (anthropic-beta: web-search-2025-03-05).
  *
  * Auth: x-agent-key / CRON_SECRET header OR authenticated admin session.
- * Called by Vercel cron every Monday at 07:00 UTC.
+ *
+ * STATUS (2026-04-20): cron disabled. Output DB (CH Competitive Intel [OS v2],
+ * af8d7edb750b4131b3b55ef5ee83556a) is not read by any server-rendered surface
+ * in src/. The only consumer is the static mockup public/portal/competitive-intel.html
+ * which shows "Watchlist vacia" copy and points users back to Notion.
+ * Running weekly burned Anthropic web-search tool budget on invisible output.
+ * Route retained for manual/admin invocation; re-add cron once a product surface
+ * consumes DB_INTEL.
  */
 
 import { NextRequest, NextResponse } from "next/server";
