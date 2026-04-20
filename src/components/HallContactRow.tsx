@@ -118,6 +118,14 @@ export function HallContactRow(props: Props) {
           {googleSync === "not_in_google" && (
             <span className="text-[9px] font-bold text-amber-700">local only</span>
           )}
+          {googleSync === "read_only" && (
+            <span
+              className="text-[9px] font-bold text-amber-700"
+              title="This contact lives in Google's 'Other contacts' (auto-saved). Open the contact in Google Contacts → Save contact → then re-tag here to sync the label."
+            >
+              read-only in Google
+            </span>
+          )}
           {googleSync === "failed" && (
             <span className="text-[9px] font-bold text-red-600">Google sync failed</span>
           )}

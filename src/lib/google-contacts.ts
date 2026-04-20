@@ -212,49 +212,58 @@ export async function ensureContactGroup(label: string): Promise<string | null> 
   }
 }
 
+/** True for resources Google treats as read-only for labels (otherContacts). */
+function isReadOnlyResource(resourceName: string): boolean {
+  return resourceName.startsWith("otherContacts/");
+}
+
 /**
  * Add `label` to the given contact and (optionally) remove other CH/system
  * labels that conflict. We treat relationship_class as single-value for the
  * classifier — if Jose tags an email as "Family" we remove "Investor" et al.
+ *
+ * Returns `ok:false, reason:"read_only_other_contact"` for otherContacts,
+ * which the People API does not allow mutating. The caller should promote
+ * the contact in Google Contacts ("Save contact") for the write path to work.
  */
 export async function setContactLabel(
   resourceName: string,
   label: string,
 ): Promise<{ ok: boolean; reason?: string }> {
-  const people = getPeopleClient();
-  if (!people) return { ok: false, reason: "no_google_auth" };
-
-  const targetGroupId = await ensureContactGroup(label);
-  if (!targetGroupId) return { ok: false, reason: "group_create_failed" };
-
-  // Fetch current memberships so we can preserve non-CH labels and remove
-  // conflicting CH/relationship ones.
-  const person = await people.people.get({
-    resourceName,
-    personFields: "memberships",
-  });
-  const currentMemberships = person.data.memberships ?? [];
-  const knownLabels = Object.keys(LABEL_TO_CLASS);
-
-  // Build desired membership set:
-  //   - keep memberships NOT in knownLabels (user's other groupings untouched)
-  //   - replace all known-label memberships with just the target one
-  const groups = await listContactGroups(people);
-  const knownGroupIds = new Set(
-    groups.filter(g => g.formattedName && knownLabels.includes(g.formattedName)).map(g => g.resourceName!),
-  );
-
-  const preserved = currentMemberships.filter(m => {
-    const gid = m.contactGroupMembership?.contactGroupResourceName;
-    return gid && !knownGroupIds.has(gid);
-  });
-
-  const desired: people_v1.Schema$Membership[] = [
-    ...preserved,
-    { contactGroupMembership: { contactGroupResourceName: targetGroupId } },
-  ];
-
   try {
+    if (isReadOnlyResource(resourceName)) {
+      return { ok: false, reason: "read_only_other_contact" };
+    }
+    const people = getPeopleClient();
+    if (!people) return { ok: false, reason: "no_google_auth" };
+
+    const targetGroupId = await ensureContactGroup(label);
+    if (!targetGroupId) return { ok: false, reason: "group_create_failed" };
+
+    // Fetch current memberships so we can preserve non-CH labels and remove
+    // conflicting CH/relationship ones.
+    const person = await people.people.get({
+      resourceName,
+      personFields: "memberships",
+    });
+    const currentMemberships = person.data.memberships ?? [];
+    const knownLabels = Object.keys(LABEL_TO_CLASS);
+
+    const groups = await listContactGroups(people);
+    const knownGroupIds = new Set(
+      groups.filter(g => g.formattedName && knownLabels.includes(g.formattedName)).map(g => g.resourceName!),
+    );
+
+    const preserved = currentMemberships.filter(m => {
+      const gid = m.contactGroupMembership?.contactGroupResourceName;
+      return gid && !knownGroupIds.has(gid);
+    });
+
+    const desired: people_v1.Schema$Membership[] = [
+      ...preserved,
+      { contactGroupMembership: { contactGroupResourceName: targetGroupId } },
+    ];
+
     await people.people.updateContact({
       resourceName,
       updatePersonFields: "memberships",
@@ -272,24 +281,27 @@ export async function setContactLabel(
 
 /** Remove all known (mapped) labels from a contact — class goes back to null. */
 export async function clearContactLabels(resourceName: string): Promise<{ ok: boolean; reason?: string }> {
-  const people = getPeopleClient();
-  if (!people) return { ok: false, reason: "no_google_auth" };
-
-  const person = await people.people.get({
-    resourceName,
-    personFields: "memberships",
-  });
-  const current = person.data.memberships ?? [];
-  const knownLabels = Object.keys(LABEL_TO_CLASS);
-  const groups = await listContactGroups(people);
-  const knownGroupIds = new Set(
-    groups.filter(g => g.formattedName && knownLabels.includes(g.formattedName)).map(g => g.resourceName!),
-  );
-  const preserved = current.filter(m => {
-    const gid = m.contactGroupMembership?.contactGroupResourceName;
-    return gid && !knownGroupIds.has(gid);
-  });
   try {
+    if (isReadOnlyResource(resourceName)) {
+      return { ok: false, reason: "read_only_other_contact" };
+    }
+    const people = getPeopleClient();
+    if (!people) return { ok: false, reason: "no_google_auth" };
+
+    const person = await people.people.get({
+      resourceName,
+      personFields: "memberships",
+    });
+    const current = person.data.memberships ?? [];
+    const knownLabels = Object.keys(LABEL_TO_CLASS);
+    const groups = await listContactGroups(people);
+    const knownGroupIds = new Set(
+      groups.filter(g => g.formattedName && knownLabels.includes(g.formattedName)).map(g => g.resourceName!),
+    );
+    const preserved = current.filter(m => {
+      const gid = m.contactGroupMembership?.contactGroupResourceName;
+      return gid && !knownGroupIds.has(gid);
+    });
     await people.people.updateContact({
       resourceName,
       updatePersonFields: "memberships",

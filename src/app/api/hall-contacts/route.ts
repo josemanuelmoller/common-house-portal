@@ -59,6 +59,20 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  try {
+    return await doPOST(req);
+  } catch (err) {
+    // Never let an unhandled error return an empty 500 — the UI has no way to
+    // debug that. Always surface something actionable.
+    const message = err instanceof Error ? err.message : String(err);
+    return NextResponse.json(
+      { error: "unhandled", detail: message.slice(0, 500) },
+      { status: 500 },
+    );
+  }
+}
+
+async function doPOST(req: NextRequest) {
   const guard = await adminGuardApi();
   if (guard) return guard;
 
@@ -104,20 +118,22 @@ export async function POST(req: NextRequest) {
   // If not in Contacts, skip google write — Jose can create the contact in
   // Google Contacts later; once created, next STB run will cache the
   // resourceName automatically.
-  let googleSyncOutcome: "synced" | "not_in_google" | "skipped" | "failed" = "skipped";
+  let googleSyncOutcome: "synced" | "not_in_google" | "read_only" | "skipped" | "failed" = "skipped";
   let googleError: string | undefined;
   if (resourceName) {
     if (rc) {
       const targetLabel = CLASS_TO_LABEL[rc as keyof typeof CLASS_TO_LABEL];
       if (targetLabel) {
         const res = await setContactLabel(resourceName, targetLabel);
-        googleSyncOutcome = res.ok ? "synced" : "failed";
-        if (!res.ok) googleError = res.reason;
+        if (res.ok) googleSyncOutcome = "synced";
+        else if (res.reason === "read_only_other_contact") googleSyncOutcome = "read_only";
+        else { googleSyncOutcome = "failed"; googleError = res.reason; }
       }
     } else {
       const res = await clearContactLabels(resourceName);
-      googleSyncOutcome = res.ok ? "synced" : "failed";
-      if (!res.ok) googleError = res.reason;
+      if (res.ok) googleSyncOutcome = "synced";
+      else if (res.reason === "read_only_other_contact") googleSyncOutcome = "read_only";
+      else { googleSyncOutcome = "failed"; googleError = res.reason; }
     }
   } else if (!resourceName) {
     googleSyncOutcome = "not_in_google";
