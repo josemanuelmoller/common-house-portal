@@ -44,3 +44,30 @@ export async function getDailyBriefing(dateStr?: string): Promise<DailyBriefing 
     return null;
   }
 }
+
+// Fetch the most recent briefing whose Market Signals field is non-empty,
+// regardless of date. Used by the Hall so the panel always shows the last
+// known signals with a clear "generated on" timestamp.
+export async function getLatestMarketSignals(): Promise<{ text: string; date: string | null; generatedAt: string | null } | null> {
+  try {
+    const res = await notion.databases.query({
+      database_id: DB.dailyBriefings,
+      sorts: [{ property: "Date", direction: "descending" }],
+      page_size: 14, // look at the last ~2 weeks
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const page of res.results as any[]) {
+      const signals = text(prop(page, "Market Signals"));
+      if (signals && signals.trim().length > 0) {
+        return {
+          text:        signals,
+          date:        date(prop(page, "Date")),
+          generatedAt: date(prop(page, "Generated At")),
+        };
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}

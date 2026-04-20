@@ -26,11 +26,13 @@ import { InboxTriage, type InboxItem } from "@/components/InboxTriage";
 import { DraftCheckinButton } from "@/components/DraftCheckinButton";
 import { ChiefOfStaffDesk, ParkedLoopsSection } from "@/components/ChiefOfStaffDesk";
 import { DiscoverySection } from "@/components/DiscoverySection";
+import { MarketSignalsPanel } from "@/components/MarketSignalsPanel";
 import OpportunityExplorer from "@/components/OpportunityExplorer";
 import {
   getProjectsOverview,
   getDecisionItems,
   getDailyBriefing,
+  getLatestMarketSignals,
   getAgentDrafts,
   getCoSTasks,
   getParkedLoops,
@@ -432,6 +434,7 @@ export default async function AdminPage() {
     projects,
     decisions,
     dailyBriefing,
+    latestMarketSignals,
     agentDrafts,
     gmailDrafts,
     approvedDrafts,
@@ -447,6 +450,7 @@ export default async function AdminPage() {
     getProjectsOverview(),
     getDecisionItems("Open"),
     getDailyBriefing(),
+    getLatestMarketSignals(),
     getAgentDrafts("Pending Review"),
     getAgentDrafts("Draft Created"),
     getAgentDrafts("Approved"),
@@ -809,20 +813,13 @@ export default async function AdminPage() {
                 </div>
               )}
 
-              {dailyBriefing?.marketSignals && (
-                <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-                  <div className="px-5 py-3 border-b border-[#EFEFEA]">
-                    <p className="text-xs font-bold text-[#131218]">Market signals</p>
-                  </div>
-                  <div className="px-5 py-4">
-                    <pre className="text-[11px] text-[#131218]/65 leading-[1.65] whitespace-pre-wrap font-sans">
-                      {dailyBriefing.marketSignals.slice(0, 500)}
-                    </pre>
-                  </div>
-                </div>
-              )}
+              <MarketSignalsPanel
+                text={latestMarketSignals?.text ?? null}
+                date={latestMarketSignals?.date ?? null}
+                generatedAt={latestMarketSignals?.generatedAt ?? null}
+              />
 
-              {!dailyBriefing?.meetingPrep && !dailyBriefing?.marketSignals && (
+              {!dailyBriefing?.meetingPrep && !latestMarketSignals && (
                 <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-4">
                   <p className="text-[11px] text-[#131218]/30">No briefing context yet today.</p>
                 </div>
