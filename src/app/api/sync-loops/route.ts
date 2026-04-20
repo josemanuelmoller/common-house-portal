@@ -258,6 +258,14 @@ async function upsertLoop(
       // Backfill intent_key on old rows if missing.
       updatePayload.intent_key = intentKey;
 
+      // Seed last_evidence_fingerprint if missing — gives the materially-new
+      // gate a baseline for future syncs. Without this, the first re-sync of
+      // a legacy closed loop would flicker (no baseline → gate can't judge).
+      if (!(existing as { last_evidence_fingerprint?: string | null }).last_evidence_fingerprint) {
+        updatePayload.last_evidence_fingerprint   = incomingFingerprint;
+        updatePayload.last_meaningful_evidence_at = new Date().toISOString();
+      }
+
       await sb.from("loops").update(updatePayload).eq("id", loopId);
       stats.upserted++;
     }

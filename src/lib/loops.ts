@@ -279,6 +279,11 @@ export function fingerprintSimilarity(a: string | null, b: string | null): numbe
  * Returns true when incoming evidence justifies reopening a resolved/dismissed loop.
  * Gate is intentionally strict — false negatives (loop stays closed) are far less
  * damaging than false positives (loop flickers back on every paraphrase).
+ *
+ * NULL previousFingerprint is treated as NOT materially new (conservative). This
+ * handles the cold-start case where a legacy closed loop has no baseline to
+ * compare against — we default to "same thing, stay closed" rather than
+ * resurrecting it on first re-sync. A signal-type change still overrides.
  */
 export function isMateriallyNewEvidence(params: {
   previousFingerprint: string | null;
@@ -291,8 +296,10 @@ export function isMateriallyNewEvidence(params: {
   if (params.previousSignalType && params.previousSignalType !== params.incomingSignalType) {
     return true;
   }
-  // No prior fingerprint to compare against — treat as material (first real evidence).
-  if (!params.previousFingerprint) return true;
+  // No prior fingerprint → conservative: NOT material. Stays closed until
+  // either a genuinely new signal arrives (caller already gates on isNewSignal
+  // for user-dismissed rows) or a baseline is established and then changes.
+  if (!params.previousFingerprint) return false;
 
   const threshold = params.similarityThreshold ?? 0.55;
   const sim = fingerprintSimilarity(params.previousFingerprint, params.incomingFingerprint);

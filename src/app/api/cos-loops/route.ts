@@ -14,7 +14,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminGuardApi } from "@/lib/require-admin";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
-import { ACTIVE_LOOP_STATUSES, type ActionType, type LoopStatus } from "@/lib/loops";
+import {
+  ACTIVE_LOOP_STATUSES,
+  normalizeFingerprint,
+  type ActionType,
+  type LoopStatus,
+} from "@/lib/loops";
 
 // Button label → (status, action, timestamp column set when transitioning into the state).
 // Source of truth for how Hall UI state buttons map to DB state.
@@ -126,6 +131,21 @@ export async function PATCH(req: NextRequest) {
     };
     if (transition.stampCol) {
       updatePayload[transition.stampCol] = nowIso;
+    }
+
+    // For terminal transitions (Done / Dropped), snapshot the current title as
+    // last_evidence_fingerprint if it's not already set. This gives the next
+    // sync a baseline so paraphrased re-evidence doesn't flicker the loop back.
+    if (transition.stampCol !== null) {
+      const { data: row } = await sb
+        .from("loops")
+        .select("title, last_evidence_fingerprint")
+        .eq("id", loopId)
+        .maybeSingle();
+      if (row && !row.last_evidence_fingerprint && row.title) {
+        updatePayload.last_evidence_fingerprint   = normalizeFingerprint(row.title);
+        updatePayload.last_meaningful_evidence_at = nowIso;
+      }
     }
 
     const { error: updateErr } = await sb
