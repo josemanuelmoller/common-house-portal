@@ -1,5 +1,4 @@
 import { Sidebar } from "@/components/Sidebar";
-import { ADMIN_NAV as NAV } from "@/lib/admin-nav";
 import { requireAdmin } from "@/lib/require-admin";
 import {
   getObjectivesForYear,
@@ -25,7 +24,7 @@ export default async function PlanPage() {
 
   return (
     <div className="flex min-h-screen bg-[#EFEFEA]">
-      <Sidebar items={NAV} />
+      <Sidebar adminNav />
 
       <main className="flex-1 ml-[228px] overflow-auto">
         <header className="bg-[#131218] text-white px-12 pt-10 pb-11">

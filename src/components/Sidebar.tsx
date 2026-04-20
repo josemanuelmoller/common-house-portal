@@ -38,6 +38,7 @@ type NavEntry = NavGroup | NavLink;
 
 export const ADMIN_NAV_V2: NavEntry[] = [
   { kind: "link",  label: "The Hall",    href: "/admin",         icon: "◈" },
+  { kind: "link",  label: "The Plan",    href: "/admin/plan",    icon: "◆" },
   { kind: "link",  label: "Residents",   href: "/residents",     icon: "◍" },
   {
     kind: "group", label: "Portfolio", icon: "◧",
