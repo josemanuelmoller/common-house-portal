@@ -389,6 +389,24 @@ function SectionHeader({ label, count, action, href }: {
   );
 }
 
+// Compact quiet-state row — used in place of a large dead slab when a section
+// has nothing to show. Keeps the header visible so state is auditable, but the
+// row is ~36px instead of ~120px.
+function QuietRow({ label, note, action }: {
+  label: string;
+  note: string;
+  action?: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-center gap-3 bg-white/50 border border-dashed border-[#E0E0D8] rounded-xl px-4 py-2">
+      <span className="w-1.5 h-1.5 rounded-full bg-[#131218]/15 shrink-0" />
+      <span className="text-[10px] font-bold uppercase tracking-[2px] text-[#131218]/30">{label}</span>
+      <span className="text-[11px] text-[#131218]/45 flex-1 min-w-0 truncate">{note}</span>
+      {action}
+    </div>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 async function fetchInboxServer(): Promise<{ items: InboxItem[]; total_scanned: number }> {
@@ -514,16 +532,15 @@ export default async function AdminPage() {
       <main className="flex-1 ml-60 overflow-auto">
 
         {/* ── 0. Header ─────────────────────────────────────────────────── */}
-        <div className="bg-[#131218] px-10 py-10">
-          <p className="text-[8px] font-bold uppercase tracking-[2.5px] text-white/20 mb-3">
+        <div className="bg-[#131218] px-10 pt-7 pb-6">
+          <p className="text-[8px] font-bold uppercase tracking-[2.5px] text-white/20 mb-2">
             HOME · {dateLabel.toUpperCase()} · v2
           </p>
-          <h1 className="text-[2.6rem] font-[300] text-white leading-[1] tracking-[-1.5px]">
-            {greeting},<br />
-            <em className="font-[900] italic text-[#c8f55a]">{firstName}.</em>
+          <h1 className="text-[1.85rem] font-[300] text-white leading-[1.1] tracking-[-1px]">
+            {greeting}, <em className="font-[900] italic text-[#c8f55a] not-italic-fallback">{firstName}.</em>
           </h1>
-          <p className="text-[12.5px] text-white/40 mt-3 max-w-[520px] leading-[1.65]">
-            Here is your day — what moves, what waits, and what needs your attention.
+          <p className="text-[12px] text-white/40 mt-2 leading-[1.5]">
+            What moves, what waits, and what needs your attention.
           </p>
         </div>
 
@@ -531,25 +548,30 @@ export default async function AdminPage() {
 
           {/* ── 1. Focus of the Day ───────────────────────────────────────── */}
           {focusRec ? (
-            <div className="bg-[#131218] rounded-2xl px-7 py-6 border border-[#131218]">
+            <div className="bg-[#131218] rounded-2xl px-6 py-5 border border-[#131218]">
               <div className="flex items-start justify-between gap-6">
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2.5 mb-3">
+                  <div className="flex items-center gap-2.5 mb-2.5">
                     <p className="text-[9px] font-bold uppercase tracking-[2.5px] text-[#c8f55a]/60">
                       Focus of the Day
                     </p>
                     <span className="text-[9px] font-bold text-[#131218] bg-[#c8f55a]/90 px-2 py-0.5 rounded-full">
                       {focusRec.timeEstimate}
                     </span>
+                    {dailyBriefing?.generatedAt && (
+                      <span className="text-[8px] text-white/25 ml-auto md:ml-0">
+                        briefing {new Date(dailyBriefing.generatedAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                    )}
                   </div>
-                  <p className="text-[15px] font-semibold text-white leading-[1.6] max-w-[640px]">
+                  <p className="text-[14px] font-semibold text-white leading-[1.5] max-w-[640px]">
                     {focusRec.action}
                   </p>
-                  <p className="text-[11px] text-white/45 mt-2 leading-snug">
+                  <p className="text-[11px] text-white/45 mt-1.5 leading-snug">
                     {focusRec.whyToday}
                   </p>
                 </div>
-                <div className="flex flex-col items-end gap-2 shrink-0">
+                <div className="flex flex-col items-end gap-1.5 shrink-0">
                   {focusRec.links.map(link => (
                     <a
                       key={link.url}
@@ -567,22 +589,94 @@ export default async function AdminPage() {
                   ))}
                 </div>
               </div>
-              {dailyBriefing?.generatedAt && (
-                <p className="text-[8px] text-white/15 mt-4 pt-3 border-t border-white/5">
-                  Briefing generated at {new Date(dailyBriefing.generatedAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
-                </p>
-              )}
             </div>
-          ) : (
-            <div className="bg-[#131218]/6 border border-dashed border-[#131218]/15 rounded-2xl px-7 py-5 flex items-center justify-between gap-4">
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-[2.5px] text-[#131218]/30 mb-1">Focus of the Day</p>
-                <p className="text-[13px] text-[#131218]/40">Nothing actionable in queue right now.</p>
-                <p className="text-[11px] text-[#131218]/25 mt-0.5">Focus appears when CoS tasks, inbox, or drafts have a clear next action.</p>
+          ) : (() => {
+            // Smarter empty state — surface up to 2 lightweight alternatives
+            // so the slot is never a dead dialogue box.
+            type Suggestion = { label: string; action: string; href: string; kind: "inbox" | "decision" | "candidate" | "cold" };
+            const suggestions: Suggestion[] = [];
+
+            const topInbox = inboxData.items[0];
+            if (topInbox) {
+              suggestions.push({
+                label: "Reply",
+                action: `Reply to "${topInbox.subject.slice(0, 56)}${topInbox.subject.length > 56 ? "…" : ""}" from ${topInbox.fromName}`,
+                href: topInbox.gmailUrl,
+                kind: "inbox",
+              });
+            }
+            const firstUrgentDecision = deskDecisions[0];
+            if (firstUrgentDecision && suggestions.length < 2) {
+              suggestions.push({
+                label: "Decide",
+                action: `Make the call on "${firstUrgentDecision.title.slice(0, 64)}${firstUrgentDecision.title.length > 64 ? "…" : ""}"`,
+                href: "/admin/decisions",
+                kind: "decision",
+              });
+            }
+            const firstCandidate = candidates[0];
+            if (firstCandidate && suggestions.length < 2) {
+              suggestions.push({
+                label: "Review",
+                action: `Review candidate — ${firstCandidate.name}`,
+                href: firstCandidate.notionUrl,
+                kind: "candidate",
+              });
+            }
+            const firstCold = coldRelationships[0];
+            if (firstCold && suggestions.length < 2) {
+              suggestions.push({
+                label: "Reach out",
+                action: `Catch up with ${firstCold.name} — ${firstCold.warmth.toLowerCase()}`,
+                href: firstCold.notionUrl,
+                kind: "cold",
+              });
+            }
+
+            if (suggestions.length === 0) {
+              return (
+                <div className="bg-white border border-[#E0E0D8] rounded-xl px-5 py-3 flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#c8f55a] shrink-0" />
+                    <p className="text-[10px] font-bold uppercase tracking-[2.5px] text-[#131218]/35">Focus of the Day</p>
+                    <p className="text-[12px] text-[#131218]/50 truncate">Queue is clear — good moment for deep work.</p>
+                  </div>
+                  <TriggerBriefingButton />
+                </div>
+              );
+            }
+
+            return (
+              <div className="bg-white border border-[#E0E0D8] rounded-xl overflow-hidden">
+                <div className="px-5 pt-3 pb-2 flex items-center justify-between gap-3 border-b border-[#EFEFEA]">
+                  <div className="flex items-center gap-2.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#c8f55a]" />
+                    <p className="text-[10px] font-bold uppercase tracking-[2.5px] text-[#131218]/35">Focus of the Day</p>
+                    <span className="text-[10px] text-[#131218]/35">·</span>
+                    <span className="text-[10px] text-[#131218]/40">No critical task — {suggestions.length === 1 ? "here's a helpful move" : "here are a couple of helpful moves"}</span>
+                  </div>
+                  <TriggerBriefingButton />
+                </div>
+                <div className="divide-y divide-[#EFEFEA]">
+                  {suggestions.map((s, i) => (
+                    <a
+                      key={i}
+                      href={s.href}
+                      target={s.href.startsWith("http") ? "_blank" : undefined}
+                      rel={s.href.startsWith("http") ? "noopener noreferrer" : undefined}
+                      className="flex items-center gap-3 px-5 py-2.5 hover:bg-[#EFEFEA]/50 transition-colors"
+                    >
+                      <span className="text-[9px] font-bold uppercase tracking-widest text-[#131218]/40 bg-[#EFEFEA] px-2 py-0.5 rounded-full shrink-0 w-[72px] text-center">
+                        {s.label}
+                      </span>
+                      <p className="text-[12px] text-[#131218] flex-1 min-w-0 truncate">{s.action}</p>
+                      <span className="text-[#131218]/25 shrink-0 text-sm">→</span>
+                    </a>
+                  ))}
+                </div>
               </div>
-              <TriggerBriefingButton />
-            </div>
-          )}
+            );
+          })()}
 
           {/* ── 2. P1 Banner — only P1 Critical decisions or deadlines ≤7 days ── */}
           {showBanner && (
@@ -606,88 +700,70 @@ export default async function AdminPage() {
           )}
 
           {/* ── 3. Stats row ──────────────────────────────────────────────── */}
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-3 gap-4 items-stretch">
 
             {/* Tile 1 — Portfolio */}
-            <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-5">
-              <p className="text-[9px] font-bold text-[#131218]/25 uppercase tracking-widest mb-2">Portfolio activo</p>
-              <p className="text-3xl font-[800] text-[#131218] tracking-tight leading-none mb-2">{projects.length}</p>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-semibold text-[#131218]/40">
-                  {workroomCount} Workroom · {garageCount} Garage{untypedCount > 0 ? ` · ${untypedCount} sin tipo` : ""}
+            <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-4 flex flex-col">
+              <p className="text-[9px] font-bold text-[#131218]/25 uppercase tracking-widest mb-1.5">Portfolio activo</p>
+              <div className="flex items-baseline gap-2.5">
+                <p className="text-[28px] font-[800] text-[#131218] tracking-tight leading-none">{projects.length}</p>
+                <span className="text-[10px] font-semibold text-[#131218]/40 leading-tight">
+                  {workroomCount}W · {garageCount}G{untypedCount > 0 ? ` · ${untypedCount} untyped` : ""}
                 </span>
               </div>
-              {blockerCount > 0 && (
-                <div className="mt-2.5 flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" />
-                  <span className="text-[10px] font-bold text-red-500">{blockerCount} blocker{blockerCount !== 1 ? "s" : ""}</span>
-                </div>
-              )}
+              <div className="mt-auto pt-3 flex items-center gap-3 text-[10px]">
+                {blockerCount > 0 ? (
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" />
+                    <span className="font-bold text-red-500">{blockerCount} blocker{blockerCount !== 1 ? "s" : ""}</span>
+                  </span>
+                ) : (
+                  <span className="text-[#131218]/25">No blockers</span>
+                )}
+                {staleProjects.length > 0 && (
+                  <span className="text-[#131218]/40">· {staleProjects.length} stale 30d+</span>
+                )}
+              </div>
             </div>
 
-            {/* Tile 2 — Cola de trabajo */}
-            <Link href="/admin/decisions" className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-5 hover:bg-[#EFEFEA]/40 transition-colors block">
-              <p className="text-[9px] font-bold text-[#131218]/25 uppercase tracking-widest mb-2">Decisiones + updates</p>
-              <p className={`text-3xl font-[800] tracking-tight leading-none mb-2 ${openDecisions.length > 0 ? "text-amber-500" : "text-[#131218]/15"}`}>
-                {openDecisions.length}
-              </p>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-semibold text-[#131218]/40">
-                  {totalPending > 0 ? `${totalPending} requieren acción · ` : ""}{urgentDecisions.length} urgentes · {needsUpdate.length} por actualizar
+            {/* Tile 2 — Decisiones + updates */}
+            <Link href="/admin/decisions" className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-4 hover:bg-[#EFEFEA]/40 transition-colors flex flex-col">
+              <p className="text-[9px] font-bold text-[#131218]/25 uppercase tracking-widest mb-1.5">Decisiones + updates</p>
+              <div className="flex items-baseline gap-2.5">
+                <p className={`text-[28px] font-[800] tracking-tight leading-none ${openDecisions.length > 0 ? "text-amber-500" : "text-[#131218]/15"}`}>
+                  {openDecisions.length}
+                </p>
+                <span className="text-[10px] font-semibold text-[#131218]/40 leading-tight">
+                  {totalPending > 0 ? `${totalPending} need action` : "desk clear"}
                 </span>
               </div>
-              {withDeadlines.length > 0 && (
-                <div className="mt-2.5 flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
-                  <span className="text-[10px] font-bold text-amber-500">{withDeadlines.length} deadline{withDeadlines.length !== 1 ? "s" : ""} esta semana</span>
-                </div>
-              )}
+              <div className="mt-auto pt-3 flex items-center gap-3 text-[10px]">
+                <span className="text-[#131218]/40">
+                  {urgentDecisions.length} urgent · {needsUpdate.length} to update
+                </span>
+                {withDeadlines.length > 0 && (
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+                    <span className="font-bold text-amber-500">{withDeadlines.length} this week</span>
+                  </span>
+                )}
+              </div>
             </Link>
 
-            {/* Tile 3 — OS Layer */}
-            <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-5">
-              <p className="text-[9px] font-bold text-[#131218]/25 uppercase tracking-widest mb-3">OS activo</p>
-              <div className="space-y-2.5">
+            {/* Tile 3 — OS activo */}
+            <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-4">
+              <p className="text-[9px] font-bold text-[#131218]/25 uppercase tracking-widest mb-2">OS activo</p>
+              <div className="space-y-1.5">
                 {[
-                  {
-                    label: "Borradores de agentes",
-                    count: agentDrafts.length,
-                    activeColor: "text-[#131218]",
-                    hint: "Pending agent drafts needing your review",
-                  },
-                  {
-                    label: "CoS tasks activas",
-                    count: cosTasks.length,
-                    activeColor: "text-amber-500",
-                    hint: "Tasks with meetings, pending reviews, or explicit actions",
-                  },
-                  {
-                    label: "Candidatos sin revisar",
-                    count: candidates.length,
-                    activeColor: "text-amber-400",
-                    hint: "Use Scan inbox to detect new candidates",
-                  },
-                  {
-                    label: "Relaciones frías",
-                    count: coldOnly.length,
-                    activeColor: "text-blue-500",
-                    hint: "Populated by relationship warmth scan (Mon · Thu)",
-                  },
-                  {
-                    label: "Dormantes",
-                    count: dormantRelationships.length,
-                    activeColor: "text-[#131218]/40",
-                    hint: "No contact in 60+ days",
-                  },
-                ].map(({ label, count, activeColor, hint }) => (
-                  <div key={label}>
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] text-[#131218]/50">{label}</span>
-                      <span className={`text-[13px] font-[800] ${count > 0 ? activeColor : "text-[#131218]/15"}`}>{count}</span>
-                    </div>
-                    {count === 0 && (
-                      <p className="text-[9px] text-[#131218]/20 mt-0.5 leading-snug">{hint}</p>
-                    )}
+                  { label: "Agent drafts",   count: agentDrafts.length,   activeColor: "text-[#131218]" },
+                  { label: "CoS tasks",      count: cosTasks.length,      activeColor: "text-amber-500" },
+                  { label: "Candidates",     count: candidates.length,    activeColor: "text-amber-400" },
+                  { label: "Cold relations", count: coldOnly.length,      activeColor: "text-blue-500" },
+                  { label: "Dormant",        count: dormantRelationships.length, activeColor: "text-[#131218]/40" },
+                ].map(({ label, count, activeColor }) => (
+                  <div key={label} className="flex items-center justify-between">
+                    <span className="text-[11px] text-[#131218]/50">{label}</span>
+                    <span className={`text-[12px] font-[800] ${count > 0 ? activeColor : "text-[#131218]/15"}`}>{count}</span>
                   </div>
                 ))}
               </div>
@@ -767,38 +843,68 @@ export default async function AdminPage() {
                 <RadarSection initialLoops={radarLoops} />
               </div>
 
-              {/* ── 6. My Commitments (from briefing + decisions) ─────────── */}
-              {(dailyBriefing?.myCommitments || openDecisions.length > 0) && (
-                <div>
-                  <SectionHeader label="Open decisions" count={openDecisions.length} action="Decisions" href="/admin/decisions" />
-                  <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-                    {dailyBriefing?.myCommitments ? (
-                      <div className="px-5 py-4 border-b border-[#EFEFEA]">
-                        <p className="text-[9px] font-bold uppercase tracking-widest text-[#131218]/25 mb-2">From today&apos;s briefing</p>
-                        <pre className="text-[11.5px] text-[#131218]/70 leading-[1.65] whitespace-pre-wrap font-sans">
-                          {dailyBriefing.myCommitments.slice(0, 600)}
-                        </pre>
-                      </div>
-                    ) : null}
-                    {openDecisions.slice(0, 5).map(d => (
-                      <Link key={d.id} href="/admin/decisions" className="flex items-center gap-3 px-5 py-3.5 hover:bg-[#EFEFEA]/40 transition-colors border-b border-[#EFEFEA] last:border-0">
-                        <div className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 ${d.priority === "P1 Critical" ? "bg-red-100" : "bg-[#EFEFEA]"}`}>
-                          <span className={`text-[9px] font-bold ${d.priority === "P1 Critical" ? "text-red-600" : "text-[#131218]/35"}`}>!</span>
+              {/* ── 6. Open decisions ─────────────────────────────────────── */}
+              {(() => {
+                // Hide dead "From today's briefing — No open P1 items" wrappers.
+                // Only show briefing commitments if they contain substantive content
+                // (more than a short "no items" placeholder).
+                const substantiveCommitments = dailyBriefing?.myCommitments
+                  && dailyBriefing.myCommitments.trim().length > 40
+                  && !/^no\b/i.test(dailyBriefing.myCommitments.trim());
+
+                if (!substantiveCommitments && openDecisions.length === 0) return null;
+
+                // Sort: P1 Critical first, then due soonest.
+                const sortedDecisions = [...openDecisions].sort((a, b) => {
+                  const pri = (p: string) => p === "P1 Critical" ? 0 : p === "High" ? 1 : 2;
+                  const diff = pri(a.priority) - pri(b.priority);
+                  if (diff !== 0) return diff;
+                  const ad = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
+                  const bd = b.dueDate ? new Date(b.dueDate).getTime() : Infinity;
+                  return ad - bd;
+                });
+
+                return (
+                  <div>
+                    <SectionHeader label="Open decisions" count={openDecisions.length} action="All decisions" href="/admin/decisions" />
+                    <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
+                      {substantiveCommitments && (
+                        <div className="px-5 py-3.5 border-b border-[#EFEFEA] bg-[#EFEFEA]/40">
+                          <p className="text-[9px] font-bold uppercase tracking-widest text-[#131218]/30 mb-1.5">From today&apos;s briefing</p>
+                          <pre className="text-[11.5px] text-[#131218]/70 leading-[1.6] whitespace-pre-wrap font-sans">
+                            {dailyBriefing!.myCommitments.slice(0, 500)}
+                          </pre>
                         </div>
-                        <p className="text-[11px] font-medium text-[#131218] flex-1 min-w-0 truncate">{d.title}</p>
-                        <div className="flex items-center gap-2 shrink-0">
-                          {d.dueDate && (
-                            <span className="text-[9px] font-bold text-[#131218]/35">
-                              {new Date(d.dueDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
-                            </span>
-                          )}
-                          <span className="text-[9px] font-bold text-[#131218]/25">{d.decisionType}</span>
-                        </div>
-                      </Link>
-                    ))}
+                      )}
+                      {sortedDecisions.slice(0, 5).map(d => {
+                        const isP1  = d.priority === "P1 Critical";
+                        const isHigh = d.priority === "High";
+                        const daysToDue = d.dueDate ? Math.floor((new Date(d.dueDate).getTime() - Date.now()) / 86400000) : null;
+                        const dueBadgeClass = daysToDue === null ? "text-[#131218]/30"
+                          : daysToDue < 0 ? "text-red-600"
+                          : daysToDue <= 3 ? "text-amber-600"
+                          : "text-[#131218]/40";
+                        return (
+                          <Link key={d.id} href="/admin/decisions" className={`flex items-center gap-3 px-5 py-3 hover:bg-[#EFEFEA]/40 transition-colors border-b border-[#EFEFEA] last:border-0 ${isP1 ? "border-l-2 border-l-red-400" : ""}`}>
+                            <div className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 ${isP1 ? "bg-red-100" : isHigh ? "bg-amber-50" : "bg-[#EFEFEA]"}`}>
+                              <span className={`text-[9px] font-bold ${isP1 ? "text-red-600" : isHigh ? "text-amber-600" : "text-[#131218]/35"}`}>!</span>
+                            </div>
+                            <p className="text-[11.5px] font-medium text-[#131218] flex-1 min-w-0 truncate">{d.title}</p>
+                            <div className="flex items-center gap-2 shrink-0">
+                              {d.dueDate && (
+                                <span className={`text-[9px] font-bold ${dueBadgeClass}`}>
+                                  {new Date(d.dueDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+                                </span>
+                              )}
+                              <span className="text-[9px] font-bold text-[#131218]/25">{d.decisionType}</span>
+                            </div>
+                          </Link>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
 
               {/* ── 7. Relationship Queue ─────────────────────────────────── */}
               {coldRelationships.length > 0 && (

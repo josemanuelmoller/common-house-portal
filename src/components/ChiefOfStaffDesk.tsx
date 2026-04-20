@@ -428,10 +428,10 @@ export function ChiefOfStaffDesk({ tasks }: { tasks: CoSTask[] }) {
 
   if (visible.length === 0) {
     return (
-      <div className="bg-white/50 border border-dashed border-[#E0E0D8] rounded-2xl px-5 py-10 text-center">
-        <p className="text-[12px] text-[#131218]/25 font-medium">No active tasks</p>
-        <p className="text-[10.5px] text-[#131218]/18 mt-1">
-          Tasks appear when there is inbound work to review, a meeting to prep for, or an explicit action on any opportunity
+      <div className="flex items-center gap-3 bg-white/50 border border-dashed border-[#E0E0D8] rounded-xl px-4 py-2">
+        <span className="w-1.5 h-1.5 rounded-full bg-[#c8f55a] shrink-0" />
+        <p className="text-[11px] text-[#131218]/45 flex-1 min-w-0">
+          Desk is clear — tasks surface when work has a review link, meeting, or explicit action.
         </p>
       </div>
     );

@@ -57,8 +57,9 @@ export function RadarSection({ initialLoops }: { initialLoops: RadarLoop[] }) {
 
   if (visible.length === 0) {
     return (
-      <div className="bg-[#131218]/4 border border-dashed border-[#131218]/10 rounded-2xl px-5 py-4 text-center">
-        <p className="text-[11px] text-[#131218]/30 font-medium">Radar clear — no passive discovery items</p>
+      <div className="flex items-center gap-3 bg-white/50 border border-dashed border-[#E0E0D8] rounded-xl px-4 py-2">
+        <span className="w-1.5 h-1.5 rounded-full bg-[#131218]/15 shrink-0" />
+        <p className="text-[11px] text-[#131218]/40 flex-1 min-w-0">Radar clear — no passive discovery items.</p>
       </div>
     );
   }

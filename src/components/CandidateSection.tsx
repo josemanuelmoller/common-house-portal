@@ -152,12 +152,12 @@ export function CandidateSection({ candidates }: Props) {
         </button>
       </div>
 
-      {/* Empty state */}
+      {/* Empty state — compact */}
       {visible.length === 0 && !scanning && (
-        <div className="bg-white/50 border border-dashed border-[#E0E0D8] rounded-xl px-4 py-6 text-center">
-          <p className="text-[11.5px] text-[#131218]/25 font-medium">No unreviewed candidates</p>
-          <p className="text-[10px] text-[#131218]/18 mt-1">
-            Scan inbox to detect new opportunities, or use the &ldquo;+&rdquo; button on inbox items
+        <div className="flex items-center gap-3 bg-white/50 border border-dashed border-[#E0E0D8] rounded-xl px-4 py-2">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#131218]/15 shrink-0" />
+          <p className="text-[11px] text-[#131218]/40 flex-1 min-w-0 truncate">
+            No unreviewed candidates — use <span className="font-semibold text-[#131218]/55">Scan inbox</span> above or the &ldquo;+&rdquo; button on inbox rows.
           </p>
         </div>
       )}
