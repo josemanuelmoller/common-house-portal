@@ -3,10 +3,19 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
+export type MarketSignalBrief = {
+  id: string;
+  title: string;
+  sourceLink: string | null;
+  notionUrl: string;
+  theme: string[];
+};
+
 interface Props {
   text: string | null;
   date: string | null;          // ISO date string of the briefing the signals came from
   generatedAt: string | null;   // ISO datetime the record was last written
+  briefs?: MarketSignalBrief[]; // Insight Briefs fed into the signal — linked at the bottom
 }
 
 function relativeAge(iso: string | null): string | null {
@@ -30,7 +39,7 @@ function formatStamp(iso: string | null): string {
   return `${day} · ${time}`;
 }
 
-export function MarketSignalsPanel({ text, date, generatedAt }: Props) {
+export function MarketSignalsPanel({ text, date, generatedAt, briefs = [] }: Props) {
   const router = useRouter();
   const [state, setState] = useState<"idle" | "running" | "just-updated" | "error">("idle");
 
@@ -93,6 +102,34 @@ export function MarketSignalsPanel({ text, date, generatedAt }: Props) {
           </p>
         )}
       </div>
+
+      {briefs.length > 0 && (
+        <div className="px-5 py-3 border-t border-[#EFEFEA] bg-[#FAFAF8]">
+          <p className="text-[8.5px] font-bold uppercase tracking-widest text-[#131218]/35 mb-2">
+            Sources · {briefs.length}
+          </p>
+          <ul className="flex flex-wrap gap-1.5">
+            {briefs.slice(0, 12).map(b => {
+              const href = b.sourceLink ?? b.notionUrl;
+              const isOriginal = !!b.sourceLink;
+              return (
+                <li key={b.id}>
+                  <a
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title={isOriginal ? "Open original source" : "Open in Notion"}
+                    className="inline-flex items-center gap-1 text-[9.5px] font-semibold text-[#131218]/60 bg-white border border-[#E0E0D8] hover:border-[#131218]/30 hover:text-[#131218] transition-colors px-2 py-0.5 rounded-full max-w-[220px]"
+                  >
+                    <span className="truncate">{b.title}</span>
+                    <span className="text-[8px] opacity-60 shrink-0">{isOriginal ? "↗" : "N↗"}</span>
+                  </a>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }
@@ -171,12 +208,14 @@ function SignalList({ raw }: { raw: string }) {
           ? TAG_COLOR[s.tag]
           : "bg-[#EFEFEA] text-[#131218]/55 border-[#E0E0D8]";
         return (
-          <li key={i} className="flex gap-2.5">
-            {s.tag && (
-              <span className={`shrink-0 text-[8.5px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full border ${color} self-start mt-0.5 whitespace-nowrap`}>
-                {s.tag}
-              </span>
-            )}
+          <li key={i} className="flex gap-3">
+            <span
+              className={`shrink-0 w-[96px] text-[8.5px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full border text-center ${
+                s.tag ? color : "bg-[#EFEFEA] text-[#131218]/30 border-[#E0E0D8]"
+              } self-start mt-0.5`}
+            >
+              {s.tag ?? "—"}
+            </span>
             <div className="flex-1 min-w-0">
               <p className="text-[11.5px] font-semibold text-[#131218] leading-snug">
                 {s.headline}

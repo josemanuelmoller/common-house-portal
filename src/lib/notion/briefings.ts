@@ -45,6 +45,45 @@ export async function getDailyBriefing(dateStr?: string): Promise<DailyBriefing 
   }
 }
 
+// Lightweight snapshot of a recent Insight Brief — used as the Sources strip
+// under the Market Signals panel so the user can jump to the original source.
+export type MarketSignalBrief = {
+  id: string;
+  title: string;
+  sourceLink: string | null;   // URL to the original news / report
+  notionUrl: string;           // fallback — opens the brief in Notion
+  theme: string[];
+};
+
+export async function getRecentInsightBriefBriefs(): Promise<MarketSignalBrief[]> {
+  try {
+    const since = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
+    const res = await notion.databases.query({
+      database_id: DB.insightBriefs,
+      filter: {
+        timestamp: "last_edited_time",
+        last_edited_time: { on_or_after: since },
+      },
+      sorts: [{ timestamp: "last_edited_time", direction: "descending" }],
+      page_size: 20,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (res.results as any[]).map(page => {
+      const url = page.properties?.["Source Link"]?.url ?? null;
+      return {
+        id:         page.id,
+        title:      text(prop(page, "Brief Title")) || text(prop(page, "Name")) || "Untitled",
+        sourceLink: typeof url === "string" && url.length > 0 ? url : null,
+        notionUrl:  page.url ?? "",
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        theme:      (page.properties?.["Theme"]?.multi_select ?? []).map((r: any) => r.name),
+      };
+    });
+  } catch {
+    return [];
+  }
+}
+
 // Fetch the most recent briefing whose Market Signals field is non-empty,
 // regardless of date. Used by the Hall so the panel always shows the last
 // known signals with a clear "generated on" timestamp.

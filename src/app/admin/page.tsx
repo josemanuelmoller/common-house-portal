@@ -33,6 +33,7 @@ import {
   getDecisionItems,
   getDailyBriefing,
   getLatestMarketSignals,
+  getRecentInsightBriefBriefs,
   getAgentDrafts,
   getCoSTasks,
   getParkedLoops,
@@ -435,6 +436,7 @@ export default async function AdminPage() {
     decisions,
     dailyBriefing,
     latestMarketSignals,
+    marketSignalBriefs,
     agentDrafts,
     gmailDrafts,
     approvedDrafts,
@@ -451,6 +453,7 @@ export default async function AdminPage() {
     getDecisionItems("Open"),
     getDailyBriefing(),
     getLatestMarketSignals(),
+    getRecentInsightBriefBriefs(),
     getAgentDrafts("Pending Review"),
     getAgentDrafts("Draft Created"),
     getAgentDrafts("Approved"),
@@ -817,6 +820,7 @@ export default async function AdminPage() {
                 text={latestMarketSignals?.text ?? null}
                 date={latestMarketSignals?.date ?? null}
                 generatedAt={latestMarketSignals?.generatedAt ?? null}
+                briefs={marketSignalBriefs}
               />
 
               {!dailyBriefing?.meetingPrep && !latestMarketSignals && (
