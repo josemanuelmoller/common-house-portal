@@ -21,6 +21,11 @@ export const GOOGLE_SCOPES_ALL = [
   // /admin/hall/contacts to dual-write relationship_class tags back to
   // Google Contacts (bidirectional sync).
   "https://www.googleapis.com/auth/contacts",
+  // Read-only access to 'otherContacts' — people Google auto-saved from
+  // Gmail interactions + Calendar invites, but who were never promoted to
+  // the user's main address book. Needed to resolve attendees like a
+  // therapist / provider who have never been manually added.
+  "https://www.googleapis.com/auth/contacts.other.readonly",
 ] as const;
 
 export type GoogleScope = typeof GOOGLE_SCOPES_ALL[number];
