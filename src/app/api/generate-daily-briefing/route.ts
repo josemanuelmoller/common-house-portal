@@ -92,11 +92,34 @@ async function fetchFollowUpOpportunities() {
     page_size: 15,
   });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (res.results as any[]).map(p => ({
+  const raw = (res.results as any[]).map(p => ({
+    id:     p.id,
     name:   text(prop(p, "Opportunity Name")),
     stage:  sel(prop(p, "Opportunity Status")),
+    type:   sel(prop(p, "Opportunity Type")),
     org:    p.properties?.["Organization"]?.relation?.[0]?.id ?? null,
   }));
+
+  // Grant activation gate: unfollowed grants must NOT enter the daily briefing.
+  // Cross-check against Supabase is_followed (source of truth for human activation).
+  const grantIds = raw.filter(r => r.type === "Grant").map(r => r.id);
+  const followedGrantIds = new Set<string>();
+  if (grantIds.length > 0) {
+    try {
+      const { getSupabaseServerClient } = await import("@/lib/supabase-server");
+      const sb = getSupabaseServerClient();
+      const { data } = await sb
+        .from("opportunities")
+        .select("notion_id")
+        .in("notion_id", grantIds)
+        .eq("is_followed", true);
+      for (const r of (data ?? []) as { notion_id: string }[]) followedGrantIds.add(r.notion_id);
+    } catch { /* if Supabase unreachable, fail closed: drop all grants */ }
+  }
+
+  return raw
+    .filter(r => r.type !== "Grant" || followedGrantIds.has(r.id))
+    .map(({ name, stage, org }) => ({ name, stage, org }));
 }
 
 async function fetchPendingDecisions() {

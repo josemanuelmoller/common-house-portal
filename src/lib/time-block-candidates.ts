@@ -125,11 +125,35 @@ export async function candidatesFromLoops(limit = 20): Promise<Candidate[]> {
     .order("priority_score", { ascending: false, nullsFirst: false })
     .limit(limit);
   if (error || !data) return [];
+
+  // Grant activation gate: drop any loop whose linked opportunity is an
+  // unfollowed grant. Belt-and-suspenders vs. stale loops left from a time
+  // the grant was followed, or created by legacy paths.
+  const oppIds = [...new Set(
+    (data as LoopRow[])
+      .filter(l => l.linked_entity_type === "opportunity")
+      .map(l => l.linked_entity_id)
+      .filter(Boolean),
+  )];
+  const unfollowedGrantIds = new Set<string>();
+  if (oppIds.length > 0) {
+    const { data: opps } = await sb
+      .from("opportunities")
+      .select("notion_id,opportunity_type,is_followed")
+      .in("notion_id", oppIds);
+    for (const o of (opps ?? []) as { notion_id: string; opportunity_type: string | null; is_followed: boolean | null }[]) {
+      if (o.opportunity_type === "Grant" && o.is_followed !== true) {
+        unfollowedGrantIds.add(o.notion_id);
+      }
+    }
+  }
+
   const now = Date.now();
   const out: Candidate[] = [];
   for (const l of data as LoopRow[]) {
     // Titles that are clearly non-specific get filtered out.
     if (!l.title || l.title.trim().length < 6) continue;
+    if (l.linked_entity_type === "opportunity" && unfollowedGrantIds.has(l.linked_entity_id)) continue;
 
     const dueSoonDays = l.due_at
       ? Math.floor((new Date(l.due_at).getTime() - now) / 86_400_000)
@@ -168,6 +192,8 @@ type OppRow = {
   follow_up_status: string | null;
   qualification_status: string | null;
   status: string | null;
+  opportunity_type: string | null;
+  is_followed: boolean | null;
 };
 
 export async function candidatesFromOpportunities(
@@ -177,7 +203,7 @@ export async function candidatesFromOpportunities(
   const sb = getSupabaseServerClient();
   const { data, error } = await sb
     .from("opportunities")
-    .select("notion_id,title,org_name,suggested_next_step,opportunity_score,follow_up_status,qualification_status,status")
+    .select("notion_id,title,org_name,suggested_next_step,opportunity_score,follow_up_status,qualification_status,status,opportunity_type,is_followed")
     .eq("is_legacy",   false)
     .eq("is_archived", false)
     .eq("is_active",   true)
@@ -189,6 +215,9 @@ export async function candidatesFromOpportunities(
   const out: Candidate[] = [];
   for (const o of data as OppRow[]) {
     if (coveredByLoop.has(o.notion_id)) continue;
+    // Grant activation gate: grants must be explicitly Followed by a human.
+    // System score alone must NOT push a grant into Suggested Time Blocks.
+    if (o.opportunity_type === "Grant" && o.is_followed !== true) continue;
     const step = (o.suggested_next_step ?? "").trim();
     if (!step || step.length < 12) continue;                 // require specificity
 

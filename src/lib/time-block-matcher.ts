@@ -66,9 +66,15 @@ function slotFits(c: Candidate, s: Slot): boolean {
 function slotScore(c: Candidate, s: Slot, now: Date, opts: MatchOptions): number {
   let score = c.urgency_score;
 
-  // Time-decay: earlier slots preferred for urgent work
+  // Universal earliness preference. Applied to ALL candidates so the earliest
+  // valid slot in the week wins by default. A full day later costs ~6 points;
+  // across a 5-day week the penalty is ~30 points, dominating the task-specific
+  // bonuses below (morning +6, prep +8, follow-up +10). Only hard_time_constraint
+  // (a prep binding to its meeting) pulls selection to a later slot.
   const hoursOut = Math.max(0, (s.start.getTime() - now.getTime()) / 3600_000);
-  if (c.urgency_score >= 70) score -= Math.min(20, hoursOut * 0.3); // urgent ⇒ earlier wins
+  score -= hoursOut * 0.25;
+  // Extra kick for urgent work so it lands first among early slots
+  if (c.urgency_score >= 70) score -= Math.min(15, hoursOut * 0.15);
 
   // Task-slot fit
   const targetMid = (TASK_TYPE_SLOT_MIN_MIN[c.task_type] + TASK_TYPE_SLOT_MAX_MIN[c.task_type]) / 2;
@@ -108,13 +114,20 @@ export function matchCandidatesToSlots(
   limit = 5,
   opts: MatchOptions = DEFAULT_MATCH_OPTIONS,
 ): Match[] {
-  // Sort candidates by urgency DESC, then confidence DESC
+  // Sort candidates by urgency DESC, then confidence DESC. Highest-urgency work
+  // gets first pick of the earliest slots.
   const pool = [...candidates].sort((a, b) => {
     if (b.urgency_score !== a.urgency_score) return b.urgency_score - a.urgency_score;
     return b.confidence_score - a.confidence_score;
   });
 
-  // Track used slots — a slot can't be assigned twice (simplification).
+  // Sort slots EARLIEST FIRST. Iterating in ascending time order means any
+  // later slot needs a strictly higher score to beat an earlier one — the
+  // earliness bias in slotScore guarantees earlier wins on ties.
+  const ordered = [...slots]
+    .map((s, originalIdx) => ({ s, originalIdx }))
+    .sort((a, b) => a.s.start.getTime() - b.s.start.getTime());
+
   const used = new Set<number>();
   const matches: Match[] = [];
   const seenFingerprint = new Set<string>();
@@ -123,21 +136,24 @@ export function matchCandidatesToSlots(
     if (matches.length >= limit) break;
     if (seenFingerprint.has(c.fingerprint)) continue;
 
-    let best: { idx: number; score: number; slot: Slot } | null = null;
-    for (let i = 0; i < slots.length; i++) {
+    let best: { orderedIdx: number; score: number; slot: Slot } | null = null;
+    for (let i = 0; i < ordered.length; i++) {
       if (used.has(i)) continue;
-      const s = slots[i];
+      const s = ordered[i].s;
       if (!slotFits(c, s)) continue;
       const sc = slotScore(c, s, now, opts);
-      if (!best || sc > best.score) best = { idx: i, score: sc, slot: s };
+      // Strict >: since slots are ordered earliest-first, a later slot only
+      // wins if its score is higher, never on a tie.
+      if (!best || sc > best.score) best = { orderedIdx: i, score: sc, slot: s };
     }
     if (!best) continue;
-    used.add(best.idx);
+    used.add(best.orderedIdx);
     seenFingerprint.add(c.fingerprint);
     matches.push({ candidate: c, slot: best.slot, score: best.score });
   }
 
-  // Re-rank final matches by score DESC for display
-  matches.sort((a, b) => b.score - a.score);
+  // Final display order: chronological ascending so Jose sees the earliest-scheduled
+  // block first in the UI. Matches the selection preference end-to-end.
+  matches.sort((a, b) => a.slot.start.getTime() - b.slot.start.getTime());
   return matches;
 }

@@ -521,6 +521,27 @@ async function syncEvidenceLoops(stats: Stats): Promise<void> {
   }
 }
 
+// ─── Followed-grants gate ────────────────────────────────────────────────────
+//
+// Returns the set of Notion page IDs for opportunities where a human has
+// explicitly flipped is_followed = true. This is the activation gate for
+// grants entering loops / Hall / Suggested Time Blocks / Chief of Staff.
+
+async function loadFollowedGrantIds(): Promise<Set<string>> {
+  try {
+    const sb = getSupabaseServerClient();
+    const { data, error } = await sb
+      .from("opportunities")
+      .select("notion_id")
+      .eq("opportunity_type", "Grant")
+      .eq("is_followed", true);
+    if (error || !data) return new Set();
+    return new Set(data.map(r => r.notion_id as string).filter(Boolean));
+  } catch {
+    return new Set();
+  }
+}
+
 // ─── Source 2: Opportunities ──────────────────────────────────────────────────
 
 async function syncOpportunityLoops(stats: Stats): Promise<void> {
@@ -539,6 +560,11 @@ async function syncOpportunityLoops(stats: Stats): Promise<void> {
     sorts: [{ timestamp: "last_edited_time", direction: "ascending" }],
     page_size: 30,
   });
+
+  // Grant activation gate — preload the set of Notion page IDs that Jose has
+  // explicitly marked as Followed. System scoring alone is NOT enough to push
+  // a grant into loops / Hall / STB / CoS; only is_followed = true qualifies.
+  const followedGrantIds = await loadFollowedGrantIds();
 
   const TERMINAL_STAGES    = new Set(["Closed Won", "Closed Lost", "Stalled"]);
   const TERMINAL_STATUSES  = new Set(["Done", "Dropped"]);
@@ -559,11 +585,12 @@ async function syncOpportunityLoops(stats: Stats): Promise<void> {
     const lastEdited     = page.last_edited_time?.slice(0, 10) ?? null;
     const opportunityScore: number | null = page.properties["Opportunity Score"]?.number ?? null;
 
-    // Grant records: pending action is sourcing context, not a task
+    // Grant records: explicit activation required.
+    // System scoring / Follow-up Status alone is NOT enough — only grants
+    // that Jose has explicitly Followed (opportunities.is_followed = true)
+    // may enter the active operating layer.
     if (isGrant(oppType)) {
-      // Only create a loop if there is an explicit Follow-up Status set by a human
-      const hasStatus = ["Needed", "Waiting", "Sent"].includes(followStatus);
-      if (!hasStatus) continue;
+      if (!followedGrantIds.has(page.id)) continue;
     }
 
     // Recency gate on pending action: ignore if > 30 days since last edit

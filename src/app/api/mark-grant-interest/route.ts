@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { currentUser } from "@clerk/nextjs/server";
 import { adminGuardApi } from "@/lib/require-admin";
 import { notion, DB } from "@/lib/notion";
+import { getSupabaseServerClient } from "@/lib/supabase-server";
 
 const ORGS_DB = "bef1bb86ab2b4cd280b6b33f9034b96c";
 
@@ -121,6 +123,27 @@ export async function POST(req: NextRequest) {
       { status: 500, headers: corsHeaders() }
     );
   }
+
+  // Calling mark-grant-interest IS an explicit human Follow signal. Mirror
+  // that to Supabase so the is_followed gate admits the grant into Hall / STB
+  // / CoS. Best-effort: Notion page might exist in Supabase only after the
+  // next sync-opportunities run, so we also set followed_by for provenance.
+  try {
+    const user = await currentUser();
+    const actorEmail = user?.primaryEmailAddress?.emailAddress ?? "mark-grant-interest";
+    const sb = getSupabaseServerClient();
+    await sb
+      .from("opportunities")
+      .update({
+        is_followed:     true,
+        followed_at:     new Date().toISOString(),
+        followed_by:     actorEmail,
+        unfollowed_at:   null,
+        unfollow_reason: null,
+        updated_at:      new Date().toISOString(),
+      })
+      .eq("notion_id", opportunityPage.id);
+  } catch { /* non-critical — sync-opportunities will backfill later */ }
 
   return NextResponse.json(
     {

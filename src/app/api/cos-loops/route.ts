@@ -56,7 +56,36 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 502 });
     }
 
-    return NextResponse.json({ ok: true, loops: data ?? [] });
+    const loopRows = (data ?? []) as { linked_entity_type: string | null; linked_entity_id: string | null }[];
+
+    // Grant activation gate: drop any loop whose linked opportunity is an
+    // unfollowed grant. Applies whether the loop was created legacy or by a
+    // path that bypassed sync-loops. System-scored grants must never reach CoS.
+    const oppIds = [...new Set(
+      loopRows
+        .filter(l => l.linked_entity_type === "opportunity" && l.linked_entity_id)
+        .map(l => l.linked_entity_id as string),
+    )];
+    const unfollowedGrantIds = new Set<string>();
+    if (oppIds.length > 0) {
+      const { data: opps } = await sb
+        .from("opportunities")
+        .select("notion_id, opportunity_type, is_followed")
+        .in("notion_id", oppIds);
+      for (const o of (opps ?? []) as { notion_id: string; opportunity_type: string | null; is_followed: boolean | null }[]) {
+        if (o.opportunity_type === "Grant" && o.is_followed !== true) {
+          unfollowedGrantIds.add(o.notion_id);
+        }
+      }
+    }
+
+    const filtered = (data ?? []).filter(row => {
+      const r = row as { linked_entity_type: string | null; linked_entity_id: string | null };
+      if (r.linked_entity_type !== "opportunity" || !r.linked_entity_id) return true;
+      return !unfollowedGrantIds.has(r.linked_entity_id);
+    });
+
+    return NextResponse.json({ ok: true, loops: filtered });
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 });
   }

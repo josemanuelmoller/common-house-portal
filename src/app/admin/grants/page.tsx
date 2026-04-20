@@ -2,6 +2,8 @@ import Link from "next/link";
 import { Sidebar } from "@/components/Sidebar";
 import { notion, DB, getDecisionItems } from "@/lib/notion";
 import { requireAdmin } from "@/lib/require-admin";
+import { getSupabaseServerClient } from "@/lib/supabase-server";
+import { GrantFollowButton } from "@/components/GrantFollowButton";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -16,6 +18,9 @@ interface GrantOpportunity {
   statusLabel: string;
   priority: string;   // "P1" | "P2" | "P3" | "P4" | ""
   orgId: string;
+  isFollowed: boolean;
+  followedAt: string | null;
+  unfollowReason: string | null;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -98,6 +103,25 @@ async function getGrantOpportunities(): Promise<GrantOpportunity[]> {
     } catch { /* skip */ }
   }));
 
+  // Pull follow state from Supabase (source of truth for human activation).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const pageIds = (res.results as any[]).map(p => p.id);
+  const followState: Record<string, { is_followed: boolean; followed_at: string | null; unfollow_reason: string | null }> = {};
+  try {
+    const sb = getSupabaseServerClient();
+    const { data } = await sb
+      .from("opportunities")
+      .select("notion_id, is_followed, followed_at, unfollow_reason")
+      .in("notion_id", pageIds);
+    for (const row of (data ?? []) as { notion_id: string; is_followed: boolean | null; followed_at: string | null; unfollow_reason: string | null }[]) {
+      followState[row.notion_id] = {
+        is_followed:     row.is_followed === true,
+        followed_at:     row.followed_at,
+        unfollow_reason: row.unfollow_reason,
+      };
+    }
+  } catch { /* supabase unavailable — treat all as not followed */ }
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (res.results as any[]).map((page) => {
     const props = page.properties;
@@ -106,6 +130,7 @@ async function getGrantOpportunities(): Promise<GrantOpportunity[]> {
     const status  = props["Opportunity Status"]?.select?.name ?? "New";
     const priority = props["Priority"]?.select?.name ?? "";
     const orgId   = props["Account / Organization"]?.relation?.[0]?.id ?? "";
+    const fs      = followState[page.id];
     return {
       id: page.id,
       notionUrl: page.url ?? "",
@@ -117,6 +142,9 @@ async function getGrantOpportunities(): Promise<GrantOpportunity[]> {
       statusLabel: STATUS_LABEL[status] ?? status,
       priority: PRIORITY_SHORT[priority] ?? priority,
       orgId,
+      isFollowed:     fs?.is_followed ?? false,
+      followedAt:     fs?.followed_at ?? null,
+      unfollowReason: fs?.unfollow_reason ?? null,
     };
   });
 }
@@ -133,6 +161,7 @@ export default async function GrantsPage() {
 
   const grantDecisions = decisions.filter(d => d.category === "Grants");
   const urgentGrants   = grants.filter(g => g.priority === "P1");
+  const followedGrants = grants.filter(g => g.isFollowed);
   const p1Decisions    = grantDecisions.filter(d =>
     d.priority === "P1" || d.priority === "P1 Critical" || d.priority === "Urgent"
   );
@@ -199,11 +228,19 @@ export default async function GrantsPage() {
           )}
 
           {/* Stats row */}
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-4 gap-4">
             <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-4">
               <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30 mb-2">Grant pipeline</p>
               <p className="text-3xl font-bold text-[#131218] tracking-tight">{grants.length}</p>
               <p className="text-[11px] text-[#131218]/40 font-medium mt-1.5">Active opportunities</p>
+            </div>
+            <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-4">
+              <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30 mb-2">Following</p>
+              {followedGrants.length > 0
+                ? <p className="text-3xl font-bold text-green-600 tracking-tight">{followedGrants.length}</p>
+                : <p className="text-3xl font-bold text-[#131218]/15 tracking-tight">0</p>
+              }
+              <p className="text-[11px] text-[#131218]/40 font-medium mt-1.5">In Hall / Suggested Blocks</p>
             </div>
             <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-4">
               <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30 mb-2">P1 — Act Now</p>
@@ -221,6 +258,15 @@ export default async function GrantsPage() {
               }
               <p className="text-[11px] text-[#131218]/40 font-medium mt-1.5">Approvals / inputs pending</p>
             </div>
+          </div>
+
+          {/* Activation model notice */}
+          <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-3.5">
+            <p className="text-[11px] text-[#131218]/60 leading-snug">
+              <strong className="text-[#131218]">Grants are passive by default.</strong>{" "}
+              System-discovered grants stay here until you <em>Follow</em> one. Only followed grants enter the Hall,
+              Suggested Time Blocks and Chief-of-Staff. Unfollow or Dismiss to suppress re-surfacing.
+            </p>
           </div>
 
           {/* Pipeline table + decisions side panel */}
@@ -255,7 +301,7 @@ export default async function GrantsPage() {
                 <table className="w-full text-left">
                   <thead>
                     <tr className="border-b border-[#EFEFEA]">
-                      {["Funder / Program", "Status", "Priority", "For"].map(h => (
+                      {["Funder / Program", "Status", "Priority", "For", "Activation"].map(h => (
                         <th key={h} className="px-4 py-2.5 text-[8.5px] font-bold tracking-widest uppercase text-[#131218]/25 first:pl-5 last:pr-5">
                           {h}
                         </th>
@@ -263,12 +309,25 @@ export default async function GrantsPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#EFEFEA]">
-                    {grants.map(g => (
-                      <tr key={g.id} className="hover:bg-[#EFEFEA]/40 transition-colors group">
+                    {[...grants].sort((a, b) => Number(b.isFollowed) - Number(a.isFollowed)).map(g => (
+                      <tr key={g.id} className={`hover:bg-[#EFEFEA]/40 transition-colors group ${g.isFollowed ? "bg-[#B2FF59]/5" : ""}`}>
                         <td className="pl-5 pr-4 py-3.5">
-                          <p className="text-[12px] font-bold text-[#131218] leading-tight">{g.funder || g.program}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-[12px] font-bold text-[#131218] leading-tight">{g.funder || g.program}</p>
+                            {g.isFollowed && (
+                              <span className="inline-flex items-center gap-1 text-[8px] font-bold px-1.5 py-0.5 rounded bg-[#B2FF59]/30 text-green-900" title="Explicitly followed by Jose">
+                                <span className="w-1 h-1 rounded-full bg-green-600" />
+                                FOLLOWING
+                              </span>
+                            )}
+                          </div>
                           {g.program && g.program !== g.funder && (
                             <p className="text-[10px] text-[#131218]/40 mt-0.5 font-medium">{g.program}</p>
+                          )}
+                          {!g.isFollowed && g.unfollowReason && (
+                            <p className="text-[9px] text-[#131218]/30 mt-0.5 italic" title="Dismiss reason">
+                              Dismissed: {g.unfollowReason}
+                            </p>
                           )}
                         </td>
                         <td className="px-4 py-3.5">
@@ -285,10 +344,13 @@ export default async function GrantsPage() {
                             <span className="text-[10px] text-[#131218]/20">—</span>
                           )}
                         </td>
-                        <td className="px-4 py-3.5 pr-5">
+                        <td className="px-4 py-3.5">
                           <span className="text-[10px] font-semibold text-[#131218]/50">
                             {g.startup || "—"}
                           </span>
+                        </td>
+                        <td className="px-4 py-3.5 pr-5">
+                          <GrantFollowButton opportunityId={g.id} initialFollowed={g.isFollowed} />
                         </td>
                       </tr>
                     ))}
