@@ -47,9 +47,11 @@ const TASK_TYPE_SLOT_MAX_MIN: Record<TaskType, number> = {
 
 function slotFits(c: Candidate, s: Slot): boolean {
   const min = TASK_TYPE_SLOT_MIN_MIN[c.task_type];
-  const max = TASK_TYPE_SLOT_MAX_MIN[c.task_type];
   if (s.durationMin < min) return false;
-  if (s.durationMin > max + 60) return false;               // oversize is fine but we cap runaway
+  // No upper bound — a short task is allowed to land inside a larger open
+  // window (the persisted block is later capped to candidate.duration_min + 15,
+  // so Jose sees a right-sized block). The fit penalty in slotScore still
+  // prefers closer-to-target slots when one is available.
   if (c.hard_time_constraint) {
     const { kind, reference, withinMs } = c.hard_time_constraint;
     if (kind === "before") {
