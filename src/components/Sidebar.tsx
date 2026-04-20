@@ -74,6 +74,7 @@ export const ADMIN_NAV_V2: NavEntry[] = [
       { label: "Intake / OS",     href: "/admin/os" },
       { label: "Content",         href: "/admin/content" },
       { label: "Knowledge",       href: "/admin/knowledge" },
+      { label: "Contacts",        href: "/admin/hall/contacts" },
       { label: "System Health",   href: "/admin/health" },
     ],
   },
