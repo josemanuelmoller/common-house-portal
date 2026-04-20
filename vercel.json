@@ -87,7 +87,7 @@
     },
     {
       "path": "/api/cron/observe-calendar",
-      "schedule": "0 */4 * * *"
+      "schedule": "0 6 * * *"
     }
   ]
 }
