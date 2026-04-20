@@ -219,19 +219,25 @@ async function upsertLoop(
 
     const isNewSignal = !sigError && sigData && sigData.length > 0;
 
-    // 3. If loop was resolved/dismissed AND this is a new signal → reopen it
-    //    Exception: never reopen a loop the founder explicitly dropped.
-    //    founder_interest = 'dropped' is a permanent human decision; sync noise must not override it.
-    if (
-      existing &&
-      (existing.status === "resolved" || existing.status === "dismissed") &&
-      isNewSignal &&
-      existing.founder_interest !== "dropped"
-    ) {
+    // 3. Reopen logic — two cases:
+    //    a. status = 'resolved' (auto-resolved by sync): source is still active → always reopen.
+    //       Signals are deduped so isNewSignal would always be false here; can't use it as gate.
+    //    b. status = 'dismissed' (user explicitly closed): only reopen if founder didn't drop it
+    //       AND a genuinely new signal arrived.
+    //    Never reopen if founder_interest = 'dropped' — that is a permanent human decision.
+    const autoResolved = existing?.status === "resolved";
+    const userDismissed = existing?.status === "dismissed";
+    const shouldReopen =
+      (autoResolved && existing.founder_interest !== "dropped") ||
+      (userDismissed && isNewSignal && existing.founder_interest !== "dropped");
+
+    if (existing && shouldReopen) {
       await sb.from("loops").update({ status: "open", updated_at: new Date().toISOString() }).eq("id", loopId);
       await sb.from("loop_actions").insert({
-        loop_id: loopId, action_type: "reopened", actor: "system",
-        note: `Reopened by new signal: ${signalType}`,
+        loop_id:     loopId,
+        action_type: "reopened",
+        actor:       "system",
+        note:        autoResolved ? "Reopened: source still active" : `Reopened by new signal: ${signalType}`,
       });
     }
 
