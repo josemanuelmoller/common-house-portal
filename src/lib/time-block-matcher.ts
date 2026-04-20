@@ -19,6 +19,16 @@ export type Match = {
   score: number;                      // combined score used for ranking
 };
 
+export type MatchOptions = {
+  timezone:                     string;
+  prefer_morning_for_deep_work: boolean;
+};
+
+export const DEFAULT_MATCH_OPTIONS: MatchOptions = {
+  timezone:                     process.env.HALL_TIMEZONE || "America/Costa_Rica",
+  prefer_morning_for_deep_work: true,
+};
+
 const TASK_TYPE_SLOT_MIN_MIN: Record<TaskType, number> = {
   deep_work: 90,
   decision:  40,
@@ -53,7 +63,7 @@ function slotFits(c: Candidate, s: Slot): boolean {
   return true;
 }
 
-function slotScore(c: Candidate, s: Slot, now: Date): number {
+function slotScore(c: Candidate, s: Slot, now: Date, opts: MatchOptions): number {
   let score = c.urgency_score;
 
   // Time-decay: earlier slots preferred for urgent work
@@ -77,11 +87,11 @@ function slotScore(c: Candidate, s: Slot, now: Date): number {
     if (gap <= 2 * 3600_000) score += 10;
   }
 
-  // Deep work bonus for morning slots (before 12:00 local — approximated via ISO)
-  if (c.task_type === "deep_work") {
+  // Deep work bonus for morning slots (opt-in via preferences)
+  if (c.task_type === "deep_work" && opts.prefer_morning_for_deep_work) {
     const hour = Number(
       new Intl.DateTimeFormat("en-GB", {
-        timeZone: process.env.HALL_TIMEZONE || "America/Costa_Rica",
+        timeZone: opts.timezone,
         hour: "2-digit", hour12: false,
       }).format(s.start)
     );
@@ -96,6 +106,7 @@ export function matchCandidatesToSlots(
   slots: Slot[],
   now: Date,
   limit = 5,
+  opts: MatchOptions = DEFAULT_MATCH_OPTIONS,
 ): Match[] {
   // Sort candidates by urgency DESC, then confidence DESC
   const pool = [...candidates].sort((a, b) => {
@@ -117,7 +128,7 @@ export function matchCandidatesToSlots(
       if (used.has(i)) continue;
       const s = slots[i];
       if (!slotFits(c, s)) continue;
-      const sc = slotScore(c, s, now);
+      const sc = slotScore(c, s, now, opts);
       if (!best || sc > best.score) best = { idx: i, score: sc, slot: s };
     }
     if (!best) continue;

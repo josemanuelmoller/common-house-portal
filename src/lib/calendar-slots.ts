@@ -6,20 +6,28 @@
  * produces usable working-hours slots with the right buffer + duration buckets.
  */
 
-import { getCalendarClient, CALENDAR_ID, HALL_TIMEZONE } from "./google-calendar";
+import { getCalendarClient, CALENDAR_ID } from "./google-calendar";
+import { HALL_PREFS_DEFAULTS, type HallPreferences } from "./hall-preferences";
 
-/** A time-of-day in the working-hours window (local to HALL_TIMEZONE). */
-const WORK_START_HOUR = 9;
-const WORK_END_HOUR   = 18;
-/** Buffer around meetings, in minutes. */
-const MEETING_BUFFER_MIN = 10;
-/** Below this many contiguous minutes we don't produce a slot. */
-const MIN_SLOT_MIN = 20;
-/** Lunch gap treatment: we block 12:30-13:30 as unbookable. */
-const LUNCH_START_HOUR = 12;
-const LUNCH_START_MIN  = 30;
-const LUNCH_END_HOUR   = 13;
-const LUNCH_END_MIN    = 30;
+/**
+ * Resolved slot-generation options. Pass in from a HallPreferences row (which
+ * defaults to HALL_PREFS_DEFAULTS if the user has no row yet).
+ */
+export type SlotOptions = Pick<
+  HallPreferences,
+  | "working_day_start"
+  | "working_day_end"
+  | "working_days"
+  | "min_slot_minutes"
+  | "timezone"
+  | "lunch_start_hour"
+  | "lunch_start_min"
+  | "lunch_end_hour"
+  | "lunch_end_min"
+  | "meeting_buffer_minutes"
+>;
+
+export const DEFAULT_SLOT_OPTIONS: SlotOptions = HALL_PREFS_DEFAULTS;
 
 export type BusyBlock = { start: Date; end: Date };
 
@@ -89,7 +97,7 @@ function wallToUTC(tz: string, y: number, mo: number, da: number, h: number, mi:
 
 // ─── Read calendar ───────────────────────────────────────────────────────────
 
-export async function listBusyBlocks(daysAhead: number): Promise<BusyBlock[]> {
+export async function listBusyBlocks(daysAhead: number, tz: string = DEFAULT_SLOT_OPTIONS.timezone): Promise<BusyBlock[]> {
   const cal = getCalendarClient();
   if (!cal) throw new Error("Calendar client unavailable: GMAIL_* env vars missing.");
   const now = new Date();
@@ -99,7 +107,7 @@ export async function listBusyBlocks(daysAhead: number): Promise<BusyBlock[]> {
       timeMin: now.toISOString(),
       timeMax: end.toISOString(),
       items:   [{ id: CALENDAR_ID }],
-      timeZone: HALL_TIMEZONE,
+      timeZone: tz,
     },
   });
   const raw = res.data.calendars?.[CALENDAR_ID]?.busy ?? [];
@@ -151,26 +159,24 @@ function classifySize(min: number): Slot["size"] {
   return "quick";
 }
 
-/** Generate working-hour windows (one per weekday) within [now, end]. */
-function workingHourWindows(now: Date, end: Date): { start: Date; end: Date }[] {
+/** Generate working-hour windows (one per working day) within [now, end]. */
+function workingHourWindows(now: Date, end: Date, opts: SlotOptions): { start: Date; end: Date }[] {
   const windows: { start: Date; end: Date }[] = [];
-  const tz = HALL_TIMEZONE;
-  // Walk day by day in HALL_TIMEZONE
+  const tz = opts.timezone;
   const startWc = wallClockInTZ(now, tz);
   let cursor = wallToUTC(tz, startWc.y, startWc.mo, startWc.da, 0, 0);
-  // Cap iterations defensively.
+  const workingDays = new Set(opts.working_days);
   for (let i = 0; i < 14; i++) {
     const cWc = wallClockInTZ(cursor, tz);
     if (cursor.getTime() > end.getTime()) break;
-    if (cWc.wd >= 1 && cWc.wd <= 5) {
-      const winStart = wallToUTC(tz, cWc.y, cWc.mo, cWc.da, WORK_START_HOUR, 0);
-      const winEnd   = wallToUTC(tz, cWc.y, cWc.mo, cWc.da, WORK_END_HOUR, 0);
+    if (workingDays.has(cWc.wd)) {
+      const winStart = wallToUTC(tz, cWc.y, cWc.mo, cWc.da, opts.working_day_start, 0);
+      const winEnd   = wallToUTC(tz, cWc.y, cWc.mo, cWc.da, opts.working_day_end,   0);
       const effStart = winStart.getTime() < now.getTime() ? now : winStart;
       if (effStart.getTime() < winEnd.getTime()) {
         windows.push({ start: effStart, end: winEnd });
       }
     }
-    // Advance 1 day. Use 25h step to safely cross DST.
     cursor = new Date(cursor.getTime() + 25 * 3600_000);
     const nextWc = wallClockInTZ(cursor, tz);
     cursor = wallToUTC(tz, nextWc.y, nextWc.mo, nextWc.da, 0, 0);
@@ -179,13 +185,17 @@ function workingHourWindows(now: Date, end: Date): { start: Date; end: Date }[] 
 }
 
 /** Return lunch break blocks for each window's date so we don't schedule over lunch. */
-function lunchBlocksForWindows(windows: { start: Date; end: Date }[]): BusyBlock[] {
-  const tz = HALL_TIMEZONE;
+function lunchBlocksForWindows(windows: { start: Date; end: Date }[], opts: SlotOptions): BusyBlock[] {
+  const tz = opts.timezone;
+  // Zero-length lunch (start==end) → skip; lets users disable lunch by setting equal values.
+  if (opts.lunch_start_hour === opts.lunch_end_hour && opts.lunch_start_min === opts.lunch_end_min) {
+    return [];
+  }
   return windows.map(w => {
     const wc = wallClockInTZ(w.start, tz);
     return {
-      start: wallToUTC(tz, wc.y, wc.mo, wc.da, LUNCH_START_HOUR, LUNCH_START_MIN),
-      end:   wallToUTC(tz, wc.y, wc.mo, wc.da, LUNCH_END_HOUR,   LUNCH_END_MIN),
+      start: wallToUTC(tz, wc.y, wc.mo, wc.da, opts.lunch_start_hour, opts.lunch_start_min),
+      end:   wallToUTC(tz, wc.y, wc.mo, wc.da, opts.lunch_end_hour,   opts.lunch_end_min),
     };
   });
 }
@@ -196,19 +206,18 @@ export function findOpenSlots(
   daysAhead: number,
   busy: BusyBlock[],
   meetings: UpcomingMeeting[],
+  opts: SlotOptions = DEFAULT_SLOT_OPTIONS,
 ): Slot[] {
   const end = new Date(now.getTime() + daysAhead * 24 * 3600_000);
-  const windows = workingHourWindows(now, end);
+  const windows = workingHourWindows(now, end, opts);
   if (windows.length === 0) return [];
 
-  // Expand busy blocks by buffer
+  const bufferMs = opts.meeting_buffer_minutes * 60_000;
   const buffered: BusyBlock[] = busy.map(b => ({
-    start: new Date(b.start.getTime() - MEETING_BUFFER_MIN * 60_000),
-    end:   new Date(b.end.getTime()   + MEETING_BUFFER_MIN * 60_000),
+    start: new Date(b.start.getTime() - bufferMs),
+    end:   new Date(b.end.getTime()   + bufferMs),
   }));
-
-  // Add lunch as busy
-  const lunch = lunchBlocksForWindows(windows);
+  const lunch = lunchBlocksForWindows(windows, opts);
   const allBusy = [...buffered, ...lunch].sort((a, b) => a.start.getTime() - b.start.getTime());
 
   const slots: Slot[] = [];
@@ -221,7 +230,7 @@ export function findOpenSlots(
       const busyEnd   = b.end.getTime()   > win.end.getTime()   ? win.end   : b.end;
       if (cursor.getTime() < busyStart.getTime()) {
         const durMin = (busyStart.getTime() - cursor.getTime()) / 60_000;
-        if (durMin >= MIN_SLOT_MIN) {
+        if (durMin >= opts.min_slot_minutes) {
           slots.push({
             start: cursor,
             end:   busyStart,
@@ -234,7 +243,7 @@ export function findOpenSlots(
     }
     if (cursor.getTime() < win.end.getTime()) {
       const durMin = (win.end.getTime() - cursor.getTime()) / 60_000;
-      if (durMin >= MIN_SLOT_MIN) {
+      if (durMin >= opts.min_slot_minutes) {
         slots.push({
           start: cursor,
           end:   win.end,
@@ -245,7 +254,6 @@ export function findOpenSlots(
     }
   }
 
-  // Link slots to adjacent meetings (for prep/follow-up matching).
   const sortedMtgs = [...meetings].sort((a, b) => a.start.getTime() - b.start.getTime());
   for (const s of slots) {
     const prev = [...sortedMtgs].reverse().find(m => m.end.getTime() <= s.start.getTime() && s.start.getTime() - m.end.getTime() <= 6 * 3600_000);
@@ -257,14 +265,14 @@ export function findOpenSlots(
   return slots;
 }
 
-/** Human-readable window string (e.g. "Thu 14:00–15:30"). */
-export function formatSlotLabel(s: Slot): string {
+/** Human-readable window string (e.g. "Thu 14:00–15:30") in the given timezone. */
+export function formatSlotLabel(s: Slot, tz: string = DEFAULT_SLOT_OPTIONS.timezone): string {
   const fmt = new Intl.DateTimeFormat("en-GB", {
-    timeZone: HALL_TIMEZONE,
+    timeZone: tz,
     weekday: "short", hour: "2-digit", minute: "2-digit", hour12: false,
   });
   const fmtTime = new Intl.DateTimeFormat("en-GB", {
-    timeZone: HALL_TIMEZONE,
+    timeZone: tz,
     hour: "2-digit", minute: "2-digit", hour12: false,
   });
   return `${fmt.format(s.start)}–${fmtTime.format(s.end)}`;

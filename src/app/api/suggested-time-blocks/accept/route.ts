@@ -12,7 +12,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { currentUser } from "@clerk/nextjs/server";
 import { adminGuardApi } from "@/lib/require-admin";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
-import { getCalendarClient, CALENDAR_ID, HALL_TIMEZONE } from "@/lib/google-calendar";
+import { getCalendarClient, CALENDAR_ID } from "@/lib/google-calendar";
+import { classifyGoogleError } from "@/lib/google-auth";
+import { getHallPreferences } from "@/lib/hall-preferences";
+import { logHallEvent } from "@/lib/hall-events";
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +49,7 @@ export async function POST(req: NextRequest) {
   const cal = getCalendarClient();
   if (!cal) return NextResponse.json({ error: "calendar_unavailable" }, { status: 502 });
 
+  const prefs = await getHallPreferences(email);
   const description = [
     row.why_now,
     "",
@@ -62,8 +66,8 @@ export async function POST(req: NextRequest) {
       requestBody: {
         summary:     row.title,
         description,
-        start:       { dateTime: row.suggested_start_time, timeZone: HALL_TIMEZONE },
-        end:         { dateTime: row.suggested_end_time,   timeZone: HALL_TIMEZONE },
+        start:       { dateTime: row.suggested_start_time, timeZone: prefs.timezone },
+        end:         { dateTime: row.suggested_end_time,   timeZone: prefs.timezone },
         reminders:   { useDefault: true },
         colorId:     "2",  // sage; distinct from blocked meetings
         source:      { title: "Hall", url: "https://portal.wearecommonhouse.com/admin" },
@@ -83,16 +87,23 @@ export async function POST(req: NextRequest) {
       })
       .eq("id", id);
 
+    logHallEvent({
+      source: "suggested-time-blocks", type: "stb_accept", user_email: email,
+      metadata: { id, task_type: row.task_type, duration_min: row.duration_minutes },
+    });
+
     return NextResponse.json({ ok: true, event_link: eventLink });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    const isScope = /insufficient|scope|invalid_grant/i.test(message);
-    return NextResponse.json(
-      {
-        error:   isScope ? "calendar_scope_missing" : "calendar_write_failed",
-        message,
-      },
-      { status: 502 }
-    );
+    const kind = classifyGoogleError(err);
+    const errorCode =
+      kind === "scope_missing" ? "calendar_scope_missing"
+      : kind === "auth_revoked" ? "calendar_auth_revoked"
+      : "calendar_write_failed";
+    logHallEvent({
+      source: "suggested-time-blocks", type: "stb_accept_error", user_email: email,
+      metadata: { id, error_code: errorCode, message: message.slice(0, 240) },
+    });
+    return NextResponse.json({ error: errorCode, message }, { status: 502 });
   }
 }

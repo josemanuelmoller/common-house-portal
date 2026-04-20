@@ -71,7 +71,9 @@ export function SuggestedTimeBlocks() {
       const data = (await res.json()) as ApiResponse;
       if ("error" in data) {
         if (data.error === "calendar_scope_missing") {
-          setError("Calendar access unavailable — the Gmail refresh token is missing calendar.events scope.");
+          setError("Deployed — waiting on Google Calendar consent. Re-authorise with calendar.events scope and suggestions will activate automatically.");
+        } else if (data.error === "calendar_auth_revoked") {
+          setError("Deployed — Google refresh token was revoked or expired. Re-run the OAuth flow to restore suggestions.");
         } else {
           setError(data.message || data.error);
         }

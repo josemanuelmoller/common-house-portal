@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { currentUser } from "@clerk/nextjs/server";
 import { adminGuardApi } from "@/lib/require-admin";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
+import { logHallEvent } from "@/lib/hall-events";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +37,11 @@ export async function POST(req: NextRequest) {
     .eq("id", id)
     .eq("user_email", email);
   if (error) return NextResponse.json({ error: "db", message: error.message }, { status: 500 });
+
+  logHallEvent({
+    source: "suggested-time-blocks", type: "stb_snooze", user_email: email,
+    metadata: { id, hours: snoozeHours },
+  });
 
   return NextResponse.json({ ok: true, snoozed_until: until.toISOString() });
 }

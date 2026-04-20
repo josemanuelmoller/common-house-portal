@@ -35,6 +35,9 @@ import {
   loopCoveredEntityIds,
 } from "@/lib/time-block-candidates";
 import { matchCandidatesToSlots } from "@/lib/time-block-matcher";
+import { getHallPreferences } from "@/lib/hall-preferences";
+import { classifyGoogleError } from "@/lib/google-auth";
+import { logHallEvent } from "@/lib/hall-events";
 
 export const dynamic = "force-dynamic";
 
@@ -71,6 +74,9 @@ export async function GET(_req: NextRequest) {
 
   const sb = getSupabaseServerClient();
   const nowIso = new Date().toISOString();
+  const prefs = await getHallPreferences(email);
+
+  logHallEvent({ source: "suggested-time-blocks", type: "stb_requested", user_email: email });
 
   // ── Step 1: check if stored set is still fresh ──────────────────────────
   const { data: existing } = await sb
@@ -90,9 +96,13 @@ export async function GET(_req: NextRequest) {
     Date.now() - new Date(newestGeneratedAt).getTime() < FRESH_WINDOW_MS;
 
   if (isFresh) {
+    logHallEvent({
+      source: "suggested-time-blocks", type: "stb_returned_cached", user_email: email,
+      metadata: { count: existingRows.length },
+    });
     return NextResponse.json({
       mode: "cached",
-      suggestions: existingRows.map(formatForClient),
+      suggestions: existingRows.map(r => formatForClient(r, prefs.timezone)),
       generated_at: newestGeneratedAt,
     });
   }
@@ -102,13 +112,17 @@ export async function GET(_req: NextRequest) {
     const now = new Date();
 
     const [busy, upcoming] = await Promise.all([
-      listBusyBlocks(7),
+      listBusyBlocks(7, prefs.timezone),
       listUpcomingMeetings(7),
     ]);
 
-    const slots = findOpenSlots(now, 7, busy, upcoming);
+    const slots = findOpenSlots(now, 7, busy, upcoming, prefs);
 
     if (slots.length === 0) {
+      logHallEvent({
+        source: "suggested-time-blocks", type: "stb_no_valid_slots", user_email: email,
+        metadata: { busy_blocks: busy.length, upcoming_meetings: upcoming.length },
+      });
       return NextResponse.json({
         mode: "empty",
         suggestions: [],
@@ -154,9 +168,29 @@ export async function GET(_req: NextRequest) {
       ...oppCands,
     ].filter(c => !suppressed.has(c.fingerprint));
 
-    const matches = matchCandidatesToSlots(allCands, slots, now, MAX_SUGGESTIONS);
+    const matches = matchCandidatesToSlots(allCands, slots, now, MAX_SUGGESTIONS, {
+      timezone:                     prefs.timezone,
+      prefer_morning_for_deep_work: prefs.prefer_morning_for_deep_work,
+    });
+
+    logHallEvent({
+      source: "suggested-time-blocks", type: "stb_suggestions_generated", user_email: email,
+      metadata: {
+        slots_found:          slots.length,
+        candidates_considered: allCands.length,
+        loop_candidates:       loopCands.length,
+        opportunity_candidates: oppCands.length,
+        prep_candidates:       prepCands.length,
+        followup_candidates:   followUpCands.length,
+        suppressed_count:      suppressed.size,
+      },
+    });
 
     if (matches.length === 0) {
+      logHallEvent({
+        source: "suggested-time-blocks", type: "stb_no_strong_candidates", user_email: email,
+        metadata: { slots_found: slots.length, candidates_considered: allCands.length },
+      });
       return NextResponse.json({
         mode: "empty",
         suggestions: [],
@@ -200,9 +234,18 @@ export async function GET(_req: NextRequest) {
 
     // Attach slot label for client display
     const suggestions = (saved ?? []).map((row, i) => ({
-      ...formatForClient(row as StoredBlock),
-      slot_label: formatSlotLabel(matches[i].slot),
+      ...formatForClient(row as StoredBlock, prefs.timezone),
+      slot_label: formatSlotLabel(matches[i].slot, prefs.timezone),
     }));
+
+    logHallEvent({
+      source: "suggested-time-blocks", type: "stb_suggestions_matched", user_email: email,
+      metadata: { matched: suggestions.length, mode: "fresh" },
+    });
+    logHallEvent({
+      source: "suggested-time-blocks", type: "stb_returned_fresh", user_email: email,
+      metadata: { count: suggestions.length },
+    });
 
     return NextResponse.json({
       mode: "fresh",
@@ -213,11 +256,16 @@ export async function GET(_req: NextRequest) {
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    const isScopeError = /insufficient|scope|invalid_grant/i.test(message);
-    return NextResponse.json({
-      error: isScopeError ? "calendar_scope_missing" : "generation_failed",
-      message,
-    }, { status: 502 });
+    const kind = classifyGoogleError(err);
+    const errorCode =
+      kind === "scope_missing" ? "calendar_scope_missing"
+      : kind === "auth_revoked" ? "calendar_auth_revoked"
+      : "generation_failed";
+    logHallEvent({
+      source: "suggested-time-blocks", type: "stb_calendar_auth_error", user_email: email,
+      metadata: { error_code: errorCode, message: message.slice(0, 240) },
+    });
+    return NextResponse.json({ error: errorCode, message }, { status: 502 });
   }
 }
 
@@ -258,7 +306,7 @@ async function listPastMeetings(daysBack: number) {
   return out;
 }
 
-function formatForClient(row: StoredBlock) {
+function formatForClient(row: StoredBlock, tz: string) {
   return {
     id:                 row.id,
     title:              row.title,
@@ -280,6 +328,6 @@ function formatForClient(row: StoredBlock) {
       end:   new Date(row.suggested_end_time),
       durationMin: row.duration_minutes,
       size: row.duration_minutes >= 90 ? "deep" : row.duration_minutes >= 45 ? "medium" : "quick",
-    }),
+    }, tz),
   };
 }

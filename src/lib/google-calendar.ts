@@ -1,35 +1,34 @@
 /**
  * google-calendar.ts
- * Server-only Google Calendar client factory.
+ * Service-specific factory for Google Calendar. Uses the shared auth layer.
  *
- * Reuses the Gmail OAuth credentials (GMAIL_CLIENT_ID / GMAIL_CLIENT_SECRET /
- * GMAIL_REFRESH_TOKEN). Requires the refresh token to have calendar scope:
+ * Required scope on the refresh token:
  *   https://www.googleapis.com/auth/calendar.events
- * If the scope is missing, API calls will fail with "insufficient scope" and
- * the feature degrades with a visible error — not a silent failure.
  *
- * Single-user model: writes go to the primary calendar of the Google account
- * that owns the refresh token (i.e. Jose's calendar).
+ * Returns null only when the shared auth layer can't construct a client
+ * (missing env vars). A present client does NOT guarantee the calendar scope
+ * is granted — that is only discovered on the first API call.
  */
 
 import { google, calendar_v3 } from "googleapis";
+import { getGoogleAuthClient } from "./google-auth";
 
 export type CalendarClient = calendar_v3.Calendar;
 
-export function getCalendarClient(): CalendarClient | null {
-  const clientId     = process.env.GMAIL_CLIENT_ID;
-  const clientSecret = process.env.GMAIL_CLIENT_SECRET;
-  const refreshToken = process.env.GMAIL_REFRESH_TOKEN;
-
-  if (!clientId || !clientSecret || !refreshToken) return null;
-
-  const auth = new google.auth.OAuth2(clientId, clientSecret);
-  auth.setCredentials({ refresh_token: refreshToken });
-  return google.calendar({ version: "v3", auth });
+export function getGoogleCalendarClient(): CalendarClient | null {
+  const auth = getGoogleAuthClient();
+  if (!auth.ok) return null;
+  return google.calendar({ version: "v3", auth: auth.client });
 }
+
+/** Legacy alias — kept so existing imports (`getCalendarClient`) keep working. */
+export const getCalendarClient = getGoogleCalendarClient;
 
 export const CALENDAR_ID = process.env.TIME_BLOCK_CALENDAR_ID || "primary";
 
-/** Timezone string used for all slot/event computation. IANA name. */
-export const HALL_TIMEZONE =
+/** Default IANA timezone; overridden per-user via hall_preferences.timezone. */
+export const HALL_TIMEZONE_DEFAULT =
   process.env.HALL_TIMEZONE || "America/Costa_Rica";
+
+/** Back-compat export used by existing modules. */
+export const HALL_TIMEZONE = HALL_TIMEZONE_DEFAULT;
