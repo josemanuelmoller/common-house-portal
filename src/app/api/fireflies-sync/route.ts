@@ -23,6 +23,7 @@ import { Client } from "@notionhq/client";
 import { currentUser } from "@clerk/nextjs/server";
 import { isAdminUser, isAdminEmail } from "@/lib/clients";
 import { withRoutineLog } from "@/lib/routine-log";
+import { observeTranscript } from "@/lib/hall-contact-observers";
 
 export const maxDuration = 90;
 
@@ -368,6 +369,25 @@ async function _POST(req: NextRequest) {
     peopleUpdated += await updatePeopleLastContact([email], dateStr);
   }
 
+  // ── 8. Observe contacts into hall_attendees (all transcripts, even unmatched) ─
+  //    The registry cares about every person Jose interacted with, not only
+  //    those tied to a project. Dedup by transcript_id prevents inflation.
+  let observedContacts = 0;
+  for (const t of transcripts) {
+    try {
+      const emails = (t.participants ?? []).filter(e => e && e.includes("@"));
+      if (emails.length === 0) continue;
+      const obs = await observeTranscript({
+        transcriptId:      t.id,
+        participantEmails: emails,
+        title:             t.title,
+        meetingAt:         new Date(t.date),
+        meetingLink:       t.meeting_link,
+      });
+      if (obs.newObservation) observedContacts += obs.incremented;
+    } catch { /* best-effort */ }
+  }
+
   const errors = [...projectErrors, ...sourceErrors];
 
   return NextResponse.json({
@@ -380,6 +400,7 @@ async function _POST(req: NextRequest) {
     projects_updated: projectsUpdated,
     sources_created:  sourcesCreated,
     people_updated:   peopleUpdated,
+    observed_contacts: observedContacts,
     errors,
   });
 }

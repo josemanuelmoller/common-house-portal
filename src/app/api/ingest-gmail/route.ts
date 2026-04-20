@@ -20,6 +20,20 @@ import { Client } from "@notionhq/client";
 import { currentUser } from "@clerk/nextjs/server";
 import { isAdminUser, isAdminEmail } from "@/lib/clients";
 import { withRoutineLog } from "@/lib/routine-log";
+import { observeGmailThread } from "@/lib/hall-contact-observers";
+
+/** Parse "Name <email@domain.com>" or raw email → lowercased email. */
+function extractEmail(header: string): string {
+  const match = header.match(/<([^>]+)>/);
+  const raw = match ? match[1] : header;
+  return raw.toLowerCase().trim();
+}
+
+/** Split a To/Cc header into individual emails. Commas inside quoted names respected. */
+function splitAddressList(header: string): string[] {
+  // Simple heuristic: comma-separate, trim, keep what has '@'.
+  return header.split(",").map(s => extractEmail(s)).filter(e => /.+@.+\..+/.test(e));
+}
 
 const notion = new Client({ auth: process.env.NOTION_API_KEY });
 
@@ -122,8 +136,18 @@ async function _POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: String(err) }, { status: 500 });
   }
 
+  // Resolve the OAuth owner's email so we can exclude self from attendee
+  // observations. Cheap (one getProfile call) and robust — unaffected by
+  // any stale GMAIL_USER_EMAIL env var that might still point elsewhere.
+  let selfEmail = "";
+  try {
+    const profile = await gmail.users.getProfile({ userId: "me" });
+    selfEmail = (profile.data.emailAddress ?? "").toLowerCase();
+  } catch { /* best-effort — fall through without self-filter */ }
+
   let created = 0;
   let skipped = 0;
+  let observedContacts = 0;
   const errors: string[] = [];
 
   for (const threadId of threadIds) {
@@ -134,15 +158,15 @@ async function _POST(req: NextRequest) {
         userId: userEmail,
         id: threadId,
         format: "metadata",
-        metadataHeaders: ["Subject", "From", "Date", "To"],
+        metadataHeaders: ["Subject", "From", "To", "Cc", "Date"],
       });
 
-      const firstMsg  = thread.data.messages?.[0];
+      const messages  = thread.data.messages ?? [];
+      const firstMsg  = messages[0];
+      const lastMsg   = messages[messages.length - 1] ?? firstMsg;
       const headers   = firstMsg?.payload?.headers ?? [];
       const subject   = headers.find(h => h.name === "Subject")?.value  ?? "(no subject)";
-      const from      = headers.find(h => h.name === "From")?.value     ?? "";
       const dateStr   = headers.find(h => h.name === "Date")?.value     ?? "";
-      const msgCount  = thread.data.messages?.length ?? 1;
 
       const sourceDate = dateStr ? new Date(dateStr).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10);
       const threadUrl  = `https://mail.google.com/mail/u/0/#inbox/${threadId}`;
@@ -163,8 +187,41 @@ async function _POST(req: NextRequest) {
       }
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await notion.pages.create({ parent: { database_id: SOURCES_DB }, properties: properties as any });
+      const createdPage = await notion.pages.create({ parent: { database_id: SOURCES_DB }, properties: properties as any });
       created++;
+
+      // ── Observe contacts. Collect From / To / Cc across EVERY message
+      //    in the thread, exclude self, lowercase + dedup. Pass through
+      //    the shared observer which handles the thread_id dedup so
+      //    email_thread_count stays accurate even on reruns.
+      try {
+        const allEmails = new Set<string>();
+        for (const m of messages) {
+          const h = m.payload?.headers ?? [];
+          const from = h.find(x => x.name === "From")?.value ?? "";
+          if (from) {
+            const e = extractEmail(from);
+            if (e) allEmails.add(e);
+          }
+          for (const field of ["To", "Cc"] as const) {
+            const v = h.find(x => x.name === field)?.value ?? "";
+            if (v) for (const e of splitAddressList(v)) allEmails.add(e);
+          }
+        }
+        if (selfEmail) allEmails.delete(selfEmail);
+
+        const lastDateStr = lastMsg?.payload?.headers?.find(h => h.name === "Date")?.value ?? dateStr;
+        const lastAt = lastDateStr ? new Date(lastDateStr) : new Date();
+
+        const obs = await observeGmailThread({
+          threadId,
+          attendeeEmails:  [...allEmails],
+          subject,
+          lastMessageAt:   lastAt,
+          notionSourceId:  createdPage.id,
+        });
+        if (obs.newObservation) observedContacts += obs.incremented;
+      } catch { /* observer errors are non-critical */ }
 
       void notion; // suppress unused warning
     } catch (err) {
@@ -172,7 +229,7 @@ async function _POST(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ ok: true, checked: threadIds.length, created, skipped, errors });
+  return NextResponse.json({ ok: true, checked: threadIds.length, created, skipped, observed_contacts: observedContacts, errors });
 }
 
 export const POST = withRoutineLog("ingest-gmail", _POST);

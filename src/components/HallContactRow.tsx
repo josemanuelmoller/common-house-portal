@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
@@ -99,9 +100,13 @@ export function HallContactRow(props: Props) {
     <div className={`flex items-start gap-4 px-5 py-3.5 hover:bg-[#EFEFEA]/40 transition-colors ${bg}`}>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5 flex-wrap">
-          <p className="text-[12px] font-bold text-[#131218] truncate">
+          <Link
+            href={`/admin/hall/contacts/${encodeURIComponent(props.email)}`}
+            className="text-[12px] font-bold text-[#131218] truncate hover:underline decoration-[#131218]/30 underline-offset-2"
+            title={`Open ${props.display_name || props.email} detail`}
+          >
             {props.display_name || props.email.split("@")[0]}
-          </p>
+          </Link>
           {selected.map(cls => {
             const kind = CLASSES.find(c => c.v === cls)?.kind;
             return (

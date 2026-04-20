@@ -21,6 +21,7 @@ import { google } from "googleapis";
 import Anthropic from "@anthropic-ai/sdk";
 import { adminGuardApi } from "@/lib/require-admin";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
+import { getContactsByEmails, isPersonalContact, isVipContact, type ContactView } from "@/lib/contacts";
 
 // Normalize a subject for lineage matching: strip Re:/Fwd: prefixes, lowercase, collapse whitespace.
 function normalizeSubject(subject: string): string {
@@ -364,6 +365,11 @@ async function handleGet(req: NextRequest) {
   actionable.sort((a, b) => b.daysWaiting - a.daysWaiting);
   const top = actionable.slice(0, 15);
 
+  // Enrich with contact classes. One SELECT covers all 15 senders.
+  const senderEmails = top.map(c => c.from);
+  const contactsByEmail = await getContactsByEmails(senderEmails);
+  const senderContact: (ContactView | undefined)[] = top.map(c => contactsByEmail.get(c.from));
+
   // Claude Haiku classifies urgency
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -404,7 +410,13 @@ ${THRESHOLD_DAYS <= 2 ? "Cap Urgents at 3 total across the batch." : ""}
 For each item also write a 1-sentence reason (max 12 words) — lead with WHY Jose must act, or why it's FYI.
 
 Emails:
-${top.map((c, i) => `${i + 1}. From: ${c.fromName} <${c.from}> (waiting-on-Jose side)\n   Subject: ${c.subject}\n   Messages in thread: ${c.msgCount} · joseStarted: ${c.iStartedThread} · joseReplied: ${c.hasMyReply}\n   Latest preview: ${c.snippet.slice(0, 220)}`).join("\n\n")}
+${top.map((c, i) => {
+    const contact = senderContact[i];
+    const classLabel = contact?.relationship_classes?.length
+      ? ` [${contact.relationship_classes.join(", ")}]`
+      : "";
+    return `${i + 1}. From: ${c.fromName} <${c.from}>${classLabel} (waiting-on-Jose side)\n   Subject: ${c.subject}\n   Messages in thread: ${c.msgCount} · joseStarted: ${c.iStartedThread} · joseReplied: ${c.hasMyReply}\n   Latest preview: ${c.snippet.slice(0, 220)}`;
+  }).join("\n\n")}
 
 Return ONLY a JSON array — no markdown, no explanation:
 [{"index": 1, "label": "Urgent"|"Needs Reply"|"FYI", "reason": "..."}]`;
@@ -426,9 +438,37 @@ Return ONLY a JSON array — no markdown, no explanation:
     classifications = top.map((_, i) => ({ index: i + 1, label: "Needs Reply", reason: "Unable to classify" }));
   }
 
-  // Merge
+  // Merge + contact-class overrides. Classes are authored by Jose so they
+  // beat Haiku when they disagree:
+  //   - VIP sender       → escalate to Urgent (unless Haiku firmly said FYI and
+  //                         the thread also reads as pure FYI — we still mark
+  //                         Needs Reply in that case, never flatten a VIP).
+  //   - Pure personal    → force FYI (therapy, family, friends — never flagged).
   const items = top.map((c, i) => {
     const cl = classifications.find(x => x.index === i + 1);
+    const contact = senderContact[i];
+
+    let label  = cl?.label ?? "Needs Reply";
+    let reason = cl?.reason ?? "";
+    let contactOverride: "vip_escalated" | "personal_muted" | null = null;
+
+    if (contact) {
+      if (isPersonalContact(contact) && label !== "FYI") {
+        label = "FYI";
+        reason = reason ? `${reason} · personal contact — muted` : "Personal contact — muted";
+        contactOverride = "personal_muted";
+      } else if (isVipContact(contact)) {
+        if (label === "FYI") {
+          label = "Needs Reply";
+          reason = reason ? `${reason} · VIP — surfacing` : "VIP sender — surfacing for review";
+        } else {
+          label = "Urgent";
+          if (!reason) reason = "VIP sender — prioritised";
+        }
+        contactOverride = "vip_escalated";
+      }
+    }
+
     return {
       threadId:    c.threadId,
       subject:     c.subject,
@@ -437,8 +477,10 @@ Return ONLY a JSON array — no markdown, no explanation:
       snippet:     c.snippet.slice(0, 200),
       daysWaiting: c.daysWaiting,
       isUnread:    c.isUnread,
-      label:       cl?.label ?? "Needs Reply",
-      reason:      cl?.reason ?? "",
+      label,
+      reason,
+      contact_classes: contact?.relationship_classes ?? [],
+      contact_override: contactOverride,
       // authuser is a query param (before the hash) so Gmail actually reads it;
       // #all/<tid> lands on the thread whether or not it's still in Inbox.
       gmailUrl:    buildGmailUrl(c.threadId, JOSE_EMAIL),
