@@ -16,13 +16,18 @@ type ContactRow = {
   first_seen_at: string;
   classified_at: string | null;
   classified_by: string | null;
+  google_resource_name: string | null;
+  google_source: string | null;
+  google_labels: string[] | null;
+  google_synced_at: string | null;
+  google_last_write_at: string | null;
 };
 
 async function getContacts(): Promise<ContactRow[]> {
   const sb = getSupabaseServerClient();
   const { data } = await sb
     .from("hall_attendees")
-    .select("email, display_name, relationship_class, auto_suggested, last_meeting_title, meeting_count, last_seen_at, first_seen_at, classified_at, classified_by")
+    .select("email, display_name, relationship_class, auto_suggested, last_meeting_title, meeting_count, last_seen_at, first_seen_at, classified_at, classified_by, google_resource_name, google_source, google_labels, google_synced_at, google_last_write_at")
     .gte("last_seen_at", new Date(Date.now() - 120 * 86400_000).toISOString())
     .order("meeting_count", { ascending: false })
     .order("last_seen_at", { ascending: false })

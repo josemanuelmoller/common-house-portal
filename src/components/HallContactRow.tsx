@@ -12,6 +12,9 @@ type Props = {
   meeting_count: number;
   last_seen_at: string;
   classified_by: string | null;
+  google_resource_name?: string | null;
+  google_source?: string | null;
+  google_last_write_at?: string | null;
 };
 
 const CLASSES = [
@@ -42,9 +45,11 @@ export function HallContactRow(props: Props) {
   const [cls, setCls] = useState<string | null>(props.relationship_class);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [googleSync, setGoogleSync] = useState<string | null>(null);
 
   async function save(next: string | null) {
     setError(null);
+    setGoogleSync(null);
     const prev = cls;
     setCls(next);
     try {
@@ -59,6 +64,8 @@ export function HallContactRow(props: Props) {
         setError(j?.error ?? `HTTP ${res.status}`);
         return;
       }
+      const j = await res.json().catch(() => ({}));
+      if (j.google_sync) setGoogleSync(j.google_sync);
       startTransition(() => router.refresh());
     } catch (e) {
       setCls(prev);
@@ -94,6 +101,27 @@ export function HallContactRow(props: Props) {
           {" · last seen "}{timeAgo(props.last_seen_at)}
           {props.last_meeting_title && ` · "${props.last_meeting_title.slice(0, 60)}${props.last_meeting_title.length > 60 ? "…" : ""}"`}
         </p>
+        <div className="flex items-center gap-2 mt-1">
+          {props.google_resource_name ? (
+            <span className="text-[9px] font-semibold text-[#131218]/50">
+              ✓ in Google Contacts
+              {props.google_last_write_at && <span className="text-[#131218]/30"> · synced {timeAgo(props.google_last_write_at)}</span>}
+            </span>
+          ) : props.google_source === "not_found" ? (
+            <span className="text-[9px] font-semibold text-amber-700/80">
+              ✗ not in Google Contacts — tag locally only
+            </span>
+          ) : null}
+          {googleSync === "synced" && (
+            <span className="text-[9px] font-bold text-green-700">✓ Google updated</span>
+          )}
+          {googleSync === "not_in_google" && (
+            <span className="text-[9px] font-bold text-amber-700">local only</span>
+          )}
+          {googleSync === "failed" && (
+            <span className="text-[9px] font-bold text-red-600">Google sync failed</span>
+          )}
+        </div>
         {props.auto_suggested && !cls && (
           <p className="text-[9px] text-amber-700 italic mt-1">
             System proposes: {props.auto_suggested}

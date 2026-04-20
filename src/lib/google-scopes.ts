@@ -16,6 +16,11 @@ export const GOOGLE_SCOPES_ALL = [
   "https://www.googleapis.com/auth/calendar.readonly",
   // Calendar — create/update events (events.insert, events.update)
   "https://www.googleapis.com/auth/calendar.events",
+  // Contacts — People API: read contacts + labels, create/assign labels
+  // Used by meeting-classifier to resolve attendee identities and by
+  // /admin/hall/contacts to dual-write relationship_class tags back to
+  // Google Contacts (bidirectional sync).
+  "https://www.googleapis.com/auth/contacts",
 ] as const;
 
 export type GoogleScope = typeof GOOGLE_SCOPES_ALL[number];
