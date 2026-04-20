@@ -4,6 +4,7 @@
 export const ADMIN_NAV = [
   // ── Overview ─────────────────────────────────────────────────────────────
   { label: "House View",          href: "/admin",                icon: "◈" },
+  { label: "The Plan",            href: "/admin/plan",           icon: "◆" },
   { label: "Residents",           href: "/residents",            icon: "◍" },
 
   // ── Portfolio ─────────────────────────────────────────────────────────────
