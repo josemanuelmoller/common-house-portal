@@ -3,6 +3,7 @@ import { requireAdmin } from "@/lib/require-admin";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { HallContactRow } from "@/components/HallContactRow";
 import { HallContactsAutoRefresh } from "@/components/HallContactsAutoRefresh";
+import { HallContactsCollapsibleList } from "@/components/HallContactsCollapsibleList";
 
 export const dynamic = "force-dynamic";
 
@@ -41,7 +42,17 @@ export default async function HallContactsPage() {
   const contacts = await getContacts();
 
   const unclassified = contacts.filter(c => !c.relationship_class);
-  const classified   = contacts.filter(c =>  c.relationship_class);
+  // Sort classified by most-recent human tag first, fallback to last_seen_at.
+  const classified   = contacts
+    .filter(c => c.relationship_class)
+    .sort((a, b) => {
+      const at = a.classified_at ? new Date(a.classified_at).getTime() : 0;
+      const bt = b.classified_at ? new Date(b.classified_at).getTime() : 0;
+      if (at !== bt) return bt - at;
+      const as = new Date(a.last_seen_at).getTime();
+      const bs = new Date(b.last_seen_at).getTime();
+      return bs - as;
+    });
   const personal     = classified.filter(c => ["Family", "Personal Service", "Friend"].includes(c.relationship_class ?? ""));
   const vip          = classified.filter(c => ["Investor", "Funder", "Portfolio"].includes(c.relationship_class ?? ""));
 
@@ -126,15 +137,11 @@ export default async function HallContactsPage() {
               <div className="flex-1 h-px bg-[#E0E0D8]" />
               <span className="text-[10px] font-semibold text-[#131218]/30">{classified.length}</span>
             </div>
-            <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden divide-y divide-[#EFEFEA]">
-              {classified.length === 0 ? (
-                <div className="px-5 py-8 text-center">
-                  <p className="text-sm text-[#131218]/25">No contacts classified yet.</p>
-                </div>
-              ) : classified.map(c => (
-                <HallContactRow key={c.email} {...c} />
-              ))}
-            </div>
+            <HallContactsCollapsibleList
+              rows={classified}
+              initialVisible={5}
+              emptyText="No contacts classified yet."
+            />
           </section>
         </div>
       </main>
