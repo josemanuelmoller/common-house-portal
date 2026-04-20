@@ -158,6 +158,120 @@ export function isVipContact(c: ContactView): boolean {
   return (c.relationship_classes ?? []).some(x => VIP_CLASSES.has(x));
 }
 
+// ─── Organization rollup ───────────────────────────────────────────────────
+
+export type OrgRollup = {
+  domain:            string;
+  contacts:          ContactView[];
+  contact_count:     number;
+  meeting_sum:       number;
+  email_sum:         number;
+  transcript_sum:    number;
+  vip_count:         number;
+  tagged_count:      number;
+  untagged_count:    number;
+  /** Classes shared by every contact in the group (for a "most common" badge). */
+  shared_classes:    string[];
+  last_interaction_at: string | null;
+};
+
+// Email providers where a shared domain does NOT mean a shared organisation.
+// These get grouped together but flagged so the UI can show them differently.
+const PERSONAL_DOMAINS = new Set([
+  "gmail.com", "googlemail.com", "outlook.com", "hotmail.com",
+  "yahoo.com", "yahoo.es", "yahoo.co.uk", "icloud.com", "me.com",
+  "live.com", "msn.com", "protonmail.com", "proton.me",
+]);
+
+export function isPersonalDomain(domain: string): boolean {
+  return PERSONAL_DOMAINS.has(domain.toLowerCase());
+}
+
+/**
+ * Groups hall_attendees by email domain. Sorts by total touches descending
+ * so the orgs you interact with most land on top.
+ *
+ * Filters applied:
+ *   - dismissed rows excluded
+ *   - self identities excluded
+ *   - domains with fewer than `minContacts` rolled separately (return under
+ *     a '__singletons__' bucket the UI can hide or fold)
+ */
+export async function getOrganizationRollup(minContacts = 2): Promise<{
+  orgs:       OrgRollup[];
+  singletons: ContactView[];
+}> {
+  const { getSupabaseServerClient } = await import("./supabase-server");
+  const { getSelfEmails } = await import("./hall-self");
+  const sb = getSupabaseServerClient();
+  const selfSet = await getSelfEmails();
+
+  const { data } = await sb
+    .from("hall_attendees")
+    .select(ALL_FIELDS)
+    .is("dismissed_at", null)
+    .gte("last_seen_at", new Date(Date.now() - 120 * 86400_000).toISOString())
+    .order("meeting_count", { ascending: false })
+    .limit(600);
+
+  const rows = ((data ?? []) as unknown as ContactView[]).filter(r => !selfSet.has(r.email));
+
+  const byDomain = new Map<string, ContactView[]>();
+  for (const c of rows) {
+    const domain = (c.email.split("@")[1] ?? "").toLowerCase();
+    if (!domain) continue;
+    const bucket = byDomain.get(domain) ?? [];
+    bucket.push({
+      ...c,
+      relationship_classes: c.relationship_classes ?? [],
+      google_labels:        c.google_labels ?? [],
+    });
+    byDomain.set(domain, bucket);
+  }
+
+  const orgs: OrgRollup[] = [];
+  const singletons: ContactView[] = [];
+
+  for (const [domain, contacts] of byDomain) {
+    if (contacts.length < minContacts) {
+      singletons.push(...contacts);
+      continue;
+    }
+    const meeting_sum    = contacts.reduce((a, c) => a + (c.meeting_count ?? 0), 0);
+    const email_sum      = contacts.reduce((a, c) => a + (c.email_thread_count ?? 0), 0);
+    const transcript_sum = contacts.reduce((a, c) => a + (c.transcript_count ?? 0), 0);
+    const vip_count      = contacts.filter(isVipContact).length;
+    const tagged_count   = contacts.filter(c => (c.relationship_classes ?? []).length > 0).length;
+    const untagged_count = contacts.length - tagged_count;
+
+    // Shared classes = intersection of all contacts' class sets.
+    const shared = contacts.reduce<Set<string> | null>((acc, c) => {
+      const set = new Set(c.relationship_classes ?? []);
+      if (acc === null) return set;
+      return new Set([...acc].filter(x => set.has(x)));
+    }, null) ?? new Set();
+
+    const latest = contacts
+      .map(c => c.last_seen_at)
+      .filter((x): x is string => !!x)
+      .sort()
+      .pop() ?? null;
+
+    orgs.push({
+      domain,
+      contacts,
+      contact_count:    contacts.length,
+      meeting_sum, email_sum, transcript_sum, vip_count,
+      tagged_count, untagged_count,
+      shared_classes:   [...shared],
+      last_interaction_at: latest,
+    });
+  }
+
+  orgs.sort((a, b) => (b.meeting_sum + b.email_sum + b.transcript_sum) - (a.meeting_sum + a.email_sum + a.transcript_sum));
+  return { orgs, singletons };
+}
+
 /** A generic relevance score for downstream priorization (inbox, STB, briefing). */
 export function contactPriorityScore(c: ContactView): number {
   let score = 0;

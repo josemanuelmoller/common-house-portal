@@ -2,10 +2,12 @@ import { Sidebar } from "@/components/Sidebar";
 import { requireAdmin } from "@/lib/require-admin";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { getSelfEmails } from "@/lib/hall-self";
+import { getOrganizationRollup, isPersonalDomain } from "@/lib/contacts";
 import { HallContactRow } from "@/components/HallContactRow";
 import { HallContactsAutoRefresh } from "@/components/HallContactsAutoRefresh";
 import { HallContactsCollapsibleList } from "@/components/HallContactsCollapsibleList";
 import { HallContactsDismissedToggle } from "@/components/HallContactsDismissedToggle";
+import { HallContactsByOrg } from "@/components/HallContactsByOrg";
 
 export const dynamic = "force-dynamic";
 
@@ -47,10 +49,36 @@ async function getContacts(): Promise<ContactRow[]> {
 
 export default async function HallContactsPage() {
   await requireAdmin();
-  const contacts = await getContacts();
+  const [contacts, rollup] = await Promise.all([
+    getContacts(),
+    getOrganizationRollup(2),
+  ]);
 
   const active     = contacts.filter(c => !c.dismissed_at);
   const dismissed  = contacts.filter(c =>  c.dismissed_at);
+
+  // Shape the rollup for the client component. Each org's contacts are
+  // converted to the HallContactRow props shape so the existing editor
+  // works inline inside each group.
+  const orgsForClient = rollup.orgs.map(o => ({
+    ...o,
+    is_personal_domain: isPersonalDomain(o.domain),
+    contacts: o.contacts.map(c => ({
+      email:                 c.email,
+      display_name:          c.display_name,
+      relationship_class:    c.relationship_classes?.[0] ?? null,
+      relationship_classes:  c.relationship_classes,
+      auto_suggested:        c.auto_suggested,
+      last_meeting_title:    c.last_meeting_title,
+      meeting_count:         c.meeting_count,
+      last_seen_at:          c.last_seen_at ?? c.first_seen_at,
+      classified_by:         c.classified_by,
+      google_resource_name:  c.google_resource_name,
+      google_source:         c.google_source,
+      google_last_write_at:  null,
+      dismissed_at:          null,
+    })),
+  }));
   const hasClasses = (c: ContactRow) => (c.relationship_classes ?? []).length > 0;
   const unclassified = active.filter(c => !hasClasses(c));
   const classified = active
@@ -141,6 +169,9 @@ export default async function HallContactsPage() {
               ))}
             </div>
           </section>
+
+          {/* By organization — bulk tag + rollup */}
+          <HallContactsByOrg orgs={orgsForClient} />
 
           {/* Classified */}
           <section>
