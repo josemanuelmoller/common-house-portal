@@ -22,6 +22,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Client } from "@notionhq/client";
 import { currentUser } from "@clerk/nextjs/server";
 import { isAdminUser, isAdminEmail } from "@/lib/clients";
+import { withRoutineLog } from "@/lib/routine-log";
 
 export const maxDuration = 90;
 
@@ -215,7 +216,7 @@ async function updatePeopleLastContact(emails: string[], dateStr: string): Promi
 
 // ─── Handler ──────────────────────────────────────────────────────────────────
 
-export async function POST(req: NextRequest) {
+async function _POST(req: NextRequest) {
   if (!(await authCheck(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -382,3 +383,5 @@ export async function POST(req: NextRequest) {
     errors,
   });
 }
+
+export const POST = withRoutineLog("fireflies-sync", _POST);
