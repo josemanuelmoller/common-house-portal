@@ -10,7 +10,8 @@ export const dynamic = "force-dynamic";
 type ContactRow = {
   email: string;
   display_name: string | null;
-  relationship_class: string | null;
+  relationship_class:   string | null;
+  relationship_classes: string[] | null;
   auto_suggested: string | null;
   last_meeting_title: string | null;
   meeting_count: number;
@@ -29,7 +30,7 @@ async function getContacts(): Promise<ContactRow[]> {
   const sb = getSupabaseServerClient();
   const { data } = await sb
     .from("hall_attendees")
-    .select("email, display_name, relationship_class, auto_suggested, last_meeting_title, meeting_count, last_seen_at, first_seen_at, classified_at, classified_by, google_resource_name, google_source, google_labels, google_synced_at, google_last_write_at")
+    .select("email, display_name, relationship_class, relationship_classes, auto_suggested, last_meeting_title, meeting_count, last_seen_at, first_seen_at, classified_at, classified_by, google_resource_name, google_source, google_labels, google_synced_at, google_last_write_at")
     .gte("last_seen_at", new Date(Date.now() - 120 * 86400_000).toISOString())
     .order("meeting_count", { ascending: false })
     .order("last_seen_at", { ascending: false })
@@ -41,20 +42,20 @@ export default async function HallContactsPage() {
   await requireAdmin();
   const contacts = await getContacts();
 
-  const unclassified = contacts.filter(c => !c.relationship_class);
-  // Sort classified by most-recent human tag first, fallback to last_seen_at.
-  const classified   = contacts
-    .filter(c => c.relationship_class)
+  const hasClasses = (c: ContactRow) => (c.relationship_classes ?? []).length > 0;
+  const unclassified = contacts.filter(c => !hasClasses(c));
+  const classified = contacts
+    .filter(hasClasses)
     .sort((a, b) => {
       const at = a.classified_at ? new Date(a.classified_at).getTime() : 0;
       const bt = b.classified_at ? new Date(b.classified_at).getTime() : 0;
       if (at !== bt) return bt - at;
-      const as = new Date(a.last_seen_at).getTime();
-      const bs = new Date(b.last_seen_at).getTime();
-      return bs - as;
+      return new Date(b.last_seen_at).getTime() - new Date(a.last_seen_at).getTime();
     });
-  const personal     = classified.filter(c => ["Family", "Personal Service", "Friend"].includes(c.relationship_class ?? ""));
-  const vip          = classified.filter(c => ["Investor", "Funder", "Portfolio"].includes(c.relationship_class ?? ""));
+  const PERSONAL = new Set(["Family", "Personal Service", "Friend"]);
+  const VIP      = new Set(["Investor", "Funder", "Portfolio"]);
+  const personal = classified.filter(c => (c.relationship_classes ?? []).some(x => PERSONAL.has(x)));
+  const vip      = classified.filter(c => (c.relationship_classes ?? []).some(x => VIP.has(x)));
 
   return (
     <div className="flex min-h-screen bg-[#EFEFEA]">

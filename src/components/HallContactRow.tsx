@@ -6,7 +6,8 @@ import { useRouter } from "next/navigation";
 type Props = {
   email: string;
   display_name: string | null;
-  relationship_class: string | null;
+  relationship_class: string | null;       // legacy mirror
+  relationship_classes?: string[] | null;  // canonical multi-tag
   auto_suggested: string | null;
   last_meeting_title: string | null;
   meeting_count: number;
@@ -42,24 +43,27 @@ function timeAgo(iso: string): string {
 
 export function HallContactRow(props: Props) {
   const router = useRouter();
-  const [cls, setCls] = useState<string | null>(props.relationship_class);
+  const initial = props.relationship_classes && props.relationship_classes.length > 0
+    ? props.relationship_classes
+    : props.relationship_class ? [props.relationship_class] : [];
+  const [selected, setSelected] = useState<string[]>(initial);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [googleSync, setGoogleSync] = useState<string | null>(null);
 
-  async function save(next: string | null) {
+  async function save(next: string[]) {
     setError(null);
     setGoogleSync(null);
-    const prev = cls;
-    setCls(next);
+    const prev = selected;
+    setSelected(next);
     try {
       const res = await fetch("/api/hall-contacts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: props.email, relationship_class: next }),
+        body: JSON.stringify({ email: props.email, relationship_classes: next }),
       });
       if (!res.ok) {
-        setCls(prev);
+        setSelected(prev);
         const j = await res.json().catch(() => ({}));
         setError(j?.error ?? `HTTP ${res.status}`);
         return;
@@ -68,32 +72,48 @@ export function HallContactRow(props: Props) {
       if (j.google_sync) setGoogleSync(j.google_sync);
       startTransition(() => router.refresh());
     } catch (e) {
-      setCls(prev);
+      setSelected(prev);
       setError(e instanceof Error ? e.message : String(e));
     }
   }
 
-  const kind = CLASSES.find(c => c.v === cls)?.kind;
-  const bg = kind === "personal" ? "bg-[#FFF4E6]/40"
-           : kind === "vip"      ? "bg-[#B2FF59]/10"
+  function toggle(cls: string) {
+    if (selected.includes(cls)) save(selected.filter(c => c !== cls));
+    else save([...selected, cls]);
+  }
+
+  const selectedKinds = selected.map(s => CLASSES.find(c => c.v === s)?.kind).filter(Boolean) as ("personal"|"vip"|"work")[];
+  const hasPersonal = selectedKinds.includes("personal");
+  const hasVip      = selectedKinds.includes("vip");
+  // Visual priority when a contact carries mixed classes (e.g. Family + CH Team):
+  // VIP tint wins because "high-stakes contact" is more actionable for Jose
+  // than "personal". The chips themselves show the full set unambiguously.
+  const bg = hasVip      ? "bg-[#B2FF59]/10"
+           : hasPersonal ? "bg-[#FFF4E6]/40"
            : "";
 
   return (
     <div className={`flex items-start gap-4 px-5 py-3.5 hover:bg-[#EFEFEA]/40 transition-colors ${bg}`}>
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 flex-wrap">
           <p className="text-[12px] font-bold text-[#131218] truncate">
             {props.display_name || props.email.split("@")[0]}
           </p>
-          {cls && (
-            <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded ${
-              kind === "personal" ? "bg-amber-100 text-amber-800"
-              : kind === "vip"    ? "bg-[#B2FF59]/40 text-green-900"
-              : "bg-[#131218]/6 text-[#131218]/60"
-            }`}>
-              {cls.toUpperCase()}
-            </span>
-          )}
+          {selected.map(cls => {
+            const kind = CLASSES.find(c => c.v === cls)?.kind;
+            return (
+              <span
+                key={cls}
+                className={`text-[8px] font-bold px-1.5 py-0.5 rounded ${
+                  kind === "personal" ? "bg-amber-100 text-amber-800"
+                  : kind === "vip"    ? "bg-[#B2FF59]/40 text-green-900"
+                  : "bg-[#131218]/6 text-[#131218]/60"
+                }`}
+              >
+                {cls.toUpperCase()}
+              </span>
+            );
+          })}
         </div>
         <p className="text-[10px] text-[#131218]/50 truncate mt-0.5">{props.email}</p>
         <p className="text-[10px] text-[#131218]/35 mt-1">
@@ -130,7 +150,7 @@ export function HallContactRow(props: Props) {
             <span className="text-[9px] font-bold text-red-600">Google sync failed</span>
           )}
         </div>
-        {props.auto_suggested && !cls && (
+        {props.auto_suggested && selected.length === 0 && (
           <p className="text-[9px] text-amber-700 italic mt-1">
             System proposes: {props.auto_suggested}
           </p>
@@ -140,7 +160,7 @@ export function HallContactRow(props: Props) {
 
       <div className="flex items-center gap-1.5 flex-wrap max-w-[360px] justify-end shrink-0">
         {CLASSES.map(c => {
-          const active = cls === c.v;
+          const active = selected.includes(c.v);
           const base = "text-[9px] font-bold px-2 py-1 rounded-full transition-colors";
           const activeCls = c.kind === "personal" ? "bg-amber-500 text-white"
                           : c.kind === "vip"     ? "bg-[#B2FF59] text-black"
@@ -151,9 +171,9 @@ export function HallContactRow(props: Props) {
               key={c.v}
               type="button"
               disabled={pending}
-              onClick={() => save(active ? null : c.v)}
+              onClick={() => toggle(c.v)}
               className={`${base} ${active ? activeCls : inactiveCls} ${pending ? "opacity-60 cursor-wait" : ""}`}
-              title={active ? `Click to untag ${c.label}` : `Tag as ${c.label}`}
+              title={active ? `Click to remove ${c.label}` : `Add ${c.label}`}
             >
               {c.label}
             </button>

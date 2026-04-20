@@ -65,7 +65,7 @@ export type ResolvedContact = {
   resourceName:   string | null;     // "people/c1234" — null if not in Contacts
   displayName:    string | null;
   labels:         string[];          // all contactGroup names on this contact
-  class:          string | null;     // derived relationship_class (first LABEL_TO_CLASS hit)
+  classes:        string[];          // every LABEL_TO_CLASS hit (multi-tag)
   source:         "myContacts" | "otherContacts" | "directory" | "not_found";
 };
 
@@ -89,7 +89,7 @@ export async function lookupByEmails(emails: string[]): Promise<Map<string, Reso
   if (!people) {
     // No Google auth — every email resolves as not_found (system fails open)
     for (const e of unique) {
-      out.set(e, { email: e, resourceName: null, displayName: null, labels: [], class: null, source: "not_found" });
+      out.set(e, { email: e, resourceName: null, displayName: null, labels: [], classes: [], source: "not_found" });
     }
     return out;
   }
@@ -117,7 +117,7 @@ async function findContactForEmail(
   groupNameById: Map<string, string>,
 ): Promise<ResolvedContact> {
   const stub: ResolvedContact = {
-    email, resourceName: null, displayName: null, labels: [], class: null, source: "not_found",
+    email, resourceName: null, displayName: null, labels: [], classes: [], source: "not_found",
   };
 
   // Try myContacts first (user-saved)
@@ -174,14 +174,14 @@ function formatContact(
     const name = groupNameById.get(gid);
     if (name) labels.push(name);
   }
-  // Map the first matching label to a class. Order of labels as Google returns
-  // them is not stable across calls — LABEL_TO_CLASS insertion order wins for
-  // determinism (Family/Friends/Personal Service before workplace labels).
-  let cls: string | null = null;
+  // Multi-tag: emit every LABEL_TO_CLASS hit, deduplicated and in the
+  // deterministic LABEL_TO_CLASS insertion order (Family/Friends/Personal
+  // before workplace labels).
+  const classes: string[] = [];
   for (const label of Object.keys(LABEL_TO_CLASS)) {
-    if (labels.includes(label)) { cls = LABEL_TO_CLASS[label]; break; }
+    if (labels.includes(label)) classes.push(LABEL_TO_CLASS[label]);
   }
-  return { email, resourceName, displayName, labels, class: cls, source };
+  return { email, resourceName, displayName, labels, classes, source };
 }
 
 // ─── Contact group (label) management ────────────────────────────────────────
@@ -215,6 +215,66 @@ export async function ensureContactGroup(label: string): Promise<string | null> 
 /** True for resources Google treats as read-only for labels (otherContacts). */
 function isReadOnlyResource(resourceName: string): boolean {
   return resourceName.startsWith("otherContacts/");
+}
+
+/**
+ * Multi-tag write: assigns EVERY provided label and removes any known
+ * (LABEL_TO_CLASS) label not in the target set. Preserves unrelated
+ * memberships (e.g. Jose's "Algramo" group).
+ */
+export async function setContactLabels(
+  resourceName: string,
+  labels: string[],
+): Promise<{ ok: boolean; reason?: string }> {
+  try {
+    if (isReadOnlyResource(resourceName)) {
+      return { ok: false, reason: "read_only_other_contact" };
+    }
+    const people = getPeopleClient();
+    if (!people) return { ok: false, reason: "no_google_auth" };
+
+    // Ensure all target groups exist (create missing custom ones idempotently).
+    const targetGroupIds: string[] = [];
+    for (const label of labels) {
+      const gid = await ensureContactGroup(label);
+      if (gid) targetGroupIds.push(gid);
+    }
+
+    const person = await people.people.get({
+      resourceName,
+      personFields: "memberships",
+    });
+    const current = person.data.memberships ?? [];
+    const knownLabels = Object.keys(LABEL_TO_CLASS);
+    const groups = await listContactGroups(people);
+    const knownGroupIds = new Set(
+      groups.filter(g => g.formattedName && knownLabels.includes(g.formattedName)).map(g => g.resourceName!),
+    );
+
+    // Preserve non-known memberships; replace known-group memberships with the
+    // exact target set.
+    const preserved = current.filter(m => {
+      const gid = m.contactGroupMembership?.contactGroupResourceName;
+      return gid && !knownGroupIds.has(gid);
+    });
+    const desired: people_v1.Schema$Membership[] = [
+      ...preserved,
+      ...targetGroupIds.map(id => ({ contactGroupMembership: { contactGroupResourceName: id } })),
+    ];
+
+    await people.people.updateContact({
+      resourceName,
+      updatePersonFields: "memberships",
+      requestBody: {
+        resourceName,
+        etag: person.data.etag,
+        memberships: desired,
+      },
+    });
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, reason: err instanceof Error ? err.message : String(err) };
+  }
 }
 
 /**

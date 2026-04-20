@@ -19,9 +19,8 @@ import { adminGuardApi } from "@/lib/require-admin";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import {
   CLASS_TO_LABEL,
-  clearContactLabels,
   lookupByEmails,
-  setContactLabel,
+  setContactLabels,
 } from "@/lib/google-contacts";
 
 const VALID_CLASSES = [
@@ -43,12 +42,12 @@ export async function GET(req: NextRequest) {
     const sb = getSupabaseServerClient();
     let query = sb
       .from("hall_attendees")
-      .select("email, display_name, relationship_class, auto_suggested, last_meeting_title, meeting_count, first_seen_at, last_seen_at, classified_at, classified_by")
+      .select("email, display_name, relationship_class, relationship_classes, auto_suggested, last_meeting_title, meeting_count, first_seen_at, last_seen_at, classified_at, classified_by")
       .gte("last_seen_at", cutoff)
       .order("meeting_count", { ascending: false })
       .order("last_seen_at",  { ascending: false })
       .limit(200);
-    if (onlyUnclassified) query = query.is("relationship_class", null);
+    if (onlyUnclassified) query = query.or("relationship_classes.is.null,relationship_classes.eq.{}");
 
     const { data, error } = await query;
     if (error) return NextResponse.json({ error: error.message }, { status: 502 });
@@ -79,20 +78,34 @@ async function doPOST(req: NextRequest) {
   const user = await currentUser();
   const actor = user?.primaryEmailAddress?.emailAddress ?? "unknown";
 
-  let body: { email?: string; relationship_class?: string | null };
+  let body: {
+    email?: string;
+    relationship_class?: string | null;
+    relationship_classes?: string[] | null;
+  };
   try { body = await req.json(); } catch { return NextResponse.json({ error: "Invalid JSON" }, { status: 400 }); }
 
   const email = (body.email ?? "").trim().toLowerCase();
   if (!email || !/.+@.+\..+/.test(email)) {
     return NextResponse.json({ error: "valid email required" }, { status: 400 });
   }
-  const rc = body.relationship_class;
-  if (rc !== null && rc !== undefined && !VALID_CLASSES.includes(rc as RelationshipClass)) {
+
+  // Accept either:
+  //   classes:  string[]      (canonical)
+  //   class:    string | null (legacy single-value)
+  //   empty array / null      → remove all classes
+  const rawClasses: string[] = Array.isArray(body.relationship_classes)
+    ? body.relationship_classes
+    : body.relationship_class == null ? [] : [body.relationship_class];
+  const uniqClasses = [...new Set(rawClasses.map(c => String(c).trim()).filter(Boolean))];
+  const invalid = uniqClasses.filter(c => !VALID_CLASSES.includes(c as RelationshipClass));
+  if (invalid.length > 0) {
     return NextResponse.json(
-      { error: "relationship_class must be one of " + VALID_CLASSES.join(" | ") + " or null" },
+      { error: `invalid classes: ${invalid.join(", ")}. Allowed: ${VALID_CLASSES.join(" | ")}` },
       { status: 400 },
     );
   }
+  const classes = uniqClasses as RelationshipClass[];
 
   const nowIso = new Date().toISOString();
   const sb = getSupabaseServerClient();
@@ -114,28 +127,19 @@ async function doPOST(req: NextRequest) {
     }
   } catch { /* carry on — local write still happens */ }
 
-  // Dual-write to Google Contacts. If the contact exists, set/clear labels.
-  // If not in Contacts, skip google write — Jose can create the contact in
-  // Google Contacts later; once created, next STB run will cache the
-  // resourceName automatically.
+  // Dual-write to Google Contacts — set exactly the target labels, remove
+  // any known label no longer selected. Empty array clears all known labels.
   let googleSyncOutcome: "synced" | "not_in_google" | "read_only" | "skipped" | "failed" = "skipped";
   let googleError: string | undefined;
   if (resourceName) {
-    if (rc) {
-      const targetLabel = CLASS_TO_LABEL[rc as keyof typeof CLASS_TO_LABEL];
-      if (targetLabel) {
-        const res = await setContactLabel(resourceName, targetLabel);
-        if (res.ok) googleSyncOutcome = "synced";
-        else if (res.reason === "read_only_other_contact") googleSyncOutcome = "read_only";
-        else { googleSyncOutcome = "failed"; googleError = res.reason; }
-      }
-    } else {
-      const res = await clearContactLabels(resourceName);
-      if (res.ok) googleSyncOutcome = "synced";
-      else if (res.reason === "read_only_other_contact") googleSyncOutcome = "read_only";
-      else { googleSyncOutcome = "failed"; googleError = res.reason; }
-    }
-  } else if (!resourceName) {
+    const targetLabels = classes
+      .map(c => CLASS_TO_LABEL[c as keyof typeof CLASS_TO_LABEL])
+      .filter((l): l is string => !!l);
+    const res = await setContactLabels(resourceName, targetLabels);
+    if (res.ok) googleSyncOutcome = "synced";
+    else if (res.reason === "read_only_other_contact") googleSyncOutcome = "read_only";
+    else { googleSyncOutcome = "failed"; googleError = res.reason; }
+  } else {
     googleSyncOutcome = "not_in_google";
   }
 
@@ -145,9 +149,9 @@ async function doPOST(req: NextRequest) {
       .upsert(
         {
           email,
-          relationship_class:    rc ?? null,
-          classified_at:         rc ? nowIso : null,
-          classified_by:         rc ? actor  : null,
+          relationship_classes:  classes,
+          classified_at:         classes.length > 0 ? nowIso : null,
+          classified_by:         classes.length > 0 ? actor  : null,
           google_resource_name:  resourceName,
           google_last_write_at:  googleSyncOutcome === "synced" ? nowIso : null,
           google_synced_at:      googleSyncOutcome === "synced" ? nowIso : null,
@@ -155,7 +159,7 @@ async function doPOST(req: NextRequest) {
         },
         { onConflict: "email" },
       )
-      .select("email, relationship_class, classified_at, classified_by, google_resource_name, google_last_write_at")
+      .select("email, relationship_class, relationship_classes, classified_at, classified_by, google_resource_name, google_last_write_at")
       .maybeSingle();
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({

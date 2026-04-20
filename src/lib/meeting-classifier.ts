@@ -38,13 +38,17 @@ export type RelationshipClass =
   | "Investor"
   | "Funder"
   | "Vendor"
-  | "External"
-  | null;
+  | "External";
 
 const PERSONAL_CLASSES: ReadonlySet<string> = new Set(["Family", "Personal Service", "Friend"]);
 const VIP_CLASSES:      ReadonlySet<string> = new Set(["Investor", "Funder", "Portfolio"]);
 
-export type AttendeeLookup = Map<string, RelationshipClass>;
+/**
+ * Multi-tag by design: a single attendee can carry multiple classes (e.g.
+ * Jose's brother is Family AND CH Team). Returning an empty array means
+ * "unknown" — the classifier fails open.
+ */
+export type AttendeeLookup = Map<string, RelationshipClass[]>;
 
 /**
  * Resolve relationship_class for each email via a read-through cache:
@@ -68,15 +72,16 @@ export async function loadAttendeeClasses(emails: string[]): Promise<AttendeeLoo
 
   type Row = {
     email: string;
-    relationship_class: string | null;
-    google_synced_at:   string | null;
+    relationship_class:   string | null;   // legacy mirror
+    relationship_classes: string[] | null; // canonical
+    google_synced_at:     string | null;
   };
   let rows: Row[] = [];
   if (sb) {
     try {
       const { data } = await sb
         .from("hall_attendees")
-        .select("email, relationship_class, google_synced_at")
+        .select("email, relationship_class, relationship_classes, google_synced_at")
         .in("email", unique);
       rows = (data ?? []) as Row[];
     } catch { /* ignore */ }
@@ -90,15 +95,16 @@ export async function loadAttendeeClasses(emails: string[]): Promise<AttendeeLoo
 
   for (const email of unique) {
     const row = byEmail.get(email);
-    if (row?.relationship_class) {
-      // Human-set class — highest priority, never re-derived from Google.
-      out.set(email, row.relationship_class as RelationshipClass);
+    const classes: RelationshipClass[] = (row?.relationship_classes ?? []).filter(
+      (c): c is RelationshipClass => !!c,
+    ) as RelationshipClass[];
+    if (classes.length > 0) {
+      out.set(email, classes);
       continue;
     }
     const freshGoogle = row?.google_synced_at && new Date(row.google_synced_at).getTime() > cutoff;
     if (freshGoogle) {
-      // Within TTL — trust the cached null (we already checked Google recently).
-      out.set(email, null);
+      out.set(email, []);
       continue;
     }
     needGoogle.push(email);
@@ -111,15 +117,15 @@ export async function loadAttendeeClasses(emails: string[]): Promise<AttendeeLoo
   try {
     resolved = await googleLookupByEmails(needGoogle);
   } catch {
-    for (const e of needGoogle) out.set(e, null);
+    for (const e of needGoogle) out.set(e, []);
     return out;
   }
 
-  // Persist cache + derive class in the same pass.
+  // Persist cache + derive classes in the same pass.
   const nowIso = new Date().toISOString();
   const updates: Array<{
     email: string;
-    relationship_class: string | null;
+    relationship_classes: string[];
     google_resource_name: string | null;
     google_source: string;
     google_labels: string[];
@@ -129,14 +135,11 @@ export async function loadAttendeeClasses(emails: string[]): Promise<AttendeeLoo
 
   for (const email of needGoogle) {
     const r = resolved.get(email);
-    const googleClass = r?.class ?? null;
-    out.set(email, googleClass as RelationshipClass);
+    const googleClasses = (r?.classes ?? []) as RelationshipClass[];
+    out.set(email, googleClasses);
     updates.push({
       email,
-      // Only auto-fill relationship_class if Google told us something AND the
-      // local row doesn't already have a human-set class. Upsert preserves
-      // human edits that happened between this lookup and the write.
-      relationship_class:   googleClass,
+      relationship_classes: googleClasses,
       google_resource_name: r?.resourceName ?? null,
       google_source:        r?.source ?? "not_found",
       google_labels:        r?.labels ?? [],
@@ -147,24 +150,21 @@ export async function loadAttendeeClasses(emails: string[]): Promise<AttendeeLoo
 
   if (sb && updates.length > 0) {
     try {
-      // Two-step to avoid clobbering manually-set relationship_class:
-      //   (1) upsert all rows with google_* fields
-      //   (2) for rows where the server already has a non-null class, we want
-      //       to keep it. Supabase upsert does overwrite; do a select first to
-      //       filter out rows with existing relationship_class set.
+      // Never clobber a human-set tag set: if the row already has any
+      // relationship_classes, skip the classes field in the upsert for that row.
       const { data: existing } = await sb
         .from("hall_attendees")
-        .select("email, relationship_class")
+        .select("email, relationship_classes")
         .in("email", updates.map(u => u.email));
       const humanSet = new Set(
-        ((existing ?? []) as { email: string; relationship_class: string | null }[])
-          .filter(r => r.relationship_class)
+        ((existing ?? []) as { email: string; relationship_classes: string[] | null }[])
+          .filter(r => (r.relationship_classes ?? []).length > 0)
           .map(r => r.email),
       );
       const safeUpdates = updates.map(u =>
         humanSet.has(u.email)
-          ? { ...u, relationship_class: undefined }  // drop the field; upsert won't touch it
-          : u
+          ? { ...u, relationship_classes: undefined }
+          : u,
       );
       await sb
         .from("hall_attendees")
@@ -194,8 +194,8 @@ export type MeetingClassification = {
   confirmed_count:   number;
   tentative_count:   number;
   needs_action_count: number;
-  all_classes_present: RelationshipClass[];
-  unknown_attendees:  MeetingAttendee[];  // attendees not yet in hall_attendees with a class
+  all_classes_present: RelationshipClass[][];
+  unknown_attendees:  MeetingAttendee[];
 };
 
 export function classifyMeeting(
@@ -210,19 +210,23 @@ export function classifyMeeting(
     else if (a.responseStatus === "needsAction") needsAction++;
   }
 
-  const classes: RelationshipClass[] = nonSelf.map(a => lookup.get(a.email) ?? null);
-  const knownClasses = classes.filter(c => c !== null) as Exclude<RelationshipClass, null>[];
+  // Per-attendee class arrays. Empty = unknown.
+  const perAttendee: RelationshipClass[][] = nonSelf.map(a => lookup.get(a.email) ?? []);
 
-  // is_personal: at least one non-self attendee AND every non-self attendee
-  // is classified personal. An unknown attendee is NOT personal by default
-  // (fail open on uncertainty — never drop prep when we do not know who is coming).
+  // is_personal: at least one non-self attendee, every attendee has ≥1 class,
+  // AND every class of every attendee is personal. If any attendee is unknown
+  // OR has any non-personal class (e.g. brother tagged Family + CH Team),
+  // the meeting is treated as work and prep is still emitted.
   const is_personal =
     nonSelf.length > 0 &&
-    classes.every(c => c !== null && PERSONAL_CLASSES.has(c));
+    perAttendee.every(classes =>
+      classes.length > 0 && classes.every(c => PERSONAL_CLASSES.has(c)),
+    );
 
-  const has_vip = knownClasses.some(c => VIP_CLASSES.has(c));
+  // has_vip: any class of any attendee is VIP.
+  const has_vip = perAttendee.some(classes => classes.some(c => VIP_CLASSES.has(c)));
 
-  const unknown_attendees = nonSelf.filter(a => !lookup.has(a.email));
+  const unknown_attendees = nonSelf.filter(a => (lookup.get(a.email) ?? []).length === 0);
 
   return {
     is_personal,
@@ -230,7 +234,7 @@ export function classifyMeeting(
     confirmed_count:    confirmed,
     tentative_count:    tentative,
     needs_action_count: needsAction,
-    all_classes_present: classes,
+    all_classes_present: perAttendee,
     unknown_attendees,
   };
 }
