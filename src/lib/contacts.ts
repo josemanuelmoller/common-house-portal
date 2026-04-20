@@ -173,6 +173,12 @@ export type OrgRollup = {
   /** Classes shared by every contact in the group (for a "most common" badge). */
   shared_classes:    string[];
   last_interaction_at: string | null;
+  /** Registered org row fields — null when this domain is still 'proposed'. */
+  org_registered:    boolean;
+  org_name:          string | null;
+  org_classes:       string[];
+  org_notion_id:     string | null;
+  org_notes:         string | null;
 };
 
 // Email providers where a shared domain does NOT mean a shared organisation.
@@ -206,15 +212,23 @@ export async function getOrganizationRollup(minContacts = 2): Promise<{
   const sb = getSupabaseServerClient();
   const selfSet = await getSelfEmails();
 
-  const { data } = await sb
-    .from("hall_attendees")
-    .select(ALL_FIELDS)
-    .is("dismissed_at", null)
-    .gte("last_seen_at", new Date(Date.now() - 120 * 86400_000).toISOString())
-    .order("meeting_count", { ascending: false })
-    .limit(600);
+  const [contactsRes, orgsRes] = await Promise.all([
+    sb.from("hall_attendees")
+      .select(ALL_FIELDS)
+      .is("dismissed_at", null)
+      .gte("last_seen_at", new Date(Date.now() - 120 * 86400_000).toISOString())
+      .order("meeting_count", { ascending: false })
+      .limit(600),
+    sb.from("hall_organizations")
+      .select("domain, name, relationship_classes, notion_id, notes")
+      .is("dismissed_at", null),
+  ]);
 
-  const rows = ((data ?? []) as unknown as ContactView[]).filter(r => !selfSet.has(r.email));
+  const rows = ((contactsRes.data ?? []) as unknown as ContactView[]).filter(r => !selfSet.has(r.email));
+
+  type OrgRow = { domain: string; name: string; relationship_classes: string[] | null; notion_id: string | null; notes: string | null };
+  const orgByDomain = new Map<string, OrgRow>();
+  for (const r of (orgsRes.data ?? []) as OrgRow[]) orgByDomain.set(r.domain.toLowerCase(), r);
 
   const byDomain = new Map<string, ContactView[]>();
   for (const c of rows) {
@@ -257,6 +271,7 @@ export async function getOrganizationRollup(minContacts = 2): Promise<{
       .sort()
       .pop() ?? null;
 
+    const registered = orgByDomain.get(domain);
     orgs.push({
       domain,
       contacts,
@@ -265,6 +280,11 @@ export async function getOrganizationRollup(minContacts = 2): Promise<{
       tagged_count, untagged_count,
       shared_classes:   [...shared],
       last_interaction_at: latest,
+      org_registered:   !!registered,
+      org_name:         registered?.name ?? null,
+      org_classes:      registered?.relationship_classes ?? [],
+      org_notion_id:    registered?.notion_id ?? null,
+      org_notes:        registered?.notes ?? null,
     });
   }
 

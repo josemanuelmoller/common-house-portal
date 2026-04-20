@@ -61,8 +61,21 @@ export default async function HallContactsPage() {
   // converted to the HallContactRow props shape so the existing editor
   // works inline inside each group.
   const orgsForClient = rollup.orgs.map(o => ({
-    ...o,
-    is_personal_domain: isPersonalDomain(o.domain),
+    domain:              o.domain,
+    contact_count:       o.contact_count,
+    meeting_sum:         o.meeting_sum,
+    email_sum:           o.email_sum,
+    transcript_sum:      o.transcript_sum,
+    vip_count:           o.vip_count,
+    tagged_count:        o.tagged_count,
+    untagged_count:      o.untagged_count,
+    shared_classes:      o.shared_classes,
+    last_interaction_at: o.last_interaction_at,
+    is_personal_domain:  isPersonalDomain(o.domain),
+    org_registered:      o.org_registered,
+    org_name:            o.org_name,
+    org_classes:         o.org_classes,
+    org_notion_id:       o.org_notion_id,
     contacts: o.contacts.map(c => ({
       email:                 c.email,
       display_name:          c.display_name,
