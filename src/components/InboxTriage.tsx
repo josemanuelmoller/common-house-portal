@@ -213,45 +213,54 @@ export function InboxTriage({ initialItems, initialScanned = 0 }: Props) {
             </div>
 
             <div className="flex items-center gap-2 shrink-0">
+              {/* Classification label — informational, not a CTA */}
               <span className={`text-[8.5px] font-bold px-2 py-0.5 rounded-full ${LABEL_STYLE[item.label]}`}>
                 {item.label}
               </span>
+
+              {/* PRIMARY ACTION — solid pill */}
+              <a
+                href={item.gmailUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[10px] font-bold text-white bg-[#131218] hover:bg-[#2a2938] transition-colors px-2.5 py-1 rounded-md whitespace-nowrap"
+              >
+                Open →
+              </a>
+
+              {/* SECONDARY — candidate creation, small icon-only */}
               {created.has(item.threadId) ? (
-                <span className="text-[9px] font-bold text-green-600">✓ Opp</span>
+                <span className="text-[10px] font-bold text-green-600 w-5 text-center" title="Candidate created">✓</span>
               ) : failed.has(item.threadId) ? (
                 <button
                   onClick={() => createCandidate(item)}
                   disabled={creating === item.threadId}
                   title="Failed — click to retry"
-                  className="text-[9px] font-bold text-red-500 hover:text-red-700 transition-colors disabled:opacity-40"
+                  className="text-[11px] font-bold text-red-500 hover:text-red-700 transition-colors disabled:opacity-40 w-5 text-center"
                 >
-                  {creating === item.threadId ? "…" : "Retry"}
+                  {creating === item.threadId ? "…" : "↻"}
                 </button>
               ) : (
                 <button
                   onClick={() => createCandidate(item)}
                   disabled={creating === item.threadId}
                   title="Create opportunity candidate from this email"
-                  className="text-[9px] font-bold text-amber-500 hover:text-amber-700 transition-colors disabled:opacity-40"
+                  aria-label="Create opportunity candidate"
+                  className="text-[12px] font-bold text-[#131218]/30 hover:text-amber-500 transition-colors disabled:opacity-40 w-5 text-center leading-none"
                 >
-                  {creating === item.threadId ? "…" : "+ Opp"}
+                  {creating === item.threadId ? "…" : "+"}
                 </button>
               )}
-              <a
-                href={item.gmailUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[9px] font-bold text-[#131218]/40 hover:text-[#131218] transition-colors uppercase tracking-widest"
-              >
-                Open →
-              </a>
+
+              {/* TERTIARY — quiet dismiss */}
               <button
                 onClick={() => ignoreItem(item)}
                 disabled={ignoring === item.threadId}
                 title="Ignore this thread — won't resurface"
-                className="text-[9px] font-bold text-[#131218]/25 hover:text-[#131218]/70 transition-colors uppercase tracking-widest disabled:opacity-40"
+                aria-label="Ignore"
+                className="text-[11px] text-[#131218]/25 hover:text-[#131218]/70 transition-colors disabled:opacity-40 w-5 text-center leading-none"
               >
-                {ignoring === item.threadId ? "…" : "Ignore"}
+                {ignoring === item.threadId ? "…" : "×"}
               </button>
             </div>
           </div>

@@ -544,7 +544,7 @@ export default async function AdminPage() {
           </p>
         </div>
 
-        <div className="px-8 py-6 space-y-6 max-w-7xl">
+        <div className="px-8 py-6 space-y-6 max-w-6xl mx-auto">
 
           {/* ── 1. Focus of the Day ───────────────────────────────────────── */}
           {focusRec ? (
@@ -704,7 +704,7 @@ export default async function AdminPage() {
 
             {/* Tile 1 — Portfolio */}
             <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-4 flex flex-col">
-              <p className="text-[9px] font-bold text-[#131218]/25 uppercase tracking-widest mb-1.5">Portfolio activo</p>
+              <p className="text-[9px] font-bold text-[#131218]/25 uppercase tracking-widest mb-1.5">Active portfolio</p>
               <div className="flex items-baseline gap-2.5">
                 <p className="text-[28px] font-[800] text-[#131218] tracking-tight leading-none">{projects.length}</p>
                 <span className="text-[10px] font-semibold text-[#131218]/40 leading-tight">
@@ -728,7 +728,7 @@ export default async function AdminPage() {
 
             {/* Tile 2 — Decisiones + updates */}
             <Link href="/admin/decisions" className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-4 hover:bg-[#EFEFEA]/40 transition-colors flex flex-col">
-              <p className="text-[9px] font-bold text-[#131218]/25 uppercase tracking-widest mb-1.5">Decisiones + updates</p>
+              <p className="text-[9px] font-bold text-[#131218]/25 uppercase tracking-widest mb-1.5">Decisions + updates</p>
               <div className="flex items-baseline gap-2.5">
                 <p className={`text-[28px] font-[800] tracking-tight leading-none ${openDecisions.length > 0 ? "text-amber-500" : "text-[#131218]/15"}`}>
                   {openDecisions.length}
@@ -752,7 +752,7 @@ export default async function AdminPage() {
 
             {/* Tile 3 — OS activo */}
             <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-4">
-              <p className="text-[9px] font-bold text-[#131218]/25 uppercase tracking-widest mb-2">OS activo</p>
+              <p className="text-[9px] font-bold text-[#131218]/25 uppercase tracking-widest mb-2">OS activity</p>
               <div className="space-y-1.5">
                 {[
                   { label: "Agent drafts",   count: agentDrafts.length,   activeColor: "text-[#131218]" },
@@ -951,106 +951,6 @@ export default async function AdminPage() {
                 </div>
               )}
 
-              {/* ── 8. Active Portfolio ───────────────────────────────────── */}
-              <div>
-                <SectionHeader label="Active portfolio" count={projects.length} />
-                <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-                  <div className="grid grid-cols-[2fr_1fr_80px_80px_80px_20px] px-5 py-2.5 border-b border-[#EFEFEA]">
-                    {["Project", "Stage", "Type", "Warmth", "Update", ""].map(h => (
-                      <div key={h} className="text-[9px] font-bold text-[#131218]/25 uppercase tracking-widest">{h}</div>
-                    ))}
-                  </div>
-                  <div className="divide-y divide-[#EFEFEA]">
-                    {projects.map(p => {
-                      const activityDate = [p.lastUpdate, p.lastEvidenceDate, p.lastMeetingDate].filter(Boolean).sort().pop() ?? null;
-                      const days    = daysSince(activityDate);
-                      const warmth  = warmthLabel(days);
-                      const typeLbl = projectTypeLabel(p.primaryWorkspace);
-                      const typeCls = projectTypeBadge(p.primaryWorkspace);
-                      return (
-                        <Link
-                          key={p.id}
-                          href={`/admin/projects/${p.id}`}
-                          className="grid grid-cols-[2fr_1fr_80px_80px_80px_20px] px-5 py-4 hover:bg-[#EFEFEA]/50 transition-colors group items-center"
-                        >
-                          <div className="min-w-0">
-                            <p className="text-[12px] font-semibold text-[#131218] truncate">{p.name}</p>
-                            {p.geography.length > 0 && (
-                              <p className="text-[10px] text-[#131218]/30 font-medium truncate mt-0.5">{p.geography.slice(0, 2).join(" · ")}</p>
-                            )}
-                          </div>
-                          <div>
-                            {p.stage ? (
-                              <span className={`inline-block text-[9px] font-bold px-2 py-0.5 rounded-full ${STAGE_COLORS[p.stage] ?? "bg-[#EFEFEA] text-[#131218]/50"}`}>
-                                {p.stage}
-                              </span>
-                            ) : <span className="text-[#131218]/15 text-xs">—</span>}
-                          </div>
-                          <div>
-                            {typeLbl !== "—" ? (
-                              <span className={`inline-block text-[9px] font-bold px-2 py-0.5 rounded-full ${typeCls}`}>{typeLbl}</span>
-                            ) : <span className="text-[#131218]/15 text-xs">—</span>}
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${warmth.dot}`} />
-                            <span className={`text-[10px] font-semibold ${warmth.text}`}>{warmth.label}</span>
-                          </div>
-                          <div>
-                            {p.lastUpdate ? (
-                              <p className="text-[10px] text-[#131218]/50 font-medium">
-                                {new Date(p.lastUpdate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
-                              </p>
-                            ) : <span className="text-[#131218]/15 text-xs">—</span>}
-                            {p.updateNeeded && <p className="text-[9px] font-bold text-amber-500 mt-0.5">! Update</p>}
-                            {p.blockerCount > 0 && <p className="text-[9px] font-bold text-red-500 mt-0.5">↯ Blocked</p>}
-                          </div>
-                          <div className="text-[#131218]/20 group-hover:text-[#131218]/60 transition-colors text-sm text-right">→</div>
-                        </Link>
-                      );
-                    })}
-                    {projects.length === 0 && (
-                      <div className="px-5 py-8 text-center">
-                        <p className="text-sm text-[#131218]/25 font-medium">No active projects</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* ── 9. Opportunities Explorer ─────────────────────────────── */}
-              {(filteredOpps.ch.length > 0 || filteredOpps.portfolio.length > 0) && (
-                <div>
-                  <SectionHeader label="Opportunities — explore" count={filteredOpps.ch.length + filteredOpps.portfolio.length} />
-                  <OpportunityExplorer ch={filteredOpps.ch} portfolio={filteredOpps.portfolio} />
-                </div>
-              )}
-
-              {/* ── 10. Ready to Publish ─────────────────────────────────── */}
-              {readyContent.length > 0 && (
-                <div>
-                  <SectionHeader label="Ready to publish" count={readyContent.length} />
-                  <div className="grid grid-cols-3 gap-3">
-                    {readyContent.map(c => (
-                      <a
-                        key={c.id}
-                        href={c.notionUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="bg-white rounded-xl border border-[#E0E0D8] px-4 py-3.5 hover:bg-[#EFEFEA]/50 transition-colors"
-                      >
-                        <p className="text-[9px] font-bold uppercase tracking-widest text-[#131218]/25 mb-1">
-                          {c.platform} · {c.contentType}
-                        </p>
-                        <p className="text-[12px] font-semibold text-[#131218] leading-snug">{c.title}</p>
-                        {c.publishWindow && (
-                          <p className="text-[10px] text-[#131218]/35 mt-1">Window: {c.publishWindow}</p>
-                        )}
-                      </a>
-                    ))}
-                  </div>
-                </div>
-              )}
-
             </div>
 
             {/* ── RIGHT COLUMN ──────────────────────────────────────────────── */}
@@ -1160,6 +1060,211 @@ export default async function AdminPage() {
 
             </div>
           </div>
+
+          {/* ── MONITORING STRIP ─────────────────────────────────────────────
+              Two-column grid ends above. Everything below is full-width so the
+              right rail never goes visually idle while the portfolio scrolls. */}
+
+          {/* ── 8. Active Portfolio — ranked + editorial summary ──────── */}
+          {(() => {
+            // Editorial summary counts — computed once so summary and rows agree.
+            const projBlocked  = projects.filter(p => p.blockerCount > 0);
+            const projUpdate   = projects.filter(p => p.blockerCount === 0 && p.updateNeeded);
+            const projStale    = projects.filter(p => {
+              const d = daysSince(bestActivity(p));
+              return p.blockerCount === 0 && !p.updateNeeded && d !== null && d > 30;
+            });
+            const projDormant  = projects.filter(p => {
+              const d = daysSince(bestActivity(p));
+              return p.blockerCount === 0 && !p.updateNeeded && d !== null && d > 60;
+            });
+            const projHealthy  = projects.length - projBlocked.length - projUpdate.length - projStale.length;
+
+            // Rank: blocked → update-needed → stale → healthy/warm → dormant
+            const rankOf = (p: typeof projects[number]): number => {
+              if (p.blockerCount > 0) return 0;
+              if (p.updateNeeded)     return 1;
+              const d = daysSince(bestActivity(p));
+              if (d !== null && d > 60) return 4;       // dormant last
+              if (d !== null && d > 30) return 2;       // stale
+              return 3;                                  // healthy
+            };
+            const ranked = [...projects].sort((a, b) => {
+              const ra = rankOf(a), rb = rankOf(b);
+              if (ra !== rb) return ra - rb;
+              // secondary: most recent activity first
+              const ad = new Date(bestActivity(a) ?? 0).getTime();
+              const bd = new Date(bestActivity(b) ?? 0).getTime();
+              return bd - ad;
+            });
+
+            return (
+              <div>
+                <SectionHeader label="Active portfolio" count={projects.length} />
+
+                {/* Editorial summary — read in 2 seconds */}
+                <div className="flex flex-wrap items-center gap-x-5 gap-y-1 mb-3 px-1 text-[11px]">
+                  {projBlocked.length > 0 && (
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
+                      <span className="font-bold text-red-500">{projBlocked.length} blocked</span>
+                    </span>
+                  )}
+                  {projUpdate.length > 0 && (
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                      <span className="font-bold text-amber-600">{projUpdate.length} need update</span>
+                    </span>
+                  )}
+                  {projStale.length > 0 && (
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-red-300" />
+                      <span className="text-[#131218]/60">{projStale.length} stale 30d+</span>
+                    </span>
+                  )}
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#c8f55a]" />
+                    <span className="text-[#131218]/55">{projHealthy} healthy</span>
+                  </span>
+                  {projDormant.length > 0 && (
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#131218]/20" />
+                      <span className="text-[#131218]/40">{projDormant.length} dormant</span>
+                    </span>
+                  )}
+                </div>
+
+                {/* Denser list — 4 columns, type baked into project cell */}
+                <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
+                  <div className="divide-y divide-[#EFEFEA]">
+                    {ranked.map(p => {
+                      const activityDate = bestActivity(p);
+                      const days    = daysSince(activityDate);
+                      const warmth  = warmthLabel(days);
+                      const typeLbl = projectTypeLabel(p.primaryWorkspace);
+                      const typeCls = projectTypeBadge(p.primaryWorkspace);
+                      const hasSignal = p.blockerCount > 0 || p.updateNeeded;
+                      return (
+                        <Link
+                          key={p.id}
+                          href={`/admin/projects/${p.id}`}
+                          className={`grid grid-cols-[minmax(0,2.2fr)_minmax(0,1fr)_110px_110px_24px] gap-3 px-5 py-3 hover:bg-[#EFEFEA]/50 transition-colors group items-center ${p.blockerCount > 0 ? "border-l-2 border-l-red-400" : p.updateNeeded ? "border-l-2 border-l-amber-300" : ""}`}
+                        >
+                          {/* Project name + inline type + geography */}
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <p className="text-[12px] font-semibold text-[#131218] truncate">{p.name}</p>
+                              {typeLbl !== "—" && (
+                                <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${typeCls}`}>{typeLbl}</span>
+                              )}
+                            </div>
+                            {p.geography.length > 0 && (
+                              <p className="text-[10px] text-[#131218]/30 font-medium truncate mt-0.5">{p.geography.slice(0, 2).join(" · ")}</p>
+                            )}
+                          </div>
+
+                          {/* Stage */}
+                          <div className="min-w-0">
+                            {p.stage ? (
+                              <span className={`inline-block text-[9px] font-bold px-2 py-0.5 rounded-full truncate max-w-full ${STAGE_COLORS[p.stage] ?? "bg-[#EFEFEA] text-[#131218]/50"}`}>
+                                {p.stage}
+                              </span>
+                            ) : <span className="text-[#131218]/15 text-xs">—</span>}
+                          </div>
+
+                          {/* Warmth */}
+                          <div className="flex items-center gap-1.5">
+                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${warmth.dot}`} />
+                            <span className={`text-[10px] font-semibold ${warmth.text}`}>{warmth.label}</span>
+                          </div>
+
+                          {/* Signal OR last-update date — never both empty */}
+                          <div className="text-right min-w-0">
+                            {hasSignal ? (
+                              <div className="flex flex-col items-end gap-0.5">
+                                {p.blockerCount > 0 && (
+                                  <span className="text-[9px] font-bold text-red-500">↯ Blocked</span>
+                                )}
+                                {p.updateNeeded && p.blockerCount === 0 && (
+                                  <span className="text-[9px] font-bold text-amber-500">! Update due</span>
+                                )}
+                              </div>
+                            ) : p.lastUpdate ? (
+                              <p className="text-[10px] text-[#131218]/50 font-medium">
+                                {new Date(p.lastUpdate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+                              </p>
+                            ) : days !== null ? (
+                              <p className="text-[10px] text-[#131218]/30 font-medium">{days}d silent</p>
+                            ) : (
+                              <span className="text-[#131218]/15 text-xs">—</span>
+                            )}
+                          </div>
+
+                          <div className="text-[#131218]/20 group-hover:text-[#131218]/60 transition-colors text-sm text-right">→</div>
+                        </Link>
+                      );
+                    })}
+                    {projects.length === 0 && (
+                      <div className="px-5 py-6 text-center">
+                        <p className="text-[11px] text-[#131218]/25 font-medium">No active projects</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* ── 9. Opportunities Explorer — low-profile footprint ──────── */}
+          {(filteredOpps.ch.length > 0 || filteredOpps.portfolio.length > 0) && (
+            <details className="group">
+              <summary className="list-none cursor-pointer flex items-center gap-3 px-1 py-2 hover:opacity-80 transition-opacity">
+                <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Opportunities — explore</p>
+                <span className="text-[9px] font-bold bg-[#131218]/6 text-[#131218]/40 px-1.5 py-0.5 rounded-full">
+                  {filteredOpps.ch.length + filteredOpps.portfolio.length}
+                </span>
+                <div className="flex-1 h-px bg-[#E0E0D8]" />
+                <span className="text-[9px] font-bold text-[#131218]/30 uppercase tracking-widest whitespace-nowrap group-open:hidden">
+                  Show →
+                </span>
+                <span className="text-[9px] font-bold text-[#131218]/30 uppercase tracking-widest whitespace-nowrap hidden group-open:inline">
+                  Hide ↑
+                </span>
+              </summary>
+              <div className="mt-2">
+                <p className="text-[10px] text-[#131218]/30 mb-2 px-1">
+                  Low-pressure exploration. Nothing requires action — flag anything that looks worth pursuing.
+                </p>
+                <OpportunityExplorer ch={filteredOpps.ch} portfolio={filteredOpps.portfolio} />
+              </div>
+            </details>
+          )}
+
+          {/* ── 10. Ready to Publish ─────────────────────────────────── */}
+          {readyContent.length > 0 && (
+            <div>
+              <SectionHeader label="Ready to publish" count={readyContent.length} />
+              <div className="grid grid-cols-3 gap-3">
+                {readyContent.map(c => (
+                  <a
+                    key={c.id}
+                    href={c.notionUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="bg-white rounded-xl border border-[#E0E0D8] px-4 py-3.5 hover:bg-[#EFEFEA]/50 transition-colors"
+                  >
+                    <p className="text-[9px] font-bold uppercase tracking-widest text-[#131218]/25 mb-1">
+                      {c.platform} · {c.contentType}
+                    </p>
+                    <p className="text-[12px] font-semibold text-[#131218] leading-snug">{c.title}</p>
+                    {c.publishWindow && (
+                      <p className="text-[10px] text-[#131218]/35 mt-1">Window: {c.publishWindow}</p>
+                    )}
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
 
         </div>
       </main>

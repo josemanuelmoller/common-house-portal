@@ -105,16 +105,20 @@ export function ReadyForJoseSection({
 
   if (allItems.length === 0) {
     return (
-      <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-4">
-        <p className="text-[11px] text-[#131218]/30">
-          No ready work yet — approve a draft or send one to Gmail to see it here.
+      <div className="flex items-center gap-3 bg-white/50 border border-dashed border-[#E0E0D8] rounded-xl px-4 py-2">
+        <span className="w-1.5 h-1.5 rounded-full bg-[#131218]/15 shrink-0" />
+        <p className="text-[11px] text-[#131218]/40 flex-1 min-w-0">
+          No prepared work yet — approve a draft or let an agent generate one.
         </p>
       </div>
     );
   }
 
+  // Responsive grid: 1 item → full-width single card, 2 → 2-col, 3+ → 3-col.
+  const cols = allItems.length === 1 ? "grid-cols-1" : allItems.length === 2 ? "grid-cols-2" : "grid-cols-3";
+
   return (
-    <div className="grid grid-cols-3 gap-3">
+    <div className={`grid gap-3 ${cols}`}>
       {allItems.slice(0, 6).map((item) => {
         const icon    = typeIcon(item.draftType);
         const state   = states[item.id] ?? "idle";
