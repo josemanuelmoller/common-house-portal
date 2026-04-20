@@ -299,14 +299,11 @@ export async function syncCalendarDelta(): Promise<CalendarSyncResult> {
       };
       if (stored && !nextPageToken) {
         req.syncToken = stored;
-      } else if (!stored && !nextPageToken) {
-        // Full sync — bound by a conservative window so the first run is
-        // cheap. After this we rely on delta for everything.
-        const now = new Date();
-        req.timeMin = new Date(now.getTime() - 2 * 24 * 3600_000).toISOString();
-        req.timeMax = new Date(now.getTime() + 14 * 24 * 3600_000).toISOString();
-        req.orderBy = "startTime";
       }
+      // NOTE: do NOT set timeMin / timeMax / orderBy on the first-page request.
+      // Google's Calendar API only returns `nextSyncToken` when none of those
+      // parameters are present — adding them blocks future delta calls. We
+      // filter the returned set in memory instead.
       const res = await cal.events.list(req);
       allEvents.push(...(res.data.items ?? []));
       nextPageToken = res.data.nextPageToken ?? undefined;
@@ -330,6 +327,13 @@ export async function syncCalendarDelta(): Promise<CalendarSyncResult> {
   // Normalize + filter. Keep cancelled events so we can decrement. Drop
   // events with no dateTime (all-day blocks) and events with no attendees
   // that were never in our store (no work to do).
+  // Window clamp: only observe events whose start is within [-2d, +14d] of
+  // now. Google delivers everything on full sync (we cannot restrict the
+  // request without losing syncToken) so the window is applied in memory.
+  const now = Date.now();
+  const windowStart = now - 2  * 24 * 3600_000;
+  const windowEnd   = now + 14 * 24 * 3600_000;
+
   const normalized: ObservedEvent[] = [];
   for (const raw of allEvents) {
     const ev = normalizeEvent(raw);
@@ -343,6 +347,9 @@ export async function syncCalendarDelta(): Promise<CalendarSyncResult> {
     const hasTime = /T\d{2}/.test(ev.event_start);
     if (!hasTime) continue;
     if (ev.attendees.length === 0) continue;                     // personal block, no attendees
+    const startMs = new Date(ev.event_start).getTime();
+    if (Number.isNaN(startMs)) continue;
+    if (startMs < windowStart || startMs > windowEnd) continue;
     normalized.push(ev);
   }
 
