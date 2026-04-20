@@ -246,6 +246,32 @@ export async function createContactFromEmail(
 }
 
 /**
+ * Promote a Google 'otherContact' (auto-saved from Gmail / Calendar invites)
+ * into the main address book so labels can be applied. Uses the native
+ * copyOtherContactToMyContactsGroup op, which preserves name + email and
+ * returns the new people/c… resourceName.
+ */
+export async function promoteOtherContact(
+  otherContactResourceName: string,
+): Promise<{ ok: true; resourceName: string } | { ok: false; reason: string }> {
+  try {
+    if (!otherContactResourceName.startsWith("otherContacts/")) {
+      return { ok: false, reason: "not_an_other_contact" };
+    }
+    const people = getPeopleClient();
+    if (!people) return { ok: false, reason: "no_google_auth" };
+    const res = await people.otherContacts.copyOtherContactToMyContactsGroup({
+      resourceName: otherContactResourceName,
+      requestBody:  { copyMask: "names,emailAddresses,phoneNumbers" },
+    });
+    if (!res.data.resourceName) return { ok: false, reason: "no_resource_name_returned" };
+    return { ok: true, resourceName: res.data.resourceName };
+  } catch (err) {
+    return { ok: false, reason: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/**
  * Multi-tag write: assigns EVERY provided label and removes any known
  * (LABEL_TO_CLASS) label not in the target set. Preserves unrelated
  * memberships (e.g. Jose's "Algramo" group).

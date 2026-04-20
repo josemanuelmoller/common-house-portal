@@ -21,6 +21,7 @@ import {
   CLASS_TO_LABEL,
   createContactFromEmail,
   lookupByEmails,
+  promoteOtherContact,
   setContactLabels,
 } from "@/lib/google-contacts";
 
@@ -133,34 +134,48 @@ async function doPOST(req: NextRequest) {
     }
   } catch { /* carry on — local write still happens */ }
 
-  // Auto-create the contact in Google if it's not there and the user is
-  // ASSIGNING classes (no point creating a blank contact when they are just
-  // clearing tags). Only fires when resourceName is null — otherContacts
-  // already has a read-only resourceName so this is skipped for them.
-  let googleSyncOutcome: "synced" | "not_in_google" | "read_only" | "created" | "skipped" | "failed" = "skipped";
+  // Three paths for Google Contacts write, depending on where the attendee
+  // currently lives:
+  //   A) not in Google at all           → create in myContacts, then tag
+  //   B) in Google's 'Other contacts'   → promote to myContacts, then tag
+  //                                        (old behaviour refused to tag)
+  //   C) already in myContacts          → just tag
+  // Clearing tags on an absent or otherContact record is a no-op — we do not
+  // materialise empty contacts or promote just to untag.
+  let googleSyncOutcome:
+    | "synced" | "created" | "promoted" | "not_in_google" | "read_only" | "skipped" | "failed"
+    = "skipped";
   let googleError: string | undefined;
 
   if (!resourceName && classes.length > 0) {
+    // Path A
     const created = await createContactFromEmail(email, displayNameCached);
-    if (created.ok) {
-      resourceName   = created.resourceName;
-      googleSyncOutcome = "created"; // will flip to "synced" once labels are set below
-    } else {
-      googleError    = created.reason;
-      googleSyncOutcome = "failed";
-    }
+    if (created.ok) { resourceName = created.resourceName; googleSyncOutcome = "created"; }
+    else { googleError = created.reason; googleSyncOutcome = "failed"; }
+  } else if (resourceName?.startsWith("otherContacts/") && classes.length > 0) {
+    // Path B — promote, then use the new people/c… resourceName
+    const promoted = await promoteOtherContact(resourceName);
+    if (promoted.ok) { resourceName = promoted.resourceName; googleSyncOutcome = "promoted"; }
+    else { googleError = promoted.reason; googleSyncOutcome = "failed"; }
   }
 
-  if (resourceName) {
+  if (resourceName && !resourceName.startsWith("otherContacts/")) {
+    // Path A/B end, or path C
     const targetLabels = classes
       .map(c => CLASS_TO_LABEL[c as keyof typeof CLASS_TO_LABEL])
       .filter((l): l is string => !!l);
     const res = await setContactLabels(resourceName, targetLabels);
-    if (res.ok) googleSyncOutcome = "synced";
-    else if (res.reason === "read_only_other_contact") googleSyncOutcome = "read_only";
-    else { googleSyncOutcome = "failed"; googleError = res.reason; }
-  } else if (googleSyncOutcome !== "failed") {
-    googleSyncOutcome = "not_in_google";
+    if (res.ok) {
+      // Keep 'created' / 'promoted' — more informative than generic 'synced'
+      if (googleSyncOutcome !== "created" && googleSyncOutcome !== "promoted") {
+        googleSyncOutcome = "synced";
+      }
+    } else {
+      googleSyncOutcome = "failed";
+      googleError = res.reason;
+    }
+  } else if (googleSyncOutcome !== "failed" && googleSyncOutcome !== "created" && googleSyncOutcome !== "promoted") {
+    googleSyncOutcome = resourceName?.startsWith("otherContacts/") ? "read_only" : "not_in_google";
   }
 
   try {

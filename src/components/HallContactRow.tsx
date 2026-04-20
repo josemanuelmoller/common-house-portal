@@ -124,7 +124,11 @@ export function HallContactRow(props: Props) {
           {props.last_meeting_title && ` · "${props.last_meeting_title.slice(0, 60)}${props.last_meeting_title.length > 60 ? "…" : ""}"`}
         </p>
         <div className="flex items-center gap-2 mt-1">
-          {props.google_resource_name ? (
+          {props.google_resource_name?.startsWith("otherContacts/") ? (
+            <span className="text-[9px] font-semibold text-[#131218]/50">
+              Auto-saved by Google — will be promoted when you tag
+            </span>
+          ) : props.google_resource_name ? (
             <span className="text-[9px] font-semibold text-[#131218]/50">
               ✓ in Google Contacts
               {props.google_last_write_at && <span className="text-[#131218]/30"> · synced {timeAgo(props.google_last_write_at)}</span>}
@@ -137,19 +141,14 @@ export function HallContactRow(props: Props) {
           {googleSync === "created" && (
             <span className="text-[9px] font-bold text-green-700">✓ Created in Google</span>
           )}
+          {googleSync === "promoted" && (
+            <span className="text-[9px] font-bold text-green-700">✓ Promoted to Contacts</span>
+          )}
           {googleSync === "synced" && (
             <span className="text-[9px] font-bold text-green-700">✓ Google updated</span>
           )}
           {googleSync === "not_in_google" && (
             <span className="text-[9px] font-bold text-amber-700">local only</span>
-          )}
-          {googleSync === "read_only" && (
-            <span
-              className="text-[9px] font-bold text-amber-700"
-              title="This contact lives in Google's 'Other contacts' (auto-saved). Open the contact in Google Contacts → Save contact → then re-tag here to sync the label."
-            >
-              read-only in Google
-            </span>
           )}
           {googleSync === "failed" && (
             <span className="text-[9px] font-bold text-red-600">Google sync failed</span>
