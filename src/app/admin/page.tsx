@@ -788,13 +788,12 @@ export default async function AdminPage() {
 
           {/* ── 4b. Suggested Time Blocks — when to execute ─────────────── */}
           <div>
-            <SectionHeader label="Suggested time blocks" />
+            <div className="flex items-center gap-3 mb-3">
+              <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Suggested time blocks</p>
+              <div className="flex-1 h-px bg-[#E0E0D8]" />
+              <HallManualTriggers />
+            </div>
             <SuggestedTimeBlocks />
-          </div>
-
-          {/* ── 4c. Manual refresh triggers ─────────────────────────────── */}
-          <div>
-            <HallManualTriggers />
           </div>
 
           {/* ── 4c. Inbox only on the left; drafts moved into CoS ─── */}
