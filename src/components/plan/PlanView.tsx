@@ -209,17 +209,17 @@ function RevenueStrip({ summaries, currentQuarter }: { summaries: QuarterRevenue
         return (
           <div
             key={s.quarter ?? "annual"}
-            className={`bg-white border rounded-2xl p-5 flex flex-col min-h-[200px] ${
+            className={`bg-white border rounded-2xl px-4 py-3.5 flex flex-col min-h-[128px] ${
               isCurrent ? "border-[#131218] border-2" : "border-[#E0E0D8]"
             }`}
           >
-            <div className="text-[8px] font-bold tracking-[2px] uppercase text-[#131218]/50 mb-3.5">
+            <div className="text-[8px] font-bold tracking-[2px] uppercase text-[#131218]/50 mb-2">
               Q{s.quarter} 2026{isCurrent ? " — en curso" : ""}
             </div>
-            <div className="text-[2.1rem] font-black tracking-[-1.2px] leading-none text-[#131218]">
+            <div className="text-[1.55rem] font-black tracking-[-0.8px] leading-none text-[#131218]">
               {fmtCurrency(paid || target)}
             </div>
-            <div className="text-[10.5px] font-medium text-[#131218]/50 mt-2">
+            <div className="text-[10px] font-medium text-[#131218]/50 mt-1">
               de {fmtCurrency(target)}
               {paid > 0 ? ` · ${progress}%` : " · target"}
             </div>
@@ -248,14 +248,14 @@ function AnnualAdjustedCell({ summaries }: { summaries: QuarterRevenueSummary[] 
   const diff = origTotal - adjTotal;
 
   return (
-    <div className="bg-white border border-[#E0E0D8] rounded-2xl p-5 flex flex-col min-h-[200px]">
-      <div className="text-[8px] font-bold tracking-[2px] uppercase text-[#131218]/50 mb-3.5">
+    <div className="bg-white border border-[#E0E0D8] rounded-2xl px-4 py-3.5 flex flex-col min-h-[128px]">
+      <div className="text-[8px] font-bold tracking-[2px] uppercase text-[#131218]/50 mb-2">
         Anual 2026
       </div>
-      <div className="text-[2.1rem] font-black tracking-[-1.2px] leading-none text-[#131218]">
+      <div className="text-[1.55rem] font-black tracking-[-0.8px] leading-none text-[#131218]">
         {fmtCurrency(adjTotal)}
       </div>
-      <div className="text-[10.5px] font-medium text-[#131218]/50 mt-2">
+      <div className="text-[10px] font-medium text-[#131218]/50 mt-1">
         {diff > 0 ? `original ${fmtCurrency(origTotal)}` : `target · cerrado ${fmtCurrency(paidTotal)}`}
       </div>
       <div className="h-1 bg-[#EFEFEA] rounded mt-auto overflow-hidden">
