@@ -46,6 +46,7 @@ import { ADMIN_NAV } from "@/lib/admin-nav";
 import { requireAdmin } from "@/lib/require-admin";
 import { TriggerBriefingButton } from "@/components/TriggerBriefingButton";
 import { ReadyForJoseSection } from "@/components/ReadyForJoseSection";
+import { SuggestedTimeBlocks } from "@/components/SuggestedTimeBlocks";
 
 export { ADMIN_NAV as NAV } from "@/lib/admin-nav";
 export const dynamic = "force-dynamic";
@@ -777,6 +778,12 @@ export default async function AdminPage() {
               <AgentQueueSection drafts={agentDrafts} />
             </div>
           )}
+
+          {/* ── 4b. Suggested Time Blocks — when to execute ─────────────── */}
+          <div>
+            <SectionHeader label="Suggested time blocks" />
+            <SuggestedTimeBlocks />
+          </div>
 
           {/* ── 4c. Ready for Jose — prepared work already done ───────────── */}
           <div>

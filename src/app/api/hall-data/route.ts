@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { notion, DB } from "@/lib/notion"
-import { createClient } from "@supabase/supabase-js"
+import { getSupabaseServerClient } from "@/lib/supabase-server"
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyPage = any
@@ -63,34 +63,51 @@ export async function OPTIONS() {
 
 export async function GET() {
   try {
-    // Run all Notion queries in parallel
+    // Run each Notion query in isolation — one failing DB must not blank out the
+    // whole Hall dashboard. Errors are surfaced in the response as `sourceErrors`
+    // so the frontend can degrade gracefully and server logs pinpoint the culprit.
+    const sourceErrors: Record<string, string> = {}
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    async function safeQuery(name: string, args: any): Promise<{ results: AnyPage[]; has_more: boolean }> {
+      try {
+        const res = await notion.databases.query(args)
+        return { results: res.results as AnyPage[], has_more: res.has_more ?? false }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        sourceErrors[name] = msg
+        console.error(`[hall-data] ${name} query failed:`, msg)
+        return { results: [], has_more: false }
+      }
+    }
+
     const [projectsRes, decisionsRes, contentRes, agentDraftsRes, evidenceRes] = await Promise.all([
-      notion.databases.query({
+      safeQuery("projects", {
         database_id: DB.projects,
         filter: { property: "Project Status", select: { equals: "Active" } },
         sorts: [{ property: "Last Status Update", direction: "descending" }],
         page_size: 20,
       }),
-      notion.databases.query({
+      safeQuery("decisions", {
         database_id: DB.decisions,
         filter: { property: "Status", select: { equals: "Open" } },
         sorts: [{ property: "Priority", direction: "ascending" }],
         page_size: 10,
       }),
-      notion.databases.query({
+      safeQuery("contentPipeline", {
         database_id: DB.contentPipeline,
         filter: { property: "Status", select: { equals: "In Review" } },
         page_size: 5,
       }),
-      notion.databases.query({
+      safeQuery("agentDrafts", {
         database_id: DB.agentDrafts,
         filter: { property: "Status", select: { equals: "Pending Review" } },
         page_size: 5,
       }),
-      notion.databases.query({
+      safeQuery("evidence", {
         database_id: DB.evidence,
         filter: { property: "Validation Status", select: { equals: "New" } },
-        page_size: 1, // we only need the count
+        page_size: 1,
       }),
     ])
 
@@ -159,20 +176,22 @@ export async function GET() {
       pendingBreakdown: pendingParts.join(" · ") || "Todo al día",
     }
 
-    // Agent pulse from Supabase (agent_runs table)
+    // Agent pulse from Supabase (agent_runs table). Uses server helper which
+    // falls back from SUPABASE_SERVICE_KEY to SUPABASE_ANON_KEY when service key
+    // is absent — agent_runs is RLS-readable by anon, so the fallback is valid.
     let agentPulse: { agent: string; status: string; timeAgo: string }[] = []
     try {
-      const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_KEY!
-      )
-      const { data } = await supabase
+      const supabase = getSupabaseServerClient()
+      const { data, error } = await supabase
         .from("agent_runs")
         .select("agent_name, status, created_at")
         .order("created_at", { ascending: false })
         .limit(100)
 
-      if (data) {
+      if (error) {
+        sourceErrors.agentPulse = error.message
+        console.error("[hall-data] agent_runs query failed:", error.message)
+      } else if (data) {
         const seen = new Set<string>()
         agentPulse = data
           .filter(row => {
@@ -187,8 +206,10 @@ export async function GET() {
             timeAgo: timeAgo(row.created_at as string),
           }))
       }
-    } catch {
-      // Supabase unavailable — agentPulse stays empty, UI keeps static data
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      sourceErrors.agentPulse = msg
+      console.error("[hall-data] supabase client unavailable:", msg)
     }
 
     return NextResponse.json(
@@ -201,13 +222,14 @@ export async function GET() {
         agentPulse,
         stats,
         fetchedAt: new Date().toISOString(),
+        ...(Object.keys(sourceErrors).length ? { sourceErrors } : {}),
       },
       { headers: corsHeaders() }
     )
   } catch (err) {
-    console.error("[hall-data] error:", err)
+    console.error("[hall-data] unexpected error:", err)
     return NextResponse.json(
-      { error: "Failed to fetch hall data" },
+      { error: "Failed to fetch hall data", detail: err instanceof Error ? err.message : String(err) },
       { status: 500, headers: corsHeaders() }
     )
   }

@@ -1,0 +1,287 @@
+/**
+ * time-block-candidates.ts
+ * Layer B of Suggested Time Blocks — Work Candidate Engine.
+ *
+ * Produces a ranked list of specific, actionable candidates from:
+ *   - loops           (Supabase)
+ *   - opportunities   (Supabase)
+ *   - upcoming meetings (Google Calendar) — for prep + follow-up candidates
+ *
+ * Each candidate carries enough context for the matcher to assign it to a slot:
+ *   title, entity ref, estimated duration, task_type, urgency_score,
+ *   why_now, expected_outcome, optional hard time constraint.
+ */
+
+import { getSupabaseServerClient } from "./supabase-server";
+import type { UpcomingMeeting } from "./calendar-slots";
+
+export type TaskType = "deep_work" | "follow_up" | "prep" | "decision" | "admin";
+
+export type Candidate = {
+  /** Specific action sentence. Not vague. */
+  title: string;
+  entity_type: "loop" | "opportunity" | "project" | "meeting_prep" | "meeting_follow_up";
+  entity_id: string;
+  entity_label: string;
+  duration_min: number;
+  task_type: TaskType;
+  urgency_score: number;      // 0-100
+  confidence_score: number;   // 0-100 — how confident we are the title is real and specific
+  why_now: string;
+  expected_outcome: string;
+  /** Stable de-dup key. */
+  fingerprint: string;
+  /** If set, the assigned slot must satisfy this window. Used for prep/follow-up. */
+  hard_time_constraint?: { kind: "before" | "after"; reference: Date; withinMs: number };
+};
+
+// ─── Loops → Candidates ──────────────────────────────────────────────────────
+
+type LoopRow = {
+  id: string;
+  title: string;
+  loop_type: string;
+  status: string;
+  priority_score: number;
+  founder_owned: boolean;
+  due_at: string | null;
+  linked_entity_type: string;
+  linked_entity_id: string;
+  linked_entity_name: string;
+  review_url: string | null;
+  intervention_moment: string;
+};
+
+function loopDuration(loopType: string): number {
+  switch (loopType) {
+    case "blocker":     return 60;
+    case "decision":    return 45;
+    case "review":      return 60;
+    case "prep":        return 45;
+    case "commitment":  return 60;
+    case "follow_up":   return 30;
+    default:            return 45;
+  }
+}
+
+function loopTaskType(loopType: string): TaskType {
+  switch (loopType) {
+    case "blocker":     return "deep_work";
+    case "decision":    return "decision";
+    case "review":      return "deep_work";
+    case "prep":        return "prep";
+    case "commitment":  return "deep_work";
+    case "follow_up":   return "follow_up";
+    default:            return "admin";
+  }
+}
+
+function loopWhyNow(l: LoopRow, dueSoonDays: number | null): string {
+  const reasons: string[] = [];
+  if (l.intervention_moment === "urgent") reasons.push("Marked urgent");
+  if (l.founder_owned) reasons.push("You own this directly");
+  if (dueSoonDays !== null && dueSoonDays <= 0) reasons.push("Past due");
+  else if (dueSoonDays !== null && dueSoonDays <= 2) reasons.push(`Due in ${dueSoonDays} day${dueSoonDays === 1 ? "" : "s"}`);
+  else if (dueSoonDays !== null && dueSoonDays <= 7) reasons.push("Due this week");
+  if (l.loop_type === "blocker")  reasons.push(`Unblocks ${l.linked_entity_name}`);
+  if (l.loop_type === "decision") reasons.push(`${l.linked_entity_name} waiting on the call`);
+  if (reasons.length === 0) reasons.push(`Top-scored loop (priority ${l.priority_score}/100)`);
+  return reasons.slice(0, 2).join(" · ") + ".";
+}
+
+function loopExpectedOutcome(l: LoopRow): string {
+  switch (l.loop_type) {
+    case "blocker":    return `${l.linked_entity_name}: unblocked next step decided and written down.`;
+    case "decision":   return `Decision recorded in Notion and communicated to ${l.linked_entity_name}.`;
+    case "review":     return `Document reviewed; approve / changes / reject recorded.`;
+    case "prep":       return `Meeting prep brief drafted: agenda + open questions + desired outcome.`;
+    case "commitment": return `Committed deliverable sent to ${l.linked_entity_name}.`;
+    case "follow_up":  return `Reply sent on the ${l.linked_entity_name} thread.`;
+    default:           return `Loop closed in Notion with a concrete next step.`;
+  }
+}
+
+function loopTitle(l: LoopRow): string {
+  // The loop title is already specific for most loop_types. Prefix with a verb
+  // where it clarifies intent.
+  const t = l.title.trim();
+  switch (l.loop_type) {
+    case "blocker":    return t.startsWith("Blocker") ? t : `Unblock — ${t}`;
+    case "decision":   return t.startsWith("Decide")  || t.startsWith("Decision") ? t : `Decide — ${t}`;
+    case "review":     return t.startsWith("Review")  ? t : `Review — ${t}`;
+    case "prep":       return t.startsWith("Prep")    ? t : `Prep — ${t}`;
+    case "commitment": return t.startsWith("Deliver") ? t : `Deliver — ${t}`;
+    case "follow_up":  return t.startsWith("Reply")   || t.startsWith("Follow") ? t : `Follow up — ${t}`;
+    default:           return t;
+  }
+}
+
+export async function candidatesFromLoops(limit = 20): Promise<Candidate[]> {
+  const sb = getSupabaseServerClient();
+  const { data, error } = await sb
+    .from("loops")
+    .select("id,title,loop_type,status,priority_score,founder_owned,due_at,linked_entity_type,linked_entity_id,linked_entity_name,review_url,intervention_moment")
+    .in("status", ["open", "in_progress", "reopened"])
+    .order("priority_score", { ascending: false, nullsFirst: false })
+    .limit(limit);
+  if (error || !data) return [];
+  const now = Date.now();
+  const out: Candidate[] = [];
+  for (const l of data as LoopRow[]) {
+    // Titles that are clearly non-specific get filtered out.
+    if (!l.title || l.title.trim().length < 6) continue;
+
+    const dueSoonDays = l.due_at
+      ? Math.floor((new Date(l.due_at).getTime() - now) / 86_400_000)
+      : null;
+    const urgencyBoost =
+      (l.intervention_moment === "urgent" ? 15 : 0) +
+      (dueSoonDays !== null && dueSoonDays <= 0 ? 20 : 0) +
+      (dueSoonDays !== null && dueSoonDays <= 2 ? 10 : 0);
+    const urgency = Math.min(100, l.priority_score + urgencyBoost);
+
+    out.push({
+      title:            loopTitle(l),
+      entity_type:      "loop",
+      entity_id:        l.id,
+      entity_label:     l.linked_entity_name,
+      duration_min:     loopDuration(l.loop_type),
+      task_type:        loopTaskType(l.loop_type),
+      urgency_score:    urgency,
+      confidence_score: l.priority_score >= 60 ? 85 : 70,
+      why_now:          loopWhyNow(l, dueSoonDays),
+      expected_outcome: loopExpectedOutcome(l),
+      fingerprint:      `loop:${l.id}:${loopTaskType(l.loop_type)}`,
+    });
+  }
+  return out;
+}
+
+// ─── Opportunities → Candidates ──────────────────────────────────────────────
+
+type OppRow = {
+  notion_id: string;
+  title: string;
+  org_name: string | null;
+  suggested_next_step: string | null;
+  opportunity_score: number | null;
+  follow_up_status: string | null;
+  qualification_status: string | null;
+  status: string | null;
+};
+
+export async function candidatesFromOpportunities(
+  coveredByLoop: Set<string>,
+  limit = 15,
+): Promise<Candidate[]> {
+  const sb = getSupabaseServerClient();
+  const { data, error } = await sb
+    .from("opportunities")
+    .select("notion_id,title,org_name,suggested_next_step,opportunity_score,follow_up_status,qualification_status,status")
+    .eq("is_legacy",   false)
+    .eq("is_archived", false)
+    .eq("is_active",   true)
+    .gte("opportunity_score", 60)
+    .order("opportunity_score", { ascending: false, nullsFirst: false })
+    .limit(limit);
+  if (error || !data) return [];
+
+  const out: Candidate[] = [];
+  for (const o of data as OppRow[]) {
+    if (coveredByLoop.has(o.notion_id)) continue;
+    const step = (o.suggested_next_step ?? "").trim();
+    if (!step || step.length < 12) continue;                 // require specificity
+
+    const urgency = Math.min(100, (o.opportunity_score ?? 0) + (o.follow_up_status === "Needed" ? 15 : 0));
+
+    out.push({
+      title:            `${step.replace(/\.$/, "")} — ${o.org_name ?? o.title}`,
+      entity_type:      "opportunity",
+      entity_id:        o.notion_id,
+      entity_label:     o.org_name ?? o.title,
+      duration_min:     step.length > 80 ? 60 : 45,
+      task_type:        "deep_work",
+      urgency_score:    urgency,
+      confidence_score: 75,
+      why_now:          `Active opportunity (score ${o.opportunity_score ?? "—"}/100)${o.follow_up_status === "Needed" ? " · follow-up flagged" : ""}.`,
+      expected_outcome: `Next step executed: ${step.length > 140 ? step.slice(0, 140) + "…" : step}`,
+      fingerprint:      `opportunity:${o.notion_id}:deep_work`,
+    });
+  }
+  return out;
+}
+
+// ─── Meetings → Prep + Follow-up Candidates ─────────────────────────────────
+
+export function candidatesFromMeetings(
+  meetings: UpcomingMeeting[],
+  now: Date,
+): Candidate[] {
+  const out: Candidate[] = [];
+  for (const m of meetings) {
+    const msUntil = m.start.getTime() - now.getTime();
+    const daysUntil = msUntil / 86_400_000;
+    if (msUntil <= 0) continue;                                // only upcoming
+    if (daysUntil > 7) continue;
+
+    // Prep candidate: needed if meeting is in next 3 days and has attendees
+    if (daysUntil <= 3) {
+      out.push({
+        title:            `Prep for "${m.title}"`,
+        entity_type:      "meeting_prep",
+        entity_id:        m.id,
+        entity_label:     m.title,
+        duration_min:     45,
+        task_type:        "prep",
+        urgency_score:    daysUntil <= 1 ? 85 : 70,
+        confidence_score: 80,
+        why_now:          `Meeting ${new Intl.DateTimeFormat("en-GB", { timeZone: "America/Costa_Rica", weekday: "short", hour: "2-digit", minute: "2-digit", hour12: false }).format(m.start)} with ${m.attendeeCount} attendee${m.attendeeCount === 1 ? "" : "s"} — no prep captured yet.`,
+        expected_outcome: `Agenda + 3 desired outcomes + open questions written into the meeting notes.`,
+        fingerprint:      `meeting_prep:${m.id}:prep`,
+        hard_time_constraint: { kind: "before", reference: m.start, withinMs: 24 * 3600_000 },
+      });
+    }
+  }
+  return out;
+}
+
+export function candidatesFromRecentMeetings(
+  recentMeetings: UpcomingMeeting[],
+  now: Date,
+): Candidate[] {
+  // "recent" = ended in the last 24 hours
+  const out: Candidate[] = [];
+  for (const m of recentMeetings) {
+    const endedAgoMs = now.getTime() - m.end.getTime();
+    if (endedAgoMs < 0 || endedAgoMs > 24 * 3600_000) continue;
+    out.push({
+      title:            `Follow up on "${m.title}"`,
+      entity_type:      "meeting_follow_up",
+      entity_id:        m.id,
+      entity_label:     m.title,
+      duration_min:     30,
+      task_type:        "follow_up",
+      urgency_score:    80,
+      confidence_score: 70,
+      why_now:          `Meeting ended ${Math.round(endedAgoMs / 3600_000)}h ago — follow-up decays fast.`,
+      expected_outcome: `Action items confirmed; one follow-up email sent to ${m.attendeeCount} attendee${m.attendeeCount === 1 ? "" : "s"}.`,
+      fingerprint:      `meeting_follow_up:${m.id}:follow_up`,
+      hard_time_constraint: { kind: "after", reference: m.end, withinMs: 48 * 3600_000 },
+    });
+  }
+  return out;
+}
+
+/** Entity ids covered by existing loops so opportunities don't duplicate. */
+export async function loopCoveredEntityIds(): Promise<Set<string>> {
+  const sb = getSupabaseServerClient();
+  const { data } = await sb
+    .from("loops")
+    .select("linked_entity_id,linked_entity_type,status")
+    .in("status", ["open", "in_progress", "reopened"]);
+  const out = new Set<string>();
+  for (const r of (data ?? []) as { linked_entity_id: string }[]) {
+    if (r.linked_entity_id) out.add(r.linked_entity_id);
+  }
+  return out;
+}

@@ -108,8 +108,11 @@ interface AgentRunRow {
 }
 
 async function getAgentRunData(): Promise<AgentRunRow[]> {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_KEY;
+  // agent_latest_runs is a low-privilege read view; service key not required.
+  // Prefer service key if present (bypasses RLS), fall back to anon key which
+  // relies on the view's published RLS policy.
+  const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_KEY ?? process.env.SUPABASE_ANON_KEY;
   if (!url || !key) return [];
 
   try {
