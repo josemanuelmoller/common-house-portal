@@ -85,12 +85,19 @@ interface FirefliesTranscript {
   } | null;
 }
 
+class FirefliesError extends Error {
+  constructor(message: string, public readonly detail: unknown) { super(message); }
+}
+
 async function getTranscripts(fromDate: string, toDate: string): Promise<FirefliesTranscript[]> {
   const apiKey = process.env.FIREFLIES_API_KEY;
-  if (!apiKey) return [];
+  if (!apiKey) throw new FirefliesError("FIREFLIES_API_KEY missing", null);
 
+  // Fireflies expects DateTime (ISO-8601), not String. Declaring the
+  // variables as String makes Fireflies reject the query with
+  // GRAPHQL_VALIDATION_FAILED and the prior catch-all silently returned [].
   const query = `
-    query GetTranscripts($fromDate: String, $toDate: String) {
+    query GetTranscripts($fromDate: DateTime, $toDate: DateTime) {
       transcripts(fromDate: $fromDate, toDate: $toDate) {
         id
         title
@@ -105,21 +112,22 @@ async function getTranscripts(fromDate: string, toDate: string): Promise<Firefli
     }
   `;
 
-  try {
-    const res = await fetch(FIREFLIES_API, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({ query, variables: { fromDate, toDate } }),
-    });
-    if (!res.ok) return [];
-    const json = await res.json();
-    return json?.data?.transcripts ?? [];
-  } catch {
-    return [];
+  const res = await fetch(FIREFLIES_API, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({ query, variables: { fromDate, toDate } }),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok || json?.errors) {
+    throw new FirefliesError(
+      `Fireflies API error (HTTP ${res.status})`,
+      json?.errors ?? json ?? { http_status: res.status },
+    );
   }
+  return json?.data?.transcripts ?? [];
 }
 
 // ─── Project matching ─────────────────────────────────────────────────────────
@@ -219,8 +227,12 @@ export async function POST(req: NextRequest) {
     if (typeof body?.days === "number" && body.days > 0) days = body.days;
   } catch { /* no body */ }
 
-  const toDate   = new Date().toISOString().slice(0, 10);
-  const fromDate = new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
+  // Fireflies expects DateTime (full ISO 8601). Notion's date filter wants
+  // YYYY-MM-DD. Keep them as separate strings.
+  const now = new Date();
+  const fromIso       = new Date(now.getTime() - days * 86_400_000).toISOString();
+  const toIso         = now.toISOString();
+  const fromDateOnly  = fromIso.slice(0, 10);
 
   // ── 1. Load active projects ──────────────────────────────────────────────────
   let projects: ProjectRecord[] = [];
@@ -241,7 +253,20 @@ export async function POST(req: NextRequest) {
   }
 
   // ── 2. Fetch transcripts from Fireflies ─────────────────────────────────────
-  const transcripts = await getTranscripts(fromDate, toDate);
+  let transcripts: FirefliesTranscript[];
+  try {
+    transcripts = await getTranscripts(fromIso, toIso);
+  } catch (err) {
+    const e = err as FirefliesError;
+    // Surface the real cause to the UI instead of silent 0.
+    return NextResponse.json({
+      ok: false,
+      error: "fireflies_api_error",
+      message: e.message,
+      detail: e.detail,
+      mode: days === 1 ? "delta" : `backfill-${days}d`,
+    }, { status: 502 });
+  }
 
   if (transcripts.length === 0) {
     return NextResponse.json({
@@ -251,7 +276,7 @@ export async function POST(req: NextRequest) {
   }
 
   // ── 3. Pre-load existing Source URLs to prevent duplicates ──────────────────
-  const alreadyIngested = await getExistingSourceUrls(fromDate);
+  const alreadyIngested = await getExistingSourceUrls(fromDateOnly);
 
   // ── 4. Match transcripts to projects ────────────────────────────────────────
   const latestByProject = new Map<string, string>();                              // projectId → date
@@ -347,8 +372,8 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({
     ok: true,
     mode:             days === 1 ? "delta" : `backfill-${days}d`,
-    fromDate,
-    toDate,
+    fromDate:         fromIso,
+    toDate:           toIso,
     transcripts:      transcripts.length,
     matched:          latestByProject.size,
     projects_updated: projectsUpdated,

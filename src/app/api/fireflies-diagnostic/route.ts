@@ -50,7 +50,7 @@ export async function GET(req: NextRequest) {
 
   // Probe 2: transcripts query (same shape the sync uses)
   const listQuery = `
-    query List($fromDate: String, $toDate: String) {
+    query List($fromDate: DateTime, $toDate: DateTime) {
       transcripts(fromDate: $fromDate, toDate: $toDate, limit: 50) {
         id title date meeting_link
       }
