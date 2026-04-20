@@ -53,7 +53,8 @@ export default async function HallContactsPage() {
       return new Date(b.last_seen_at).getTime() - new Date(a.last_seen_at).getTime();
     });
   const PERSONAL = new Set(["Family", "Personal Service", "Friend"]);
-  const VIP      = new Set(["VIP", "Investor", "Funder", "Portfolio"]);
+  // VIP boost is explicit-only: only the 'VIP' tag activates the boost.
+  const VIP      = new Set(["VIP"]);
   const personal = classified.filter(c => (c.relationship_classes ?? []).some(x => PERSONAL.has(x)));
   const vip      = classified.filter(c => (c.relationship_classes ?? []).some(x => VIP.has(x)));
 
@@ -104,7 +105,8 @@ export default async function HallContactsPage() {
               <strong className="text-[#131218]">How it works.</strong>{" "}
               When all non-you attendees are classified Family / Personal Service / Friend,
               the meeting stays on your calendar for slot planning but no prep / follow-up
-              task is emitted. Investor / Funder / Portfolio attendees boost prep urgency.
+              task is emitted. Only the <strong>VIP</strong> tag boosts prep urgency —
+              add it on top of any role (Client, Investor, Partner, …) to mark a decision-maker.
               Unclassified attendees default to "unknown" — prep still emitted (fail-open).
             </p>
           </div>

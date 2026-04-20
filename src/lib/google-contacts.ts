@@ -38,6 +38,7 @@ export const LABEL_TO_CLASS: Readonly<Record<string, string>> = {
   "VIP":               "VIP",
   "Investor":          "Investor",
   "Funder":            "Funder",
+  "Client":            "Client",
   "Partner":           "Partner",
   "Vendor":            "Vendor",
   "External":          "External",

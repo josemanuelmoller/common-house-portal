@@ -37,14 +37,21 @@ export type RelationshipClass =
   | "Portfolio"
   | "Investor"
   | "Funder"
+  | "Client"
   | "VIP"
   | "Partner"
   | "Vendor"
   | "External";
 
 const PERSONAL_CLASSES: ReadonlySet<string> = new Set(["Family", "Personal Service", "Friend"]);
-// VIP boost: any one of these classes → prep urgency +15 in STB.
-const VIP_CLASSES:      ReadonlySet<string> = new Set(["VIP", "Investor", "Funder", "Portfolio"]);
+
+// VIP boost is explicit-only: the single 'VIP' class is the trigger. Role
+// classes (Investor / Funder / Portfolio / Client / Partner / Team / …)
+// describe WHAT the relationship is; 'VIP' describes whether THIS particular
+// person is a decision-maker. A junior analyst at a VC fund is Investor but
+// not VIP; the managing partner is Investor + VIP. Same logic for Clients
+// (decision-maker buyer vs. coordinator) and any other role.
+const VIP_CLASSES: ReadonlySet<string> = new Set(["VIP"]);
 
 /**
  * Multi-tag by design: a single attendee can carry multiple classes (e.g.

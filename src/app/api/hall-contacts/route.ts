@@ -28,7 +28,7 @@ import {
 const VALID_CLASSES = [
   "Family", "Personal Service", "Friend",
   "Team", "Portfolio",
-  "VIP", "Investor", "Funder",
+  "VIP", "Investor", "Funder", "Client",
   "Partner", "Vendor", "External",
 ] as const;
 type RelationshipClass = typeof VALID_CLASSES[number];
