@@ -136,10 +136,13 @@ export function ReadyForJoseSection({
                   {icon}
                 </div>
                 <div className="flex-1 min-w-0">
-                  {/* Source badge */}
-                  <div className="flex items-center gap-1.5 mb-0.5">
-                    <span className="text-[8px] font-bold uppercase tracking-widest text-[#131218]/25">
-                      {item.draftType}
+                  {/* Kind + source + type chips */}
+                  <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+                    <span className="text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full border bg-[#c8f55a]/25 text-[#131218]/70 border-[#c8f55a]">
+                      Draft
+                    </span>
+                    <span className="text-[8px] font-bold uppercase tracking-widest text-[#131218]/35">
+                      · {item.draftType}
                     </span>
                     {item.source === "gmail" && (
                       <span className="text-[8px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-full">

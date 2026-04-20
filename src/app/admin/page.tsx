@@ -25,8 +25,7 @@ import { AgentQueueSection } from "@/components/AgentQueueSection";
 import { InboxTriage, type InboxItem } from "@/components/InboxTriage";
 import { DraftCheckinButton } from "@/components/DraftCheckinButton";
 import { ChiefOfStaffDesk, ParkedLoopsSection } from "@/components/ChiefOfStaffDesk";
-import { CandidateSection } from "@/components/CandidateSection";
-import { RadarSection } from "@/components/RadarSection";
+import { DiscoverySection } from "@/components/DiscoverySection";
 import OpportunityExplorer from "@/components/OpportunityExplorer";
 import {
   getProjectsOverview,
@@ -785,21 +784,9 @@ export default async function AdminPage() {
             <SuggestedTimeBlocks />
           </div>
 
-          {/* ── 4c + 4b. Ready for Jose + Inbox, with briefing panels beside ─── */}
+          {/* ── 4c. Inbox only on the left; drafts moved into CoS ─── */}
           <div className="grid grid-cols-[1fr_340px] gap-6 items-start">
             <div className="space-y-6 min-w-0">
-              {/* Ready for Jose — prepared work already done */}
-              <div>
-                <SectionHeader
-                  label="Ready for Jose"
-                  count={rfjGmailDrafts.length + rfjApprovedDrafts.length}
-                />
-                <ReadyForJoseSection
-                  gmailDrafts={rfjGmailDrafts}
-                  approvedDrafts={rfjApprovedDrafts}
-                />
-              </div>
-
               {/* Inbox Triage */}
               <div>
                 <SectionHeader label="Inbox — needs attention" />
@@ -849,25 +836,38 @@ export default async function AdminPage() {
             {/* ── LEFT COLUMN ───────────────────────────────────────────────── */}
             <div className="space-y-6">
 
-              {/* ── 5a. Opportunity Candidates — always visible so Scan button is accessible */}
+              {/* ── 5a. Discovery — Candidates + Radar in one tabbed pane ─── */}
               <div>
                 <SectionHeader
-                  label="Unreviewed signals"
-                  count={candidates.length}
+                  label="Discovery"
+                  count={candidates.length + radarLoops.length}
                 />
-                <CandidateSection candidates={candidates} />
+                <DiscoverySection candidates={candidates} radarLoops={radarLoops} />
               </div>
 
-              {/* ── 5b. Chief of Staff — Tasks ───────────────────────────── */}
-              <div>
-                <SectionHeader
-                  label="Chief of Staff · Tasks"
-                  count={cosTasks.length}
-                  action={cosTasks.length > 0 ? "All opportunities →" : undefined}
-                  href="/admin/opportunities"
-                />
-                <ChiefOfStaffDesk tasks={cosTasks} />
-              </div>
+              {/* ── 5b. Chief of Staff — drafts + tasks unified queue ───── */}
+              {(() => {
+                const totalCoS = cosTasks.length + rfjGmailDrafts.length + rfjApprovedDrafts.length;
+                return (
+                  <div>
+                    <SectionHeader
+                      label="Chief of Staff"
+                      count={totalCoS}
+                      action={cosTasks.length > 0 ? "All opportunities →" : undefined}
+                      href="/admin/opportunities"
+                    />
+                    {(rfjGmailDrafts.length + rfjApprovedDrafts.length) > 0 && (
+                      <div className="mb-3">
+                        <ReadyForJoseSection
+                          gmailDrafts={rfjGmailDrafts}
+                          approvedDrafts={rfjApprovedDrafts}
+                        />
+                      </div>
+                    )}
+                    <ChiefOfStaffDesk tasks={cosTasks} />
+                  </div>
+                );
+              })()}
 
               {/* ── 5b-parked. Parked · Waiting ───────────────────────────── */}
               {parkedTasks.length > 0 && (
@@ -875,20 +875,6 @@ export default async function AdminPage() {
                   <ParkedLoopsSection tasks={parkedTasks} />
                 </div>
               )}
-
-              {/* ── 5c. Radar — passive discovery, not yet acted on ──────── */}
-              <div>
-                <SectionHeader
-                  label="Radar"
-                  count={radarLoops.length}
-                />
-                <div className="mb-1.5">
-                  <p className="text-[9px] text-[#131218]/30 leading-snug">
-                    Grants, new inbounds, and low-signal opportunities — not in CoS until you mark them Interested.
-                  </p>
-                </div>
-                <RadarSection initialLoops={radarLoops} />
-              </div>
 
               {/* ── 6. Open decisions ─────────────────────────────────────── */}
               {(() => {
@@ -1002,51 +988,6 @@ export default async function AdminPage() {
 
             {/* ── RIGHT COLUMN ──────────────────────────────────────────────── */}
             <div className="flex flex-col gap-4">
-
-              {/* On your desk — only things Jose can act on */}
-              <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-                <div className="px-5 py-3.5 border-b border-[#EFEFEA] flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-lg bg-[#131218] flex items-center justify-center shrink-0">
-                      <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
-                      </svg>
-                    </div>
-                    <p className="text-xs font-bold text-[#131218]">On your desk</p>
-                  </div>
-                  {totalPending > 0 && (
-                    <span className="text-[10px] font-bold bg-[#131218] text-white px-2 py-0.5 rounded-full">{totalPending}</span>
-                  )}
-                </div>
-                <div className="divide-y divide-[#EFEFEA]">
-                  {/* All open decisions Jose needs to act on */}
-                  {deskDecisions.slice(0, 5).map(d => {
-                    const isApproval = d.decisionType === "Approval";
-                    const isPolicy   = d.decisionType === "Policy / Automation Decision";
-                    const isUrgent   = d.priority === "P1 Critical" || d.priority === "High";
-                    const actionLabel = isApproval ? "Approve" : isPolicy ? "Decide" : "Input needed";
-                    return (
-                      <Link key={`dec-${d.id}`} href="/admin/decisions" className="flex items-center gap-3 px-5 py-3.5 hover:bg-[#EFEFEA]/40 transition-colors">
-                        <div className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 ${isUrgent ? "bg-red-100" : "bg-[#EFEFEA]"}`}>
-                          <span className={`text-[9px] font-bold ${isUrgent ? "text-red-600" : "text-[#131218]/40"}`}>{isApproval ? "✓" : "?"}</span>
-                        </div>
-                        <p className="text-[11px] font-medium text-[#131218] flex-1 min-w-0 truncate">{d.title}</p>
-                        <span className="text-[9px] font-bold text-[#131218]/30 shrink-0">{actionLabel}</span>
-                      </Link>
-                    );
-                  })}
-                  {totalPending === 0 && (
-                    <div className="px-5 py-5 text-center">
-                      <p className="text-[11px] text-[#131218]/25 font-medium">Desk clear ✓</p>
-                    </div>
-                  )}
-                </div>
-                <div className="px-5 py-2.5 border-t border-[#EFEFEA]">
-                  <Link href="/admin/decisions" className="text-[10px] font-bold text-[#131218]/30 hover:text-[#131218]/70 transition-colors uppercase tracking-widest">
-                    All decisions →
-                  </Link>
-                </div>
-              </div>
 
               {/* Stale projects */}
               {staleProjects.length > 0 && (
