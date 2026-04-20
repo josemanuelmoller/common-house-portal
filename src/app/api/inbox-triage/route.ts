@@ -20,6 +20,24 @@ import { NextRequest, NextResponse } from "next/server";
 import { google } from "googleapis";
 import Anthropic from "@anthropic-ai/sdk";
 import { adminGuardApi } from "@/lib/require-admin";
+import { getSupabaseServerClient } from "@/lib/supabase-server";
+
+// Normalize a subject for lineage matching: strip Re:/Fwd: prefixes, lowercase, collapse whitespace.
+function normalizeSubject(subject: string): string {
+  return subject
+    .toLowerCase()
+    .replace(/^(\s*(re|fw|fwd|aw|sv|r|f)\s*:\s*)+/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// Build the reliable Gmail deep-link: pick the account via ?authuser= BEFORE
+// the hash, then use #all/<threadId> which works even if the thread has left
+// the inbox. u/0 is removed because it silently lands in the wrong account
+// when slot 0 isn't the CH one in the browser.
+function buildGmailUrl(threadId: string, userEmail: string): string {
+  return `https://mail.google.com/mail/?authuser=${encodeURIComponent(userEmail)}#all/${threadId}`;
+}
 
 export const maxDuration = 60;
 
@@ -194,6 +212,36 @@ async function handleGet(req: NextRequest) {
     return NextResponse.json({ ok: true, items: [] });
   }
 
+  // ── Ignore list: drop threads Jose has explicitly ignored ─────────────────
+  // We match on thread_id (strong identity) AND on normalized subject + from
+  // (lineage identity) so a reply storm that spawns a new thread with the
+  // same title from the same sender stays suppressed too.
+  let ignoredThreadIds = new Set<string>();
+  let ignoredLineages = new Set<string>(); // key = `${subject_norm}|${from_email}`
+  try {
+    const sb = getSupabaseServerClient();
+    const { data } = await sb
+      .from("inbox_ignores")
+      .select("thread_id, subject_norm, from_email");
+    if (data) {
+      ignoredThreadIds = new Set(data.map(r => r.thread_id as string).filter(Boolean));
+      ignoredLineages = new Set(
+        data
+          .filter(r => r.subject_norm && r.from_email)
+          .map(r => `${r.subject_norm}|${(r.from_email as string).toLowerCase()}`)
+      );
+    }
+  } catch (err) {
+    console.warn("[inbox-triage] Supabase ignore lookup failed:", err);
+  }
+
+  const notIgnored = candidates.filter(c => {
+    if (ignoredThreadIds.has(c.threadId)) return false;
+    const key = `${normalizeSubject(c.subject)}|${c.from.toLowerCase()}`;
+    if (ignoredLineages.has(key)) return false;
+    return true;
+  });
+
   // ── Rule-based pre-filter: drop calendar noise before Claude ─────────────
   // Calendar auto-updates (invites, RSVPs, recurring updates) are never
   // actionable inbox items — they clutter the triage and inflate Urgent count.
@@ -230,17 +278,65 @@ async function handleGet(req: NextRequest) {
   const CALENDAR_SENDER_PATTERNS = [
     "noreply@",
     "no-reply@",
+    "do-not-reply@",
+    "donotreply@",
     "calendar-notification@",
     "calendar@",
     "notifications-noreply@",
+    "notifications@",
+    "@calendly.com",
+    "@zoom.us",
+    "@fireflies.ai",
+    "@granola.ai",
+    "@otter.ai",
+    "@loom.com",
+    "@mailchimp.com",
+    "@substack.com",
+    "@linkedin.com",
+    "@medium.com",
+    "@github.com",
+    "@notion.so",
+    "@slack.com",
+    "@stripe.com",
+    "@typeform.com",
+    "@docusign.net",
+    "@dropboxmail.com",
+    "bounce",
+    "mailer-daemon",
+    "postmaster@",
+  ];
+  // Subjects that are almost always non-actionable noise from human senders.
+  const NOISE_SUBJECT_HINTS = [
+    "unsubscribe",
+    "newsletter",
+    "weekly digest",
+    "daily digest",
+    "your receipt",
+    "receipt from",
+    "payment received",
+    "payment confirmation",
+    "invoice paid",
+    "out of office",
+    "automatic reply",
+    "respuesta automática",
+    "respuesta automatica",
+    "notification:",
+    "your meeting notes",
+    "meeting notes are ready",
+    "meeting recap",
+    "call recording",
+    "is ready to view",
+    "summary of your",
+    "here are your notes",
   ];
   const isCalendarNoise = (c: (typeof candidates)[0]): boolean => {
     const subjectLower = c.subject.toLowerCase();
     if (CALENDAR_SUBJECT_PREFIXES.some(pfx => subjectLower.startsWith(pfx))) return true;
     if (CALENDAR_SENDER_PATTERNS.some(pat => c.from.toLowerCase().includes(pat))) return true;
+    if (NOISE_SUBJECT_HINTS.some(h => subjectLower.includes(h))) return true;
     return false;
   };
-  const actionable = candidates.filter(c => !isCalendarNoise(c));
+  const actionable = notIgnored.filter(c => !isCalendarNoise(c));
 
   // Sort by days waiting descending before sending to Claude
   actionable.sort((a, b) => b.daysWaiting - a.daysWaiting);
@@ -253,21 +349,42 @@ async function handleGet(req: NextRequest) {
     weekday: "long", day: "numeric", month: "long", year: "numeric",
   });
 
-  const prompt = `You are triaging emails for Jose, founder of Common House (circular economy accelerator).
+  const prompt = `You are triaging Jose's inbox. Jose is founder of Common House (circular economy accelerator, Madrid). Be STRICT — over-flagging wastes his time.
 Today's date is: ${todayFormatted}.
-Classify each email as exactly one of: "Urgent", "Needs Reply", or "FYI".
 
-Rules:
-- "Urgent": sender is a partner, funder, investor, retailer, grant body, or government entity; OR email mentions a deadline, decision, contract, or explicit request.${THRESHOLD_DAYS <= 2 ? " Max 3 Urgents." : ""}
-- "Needs Reply": clear question, invitation, intro, or action requested. Jose should respond.
-- "FYI": newsletter, notification, auto-generated, low-stakes update, OR a confirmed meeting/event whose date has already passed (based on today's date above).
+Label each email as exactly one of:
+  "Urgent"      — needs Jose TODAY or this week
+  "Needs Reply" — clearly needs Jose's reply / decision / intervention
+  "FYI"         — does NOT need Jose's action
 
-For each item, also write a 1-sentence reason (max 12 words).
+DEFAULT TO "FYI" when unsure. A Jose-intervention must be genuinely required.
 
-Emails to classify:
-${top.map((c, i) => `${i + 1}. From: ${c.fromName} <${c.from}>\n   Subject: ${c.subject}\n   Preview: ${c.snippet.slice(0, 150)}`).join("\n\n")}
+Mark "FYI" (do NOT surface) when:
+  • Email is a meeting confirmation, calendar link, Calendly/Zoom/Meet invite, or meeting-notes recap.
+  • Jose already made an intro and the thread is two introduced parties talking — Jose is only CC'd or thanked. No direct question to Jose.
+  • The last message is a "thanks" / "got it" / acknowledgement with no new question.
+  • The message is a passive FYI, forward, or loop-in with no ask.
+  • The message is a scheduled/informational update from a tool, newsletter, or auto-report.
+  • The event / deadline referenced has already passed.
+  • Sender is a colleague and the message is coordination without a direct ask to Jose.
 
-Return ONLY valid JSON array — no markdown, no explanation:
+Mark "Needs Reply" only when:
+  • There is a clear question addressed to Jose.
+  • A decision, approval, signature, or intervention from Jose is explicitly required.
+  • A partner/investor/funder is waiting on Jose specifically.
+
+Mark "Urgent" only when "Needs Reply" is true AND:
+  • Sender is a retailer, funder, grant body, government, investor, board member, or strategic partner.
+  • OR there is an explicit deadline within 7 days.
+  • OR contract/money/legal decision is on the line.
+${THRESHOLD_DAYS <= 2 ? "Cap Urgents at 3 total across the batch." : ""}
+
+For each item also write a 1-sentence reason (max 12 words) — lead with WHY Jose must act, or why it's FYI.
+
+Emails:
+${top.map((c, i) => `${i + 1}. From: ${c.fromName} <${c.from}>\n   Subject: ${c.subject}\n   Preview: ${c.snippet.slice(0, 180)}`).join("\n\n")}
+
+Return ONLY a JSON array — no markdown, no explanation:
 [{"index": 1, "label": "Urgent"|"Needs Reply"|"FYI", "reason": "..."}]`;
 
   let classifications: { index: number; label: string; reason: string }[] = [];
@@ -300,8 +417,9 @@ Return ONLY valid JSON array — no markdown, no explanation:
       isUnread:    c.isUnread,
       label:       cl?.label ?? "Needs Reply",
       reason:      cl?.reason ?? "",
-      // authuser pins to CH account regardless of which Google account is slot 0 in the browser
-      gmailUrl:    `https://mail.google.com/mail/u/0/#inbox/${c.threadId}?authuser=josemanuel@wearecommonhouse.com`,
+      // authuser is a query param (before the hash) so Gmail actually reads it;
+      // #all/<tid> lands on the thread whether or not it's still in Inbox.
+      gmailUrl:    buildGmailUrl(c.threadId, JOSE_EMAIL),
     };
   });
 

@@ -28,6 +28,8 @@ const LABEL_DOT: Record<string, string> = {
   "FYI":         "bg-[#131218]/20",
 };
 
+const MAX_VISIBLE_ROWS = 5;
+
 interface Props {
   /** Pre-fetched server-side data. If provided, skips the initial client fetch. */
   initialItems?: InboxItem[];
@@ -41,7 +43,8 @@ export function InboxTriage({ initialItems, initialScanned = 0 }: Props) {
   const [loading, setLoading]         = useState(!serverHasData); // auto-load when no server data
   const [error, setError]             = useState<string | null>(null);
   const [scanned, setScanned]         = useState<number>(initialScanned);
-  const [dismissed, setDismiss]       = useState<Set<string>>(new Set());
+  const [hidden, setHidden]           = useState<Set<string>>(new Set());
+  const [ignoring, setIgnoring]       = useState<string | null>(null);
   const [creating, setCreating]       = useState<string | null>(null); // threadId being created
   const [created, setCreated]         = useState<Set<string>>(new Set()); // threadIds already created
   const [failed, setFailed]           = useState<Set<string>>(new Set()); // threadIds that failed
@@ -102,7 +105,32 @@ export function InboxTriage({ initialItems, initialScanned = 0 }: Props) {
     }
   }
 
-  const visible = items.filter(i => !dismissed.has(i.threadId));
+  async function ignoreItem(item: InboxItem) {
+    setIgnoring(item.threadId);
+    // Optimistic hide — server persists it, refresh confirms it won't resurface.
+    setHidden(prev => new Set(prev).add(item.threadId));
+    try {
+      const res = await fetch("/api/inbox-ignore", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          threadId: item.threadId,
+          subject:  item.subject,
+          from:     item.from,
+        }),
+      });
+      if (!res.ok) {
+        // Rollback on failure so the user sees the real state.
+        setHidden(prev => { const s = new Set(prev); s.delete(item.threadId); return s; });
+      }
+    } catch {
+      setHidden(prev => { const s = new Set(prev); s.delete(item.threadId); return s; });
+    } finally {
+      setIgnoring(null);
+    }
+  }
+
+  const visible = items.filter(i => !hidden.has(i.threadId));
 
   if (loading) {
     return (
@@ -129,8 +157,8 @@ export function InboxTriage({ initialItems, initialScanned = 0 }: Props) {
 
   if (visible.length === 0) {
     return (
-      <div className="flex items-center justify-between py-3">
-        <p className="text-[12px] text-[#131218]/35">Inbox clear — no threads waiting 2+ days.</p>
+      <div className="max-w-[760px] flex items-center justify-between py-3 px-4 bg-white rounded-xl border border-[#E0E0D8]">
+        <p className="text-[12px] text-[#131218]/35">Inbox clear — nothing waiting on Jose.</p>
         <button
           onClick={refresh}
           className="text-[9px] font-bold text-[#131218]/25 hover:text-[#131218] transition-colors uppercase tracking-widest"
@@ -141,48 +169,55 @@ export function InboxTriage({ initialItems, initialScanned = 0 }: Props) {
     );
   }
 
+  // Approx row height is ~72px — cap container so ~5 rows show before scroll.
+  const overflow = visible.length > MAX_VISIBLE_ROWS;
+
   return (
-    <div className="space-y-2">
-      {visible.map((item) => (
-        <div
-          key={item.threadId}
-          className="bg-white rounded-xl border border-[#E0E0D8] px-4 py-3 flex items-start gap-3"
-        >
-          <span className={`mt-[3px] w-2 h-2 rounded-full shrink-0 ${LABEL_DOT[item.label]}`} />
+    <div className="max-w-[760px]">
+      <div
+        className={`bg-white rounded-xl border border-[#E0E0D8] divide-y divide-[#E0E0D8] ${
+          overflow ? "max-h-[380px] overflow-y-auto" : ""
+        }`}
+      >
+        {visible.map((item) => (
+          <div
+            key={item.threadId}
+            className="px-3.5 py-2.5 flex items-start gap-3 hover:bg-[#FAFAF5] transition-colors"
+          >
+            <span className={`mt-[5px] w-1.5 h-1.5 rounded-full shrink-0 ${LABEL_DOT[item.label]}`} />
 
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-0.5 flex-wrap">
-              <span className="text-[12px] font-semibold text-[#131218] truncate max-w-[320px]">
-                {item.subject}
-              </span>
-              {item.isUnread && (
-                <span className="text-[8px] font-black uppercase tracking-widest text-[#131218]/30 bg-[#131218]/6 px-1.5 py-0.5 rounded-full shrink-0">
-                  Unread
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-[12px] font-semibold text-[#131218] truncate">
+                  {item.subject}
                 </span>
-              )}
+                {item.isUnread && (
+                  <span className="text-[8px] font-black uppercase tracking-widest text-[#131218]/30 bg-[#131218]/6 px-1.5 py-0.5 rounded-full shrink-0">
+                    Unread
+                  </span>
+                )}
+              </div>
+              <p className="text-[10.5px] text-[#131218]/45 truncate">
+                <span className="font-semibold">{item.fromName}</span>
+                <span className="text-[#131218]/25"> · </span>
+                <span className={item.daysWaiting >= 5 ? "text-red-500 font-bold" : "text-[#131218]/35"}>
+                  {item.daysWaiting}d
+                </span>
+                {item.reason && (
+                  <>
+                    <span className="text-[#131218]/25"> · </span>
+                    <span className="italic">{item.reason}</span>
+                  </>
+                )}
+              </p>
             </div>
-            <p className="text-[11px] text-[#131218]/45 mb-1">
-              <span className="font-semibold">{item.fromName}</span>
-              {" · "}
-              <span className="text-[#131218]/30">{item.from}</span>
-              {" · "}
-              <span className={item.daysWaiting >= 5 ? "text-red-500 font-bold" : "text-[#131218]/30"}>
-                {item.daysWaiting}d waiting
-              </span>
-            </p>
-            {item.reason && (
-              <p className="text-[10.5px] text-[#131218]/40 leading-snug italic">{item.reason}</p>
-            )}
-          </div>
 
-          <div className="flex flex-col items-end gap-1.5 shrink-0">
-            <span className={`text-[8.5px] font-bold px-2 py-0.5 rounded-full ${LABEL_STYLE[item.label]}`}>
-              {item.label}
-            </span>
-            <div className="flex items-center gap-2">
-              {/* Quick-create opportunity candidate */}
+            <div className="flex items-center gap-2 shrink-0">
+              <span className={`text-[8.5px] font-bold px-2 py-0.5 rounded-full ${LABEL_STYLE[item.label]}`}>
+                {item.label}
+              </span>
               {created.has(item.threadId) ? (
-                <span className="text-[9px] font-bold text-green-600">✓ Candidate</span>
+                <span className="text-[9px] font-bold text-green-600">✓ Opp</span>
               ) : failed.has(item.threadId) ? (
                 <button
                   onClick={() => createCandidate(item)}
@@ -190,7 +225,7 @@ export function InboxTriage({ initialItems, initialScanned = 0 }: Props) {
                   title="Failed — click to retry"
                   className="text-[9px] font-bold text-red-500 hover:text-red-700 transition-colors disabled:opacity-40"
                 >
-                  {creating === item.threadId ? "…" : "✕ Retry"}
+                  {creating === item.threadId ? "…" : "Retry"}
                 </button>
               ) : (
                 <button
@@ -206,25 +241,28 @@ export function InboxTriage({ initialItems, initialScanned = 0 }: Props) {
                 href={item.gmailUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-[9px] font-bold text-[#131218]/30 hover:text-[#131218] transition-colors"
+                className="text-[9px] font-bold text-[#131218]/40 hover:text-[#131218] transition-colors uppercase tracking-widest"
               >
                 Open →
               </a>
               <button
-                onClick={() => setDismiss(prev => new Set(prev).add(item.threadId))}
-                className="text-[9px] font-bold text-[#131218]/20 hover:text-[#131218]/50 transition-colors"
-                title="Dismiss from view"
+                onClick={() => ignoreItem(item)}
+                disabled={ignoring === item.threadId}
+                title="Ignore this thread — won't resurface"
+                className="text-[9px] font-bold text-[#131218]/25 hover:text-[#131218]/70 transition-colors uppercase tracking-widest disabled:opacity-40"
               >
-                ✕
+                {ignoring === item.threadId ? "…" : "Ignore"}
               </button>
             </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
 
-      <div className="flex items-center justify-between pt-1">
-        <p className="text-[9px] text-[#131218]/20">
-          {scanned} thread{scanned !== 1 ? "s" : ""} scanned · {visible.length} flagged
+      <div className="flex items-center justify-between pt-1.5 px-1">
+        <p className="text-[9px] text-[#131218]/25">
+          {visible.length} flagged
+          {overflow && <span className="text-[#131218]/35"> · scroll for more</span>}
+          <span className="text-[#131218]/15"> · {scanned} scanned</span>
         </p>
         <button
           onClick={refresh}
