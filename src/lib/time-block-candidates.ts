@@ -14,6 +14,7 @@
 
 import { getSupabaseServerClient } from "./supabase-server";
 import type { UpcomingMeeting } from "./calendar-slots";
+import { classifyMeeting, type AttendeeLookup } from "./meeting-classifier";
 
 export type TaskType = "deep_work" | "follow_up" | "prep" | "decision" | "admin";
 
@@ -245,6 +246,7 @@ export async function candidatesFromOpportunities(
 export function candidatesFromMeetings(
   meetings: UpcomingMeeting[],
   now: Date,
+  lookup: AttendeeLookup = new Map(),
 ): Candidate[] {
   const out: Candidate[] = [];
   for (const m of meetings) {
@@ -253,8 +255,29 @@ export function candidatesFromMeetings(
     if (msUntil <= 0) continue;                                // only upcoming
     if (daysUntil > 7) continue;
 
+    const cls = classifyMeeting(m, lookup);
+
+    // is_personal = every non-self attendee is Family/Personal Service/Friend.
+    // Skip prep entirely — the event stays busy on the calendar for slot
+    // finding, but no prep/follow-up task is emitted.
+    if (cls.is_personal) continue;
+
     // Prep candidate: needed if meeting is in next 3 days and has attendees
     if (daysUntil <= 3) {
+      // VIP boost: any non-self attendee in Investor / Funder / Portfolio
+      const baseUrgency = daysUntil <= 1 ? 85 : 70;
+      const vipBoost    = cls.has_vip ? 15 : 0;
+      // Attendee-confirmation weighting: heavier signal when most attendees have
+      // already accepted. Raw count scales slightly so big confirmed meetings win.
+      const confirmBoost = Math.min(5, cls.confirmed_count);
+      const urgency = Math.min(100, baseUrgency + vipBoost + confirmBoost);
+
+      const whyParts: string[] = [
+        `Meeting ${new Intl.DateTimeFormat("en-GB", { timeZone: "America/Costa_Rica", weekday: "short", hour: "2-digit", minute: "2-digit", hour12: false }).format(m.start)}`,
+        `${cls.confirmed_count} confirmed${cls.tentative_count ? ` + ${cls.tentative_count} tentative` : ""}`,
+      ];
+      if (cls.has_vip) whyParts.push("VIP attendee — high-stakes");
+
       out.push({
         title:            `Prep for "${m.title}"`,
         entity_type:      "meeting_prep",
@@ -262,9 +285,9 @@ export function candidatesFromMeetings(
         entity_label:     m.title,
         duration_min:     45,
         task_type:        "prep",
-        urgency_score:    daysUntil <= 1 ? 85 : 70,
+        urgency_score:    urgency,
         confidence_score: 80,
-        why_now:          `Meeting ${new Intl.DateTimeFormat("en-GB", { timeZone: "America/Costa_Rica", weekday: "short", hour: "2-digit", minute: "2-digit", hour12: false }).format(m.start)} with ${m.attendeeCount} attendee${m.attendeeCount === 1 ? "" : "s"} — no prep captured yet.`,
+        why_now:          whyParts.join(" · ") + ".",
         expected_outcome: `Agenda + 3 desired outcomes + open questions written into the meeting notes.`,
         fingerprint:      `meeting_prep:${m.id}:prep`,
         hard_time_constraint: { kind: "before", reference: m.start, withinMs: 24 * 3600_000 },
@@ -277,12 +300,17 @@ export function candidatesFromMeetings(
 export function candidatesFromRecentMeetings(
   recentMeetings: UpcomingMeeting[],
   now: Date,
+  lookup: AttendeeLookup = new Map(),
 ): Candidate[] {
   // "recent" = ended in the last 24 hours
   const out: Candidate[] = [];
   for (const m of recentMeetings) {
     const endedAgoMs = now.getTime() - m.end.getTime();
     if (endedAgoMs < 0 || endedAgoMs > 24 * 3600_000) continue;
+    // Skip personal meetings — never queue a follow-up for a therapy
+    // appointment, family dinner, etc.
+    const cls = classifyMeeting(m, lookup);
+    if (cls.is_personal) continue;
     out.push({
       title:            `Follow up on "${m.title}"`,
       entity_type:      "meeting_follow_up",

@@ -22,6 +22,10 @@ import {
   candidatesFromMeetings,
   loopCoveredEntityIds,
 } from "@/lib/time-block-candidates";
+import {
+  collectNonSelfEmails,
+  loadAttendeeClasses,
+} from "@/lib/meeting-classifier";
 import { getHallPreferences } from "@/lib/hall-preferences";
 
 export const dynamic = "force-dynamic";
@@ -48,7 +52,8 @@ export async function GET() {
     candidatesFromLoops(20),
     candidatesFromOpportunities(covered, 15),
   ]);
-  const prepCands = candidatesFromMeetings(upcoming, now);
+  const lookup = await loadAttendeeClasses(collectNonSelfEmails(upcoming));
+  const prepCands = candidatesFromMeetings(upcoming, now, lookup);
 
   const allCands = [...loopCands, ...oppCands, ...prepCands];
 

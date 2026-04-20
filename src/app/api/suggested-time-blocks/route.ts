@@ -38,6 +38,11 @@ import { matchCandidatesToSlots } from "@/lib/time-block-matcher";
 import { getHallPreferences } from "@/lib/hall-preferences";
 import { classifyGoogleError } from "@/lib/google-auth";
 import { logHallEvent } from "@/lib/hall-events";
+import {
+  collectNonSelfEmails,
+  loadAttendeeClasses,
+  observeAttendees,
+} from "@/lib/meeting-classifier";
 
 export const dynamic = "force-dynamic";
 
@@ -141,8 +146,16 @@ export async function GET(_req: NextRequest) {
     // events.list call embedded here to keep surface area small.
     const recent = await listPastMeetings(1);
 
-    const prepCands      = candidatesFromMeetings(upcoming, now);
-    const followUpCands  = candidatesFromRecentMeetings(recent, now);
+    // Attendee enrichment — look up who's in each meeting and observe new
+    // emails so Jose can classify them later from /admin/hall/contacts.
+    // is_personal meetings skip prep/follow-up entirely; VIP meetings get
+    // an urgency boost. Upsert is fire-and-forget best-effort.
+    const attendeeEmails = collectNonSelfEmails([...upcoming, ...recent]);
+    const attendeeLookup = await loadAttendeeClasses(attendeeEmails);
+    void observeAttendees([...upcoming, ...recent]);
+
+    const prepCands      = candidatesFromMeetings(upcoming, now, attendeeLookup);
+    const followUpCands  = candidatesFromRecentMeetings(recent, now, attendeeLookup);
 
     // Fingerprint blacklist: dismissed in last 24h, snoozed until future
     const { data: blocks } = await sb
@@ -285,7 +298,7 @@ async function listPastMeetings(daysBack: number) {
     orderBy:      "startTime",
     maxResults:   30,
   });
-  const out = [];
+  const out: import("@/lib/calendar-slots").UpcomingMeeting[] = [];
   for (const e of res.data.items ?? []) {
     const startIso = e.start?.dateTime ?? null;
     const endIso   = e.end?.dateTime   ?? null;
@@ -293,14 +306,25 @@ async function listPastMeetings(daysBack: number) {
     const attendees = (e.attendees ?? []).filter(a => !a.resource);
     if (attendees.length === 0) continue;
     if (e.status === "cancelled") continue;
+    const structured = attendees.map(a => ({
+      email:          (a.email ?? "").toLowerCase(),
+      displayName:    a.displayName ?? null,
+      responseStatus: (["accepted", "tentative", "needsAction", "declined"] as const).includes(
+        a.responseStatus as never,
+      )
+        ? (a.responseStatus as "accepted" | "tentative" | "needsAction" | "declined")
+        : "unknown" as const,
+      self:           a.self === true,
+    })).filter(a => a.email);
     out.push({
       id:             e.id,
       title:          e.summary || "(untitled meeting)",
       start:          new Date(startIso),
       end:            new Date(endIso),
-      attendeeCount:  attendees.length,
-      organizerEmail: e.organizer?.email ?? null,
+      attendeeCount:  structured.filter(a => a.responseStatus !== "declined").length,
+      organizerEmail: e.organizer?.email?.toLowerCase() ?? null,
       htmlLink:       e.htmlLink ?? "",
+      attendees:      structured,
     });
   }
   return out;

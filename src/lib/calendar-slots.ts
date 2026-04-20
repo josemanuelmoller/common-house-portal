@@ -31,6 +31,13 @@ export const DEFAULT_SLOT_OPTIONS: SlotOptions = HALL_PREFS_DEFAULTS;
 
 export type BusyBlock = { start: Date; end: Date };
 
+export type MeetingAttendee = {
+  email: string;
+  displayName: string | null;
+  responseStatus: "accepted" | "tentative" | "needsAction" | "declined" | "unknown";
+  self: boolean;
+};
+
 export type UpcomingMeeting = {
   id: string;
   title: string;
@@ -39,6 +46,7 @@ export type UpcomingMeeting = {
   attendeeCount: number;
   organizerEmail: string | null;
   htmlLink: string;
+  attendees: MeetingAttendee[];
 };
 
 export type Slot = {
@@ -138,14 +146,27 @@ export async function listUpcomingMeetings(daysAhead: number): Promise<UpcomingM
     const attendees = (e.attendees ?? []).filter(a => !a.resource);
     if (attendees.length === 0) continue;                     // not a meeting — likely a block
     if (e.status === "cancelled") continue;
+
+    const structuredAttendees: MeetingAttendee[] = attendees.map(a => ({
+      email:          (a.email ?? "").toLowerCase(),
+      displayName:    a.displayName ?? null,
+      responseStatus: (["accepted", "tentative", "needsAction", "declined"] as const).includes(
+        a.responseStatus as never,
+      )
+        ? (a.responseStatus as MeetingAttendee["responseStatus"])
+        : "unknown",
+      self:           a.self === true,
+    })).filter(a => a.email);
+
     out.push({
       id:             e.id,
       title:          e.summary || "(untitled meeting)",
       start:          new Date(startIso),
       end:            new Date(endIso),
-      attendeeCount:  attendees.length,
-      organizerEmail: e.organizer?.email ?? null,
+      attendeeCount:  structuredAttendees.filter(a => a.responseStatus !== "declined").length,
+      organizerEmail: e.organizer?.email?.toLowerCase() ?? null,
       htmlLink:       e.htmlLink ?? "",
+      attendees:      structuredAttendees,
     });
   }
   return out;
