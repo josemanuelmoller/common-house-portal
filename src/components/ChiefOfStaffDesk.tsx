@@ -302,6 +302,22 @@ function TaskCard({
                 Notion →
               </a>
             </div>
+
+            {/* ── Debug strip (temporary) ─────────────────────────────────── */}
+            <div className="mt-2 pt-2 border-t border-dashed border-[#131218]/8">
+              <p className="text-[8px] font-mono text-[#131218]/25 leading-relaxed">
+                <span className="font-bold uppercase tracking-widest">debug</span>
+                {" · "}passive={task.isPassiveDiscovery ? "yes" : "no"}
+                {" · "}source={task.taskSource ?? "?"}
+                {" · "}loop={task.loopEngineId ? "engine" : "notion-fallback"}
+                {" · "}in-cos-because=
+                {task.loopType === "blocker" || task.loopType === "commitment"
+                  ? "type-safety-net"
+                  : task.isPassiveDiscovery
+                  ? "founder-interested"
+                  : "active-signal"}
+              </p>
+            </div>
           </div>
         </div>
       )}

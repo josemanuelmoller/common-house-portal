@@ -41,7 +41,9 @@ export function RadarSection({ initialLoops }: { initialLoops: RadarLoop[] }) {
   const [isPending, startTransition] = useTransition();
   const [optimistic, setOptimistic] = useState<Record<string, string | null>>({});
 
-  // Derive visible loops: remove items optimistically dropped
+  // Optimistic state:
+  //   "dropped"    → remove from Radar immediately
+  //   "interested" → show as "→ CoS" briefly, then remove on router.refresh()
   const visible = initialLoops.filter(l => {
     const interest = optimistic[l.id] !== undefined ? optimistic[l.id] : l.founder_interest;
     return interest !== "dropped";
@@ -69,8 +71,10 @@ export function RadarSection({ initialLoops }: { initialLoops: RadarLoop[] }) {
           const badge = interest ? INTEREST_BADGE[interest] : null;
           const typeLabel = LOOP_TYPE_LABEL[loop.loop_type] ?? loop.loop_type;
 
+          const movingToCoS = interest === "interested" && optimistic[loop.id] === "interested";
+
           return (
-            <div key={loop.id} className="flex items-center gap-3 px-5 py-3.5">
+            <div key={loop.id} className={`flex items-center gap-3 px-5 py-3.5 transition-colors ${movingToCoS ? "bg-[#c8f55a]/10" : ""}`}>
               {/* Type badge */}
               <span className="text-[8px] font-bold uppercase tracking-widest text-[#131218]/30 bg-[#EFEFEA] px-2 py-0.5 rounded-full shrink-0">
                 {typeLabel}
@@ -87,14 +91,22 @@ export function RadarSection({ initialLoops }: { initialLoops: RadarLoop[] }) {
                   {loop.title}
                 </a>
                 <p className="text-[10px] text-[#131218]/35 truncate mt-0.5">{loop.linked_entity_name}</p>
+                {/* debug strip */}
+                <p className="text-[8px] font-mono text-[#131218]/20 mt-0.5 truncate">
+                  radar · passive=yes · interest={interest ?? "none"} · variant={loop.normalized_key.split(":").pop()}
+                </p>
               </div>
 
               {/* Interest state badge */}
-              {badge && (
+              {movingToCoS ? (
+                <span className="text-[8px] font-bold px-2 py-0.5 rounded-full shrink-0 bg-[#c8f55a] text-[#131218]">
+                  → CoS
+                </span>
+              ) : badge ? (
                 <span className={`text-[8px] font-bold px-2 py-0.5 rounded-full shrink-0 ${badge.cls}`}>
                   {badge.label}
                 </span>
-              )}
+              ) : null}
 
               {/* Action buttons */}
               <div className="flex items-center gap-1.5 shrink-0">

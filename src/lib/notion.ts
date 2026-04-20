@@ -1019,8 +1019,10 @@ async function getCoSTasksFromLoops(): Promise<CoSTask[] | null> {
       .from("loops")
       .select("*")
       .in("status", ["open", "in_progress"])
-      // Track A: only include active loops; passive discovery only enters CoS when founder is interested
-      .or("is_passive_discovery.eq.false,founder_interest.eq.interested")
+      // Track A: gate — passive discovery stays in Radar unless founder marked it interested.
+      // Safety net: blockers + commitments always reach CoS regardless of passive flag,
+      // because a misclassified blocker going missing is worse than a false-positive.
+      .or("is_passive_discovery.eq.false,founder_interest.eq.interested,loop_type.eq.blocker,loop_type.eq.commitment")
       .order("priority_score", { ascending: false })
       .order("first_seen_at",  { ascending: true })
       .limit(50);
@@ -1046,6 +1048,7 @@ async function getCoSTasksFromLoops(): Promise<CoSTask[] | null> {
 
 export type RadarLoop = {
   id: string;
+  normalized_key: string;
   title: string;
   loop_type: string;
   linked_entity_name: string;
@@ -1061,7 +1064,7 @@ export async function getRadarLoops(): Promise<RadarLoop[]> {
 
     const { data, error } = await sb
       .from("loops")
-      .select("id, title, loop_type, linked_entity_name, notion_url, founder_interest, priority_score")
+      .select("id, normalized_key, title, loop_type, linked_entity_name, notion_url, founder_interest, priority_score")
       .eq("is_passive_discovery", true)
       .in("status", ["open", "in_progress"])
       .neq("founder_interest", "dropped")

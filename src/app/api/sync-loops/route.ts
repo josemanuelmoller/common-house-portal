@@ -141,7 +141,7 @@ async function upsertLoop(
     //    - On conflict: update mutable fields only; preserve status/first_seen_at
     const { data: existing } = await sb
       .from("loops")
-      .select("id, status, signal_count")
+      .select("id, status, signal_count, founder_interest")
       .eq("normalized_key", input.normalized_key)
       .single();
 
@@ -220,7 +220,14 @@ async function upsertLoop(
     const isNewSignal = !sigError && sigData && sigData.length > 0;
 
     // 3. If loop was resolved/dismissed AND this is a new signal → reopen it
-    if (existing && (existing.status === "resolved" || existing.status === "dismissed") && isNewSignal) {
+    //    Exception: never reopen a loop the founder explicitly dropped.
+    //    founder_interest = 'dropped' is a permanent human decision; sync noise must not override it.
+    if (
+      existing &&
+      (existing.status === "resolved" || existing.status === "dismissed") &&
+      isNewSignal &&
+      existing.founder_interest !== "dropped"
+    ) {
       await sb.from("loops").update({ status: "open", updated_at: new Date().toISOString() }).eq("id", loopId);
       await sb.from("loop_actions").insert({
         loop_id: loopId, action_type: "reopened", actor: "system",
@@ -556,35 +563,50 @@ async function syncProjectLoops(stats: Stats): Promise<void> {
 }
 
 // ─── Auto-resolve stale loops ─────────────────────────────────────────────────
-// Loops whose source records have been resolved, won, or dropped should not
-// linger. We resolve open loops whose last_seen_at is > 2 sync cycles old.
-// Sync runs every 30 min → 2 cycles = 65 min to be safe.
+// Tiered thresholds to prevent CoS going hollow between syncs:
+//   blocker / commitment → 4 hours  (high-cost to lose; tolerate sync delays)
+//   everything else      → 65 min   (2 sync cycles — quick cleanup)
+// Loops with founder_interest = 'dropped' are never reopened by sync, but are
+// still auto-resolved here so they don't accumulate indefinitely.
 
 async function autoResolveStaleLoops(): Promise<number> {
   const sb = getSupabaseServerClient();
-  const cutoff = new Date(Date.now() - 65 * 60 * 1000).toISOString();
 
-  const { data, error } = await sb
+  const stdCutoff       = new Date(Date.now() -  65 * 60 * 1000).toISOString();
+  const criticalCutoff  = new Date(Date.now() - 240 * 60 * 1000).toISOString(); // 4 h
+
+  // Resolve low-priority loops after 65 min
+  const { data: stdData } = await sb
     .from("loops")
     .update({ status: "resolved", updated_at: new Date().toISOString() })
     .eq("status", "open")
-    .lt("last_seen_at", cutoff)
+    .not("loop_type", "in", "(blocker,commitment)")
+    .lt("last_seen_at", stdCutoff)
     .select("id");
 
-  if (error) return 0;
+  // Resolve blockers/commitments only after 4 h
+  const { data: critData } = await sb
+    .from("loops")
+    .update({ status: "resolved", updated_at: new Date().toISOString() })
+    .eq("status", "open")
+    .in("loop_type", ["blocker", "commitment"])
+    .lt("last_seen_at", criticalCutoff)
+    .select("id");
 
-  if (data && data.length > 0) {
+  const allResolved = [...(stdData ?? []), ...(critData ?? [])];
+
+  if (allResolved.length > 0) {
     await sb.from("loop_actions").insert(
-      data.map((row: { id: string }) => ({
-        loop_id: row.id,
+      allResolved.map((row: { id: string }) => ({
+        loop_id:     row.id,
         action_type: "resolved",
-        actor: "system",
-        note: "Auto-resolved: source record no longer active",
+        actor:       "system",
+        note:        "Auto-resolved: source record no longer active",
       })),
     );
   }
 
-  return data?.length ?? 0;
+  return allResolved.length;
 }
 
 // ─── Handler ──────────────────────────────────────────────────────────────────
