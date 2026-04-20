@@ -43,6 +43,7 @@ const DB = {
   people:         "1bc0f96f33ca4a9e9ff26844377e81de",
   dailyBriefings: "d206d6cdb09040d3ac2f34a977ad9f2a",
   evidence:       "fa28124978d043039d8932ac9964ccf5",
+  insightBriefs:  "04bed3a3fd1a4b3a99643cd21562e08a",
 };
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
@@ -189,27 +190,43 @@ async function fetchColdPeople() {
   }));
 }
 
-async function fetchRecentEvidence() {
-  const since = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+// Insight Briefs are the authoritative source for market signals — they
+// capture sector reports, competitor moves, funding announcements, and
+// ecosystem news curated into CH's Insight Engine. Internal CH Evidence is
+// about decisions/blockers/tasks — NOT market intel — so it is not read here.
+async function fetchRecentInsightBriefs() {
+  const since = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
   const res = await notion.databases.query({
-    database_id: DB.evidence,
+    database_id: DB.insightBriefs,
     filter: {
-      and: [
-        { property: "Validation Status", select: { equals: "Validated" } },
-        { property: "Date Captured", date: { on_or_after: since } },
-      ],
+      timestamp: "last_edited_time",
+      last_edited_time: { on_or_after: since },
     },
-    sorts: [{ property: "Date Captured", direction: "descending" }],
-    page_size: 10,
+    sorts: [{ timestamp: "last_edited_time", direction: "descending" }],
+    page_size: 20,
   });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (res.results as any[]).map(p => ({
-    title:     text(prop(p, "Title")) || text(prop(p, "Name")),
-    type:      sel(prop(p, "Evidence Type")),
-    statement: (p.properties?.["Evidence Statement"]?.rich_text ?? [])
+  return (res.results as any[]).map(p => {
+    const richText = (name: string) =>
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .map((r: any) => r.plain_text).join("").slice(0, 200),
-  }));
+      (p.properties?.[name]?.rich_text ?? []).map((r: any) => r.plain_text).join("");
+    const multi = (name: string) =>
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (p.properties?.[name]?.multi_select ?? []).map((r: any) => r.name);
+    // Prefer Executive Summary; fall back to Key Insights, then Key Facts.
+    const summary =
+      richText("Executive Summary")
+      || richText("Key Insights")
+      || richText("Key Facts")
+      || "";
+    return {
+      title:     text(prop(p, "Brief Title")) || text(prop(p, "Name")) || "Untitled",
+      summary:   summary.slice(0, 400),
+      theme:     multi("Theme"),
+      relevance: multi("Relevance"),
+      status:    sel(prop(p, "Status")),
+    };
+  });
 }
 
 // ─── Check for existing briefing today ───────────────────────────────────────
@@ -233,7 +250,7 @@ async function _POST(req: NextRequest) {
   const today = new Date().toISOString().slice(0, 10);
 
   // Fetch all data in parallel
-  const [projects, followUps, decisions, drafts, readyContent, coldPeople, recentEvidence] =
+  const [projects, followUps, decisions, drafts, readyContent, coldPeople, recentBriefs] =
     await Promise.all([
       fetchActiveProjects().catch(() => []),
       fetchFollowUpOpportunities().catch(() => []),
@@ -241,7 +258,7 @@ async function _POST(req: NextRequest) {
       fetchPendingDrafts().catch(() => []),
       fetchReadyContent().catch(() => []),
       fetchColdPeople().catch(() => []),
-      fetchRecentEvidence().catch(() => []),
+      fetchRecentInsightBriefs().catch(() => []),
     ]);
 
   // Build context for Claude
@@ -266,8 +283,10 @@ ${readyContent.map(c => `- ${c.title} [${c.platform}]`).join("\n") || "None"}
 ## Cold / Dormant Relationships (${coldPeople.length})
 ${coldPeople.slice(0, 8).map(p => `- ${p.name} [${p.warmth}]`).join("\n") || "None"}
 
-## Recent Validated Evidence (last 3 days)
-${recentEvidence.map(e => `- [${e.type}] ${e.title}: ${e.statement}`).join("\n") || "None"}
+## Recent Insight Briefs (last 14 days) — source for market signals
+${recentBriefs.map(b =>
+  `- "${b.title}" [${b.theme.join(", ") || "no-theme"}${b.relevance.length ? " · rel: " + b.relevance.join(", ") : ""}]: ${b.summary || "(no summary)"}`
+).join("\n") || "None"}
 `.trim();
 
   // Claude Haiku generates the briefing sections
@@ -290,7 +309,7 @@ Return EXACTLY this JSON (no extra keys, no markdown):
   "my_commitments": "open P1 decisions and any blockers that need JMM action, or 'No open P1 items' if none",
   "follow_up_queue": "list of opportunities needing follow-up, or 'No follow-ups needed' if none",
   "agent_queue": "summary of pending drafts to review, or 'Agent queue clear' if none",
-  "market_signals": "1-2 signals from recent evidence that are commercially relevant, or 'No new signals' if none",
+  "market_signals": "3-5 external market signals drawn ONLY from the Insight Briefs above. Cover three kinds when evidence allows: (a) portfolio-relevant moves (iRefill, SUFI, Yenxa, Auto Mercado, Greenleaf), (b) CH-vertical shifts (retail refill, financial inclusion, sustainable food, agritech, circular economy), (c) competitor or ecosystem moves (who raised, launched, pivoted, or entered CH's space). Format each as 'Headline (signal type — relevance)'. If the brief list is empty or irrelevant, return 'No recent briefs logged — run the Insight Engine to pull sector signals.'",
   "ready_to_publish": "list of content ready to go live, or 'Nothing ready to publish' if none"
 }`,
     }],
