@@ -633,6 +633,11 @@ export type CoSTask = {
   linkedEntityId?: string;
   // Track A: true when this loop was classified as passive discovery at sync time
   isPassiveDiscovery?: boolean;
+  founderOwned?: boolean;
+
+  // Lifecycle observability (loop-engine tasks only)
+  reopenCount?: number;     // > 0 means this topic was previously resolved/dismissed
+  loopStatus?: string;      // raw DB status: open | in_progress | waiting | reopened | …
 };
 
 function mapFollowUpStatus(raw: string): CoSTask["taskStatus"] {

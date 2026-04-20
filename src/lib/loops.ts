@@ -33,6 +33,11 @@ type CoSTask = {
   taskSource?: "opportunity" | "project" | "evidence";
   loopEngineId?: string;
   isPassiveDiscovery?: boolean;
+  founderOwned?: boolean;
+
+  // Lifecycle observability (loop-engine tasks only)
+  reopenCount?: number;       // > 0 means this topic was previously resolved/dismissed
+  loopStatus?: string;        // raw DB status: open | in_progress | waiting | reopened | …
 
   // Notion page ID of the linked opportunity (opportunity-type loops only).
   // Used by the Opportunities Explorer dedup: when the loop engine is active,
@@ -624,5 +629,8 @@ export function mapLoopToCoSTask(loop: Loop): CoSTask {
     loopEngineId:        loop.id,
     linkedEntityId:      loop.linked_entity_type === "opportunity" ? loop.linked_entity_id : undefined,
     isPassiveDiscovery:  loop.is_passive_discovery,
+    founderOwned:        loop.founder_owned,
+    reopenCount:         loop.reopen_count,
+    loopStatus:          loop.status,
   };
 }

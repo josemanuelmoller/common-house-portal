@@ -142,6 +142,11 @@ function TaskCard({
                   {sBadge.label}
                 </span>
               )}
+              {(task.reopenCount ?? 0) > 0 && (
+                <span className="text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full border bg-orange-50 text-orange-600 border-orange-200">
+                  Reopened{(task.reopenCount ?? 0) > 1 ? ` ×${task.reopenCount}` : ""}
+                </span>
+              )}
               {hint && (
                 <span className="text-[8px] font-medium text-[#131218]/30 uppercase tracking-widest">
                   · {hint}
@@ -305,19 +310,22 @@ function TaskCard({
               </a>
             </div>
 
-            {/* ── Debug strip (temporary) ─────────────────────────────────── */}
+            {/* ── Debug strip (admin observability) ──────────────────────── */}
             <div className="mt-2 pt-2 border-t border-dashed border-[#131218]/8">
               <p className="text-[8px] font-mono text-[#131218]/25 leading-relaxed">
                 <span className="font-bold uppercase tracking-widest">debug</span>
+                {" · "}status={task.loopStatus ?? task.taskStatus}
                 {" · "}passive={task.isPassiveDiscovery ? "yes" : "no"}
-                {" · "}source={task.taskSource ?? "?"}
-                {" · "}loop={task.loopEngineId ? "engine" : "notion-fallback"}
-                {" · "}in-cos-because=
-                {task.loopType === "blocker" || task.loopType === "commitment"
-                  ? "type-safety-net"
-                  : task.isPassiveDiscovery
-                  ? "founder-interested"
-                  : "active-signal"}
+                {" · "}founder-owned={task.founderOwned ? "yes" : "no"}
+                {" · "}reopened={
+                  (task.reopenCount ?? 0) > 0
+                    ? `yes ×${task.reopenCount}`
+                    : "no"
+                }
+                {" · "}source={task.loopEngineId ? "engine" : "notion-fallback"}
+                {task.loopEngineId && (
+                  <span title={task.loopEngineId}>{" · "}id={task.loopEngineId.slice(0, 8)}…</span>
+                )}
               </p>
             </div>
           </div>
