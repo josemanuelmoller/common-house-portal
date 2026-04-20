@@ -25,8 +25,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { Client } from "@notionhq/client";
-import { auth } from "@clerk/nextjs/server";
-import { isAdminUser } from "@/lib/clients";
+import { currentUser } from "@clerk/nextjs/server";
+import { isAdminUser, isAdminEmail } from "@/lib/clients";
 import { withRoutineLog } from "@/lib/routine-log";
 
 export const maxDuration = 120;
@@ -53,10 +53,14 @@ async function authCheck(req: NextRequest): Promise<boolean> {
   const expected  = process.env.CRON_SECRET;
   if (agentKey && agentKey === expected) return true;
   if (cronToken === `Bearer ${expected}`) return true;
-  // Allow authenticated admin session (browser trigger)
+  // Allow authenticated admin session (browser trigger) — match adminGuardApi
+  // by checking BOTH ADMIN_USER_IDS and ADMIN_EMAILS so browser-triggered
+  // refreshes work in prod where userIds can drift from dev.
   try {
-    const { userId } = await auth();
-    if (userId && isAdminUser(userId)) return true;
+    const user = await currentUser();
+    if (!user) return false;
+    const email = user.primaryEmailAddress?.emailAddress ?? "";
+    if (isAdminUser(user.id) || isAdminEmail(email)) return true;
   } catch { /* no-op */ }
   return false;
 }
