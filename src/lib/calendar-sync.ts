@@ -27,6 +27,7 @@ import { google, calendar_v3 } from "googleapis";
 import { getGoogleAuthClient } from "./google-auth";
 import { getSupabaseServerClient } from "./supabase-server";
 import { CALENDAR_ID } from "./google-calendar";
+import { getSelfEmails } from "./hall-self";
 import type { MeetingAttendee } from "./calendar-slots";
 
 const SYNC_SCOPE = "primary";
@@ -92,13 +93,20 @@ type DbEventRow = {
   is_cancelled:    boolean | null;
 };
 
-/** Emails that count for meeting_count — non-self, non-declined, non-empty. */
-function countableEmails(attendees: MeetingAttendee[]): string[] {
+/**
+ * Emails that count for meeting_count — non-self, non-declined, non-empty.
+ * `selfSet` is the full self-identity list (primary + aliases); some events
+ * may include a Jose-alias where Google did NOT mark attendee.self=true
+ * (e.g. a calendar share from another account). Filtering against the set
+ * plus the flag covers both cases.
+ */
+function countableEmails(attendees: MeetingAttendee[], selfSet: Set<string>): string[] {
   const out: string[] = [];
   for (const a of attendees) {
     if (a.self) continue;
     if (a.responseStatus === "declined") continue;
     if (!a.email) continue;
+    if (selfSet.has(a.email.toLowerCase())) continue;
     out.push(a.email);
   }
   return [...new Set(out)];
@@ -110,6 +118,7 @@ async function applyEventsToAttendees(
 ): Promise<void> {
   if (events.length === 0) return;
   const sb = getSupabaseServerClient();
+  const selfSet = await getSelfEmails();
 
   // 1) Load prior state for this batch of event_ids
   const eventIds = events.map(e => e.event_id);
@@ -137,7 +146,7 @@ async function applyEventsToAttendees(
     const wasCancelled = prior?.is_cancelled === true;
     const wasNew = !prior;
 
-    const currentCountable = new Set(ev.is_cancelled ? [] : countableEmails(ev.attendees));
+    const currentCountable = new Set(ev.is_cancelled ? [] : countableEmails(ev.attendees, selfSet));
 
     // Stats
     if (ev.is_cancelled && prior && !wasCancelled) stats.cancelled_events++;

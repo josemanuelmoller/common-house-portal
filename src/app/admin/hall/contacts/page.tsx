@@ -1,9 +1,11 @@
 import { Sidebar } from "@/components/Sidebar";
 import { requireAdmin } from "@/lib/require-admin";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
+import { getSelfEmails } from "@/lib/hall-self";
 import { HallContactRow } from "@/components/HallContactRow";
 import { HallContactsAutoRefresh } from "@/components/HallContactsAutoRefresh";
 import { HallContactsCollapsibleList } from "@/components/HallContactsCollapsibleList";
+import { HallContactsDismissedToggle } from "@/components/HallContactsDismissedToggle";
 
 export const dynamic = "force-dynamic";
 
@@ -24,27 +26,34 @@ type ContactRow = {
   google_labels: string[] | null;
   google_synced_at: string | null;
   google_last_write_at: string | null;
+  dismissed_at: string | null;
+  dismissed_reason: string | null;
 };
 
 async function getContacts(): Promise<ContactRow[]> {
   const sb = getSupabaseServerClient();
   const { data } = await sb
     .from("hall_attendees")
-    .select("email, display_name, relationship_class, relationship_classes, auto_suggested, last_meeting_title, meeting_count, last_seen_at, first_seen_at, classified_at, classified_by, google_resource_name, google_source, google_labels, google_synced_at, google_last_write_at")
+    .select("email, display_name, relationship_class, relationship_classes, auto_suggested, last_meeting_title, meeting_count, last_seen_at, first_seen_at, classified_at, classified_by, google_resource_name, google_source, google_labels, google_synced_at, google_last_write_at, dismissed_at, dismissed_reason")
     .gte("last_seen_at", new Date(Date.now() - 120 * 86400_000).toISOString())
     .order("meeting_count", { ascending: false })
     .order("last_seen_at", { ascending: false })
-    .limit(200);
-  return (data ?? []) as ContactRow[];
+    .limit(400);
+  const rows = (data ?? []) as ContactRow[];
+  // Filter out Jose's own identities — he should never see himself as a contact.
+  const self = await getSelfEmails();
+  return rows.filter(r => !self.has(r.email));
 }
 
 export default async function HallContactsPage() {
   await requireAdmin();
   const contacts = await getContacts();
 
+  const active     = contacts.filter(c => !c.dismissed_at);
+  const dismissed  = contacts.filter(c =>  c.dismissed_at);
   const hasClasses = (c: ContactRow) => (c.relationship_classes ?? []).length > 0;
-  const unclassified = contacts.filter(c => !hasClasses(c));
-  const classified = contacts
+  const unclassified = active.filter(c => !hasClasses(c));
+  const classified = active
     .filter(hasClasses)
     .sort((a, b) => {
       const at = a.classified_at ? new Date(a.classified_at).getTime() : 0;
@@ -146,6 +155,9 @@ export default async function HallContactsPage() {
               emptyText="No contacts classified yet."
             />
           </section>
+
+          {/* Dismissed (collapsed by default) */}
+          <HallContactsDismissedToggle rows={dismissed} />
         </div>
       </main>
     </div>

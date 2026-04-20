@@ -39,6 +39,7 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url);
   const onlyUnclassified = searchParams.get("unclassified") === "1";
+  const includeDismissed = searchParams.get("include_dismissed") === "1";
   const days = Math.max(1, Math.min(365, Number(searchParams.get("days") ?? "90")));
   const cutoff = new Date(Date.now() - days * 86400_000).toISOString();
 
@@ -46,12 +47,13 @@ export async function GET(req: NextRequest) {
     const sb = getSupabaseServerClient();
     let query = sb
       .from("hall_attendees")
-      .select("email, display_name, relationship_class, relationship_classes, auto_suggested, last_meeting_title, meeting_count, first_seen_at, last_seen_at, classified_at, classified_by")
+      .select("email, display_name, relationship_class, relationship_classes, auto_suggested, last_meeting_title, meeting_count, first_seen_at, last_seen_at, classified_at, classified_by, dismissed_at, dismissed_reason")
       .gte("last_seen_at", cutoff)
       .order("meeting_count", { ascending: false })
       .order("last_seen_at",  { ascending: false })
       .limit(200);
     if (onlyUnclassified) query = query.or("relationship_classes.is.null,relationship_classes.eq.{}");
+    if (!includeDismissed) query = query.is("dismissed_at", null);
 
     const { data, error } = await query;
     if (error) return NextResponse.json({ error: error.message }, { status: 502 });
@@ -86,12 +88,34 @@ async function doPOST(req: NextRequest) {
     email?: string;
     relationship_class?: string | null;
     relationship_classes?: string[] | null;
+    action?: "dismiss" | "undismiss" | "tag";
+    reason?: string;
   };
   try { body = await req.json(); } catch { return NextResponse.json({ error: "Invalid JSON" }, { status: 400 }); }
 
   const email = (body.email ?? "").trim().toLowerCase();
   if (!email || !/.+@.+\..+/.test(email)) {
     return NextResponse.json({ error: "valid email required" }, { status: 400 });
+  }
+
+  // ── Dismiss / undismiss shortcut path — no classes needed ─────────────────
+  if (body.action === "dismiss" || body.action === "undismiss") {
+    const sb = getSupabaseServerClient();
+    const nowIso = new Date().toISOString();
+    const isDismiss = body.action === "dismiss";
+    const { data, error } = await sb
+      .from("hall_attendees")
+      .update({
+        dismissed_at:     isDismiss ? nowIso : null,
+        dismissed_by:     isDismiss ? actor  : null,
+        dismissed_reason: isDismiss ? (body.reason ?? null) : null,
+        updated_at:       nowIso,
+      })
+      .eq("email", email)
+      .select("email, dismissed_at, dismissed_by, dismissed_reason")
+      .maybeSingle();
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: true, action: body.action, contact: data });
   }
 
   // Accept either:

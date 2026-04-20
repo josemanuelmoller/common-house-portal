@@ -17,6 +17,7 @@ type Props = {
   google_resource_name?: string | null;
   google_source?: string | null;
   google_last_write_at?: string | null;
+  dismissed_at?: string | null;
 };
 
 const CLASSES = [
@@ -86,6 +87,49 @@ export function HallContactRow(props: Props) {
     else save([...selected, cls]);
   }
 
+  async function dismiss() {
+    const reason = window.prompt(
+      "Dismiss this contact? They'll be hidden from the list and STB. Optional reason:",
+      "",
+    );
+    if (reason === null) return;  // cancelled
+    setError(null);
+    try {
+      const res = await fetch("/api/hall-contacts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: props.email, action: "dismiss", reason: reason.trim() || null }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        setError(j?.error ?? `HTTP ${res.status}`);
+        return;
+      }
+      startTransition(() => router.refresh());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  async function undismiss() {
+    setError(null);
+    try {
+      const res = await fetch("/api/hall-contacts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: props.email, action: "undismiss" }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        setError(j?.error ?? `HTTP ${res.status}`);
+        return;
+      }
+      startTransition(() => router.refresh());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
   const selectedKinds = selected.map(s => CLASSES.find(c => c.v === s)?.kind).filter(Boolean) as ("personal"|"vip"|"work")[];
   const hasPersonal = selectedKinds.includes("personal");
   const hasVip      = selectedKinds.includes("vip");
@@ -96,9 +140,23 @@ export function HallContactRow(props: Props) {
            : hasPersonal ? "bg-[#FFF4E6]/40"
            : "";
 
+  const isDismissed = !!props.dismissed_at;
+
   return (
-    <div className={`flex items-start gap-4 px-5 py-3.5 hover:bg-[#EFEFEA]/40 transition-colors ${bg}`}>
-      <div className="flex-1 min-w-0">
+    <div className={`group relative flex items-start gap-4 px-5 py-3.5 hover:bg-[#EFEFEA]/40 transition-colors ${bg} ${isDismissed ? "opacity-60" : ""}`}>
+      {/* X — dismiss (or ↺ undo when already dismissed). Shown on hover only
+          so the row stays clean. Top-right corner. */}
+      <button
+        type="button"
+        onClick={isDismissed ? undismiss : dismiss}
+        className="absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center text-[11px] leading-none text-[#131218]/30 hover:text-[#131218] hover:bg-[#131218]/8 opacity-0 group-hover:opacity-100 transition-all"
+        title={isDismissed ? "Restore — bring back to Untagged" : "Dismiss — hide without classifying"}
+        aria-label={isDismissed ? "Undismiss contact" : "Dismiss contact"}
+      >
+        {isDismissed ? "↺" : "✕"}
+      </button>
+
+      <div className="flex-1 min-w-0 pr-6">
         <div className="flex items-center gap-1.5 flex-wrap">
           <Link
             href={`/admin/hall/contacts/${encodeURIComponent(props.email)}`}
