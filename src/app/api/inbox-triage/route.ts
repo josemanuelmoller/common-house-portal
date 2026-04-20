@@ -392,7 +392,7 @@ Return ONLY a JSON array — no markdown, no explanation:
   try {
     const res = await anthropic.messages.create({
       model: "claude-haiku-4-5-20251001",
-      max_tokens: 600,
+      max_tokens: 1500,
       messages: [{ role: "user", content: prompt }],
     });
     const raw = (res.content[0] as { type: string; text: string }).text.trim();
