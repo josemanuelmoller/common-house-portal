@@ -190,6 +190,11 @@ function computeFocusRecommendation(
     else if (task.reviewUrl)  { score += 5;  reasons.push("thread to reply"); }
     if (hasExplicitPending)   { score += 10; reasons.push("specific action described"); }
 
+    // Founder ownership (Track F) — strategic items Jose leads directly
+    if (task.signalReason?.startsWith("Founder-owned")) {
+      score += 15; reasons.push("founder-owned");
+    }
+
     candidates.push({ task, score, winReason: reasons.join(" · ") });
   }
 
@@ -278,41 +283,70 @@ function computeFocusRecommendation(
     action = `Spend ${timeEstimate} on ${pendingSnippet ?? task.taskTitle} with ${task.orgName}.`;
   }
 
-  // Why today
-  let whyToday: string;
-  if (task.dueDate) {
-    const msTo = new Date(task.dueDate).getTime() - now;
-    const days = Math.floor(msTo / 86400000);
-    if (days <= 1) {
-      whyToday = task.loopType === "prep"
-        ? `Meeting ${meetingLabel} — prepare now or it's too late.`
-        : `Deadline ${meetingLabel} — last window to act.`;
-    } else if (days <= 7) {
-      whyToday = task.loopType === "prep"
-        ? `Meeting with ${task.orgName} ${meetingLabel}${reviewIsDoc ? " — document ready." : "."}`
-        : `Due ${meetingLabel}.`;
-    } else {
-      whyToday = task.loopType === "blocker"
-        ? `Unblocks ${task.opportunityName}.`
-        : `Top item in your action queue.`;
-    }
-  } else if (task.loopType === "blocker") {
-    whyToday = `Unblocks ${task.opportunityName} progress.`;
-  } else if (task.loopType === "decision") {
-    whyToday = "Decision open — needs your call to move forward.";
-  } else if (reviewIsDoc) {
-    whyToday = "Document is ready to review — no waiting on others.";
-  } else {
-    whyToday = "Top item in your action queue.";
-  }
-
   // Check if there's a matching draft for this task
   const linkedDraft = agentDrafts.find(d =>
     d.opportunityId && task.linkedEntityId && d.opportunityId === task.linkedEntityId
   );
-  if (linkedDraft) {
-    whyToday += " Draft is ready.";
+
+  // Why today — C+: up to 2 specific reasons; avoid generic fallbacks
+  const isFounderOwned = task.signalReason?.startsWith("Founder-owned") ?? false;
+  // signalReason is human-readable for Notion-fallback tasks; loop engine tasks store internal metadata ("N signals · score X")
+  const humanSignalReason = (() => {
+    if (!task.signalReason) return null;
+    const s = task.signalReason.replace(/^Founder-owned · /, "").trim();
+    if (/^\d+ signal/.test(s)) return null;
+    return s;
+  })();
+
+  const whyParts: string[] = [];
+
+  // Primary: time-based or loop-type structural signal
+  if (task.dueDate) {
+    const msTo = new Date(task.dueDate).getTime() - now;
+    const days = Math.floor(msTo / 86400000);
+    if (msTo < 0) {
+      whyParts.push(`Overdue since ${meetingLabel} — waiting on you.`);
+    } else if (days <= 1) {
+      whyParts.push(task.loopType === "prep"
+        ? `Meeting ${meetingLabel} — prepare now or it's too late.`
+        : `Deadline ${meetingLabel} — last window to act.`);
+    } else if (days <= 7) {
+      whyParts.push(task.loopType === "prep"
+        ? `Meeting with ${task.orgName} ${meetingLabel}${reviewIsDoc ? " — document ready." : "."}`
+        : `Due ${meetingLabel}.`);
+    }
+    // date is far out — fall through to signal-based reasoning below
   }
+
+  if (whyParts.length === 0) {
+    if (task.loopType === "blocker") {
+      whyParts.push(`Unblocks ${task.opportunityName} progress.`);
+    } else if (task.loopType === "decision") {
+      whyParts.push("Decision open — needs your call to move forward.");
+    } else if (reviewIsDoc) {
+      whyParts.push("Document is ready to review — no waiting on others.");
+    } else if (humanSignalReason) {
+      whyParts.push(humanSignalReason.endsWith(".") ? humanSignalReason : `${humanSignalReason}.`);
+    } else if (task.reviewUrl?.includes("mail.google.com")) {
+      whyParts.push("Email thread waiting — reply needed.");
+    }
+  }
+
+  // Secondary: prepared work or ownership signal (one more if room)
+  if (whyParts.length < 2) {
+    if (linkedDraft) {
+      whyParts.push("Draft is ready to send.");
+    } else if (isFounderOwned) {
+      whyParts.push("You own this directly.");
+    }
+  }
+
+  // Absolute fallback
+  if (whyParts.length === 0) {
+    whyParts.push(isFounderOwned ? "You own this directly — top of your action queue." : "Top item in your action queue.");
+  }
+
+  let whyToday = whyParts.join(" ");
 
   // Links
   const links: FocusLink[] = [];
