@@ -701,21 +701,21 @@ export default async function AdminPage() {
           )}
 
           {/* ── 3. Stats row ──────────────────────────────────────────────── */}
-          <div className="grid grid-cols-3 gap-4 items-stretch">
+          <div className="grid grid-cols-3 gap-3 items-stretch">
 
             {/* Tile 1 — Portfolio */}
-            <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-4 flex flex-col">
-              <p className="text-[9px] font-bold text-[#131218]/25 uppercase tracking-widest mb-1.5">Active portfolio</p>
-              <div className="flex items-baseline gap-2.5">
-                <p className="text-[28px] font-[800] text-[#131218] tracking-tight leading-none">{projects.length}</p>
-                <span className="text-[10px] font-semibold text-[#131218]/40 leading-tight">
+            <div className="bg-white rounded-xl border border-[#E0E0D8] px-3.5 py-2 flex flex-col">
+              <p className="text-[9px] font-bold text-[#131218]/25 uppercase tracking-widest mb-0.5">Active portfolio</p>
+              <div className="flex items-baseline gap-2">
+                <p className="text-[18px] font-[800] text-[#131218] tracking-tight leading-none">{projects.length}</p>
+                <span className="text-[9.5px] font-semibold text-[#131218]/40 leading-tight">
                   {workroomCount}W · {garageCount}G{untypedCount > 0 ? ` · ${untypedCount} untyped` : ""}
                 </span>
               </div>
-              <div className="mt-auto pt-3 flex items-center gap-3 text-[10px]">
+              <div className="mt-auto pt-1 flex items-center gap-2.5 text-[9.5px]">
                 {blockerCount > 0 ? (
-                  <span className="flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" />
+                  <span className="flex items-center gap-1">
+                    <span className="w-1 h-1 rounded-full bg-red-400 shrink-0" />
                     <span className="font-bold text-red-500">{blockerCount} blocker{blockerCount !== 1 ? "s" : ""}</span>
                   </span>
                 ) : (
@@ -728,23 +728,23 @@ export default async function AdminPage() {
             </div>
 
             {/* Tile 2 — Decisiones + updates */}
-            <Link href="/admin/decisions" className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-4 hover:bg-[#EFEFEA]/40 transition-colors flex flex-col">
-              <p className="text-[9px] font-bold text-[#131218]/25 uppercase tracking-widest mb-1.5">Decisions + updates</p>
-              <div className="flex items-baseline gap-2.5">
-                <p className={`text-[28px] font-[800] tracking-tight leading-none ${openDecisions.length > 0 ? "text-amber-500" : "text-[#131218]/15"}`}>
+            <Link href="/admin/decisions" className="bg-white rounded-xl border border-[#E0E0D8] px-3.5 py-2 hover:bg-[#EFEFEA]/40 transition-colors flex flex-col">
+              <p className="text-[9px] font-bold text-[#131218]/25 uppercase tracking-widest mb-0.5">Decisions + updates</p>
+              <div className="flex items-baseline gap-2">
+                <p className={`text-[18px] font-[800] tracking-tight leading-none ${openDecisions.length > 0 ? "text-amber-500" : "text-[#131218]/15"}`}>
                   {openDecisions.length}
                 </p>
-                <span className="text-[10px] font-semibold text-[#131218]/40 leading-tight">
+                <span className="text-[9.5px] font-semibold text-[#131218]/40 leading-tight">
                   {totalPending > 0 ? `${totalPending} need action` : "desk clear"}
                 </span>
               </div>
-              <div className="mt-auto pt-3 flex items-center gap-3 text-[10px]">
+              <div className="mt-auto pt-1 flex items-center gap-2.5 text-[9.5px]">
                 <span className="text-[#131218]/40">
                   {urgentDecisions.length} urgent · {needsUpdate.length} to update
                 </span>
                 {withDeadlines.length > 0 && (
-                  <span className="flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+                  <span className="flex items-center gap-1">
+                    <span className="w-1 h-1 rounded-full bg-amber-400 shrink-0" />
                     <span className="font-bold text-amber-500">{withDeadlines.length} this week</span>
                   </span>
                 )}
@@ -752,9 +752,9 @@ export default async function AdminPage() {
             </Link>
 
             {/* Tile 3 — OS activo */}
-            <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-4">
-              <p className="text-[9px] font-bold text-[#131218]/25 uppercase tracking-widest mb-2">OS activity</p>
-              <div className="space-y-1.5">
+            <div className="bg-white rounded-xl border border-[#E0E0D8] px-3.5 py-2">
+              <p className="text-[9px] font-bold text-[#131218]/25 uppercase tracking-widest mb-1">OS activity</p>
+              <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
                 {[
                   { label: "Agent drafts",   count: agentDrafts.length,   activeColor: "text-[#131218]" },
                   { label: "CoS tasks",      count: cosTasks.length,      activeColor: "text-amber-500" },
@@ -763,8 +763,8 @@ export default async function AdminPage() {
                   { label: "Dormant",        count: dormantRelationships.length, activeColor: "text-[#131218]/40" },
                 ].map(({ label, count, activeColor }) => (
                   <div key={label} className="flex items-center justify-between">
-                    <span className="text-[11px] text-[#131218]/50">{label}</span>
-                    <span className={`text-[12px] font-[800] ${count > 0 ? activeColor : "text-[#131218]/15"}`}>{count}</span>
+                    <span className="text-[9.5px] text-[#131218]/50 truncate">{label}</span>
+                    <span className={`text-[10.5px] font-[800] ${count > 0 ? activeColor : "text-[#131218]/15"}`}>{count}</span>
                   </div>
                 ))}
               </div>
@@ -785,22 +785,62 @@ export default async function AdminPage() {
             <SuggestedTimeBlocks />
           </div>
 
-          {/* ── 4c. Ready for Jose — prepared work already done ───────────── */}
-          <div>
-            <SectionHeader
-              label="Ready for Jose"
-              count={rfjGmailDrafts.length + rfjApprovedDrafts.length}
-            />
-            <ReadyForJoseSection
-              gmailDrafts={rfjGmailDrafts}
-              approvedDrafts={rfjApprovedDrafts}
-            />
-          </div>
+          {/* ── 4c + 4b. Ready for Jose + Inbox, with briefing panels beside ─── */}
+          <div className="grid grid-cols-[1fr_340px] gap-6 items-start">
+            <div className="space-y-6 min-w-0">
+              {/* Ready for Jose — prepared work already done */}
+              <div>
+                <SectionHeader
+                  label="Ready for Jose"
+                  count={rfjGmailDrafts.length + rfjApprovedDrafts.length}
+                />
+                <ReadyForJoseSection
+                  gmailDrafts={rfjGmailDrafts}
+                  approvedDrafts={rfjApprovedDrafts}
+                />
+              </div>
 
-          {/* ── 4b. Inbox Triage ──────────────────────────────────────────── */}
-          <div>
-            <SectionHeader label="Inbox — needs attention" />
-            <InboxTriage initialItems={inboxData.items} initialScanned={inboxData.total_scanned} />
+              {/* Inbox Triage */}
+              <div>
+                <SectionHeader label="Inbox — needs attention" />
+                <InboxTriage initialItems={inboxData.items} initialScanned={inboxData.total_scanned} />
+              </div>
+            </div>
+
+            {/* Side column — briefing context parallel to Ready/Inbox */}
+            <div className="flex flex-col gap-4">
+              {dailyBriefing?.meetingPrep && (
+                <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
+                  <div className="px-5 py-3 border-b border-[#EFEFEA]">
+                    <p className="text-xs font-bold text-[#131218]">Meeting prep</p>
+                  </div>
+                  <div className="px-5 py-4">
+                    <pre className="text-[11px] text-[#131218]/65 leading-[1.65] whitespace-pre-wrap font-sans">
+                      {dailyBriefing.meetingPrep.slice(0, 700)}
+                    </pre>
+                  </div>
+                </div>
+              )}
+
+              {dailyBriefing?.marketSignals && (
+                <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
+                  <div className="px-5 py-3 border-b border-[#EFEFEA]">
+                    <p className="text-xs font-bold text-[#131218]">Market signals</p>
+                  </div>
+                  <div className="px-5 py-4">
+                    <pre className="text-[11px] text-[#131218]/65 leading-[1.65] whitespace-pre-wrap font-sans">
+                      {dailyBriefing.marketSignals.slice(0, 500)}
+                    </pre>
+                  </div>
+                </div>
+              )}
+
+              {!dailyBriefing?.meetingPrep && !dailyBriefing?.marketSignals && (
+                <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-4">
+                  <p className="text-[11px] text-[#131218]/30">No briefing context yet today.</p>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* ── Two-column main layout ─────────────────────────────────────── */}
@@ -962,34 +1002,6 @@ export default async function AdminPage() {
 
             {/* ── RIGHT COLUMN ──────────────────────────────────────────────── */}
             <div className="flex flex-col gap-4">
-
-              {/* Meeting Prep from briefing */}
-              {dailyBriefing?.meetingPrep && (
-                <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-                  <div className="px-5 py-3 border-b border-[#EFEFEA]">
-                    <p className="text-xs font-bold text-[#131218]">Meeting prep</p>
-                  </div>
-                  <div className="px-5 py-4">
-                    <pre className="text-[11px] text-[#131218]/65 leading-[1.65] whitespace-pre-wrap font-sans">
-                      {dailyBriefing.meetingPrep.slice(0, 700)}
-                    </pre>
-                  </div>
-                </div>
-              )}
-
-              {/* Market Signals from briefing */}
-              {dailyBriefing?.marketSignals && (
-                <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-                  <div className="px-5 py-3 border-b border-[#EFEFEA]">
-                    <p className="text-xs font-bold text-[#131218]">Market signals</p>
-                  </div>
-                  <div className="px-5 py-4">
-                    <pre className="text-[11px] text-[#131218]/65 leading-[1.65] whitespace-pre-wrap font-sans">
-                      {dailyBriefing.marketSignals.slice(0, 500)}
-                    </pre>
-                  </div>
-                </div>
-              )}
 
               {/* On your desk — only things Jose can act on */}
               <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
