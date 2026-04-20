@@ -111,25 +111,42 @@ const TAG_COLOR: Record<string, string> = {
 
 type Signal = { tag: string | null; headline: string; relevance: string | null };
 
+// Known tag whitelist prevents false positives when the headline itself
+// contains a pipe (e.g. "UK | £1.1B funding" being parsed as tag "UK").
+const KNOWN_TAGS = new Set([
+  "Policy", "Funding", "Market Move", "Sector Trend",
+  "Competitor", "Ecosystem", "Portfolio",
+]);
+
+function parseFirstLine(line: string): { tag: string | null; headline: string } {
+  // Preferred format: [Tag] Headline
+  const bracket = line.match(/^\[([^\]]+)\]\s*(.+)$/);
+  if (bracket) return { tag: bracket[1].trim(), headline: bracket[2].trim() };
+  // Haiku often drifts to: Tag | Headline — accept only known tags.
+  const pipe = line.match(/^([^|]+?)\s*[|│]\s*(.+)$/);
+  if (pipe) {
+    const candidate = pipe[1].trim();
+    if (KNOWN_TAGS.has(candidate)) {
+      return { tag: candidate, headline: pipe[2].trim() };
+    }
+  }
+  return { tag: null, headline: line };
+}
+
 function parseSignals(raw: string): Signal[] {
-  // Split on blank lines; within each block, first line = [Tag] Headline,
+  // Split on blank lines; within each block, first line carries the tag,
   // subsequent lines starting with '·' or '-' are relevance lines merged.
   const blocks = raw.split(/\n\s*\n/).map(b => b.trim()).filter(Boolean);
   const signals: Signal[] = [];
   for (const block of blocks) {
     const lines = block.split(/\n/).map(l => l.trim()).filter(Boolean);
     if (lines.length === 0) continue;
-    const first = lines[0];
-    const tagMatch = first.match(/^\[([^\]]+)\]\s*(.+)$/);
+    const { tag, headline } = parseFirstLine(lines[0]);
     const relevance = lines.slice(1)
       .map(l => l.replace(/^[·•\-]\s*/, "").trim())
       .filter(Boolean)
       .join(" ");
-    signals.push({
-      tag:       tagMatch ? tagMatch[1].trim() : null,
-      headline:  tagMatch ? tagMatch[2].trim() : first,
-      relevance: relevance || null,
-    });
+    signals.push({ tag, headline, relevance: relevance || null });
   }
   return signals;
 }
