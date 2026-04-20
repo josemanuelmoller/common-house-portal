@@ -188,8 +188,9 @@ async function doPOST(req: NextRequest) {
           classified_at:         classes.length > 0 ? nowIso : null,
           classified_by:         classes.length > 0 ? actor  : null,
           google_resource_name:  resourceName,
-          google_last_write_at:  googleSyncOutcome === "synced" ? nowIso : null,
-          google_synced_at:      googleSyncOutcome === "synced" ? nowIso : null,
+          // Any successful write path (synced / created / promoted) counts.
+          google_last_write_at:  ["synced", "created", "promoted"].includes(googleSyncOutcome) ? nowIso : null,
+          google_synced_at:      ["synced", "created", "promoted"].includes(googleSyncOutcome) ? nowIso : null,
           updated_at:            nowIso,
         },
         { onConflict: "email" },
