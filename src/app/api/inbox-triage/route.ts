@@ -136,6 +136,8 @@ async function handleGet(req: NextRequest) {
     daysWaiting: number;
     isUnread: boolean;
     hasMyReply: boolean;
+    iStartedThread: boolean; // Jose sent the first message — treat intros/FYI forwards as FYI
+    msgCount: number;
   };
 
   const candidates: Candidate[] = [];
@@ -159,10 +161,28 @@ async function handleGet(req: NextRequest) {
 
         // Subject from first message
         const subject = firstMsg.payload?.headers?.find(h => h.name === "Subject")?.value ?? "(no subject)";
-        const fromHeader = firstMsg.payload?.headers?.find(h => h.name === "From")?.value ?? "";
-        const from = extractEmail(fromHeader);
-        const fromName = extractName(fromHeader);
-        const snippet = firstMsg.snippet ?? "";
+        // Jose sent the first message? Then this is a thread he initiated
+        // (intro, outreach, FYI forward) — very different triage meaning.
+        const firstFromHeader = firstMsg.payload?.headers?.find(h => h.name === "From")?.value ?? "";
+        const iStartedThread = extractEmail(firstFromHeader) === JOSE_EMAIL.toLowerCase();
+
+        // Pick the "who's waiting on Jose" identity: it's the last non-Jose sender,
+        // NOT the first-message sender. Otherwise threads Jose started surface
+        // with Jose as `fromName` — confuses both the UI and Haiku.
+        let actionableMsg = lastMsg;
+        for (let i = messages.length - 1; i >= 0; i--) {
+          const h = messages[i].payload?.headers?.find(hh => hh.name === "From")?.value ?? "";
+          if (extractEmail(h) !== JOSE_EMAIL.toLowerCase()) {
+            actionableMsg = messages[i];
+            break;
+          }
+        }
+        const actionableFromHeader = actionableMsg.payload?.headers?.find(h => h.name === "From")?.value ?? "";
+        const from = extractEmail(actionableFromHeader);
+        const fromName = extractName(actionableFromHeader);
+        // Prefer the snippet of the actionable message (the one waiting on Jose),
+        // not the thread's opener, so Haiku sees the current ask.
+        const snippet = actionableMsg.snippet ?? firstMsg.snippet ?? "";
 
         // Date of the last message in the thread (most recent activity)
         const lastDateMs = parseInt(lastMsg.internalDate ?? "0", 10);
@@ -201,6 +221,8 @@ async function handleGet(req: NextRequest) {
           daysWaiting: Math.floor(daysWaiting),
           isUnread,
           hasMyReply,
+          iStartedThread,
+          msgCount: messages.length,
         });
       } catch {
         // skip failed threads
@@ -361,8 +383,8 @@ DEFAULT TO "FYI" when unsure. A Jose-intervention must be genuinely required.
 
 Mark "FYI" (do NOT surface) when:
   • Email is a meeting confirmation, calendar link, Calendly/Zoom/Meet invite, or meeting-notes recap.
-  • Jose already made an intro and the thread is two introduced parties talking — Jose is only CC'd or thanked. No direct question to Jose.
-  • The last message is a "thanks" / "got it" / acknowledgement with no new question.
+  • (joseStarted=true) → Jose opened the thread. Default to FYI unless the latest reply is a NEW direct question to Jose. Intros, forwards, pings, "looping you in" threads that Jose initiated do NOT need a reply just because someone thanked him. Surface only if the other party is now BLOCKED on Jose.
+  • The last message is a "thanks" / "got it" / "sounds good" / acknowledgement with no new question.
   • The message is a passive FYI, forward, or loop-in with no ask.
   • The message is a scheduled/informational update from a tool, newsletter, or auto-report.
   • The event / deadline referenced has already passed.
@@ -382,7 +404,7 @@ ${THRESHOLD_DAYS <= 2 ? "Cap Urgents at 3 total across the batch." : ""}
 For each item also write a 1-sentence reason (max 12 words) — lead with WHY Jose must act, or why it's FYI.
 
 Emails:
-${top.map((c, i) => `${i + 1}. From: ${c.fromName} <${c.from}>\n   Subject: ${c.subject}\n   Preview: ${c.snippet.slice(0, 180)}`).join("\n\n")}
+${top.map((c, i) => `${i + 1}. From: ${c.fromName} <${c.from}> (waiting-on-Jose side)\n   Subject: ${c.subject}\n   Messages in thread: ${c.msgCount} · joseStarted: ${c.iStartedThread} · joseReplied: ${c.hasMyReply}\n   Latest preview: ${c.snippet.slice(0, 220)}`).join("\n\n")}
 
 Return ONLY a JSON array — no markdown, no explanation:
 [{"index": 1, "label": "Urgent"|"Needs Reply"|"FYI", "reason": "..."}]`;
