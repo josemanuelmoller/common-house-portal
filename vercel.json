@@ -88,6 +88,10 @@
     {
       "path": "/api/cron/observe-calendar",
       "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/plan/compute-kpi",
+      "schedule": "15 3 * * *"
     }
   ]
 }

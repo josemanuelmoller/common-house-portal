@@ -50,13 +50,6 @@ export default async function PlanPage() {
               >
                 ▲ Quarter Close
               </button>
-              <button
-                disabled
-                className="text-[11px] font-bold px-4 py-2 rounded-md bg-[#B2FF59]/30 text-[#B2FF59] cursor-not-allowed"
-                title="Próximo sprint"
-              >
-                + Nuevo objetivo
-              </button>
             </div>
           </div>
         </header>

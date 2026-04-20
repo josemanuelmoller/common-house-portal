@@ -1,14 +1,27 @@
 "use client";
 
 import { useState, useMemo, useEffect, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import type {
   StrategicObjective,
   ObjectiveArea,
   ObjectiveTier,
+  ObjectiveType,
+  ObjectiveStatus,
   ObjectiveMetricType,
   QuarterRevenueSummary,
 } from "@/lib/plan";
 import { areaLabel, typeLabel, groupObjectivesByArea } from "@/lib/plan";
+
+const AREAS: ObjectiveArea[] = ["commercial", "partnerships", "product", "brand", "ops", "funding"];
+const TYPES: ObjectiveType[] = ["revenue", "milestone", "asset", "client_goal", "event", "hiring"];
+const TIERS_LIST: ObjectiveTier[] = ["high", "mid", "low"];
+const STATUSES: ObjectiveStatus[] = ["active", "achieved", "slipped", "dropped"];
+const METRICS: ObjectiveMetricType[] = [
+  "manual", "revenue_sum", "revenue_pipeline", "contracts_count",
+  "client_count_by_type", "geo_spread", "hiring_filled",
+  "milestone_binary", "event_attended", "asset_published", "mou_signed", "custom_sql",
+];
 
 type Props = {
   objectives2026: StrategicObjective[];
@@ -268,11 +281,13 @@ function AnnualAdjustedCell({ summaries }: { summaries: QuarterRevenueSummary[] 
 // ─── Main component ──────────────────────────────────────────────────────────
 
 export default function PlanView({ objectives2026, objectives2027, revenue2026, currentQuarter }: Props) {
+  const router = useRouter();
   const [tab, setTab] = useState<TabKey>(
     currentQuarter >= 1 && currentQuarter <= 4 ? (`q${currentQuarter}-2026` as TabKey) : "q2-2026"
   );
   const [highOnly, setHighOnly] = useState(false);
   const [selected, setSelected] = useState<StrategicObjective | null>(null);
+  const [creating, setCreating] = useState(false);
 
   // Pick objectives for the active tab
   const tabObjectivesAll = useMemo(() => {
@@ -332,7 +347,15 @@ export default function PlanView({ objectives2026, objectives2027, revenue2026, 
           })}
           <Tab label="Q1 2027" active={tab === "q1-2027"} onClick={() => setTab("q1-2027")} />
         </div>
-        <div className="text-[10px] text-[#131218]/40 font-medium">Última sync: hace {Math.floor(Math.random() * 5) + 1} min</div>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setCreating(true)}
+            className="text-[11px] font-bold px-3 py-1.5 rounded-md bg-[#B2FF59] text-[#131218] hover:bg-[#B2FF59]/80 transition-colors"
+          >
+            + Nuevo objetivo
+          </button>
+          <div className="text-[10px] text-[#131218]/40 font-medium">Última sync: hace {Math.floor(Math.random() * 5) + 1} min</div>
+        </div>
       </div>
 
       {/* Revenue strip (only for quarter views, not annual) */}
@@ -406,12 +429,43 @@ export default function PlanView({ objectives2026, objectives2027, revenue2026, 
         </div>
       )}
 
-      {selected && <ObjectiveDrawer obj={selected} onClose={() => setSelected(null)} />}
+      {selected && (
+        <ObjectiveDrawer
+          obj={selected}
+          onClose={() => setSelected(null)}
+          onSaved={(updated) => {
+            setSelected(updated);
+            router.refresh();
+          }}
+        />
+      )}
+      {creating && (
+        <CreateObjectiveModal
+          defaultYear={tab === "q1-2027" ? 2027 : 2026}
+          defaultQuarter={
+            tab === "annual-2026" ? null :
+            tab === "q1-2027" ? 1 :
+            parseInt(tab.charAt(1), 10)
+          }
+          onClose={() => setCreating(false)}
+          onCreated={() => {
+            setCreating(false);
+            router.refresh();
+          }}
+        />
+      )}
     </div>
   );
 }
 
-function ObjectiveDrawer({ obj, onClose }: { obj: StrategicObjective; onClose: () => void }) {
+type DrawerProps = {
+  obj: StrategicObjective;
+  onClose: () => void;
+  onSaved: (updated: StrategicObjective) => void;
+};
+
+function ObjectiveDrawer({ obj, onClose, onSaved }: DrawerProps) {
+  const [mode, setMode] = useState<"view" | "edit">("view");
   const progress =
     obj.target_value && obj.current_value != null
       ? pct(Number(obj.current_value), Number(obj.target_value))
@@ -442,13 +496,23 @@ function ObjectiveDrawer({ obj, onClose }: { obj: StrategicObjective; onClose: (
             <p className="text-[8px] font-bold tracking-[2.5px] uppercase text-white/40">
               Objetivo · {obj.year}{obj.quarter ? ` · Q${obj.quarter}` : " · Anual"}
             </p>
-            <button
-              onClick={onClose}
-              className="text-white/60 hover:text-white text-lg leading-none"
-              aria-label="Cerrar"
-            >
-              ×
-            </button>
+            <div className="flex items-center gap-2">
+              {mode === "view" && (
+                <button
+                  onClick={() => setMode("edit")}
+                  className="text-[10px] font-bold tracking-[0.5px] px-2.5 py-1 rounded border border-white/30 text-white/80 hover:text-white hover:border-white/60"
+                >
+                  Editar
+                </button>
+              )}
+              <button
+                onClick={onClose}
+                className="text-white/60 hover:text-white text-lg leading-none"
+                aria-label="Cerrar"
+              >
+                ×
+              </button>
+            </div>
           </div>
           <h2 className="text-[1.25rem] font-light tracking-[-0.5px] mt-2">
             {obj.title}
@@ -458,7 +522,25 @@ function ObjectiveDrawer({ obj, onClose }: { obj: StrategicObjective; onClose: (
             <StatusPill status={obj.status} />
           </div>
         </header>
+        {mode === "edit" ? (
+          <EditObjectiveForm
+            obj={obj}
+            onCancel={() => setMode("view")}
+            onSaved={(updated) => {
+              onSaved(updated);
+              setMode("view");
+            }}
+          />
+        ) : (
+          <ViewObjectiveBody obj={obj} progress={progress} />
+        )}
+      </aside>
+    </>
+  );
+}
 
+function ViewObjectiveBody({ obj, progress }: { obj: StrategicObjective; progress: number | null }) {
+  return (
         <div className="px-7 py-6 space-y-5">
           <DrawerField label="Descripción" value={obj.description} />
           <div className="grid grid-cols-2 gap-4">
@@ -575,11 +657,527 @@ function ObjectiveDrawer({ obj, onClose }: { obj: StrategicObjective; onClose: (
             </div>
           </div>
 
-          <div className="pt-4 text-[10px] text-[#131218]/40 italic">
-            Edición llega en el próximo sprint — por ahora read-only.
+        </div>
+  );
+}
+
+function EditObjectiveForm({
+  obj,
+  onCancel,
+  onSaved,
+}: {
+  obj: StrategicObjective;
+  onCancel: () => void;
+  onSaved: (updated: StrategicObjective) => void;
+}) {
+  const [title, setTitle] = useState(obj.title);
+  const [description, setDescription] = useState(obj.description ?? "");
+  const [tier, setTier] = useState<ObjectiveTier>(obj.tier);
+  const [status, setStatus] = useState<ObjectiveStatus>(obj.status);
+  const [quarter, setQuarter] = useState<number | null>(obj.quarter);
+  const [area, setArea] = useState<ObjectiveArea>(obj.area);
+  const [objectiveType, setObjectiveType] = useState<ObjectiveType>(obj.objective_type);
+  const [targetValue, setTargetValue] = useState<string>(
+    obj.target_value != null ? String(obj.target_value) : ""
+  );
+  const [targetUnit, setTargetUnit] = useState(obj.target_unit ?? "");
+  const [metricType, setMetricType] = useState<ObjectiveMetricType>(obj.metric_type);
+  const [metricParamsText, setMetricParamsText] = useState(
+    JSON.stringify(obj.metric_params ?? {}, null, 2)
+  );
+  const [notes, setNotes] = useState(obj.notes ?? "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  async function onSave() {
+    setSaving(true);
+    setError(null);
+    let parsedParams: Record<string, unknown>;
+    try {
+      parsedParams = metricParamsText.trim() ? JSON.parse(metricParamsText) : {};
+    } catch {
+      setError("metric_params no es JSON válido");
+      setSaving(false);
+      return;
+    }
+    try {
+      const res = await fetch(`/api/plan/objectives/${obj.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          title: title.trim(),
+          description: description.trim() || null,
+          tier,
+          status,
+          quarter,
+          area,
+          objective_type: objectiveType,
+          target_value: targetValue.trim() ? Number(targetValue) : null,
+          target_unit: targetUnit.trim() || null,
+          metric_type: metricType,
+          metric_params: parsedParams,
+          notes: notes.trim() || null,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? `status ${res.status}`);
+      onSaved(json.objective as StrategicObjective);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "error al guardar");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function onDelete() {
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/plan/objectives/${obj.id}`, { method: "DELETE" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? `status ${res.status}`);
+      onSaved(json.objective as StrategicObjective);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "error al archivar");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="px-7 py-6 space-y-4">
+      <FormField label="Título">
+        <input
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          className="w-full text-[13px] px-3 py-2 border border-[#E0E0D8] rounded-md focus:outline-none focus:border-[#131218]"
+        />
+      </FormField>
+
+      <FormField label="Descripción">
+        <textarea
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          rows={3}
+          className="w-full text-[12px] px-3 py-2 border border-[#E0E0D8] rounded-md focus:outline-none focus:border-[#131218] resize-y"
+        />
+      </FormField>
+
+      <div className="grid grid-cols-2 gap-3">
+        <FormField label="Tier">
+          <select
+            value={tier}
+            onChange={(e) => setTier(e.target.value as ObjectiveTier)}
+            className="w-full text-[12px] px-3 py-2 border border-[#E0E0D8] rounded-md bg-white focus:outline-none focus:border-[#131218]"
+          >
+            {TIERS_LIST.map((t) => (
+              <option key={t} value={t}>
+                {t.toUpperCase()}
+              </option>
+            ))}
+          </select>
+        </FormField>
+        <FormField label="Status">
+          <select
+            value={status}
+            onChange={(e) => setStatus(e.target.value as ObjectiveStatus)}
+            className="w-full text-[12px] px-3 py-2 border border-[#E0E0D8] rounded-md bg-white focus:outline-none focus:border-[#131218]"
+          >
+            {STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        </FormField>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <FormField label="Área">
+          <select
+            value={area}
+            onChange={(e) => setArea(e.target.value as ObjectiveArea)}
+            className="w-full text-[12px] px-3 py-2 border border-[#E0E0D8] rounded-md bg-white focus:outline-none focus:border-[#131218]"
+          >
+            {AREAS.map((a) => (
+              <option key={a} value={a}>
+                {areaLabel(a)}
+              </option>
+            ))}
+          </select>
+        </FormField>
+        <FormField label="Tipo">
+          <select
+            value={objectiveType}
+            onChange={(e) => setObjectiveType(e.target.value as ObjectiveType)}
+            className="w-full text-[12px] px-3 py-2 border border-[#E0E0D8] rounded-md bg-white focus:outline-none focus:border-[#131218]"
+          >
+            {TYPES.map((t) => (
+              <option key={t} value={t}>
+                {typeLabel(t)}
+              </option>
+            ))}
+          </select>
+        </FormField>
+      </div>
+
+      <FormField label="Quarter (vacío = anual)">
+        <select
+          value={quarter ?? ""}
+          onChange={(e) => setQuarter(e.target.value === "" ? null : Number(e.target.value))}
+          className="w-full text-[12px] px-3 py-2 border border-[#E0E0D8] rounded-md bg-white focus:outline-none focus:border-[#131218]"
+        >
+          <option value="">Anual</option>
+          {[1, 2, 3, 4].map((q) => (
+            <option key={q} value={q}>
+              Q{q}
+            </option>
+          ))}
+        </select>
+      </FormField>
+
+      <div className="grid grid-cols-2 gap-3">
+        <FormField label="Target">
+          <input
+            value={targetValue}
+            onChange={(e) => setTargetValue(e.target.value)}
+            type="number"
+            step="any"
+            className="w-full text-[12px] px-3 py-2 border border-[#E0E0D8] rounded-md focus:outline-none focus:border-[#131218]"
+          />
+        </FormField>
+        <FormField label="Unit">
+          <input
+            value={targetUnit}
+            onChange={(e) => setTargetUnit(e.target.value)}
+            placeholder="USD, orgs, events..."
+            className="w-full text-[12px] px-3 py-2 border border-[#E0E0D8] rounded-md focus:outline-none focus:border-[#131218]"
+          />
+        </FormField>
+      </div>
+
+      <FormField label="Cómo se mide">
+        <select
+          value={metricType}
+          onChange={(e) => setMetricType(e.target.value as ObjectiveMetricType)}
+          className="w-full text-[12px] px-3 py-2 border border-[#E0E0D8] rounded-md bg-white focus:outline-none focus:border-[#131218]"
+        >
+          {METRICS.map((m) => (
+            <option key={m} value={m}>
+              {metricLabel(m)}
+            </option>
+          ))}
+        </select>
+      </FormField>
+
+      {metricType !== "manual" && (
+        <FormField label="metric_params (JSON)">
+          <textarea
+            value={metricParamsText}
+            onChange={(e) => setMetricParamsText(e.target.value)}
+            rows={4}
+            className="w-full text-[11px] font-mono px-3 py-2 border border-[#E0E0D8] rounded-md focus:outline-none focus:border-[#131218] resize-y bg-[#FAFAF6]"
+          />
+        </FormField>
+      )}
+
+      <FormField label="Notas">
+        <textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          rows={2}
+          className="w-full text-[12px] px-3 py-2 border border-[#E0E0D8] rounded-md focus:outline-none focus:border-[#131218] resize-y"
+        />
+      </FormField>
+
+      {error && (
+        <div className="text-[11px] text-red-700 bg-red-50 border border-red-200 rounded px-3 py-2">
+          {error}
+        </div>
+      )}
+
+      <div className="flex items-center justify-between pt-4 border-t border-[#E0E0D8]">
+        {confirmDelete ? (
+          <div className="flex items-center gap-2">
+            <span className="text-[10.5px] text-red-700">¿Archivar?</span>
+            <button
+              onClick={onDelete}
+              disabled={saving}
+              className="text-[10.5px] font-bold px-2.5 py-1 rounded bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
+            >
+              Sí
+            </button>
+            <button
+              onClick={() => setConfirmDelete(false)}
+              className="text-[10.5px] px-2.5 py-1 rounded border border-[#E0E0D8] hover:border-[#131218]"
+            >
+              No
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setConfirmDelete(true)}
+            disabled={saving}
+            className="text-[10.5px] text-red-700 hover:text-red-800"
+          >
+            Archivar
+          </button>
+        )}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onCancel}
+            disabled={saving}
+            className="text-[11px] font-semibold px-3 py-1.5 rounded border border-[#E0E0D8] hover:border-[#131218]"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={onSave}
+            disabled={saving}
+            className="text-[11px] font-bold px-4 py-1.5 rounded bg-[#B2FF59] text-[#131218] hover:bg-[#B2FF59]/80 disabled:opacity-50"
+          >
+            {saving ? "Guardando..." : "Guardar"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FormField({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div>
+      <label className="text-[8.5px] font-bold tracking-[1.8px] uppercase text-[#131218]/50 mb-1.5 block">
+        {label}
+      </label>
+      {children}
+    </div>
+  );
+}
+
+function CreateObjectiveModal({
+  defaultYear,
+  defaultQuarter,
+  onClose,
+  onCreated,
+}: {
+  defaultYear: number;
+  defaultQuarter: number | null;
+  onClose: () => void;
+  onCreated: (obj: StrategicObjective) => void;
+}) {
+  const [title, setTitle] = useState("");
+  const [year, setYear] = useState(defaultYear);
+  const [quarter, setQuarter] = useState<number | null>(defaultQuarter);
+  const [area, setArea] = useState<ObjectiveArea>("commercial");
+  const [objectiveType, setObjectiveType] = useState<ObjectiveType>("milestone");
+  const [tier, setTier] = useState<ObjectiveTier>("mid");
+  const [targetValue, setTargetValue] = useState("");
+  const [targetUnit, setTargetUnit] = useState("");
+  const [metricType, setMetricType] = useState<ObjectiveMetricType>("manual");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  async function onCreate() {
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/plan/objectives", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          title: title.trim(),
+          year,
+          quarter,
+          area,
+          objective_type: objectiveType,
+          tier,
+          target_value: targetValue.trim() ? Number(targetValue) : null,
+          target_unit: targetUnit.trim() || null,
+          metric_type: metricType,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? `status ${res.status}`);
+      onCreated(json.objective as StrategicObjective);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "error al crear");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <>
+      <div onClick={onClose} className="fixed inset-0 bg-black/50 z-40" aria-hidden />
+      <div
+        role="dialog"
+        aria-label="Nuevo objetivo"
+        className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-[540px] max-h-[90vh] overflow-y-auto bg-white rounded-2xl shadow-xl z-50"
+      >
+        <header className="bg-[#131218] text-white px-6 py-5 rounded-t-2xl">
+          <div className="flex items-center justify-between">
+            <p className="text-[8px] font-bold tracking-[2.5px] uppercase text-white/40">
+              Nuevo
+            </p>
+            <button
+              onClick={onClose}
+              className="text-white/60 hover:text-white text-lg leading-none"
+              aria-label="Cerrar"
+            >
+              ×
+            </button>
+          </div>
+          <h2 className="text-[1.25rem] font-light tracking-[-0.5px] mt-1">
+            Crear <em className="font-black not-italic italic text-[#B2FF59]">objetivo</em>
+          </h2>
+        </header>
+        <div className="px-6 py-5 space-y-4">
+          <FormField label="Título">
+            <input
+              autoFocus
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Ej: Un cliente grande en Francia"
+              className="w-full text-[13px] px-3 py-2 border border-[#E0E0D8] rounded-md focus:outline-none focus:border-[#131218]"
+            />
+          </FormField>
+
+          <div className="grid grid-cols-3 gap-3">
+            <FormField label="Year">
+              <input
+                value={year}
+                onChange={(e) => setYear(Number(e.target.value))}
+                type="number"
+                className="w-full text-[12px] px-3 py-2 border border-[#E0E0D8] rounded-md focus:outline-none focus:border-[#131218]"
+              />
+            </FormField>
+            <FormField label="Quarter">
+              <select
+                value={quarter ?? ""}
+                onChange={(e) => setQuarter(e.target.value === "" ? null : Number(e.target.value))}
+                className="w-full text-[12px] px-3 py-2 border border-[#E0E0D8] rounded-md bg-white focus:outline-none focus:border-[#131218]"
+              >
+                <option value="">Anual</option>
+                {[1, 2, 3, 4].map((q) => (
+                  <option key={q} value={q}>
+                    Q{q}
+                  </option>
+                ))}
+              </select>
+            </FormField>
+            <FormField label="Tier">
+              <select
+                value={tier}
+                onChange={(e) => setTier(e.target.value as ObjectiveTier)}
+                className="w-full text-[12px] px-3 py-2 border border-[#E0E0D8] rounded-md bg-white focus:outline-none focus:border-[#131218]"
+              >
+                {TIERS_LIST.map((t) => (
+                  <option key={t} value={t}>
+                    {t.toUpperCase()}
+                  </option>
+                ))}
+              </select>
+            </FormField>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <FormField label="Área">
+              <select
+                value={area}
+                onChange={(e) => setArea(e.target.value as ObjectiveArea)}
+                className="w-full text-[12px] px-3 py-2 border border-[#E0E0D8] rounded-md bg-white focus:outline-none focus:border-[#131218]"
+              >
+                {AREAS.map((a) => (
+                  <option key={a} value={a}>
+                    {areaLabel(a)}
+                  </option>
+                ))}
+              </select>
+            </FormField>
+            <FormField label="Tipo">
+              <select
+                value={objectiveType}
+                onChange={(e) => setObjectiveType(e.target.value as ObjectiveType)}
+                className="w-full text-[12px] px-3 py-2 border border-[#E0E0D8] rounded-md bg-white focus:outline-none focus:border-[#131218]"
+              >
+                {TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {typeLabel(t)}
+                  </option>
+                ))}
+              </select>
+            </FormField>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <FormField label="Target (opcional)">
+              <input
+                value={targetValue}
+                onChange={(e) => setTargetValue(e.target.value)}
+                type="number"
+                step="any"
+                placeholder="500000, 3, ..."
+                className="w-full text-[12px] px-3 py-2 border border-[#E0E0D8] rounded-md focus:outline-none focus:border-[#131218]"
+              />
+            </FormField>
+            <FormField label="Unit">
+              <input
+                value={targetUnit}
+                onChange={(e) => setTargetUnit(e.target.value)}
+                placeholder="USD, orgs, ..."
+                className="w-full text-[12px] px-3 py-2 border border-[#E0E0D8] rounded-md focus:outline-none focus:border-[#131218]"
+              />
+            </FormField>
+          </div>
+
+          <FormField label="Cómo se mide (métrica auto, default manual)">
+            <select
+              value={metricType}
+              onChange={(e) => setMetricType(e.target.value as ObjectiveMetricType)}
+              className="w-full text-[12px] px-3 py-2 border border-[#E0E0D8] rounded-md bg-white focus:outline-none focus:border-[#131218]"
+            >
+              {METRICS.map((m) => (
+                <option key={m} value={m}>
+                  {metricLabel(m)}
+                </option>
+              ))}
+            </select>
+          </FormField>
+
+          {error && (
+            <div className="text-[11px] text-red-700 bg-red-50 border border-red-200 rounded px-3 py-2">
+              {error}
+            </div>
+          )}
+
+          <div className="flex items-center justify-end gap-2 pt-2">
+            <button
+              onClick={onClose}
+              disabled={saving}
+              className="text-[11px] font-semibold px-3 py-1.5 rounded border border-[#E0E0D8] hover:border-[#131218]"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={onCreate}
+              disabled={saving || !title.trim()}
+              className="text-[11px] font-bold px-4 py-1.5 rounded bg-[#B2FF59] text-[#131218] hover:bg-[#B2FF59]/80 disabled:opacity-50"
+            >
+              {saving ? "Creando..." : "Crear"}
+            </button>
           </div>
         </div>
-      </aside>
+      </div>
     </>
   );
 }
