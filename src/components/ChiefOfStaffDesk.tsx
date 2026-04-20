@@ -76,6 +76,8 @@ function statusBadge(status: CoSTask["taskStatus"]): { label: string; cls: strin
   switch (status) {
     case "in-progress": return { label: "In progress", cls: "bg-blue-50 text-blue-600 border-blue-200" };
     case "waiting":     return { label: "Waiting",     cls: "bg-[#EFEFEA] text-[#131218]/40 border-[#E0E0D8]" };
+    // "todo" for a row that was previously reopened — Loop Engine surfaces it
+    // as actionable again, but we still want the lineage context visible.
     default:            return null;
   }
 }
@@ -334,75 +336,84 @@ export function ChiefOfStaffDesk({ tasks }: { tasks: CoSTask[] }) {
 
   async function handleStatusChange(taskId: string, status: string) {
     setUpdating(taskId);
-    // Optimistic hide for Done / Dropped
-    if (status === "Done" || status === "Dropped") {
+
+    // Optimistic hide for TERMINAL transitions only (Done, Dropped).
+    // Waiting / In Progress are VISIBLE persistent states — never hide them.
+    const terminal = status === "Done" || status === "Dropped";
+    if (terminal) {
       setLocalDone(prev => new Set(prev).add(taskId));
     }
 
     const task = tasks.find(t => t.id === taskId);
-
-    // Reliable Loop Engine detection: use loopEngineId field set only by mapLoopToCoSTask.
-    // Do NOT use UUID regex — Notion page IDs are also UUID format and would false-positive.
     const isLoopEngineTask = !!task?.loopEngineId;
 
-    if (isLoopEngineTask) {
-      // Loop Engine task — write to /api/cos-loops (status transitions + loop_action)
-      // Also write to /api/followup-status if the loop is opportunity-sourced (keeps Notion in sync)
-      try {
-        await fetch("/api/cos-loops", {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ loopId: task.loopEngineId, status }),
-        });
-
-        // If this loop maps to a Notion opportunity, also update Follow-up Status there
-        if (task?.taskSource === "opportunity" && task.pendingAction) {
-          // notionUrl contains the Notion page URL; extract the page ID from it
-          const notionPageId = task.notionUrl.split("/").pop()?.replace(/-/g, "");
-          if (notionPageId && notionPageId.length === 32) {
-            // Fire-and-forget — don't block on Notion
-            fetch("/api/followup-status", {
-              method: "PATCH",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ opportunityId: notionPageId, status }),
-            }).catch(() => {});
-          }
-        }
-
-        router.refresh();
-      } catch {
-        if (status === "Done" || status === "Dropped") {
-          setLocalDone(prev => { const s = new Set(prev); s.delete(taskId); return s; });
-        }
-      } finally {
-        setUpdating(null);
-      }
-      return;
-    }
-
-    // Notion-fallback task (Notion page ID, not UUID)
-    if (task?.taskSource === "project" || task?.taskSource === "evidence") {
-      // No Notion field to update — hide locally only
-      router.refresh();
-      setUpdating(null);
-      return;
-    }
+    let cosOk  = true;
+    let loopSyncOk = true;
 
     try {
-      await fetch("/api/followup-status", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ opportunityId: taskId, status }),
-      });
-      router.refresh();
+      if (isLoopEngineTask) {
+        const resp = await fetch("/api/cos-loops", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ loopId: task!.loopEngineId, status }),
+        });
+        cosOk = resp.ok;
+
+        // Keep Notion in sync for opportunity-sourced loops. Now AWAITED so we
+        // know the real end-to-end result — persistence must be confirmed both
+        // in Supabase (loops) and in Notion (Follow-up Status) for opportunity
+        // tasks, otherwise a refresh would revert the button.
+        if (task?.taskSource === "opportunity") {
+          const notionPageId = task.notionUrl.split("/").pop()?.replace(/-/g, "");
+          if (notionPageId && notionPageId.length === 32) {
+            try {
+              const r2 = await fetch("/api/followup-status", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ opportunityId: notionPageId, status }),
+              });
+              if (r2.ok) {
+                const body = await r2.json().catch(() => ({} as { loop_sync_ok?: boolean }));
+                loopSyncOk = body?.loop_sync_ok !== false;
+              } else {
+                loopSyncOk = false;
+              }
+            } catch {
+              loopSyncOk = false;
+            }
+          }
+        }
+      } else if (task?.taskSource === "project" || task?.taskSource === "evidence") {
+        // Notion-fallback task (no Loop Engine row). Hall renders from a
+        // separate read path in this case; nothing to persist server-side.
+        // (Kept as a no-op branch — preserves prior behavior for cold start.)
+      } else {
+        // Notion-fallback opportunity
+        const resp = await fetch("/api/followup-status", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ opportunityId: taskId, status }),
+        });
+        cosOk = resp.ok;
+      }
     } catch {
-      // On error, remove the optimistic hide
-      if (status === "Done" || status === "Dropped") {
+      cosOk = false;
+    }
+
+    if (!cosOk || !loopSyncOk) {
+      // Revert optimistic hide on failure; user will retry.
+      if (terminal) {
         setLocalDone(prev => { const s = new Set(prev); s.delete(taskId); return s; });
       }
-    } finally {
-      setUpdating(null);
+      // Visible surface for partial failure (followup-status shape).
+      if (!loopSyncOk) {
+        console.warn("[ChiefOfStaffDesk] Partial persistence: Notion updated but Loop Engine sync failed.");
+      }
     }
+
+    // Always refresh so the server-rendered list reflects the new state.
+    router.refresh();
+    setUpdating(null);
   }
 
   const visible = tasks.filter(t => !localDone.has(t.id));
@@ -459,6 +470,100 @@ export function ChiefOfStaffDesk({ tasks }: { tasks: CoSTask[] }) {
           />
         ))}
       </div>
+    </div>
+  );
+}
+
+// ─── Parked Section ───────────────────────────────────────────────────────────
+//
+// Separate compact strip for loops the user has explicitly marked Waiting.
+// These persist across refreshes. Resume = transition back to open.
+// Done / Drop on a parked loop move it to terminal state.
+
+export function ParkedLoopsSection({ tasks }: { tasks: CoSTask[] }) {
+  const router = useRouter();
+  const [updating, setUpdating] = useState<string | null>(null);
+  const [hidden, setHidden]     = useState<Set<string>>(new Set());
+
+  async function transition(taskId: string, loopId: string, status: string) {
+    setUpdating(taskId);
+    if (status === "Done" || status === "Dropped" || status === "Needed") {
+      setHidden(prev => new Set(prev).add(taskId));
+    }
+    try {
+      const resp = await fetch("/api/cos-loops", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ loopId, status }),
+      });
+      if (!resp.ok) {
+        setHidden(prev => { const s = new Set(prev); s.delete(taskId); return s; });
+      }
+    } catch {
+      setHidden(prev => { const s = new Set(prev); s.delete(taskId); return s; });
+    }
+    router.refresh();
+    setUpdating(null);
+  }
+
+  const visible = tasks.filter(t => !hidden.has(t.id));
+  if (visible.length === 0) return null;
+
+  return (
+    <div className="bg-[#FAFAF8] border border-dashed border-[#E0E0D8] rounded-2xl overflow-hidden">
+      <div className="px-5 py-2.5 border-b border-[#EFEFEA] flex items-center gap-2">
+        <span className="text-[9px] font-bold uppercase tracking-widest text-[#131218]/35">
+          Parked · Waiting
+        </span>
+        <span className="text-[9px] text-[#131218]/25">{visible.length}</span>
+        <span className="text-[9px] text-[#131218]/25 ml-auto">
+          Out of the urgent queue until you resume
+        </span>
+      </div>
+      <ul className="divide-y divide-[#EFEFEA]">
+        {visible.map(task => {
+          const loopId = task.loopEngineId;
+          if (!loopId) return null;
+          const isUpdating = updating === task.id;
+          return (
+            <li key={task.id} className="px-5 py-2.5 flex items-center gap-3">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#131218]/20 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-[11.5px] font-semibold text-[#131218]/70 truncate">
+                  {task.taskTitle}
+                </p>
+                <p className="text-[9.5px] text-[#131218]/30 truncate">
+                  {task.opportunityName}
+                </p>
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                <button
+                  onClick={() => transition(task.id, loopId, "Needed")}
+                  disabled={isUpdating}
+                  className="text-[9px] font-bold text-[#131218]/50 bg-white border border-[#E0E0D8] hover:bg-[#EFEFEA] px-2 py-1 rounded-full transition-colors disabled:opacity-40"
+                >
+                  Resume
+                </button>
+                <button
+                  onClick={() => transition(task.id, loopId, "Done")}
+                  disabled={isUpdating}
+                  className="text-[9px] font-bold text-green-600 bg-green-50 border border-green-200 hover:bg-green-100 px-2 py-1 rounded-full transition-colors disabled:opacity-40"
+                >
+                  ✓ Done
+                </button>
+                <button
+                  onClick={() => transition(task.id, loopId, "Dropped")}
+                  disabled={isUpdating}
+                  className="text-[9px] font-bold text-[#131218]/30 hover:text-[#131218]/50 transition-colors px-1"
+                  title="Drop"
+                >
+                  ×
+                </button>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }

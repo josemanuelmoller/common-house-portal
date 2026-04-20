@@ -25,13 +25,17 @@ import { Client } from "@notionhq/client";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import {
   buildNormalizedKey,
+  buildIntentKey,
   classifyOpportunityLoop,
   computePriorityScore,
   isActionablePendingAction,
   isGrant,
+  isMateriallyNewEvidence,
   isPassiveDiscovery,
+  normalizeFingerprint,
   type Loop,
   type LoopType,
+  type NormalizedKeyVariant,
   type SignalType,
 } from "@/lib/loops";
 
@@ -120,10 +124,22 @@ function isOperatorActionable(title: string, excerpt: string | null): boolean {
 
 type UpsertLoopInput = Omit<Loop,
   "id" | "status" | "signal_count" | "first_seen_at" | "last_seen_at" |
-  "last_action_at" | "created_at" | "updated_at" | "founder_interest"
->;
+  "last_action_at" | "created_at" | "updated_at" | "founder_interest" |
+  "lineage_id" | "parent_loop_id" |
+  "resolved_at" | "dismissed_at" | "reopened_at" | "reopen_count" |
+  "last_meaningful_evidence_at" | "last_evidence_fingerprint"
+> & {
+  variant?: NormalizedKeyVariant | null;
+};
 
-type Stats = { upserted: number; skipped: number; signals_added: number; errors: string[] };
+type Stats = {
+  upserted: number;
+  skipped: number;
+  signals_added: number;
+  reopened: number;
+  suppressed_reopens: number;   // matched a closed loop but evidence was NOT materially new
+  errors: string[];
+};
 
 async function upsertLoop(
   input: UpsertLoopInput,
@@ -136,27 +152,64 @@ async function upsertLoop(
   const sb = getSupabaseServerClient();
 
   try {
-    // 1. Upsert the loop row (ON CONFLICT normalized_key)
-    //    - On insert: all fields written fresh
-    //    - On conflict: update mutable fields only; preserve status/first_seen_at
-    const { data: existing } = await sb
+    // ── 1. Compute intent_key + evidence fingerprint ──────────────────────────
+    const fingerprintSource = signalExcerpt || input.title || input.linked_entity_name;
+    const incomingFingerprint = normalizeFingerprint(fingerprintSource);
+    const intentKey = input.intent_key ?? buildIntentKey({
+      entityType:  input.linked_entity_type,
+      entitySlug:  input.linked_entity_name || input.linked_entity_id,
+      loopType:    input.loop_type,
+      variant:     input.variant ?? null,
+      contentText: fingerprintSource,
+    });
+
+    // ── 2. Two-tier identity lookup ───────────────────────────────────────────
+    //    (a) normalized_key (same Notion page re-synced)
+    //    (b) intent_key     (same underlying issue, possibly different page)
+    const { data: byNormalized } = await sb
       .from("loops")
-      .select("id, status, signal_count, founder_interest")
+      .select("id, status, signal_count, founder_interest, lineage_id, last_evidence_fingerprint")
       .eq("normalized_key", input.normalized_key)
-      .single();
+      .maybeSingle();
+
+    let existing = byNormalized;
+    let matchedBy: "normalized_key" | "intent_key" | null =
+      byNormalized ? "normalized_key" : null;
+
+    if (!existing) {
+      // Intent-key fallback: semantic match. Prefer active loops, then most recent.
+      const { data: byIntent } = await sb
+        .from("loops")
+        .select("id, status, signal_count, founder_interest, lineage_id, last_evidence_fingerprint")
+        .eq("intent_key", intentKey)
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (byIntent) {
+        existing = byIntent;
+        matchedBy = "intent_key";
+      }
+    }
 
     let loopId: string;
 
     if (!existing) {
-      // Fresh insert
+      // ── 3a. Fresh insert ───────────────────────────────────────────────────
+      // Strip non-column fields (variant) before passing to Supabase.
+      const { variant: _v, ...insertable } = input;
+      void _v;
       const { data, error } = await sb
         .from("loops")
         .insert({
-          ...input,
-          status: "open",
-          signal_count: 1,
-          first_seen_at: new Date().toISOString(),
-          last_seen_at: new Date().toISOString(),
+          ...insertable,
+          intent_key:                   intentKey,
+          status:                       "open",
+          signal_count:                 1,
+          first_seen_at:                new Date().toISOString(),
+          last_seen_at:                 new Date().toISOString(),
+          last_meaningful_evidence_at:  new Date().toISOString(),
+          last_evidence_fingerprint:    incomingFingerprint,
+          reopen_count:                 0,
         })
         .select("id")
         .single();
@@ -168,20 +221,20 @@ async function upsertLoop(
 
       loopId = data.id;
 
-      // Log creation action
+      // Lineage self-seed: lineage_id = id for fresh loops.
+      await sb.from("loops").update({ lineage_id: loopId }).eq("id", loopId);
+
       await sb.from("loop_actions").insert({
-        loop_id: loopId,
+        loop_id:     loopId,
         action_type: "created",
-        actor: "system",
-        note: `Source: ${signalType}`,
+        actor:       "system",
+        note:        `Source: ${signalType} · intent_key=${intentKey}`,
       });
 
       stats.upserted++;
     } else {
+      // ── 3b. Match found — update mutable fields ────────────────────────────
       loopId = existing.id;
-
-      // Update mutable fields (priority score may have changed; reopen if dismissed/resolved and new signal)
-      const shouldReopen = existing.status === "resolved" || existing.status === "dismissed";
       const updatePayload: Record<string, unknown> = {
         title:                input.title,
         priority_score:       input.priority_score,
@@ -195,16 +248,21 @@ async function upsertLoop(
         updated_at:           new Date().toISOString(),
       };
 
-      if (shouldReopen) {
-        // Only reopen if the incoming signal is new (checked below when inserting signal)
-        // We'll handle reopen after signal dedup check
+      // If we matched by intent_key, the new Notion page is a surrogate for the
+      // same underlying topic. Keep the original linked_entity_id stable (don't
+      // flip it), but refresh name/url for display.
+      if (matchedBy === "normalized_key") {
+        updatePayload.linked_entity_name = input.linked_entity_name;
       }
+
+      // Backfill intent_key on old rows if missing.
+      updatePayload.intent_key = intentKey;
 
       await sb.from("loops").update(updatePayload).eq("id", loopId);
       stats.upserted++;
     }
 
-    // 2. Insert signal (dedup by unique constraint: loop_id + signal_type + source_id)
+    // ── 4. Insert signal (dedup by unique: loop_id + signal_type + source_id) ──
     const { error: sigError, data: sigData } = await sb
       .from("loop_signals")
       .insert({
@@ -219,29 +277,91 @@ async function upsertLoop(
 
     const isNewSignal = !sigError && sigData && sigData.length > 0;
 
-    // 3. Reopen logic — two cases:
-    //    a. status = 'resolved' (auto-resolved by sync): source is still active → always reopen.
-    //       Signals are deduped so isNewSignal would always be false here; can't use it as gate.
-    //    b. status = 'dismissed' (user explicitly closed): only reopen if founder didn't drop it
-    //       AND a genuinely new signal arrived.
-    //    Never reopen if founder_interest = 'dropped' — that is a permanent human decision.
-    const autoResolved = existing?.status === "resolved";
-    const userDismissed = existing?.status === "dismissed";
-    const shouldReopen =
-      (autoResolved && existing.founder_interest !== "dropped") ||
-      (userDismissed && isNewSignal && existing.founder_interest !== "dropped");
+    // ── 5. Reopen gate — STRICT materially-new evidence check ─────────────────
+    //
+    //  An existing CLOSED loop may reopen only when:
+    //    - founder_interest ≠ 'dropped'                 (permanent human veto)
+    //    - AND (one of):
+    //        * auto-resolved + source re-activated + materially new evidence,
+    //        * user-dismissed + brand-new signal + materially new evidence.
+    //
+    //  Paraphrase / regenerator rewrite → suppressed. Signal is still recorded
+    //  but the loop stays closed.
 
-    if (existing && shouldReopen) {
-      await sb.from("loops").update({ status: "open", updated_at: new Date().toISOString() }).eq("id", loopId);
-      await sb.from("loop_actions").insert({
-        loop_id:     loopId,
-        action_type: "reopened",
-        actor:       "system",
-        note:        autoResolved ? "Reopened: source still active" : `Reopened by new signal: ${signalType}`,
+    if (existing &&
+        (existing.status === "resolved" || existing.status === "dismissed")) {
+
+      const founderDropped = existing.founder_interest === "dropped";
+      const autoResolved   = existing.status === "resolved";
+      const userDismissed  = existing.status === "dismissed";
+
+      const materiallyNew = isMateriallyNewEvidence({
+        previousFingerprint: existing.last_evidence_fingerprint ?? null,
+        previousSignalType:  null,  // best-effort; prior signal_type not tracked on row
+        incomingFingerprint,
+        incomingSignalType:  signalType,
       });
+
+      const shouldReopen =
+        !founderDropped &&
+        materiallyNew &&
+        (autoResolved || (userDismissed && isNewSignal));
+
+      if (shouldReopen) {
+        const nowIso = new Date().toISOString();
+        // Fetch current reopen_count so we can increment in-flight.
+        const { data: currentRow } = await sb
+          .from("loops")
+          .select("reopen_count")
+          .eq("id", loopId)
+          .single();
+        const nextReopenCount = (currentRow?.reopen_count ?? 0) + 1;
+
+        await sb.from("loops").update({
+          status:                       "reopened",
+          reopened_at:                  nowIso,
+          reopen_count:                 nextReopenCount,
+          last_meaningful_evidence_at:  nowIso,
+          last_evidence_fingerprint:    incomingFingerprint,
+          updated_at:                   nowIso,
+        }).eq("id", loopId);
+
+        await sb.from("loop_actions").insert({
+          loop_id:     loopId,
+          action_type: "reopened",
+          actor:       "system",
+          note:        `Reopened · matchedBy=${matchedBy} · signal=${signalType} · ` +
+                       `${autoResolved ? "source re-active" : "new signal on dismissed"} · ` +
+                       `fingerprint changed`,
+        });
+        stats.reopened++;
+      } else if (!materiallyNew) {
+        // Matched a closed loop but evidence is not materially new — suppress.
+        console.warn(
+          `[sync-loops] Suppressed reopen of ${existing.id} (status=${existing.status}, ` +
+          `matchedBy=${matchedBy}) — evidence not materially new (paraphrase detected).`,
+        );
+        stats.suppressed_reopens++;
+      }
+    } else if (existing && isNewSignal) {
+      // Active loop, new signal arrived — refresh meaningful-evidence watermark.
+      const materiallyNew = isMateriallyNewEvidence({
+        previousFingerprint: existing.last_evidence_fingerprint ?? null,
+        previousSignalType:  null,
+        incomingFingerprint,
+        incomingSignalType:  signalType,
+      });
+      if (materiallyNew) {
+        await sb.from("loops").update({
+          last_meaningful_evidence_at: new Date().toISOString(),
+          last_evidence_fingerprint:   incomingFingerprint,
+        }).eq("id", loopId);
+      }
+    } else if (!existing) {
+      // fresh insert already set fingerprint above
     }
 
-    // 4. Refresh signal_count from actual rows
+    // ── 6. Refresh signal_count + priority from actual rows ───────────────────
     const { count } = await sb
       .from("loop_signals")
       .select("id", { count: "exact", head: true })
@@ -357,10 +477,19 @@ async function syncEvidenceLoops(stats: Stats): Promise<void> {
     const normalizedKey = buildNormalizedKey("evidence", item.id);
     const founderOwned = isFounderOwned(item.title);
     const score = computePriorityScore(loopType, { signalCount: 1, founderOwned });
+    const intentKey = buildIntentKey({
+      entityType:  "evidence",
+      entitySlug:  item.title,
+      loopType,
+      variant:     null,
+      contentText: item.excerpt || item.title,
+    });
 
     await upsertLoop(
       {
         normalized_key:       normalizedKey,
+        intent_key:           intentKey,
+        variant:              null,
         title:                taskTitle,
         loop_type:            loopType,
         intervention_moment:  "urgent",
@@ -484,9 +613,19 @@ async function syncOpportunityLoops(stats: Stats): Promise<void> {
       founderOwned,
     });
 
+    const intentKey = buildIntentKey({
+      entityType:  "opportunity",
+      entitySlug:  name,
+      loopType,
+      variant,
+      contentText: isActionablePendingAction(effectivePending) ? effectivePending! : title,
+    });
+
     await upsertLoop(
       {
         normalized_key:       normalizedKey,
+        intent_key:           intentKey,
+        variant,
         title,
         loop_type:            loopType,
         intervention_moment:  interventionMoment,
@@ -543,9 +682,19 @@ async function syncProjectLoops(stats: Stats): Promise<void> {
     const founderOwned = isFounderOwned(name);
     const score = computePriorityScore(loopType, { signalCount: 1, founderOwned });
 
+    const intentKey = buildIntentKey({
+      entityType:  "project",
+      entitySlug:  name,
+      loopType,
+      variant:     "obstacle",
+      contentText: issueContent || taskTitle,
+    });
+
     await upsertLoop(
       {
         normalized_key:       normalizedKey,
+        intent_key:           intentKey,
+        variant:              "obstacle",
         title:                taskTitle,
         loop_type:            loopType,
         intervention_moment:  "this_week",
@@ -581,11 +730,14 @@ async function autoResolveStaleLoops(): Promise<number> {
   const stdCutoff       = new Date(Date.now() -  65 * 60 * 1000).toISOString();
   const criticalCutoff  = new Date(Date.now() - 240 * 60 * 1000).toISOString(); // 4 h
 
-  // Resolve low-priority loops after 65 min
+  const nowIso = new Date().toISOString();
+
+  // Resolve low-priority loops after 65 min.
+  // Only act on 'open' / 'reopened' — leave 'in_progress' and 'waiting' alone.
   const { data: stdData } = await sb
     .from("loops")
-    .update({ status: "resolved", updated_at: new Date().toISOString() })
-    .eq("status", "open")
+    .update({ status: "resolved", resolved_at: nowIso, updated_at: nowIso })
+    .in("status", ["open", "reopened"])
     .not("loop_type", "in", "(blocker,commitment)")
     .lt("last_seen_at", stdCutoff)
     .select("id");
@@ -593,8 +745,8 @@ async function autoResolveStaleLoops(): Promise<number> {
   // Resolve blockers/commitments only after 4 h
   const { data: critData } = await sb
     .from("loops")
-    .update({ status: "resolved", updated_at: new Date().toISOString() })
-    .eq("status", "open")
+    .update({ status: "resolved", resolved_at: nowIso, updated_at: nowIso })
+    .in("status", ["open", "reopened"])
     .in("loop_type", ["blocker", "commitment"])
     .lt("last_seen_at", criticalCutoff)
     .select("id");
@@ -622,7 +774,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const stats: Stats = { upserted: 0, skipped: 0, signals_added: 0, errors: [] };
+  const stats: Stats = {
+    upserted: 0,
+    skipped: 0,
+    signals_added: 0,
+    reopened: 0,
+    suppressed_reopens: 0,
+    errors: [],
+  };
 
   try {
     // Run all three source syncs in sequence (Notion rate limits)
@@ -635,11 +794,13 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       ok: true,
-      upserted:      stats.upserted,
-      skipped:       stats.skipped,
-      signals_added: stats.signals_added,
-      auto_resolved: autoResolved,
-      errors:        stats.errors,
+      upserted:           stats.upserted,
+      skipped:            stats.skipped,
+      signals_added:      stats.signals_added,
+      reopened:           stats.reopened,
+      suppressed_reopens: stats.suppressed_reopens,
+      auto_resolved:      autoResolved,
+      errors:             stats.errors,
     });
   } catch (err) {
     console.error("[sync-loops] Fatal error:", err);

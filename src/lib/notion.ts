@@ -1012,13 +1012,16 @@ async function getEvidenceOpenLoops(): Promise<CoSTask[]> {
 async function getCoSTasksFromLoops(): Promise<CoSTask[] | null> {
   try {
     const { getSupabaseServerClient } = await import("@/lib/supabase-server");
-    const { mapLoopToCoSTask } = await import("@/lib/loops");
+    const { mapLoopToCoSTask, ACTIVE_LOOP_STATUSES } = await import("@/lib/loops");
     const sb = getSupabaseServerClient();
 
+    // ACTIVE_LOOP_STATUSES = ['open','in_progress','reopened'].
+    // 'waiting' is intentionally excluded — parked items render in a separate
+    // compact Parked section, not mixed into the urgent CoS surface.
     const { data, error } = await sb
       .from("loops")
       .select("*")
-      .in("status", ["open", "in_progress"])
+      .in("status", ACTIVE_LOOP_STATUSES)
       // Track A: gate — passive discovery stays in Radar unless founder marked it interested.
       // Safety net: blockers + commitments always reach CoS regardless of passive flag,
       // because a misclassified blocker going missing is worse than a false-positive.
@@ -1076,6 +1079,33 @@ export async function getRadarLoops(): Promise<RadarLoop[]> {
 
     if (error || !data) return [];
     return data as RadarLoop[];
+  } catch {
+    return [];
+  }
+}
+
+// ─── Parked loops — user-paused ("Waiting") items ────────────────────────────
+//
+// Rendered in a compact Parked strip in Hall, separate from the active CoS desk.
+// Returning the same CoSTask shape keeps the frontend uniform.
+
+export async function getParkedLoops(): Promise<CoSTask[]> {
+  try {
+    const { getSupabaseServerClient } = await import("@/lib/supabase-server");
+    const { mapLoopToCoSTask, PARKED_LOOP_STATUSES } = await import("@/lib/loops");
+    const sb = getSupabaseServerClient();
+
+    const { data, error } = await sb
+      .from("loops")
+      .select("*")
+      .in("status", PARKED_LOOP_STATUSES)
+      .order("last_action_at", { ascending: false, nullsFirst: false })
+      .order("updated_at",     { ascending: false })
+      .limit(30);
+
+    if (error || !data) return [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (data as any[]).map(mapLoopToCoSTask);
   } catch {
     return [];
   }

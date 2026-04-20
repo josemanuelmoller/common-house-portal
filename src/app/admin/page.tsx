@@ -24,7 +24,7 @@ import { Sidebar } from "@/components/Sidebar";
 import { AgentQueueSection } from "@/components/AgentQueueSection";
 import { InboxTriage, type InboxItem } from "@/components/InboxTriage";
 import { DraftCheckinButton } from "@/components/DraftCheckinButton";
-import { ChiefOfStaffDesk } from "@/components/ChiefOfStaffDesk";
+import { ChiefOfStaffDesk, ParkedLoopsSection } from "@/components/ChiefOfStaffDesk";
 import { CandidateSection } from "@/components/CandidateSection";
 import { RadarSection } from "@/components/RadarSection";
 import OpportunityExplorer from "@/components/OpportunityExplorer";
@@ -34,6 +34,7 @@ import {
   getDailyBriefing,
   getAgentDrafts,
   getCoSTasks,
+  getParkedLoops,
   getRadarLoops,
   getCandidateOpportunities,
   getOpportunitiesByScope,
@@ -417,6 +418,7 @@ export default async function AdminPage() {
     gmailDrafts,
     approvedDrafts,
     cosTasks,
+    parkedTasks,
     radarLoops,
     candidates,
     opportunities,
@@ -431,6 +433,7 @@ export default async function AdminPage() {
     getAgentDrafts("Draft Created"),
     getAgentDrafts("Approved"),
     getCoSTasks(),
+    getParkedLoops(),
     getRadarLoops(),
     getCandidateOpportunities(),
     getOpportunitiesByScope(),
@@ -742,6 +745,13 @@ export default async function AdminPage() {
                 />
                 <ChiefOfStaffDesk tasks={cosTasks} />
               </div>
+
+              {/* ── 5b-parked. Parked · Waiting ───────────────────────────── */}
+              {parkedTasks.length > 0 && (
+                <div>
+                  <ParkedLoopsSection tasks={parkedTasks} />
+                </div>
+              )}
 
               {/* ── 5c. Radar — passive discovery, not yet acted on ──────── */}
               <div>

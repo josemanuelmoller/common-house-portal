@@ -53,8 +53,19 @@ export type LoopType =
 export type LoopStatus =
   | "open"
   | "in_progress"
+  | "waiting"
   | "resolved"
-  | "dismissed";
+  | "dismissed"
+  | "reopened";
+
+/** Statuses where a loop is actively surfaced in the main CoS desk. */
+export const ACTIVE_LOOP_STATUSES: LoopStatus[] = ["open", "in_progress", "reopened"];
+
+/** Parked — present but moved out of the urgent surface. */
+export const PARKED_LOOP_STATUSES: LoopStatus[] = ["waiting"];
+
+/** Terminal states. */
+export const TERMINAL_LOOP_STATUSES: LoopStatus[] = ["resolved", "dismissed"];
 
 export type InterventionMoment =
   | "urgent"
@@ -79,6 +90,7 @@ export type ActionType =
   | "created"
   | "updated"
   | "marked_in_progress"
+  | "marked_waiting"
   | "resolved"
   | "dismissed"
   | "reopened"
@@ -90,6 +102,14 @@ export type ActionType =
 export type Loop = {
   id: string;
   normalized_key: string;
+  // Semantic identity: survives Notion page churn. Same underlying issue
+  // re-created under a new Notion page_id (regenerator rewrite) resolves to
+  // the same intent_key and must NOT create a fresh loop.
+  intent_key: string | null;
+  // Lineage: first loop in a family (self on creation). Reopens preserve
+  // lineage_id so lineage traces the same topic across time.
+  lineage_id: string | null;
+  parent_loop_id: string | null;
   title: string;
   loop_type: LoopType;
   status: LoopStatus;
@@ -105,6 +125,15 @@ export type Loop = {
   first_seen_at: string;
   last_seen_at: string;
   last_action_at: string | null;
+  // Lifecycle timestamps — source of truth for "when did this happen"
+  resolved_at: string | null;
+  dismissed_at: string | null;
+  reopened_at: string | null;
+  reopen_count: number;
+  // Fingerprint of the most recent evidence content used to judge whether
+  // a new sync is materially new or just a paraphrase.
+  last_meaningful_evidence_at: string | null;
+  last_evidence_fingerprint: string | null;
   created_at: string;
   updated_at: string;
   // Track A: interest gate
@@ -163,6 +192,111 @@ export function buildNormalizedKey(
 ): string {
   const base = `${entityType}:${notionPageId}`;
   return variant ? `${base}:${variant}` : base;
+}
+
+// ─── Semantic identity (intent_key) ───────────────────────────────────────────
+//
+// intent_key groups loops that describe the SAME underlying issue even when
+// the Notion page_id changes (regenerator creates a new Evidence record from
+// similar content, renamed opportunities, etc.). It is the second-tier match
+// used when normalized_key lookup misses.
+//
+// Shape:
+//   {entity_type}:{entity_slug}:{loop_type}:{variant_or_bucket}:{content_slug}
+//
+// Example:
+//   evidence:reuse-for-all:blocker::not-enough-volume-for-co-op-pilot
+//   opportunity:coop-uk:follow_up:pending:send-proposal-v2
+
+/** Normalize free-form text for fingerprint / slug use. Deterministic, cheap. */
+export function normalizeFingerprint(input: string, maxLen = 180): string {
+  if (!input) return "";
+  let s = input.toLowerCase();
+  // Strip URLs — they mutate constantly even when topic is the same.
+  s = s.replace(/https?:\/\/\S+/g, " ");
+  // Drop boilerplate prefixes the regenerators emit.
+  s = s.replace(/^\s*(signals?:|inbox signal:|note:|update:|re:|fwd:)\s*/gi, " ");
+  // Collapse all punctuation to single space.
+  s = s.replace(/[^\p{L}\p{N}\s]/gu, " ");
+  // Collapse whitespace.
+  s = s.replace(/\s+/g, " ").trim();
+  // Drop ultra-common filler words that add no semantic signal.
+  const STOP = new Set([
+    "the","a","an","of","to","for","and","or","but","on","in","at","by",
+    "is","are","was","were","be","been","being","this","that","these","those",
+    "we","i","you","they","them","our","my","your","it","its","as","from","with",
+  ]);
+  s = s.split(" ").filter(w => w && !STOP.has(w)).join(" ");
+  return s.slice(0, maxLen);
+}
+
+/** Short, deterministic slug for use inside an intent_key. */
+export function contentSlug(input: string, maxLen = 60): string {
+  return normalizeFingerprint(input, 4000)
+    .replace(/\s+/g, "-")
+    .slice(0, maxLen);
+}
+
+/** Builds a semantic intent_key that survives wording drift AND page re-creation. */
+export function buildIntentKey(params: {
+  entityType: LinkedEntityType;
+  entitySlug: string;           // org / project / linked_entity_name slug
+  loopType: LoopType;
+  variant?: NormalizedKeyVariant | null;
+  contentText: string;          // title or excerpt — whatever best describes the topic
+}): string {
+  const entitySeg  = contentSlug(params.entitySlug || "unknown", 40);
+  const variantSeg = params.variant ?? "";
+  const contentSeg = contentSlug(params.contentText, 60);
+  return `${params.entityType}:${entitySeg}:${params.loopType}:${variantSeg}:${contentSeg}`;
+}
+
+// ─── Materially-new evidence gate ─────────────────────────────────────────────
+//
+// Resolved/dismissed loops should only re-open when incoming evidence is
+// substantively different. Pure paraphrase (same meaning, different words) or
+// regenerator rewrite of the same underlying topic must NOT resurrect the loop.
+//
+// Heuristic (cheap, deterministic):
+//   1. Different signal_type           → materially new (blocker vs commitment)
+//   2. Significant fingerprint delta   → materially new (Jaccard on tokens)
+//   3. Otherwise                       → NOT materially new (append signal only)
+
+/** Jaccard similarity on whitespace-tokenized fingerprint strings. */
+export function fingerprintSimilarity(a: string | null, b: string | null): number {
+  if (!a || !b) return 0;
+  const A = new Set(a.split(" ").filter(Boolean));
+  const B = new Set(b.split(" ").filter(Boolean));
+  if (A.size === 0 && B.size === 0) return 1;
+  let inter = 0;
+  for (const t of A) if (B.has(t)) inter++;
+  const union = A.size + B.size - inter;
+  if (union === 0) return 1;
+  return inter / union;
+}
+
+/**
+ * Returns true when incoming evidence justifies reopening a resolved/dismissed loop.
+ * Gate is intentionally strict — false negatives (loop stays closed) are far less
+ * damaging than false positives (loop flickers back on every paraphrase).
+ */
+export function isMateriallyNewEvidence(params: {
+  previousFingerprint: string | null;
+  previousSignalType: SignalType | null;
+  incomingFingerprint: string;
+  incomingSignalType: SignalType;
+  similarityThreshold?: number;   // default 0.55 — below this = materially new
+}): boolean {
+  // New signal class (e.g. was opportunity_signal, now evidence_blocker) = material.
+  if (params.previousSignalType && params.previousSignalType !== params.incomingSignalType) {
+    return true;
+  }
+  // No prior fingerprint to compare against — treat as material (first real evidence).
+  if (!params.previousFingerprint) return true;
+
+  const threshold = params.similarityThreshold ?? 0.55;
+  const sim = fingerprintSimilarity(params.previousFingerprint, params.incomingFingerprint);
+  return sim < threshold;
 }
 
 // ─── Priority scoring v1 ──────────────────────────────────────────────────────
@@ -422,8 +556,10 @@ function mapInterventionMoment(im: InterventionMoment): CoSTask["interventionMom
 function mapStatus(s: LoopStatus): CoSTask["taskStatus"] {
   switch (s) {
     case "in_progress": return "in-progress";
+    case "waiting":     return "waiting";
     case "resolved":    return "done";
     case "dismissed":   return "dropped";
+    case "reopened":    return "todo";   // reopened surfaces as actionable "todo" in UI
     default:            return "todo";
   }
 }

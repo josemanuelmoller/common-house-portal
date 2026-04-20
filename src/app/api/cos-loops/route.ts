@@ -14,14 +14,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminGuardApi } from "@/lib/require-admin";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
-import type { ActionType, LoopStatus } from "@/lib/loops";
+import { ACTIVE_LOOP_STATUSES, type ActionType, type LoopStatus } from "@/lib/loops";
 
-const STATUS_TO_ACTION: Record<string, { status: LoopStatus; action: ActionType }> = {
-  "In Progress": { status: "in_progress", action: "marked_in_progress" },
-  "Done":        { status: "resolved",    action: "resolved" },
-  "Dropped":     { status: "dismissed",   action: "dismissed" },
-  "Waiting":     { status: "open",        action: "updated" },
-  "Needed":      { status: "open",        action: "updated" },
+// Button label → (status, action, timestamp column set when transitioning into the state).
+// Source of truth for how Hall UI state buttons map to DB state.
+const STATUS_TO_ACTION: Record<
+  string,
+  { status: LoopStatus; action: ActionType; stampCol: "resolved_at" | "dismissed_at" | null }
+> = {
+  "In Progress": { status: "in_progress", action: "marked_in_progress", stampCol: null },
+  "Waiting":     { status: "waiting",     action: "marked_waiting",     stampCol: null },
+  "Done":        { status: "resolved",    action: "resolved",           stampCol: "resolved_at" },
+  "Dropped":     { status: "dismissed",   action: "dismissed",          stampCol: "dismissed_at" },
+  // Legacy synonyms — keep working for any callers not yet updated.
+  "Needed":      { status: "open",        action: "updated",            stampCol: null },
+  "Reopen":      { status: "reopened",    action: "reopened",           stampCol: null },
 };
 
 // ─── GET — list open loops ────────────────────────────────────────────────────
@@ -35,7 +42,7 @@ export async function GET(req: NextRequest) {
     const { data, error } = await sb
       .from("loops")
       .select("*")
-      .in("status", ["open", "in_progress"])
+      .in("status", ACTIVE_LOOP_STATUSES)
       .order("priority_score", { ascending: false })
       .order("first_seen_at",  { ascending: true })
       .limit(50);
@@ -111,13 +118,19 @@ export async function PATCH(req: NextRequest) {
       );
     }
 
+    const nowIso = new Date().toISOString();
+    const updatePayload: Record<string, unknown> = {
+      status:         transition.status,
+      last_action_at: nowIso,
+      updated_at:     nowIso,
+    };
+    if (transition.stampCol) {
+      updatePayload[transition.stampCol] = nowIso;
+    }
+
     const { error: updateErr } = await sb
       .from("loops")
-      .update({
-        status:         transition.status,
-        last_action_at: new Date().toISOString(),
-        updated_at:     new Date().toISOString(),
-      })
+      .update(updatePayload)
       .eq("id", loopId);
 
     if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 502 });
