@@ -19,13 +19,16 @@ import { adminGuardApi } from "@/lib/require-admin";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import {
   CLASS_TO_LABEL,
+  createContactFromEmail,
   lookupByEmails,
   setContactLabels,
 } from "@/lib/google-contacts";
 
 const VALID_CLASSES = [
   "Family", "Personal Service", "Friend",
-  "Team", "Portfolio", "Investor", "Funder", "Vendor", "External",
+  "Team", "Portfolio",
+  "VIP", "Investor", "Funder",
+  "Partner", "Vendor", "External",
 ] as const;
 type RelationshipClass = typeof VALID_CLASSES[number];
 
@@ -110,27 +113,44 @@ async function doPOST(req: NextRequest) {
   const nowIso = new Date().toISOString();
   const sb = getSupabaseServerClient();
 
-  // Ensure we have the Google resourceName. If hall_attendees has no
-  // google_resource_name yet, hit People API to resolve + cache.
+  // Resolve the Google resourceName: (1) check cache, (2) search People API.
   let resourceName: string | null = null;
+  let displayNameCached: string | null = null;
   try {
     const { data: existing } = await sb
       .from("hall_attendees")
-      .select("google_resource_name")
+      .select("google_resource_name, display_name")
       .eq("email", email)
       .maybeSingle();
-    resourceName = (existing as { google_resource_name: string | null } | null)?.google_resource_name ?? null;
+    const row = existing as { google_resource_name: string | null; display_name: string | null } | null;
+    resourceName = row?.google_resource_name ?? null;
+    displayNameCached = row?.display_name ?? null;
     if (!resourceName) {
       const resolved = await lookupByEmails([email]);
       const hit = resolved.get(email);
       resourceName = hit?.resourceName ?? null;
+      if (hit?.displayName) displayNameCached = hit.displayName;
     }
   } catch { /* carry on — local write still happens */ }
 
-  // Dual-write to Google Contacts — set exactly the target labels, remove
-  // any known label no longer selected. Empty array clears all known labels.
-  let googleSyncOutcome: "synced" | "not_in_google" | "read_only" | "skipped" | "failed" = "skipped";
+  // Auto-create the contact in Google if it's not there and the user is
+  // ASSIGNING classes (no point creating a blank contact when they are just
+  // clearing tags). Only fires when resourceName is null — otherContacts
+  // already has a read-only resourceName so this is skipped for them.
+  let googleSyncOutcome: "synced" | "not_in_google" | "read_only" | "created" | "skipped" | "failed" = "skipped";
   let googleError: string | undefined;
+
+  if (!resourceName && classes.length > 0) {
+    const created = await createContactFromEmail(email, displayNameCached);
+    if (created.ok) {
+      resourceName   = created.resourceName;
+      googleSyncOutcome = "created"; // will flip to "synced" once labels are set below
+    } else {
+      googleError    = created.reason;
+      googleSyncOutcome = "failed";
+    }
+  }
+
   if (resourceName) {
     const targetLabels = classes
       .map(c => CLASS_TO_LABEL[c as keyof typeof CLASS_TO_LABEL])
@@ -139,7 +159,7 @@ async function doPOST(req: NextRequest) {
     if (res.ok) googleSyncOutcome = "synced";
     else if (res.reason === "read_only_other_contact") googleSyncOutcome = "read_only";
     else { googleSyncOutcome = "failed"; googleError = res.reason; }
-  } else {
+  } else if (googleSyncOutcome !== "failed") {
     googleSyncOutcome = "not_in_google";
   }
 

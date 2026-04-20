@@ -24,8 +24,10 @@ const CLASSES = [
   { v: "Friend",           label: "Friend",           kind: "personal" as const },
   { v: "Team",             label: "Team",             kind: "work"     as const },
   { v: "Portfolio",        label: "Portfolio",        kind: "vip"      as const },
+  { v: "VIP",              label: "VIP",              kind: "vip"      as const },
   { v: "Investor",         label: "Investor",         kind: "vip"      as const },
   { v: "Funder",           label: "Funder",           kind: "vip"      as const },
+  { v: "Partner",          label: "Partner",          kind: "work"     as const },
   { v: "Vendor",           label: "Vendor",           kind: "work"     as const },
   { v: "External",         label: "External",         kind: "work"     as const },
 ];
@@ -128,10 +130,13 @@ export function HallContactRow(props: Props) {
               {props.google_last_write_at && <span className="text-[#131218]/30"> · synced {timeAgo(props.google_last_write_at)}</span>}
             </span>
           ) : props.google_source === "not_found" ? (
-            <span className="text-[9px] font-semibold text-amber-700/80">
-              ✗ not in Google Contacts — tag locally only
+            <span className="text-[9px] font-semibold text-[#131218]/50">
+              Not saved in Google yet — will be created when you tag
             </span>
           ) : null}
+          {googleSync === "created" && (
+            <span className="text-[9px] font-bold text-green-700">✓ Created in Google</span>
+          )}
           {googleSync === "synced" && (
             <span className="text-[9px] font-bold text-green-700">✓ Google updated</span>
           )}

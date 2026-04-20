@@ -37,11 +37,14 @@ export type RelationshipClass =
   | "Portfolio"
   | "Investor"
   | "Funder"
+  | "VIP"
+  | "Partner"
   | "Vendor"
   | "External";
 
 const PERSONAL_CLASSES: ReadonlySet<string> = new Set(["Family", "Personal Service", "Friend"]);
-const VIP_CLASSES:      ReadonlySet<string> = new Set(["Investor", "Funder", "Portfolio"]);
+// VIP boost: any one of these classes → prep urgency +15 in STB.
+const VIP_CLASSES:      ReadonlySet<string> = new Set(["VIP", "Investor", "Funder", "Portfolio"]);
 
 /**
  * Multi-tag by design: a single attendee can carry multiple classes (e.g.

@@ -35,8 +35,10 @@ export const LABEL_TO_CLASS: Readonly<Record<string, string>> = {
   "Friends":           "Friend",
   // Custom — generic enough to carry across workplaces
   "Personal Service":  "Personal Service",
+  "VIP":               "VIP",
   "Investor":          "Investor",
   "Funder":            "Funder",
+  "Partner":           "Partner",
   "Vendor":            "Vendor",
   "External":          "External",
   // Custom — workplace-scoped, prefix "CH " so Jose can create
@@ -215,6 +217,32 @@ export async function ensureContactGroup(label: string): Promise<string | null> 
 /** True for resources Google treats as read-only for labels (otherContacts). */
 function isReadOnlyResource(resourceName: string): boolean {
   return resourceName.startsWith("otherContacts/");
+}
+
+/**
+ * Create a new contact in Google Contacts (myContacts bucket) so Jose can
+ * assign labels to it. Returns the new resourceName or null on failure.
+ * Called when the user tags an attendee that People API could not find.
+ */
+export async function createContactFromEmail(
+  email: string,
+  displayName: string | null,
+): Promise<{ ok: true; resourceName: string } | { ok: false; reason: string }> {
+  try {
+    const people = getPeopleClient();
+    if (!people) return { ok: false, reason: "no_google_auth" };
+    const namePart = (displayName ?? email.split("@")[0]).slice(0, 100);
+    const res = await people.people.createContact({
+      requestBody: {
+        names:          [{ displayName: namePart }],
+        emailAddresses: [{ value: email }],
+      },
+    });
+    if (!res.data.resourceName) return { ok: false, reason: "no_resource_name_returned" };
+    return { ok: true, resourceName: res.data.resourceName };
+  } catch (err) {
+    return { ok: false, reason: err instanceof Error ? err.message : String(err) };
+  }
 }
 
 /**

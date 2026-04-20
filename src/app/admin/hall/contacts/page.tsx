@@ -53,7 +53,7 @@ export default async function HallContactsPage() {
       return new Date(b.last_seen_at).getTime() - new Date(a.last_seen_at).getTime();
     });
   const PERSONAL = new Set(["Family", "Personal Service", "Friend"]);
-  const VIP      = new Set(["Investor", "Funder", "Portfolio"]);
+  const VIP      = new Set(["VIP", "Investor", "Funder", "Portfolio"]);
   const personal = classified.filter(c => (c.relationship_classes ?? []).some(x => PERSONAL.has(x)));
   const vip      = classified.filter(c => (c.relationship_classes ?? []).some(x => VIP.has(x)));
 
