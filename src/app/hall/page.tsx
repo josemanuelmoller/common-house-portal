@@ -9,6 +9,8 @@ import { SharedMaterials } from "@/components/hall/SharedMaterials";
 import { Conversations } from "@/components/hall/Conversations";
 import { HallDecisions } from "@/components/hall/HallDecisions";
 import { HallTeam } from "@/components/hall/HallTeam";
+import { NeedsYourInput } from "@/components/hall/NeedsYourInput";
+import { NextSteps } from "@/components/hall/NextSteps";
 import { WorkspaceActivation } from "@/components/hall/WorkspaceActivation";
 import { GarageActivation } from "@/components/hall/GarageActivation";
 import { DigitalResidents } from "@/components/hall/DigitalResidents";
@@ -26,6 +28,8 @@ import type {
   HallConversation,
   HallDecision,
   HallTeamMember,
+  HallAsk,
+  HallNextStep,
 } from "@/types/hall";
 import { WORKSPACE_READY } from "@/types/workroom";
 
@@ -219,6 +223,35 @@ export default async function HallPage() {
       status:  decisionStatus(e.confidence),
     }));
 
+  // ── Asks (Needs your input) ──────────────────────────────────────────────
+  // Derived from validated Dependency + Commitment evidence — these are the
+  // open loops that require client attention. Activates the Zeigarnik layer.
+  const asks: HallAsk[] = evidence
+    .filter(
+      (e) =>
+        (e.type === "Dependency" || e.type === "Commitment") &&
+        e.validationStatus === "Validated"
+    )
+    .slice(0, 3)
+    .map((e) => ({
+      id:       e.id,
+      question: e.title,
+      context:  e.excerpt || undefined,
+      dueDate:  undefined,
+    }));
+
+  // ── Next steps ───────────────────────────────────────────────────────────
+  // Derived from validated Process Step evidence — ordered sequence of moves.
+  const nextSteps: HallNextStep[] = evidence
+    .filter((e) => e.type === "Process Step" && e.validationStatus === "Validated")
+    .slice(0, 5)
+    .map((e, i) => ({
+      id:    e.id,
+      order: i + 1,
+      label: e.title,
+      owner: undefined,
+    }));
+
   // ── Team ─────────────────────────────────────────────────────────────────
   const chPeople = [...people.lead, ...people.team].filter(
     (p) => p.classification === "Internal"
@@ -276,17 +309,42 @@ export default async function HallPage() {
     ].filter(Boolean).join(" · ") || undefined,
   };
 
+  // ── Hero CTA ─────────────────────────────────────────────────────────────
+  // Primary action anchored to the Needs-your-input section. Only surfaced when
+  // there are open asks — otherwise the Hero stays quiet and "all caught up"
+  // is implied by the empty state further down. Reserves lime for the one
+  // action the client should take right now.
+  const heroCta =
+    isLive && asks.length > 0
+      ? {
+          label:
+            asks.length === 1
+              ? "1 thing needs you"
+              : `${asks.length} things need you`,
+          href: "#asks",
+        }
+      : undefined;
+
   return (
     <div className="flex min-h-screen bg-[#EFEFEA]">
       <Sidebar items={NAV} projectName={project.name} />
 
       <main className="flex-1 overflow-auto">
-        <HallHero project={hallProject} />
+        <HallHero project={hallProject} cta={heroCta} />
 
         <div className="px-8 py-6">
           <div className="max-w-4xl mx-auto space-y-6">
 
-            {/* Onboarding: workroom_activation — threshold block, first in content area.
+            {/* Needs your input — position 2, ALWAYS in live mode.
+                Serial Position + Zeigarnik: open loops surface immediately after
+                the Hero so the client sees what's open before any narrative. */}
+            {isLive && (
+              <section id="asks" className="scroll-mt-6">
+                <NeedsYourInput asks={asks} />
+              </section>
+            )}
+
+            {/* Onboarding: workroom_activation — threshold block.
                 Pass the most recent session as a "something is already moving" signal. */}
             {showWorkspaceActivation && (
               <WorkspaceActivation
@@ -315,6 +373,12 @@ export default async function HallPage() {
 
             {/* What We Heard — hidden until editorial fields are populated */}
             {showWhatWeHeard && <WhatWeHeard project={hallProject} />}
+
+            {/* Next steps — closes the Zeigarnik loop opened by asks.
+                Only renders when there are validated Process Step evidence items. */}
+            {isLive && nextSteps.length > 0 && (
+              <NextSteps nextSteps={nextSteps} />
+            )}
 
             {/* Materials + Decisions — pair side-by-side when both present */}
             {materials.length > 0 && isLive && decisions.length > 0 ? (
