@@ -87,16 +87,92 @@ export function MarketSignalsPanel({ text, date, generatedAt }: Props) {
         </button>
       </div>
       <div className="px-5 py-4">
-        {text ? (
-          <pre className="text-[11px] text-[#131218]/65 leading-[1.65] whitespace-pre-wrap font-sans">
-            {text.slice(0, 500)}
-          </pre>
-        ) : (
+        {text ? <SignalList raw={text} /> : (
           <p className="text-[11px] text-[#131218]/30">
             No market signals captured yet. Press Refresh to run the briefing.
           </p>
         )}
       </div>
     </div>
+  );
+}
+
+// ── Signal parsing + rendering ──────────────────────────────────────────────
+
+const TAG_COLOR: Record<string, string> = {
+  "Policy":       "bg-purple-50 text-purple-700 border-purple-200",
+  "Funding":      "bg-emerald-50 text-emerald-700 border-emerald-200",
+  "Market Move":  "bg-blue-50 text-blue-700 border-blue-200",
+  "Sector Trend": "bg-amber-50 text-amber-700 border-amber-200",
+  "Competitor":   "bg-red-50 text-red-700 border-red-200",
+  "Ecosystem":    "bg-sky-50 text-sky-700 border-sky-200",
+  "Portfolio":    "bg-[#c8f55a]/25 text-[#131218]/80 border-[#c8f55a]",
+};
+
+type Signal = { tag: string | null; headline: string; relevance: string | null };
+
+function parseSignals(raw: string): Signal[] {
+  // Split on blank lines; within each block, first line = [Tag] Headline,
+  // subsequent lines starting with '·' or '-' are relevance lines merged.
+  const blocks = raw.split(/\n\s*\n/).map(b => b.trim()).filter(Boolean);
+  const signals: Signal[] = [];
+  for (const block of blocks) {
+    const lines = block.split(/\n/).map(l => l.trim()).filter(Boolean);
+    if (lines.length === 0) continue;
+    const first = lines[0];
+    const tagMatch = first.match(/^\[([^\]]+)\]\s*(.+)$/);
+    const relevance = lines.slice(1)
+      .map(l => l.replace(/^[·•\-]\s*/, "").trim())
+      .filter(Boolean)
+      .join(" ");
+    signals.push({
+      tag:       tagMatch ? tagMatch[1].trim() : null,
+      headline:  tagMatch ? tagMatch[2].trim() : first,
+      relevance: relevance || null,
+    });
+  }
+  return signals;
+}
+
+function SignalList({ raw }: { raw: string }) {
+  const signals = parseSignals(raw);
+  const structured = signals.some(s => s.tag);
+
+  // Plain fallback: if nothing parsed with a tag, render as readable paragraph(s)
+  if (!structured) {
+    return (
+      <div className="text-[11px] text-[#131218]/65 leading-[1.65] whitespace-pre-wrap">
+        {raw}
+      </div>
+    );
+  }
+
+  return (
+    <ul className="flex flex-col gap-3">
+      {signals.map((s, i) => {
+        const color = s.tag && TAG_COLOR[s.tag]
+          ? TAG_COLOR[s.tag]
+          : "bg-[#EFEFEA] text-[#131218]/55 border-[#E0E0D8]";
+        return (
+          <li key={i} className="flex gap-2.5">
+            {s.tag && (
+              <span className={`shrink-0 text-[8.5px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full border ${color} self-start mt-0.5 whitespace-nowrap`}>
+                {s.tag}
+              </span>
+            )}
+            <div className="flex-1 min-w-0">
+              <p className="text-[11.5px] font-semibold text-[#131218] leading-snug">
+                {s.headline}
+              </p>
+              {s.relevance && (
+                <p className="text-[10px] text-[#131218]/45 leading-snug mt-0.5">
+                  {s.relevance}
+                </p>
+              )}
+            </div>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
