@@ -120,6 +120,39 @@ export async function loadAttendeeClasses(emails: string[]): Promise<AttendeeLoo
     needGoogle.push(email);
   }
 
+  // ── Organisation-level fallback ──────────────────────────────────────────
+  //   For every attendee, add the classes registered on their email's domain
+  //   (hall_organizations.relationship_classes). Union-merge so contact
+  //   classes take priority but org classes fill in when the contact has none.
+  try {
+    const domainsNeeded = [...new Set(
+      unique.map(e => (e.split("@")[1] ?? "").toLowerCase()).filter(Boolean),
+    )];
+    if (sb && domainsNeeded.length > 0) {
+      const { data: orgRows } = await sb
+        .from("hall_organizations")
+        .select("domain, relationship_classes")
+        .in("domain", domainsNeeded)
+        .is("dismissed_at", null);
+      const orgMap = new Map<string, string[]>();
+      for (const r of (orgRows ?? []) as { domain: string; relationship_classes: string[] | null }[]) {
+        if ((r.relationship_classes ?? []).length > 0) {
+          orgMap.set(r.domain.toLowerCase(), r.relationship_classes!);
+        }
+      }
+      if (orgMap.size > 0) {
+        for (const email of unique) {
+          const domain = (email.split("@")[1] ?? "").toLowerCase();
+          const orgClasses = orgMap.get(domain);
+          if (!orgClasses) continue;
+          const existing = out.get(email) ?? [];
+          const union = [...new Set([...existing, ...orgClasses])] as RelationshipClass[];
+          out.set(email, union);
+        }
+      }
+    }
+  } catch { /* non-critical */ }
+
   if (needGoogle.length === 0) return out;
 
   // Hit People API for the stale/missing ones.

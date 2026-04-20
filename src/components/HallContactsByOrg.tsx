@@ -194,6 +194,31 @@ function OrgRow({ org }: { org: Org }) {
     } catch { /* ignore — keep local typed value */ }
   }
 
+  async function syncToNotion() {
+    setError(null);
+    setStatus("Syncing to Notion…");
+    try {
+      const res = await fetch("/api/hall-organizations/sync-notion", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ domain: org.domain }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok || j?.ok === false) {
+        setStatus(null);
+        setError(j?.error ?? `HTTP ${res.status}`);
+        return;
+      }
+      const verb = j.action === "created" ? "Created" : j.action === "linked_existing" ? "Linked to existing" : "Already linked";
+      setStatus(`${verb} in CH Organizations [OS v2] ✓`);
+      startTransition(() => router.refresh());
+      setTimeout(() => setStatus(null), 7000);
+    } catch (e) {
+      setStatus(null);
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
   return (
     <div className={`bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden ${org.vip_count > 0 ? "ring-1 ring-[#B2FF59]/50" : ""}`}>
       <button
@@ -258,6 +283,21 @@ function OrgRow({ org }: { org: Org }) {
                   onBlur={renameOrg}
                   className="text-[11px] font-semibold px-2 py-0.5 rounded bg-white border border-[#E0E0D8] focus:outline-none focus:border-[#131218]/40 min-w-[160px]"
                 />
+                {org.org_registered && (
+                  org.org_notion_id ? (
+                    <span className="text-[9px] font-bold text-green-700 ml-auto">✓ in CH Orgs [OS v2]</span>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={pending}
+                      onClick={syncToNotion}
+                      className="ml-auto text-[9px] font-bold px-2 py-1 rounded-full bg-[#131218] text-white hover:bg-[#131218]/85 transition-colors"
+                      title="Create or link this org in CH Organizations [OS v2]"
+                    >
+                      Sync to Notion →
+                    </button>
+                  )
+                )}
               </div>
               <div className="flex items-center gap-1.5 flex-wrap">
                 {TAG_OPTIONS.map(t => {

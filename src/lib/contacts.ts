@@ -61,23 +61,80 @@ export async function getContactByEmail(email: string): Promise<ContactView | nu
   };
 }
 
-/** Returns the contacts whose email is in the given list, one SELECT. */
+/**
+ * Returns the contacts whose email is in the given list, one SELECT.
+ * relationship_classes are unioned with their org's classes (if a registered
+ * hall_organizations row exists for the email's domain) so any downstream
+ * consumer (inbox VIP-escalate, STB personal-mute, priority score, …)
+ * respects the org tag even when the individual contact has no tag.
+ */
 export async function getContactsByEmails(emails: string[]): Promise<Map<string, ContactView>> {
   const keys = [...new Set(emails.map(e => e.toLowerCase()).filter(Boolean))];
   const out  = new Map<string, ContactView>();
   if (keys.length === 0) return out;
   const sb = getSupabaseServerClient();
-  const { data } = await sb
-    .from("hall_attendees")
-    .select(ALL_FIELDS)
-    .in("email", keys);
-  for (const r of (data ?? []) as unknown as ContactView[]) {
+
+  const domains = [...new Set(keys.map(e => (e.split("@")[1] ?? "").toLowerCase()).filter(Boolean))];
+
+  const [contactsRes, orgsRes] = await Promise.all([
+    sb.from("hall_attendees").select(ALL_FIELDS).in("email", keys),
+    domains.length > 0
+      ? sb.from("hall_organizations")
+          .select("domain, relationship_classes")
+          .in("domain", domains)
+          .is("dismissed_at", null)
+      : Promise.resolve({ data: [] as { domain: string; relationship_classes: string[] | null }[] }),
+  ]);
+
+  const orgByDomain = new Map<string, string[]>();
+  for (const r of (orgsRes.data ?? []) as { domain: string; relationship_classes: string[] | null }[]) {
+    if ((r.relationship_classes ?? []).length > 0) {
+      orgByDomain.set(r.domain.toLowerCase(), r.relationship_classes!);
+    }
+  }
+
+  for (const r of (contactsRes.data ?? []) as unknown as ContactView[]) {
+    const domain = (r.email.split("@")[1] ?? "").toLowerCase();
+    const orgClasses = orgByDomain.get(domain) ?? [];
+    const union = [...new Set([...(r.relationship_classes ?? []), ...orgClasses])];
     out.set(r.email, {
       ...r,
-      relationship_classes: r.relationship_classes ?? [],
+      relationship_classes: union,
       google_labels:        r.google_labels ?? [],
     });
   }
+
+  // Also synthesize views for emails that are NOT in hall_attendees yet but
+  // whose org IS tagged — e.g. a cold email from someone at a Client org.
+  for (const email of keys) {
+    if (out.has(email)) continue;
+    const domain = (email.split("@")[1] ?? "").toLowerCase();
+    const orgClasses = orgByDomain.get(domain);
+    if (!orgClasses) continue;
+    out.set(email, {
+      email,
+      display_name:          null,
+      relationship_classes:  orgClasses,
+      classified_at:         null,
+      classified_by:         null,
+      meeting_count:         0,
+      email_thread_count:    0,
+      transcript_count:      0,
+      first_seen_at:         new Date().toISOString(),
+      last_seen_at:          null,
+      last_meeting_title:    null,
+      last_email_at:         null,
+      last_email_subject:    null,
+      last_transcript_at:    null,
+      last_transcript_title: null,
+      google_resource_name:  null,
+      google_source:         null,
+      google_labels:         [],
+      google_synced_at:      null,
+      auto_suggested:        null,
+    });
+  }
+
   return out;
 }
 
