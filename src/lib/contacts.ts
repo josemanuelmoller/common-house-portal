@@ -349,6 +349,240 @@ export async function getOrganizationRollup(minContacts = 2): Promise<{
   return { orgs, singletons };
 }
 
+// ─── Organisation registry views ────────────────────────────────────────────
+
+export type OrganizationListEntry = {
+  domain:                string;
+  name:                  string;
+  relationship_classes:  string[];
+  notion_id:             string | null;
+  notion_synced_at:      string | null;
+  notes:                 string | null;
+  contact_count:         number;
+  meeting_sum:           number;
+  email_sum:             number;
+  transcript_sum:        number;
+  vip_contact_count:     number;
+  last_interaction_at:   string | null;
+  dismissed_at:          string | null;
+  dismissed_reason:      string | null;
+};
+
+export async function getOrganizationsList(): Promise<OrganizationListEntry[]> {
+  const sb = getSupabaseServerClient();
+  const { getSelfEmails } = await import("./hall-self");
+  const selfSet = await getSelfEmails();
+
+  const [orgsRes, attendeesRes] = await Promise.all([
+    sb.from("hall_organizations")
+      .select("domain, name, relationship_classes, notion_id, notion_synced_at, notes, dismissed_at, dismissed_reason")
+      .order("updated_at", { ascending: false }),
+    sb.from("hall_attendees")
+      .select("email, meeting_count, email_thread_count, transcript_count, last_seen_at, relationship_classes")
+      .is("dismissed_at", null),
+  ]);
+
+  type AggBucket = { count: number; meetings: number; emails: number; transcripts: number; vip: number; latest: string | null };
+  const byDomain = new Map<string, AggBucket>();
+  for (const r of (attendeesRes.data ?? []) as { email: string; meeting_count: number; email_thread_count: number; transcript_count: number; last_seen_at: string | null; relationship_classes: string[] | null }[]) {
+    if (selfSet.has(r.email)) continue;
+    const d = (r.email.split("@")[1] ?? "").toLowerCase();
+    if (!d) continue;
+    const b = byDomain.get(d) ?? { count: 0, meetings: 0, emails: 0, transcripts: 0, vip: 0, latest: null };
+    b.count++;
+    b.meetings    += r.meeting_count      ?? 0;
+    b.emails      += r.email_thread_count ?? 0;
+    b.transcripts += r.transcript_count   ?? 0;
+    if ((r.relationship_classes ?? []).includes("VIP")) b.vip++;
+    if (r.last_seen_at && (!b.latest || r.last_seen_at > b.latest)) b.latest = r.last_seen_at;
+    byDomain.set(d, b);
+  }
+
+  const out: OrganizationListEntry[] = [];
+  for (const o of (orgsRes.data ?? []) as { domain: string; name: string; relationship_classes: string[] | null; notion_id: string | null; notion_synced_at: string | null; notes: string | null; dismissed_at: string | null; dismissed_reason: string | null }[]) {
+    const a = byDomain.get(o.domain.toLowerCase()) ?? { count: 0, meetings: 0, emails: 0, transcripts: 0, vip: 0, latest: null };
+    out.push({
+      domain: o.domain,
+      name: o.name,
+      relationship_classes: o.relationship_classes ?? [],
+      notion_id: o.notion_id,
+      notion_synced_at: o.notion_synced_at,
+      notes: o.notes,
+      contact_count: a.count,
+      meeting_sum: a.meetings,
+      email_sum: a.emails,
+      transcript_sum: a.transcripts,
+      vip_contact_count: a.vip,
+      last_interaction_at: a.latest,
+      dismissed_at: o.dismissed_at,
+      dismissed_reason: o.dismissed_reason,
+    });
+  }
+  return out;
+}
+
+export type ProposedOrganization = {
+  domain:              string;
+  contact_count:       number;
+  meeting_sum:         number;
+  email_sum:           number;
+  transcript_sum:      number;
+  vip_contact_count:   number;
+  last_interaction_at: string | null;
+  sample_names:        string[];
+};
+
+/** Domains with ≥minContacts active attendees but NO row in hall_organizations. */
+export async function getProposedOrganizations(minContacts = 3): Promise<ProposedOrganization[]> {
+  const sb = getSupabaseServerClient();
+  const { getSelfEmails } = await import("./hall-self");
+  const selfSet = await getSelfEmails();
+
+  const [orgsRes, attendeesRes] = await Promise.all([
+    sb.from("hall_organizations").select("domain"),
+    sb.from("hall_attendees")
+      .select("email, display_name, meeting_count, email_thread_count, transcript_count, last_seen_at, relationship_classes")
+      .is("dismissed_at", null)
+      .gte("last_seen_at", new Date(Date.now() - 180 * 86400_000).toISOString()),
+  ]);
+
+  const existing = new Set(((orgsRes.data ?? []) as { domain: string }[]).map(r => r.domain.toLowerCase()));
+
+  type Bucket = { count: number; meetings: number; emails: number; transcripts: number; vip: number; latest: string | null; names: string[] };
+  const byDomain = new Map<string, Bucket>();
+  for (const r of (attendeesRes.data ?? []) as { email: string; display_name: string | null; meeting_count: number; email_thread_count: number; transcript_count: number; last_seen_at: string | null; relationship_classes: string[] | null }[]) {
+    if (selfSet.has(r.email)) continue;
+    const d = (r.email.split("@")[1] ?? "").toLowerCase();
+    if (!d) continue;
+    if (existing.has(d)) continue;
+    if (PERSONAL_DOMAINS.has(d)) continue;
+    const b = byDomain.get(d) ?? { count: 0, meetings: 0, emails: 0, transcripts: 0, vip: 0, latest: null, names: [] };
+    b.count++;
+    b.meetings    += r.meeting_count      ?? 0;
+    b.emails      += r.email_thread_count ?? 0;
+    b.transcripts += r.transcript_count   ?? 0;
+    if ((r.relationship_classes ?? []).includes("VIP")) b.vip++;
+    if (r.last_seen_at && (!b.latest || r.last_seen_at > b.latest)) b.latest = r.last_seen_at;
+    if (r.display_name && b.names.length < 3 && !b.names.includes(r.display_name)) b.names.push(r.display_name);
+    byDomain.set(d, b);
+  }
+
+  const out: ProposedOrganization[] = [];
+  for (const [domain, b] of byDomain) {
+    if (b.count < minContacts) continue;
+    out.push({
+      domain,
+      contact_count:       b.count,
+      meeting_sum:         b.meetings,
+      email_sum:           b.emails,
+      transcript_sum:      b.transcripts,
+      vip_contact_count:   b.vip,
+      last_interaction_at: b.latest,
+      sample_names:        b.names,
+    });
+  }
+  out.sort((a, b) => (b.meeting_sum + b.email_sum + b.transcript_sum) - (a.meeting_sum + a.email_sum + a.transcript_sum));
+  return out;
+}
+
+export type OrganizationDetail = {
+  org:       OrganizationListEntry | null;
+  contacts:  ContactView[];
+  timeline:  TimelineEntry[];
+};
+
+export async function getOrganizationDetail(domain: string, timelineLimit = 30): Promise<OrganizationDetail> {
+  const d = domain.toLowerCase();
+  const sb = getSupabaseServerClient();
+  const { getSelfEmails } = await import("./hall-self");
+  const selfSet = await getSelfEmails();
+
+  const [orgRowRes, contactRowsRes] = await Promise.all([
+    sb.from("hall_organizations")
+      .select("domain, name, relationship_classes, notion_id, notion_synced_at, notes, dismissed_at, dismissed_reason")
+      .eq("domain", d)
+      .maybeSingle(),
+    sb.from("hall_attendees")
+      .select(ALL_FIELDS)
+      .ilike("email", `%@${d}`)
+      .is("dismissed_at", null)
+      .order("meeting_count", { ascending: false })
+      .limit(200),
+  ]);
+
+  const contacts = ((contactRowsRes.data ?? []) as unknown as ContactView[])
+    .filter(r => !selfSet.has(r.email))
+    .map(c => ({ ...c, relationship_classes: c.relationship_classes ?? [], google_labels: c.google_labels ?? [] }));
+
+  const agg = contacts.reduce(
+    (a, c) => ({
+      meetings:    a.meetings    + (c.meeting_count ?? 0),
+      emails:      a.emails      + (c.email_thread_count ?? 0),
+      transcripts: a.transcripts + (c.transcript_count ?? 0),
+      vip:         a.vip         + (isVipContact(c) ? 1 : 0),
+      latest:      (!a.latest || (c.last_seen_at && c.last_seen_at > a.latest)) ? (c.last_seen_at ?? a.latest) : a.latest,
+    }),
+    { meetings: 0, emails: 0, transcripts: 0, vip: 0, latest: null as string | null },
+  );
+
+  let org: OrganizationListEntry | null = null;
+  const r = orgRowRes.data as { domain: string; name: string; relationship_classes: string[] | null; notion_id: string | null; notion_synced_at: string | null; notes: string | null; dismissed_at: string | null; dismissed_reason: string | null } | null;
+  if (r) {
+    org = {
+      domain: r.domain,
+      name: r.name,
+      relationship_classes: r.relationship_classes ?? [],
+      notion_id: r.notion_id,
+      notion_synced_at: r.notion_synced_at,
+      notes: r.notes,
+      contact_count: contacts.length,
+      meeting_sum: agg.meetings,
+      email_sum: agg.emails,
+      transcript_sum: agg.transcripts,
+      vip_contact_count: agg.vip,
+      last_interaction_at: agg.latest,
+      dismissed_at: r.dismissed_at,
+      dismissed_reason: r.dismissed_reason,
+    };
+  }
+
+  // Unified timeline across every contact at the domain.
+  const emails = contacts.map(c => c.email);
+  const timeline: TimelineEntry[] = [];
+  if (emails.length > 0) {
+    const [cal, mails, tx] = await Promise.all([
+      sb.from("hall_calendar_events")
+        .select("event_id, event_title, event_start, attendee_emails")
+        .overlaps("attendee_emails", emails)
+        .eq("is_cancelled", false)
+        .order("event_start", { ascending: false })
+        .limit(timelineLimit),
+      sb.from("hall_email_observations")
+        .select("thread_id, subject, last_message_at, notion_source_id, attendee_emails")
+        .overlaps("attendee_emails", emails)
+        .order("last_message_at", { ascending: false })
+        .limit(timelineLimit),
+      sb.from("hall_transcript_observations")
+        .select("transcript_id, title, meeting_at, meeting_link, participant_emails")
+        .overlaps("participant_emails", emails)
+        .order("meeting_at", { ascending: false })
+        .limit(timelineLimit),
+    ]);
+    for (const r of (cal.data ?? []) as { event_id: string; event_title: string; event_start: string; attendee_emails: string[] }[]) {
+      timeline.push({ kind: "meeting", at: r.event_start, title: r.event_title, event_id: r.event_id, attendee_count: r.attendee_emails?.length ?? 0 });
+    }
+    for (const r of (mails.data ?? []) as { thread_id: string; subject: string; last_message_at: string; notion_source_id: string | null }[]) {
+      timeline.push({ kind: "email", at: r.last_message_at, title: r.subject, thread_id: r.thread_id, notion_source_id: r.notion_source_id });
+    }
+    for (const r of (tx.data ?? []) as { transcript_id: string; title: string; meeting_at: string; meeting_link: string | null }[]) {
+      timeline.push({ kind: "transcript", at: r.meeting_at, title: r.title, transcript_id: r.transcript_id, meeting_link: r.meeting_link });
+    }
+    timeline.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+  }
+
+  return { org, contacts, timeline: timeline.slice(0, timelineLimit) };
+}
+
 /** A generic relevance score for downstream priorization (inbox, STB, briefing). */
 export function contactPriorityScore(c: ContactView): number {
   let score = 0;

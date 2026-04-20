@@ -27,6 +27,7 @@ import { DraftCheckinButton } from "@/components/DraftCheckinButton";
 import { ChiefOfStaffDesk, ParkedLoopsSection } from "@/components/ChiefOfStaffDesk";
 import { DiscoverySection } from "@/components/DiscoverySection";
 import { MarketSignalsPanel } from "@/components/MarketSignalsPanel";
+import { HallOrgsColdRelations, HallOrgsClassMix } from "@/components/HallOrgsWidgets";
 import OpportunityExplorer from "@/components/OpportunityExplorer";
 import {
   getProjectsOverview,
@@ -827,6 +828,9 @@ export default async function AdminPage() {
                 generatedAt={latestMarketSignals?.generatedAt ?? null}
                 briefs={marketSignalBriefs}
               />
+
+              <HallOrgsColdRelations />
+              <HallOrgsClassMix />
 
               {!dailyBriefing?.meetingPrep && !latestMarketSignals && (
                 <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-4">
