@@ -1067,7 +1067,8 @@ export async function getRadarLoops(): Promise<RadarLoop[]> {
       .select("id, normalized_key, title, loop_type, linked_entity_name, notion_url, founder_interest, priority_score")
       .eq("is_passive_discovery", true)
       .in("status", ["open", "in_progress"])
-      .neq("founder_interest", "dropped")
+      // NULL founder_interest must be included — .neq() excludes NULLs in PostgreSQL
+      .or("founder_interest.neq.dropped,founder_interest.is.null")
       // Also surface 'watching' loops — they stay in Radar until marked interested/dropped
       .order("priority_score", { ascending: false })
       .order("first_seen_at",  { ascending: true })
