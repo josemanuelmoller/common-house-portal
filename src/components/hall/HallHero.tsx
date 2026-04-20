@@ -1,11 +1,20 @@
 import { HallProject } from "@/types/hall";
 
-export function HallHero({ project }: { project: HallProject }) {
+interface HallHeroProps {
+  project: HallProject;
+  /** Primary CTA. When present, renders a lime button under the welcome note. */
+  cta?: {
+    label: string;
+    href: string;
+  };
+}
+
+export function HallHero({ project, cta }: HallHeroProps) {
   return (
     <div className="bg-[#131218] px-14 py-12">
       <div className="max-w-4xl">
         {/* Eyebrow */}
-        <p className="text-[9px] font-bold text-white/22 uppercase tracking-[2.5px] mb-5">
+        <p className="text-[11px] font-bold text-white/30 uppercase tracking-[2.5px] mb-5">
           Welcome to The Hall
         </p>
 
@@ -15,20 +24,20 @@ export function HallHero({ project }: { project: HallProject }) {
             <h1 className="text-[3rem] font-[900] text-white tracking-[-2px] leading-none">
               {project.name}
             </h1>
-            <span className="inline-block bg-[#B2FF59] text-[#131218] text-[8.5px] font-bold uppercase tracking-[2px] rounded-full px-3 py-1 mt-3.5">
+            <span className="inline-block bg-[#B2FF59] text-[#131218] text-[11px] font-bold uppercase tracking-[1.5px] rounded-full px-3 py-1 mt-3.5">
               {project.stage}
             </span>
             {project.statusLine && (
-              <span className="text-xs text-white/40 font-medium ml-3">
+              <span className="text-xs text-white/50 font-medium ml-3">
                 {project.statusLine}
               </span>
             )}
           </div>
           <div className="text-right shrink-0">
-            <p className="text-[8.5px] font-bold text-white/18 uppercase tracking-[2px]">
+            <p className="text-[11px] font-bold text-white/30 uppercase tracking-[1.5px]">
               Last updated
             </p>
-            <p className="text-xs font-semibold text-white/35 mt-1">
+            <p className="text-[13px] font-semibold text-white/55 mt-1">
               {project.lastUpdated}
             </p>
           </div>
@@ -42,8 +51,21 @@ export function HallHero({ project }: { project: HallProject }) {
           {project.welcomeNote}
         </p>
 
+        {/* Primary CTA — only renders when caller provides one (Zeigarnik/Flow).
+            Reserved lime applies here: this is the single accent colour used for the
+            one action we want the client to take right now. */}
+        {cta && (
+          <a
+            href={cta.href}
+            className="inline-flex items-center gap-2 mt-6 bg-[#B2FF59] text-[#131218] text-[12px] font-bold px-4 py-2.5 rounded-full uppercase tracking-[1.5px] hover:bg-white transition-colors"
+          >
+            {cta.label}
+            <span aria-hidden="true">→</span>
+          </a>
+        )}
+
         {/* Prepared note */}
-        <p className="text-[10px] text-white/18 font-semibold mt-5 tracking-[0.3px]">
+        <p className="text-[11px] text-white/25 font-semibold mt-5 tracking-[0.3px]">
           {project.preparedNote}
         </p>
       </div>
