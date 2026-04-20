@@ -405,6 +405,13 @@ export default async function AdminPage() {
     fetchInboxServer(),
   ]);
 
+  // ── Ready for Jose — only actionable draft types (email drafts, posts, briefs)
+  // Market Signal and other system-generated signals are excluded: they have no
+  // Jose-facing next action. "Approved" on those means the agent approved its own output.
+  const RFJ_TYPES = new Set(["Follow-up Email", "Check-in Email", "LinkedIn Post", "Grant Brief", "Grant Application Draft"]);
+  const rfjGmailDrafts    = gmailDrafts.filter(d => RFJ_TYPES.has(d.draftType));
+  const rfjApprovedDrafts = approvedDrafts.filter(d => RFJ_TYPES.has(d.draftType));
+
   // ── Derived state ────────────────────────────────────────────────────────────
   const withBlockers    = projects.filter(p => p.blockerCount > 0);
   const needsUpdate     = projects.filter(p => p.updateNeeded);
@@ -662,11 +669,11 @@ export default async function AdminPage() {
           <div>
             <SectionHeader
               label="Ready for Jose"
-              count={gmailDrafts.length + approvedDrafts.length}
+              count={rfjGmailDrafts.length + rfjApprovedDrafts.length}
             />
             <ReadyForJoseSection
-              gmailDrafts={gmailDrafts}
-              approvedDrafts={approvedDrafts}
+              gmailDrafts={rfjGmailDrafts}
+              approvedDrafts={rfjApprovedDrafts}
             />
           </div>
 
