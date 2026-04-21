@@ -163,11 +163,17 @@ export async function getContactWhatsappClips(
   if (!name || name.length < 3) return [];
   const sb = getSupabaseServerClient();
 
-  // Pull all matching messages (capped) with their parent source, then group.
-  // We query with fuzzy ILIKE on the first token AND the full name, so "Francisco"
-  // catches "Francisco Cerda L" captures too.
-  const firstToken = name.split(/\s+/)[0];
-  const pattern = `%${firstToken}%`;
+  // Tokenize around spaces/commas/dots so "Correa, Cristobal" and "J.M. Moller"
+  // produce clean tokens. Pick the longest token as the most distinctive
+  // (surnames are usually rarer than first names, and rare tokens reduce
+  // false-positive matches across the DB).
+  const tokens = name
+    .split(/[\s,.]+/)
+    .map(t => t.trim())
+    .filter(t => t.length >= 3);
+  if (tokens.length === 0) return [];
+  const probe = tokens.slice().sort((a, b) => b.length - a.length)[0];
+  const pattern = `%${probe}%`;
 
   const { data, error } = await sb
     .from("conversation_messages")
@@ -264,7 +270,22 @@ export async function getContactTimeline(email: string, limit = 15): Promise<Tim
   ]);
 
   const entries: TimelineEntry[] = [];
-  for (const r of (calendar.data ?? []) as { event_id: string; event_title: string; event_start: string; attendee_emails: string[] }[]) {
+
+  // Dedupe calendar events that share (title, start_time) — happens when the
+  // same meeting is invited twice (e.g. host adds you from two different
+  // calendars) and Google creates two event_ids. Keep the richer row.
+  type CalRow = { event_id: string; event_title: string; event_start: string; attendee_emails: string[] };
+  const calRows = (calendar.data ?? []) as CalRow[];
+  const calByKey = new Map<string, CalRow>();
+  for (const r of calRows) {
+    const normTitle = (r.event_title ?? "").trim().toLowerCase();
+    const key       = `${normTitle}::${r.event_start}`;
+    const prev      = calByKey.get(key);
+    const attendees = r.attendee_emails?.length ?? 0;
+    const prevAttendees = prev?.attendee_emails?.length ?? 0;
+    if (!prev || attendees > prevAttendees) calByKey.set(key, r);
+  }
+  for (const r of calByKey.values()) {
     entries.push({
       kind:           "meeting",
       at:             r.event_start,
