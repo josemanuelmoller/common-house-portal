@@ -3,129 +3,188 @@
 <head>
   <meta charset="utf-8" />
   <title>Clip to Common House</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg: #0f0f10;
-      --fg: #f5f5f3;
-      --muted: #9a9a97;
-      --card: #1a1a1c;
-      --border: #2a2a2d;
-      --accent: #c7f464;
-      --accent-fg: #0f0f10;
-      --danger: #f87171;
+      --bg:     #eeeee8;
+      --card:   #ffffff;
+      --ink:    #0e0e0e;
+      --muted:  #6b6b6b;
+      --border: #d8d8d0;
+      --lime:   #c8f55a;
+      --danger: #c53030;
+      --danger-tint: #fbe7e7;
     }
     html, body { margin: 0; padding: 0; }
     body {
       width: 360px;
-      font-family: -apple-system, BlinkMacSystemFont, "Inter", Segoe UI, sans-serif;
+      font-family: "Inter", -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif;
       background: var(--bg);
-      color: var(--fg);
+      color: var(--ink);
       font-size: 13px;
+      -webkit-font-smoothing: antialiased;
     }
-    .wrap { padding: 14px; }
+    .wrap { padding: 16px; }
     h1 {
-      font-size: 13px;
-      font-weight: 600;
-      margin: 0 0 10px 0;
-      letter-spacing: 0.2px;
+      font-size: 11px;
+      font-weight: 800;
+      margin: 0 0 12px 0;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 1.8px;
+    }
+    h1 em {
+      font-style: normal;
+      color: var(--ink);
+      font-weight: 800;
     }
     .meta {
       background: var(--card);
       border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 8px 10px;
-      margin-bottom: 10px;
+      border-radius: 10px;
+      padding: 10px 12px;
+      margin-bottom: 12px;
     }
-    .meta .title { font-weight: 500; margin-bottom: 2px; word-break: break-word; }
-    .meta .url { color: var(--muted); font-size: 11px; word-break: break-all; }
+    .meta .title {
+      font-weight: 600;
+      margin-bottom: 3px;
+      word-break: break-word;
+      color: var(--ink);
+      font-size: 13px;
+      line-height: 1.35;
+    }
+    .meta .url {
+      color: var(--muted);
+      font-size: 10.5px;
+      word-break: break-all;
+      line-height: 1.35;
+    }
     label {
       display: block;
-      font-size: 11px;
+      font-size: 9px;
       color: var(--muted);
-      margin: 8px 0 4px;
+      margin: 10px 0 5px;
       text-transform: uppercase;
-      letter-spacing: 0.4px;
+      letter-spacing: 1.8px;
+      font-weight: 700;
     }
     textarea {
       width: 100%;
       box-sizing: border-box;
       background: var(--card);
-      color: var(--fg);
+      color: var(--ink);
       border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 8px;
+      border-radius: 10px;
+      padding: 10px;
       font-family: inherit;
       font-size: 12px;
+      line-height: 1.45;
       resize: vertical;
+      transition: border-color 0.15s ease;
     }
-    textarea#selection { min-height: 70px; }
-    textarea#notes { min-height: 50px; }
-    .row { display: flex; gap: 8px; margin-top: 10px; }
+    textarea:focus {
+      outline: none;
+      border-color: var(--ink);
+    }
+    textarea#selection { min-height: 72px; }
+    textarea#notes { min-height: 52px; }
+    .row { display: flex; gap: 8px; margin-top: 12px; }
     button {
       flex: 1;
-      padding: 8px 12px;
+      padding: 10px 14px;
       border: none;
-      border-radius: 8px;
+      border-radius: 10px;
       font-size: 12px;
-      font-weight: 600;
+      font-weight: 700;
       cursor: pointer;
       font-family: inherit;
+      letter-spacing: 0.2px;
+      transition: transform 0.05s ease, background 0.15s ease;
     }
-    button.primary { background: var(--accent); color: var(--accent-fg); }
-    button.primary:disabled { opacity: 0.5; cursor: not-allowed; }
-    button.secondary { background: var(--card); color: var(--fg); border: 1px solid var(--border); }
+    button:active { transform: translateY(1px); }
+    button.primary {
+      background: var(--lime);
+      color: var(--ink);
+    }
+    button.primary:hover { background: #d4ff6a; }
+    button.primary:disabled { opacity: 0.55; cursor: not-allowed; }
+    button.secondary {
+      background: var(--card);
+      color: var(--ink);
+      border: 1px solid var(--border);
+    }
+    button.secondary:hover { background: #f7f7f2; }
     .status {
-      margin-top: 10px;
-      padding: 8px 10px;
-      border-radius: 8px;
-      font-size: 12px;
+      margin-top: 12px;
+      padding: 9px 11px;
+      border-radius: 10px;
+      font-size: 11.5px;
       display: none;
+      line-height: 1.4;
     }
-    .status.ok { background: rgba(199, 244, 100, 0.12); color: var(--accent); border: 1px solid rgba(199, 244, 100, 0.3); display: block; }
-    .status.err { background: rgba(248, 113, 113, 0.12); color: var(--danger); border: 1px solid rgba(248, 113, 113, 0.3); display: block; }
+    .status.ok {
+      background: var(--lime);
+      color: var(--ink);
+      display: block;
+      font-weight: 600;
+    }
+    .status.err {
+      background: var(--danger-tint);
+      color: var(--danger);
+      border: 1px solid #f0c0c0;
+      display: block;
+      font-weight: 500;
+    }
     .settings-link {
       display: block;
-      margin-top: 8px;
+      margin-top: 10px;
       color: var(--muted);
-      font-size: 11px;
+      font-size: 10.5px;
       text-decoration: none;
       text-align: right;
+      letter-spacing: 0.2px;
     }
-    .settings-link:hover { color: var(--fg); }
+    .settings-link:hover { color: var(--ink); text-decoration: underline; }
     .setup-notice {
-      background: rgba(248, 113, 113, 0.08);
-      border: 1px solid rgba(248, 113, 113, 0.3);
+      background: var(--danger-tint);
+      border: 1px solid #f0c0c0;
       color: var(--danger);
-      border-radius: 8px;
-      padding: 10px;
+      border-radius: 10px;
+      padding: 12px;
       font-size: 12px;
+      line-height: 1.45;
     }
+    .setup-notice a { color: var(--danger); font-weight: 600; }
     .label-row {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin: 8px 0 4px;
+      margin: 10px 0 5px;
     }
     .label-row label { margin: 0; }
     .linky {
       background: none;
       border: none;
-      color: var(--accent);
-      font-size: 11px;
+      color: var(--ink);
+      font-size: 10px;
       cursor: pointer;
-      padding: 2px 0;
+      padding: 2px 6px;
       font-family: inherit;
-      font-weight: 500;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      border-radius: 6px;
+      background: var(--lime);
     }
-    .linky:hover { text-decoration: underline; }
-    .linky:disabled { opacity: 0.5; cursor: wait; }
+    .linky:hover { background: #d4ff6a; }
+    .linky:disabled { opacity: 0.55; cursor: wait; }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <h1>Clip to Common House</h1>
+    <h1>Clip to <em>Common House</em></h1>
     <div id="setup" class="setup-notice" style="display:none">
-      Clipper is not configured yet. <a href="#" id="open-options" style="color:inherit;text-decoration:underline">Open settings</a> to set your token.
+      Clipper is not configured yet. <a href="#" id="open-options">Open settings</a> to set your token.
     </div>
     <div id="main" style="display:none">
       <div class="meta">
