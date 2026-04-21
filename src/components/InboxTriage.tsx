@@ -181,7 +181,7 @@ export function InboxTriage({ initialItems, initialScanned = 0 }: Props) {
     <div className="max-w-[760px]">
       <div
         className={`bg-white rounded-xl border border-[#E0E0D8] divide-y divide-[#E0E0D8] ${
-          overflow ? "max-h-[380px] overflow-y-auto" : ""
+          overflow ? "max-h-[60vh] sm:max-h-[380px] overflow-y-auto" : ""
         }`}
       >
         {visible.map((item) => (
@@ -237,13 +237,13 @@ export function InboxTriage({ initialItems, initialScanned = 0 }: Props) {
 
               {/* SECONDARY — candidate creation, 24x24 hit area (D3) */}
               {created.has(item.threadId) ? (
-                <span className="text-[11px] font-bold text-emerald-600 w-6 h-6 flex items-center justify-center" title="Candidate created">✓</span>
+                <span className="text-[11px] font-bold text-emerald-600 w-11 h-11 sm:w-6 sm:h-6 flex items-center justify-center" title="Candidate created">✓</span>
               ) : failed.has(item.threadId) ? (
                 <button
                   onClick={() => createCandidate(item)}
                   disabled={creating === item.threadId}
                   title="Failed — click to retry"
-                  className="w-6 h-6 flex items-center justify-center rounded-md text-[11px] font-bold text-red-500 hover:text-red-700 hover:bg-red-50 transition-colors disabled:opacity-40"
+                  className="w-11 h-11 sm:w-6 sm:h-6 flex items-center justify-center rounded-md text-[13px] sm:text-[11px] font-bold text-red-500 hover:text-red-700 hover:bg-red-50 transition-colors disabled:opacity-40"
                 >
                   {creating === item.threadId ? "…" : "↻"}
                 </button>
@@ -253,19 +253,19 @@ export function InboxTriage({ initialItems, initialScanned = 0 }: Props) {
                   disabled={creating === item.threadId}
                   title="Create opportunity candidate from this email"
                   aria-label="Create opportunity candidate"
-                  className="w-6 h-6 flex items-center justify-center rounded-md text-[13px] font-bold text-[#131218]/30 hover:text-amber-600 hover:bg-amber-50 transition-colors disabled:opacity-40 leading-none"
+                  className="w-11 h-11 sm:w-6 sm:h-6 flex items-center justify-center rounded-md text-[17px] sm:text-[13px] font-bold text-[#131218]/30 hover:text-amber-600 hover:bg-amber-50 transition-colors disabled:opacity-40 leading-none"
                 >
                   {creating === item.threadId ? "…" : "+"}
                 </button>
               )}
 
-              {/* TERTIARY — quiet dismiss, 24x24 hit area (D3) */}
+              {/* TERTIARY — quiet dismiss. 44x44 on mobile for thumb targets (WCAG AAA), 24x24 on sm+. */}
               <button
                 onClick={() => ignoreItem(item)}
                 disabled={ignoring === item.threadId}
                 title="Ignore this thread — won't resurface"
                 aria-label="Ignore"
-                className="w-6 h-6 flex items-center justify-center rounded-md text-[12px] text-[#131218]/25 hover:text-[#131218]/80 hover:bg-[#EFEFEA] transition-colors disabled:opacity-40 leading-none"
+                className="w-11 h-11 sm:w-6 sm:h-6 flex items-center justify-center rounded-md text-[15px] sm:text-[12px] text-[#131218]/25 hover:text-[#131218]/80 hover:bg-[#EFEFEA] transition-colors disabled:opacity-40 leading-none"
               >
                 {ignoring === item.threadId ? "…" : "×"}
               </button>

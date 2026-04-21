@@ -546,10 +546,10 @@ export default async function AdminPage() {
     <div className="flex min-h-screen bg-[#EFEFEA]">
       <Sidebar adminNav />
 
-      <main className="flex-1 ml-60 overflow-auto">
+      <main className="flex-1 md:ml-60 overflow-auto">
 
         {/* ── 0. Header ─────────────────────────────────────────────────── */}
-        <div className="bg-[#131218] px-10 pt-7 pb-6">
+        <div className="bg-[#131218] px-4 sm:px-6 md:px-10 pt-7 pb-6 pl-16 md:pl-10">
           <p className="text-[8px] font-bold uppercase tracking-[2.5px] text-white/20 mb-2">
             HOME · {dateLabel.toUpperCase()} · v2
           </p>
@@ -570,7 +570,7 @@ export default async function AdminPage() {
           </p>
         </div>
 
-        <div className="px-8 py-6 space-y-6 max-w-6xl mx-auto">
+        <div className="px-4 sm:px-6 md:px-8 py-6 space-y-6 max-w-6xl mx-auto">
 
           {/* ── 1. Focus of the Day ───────────────────────────────────────── */}
           {focusRec ? (
@@ -738,7 +738,7 @@ export default async function AdminPage() {
           )}
 
           {/* ── 3. Stats row — B6: hero tile wider, 2 satellites narrower. B7: expand abbreviations. ── */}
-          <div className="grid grid-cols-[1.6fr_1fr_1fr] gap-3 items-stretch">
+          <div className="grid grid-cols-1 sm:grid-cols-[1.6fr_1fr_1fr] gap-3 items-stretch">
 
             {/* Tile 1 — Portfolio (hero) */}
             <div className="bg-white rounded-xl border border-[#E0E0D8] px-4 py-3 flex flex-col">
@@ -839,7 +839,7 @@ export default async function AdminPage() {
           </div>
 
           {/* ── 4c. Inbox only on the left; drafts moved into CoS ─── */}
-          <div className="grid grid-cols-[1fr_340px] gap-6 items-start">
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6 items-start">
             <div className="space-y-6 min-w-0">
               {/* Inbox Triage */}
               <div>
@@ -888,7 +888,7 @@ export default async function AdminPage() {
           </div>
 
           {/* ── Two-column main layout ─────────────────────────────────────── */}
-          <div className="grid grid-cols-[1fr_340px] gap-6 items-start">
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6 items-start">
 
             {/* ── LEFT COLUMN ───────────────────────────────────────────────── */}
             <div className="space-y-6">
@@ -1191,7 +1191,8 @@ export default async function AdminPage() {
                   const dormantRows = ranked.filter(p => dormantIds.has(p.id));
                   return (
                 <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-                  <div className="divide-y divide-[#EFEFEA]">
+                  <div className="overflow-x-auto">
+                    <div className="min-w-[720px] divide-y divide-[#EFEFEA]">
                     {actionableRows.map(p => {
                       const activityDate = bestActivity(p);
                       const days    = daysSince(activityDate);
@@ -1304,6 +1305,7 @@ export default async function AdminPage() {
                         </div>
                       </details>
                     )}
+                    </div>
                   </div>
                 </div>
                   );
@@ -1366,7 +1368,7 @@ export default async function AdminPage() {
           {readyContent.length > 0 && (
             <div>
               <SectionHeader label="Ready to publish" count={readyContent.length} />
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {readyContent.map(c => (
                   <a
                     key={c.id}

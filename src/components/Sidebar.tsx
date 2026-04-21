@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { UserButton, useUser, SignOutButton } from "@clerk/nextjs";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -117,6 +117,10 @@ export function Sidebar({ items, projectName, isAdmin, adminNav }: Props) {
     : {};
 
   const [open, setOpen] = useState<Record<string, boolean>>(initialOpen);
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  // Close mobile drawer automatically on route change
+  useEffect(() => { setMobileOpen(false); }, [pathname]);
 
   const toggle = (label: string) =>
     setOpen((prev) => ({ ...prev, [label]: !prev[label] }));
@@ -124,7 +128,38 @@ export function Sidebar({ items, projectName, isAdmin, adminNav }: Props) {
   const useCollapsible = adminNav ?? isAdmin;
 
   return (
-    <aside className="w-[228px] min-h-screen bg-white border-r border-[#d8d8d0] flex flex-col flex-shrink-0 fixed top-0 left-0 z-10 overflow-y-auto">
+    <>
+      {/* Mobile hamburger — visible only below md, always on top */}
+      <button
+        onClick={() => setMobileOpen(true)}
+        aria-label="Open navigation"
+        className="md:hidden fixed top-3 left-3 z-50 w-11 h-11 rounded-lg bg-white border border-[#d8d8d0] flex items-center justify-center shadow-sm active:bg-[#EFEFEA]"
+      >
+        <span className="flex flex-col gap-[3px]">
+          <span className="block w-[18px] h-[2px] bg-[#131218]" />
+          <span className="block w-[18px] h-[2px] bg-[#131218]" />
+          <span className="block w-[18px] h-[2px] bg-[#131218]" />
+        </span>
+      </button>
+
+      {/* Backdrop — only when drawer open on mobile */}
+      {mobileOpen && (
+        <div
+          onClick={() => setMobileOpen(false)}
+          aria-hidden
+          className="md:hidden fixed inset-0 bg-black/40 z-30"
+        />
+      )}
+
+      <aside className={`w-[228px] min-h-screen bg-white border-r border-[#d8d8d0] flex flex-col flex-shrink-0 fixed top-0 left-0 z-40 overflow-y-auto transition-transform md:translate-x-0 ${mobileOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0`}>
+        {/* Mobile close button inside drawer */}
+        <button
+          onClick={() => setMobileOpen(false)}
+          aria-label="Close navigation"
+          className="md:hidden absolute top-3 right-3 w-8 h-8 rounded-md text-[#131218]/40 hover:text-[#131218] hover:bg-[#EFEFEA] flex items-center justify-center text-lg leading-none"
+        >
+          ×
+        </button>
 
       {/* Logo */}
       <div className="px-[18px] pt-5 pb-[18px] border-b border-[#d8d8d0] mb-3">
@@ -295,5 +330,6 @@ export function Sidebar({ items, projectName, isAdmin, adminNav }: Props) {
         </SignOutButton>
       </div>
     </aside>
+    </>
   );
 }
