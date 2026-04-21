@@ -107,31 +107,37 @@ export async function HallTimeAllocation() {
           <p className="text-[11px] text-[#131218]/35 text-center">No meetings in the last 7 days.</p>
         ) : (
           <>
-            {/* Stacked bar */}
-            <div className="flex w-full h-2 rounded-full overflow-hidden bg-[#EFEFEA] mb-3">
+            {/* Stacked bar — h-3 is more readable than h-2 and survives PDF render */}
+            <div className="flex w-full h-3 rounded-full overflow-hidden bg-[#E0E0D8] mb-4 ring-1 ring-[#E0E0D8]">
               {allocation.filter(a => a.hours > 0).map(a => (
                 <div
                   key={a.bucket.key}
                   className={`h-full ${a.bucket.color}`}
-                  style={{ width: `${(a.hours / totalHours) * 100}%` }}
-                  title={`${a.bucket.label}: ${a.hours.toFixed(1)}h`}
+                  style={{ width: `${(a.hours / totalHours) * 100}%`, minWidth: "2px" }}
+                  title={`${a.bucket.label}: ${a.hours.toFixed(1)}h · ${((a.hours / totalHours) * 100).toFixed(0)}%`}
                 />
               ))}
             </div>
-            {/* Table */}
+            {/* Table — Q3: amber for "below target", red reserved for 0 with target */}
             <div className="space-y-1">
               {allocation
                 .filter(a => a.hours > 0 || a.bucket.target > 0)
                 .map(a => {
                   const pct = totalHours > 0 ? (a.hours / totalHours) * 100 : 0;
                   const target = a.bucket.target;
-                  const belowTarget = target > 0 && pct < target;
+                  const far  = target > 0 && a.hours === 0;           // red only when totally neglected
+                  const near = target > 0 && pct > 0 && pct < target; // amber when present but under
+                  const over = target > 0 && pct > target * 1.5;      // K2 — highlight over-served
+                  const color = far ? "text-red-600 font-bold"
+                              : near ? "text-amber-700 font-semibold"
+                              : over ? "text-emerald-700 font-semibold"
+                              : "text-[#131218]/40";
                   return (
                     <div key={a.bucket.key} className="flex items-center gap-2 text-[10px]">
                       <span className={`w-2 h-2 rounded-full ${a.bucket.color}`} />
                       <span className="font-semibold text-[#131218]/75 w-20">{a.bucket.label}</span>
-                      <span className="text-[#131218]/50 w-14 text-right font-mono">{a.hours.toFixed(1)}h</span>
-                      <span className={`w-12 text-right font-mono ${belowTarget ? "text-red-600 font-bold" : "text-[#131218]/40"}`}>
+                      <span className="text-[#131218]/50 w-14 text-right tabular-nums">{a.hours.toFixed(1)}h</span>
+                      <span className={`w-12 text-right tabular-nums ${color}`}>
                         {pct.toFixed(0)}%
                       </span>
                       {target > 0 && (

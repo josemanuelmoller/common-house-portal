@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState } from "react"; // used by SignalList + MarketSignalsPanel
 import { useRouter } from "next/navigation";
 
 export type MarketSignalBrief = {
@@ -191,6 +191,7 @@ function parseSignals(raw: string): Signal[] {
 function SignalList({ raw }: { raw: string }) {
   const signals = parseSignals(raw);
   const structured = signals.some(s => s.tag);
+  const [expanded, setExpanded] = useState<Set<number>>(new Set());
 
   // Plain fallback: if nothing parsed with a tag, render as readable paragraph(s)
   if (!structured) {
@@ -201,12 +202,22 @@ function SignalList({ raw }: { raw: string }) {
     );
   }
 
+  const toggle = (i: number) => {
+    setExpanded(prev => {
+      const next = new Set(prev);
+      if (next.has(i)) next.delete(i); else next.add(i);
+      return next;
+    });
+  };
+
   return (
-    <ul className="flex flex-col gap-3">
+    <ul className="flex flex-col gap-2">
       {signals.map((s, i) => {
         const color = s.tag && TAG_COLOR[s.tag]
           ? TAG_COLOR[s.tag]
           : "bg-[#EFEFEA] text-[#131218]/55 border-[#E0E0D8]";
+        const isOpen = expanded.has(i);
+        const hasRelevance = !!s.relevance;
         return (
           <li key={i} className="flex gap-3">
             <span
@@ -217,11 +228,23 @@ function SignalList({ raw }: { raw: string }) {
               {s.tag ?? "—"}
             </span>
             <div className="flex-1 min-w-0">
-              <p className="text-[11.5px] font-semibold text-[#131218] leading-snug">
-                {s.headline}
-              </p>
-              {s.relevance && (
-                <p className="text-[10px] text-[#131218]/45 leading-snug mt-0.5">
+              <button
+                type="button"
+                onClick={() => hasRelevance && toggle(i)}
+                className={`text-left w-full ${hasRelevance ? "cursor-pointer" : "cursor-default"} group`}
+                disabled={!hasRelevance}
+              >
+                <p className="text-[11.5px] font-semibold text-[#131218] leading-snug group-hover:text-[#131218]/70 transition-colors">
+                  {s.headline}
+                  {hasRelevance && (
+                    <span className="ml-1 text-[9px] font-normal text-[#131218]/30">
+                      {isOpen ? "▾" : "▸"}
+                    </span>
+                  )}
+                </p>
+              </button>
+              {hasRelevance && isOpen && (
+                <p className="text-[10px] text-[#131218]/55 leading-snug mt-1">
                   {s.relevance}
                 </p>
               )}

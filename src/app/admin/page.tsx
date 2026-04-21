@@ -661,14 +661,30 @@ export default async function AdminPage() {
               );
             }
 
+            // B2 — context-aware subtitle: if the top suggestion is a P1 decision or
+            // an imminent deadline, frame the hero as "Your call today" instead of
+            // the apologetic "No critical task" default.
+            const hasP1 = p1Decisions.length > 0;
+            const hasDeadline = imminentDeadlines.length > 0;
+            const topKind = suggestions[0]?.kind;
+            const heroSubtitle = hasP1
+              ? `Your call today — ${p1Decisions.length} P1 critical`
+              : hasDeadline
+                ? `${imminentDeadlines.length} deadline${imminentDeadlines.length > 1 ? "s" : ""} this week`
+                : topKind === "decision"
+                  ? "Top decision pending your call"
+                  : topKind === "inbox"
+                    ? "Inbox needs your reply"
+                    : suggestions.length === 1 ? "Suggested move" : "Suggested moves";
+
             return (
-              <div className="bg-white border border-[#E0E0D8] rounded-xl overflow-hidden">
-                <div className="px-5 pt-3 pb-2 flex items-center justify-between gap-3 border-b border-[#EFEFEA]">
+              <div className={`bg-white border rounded-xl overflow-hidden ${hasP1 ? "border-red-300 ring-1 ring-red-100" : "border-[#E0E0D8]"}`}>
+                <div className={`px-5 pt-3 pb-2 flex items-center justify-between gap-3 border-b ${hasP1 ? "border-red-100 bg-red-50/40" : "border-[#EFEFEA]"}`}>
                   <div className="flex items-center gap-2.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#c8f55a]" />
+                    <span className={`w-1.5 h-1.5 rounded-full ${hasP1 ? "bg-red-500 animate-pulse" : "bg-[#c8f55a]"}`} />
                     <p className="text-[10px] font-bold uppercase tracking-[2.5px] text-[#131218]/35">Focus of the Day</p>
                     <span className="text-[10px] text-[#131218]/35">·</span>
-                    <span className="text-[10px] text-[#131218]/40">No critical task — {suggestions.length === 1 ? "here's a helpful move" : "here are a couple of helpful moves"}</span>
+                    <span className={`text-[10px] font-semibold ${hasP1 ? "text-red-700" : "text-[#131218]/55"}`}>{heroSubtitle}</span>
                   </div>
                   <TriggerBriefingButton />
                 </div>
@@ -693,23 +709,19 @@ export default async function AdminPage() {
             );
           })()}
 
-          {/* ── 2. P1 Banner — only P1 Critical decisions or deadlines ≤7 days ── */}
-          {showBanner && (
-            <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-xl px-5 py-3.5">
-              <span className="w-2 h-2 rounded-full bg-red-500 shrink-0 animate-pulse" />
-              <p className="text-sm text-[#131218] flex-1 min-w-0">
-                {p1Decisions.length > 0 && (
-                  <><strong>{p1Decisions.length} P1 decision{p1Decisions.length !== 1 ? "s" : ""}</strong>{" · "}{p1Decisions.slice(0, 2).map(d => d.title).join(" · ")}</>
-                )}
-                {imminentDeadlines.length > 0 && (
-                  <>{p1Decisions.length > 0 ? " · " : ""}<strong>{imminentDeadlines.length} deadline{imminentDeadlines.length !== 1 ? "s" : ""} this week</strong>
-                  {imminentDeadlines.slice(0, 1).map(d => (
-                    <span key={d.id}>{" · "}{d.title}{d.dueDate ? ` — closes ${new Date(d.dueDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}` : ""}</span>
-                  ))}</>
-                )}
+          {/* ── 2. P1 Banner — show ONLY imminent deadlines (P1 decisions are already in Focus of the Day hero).
+                Prevents rojo overload (Q3): same information shown twice turns red into wallpaper. ── */}
+          {imminentDeadlines.length > 0 && p1Decisions.length === 0 && (
+            <div className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-xl px-5 py-3">
+              <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
+              <p className="text-[13px] text-[#131218] flex-1 min-w-0">
+                <strong>{imminentDeadlines.length} deadline{imminentDeadlines.length !== 1 ? "s" : ""} this week</strong>
+                {imminentDeadlines.slice(0, 1).map(d => (
+                  <span key={d.id}>{" · "}{d.title}{d.dueDate ? ` — closes ${new Date(d.dueDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}` : ""}</span>
+                ))}
               </p>
-              <Link href="/admin/decisions" className="text-[11px] font-bold text-red-600 shrink-0 hover:text-red-800 transition-colors whitespace-nowrap">
-                View decisions →
+              <Link href="/admin/decisions" className="text-[11px] font-bold text-amber-700 shrink-0 hover:text-amber-900 transition-colors whitespace-nowrap">
+                View →
               </Link>
             </div>
           )}
