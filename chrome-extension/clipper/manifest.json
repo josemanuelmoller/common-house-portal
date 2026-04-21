@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Common House Clipper",
-  "version": "0.3.0",
-  "description": "Clip web pages into CH Sources [OS v2].",
+  "version": "0.4.0",
+  "description": "Clip web pages and WhatsApp Web conversations into CH Sources [OS v2].",
   "icons": {
     "16":  "icons/icon-16.png",
     "48":  "icons/icon-48.png",
@@ -21,6 +21,7 @@
   "permissions": ["activeTab", "scripting", "storage"],
   "host_permissions": [
     "http://localhost:3000/*",
-    "https://portal.wearecommonhouse.com/*"
+    "https://portal.wearecommonhouse.com/*",
+    "https://web.whatsapp.com/*"
   ]
 }

@@ -46,7 +46,7 @@ Restart the dev server after editing `.env.local`.
    - Local dev: `http://localhost:3000/api/clipper`
 4. Click **Save**, then **Test connection** — a successful response creates a probe clipping with URL `example.invalid/clipper-test-<timestamp>`.
 
-## Daily use
+## Daily use — web pages
 
 1. On any web page, optionally select the text you want to save.
 2. Click the extension icon.
@@ -54,6 +54,41 @@ Restart the dev server after editing `.env.local`.
 4. Add a short note on **why** this matters (optional but useful).
 5. Click **Clip**.
 6. The clipping lands in CH Sources with status `Ingested`. Downstream pipelines (`extract-meeting-evidence`, `evidence-to-knowledge`) pick it up on the next run.
+
+## Daily use — WhatsApp Web conversations (v0.4.0+)
+
+When the active tab is `web.whatsapp.com`, the popup automatically switches
+to conversation mode.
+
+1. Open the chat you want to capture in WhatsApp Web.
+2. Click the extension icon.
+3. Click **Clip conversation**. The extension auto-scrolls to the top of the
+   chat, harvesting messages as WhatsApp lazy-loads them. Progress is shown
+   as a status line; expect 2–10 seconds for chats of a few hundred
+   messages, up to ~60s for very long chats (hard cap).
+4. Review the extracted conversation in the Selection textarea — each line
+   is formatted as `[HH:MM, DD/M/YYYY] Sender: text`. Edit or trim if
+   needed.
+5. Add a note on why the conversation matters.
+6. Click **Clip**.
+
+**Media messages** (images, audio, video, stickers, documents) are recorded
+as placeholders like `[image]`, `[audio]` — the media itself is not
+uploaded. If you need the media, take a screenshot and use the regular
+clipping flow on that screenshot's hosting page.
+
+**Privacy:** you are capturing your own authenticated chat. Content of
+other participants enters the CH knowledge layer. Only clip conversations
+you have the right to share with the CH system.
+
+**Known limits of v0.4.0:**
+- Captures only the currently-open conversation (not multiple chats).
+- Relies on `data-pre-plain-text` attribute being present — this is stable
+  across WhatsApp Web versions, but system/deleted messages without it are
+  skipped.
+- Auto-scroll timeout is 60s; in chats with thousands of messages, older
+  history may be truncated. The status line says "scroll timed out" in
+  that case.
 
 ## Fields written to `CH Sources [OS v2]`
 
