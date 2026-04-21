@@ -24,6 +24,29 @@ export const maxDuration = 45;
 const MIN_DAYS_WAITING = 3;
 const MAX_THREADS      = 60;
 
+// J1 + J6 — spam tracker IDs (25608997.xxx, 8-digit-dot-long-alnum) and
+// similar patterns that dominate promotional/list-managed senders.
+const SPAM_SUBJECT_REGEX = /^\d{8}\.[A-Za-z0-9]{15,}/;
+const ATTACHMENT_SUBJECT_REGEX = /^(CamScanner|Scan \d|IMG_\d|Screenshot)\b/i;
+
+// J2 — senders that are structurally not worth chasing.
+const NOISE_LOCAL_PARTS = new Set([
+  "unsubscribe", "noreply", "no-reply", "newsletter", "notifications",
+  "notification", "mailer", "mailer-daemon", "postmaster", "support",
+  "bounces", "donotreply", "do-not-reply", "automated",
+]);
+function isNoiseSender(email: string): boolean {
+  const local = (email.split("@")[0] ?? "").toLowerCase();
+  return NOISE_LOCAL_PARTS.has(local);
+}
+
+// J6 — strip hex prefixes the spam filter missed, keep readable portion.
+function cleanSubject(raw: string): string {
+  let s = raw.replace(/^\d{8,}\.[A-Za-z0-9]{10,}[-_.]?/, "").trim();
+  if (!s) s = raw;
+  return s.length > 80 ? s.slice(0, 77) + "…" : s;
+}
+
 function getGmailClient() {
   const clientId     = process.env.GMAIL_CLIENT_ID;
   const clientSecret = process.env.GMAIL_CLIENT_SECRET;
@@ -137,6 +160,13 @@ export async function GET(_req: NextRequest) {
         if (!counterpartyEmail) return;
 
         const subject = first.payload?.headers?.find(h => h.name === "Subject")?.value ?? "(no subject)";
+
+        // J1 + J6 — discard subjects that are pure tracker IDs or attachments.
+        if (SPAM_SUBJECT_REGEX.test(subject)) return;
+        if (ATTACHMENT_SUBJECT_REGEX.test(subject)) return;
+        // J2 — discard senders with structural noise local parts.
+        if (isNoiseSender(counterpartyEmail)) return;
+
         const snippet = last.snippet ?? "";
         candidates.push({
           threadId: tid,
@@ -167,7 +197,10 @@ export async function GET(_req: NextRequest) {
         isVip:          contact ? isVipContact(contact) : false,
       };
     })
-    .filter(c => !c.isPersonal);
+    .filter(c => !c.isPersonal)
+    // J3 — require classified contact (excludes bulk senders where org/person
+    // isn't a known entity in Hall). Empty classes = we don't know who this is.
+    .filter(c => c.contactClasses.length > 0);
 
   // Rank: VIP first, then by weighted staleness+class priority.
   enriched.sort((a, b) => {
@@ -178,7 +211,7 @@ export async function GET(_req: NextRequest) {
 
   const items = enriched.slice(0, 10).map(c => ({
     threadId:    c.threadId,
-    subject:     c.subject,
+    subject:     cleanSubject(c.subject),
     to:          c.to,
     toName:      c.toName,
     snippet:     c.snippet.slice(0, 140),

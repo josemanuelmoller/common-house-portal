@@ -858,36 +858,53 @@ export default async function AdminPage() {
             {/* ── LEFT COLUMN ───────────────────────────────────────────────── */}
             <div className="space-y-6">
 
-              {/* ── 5a. Discovery — Candidates + Radar in one tabbed pane ─── */}
-              <div>
-                <SectionHeader
-                  label="Discovery"
-                  count={candidates.length + radarLoops.length}
-                />
-                <DiscoverySection candidates={candidates} radarLoops={radarLoops} />
-              </div>
-
-              {/* ── 5b. Chief of Staff — drafts + tasks unified queue ───── */}
+              {/* ── 5a+5b. Discovery + CoS — collapse to 1-line when all empty (M1+U1) ── */}
               {(() => {
+                const discoveryCount = candidates.length + radarLoops.length;
                 const totalCoS = cosTasks.length + rfjGmailDrafts.length + rfjApprovedDrafts.length;
+                const allEmpty = discoveryCount === 0 && totalCoS === 0;
+
+                if (allEmpty) {
+                  return (
+                    <div className="bg-white rounded-xl border border-[#E0E0D8] px-5 py-2.5 flex items-center gap-3">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                      <span className="text-[11px] font-semibold text-[#131218]/70">System clear</span>
+                      <span className="text-[10px] text-[#131218]/40">— no candidates, no Chief-of-Staff work, no parked loops.</span>
+                    </div>
+                  );
+                }
+
                 return (
-                  <div>
-                    <SectionHeader
-                      label="Chief of Staff"
-                      count={totalCoS}
-                      action={cosTasks.length > 0 ? "All opportunities →" : undefined}
-                      href="/admin/opportunities"
-                    />
-                    {(rfjGmailDrafts.length + rfjApprovedDrafts.length) > 0 && (
-                      <div className="mb-3">
-                        <ReadyForJoseSection
-                          gmailDrafts={rfjGmailDrafts}
-                          approvedDrafts={rfjApprovedDrafts}
-                        />
+                  <>
+                    {/* Discovery (shown only if non-empty — U1) */}
+                    {discoveryCount > 0 && (
+                      <div>
+                        <SectionHeader label="Discovery" count={discoveryCount} />
+                        <DiscoverySection candidates={candidates} radarLoops={radarLoops} />
                       </div>
                     )}
-                    <ChiefOfStaffDesk tasks={cosTasks} />
-                  </div>
+
+                    {/* Chief of Staff (shown only if non-empty — U1) */}
+                    {totalCoS > 0 && (
+                      <div>
+                        <SectionHeader
+                          label="Chief of Staff"
+                          count={totalCoS}
+                          action={cosTasks.length > 0 ? "All opportunities →" : undefined}
+                          href="/admin/opportunities"
+                        />
+                        {(rfjGmailDrafts.length + rfjApprovedDrafts.length) > 0 && (
+                          <div className="mb-3">
+                            <ReadyForJoseSection
+                              gmailDrafts={rfjGmailDrafts}
+                              approvedDrafts={rfjApprovedDrafts}
+                            />
+                          </div>
+                        )}
+                        <ChiefOfStaffDesk tasks={cosTasks} />
+                      </div>
+                    )}
+                  </>
                 );
               })()}
 

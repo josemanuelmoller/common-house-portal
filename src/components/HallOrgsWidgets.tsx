@@ -32,47 +32,42 @@ export async function HallOrgsColdRelations() {
     .sort((a, b) => daysAgo(b.last_interaction_at) - daysAgo(a.last_interaction_at))
     .slice(0, 8);
 
+  // U1 — if network is warm, don't render an empty widget.
+  if (cold.length === 0) return null;
+
   return (
     <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
       <div className="flex items-center justify-between px-5 py-3 border-b border-[#EFEFEA]">
         <div className="flex items-center gap-2">
           <span className="text-[10px] font-bold tracking-widest uppercase text-[#131218]/50">Cold orgs</span>
-          {cold.length > 0 && (
-            <span className="text-[9px] font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">
-              {cold.length}
-            </span>
-          )}
+          <span className="text-[9px] font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">
+            {cold.length}
+          </span>
         </div>
         <Link href="/admin/hall/organizations" className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/40 hover:text-[#131218]/80">
           All orgs →
         </Link>
       </div>
-      {cold.length === 0 ? (
-        <div className="px-5 py-6 text-center">
-          <p className="text-[11px] text-[#131218]/35">No idle Clients / Partners / Investors. Network is warm.</p>
-        </div>
-      ) : (
-        <div className="divide-y divide-[#EFEFEA]">
-          {cold.map(o => (
-            <Link
-              key={o.domain}
-              href={`/admin/hall/organizations/${encodeURIComponent(o.domain)}`}
-              className="flex items-center gap-3 px-5 py-2.5 hover:bg-[#EFEFEA]/40 transition-colors"
-            >
-              <div className="flex-1 min-w-0">
-                <p className="text-[11px] font-bold text-[#131218] truncate">{o.name}</p>
-                <p className="text-[9px] text-[#131218]/45 mt-0.5">
-                  {o.relationship_classes.slice(0, 2).join(" · ")}
-                  {" · "}{o.contact_count} contact{o.contact_count === 1 ? "" : "s"}
-                </p>
-              </div>
-              <span className={`text-[10px] font-bold shrink-0 ${daysAgo(o.last_interaction_at) >= 60 ? "text-red-600" : "text-amber-700"}`}>
-                {daysAgo(o.last_interaction_at)}d
-              </span>
-            </Link>
-          ))}
-        </div>
-      )}
+      <div className="divide-y divide-[#EFEFEA]">
+        {cold.map(o => (
+          <Link
+            key={o.domain}
+            href={`/admin/hall/organizations/${encodeURIComponent(o.domain)}`}
+            className="flex items-center gap-3 px-5 py-2.5 hover:bg-[#EFEFEA]/40 transition-colors"
+          >
+            <div className="flex-1 min-w-0">
+              <p className="text-[11px] font-bold text-[#131218] truncate">{o.name}</p>
+              <p className="text-[9px] text-[#131218]/45 mt-0.5">
+                {o.relationship_classes.slice(0, 2).join(" · ")}
+                {" · "}{o.contact_count} contact{o.contact_count === 1 ? "" : "s"}
+              </p>
+            </div>
+            <span className={`text-[10px] font-bold shrink-0 ${daysAgo(o.last_interaction_at) >= 60 ? "text-red-600" : "text-amber-700"}`}>
+              {daysAgo(o.last_interaction_at)}d
+            </span>
+          </Link>
+        ))}
+      </div>
     </div>
   );
 }

@@ -107,28 +107,23 @@ function formatValue(v: number): string {
 export async function HallOppFreshnessRadar() {
   const opps = await loadColdOpps();
 
+  // U1 — hide widget entirely when pipeline is hot. No empty card taking up space.
+  if (opps.length === 0) return null;
+
   return (
     <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
       <div className="flex items-center justify-between px-5 py-3 border-b border-[#EFEFEA]">
         <div className="flex items-center gap-2">
-          <span className="text-[10px] font-bold tracking-widest uppercase text-[#131218]/50">Opps enfriándose</span>
-          {opps.length > 0 && (
-            <span className="text-[9px] font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">{opps.length}</span>
-          )}
+          <span className="text-[10px] font-bold tracking-widest uppercase text-[#131218]/50">Opps going cold</span>
+          <span className="text-[9px] font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">{opps.length}</span>
         </div>
         <Link href="/admin/opportunities" className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/40 hover:text-[#131218]/80">
           All opps →
         </Link>
       </div>
-      {opps.length === 0 ? (
-        <div className="px-5 py-6 text-center">
-          <p className="text-[11px] text-[#131218]/35">Pipeline hot. Nothing has gone stale in the last few days.</p>
-        </div>
-      ) : (
-        <div className="divide-y divide-[#EFEFEA]">
-          {opps.map(o => <OppRow key={o.id} opp={o} />)}
-        </div>
-      )}
+      <div className="divide-y divide-[#EFEFEA]">
+        {opps.map(o => <OppRow key={o.id} opp={o} />)}
+      </div>
     </div>
   );
 }
