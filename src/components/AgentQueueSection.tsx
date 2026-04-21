@@ -125,7 +125,7 @@ export function AgentQueueSection({ drafts }: { drafts: AgentDraft[] }) {
   if (visible.length === 0) return null;
 
   return (
-    <div className="grid grid-cols-3 gap-3">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
       {visible.slice(0, 6).map((draft) => {
         const icon        = DRAFT_TYPE_ICON[draft.draftType] ?? "·";
         const isLinkedIn  = draft.draftType === "LinkedIn Post";
