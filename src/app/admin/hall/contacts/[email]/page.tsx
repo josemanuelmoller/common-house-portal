@@ -5,6 +5,7 @@ import { requireAdmin } from "@/lib/require-admin";
 import {
   getContactByEmail,
   getContactTimeline,
+  getContactWhatsappClips,
   isPersonalContact,
   isVipContact,
   type TimelineEntry,
@@ -52,6 +53,8 @@ export default async function ContactDrawerPage({ params }: Props) {
   ]);
 
   if (!contact) return notFound();
+
+  const whatsappClips = await getContactWhatsappClips(contact.display_name, 10);
 
   const personal = isPersonalContact(contact);
   const vip      = isVipContact(contact);
@@ -152,6 +155,66 @@ export default async function ContactDrawerPage({ params }: Props) {
               {vip && " This contact is a decision-maker: prep urgency is boosted +15."}
             </p>
           </section>
+
+          {/* WhatsApp clips */}
+          {whatsappClips.length > 0 && (
+            <section>
+              <h2 className="text-[10px] font-bold uppercase tracking-widest text-[#131218]/40 mb-3">
+                WhatsApp conversations · {whatsappClips.length}
+              </h2>
+              <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden divide-y divide-[#EFEFEA]">
+                {whatsappClips.map((clip) => {
+                  const first = new Date(clip.first_ts);
+                  const last  = new Date(clip.last_ts);
+                  const sameDay = first.toDateString() === last.toDateString();
+                  const range = sameDay
+                    ? formatWhen(clip.last_ts)
+                    : `${formatWhen(clip.first_ts)} → ${formatWhen(clip.last_ts)}`;
+                  const notionHref = clip.notion_id
+                    ? `https://www.notion.so/${clip.notion_id.replace(/-/g, "")}`
+                    : null;
+                  return (
+                    <div key={clip.source_id} className="px-5 py-4 hover:bg-[#EFEFEA]/40 transition-colors">
+                      <div className="flex items-start gap-4">
+                        <span className="text-[15px] leading-none mt-0.5">💬</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[12px] font-semibold text-[#131218] truncate">
+                            {clip.title}
+                          </p>
+                          <p className="text-[10px] text-[#131218]/45 mt-0.5">
+                            <span className="uppercase tracking-wide font-bold">WhatsApp</span>
+                            {" · "}{range}
+                            {" · "}{timeAgo(clip.last_ts)}
+                            {" · "}{clip.their_count}/{clip.total_count} msgs
+                          </p>
+                          {clip.preview.length > 0 && (
+                            <div className="mt-2 space-y-1">
+                              {clip.preview.map((p, i) => (
+                                <p key={i} className="text-[11px] text-[#131218]/60 leading-snug">
+                                  <span className="font-semibold text-[#131218]/80">{p.sender}:</span>{" "}
+                                  {p.text}
+                                </p>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        {notionHref && (
+                          <a
+                            href={notionHref}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[9px] font-bold uppercase tracking-widest text-[#131218]/40 hover:text-[#131218]/80 self-center"
+                          >
+                            Open ↗
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          )}
 
           {/* Timeline */}
           <section>

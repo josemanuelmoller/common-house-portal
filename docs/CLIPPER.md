@@ -90,6 +90,60 @@ you have the right to share with the CH system.
   history may be truncated. The status line says "scroll timed out" in
   that case.
 
+## v0.5.0 — what happens when you clip a WhatsApp conversation
+
+On submit, the extension sends the raw dump PLUS the structured message array
+to `/api/clipper`. The server then:
+
+1. Creates a Notion `CH Sources [OS v2]` record with `Source Type=Conversation`,
+   `Platform=WhatsApp`, a 1900-char "Processed Summary" (chat name, range,
+   message count, last 15 messages as preview).
+2. Upserts a matching row in Supabase `sources` (mirrored by notion_id) and
+   stores the **full raw content** in the new `sources.raw_content` column —
+   no Notion char limit applies here.
+3. Splits every captured message into its own row in the new
+   `conversation_messages` Supabase table: one row per message, with ts,
+   sender_name, direction (in/out), media_type, quote, reactions, raw_index.
+4. Fuzzy-matches each message's sender against `people`:
+   - Exact name
+   - `people.aliases` match (nicknames like "Pancho" → Francisco)
+   - Bidirectional substring ("Francisco Cerda" ↔ "Francisco Cerda L")
+   - Unique first-name fallback
+   - Self-check against `hall_self_identities` plus WA markers ("Tú", "You")
+   Match result persisted on the row as `sender_person_id`.
+5. Detects project mentions per message against the Supabase `projects`
+   index (name + canonical_project_code substring match). Every distinct
+   project matched is written back to the Notion page's `Linked Projects`
+   relation.
+
+The response payload is now `{ ok, id, messages_stored, people_matched,
+projects_matched }` instead of a simple `{ ok, id }`.
+
+### Where to see the data
+
+- **Notion:** the Source page with the short summary and the auto-linked
+  projects relation.
+- **Hall contact page** (`/admin/hall/contacts/[email]`): a new **WhatsApp
+  conversations** section surfaces clips where the contact appears as a
+  sender, with date range, message counts and a 3-line preview.
+- **Supabase direct query** (`conversation_messages`): the normalized source
+  of truth. Enables per-person timelines, semantic search and async AI
+  enrichment (planned for v0.7.0).
+
+### Populating `people.aliases` for better matching
+
+Matching "Pancho" → Francisco requires the alias to be set on the People row.
+Easiest path today is a direct Supabase SQL update:
+
+```sql
+UPDATE people
+SET aliases = array_append(aliases, 'pancho')
+WHERE name ILIKE 'Francisco Cerda%';
+```
+
+Aliases are always lowercased before comparison. Longer-form alias UI is
+scoped for the parked Track B (People rename + candidate_type).
+
 ## Fields written to `CH Sources [OS v2]`
 
 | Notion field        | Value                                          |

@@ -572,17 +572,17 @@ async function grabWhatsApp(tab) {
     const chatName = data.title || parseWaTabTitle(tab.title) || "WhatsApp conversation";
     els.pageTitle.textContent = `${chatName} · WhatsApp · Clipped ${fmtClipStamp()}`;
     const dump = formatWhatsAppDump(data);
-    // Popup textarea cap generous — user can trim before clipping. Server caps
-    // Processed Summary at ~1900 chars. Longer dumps will get truncated server-side
-    // in v0.4.0 — v0.4.1 will chunk into Notion page children.
+    // Popup textarea cap — user can trim before clipping. Server persists the
+    // full dump to Supabase (sources.raw_content) so no truncation reaches the DB.
     const POPUP_CAP = 100000;
     const capped = dump.slice(0, POPUP_CAP);
     els.selection.value = capped;
+    // Stash the structured data for submitClip to pick up (sent as-is to the API).
+    window.__waData = data;
     const truncated = dump.length > POPUP_CAP ? ` (shown truncated from ${dump.length})` : "";
     const elapsed = (data.elapsedMs / 1000).toFixed(1);
     const warn = data.timedOut ? " — scroll timed out, older messages may be missing" : "";
-    const serverWarn = dump.length > 1800 ? ` ⚠ only first ~1900 chars will land in Notion this version — trim to what matters most.` : "";
-    showStatus(`Read ${data.messageCount} messages in ${elapsed}s${warn}${truncated}.${serverWarn}`, "ok");
+    showStatus(`Read ${data.messageCount} messages in ${elapsed}s${warn}${truncated}. Review and Clip.`, "ok");
   } catch (err) {
     showStatus("Error: " + (err?.message || "unknown"), "err");
   } finally {
@@ -601,17 +601,24 @@ async function submitClip(tab) {
   els.clipBtn.disabled = true;
   els.clipBtn.textContent = "Clipping…";
 
-  // On WhatsApp, prefer the (possibly overridden) chat title over the raw page title
-  const title = isWhatsAppTab(tab) && els.pageTitle.textContent
-    ? `WhatsApp — ${els.pageTitle.textContent}`
-    : tab.title;
+  const isWa = isWhatsAppTab(tab);
+  const waData = isWa ? window.__waData : null;
 
   const body = {
     url:       tab.url,
-    title,
+    title:     isWa && waData ? `WhatsApp — ${waData.title}` : tab.title,
     selection: els.selection.value.trim(),
     notes:     els.notes.value.trim(),
   };
+
+  // WhatsApp mode — send structured payload so the server can persist raw
+  // content to Supabase, normalize messages, and match senders to people.
+  if (isWa && waData?.messages?.length) {
+    body.source_type = "whatsapp";
+    body.chat_name   = waData.title;
+    body.messages    = waData.messages;
+    body.raw_content = els.selection.value; // the (possibly user-edited) full dump
+  }
 
   try {
     const res = await fetch(apiUrl, {
@@ -635,11 +642,16 @@ async function submitClip(tab) {
 
     if (payload.deduped) {
       showStatus("Already clipped — existing record kept.", "ok");
+    } else if (payload.messages_stored != null) {
+      const parts = [`Saved · ${payload.messages_stored} messages stored`];
+      if (payload.people_matched   != null) parts.push(`${payload.people_matched} linked to people`);
+      if (payload.projects_matched != null) parts.push(`${payload.projects_matched} projects tagged`);
+      showStatus(parts.join(" · "), "ok");
     } else {
       showStatus("Saved to Common House.", "ok");
     }
     els.clipBtn.textContent = "Done";
-    setTimeout(() => window.close(), 1200);
+    setTimeout(() => window.close(), 1500);
   } catch (err) {
     showStatus("Network error: " + (err?.message || "unknown"), "err");
     els.clipBtn.disabled = false;

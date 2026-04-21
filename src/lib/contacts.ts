@@ -138,6 +138,101 @@ export async function getContactsByEmails(emails: string[]): Promise<Map<string,
   return out;
 }
 
+// ─── WhatsApp clips ─────────────────────────────────────────────────────────
+
+export type WhatsappClip = {
+  source_id:     string;
+  notion_id:     string | null;
+  title:         string;
+  source_url:    string | null;
+  first_ts:      string;   // ISO
+  last_ts:       string;   // ISO
+  total_count:   number;
+  their_count:   number;   // messages where this contact was the sender
+  preview:       { ts: string; sender: string; text: string }[]; // last 3 of theirs
+};
+
+// Returns WhatsApp conversation clips where the given contact appears as a
+// sender (matched by display_name ILIKE). Used to surface cross-channel
+// activity beyond calendar/email/meetings on the contact drawer page.
+export async function getContactWhatsappClips(
+  displayName: string | null,
+  limit = 10,
+): Promise<WhatsappClip[]> {
+  const name = (displayName ?? "").trim();
+  if (!name || name.length < 3) return [];
+  const sb = getSupabaseServerClient();
+
+  // Pull all matching messages (capped) with their parent source, then group.
+  // We query with fuzzy ILIKE on the first token AND the full name, so "Francisco"
+  // catches "Francisco Cerda L" captures too.
+  const firstToken = name.split(/\s+/)[0];
+  const pattern = `%${firstToken}%`;
+
+  const { data, error } = await sb
+    .from("conversation_messages")
+    .select("source_id, ts, sender_name, text, sources!inner(notion_id, title, source_url, source_platform)")
+    .ilike("sender_name", pattern)
+    .order("ts", { ascending: false })
+    .limit(500);
+
+  if (error || !data) return [];
+
+  type Row = {
+    source_id: string;
+    ts: string;
+    sender_name: string;
+    text: string;
+    sources: { notion_id: string | null; title: string | null; source_url: string | null; source_platform: string | null } | null;
+  };
+  const rows = (data as unknown as Row[]).filter(r => r.sources?.source_platform === "WhatsApp");
+
+  // Group by source_id
+  const bySource = new Map<string, Row[]>();
+  for (const r of rows) {
+    if (!bySource.has(r.source_id)) bySource.set(r.source_id, []);
+    bySource.get(r.source_id)!.push(r);
+  }
+
+  // For each source: also pull the total message count (all senders) via a
+  // second batched query.
+  const sourceIds = [...bySource.keys()];
+  const totalCounts = new Map<string, number>();
+  if (sourceIds.length > 0) {
+    // Supabase doesn't support count grouping via PostgREST easily, so pull
+    // the ids and count in JS. Cheap for the sizes we expect (< 50 clips).
+    const { data: allRows } = await sb
+      .from("conversation_messages")
+      .select("source_id")
+      .in("source_id", sourceIds);
+    for (const r of (allRows ?? []) as { source_id: string }[]) {
+      totalCounts.set(r.source_id, (totalCounts.get(r.source_id) ?? 0) + 1);
+    }
+  }
+
+  const clips: WhatsappClip[] = [];
+  for (const [sid, msgs] of bySource) {
+    const src = msgs[0].sources;
+    if (!src) continue;
+    const sorted = [...msgs].sort((a, b) => a.ts.localeCompare(b.ts));
+    clips.push({
+      source_id:   sid,
+      notion_id:   src.notion_id,
+      title:       src.title ?? "WhatsApp conversation",
+      source_url:  src.source_url,
+      first_ts:    sorted[0].ts,
+      last_ts:     sorted[sorted.length - 1].ts,
+      total_count: totalCounts.get(sid) ?? msgs.length,
+      their_count: msgs.length,
+      preview:     sorted.slice(-3).map(m => ({ ts: m.ts, sender: m.sender_name, text: (m.text ?? "").slice(0, 140) })),
+    });
+  }
+
+  // Sort clips by most-recent activity
+  clips.sort((a, b) => b.last_ts.localeCompare(a.last_ts));
+  return clips.slice(0, limit);
+}
+
 // ─── Timeline ───────────────────────────────────────────────────────────────
 
 export type TimelineEntry =
