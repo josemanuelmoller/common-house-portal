@@ -152,8 +152,12 @@ async function _POST(req: NextRequest) {
 
   for (const threadId of threadIds) {
     try {
-      if (await threadAlreadyIngested(threadId)) { skipped++; continue; }
+      const alreadyIngested = await threadAlreadyIngested(threadId);
 
+      // Always fetch the thread metadata — we need to run the contact observer
+      // even on already-ingested threads so late-joining participants (e.g. a
+      // reply that arrives AFTER the outbound thread was first recorded) still
+      // get registered in hall_attendees.
       const thread = await gmail.users.threads.get({
         userId: userEmail,
         id: threadId,
@@ -168,32 +172,40 @@ async function _POST(req: NextRequest) {
       const subject   = headers.find(h => h.name === "Subject")?.value  ?? "(no subject)";
       const dateStr   = headers.find(h => h.name === "Date")?.value     ?? "";
 
-      const sourceDate = dateStr ? new Date(dateStr).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10);
-      const threadUrl  = `https://mail.google.com/mail/u/0/#inbox/${threadId}`;
-      const projectId  = resolveProjectId(headers);
+      let notionSourceId: string | null = null;
 
-      const properties: Record<string, unknown> = {
-        "Source Title":     { title: [{ text: { content: subject.slice(0, 180) } }] },
-        "Source Type":      { select: { name: "Email" } },
-        "Source Platform":  { select: { name: "Gmail" } },
-        "Source URL":       { url: threadUrl },
-        "Processing Status":{ select: { name: "Ingested" } },
-        "Source Date":      { date: { start: sourceDate } },
-        "Dedup Key":        { rich_text: [{ text: { content: `gmail:${threadId}` } }] },
-      };
-      if (projectId) {
+      if (!alreadyIngested) {
+        const sourceDate = dateStr ? new Date(dateStr).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10);
+        const threadUrl  = `https://mail.google.com/mail/u/0/#inbox/${threadId}`;
+        const projectId  = resolveProjectId(headers);
+
+        const properties: Record<string, unknown> = {
+          "Source Title":     { title: [{ text: { content: subject.slice(0, 180) } }] },
+          "Source Type":      { select: { name: "Email" } },
+          "Source Platform":  { select: { name: "Gmail" } },
+          "Source URL":       { url: threadUrl },
+          "Processing Status":{ select: { name: "Ingested" } },
+          "Source Date":      { date: { start: sourceDate } },
+          "Dedup Key":        { rich_text: [{ text: { content: `gmail:${threadId}` } }] },
+        };
+        if (projectId) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (properties as any)["Linked Projects"] = { relation: [{ id: projectId }] };
+        }
+
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (properties as any)["Linked Projects"] = { relation: [{ id: projectId }] };
+        const createdPage = await notion.pages.create({ parent: { database_id: SOURCES_DB }, properties: properties as any });
+        notionSourceId = createdPage.id;
+        created++;
+      } else {
+        skipped++;
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const createdPage = await notion.pages.create({ parent: { database_id: SOURCES_DB }, properties: properties as any });
-      created++;
-
-      // ── Observe contacts. Collect From / To / Cc across EVERY message
-      //    in the thread, exclude self, lowercase + dedup. Pass through
-      //    the shared observer which handles the thread_id dedup so
-      //    email_thread_count stays accurate even on reruns.
+      // ── Observe contacts on EVERY run (new or already-ingested).
+      //    Collect From / To / Cc across every message in the thread,
+      //    exclude self, lowercase + dedup. The observer handles diffing
+      //    against prior attendee_emails so late-joiners get registered
+      //    without double-counting existing participants.
       try {
         const allEmails = new Set<string>();
         for (const m of messages) {
@@ -218,9 +230,9 @@ async function _POST(req: NextRequest) {
           attendeeEmails:  [...allEmails],
           subject,
           lastMessageAt:   lastAt,
-          notionSourceId:  createdPage.id,
+          notionSourceId,
         });
-        if (obs.newObservation) observedContacts += obs.incremented;
+        observedContacts += obs.incremented;
       } catch { /* observer errors are non-critical */ }
 
       void notion; // suppress unused warning

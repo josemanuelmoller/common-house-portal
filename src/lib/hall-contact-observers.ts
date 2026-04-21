@@ -43,37 +43,48 @@ export async function observeGmailThread(
   if (emails.length === 0) return { newObservation: false, incremented: 0 };
   const nowIso = new Date().toISOString();
 
-  // Is this a brand-new thread observation?
+  // Fetch prior observation. We need the stored attendee_emails to detect
+  // participants who joined AFTER the first observation — otherwise reply
+  // storms on outbound-initiated threads leave late-joiners off the register.
   const { data: prior } = await sb
     .from("hall_email_observations")
     .select("thread_id, attendee_emails")
     .eq("thread_id", obs.threadId)
     .maybeSingle();
   const isNew = !prior;
+  const priorEmails = new Set<string>(
+    ((prior?.attendee_emails as string[] | null) ?? []).map(e => e.toLowerCase())
+  );
 
-  // Upsert the thread ledger row
+  // Upsert the thread ledger row with the union of known participants.
+  const unionEmails = Array.from(new Set<string>([...priorEmails, ...emails]));
   await sb.from("hall_email_observations").upsert({
     thread_id:        obs.threadId,
-    attendee_emails:  emails,
+    attendee_emails:  unionEmails,
     subject:          obs.subject.slice(0, 500),
     last_message_at:  obs.lastMessageAt.toISOString(),
     notion_source_id: obs.notionSourceId ?? null,
     last_observed_at: nowIso,
   }, { onConflict: "thread_id" });
 
-  if (!isNew) return { newObservation: false, incremented: 0 };
+  // Who should we bump? On a brand-new thread: everyone. On an existing
+  // thread: only attendees that weren't recorded last time (diff).
+  const bumpEmails = isNew
+    ? emails
+    : emails.filter(e => !priorEmails.has(e));
 
-  // New thread → bump email_thread_count for each attendee; update last_email_at.
+  if (bumpEmails.length === 0) return { newObservation: false, incremented: 0 };
+
   const { data: existing } = await sb
     .from("hall_attendees")
     .select("email, email_thread_count, last_email_at")
-    .in("email", emails);
+    .in("email", bumpEmails);
   const byEmail = new Map<string, { count: number; last_at: string | null }>();
   for (const r of (existing ?? []) as { email: string; email_thread_count: number; last_email_at: string | null }[]) {
     byEmail.set(r.email, { count: r.email_thread_count ?? 0, last_at: r.last_email_at });
   }
 
-  const rows = emails.map(email => {
+  const rows = bumpEmails.map(email => {
     const current = byEmail.get(email);
     const newerTime = !current?.last_at || obs.lastMessageAt.toISOString() > current.last_at;
     return {
@@ -87,7 +98,7 @@ export async function observeGmailThread(
   });
 
   await sb.from("hall_attendees").upsert(rows, { onConflict: "email", ignoreDuplicates: false });
-  return { newObservation: true, incremented: emails.length };
+  return { newObservation: isNew, incremented: bumpEmails.length };
 }
 
 // ─── Fireflies ──────────────────────────────────────────────────────────────
