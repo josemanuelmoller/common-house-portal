@@ -101,6 +101,35 @@ async function readSelectionFromTab(tabId) {
   }
 }
 
+// Read the active WhatsApp chat title from the DOM header. Much more reliable
+// than tab.title, which often collapses to just "WhatsApp" (especially while
+// the window isn't focused or while new-message counters update).
+async function readWaChatNameFromTab(tabId) {
+  try {
+    const results = await chrome.scripting.executeScript({
+      target: { tabId },
+      func: () => {
+        const main = document.querySelector("#main");
+        if (!main) return null;
+        const header = main.querySelector("header");
+        if (!header) return null;
+        const skipRe = /^(en línea|en linea|online|offline|last seen|visto por última vez|escribiendo|typing|whatsapp|…|\s*)$/i;
+        const candidates = header.querySelectorAll("span[title], span[dir='auto']");
+        for (const c of candidates) {
+          const t = (c.getAttribute("title") || c.textContent || "").trim();
+          if (!t || skipRe.test(t)) continue;
+          if (/^\d{1,2}:\d{2}$/.test(t)) continue;
+          return t;
+        }
+        return null;
+      },
+    });
+    return results?.[0]?.result ?? null;
+  } catch {
+    return null;
+  }
+}
+
 // ─── Generic article extractor ────────────────────────────────────────────────
 
 function extractArticleText() {
@@ -545,8 +574,15 @@ async function init() {
   const isWa = isWhatsAppTab(tab);
 
   if (isWa) {
-    // WA mode — show the chat name if the tab title exposes it
-    const chatName = parseWaTabTitle(tab.title);
+    // WA mode — read the chat name from the DOM header (not tab.title, which
+    // frequently collapses to just "WhatsApp"). Fall back to tab.title if the
+    // header query fails (e.g. chat side panel still loading).
+    const chatFromDom = await readWaChatNameFromTab(tab.id);
+    const chatFromTab = parseWaTabTitle(tab.title);
+    const rawChatName = chatFromDom
+      || (chatFromTab && !/^whatsapp$/i.test(chatFromTab) ? chatFromTab : null);
+    const chatName    = rawChatName;
+
     const chatKey  = chatName ? chatKeyFor(chatName) : null;
     const lastTs   = chatKey  ? await getLastClipTs(chatKey) : 0;
     window.__waChatKey = chatKey;
@@ -554,9 +590,12 @@ async function init() {
 
     els.pageTitle.textContent = chatName
       ? `${chatName} · WhatsApp · Clipped ${fmtClipStamp()}`
-      : "WhatsApp conversation (open a chat first)";
+      : "WhatsApp — open a chat first";
     els.pageUrl.textContent   = tab.url || "";
-    if (lastTs) {
+    if (!chatName) {
+      els.grabFull.disabled  = true;
+      els.grabFull.textContent = "Open a chat first";
+    } else if (lastTs) {
       const since = fmtShortDate(new Date(lastTs));
       els.grabFull.textContent = `Clip new · since ${since}`;
       els.grabFull.title       = `Capture only messages posted after your last clip of this chat (${new Date(lastTs).toLocaleString()})`;

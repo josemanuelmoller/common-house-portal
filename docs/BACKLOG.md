@@ -42,6 +42,8 @@ Nothing committed yet for the next sprint. Pick from Ideas → Active.
 | C-6 | **Auto-scroll progress indicator** — real-time message count during extraction | 1h | Low (polish) | Low |
 | C-7 | **"Confirm org" button** with `contact_org_memberships` table (option C from discussion) | 1.5h | Med | Med |
 | C-8 | **Audio transcription** — Whisper on voice memos detected in WA clips | 6-10h | High (voice memos are ~30% of WA) | Med |
+| C-9 | **Orphan re-matching** — re-process sender_person_id nulls via orphan_match_candidates + admin review UI | 3-4h | High (diagnosed: 644/644 orphans today due to full_name vs name column bug) | **Active** |
+| C-10 | **Explicit mode indicator in popup** — top badge "WhatsApp mode" / "Article mode" / "Document mode". Today the mode is implicit from tab URL and UX differs silently. Make it visible. | 1-2h | Med (clarity) | Low |
 
 ## Ideas — intelligence on top of conversation_messages
 

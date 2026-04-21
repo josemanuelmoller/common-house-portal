@@ -3,6 +3,7 @@ import crypto from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 import { adminGuardApi } from "@/lib/require-admin";
 import { notion, DB } from "@/lib/notion";
+import { buildPersonIndex, resolvePerson, type PersonIndex, type ResolutionReason } from "@/lib/person-resolver";
 
 // Clipper API — receives clippings from the Chrome extension.
 //
@@ -88,46 +89,6 @@ function getSupabase() {
   );
 }
 
-type PeopleIdx = {
-  all:       Array<{ id: string; name: string; aliases: string[] }>;
-  exact:     Map<string, { id: string; name: string }>;
-  aliasMap:  Map<string, { id: string; name: string }>;
-  firstName: Map<string, Array<{ id: string; name: string }>>;
-};
-
-async function fetchPeopleIndex(sb: ReturnType<typeof getSupabase>): Promise<PeopleIdx> {
-  const { data } = await sb.from("people").select("id, name, aliases");
-  const exact     = new Map<string, { id: string; name: string }>();
-  const aliasMap  = new Map<string, { id: string; name: string }>();
-  const firstName = new Map<string, Array<{ id: string; name: string }>>();
-  const all: PeopleIdx["all"] = [];
-  for (const p of (data ?? []) as Array<{ id: string; name: string | null; aliases: string[] | null }>) {
-    const name = (p.name ?? "").trim();
-    if (!name) continue;
-    const entry = { id: p.id, name, aliases: p.aliases ?? [] };
-    all.push(entry);
-    const n = name.toLowerCase();
-    exact.set(n, { id: p.id, name });
-    const fn = n.split(" ")[0];
-    if (!firstName.has(fn)) firstName.set(fn, []);
-    firstName.get(fn)!.push({ id: p.id, name });
-    for (const a of (p.aliases ?? [])) {
-      const al = String(a).toLowerCase().trim();
-      if (al) aliasMap.set(al, { id: p.id, name });
-    }
-  }
-  return { all, exact, aliasMap, firstName };
-}
-
-async function fetchSelfIdentities(sb: ReturnType<typeof getSupabase>): Promise<Set<string>> {
-  try {
-    const { data } = await sb.from("hall_self_identities").select("identity");
-    return new Set((data ?? []).map((r: { identity?: string }) => String(r.identity ?? "").toLowerCase().trim()));
-  } catch {
-    return new Set();
-  }
-}
-
 async function fetchProjectIndex(sb: ReturnType<typeof getSupabase>) {
   const { data } = await sb.from("projects").select("notion_id, name, canonical_project_code");
   return (data ?? [])
@@ -140,38 +101,7 @@ async function fetchProjectIndex(sb: ReturnType<typeof getSupabase>) {
     }));
 }
 
-// ─── Matchers ─────────────────────────────────────────────────────────────────
-
-function matchSender(
-  rawName: string,
-  idx: PeopleIdx,
-  selfSet: Set<string>,
-): { person_id: string | null; is_self: boolean } {
-  const n = (rawName ?? "").toLowerCase().trim();
-  if (!n) return { person_id: null, is_self: false };
-
-  // "Tú" / "You" / "Yo" are WA's self-markers in replies/quotes
-  if (/^(tú|tu|you|yo)$/.test(n)) return { person_id: null, is_self: true };
-  if (selfSet.has(n)) return { person_id: null, is_self: true };
-
-  if (idx.exact.has(n))    return { person_id: idx.exact.get(n)!.id,    is_self: false };
-  if (idx.aliasMap.has(n)) return { person_id: idx.aliasMap.get(n)!.id, is_self: false };
-
-  // Bidirectional substring (handles "Francisco Cerda L" vs "Francisco Cerda")
-  for (const p of idx.all) {
-    const pn = p.name.toLowerCase();
-    if (pn.length >= 3 && (n.includes(pn) || pn.includes(n))) {
-      return { person_id: p.id, is_self: false };
-    }
-  }
-
-  // Fallback: unique first-name match
-  const fn = n.split(" ")[0];
-  const cands = idx.firstName.get(fn);
-  if (cands?.length === 1) return { person_id: cands[0].id, is_self: false };
-
-  return { person_id: null, is_self: false };
-}
+// ─── Project matcher (person matching moved to src/lib/person-resolver.ts) ─
 
 function detectProjects(
   text: string,
@@ -377,18 +307,26 @@ async function handleWhatsappClip(body: ClipBody) {
   const sourceId = srcRow.id as string;
 
   // 3. Build matcher indexes
-  const [peopleIdx, selfSet, projectIdx] = await Promise.all([
-    fetchPeopleIndex(sb),
-    fetchSelfIdentities(sb),
+  const [peopleIdx, projectIdx] = await Promise.all([
+    buildPersonIndex(sb),
     fetchProjectIndex(sb),
   ]);
 
-  // 4. Transform + match
+  // 4. Transform + match. Every message is resolved through the shared
+  // person-resolver so strategy + confidence can be surfaced later in
+  // orphan_match_candidates when sender_person_id lands null at write time.
   const matchedProjects = new Set<string>();
   let matchedPeopleCount = 0;
+  const bySender: Map<string, { count: number; match: ReturnType<typeof resolvePerson> }> = new Map();
   const messageRows = messages.map((m, i) => {
-    const match = matchSender(m.sender, peopleIdx, selfSet);
+    const match = resolvePerson({ name: m.sender }, peopleIdx);
     if (match.person_id) matchedPeopleCount++;
+
+    const senderKey = (m.sender || "").toLowerCase().trim();
+    const prev = bySender.get(senderKey);
+    if (!prev) bySender.set(senderKey, { count: 1, match });
+    else       prev.count += 1;
+
     for (const pid of detectProjects(m.text, projectIdx)) matchedProjects.add(pid);
     const ts = m.ts ? new Date(m.ts).toISOString() : null;
     return {
@@ -423,7 +361,39 @@ async function handleWhatsappClip(body: ClipBody) {
     }
   }
 
-  // 6. Update Linked Projects on the Notion page with everything we matched
+  // 6. For any sender that resolved with confidence < 1 (or not at all),
+  // file an orphan_match_candidate so it can be reviewed and approved later
+  // without blocking the clip. Exact-email matches (conf 1) skip this.
+  try {
+    const rows: Array<Record<string, unknown>> = [];
+    for (const [senderKey, info] of bySender) {
+      if (!senderKey || info.match.is_self) continue;
+      // Only record candidates that have a candidate person OR a failed match
+      // we want the admin to know about. Confidence 1 = definitely right,
+      // skip. Confidence 0 with no candidate = nothing to suggest yet.
+      if (info.match.confidence >= 1) continue;
+      if (!info.match.person_id) continue;
+      rows.push({
+        source_id:           sourceId,
+        sender_name:         senderKey,
+        candidate_person_id: info.match.person_id,
+        candidate_reason:    info.match.matched_by as ResolutionReason,
+        confidence:          info.match.confidence,
+        msg_count:           info.count,
+        status:              "pending",
+      });
+    }
+    if (rows.length) {
+      await sb.from("orphan_match_candidates").upsert(rows, {
+        onConflict: "source_id,candidate_person_id,sender_name",
+        ignoreDuplicates: true,
+      });
+    }
+  } catch (e) {
+    console.warn("[clipper] orphan_match_candidates file failed:", e);
+  }
+
+  // 7. Update Linked Projects on the Notion page with everything we matched
   if (matchedProjects.size) {
     try {
       await notion.pages.update({
