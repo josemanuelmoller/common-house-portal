@@ -87,12 +87,138 @@ function recencyBoost(lastSeen: string | null): number {
   return 0;
 }
 
+// Attendance ratio — transcripts are a proxy for actually showing up to a
+// Fireflies-recorded meeting. Floor at 0.3 so contacts in chats that never
+// have a bot (lots of advisor 1:1s) don't collapse to zero.
+function attendanceRatio(c: ContactRow): number {
+  const mt = c.meeting_count ?? 0;
+  const tx = c.transcript_count ?? 0;
+  if (mt === 0) return 1;
+  return Math.max(0.3, Math.min(1, tx / mt));
+}
+
 function intensityOf(c: ContactRow, waCount: number): number {
-  return (c.meeting_count ?? 0) * 3
+  const ratio = attendanceRatio(c);
+  return (c.meeting_count ?? 0) * 3 * ratio
        + (c.transcript_count ?? 0) * 2
        + (c.email_thread_count ?? 0)
        + waCount * 0.05
        + recencyBoost(c.last_seen_at);
+}
+
+// Domains treated as "personal inbox" — users on these need an explicit
+// org assignment, their domain alone says nothing about affiliation.
+const PERSONAL_DOMAINS = new Set([
+  "gmail.com", "googlemail.com",
+  "hotmail.com", "outlook.com", "live.com", "msn.com",
+  "yahoo.com", "yahoo.co.uk", "ymail.com",
+  "icloud.com", "me.com", "mac.com",
+  "protonmail.com", "proton.me", "pm.me",
+  "aol.com", "gmx.com",
+]);
+
+function domainOf(email: string): string {
+  return (email.split("@")[1] ?? "").toLowerCase();
+}
+
+type OrgSuggestion = {
+  domain: string;            // the non-personal domain we matched
+  orgName: string | null;    // pretty name if the hall_organizations row exists
+  orgNotionId: string | null;
+  matches: number;           // count of transcripts/meetings where this domain was present
+  totalEvidence: number;     // total transcripts/meetings for the user
+};
+
+// For each personal-domain contact, look at every Fireflies transcript they
+// appear in and tally the non-personal domains of their co-participants.
+// If one domain dominates (>= 2 matches AND >= 50% of their transcripts),
+// we surface it as "likely at X".
+async function getOrgSuggestions(): Promise<Map<string, OrgSuggestion>> {
+  const sb = getSupabaseServerClient();
+
+  // Pull all transcripts with their participant_emails. Cheap at this scale.
+  const { data: transcripts } = await sb
+    .from("hall_transcript_observations")
+    .select("participant_emails");
+
+  // Tally: personalEmail → { coDomain → count, totalTranscripts }
+  type Tally = { coDomains: Map<string, number>; total: number };
+  const perUser = new Map<string, Tally>();
+
+  for (const r of (transcripts ?? []) as { participant_emails: string[] | null }[]) {
+    const emails = (r.participant_emails ?? []).map(e => e.toLowerCase());
+    if (emails.length === 0) continue;
+    const byDomain = new Map<string, Set<string>>();
+    for (const e of emails) {
+      const d = domainOf(e);
+      if (!byDomain.has(d)) byDomain.set(d, new Set());
+      byDomain.get(d)!.add(e);
+    }
+
+    for (const email of emails) {
+      const d = domainOf(email);
+      if (!PERSONAL_DOMAINS.has(d)) continue;
+
+      let entry = perUser.get(email);
+      if (!entry) {
+        entry = { coDomains: new Map(), total: 0 };
+        perUser.set(email, entry);
+      }
+      entry.total++;
+      for (const [coDomain, coEmails] of byDomain) {
+        if (coDomain === d) continue;
+        if (PERSONAL_DOMAINS.has(coDomain)) continue;
+        // Only count this domain once per transcript even if multiple attendees share it
+        if (coEmails.size > 0) {
+          entry.coDomains.set(coDomain, (entry.coDomains.get(coDomain) ?? 0) + 1);
+        }
+      }
+    }
+  }
+
+  // Resolve top co-domain per user + look up org metadata in bulk
+  const suggestions = new Map<string, OrgSuggestion>();
+  const domainsNeeded = new Set<string>();
+  for (const [email, tally] of perUser) {
+    if (tally.total < 2) continue;
+    let bestDomain: string | null = null;
+    let bestCount = 0;
+    for (const [d, n] of tally.coDomains) {
+      if (n > bestCount) { bestDomain = d; bestCount = n; }
+    }
+    if (!bestDomain || bestCount < 2) continue;
+    if (bestCount / tally.total < 0.5) continue;
+    suggestions.set(email, {
+      domain: bestDomain,
+      orgName: null,
+      orgNotionId: null,
+      matches: bestCount,
+      totalEvidence: tally.total,
+    });
+    domainsNeeded.add(bestDomain);
+  }
+
+  if (domainsNeeded.size > 0) {
+    const { data: orgs } = await sb
+      .from("hall_organizations")
+      .select("domain, org_name, org_notion_id")
+      .in("domain", [...domainsNeeded])
+      .is("dismissed_at", null);
+    const orgByDomain = new Map<string, { org_name: string | null; org_notion_id: string | null }>();
+    for (const o of (orgs ?? []) as { domain: string; org_name: string | null; org_notion_id: string | null }[]) {
+      orgByDomain.set(o.domain, { org_name: o.org_name, org_notion_id: o.org_notion_id });
+    }
+    for (const [email, s] of suggestions) {
+      const hit = orgByDomain.get(s.domain);
+      if (hit) {
+        s.orgName     = hit.org_name;
+        s.orgNotionId = hit.org_notion_id;
+        suggestions.set(email, s);
+      }
+    }
+  }
+
+  return suggestions;
 }
 
 type PageProps = { searchParams: Promise<{ mode?: string }> };
@@ -102,18 +228,20 @@ export default async function HallContactsPage({ searchParams }: PageProps) {
   const { mode: modeParam } = await searchParams;
   const mode: "browse" | "classify" = modeParam === "classify" ? "classify" : "browse";
 
-  const [contacts, rollup, waCounts] = await Promise.all([
+  const [contacts, rollup, waCounts, orgSuggestions] = await Promise.all([
     getContacts(),
     getOrganizationRollup(2),
     getWhatsappCountsBySender(),
+    getOrgSuggestions(),
   ]);
 
-  // Enrich every contact with their WhatsApp count + intensity score
+  // Enrich every contact with their WhatsApp count + intensity score + org suggestion
   const enriched = contacts.map(c => {
     const wa_count  = waCountFor(c.display_name, waCounts);
     const intensity = intensityOf(c, wa_count);
     const total_touches = (c.meeting_count ?? 0) + (c.email_thread_count ?? 0) + (c.transcript_count ?? 0);
-    return { ...c, wa_count, intensity, total_touches };
+    const suggestion = orgSuggestions.get(c.email) ?? null;
+    return { ...c, wa_count, intensity, total_touches, suggestion };
   });
 
   const browse = [...enriched].filter(c => !c.dismissed_at).sort((a, b) => b.intensity - a.intensity);
@@ -318,6 +446,7 @@ type EnrichedContact = ContactRow & {
   wa_count: number;
   intensity: number;
   total_touches: number;
+  suggestion: OrgSuggestion | null;
 };
 
 function BrowseView({ contacts }: { contacts: EnrichedContact[] }) {
@@ -390,10 +519,16 @@ function ContactCard({
               </p>
             </div>
             <div className="flex items-center gap-3 text-[10px] text-[#131218]/55 font-medium flex-shrink-0">
-              {contact.meeting_count     > 0 && <span>📅 {contact.meeting_count}</span>}
+              {contact.meeting_count > 0 && (
+                <span title={contact.meeting_count > contact.transcript_count ? `${contact.meeting_count} invited · ${contact.transcript_count} confirmed in Fireflies` : `${contact.meeting_count} meetings`}>
+                  📅 {contact.meeting_count > contact.transcript_count
+                    ? `${contact.meeting_count}/${contact.transcript_count}`
+                    : contact.meeting_count}
+                </span>
+              )}
               {contact.email_thread_count > 0 && <span>📧 {contact.email_thread_count}</span>}
-              {contact.transcript_count  > 0 && <span>🎙️ {contact.transcript_count}</span>}
-              {contact.wa_count          > 0 && <span>💬 {contact.wa_count}</span>}
+              {contact.transcript_count   > 0 && <span>🎙️ {contact.transcript_count}</span>}
+              {contact.wa_count           > 0 && <span>💬 {contact.wa_count}</span>}
             </div>
           </div>
 
@@ -410,9 +545,9 @@ function ContactCard({
             </span>
           </div>
 
-          {/* Classes */}
-          {classes.length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-1">
+          {/* Classes + org suggestion */}
+          {(classes.length > 0 || contact.suggestion) && (
+            <div className="mt-2 flex flex-wrap gap-1 items-center">
               {classes.map(cls => (
                 <span
                   key={cls}
@@ -421,6 +556,14 @@ function ContactCard({
                   {cls}
                 </span>
               ))}
+              {contact.suggestion && (
+                <span
+                  title={`${contact.suggestion.matches}/${contact.suggestion.totalEvidence} transcripts match ${contact.suggestion.domain}`}
+                  className="text-[8px] font-bold tracking-wide uppercase px-1.5 py-0.5 rounded bg-[#c8f55a]/25 text-[#131218]/75 border border-[#c8f55a]/60"
+                >
+                  🔗 likely at {contact.suggestion.orgName ?? contact.suggestion.domain}
+                </span>
+              )}
             </div>
           )}
         </div>

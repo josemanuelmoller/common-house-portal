@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Sidebar } from "@/components/Sidebar";
 import { requireAdmin } from "@/lib/require-admin";
+import { getSupabaseServerClient } from "@/lib/supabase-server";
 import {
   getContactByEmail,
   getContactTimeline,
@@ -11,6 +12,73 @@ import {
   type TimelineEntry,
 } from "@/lib/contacts";
 import { HallContactRow } from "@/components/HallContactRow";
+
+// Domains we treat as personal inboxes — a user on one of these needs an
+// explicit org assignment, their domain alone says nothing about affiliation.
+const PERSONAL_DOMAINS = new Set([
+  "gmail.com", "googlemail.com",
+  "hotmail.com", "outlook.com", "live.com", "msn.com",
+  "yahoo.com", "yahoo.co.uk", "ymail.com",
+  "icloud.com", "me.com", "mac.com",
+  "protonmail.com", "proton.me", "pm.me",
+  "aol.com", "gmx.com",
+]);
+
+type OrgSuggestion = {
+  domain: string;
+  orgName: string | null;
+  matches: number;
+  total: number;
+};
+
+async function suggestOrgForPersonalContact(email: string): Promise<OrgSuggestion | null> {
+  const domain = (email.split("@")[1] ?? "").toLowerCase();
+  if (!PERSONAL_DOMAINS.has(domain)) return null;
+
+  const sb = getSupabaseServerClient();
+  const { data: transcripts } = await sb
+    .from("hall_transcript_observations")
+    .select("participant_emails")
+    .contains("participant_emails", [email]);
+
+  const counts = new Map<string, number>();
+  let total = 0;
+  for (const r of (transcripts ?? []) as { participant_emails: string[] | null }[]) {
+    const emails = (r.participant_emails ?? []).map(e => e.toLowerCase());
+    if (!emails.includes(email)) continue;
+    total++;
+    const domainsInThis = new Set<string>();
+    for (const e of emails) {
+      if (e === email) continue;
+      const d = (e.split("@")[1] ?? "").toLowerCase();
+      if (!d || PERSONAL_DOMAINS.has(d)) continue;
+      domainsInThis.add(d);
+    }
+    for (const d of domainsInThis) counts.set(d, (counts.get(d) ?? 0) + 1);
+  }
+  if (total < 2) return null;
+
+  let bestDomain: string | null = null;
+  let bestCount = 0;
+  for (const [d, n] of counts) {
+    if (n > bestCount) { bestDomain = d; bestCount = n; }
+  }
+  if (!bestDomain || bestCount < 2 || bestCount / total < 0.5) return null;
+
+  const { data: orgRow } = await sb
+    .from("hall_organizations")
+    .select("org_name")
+    .eq("domain", bestDomain)
+    .is("dismissed_at", null)
+    .maybeSingle();
+
+  return {
+    domain: bestDomain,
+    orgName: (orgRow?.org_name as string | null) ?? null,
+    matches: bestCount,
+    total,
+  };
+}
 
 export const dynamic = "force-dynamic";
 
@@ -54,7 +122,10 @@ export default async function ContactDrawerPage({ params }: Props) {
 
   if (!contact) return notFound();
 
-  const whatsappClips = await getContactWhatsappClips(contact.display_name, 10);
+  const [whatsappClips, orgSuggestion] = await Promise.all([
+    getContactWhatsappClips(contact.display_name, 10),
+    suggestOrgForPersonalContact(email),
+  ]);
 
   const personal = isPersonalContact(contact);
   const vip      = isVipContact(contact);
@@ -130,6 +201,28 @@ export default async function ContactDrawerPage({ params }: Props) {
         </header>
 
         <div className="px-12 py-9 max-w-5xl space-y-8">
+
+          {/* Org suggestion banner — gmail/personal user who co-attends with a single org */}
+          {orgSuggestion && (
+            <div className="bg-[#c8f55a]/20 border border-[#c8f55a] rounded-2xl px-5 py-4 flex items-start gap-3">
+              <span className="text-[18px] leading-none">🔗</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-[13px] font-bold text-[#131218] leading-snug">
+                  Likely affiliated with{" "}
+                  <span className="underline decoration-[#131218]/30 underline-offset-2">
+                    {orgSuggestion.orgName ?? orgSuggestion.domain}
+                  </span>
+                </p>
+                <p className="text-[11px] text-[#131218]/70 mt-1 leading-snug">
+                  This contact is on a personal email, but{" "}
+                  <strong>{orgSuggestion.matches}/{orgSuggestion.total}</strong>{" "}
+                  of their recorded meetings include participants from{" "}
+                  <code className="text-[10px] bg-white/60 px-1 rounded">{orgSuggestion.domain}</code>.
+                  Consider adding <strong>{contact.display_name || email.split("@")[0]}</strong> to that organization manually.
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Summary card */}
           <div className="grid grid-cols-3 gap-4">
