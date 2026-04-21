@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Sidebar } from "@/components/Sidebar";
 import { requireAdmin } from "@/lib/require-admin";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
@@ -19,6 +20,8 @@ type ContactRow = {
   auto_suggested: string | null;
   last_meeting_title: string | null;
   meeting_count: number;
+  email_thread_count: number;
+  transcript_count: number;
   last_seen_at: string;
   first_seen_at: string;
   classified_at: string | null;
@@ -36,7 +39,7 @@ async function getContacts(): Promise<ContactRow[]> {
   const sb = getSupabaseServerClient();
   const { data } = await sb
     .from("hall_attendees")
-    .select("email, display_name, relationship_class, relationship_classes, auto_suggested, last_meeting_title, meeting_count, last_seen_at, first_seen_at, classified_at, classified_by, google_resource_name, google_source, google_labels, google_synced_at, google_last_write_at, dismissed_at, dismissed_reason")
+    .select("email, display_name, relationship_class, relationship_classes, auto_suggested, last_meeting_title, meeting_count, email_thread_count, transcript_count, last_seen_at, first_seen_at, classified_at, classified_by, google_resource_name, google_source, google_labels, google_synced_at, google_last_write_at, dismissed_at, dismissed_reason")
     .gte("last_seen_at", new Date(Date.now() - 120 * 86400_000).toISOString())
     .order("meeting_count", { ascending: false })
     .order("last_seen_at", { ascending: false })
@@ -47,12 +50,73 @@ async function getContacts(): Promise<ContactRow[]> {
   return rows.filter(r => !self.has(r.email));
 }
 
-export default async function HallContactsPage() {
+// Aggregate WhatsApp message counts by sender_name (lowercased).
+// Used to feed the relationship-intensity score in Browse mode.
+async function getWhatsappCountsBySender(): Promise<Map<string, number>> {
+  const sb = getSupabaseServerClient();
+  const { data } = await sb
+    .from("conversation_messages")
+    .select("sender_name")
+    .eq("platform", "whatsapp")
+    .eq("sender_is_self", false);
+  const counts = new Map<string, number>();
+  for (const r of (data ?? []) as { sender_name: string | null }[]) {
+    const n = (r.sender_name ?? "").toLowerCase().trim();
+    if (!n) continue;
+    counts.set(n, (counts.get(n) ?? 0) + 1);
+  }
+  return counts;
+}
+
+function waCountFor(displayName: string | null, waCounts: Map<string, number>): number {
+  const n = (displayName ?? "").toLowerCase().trim();
+  if (!n || n.length < 3) return 0;
+  const token = n.split(/\s+/)[0];
+  let total = 0;
+  for (const [k, v] of waCounts) {
+    if (k === n || k.startsWith(token + " ") || k.startsWith(token)) total += v;
+  }
+  return total;
+}
+
+function recencyBoost(lastSeen: string | null): number {
+  if (!lastSeen) return 0;
+  const days = (Date.now() - new Date(lastSeen).getTime()) / 86400_000;
+  if (days < 7)  return 5;
+  if (days < 30) return 2;
+  return 0;
+}
+
+function intensityOf(c: ContactRow, waCount: number): number {
+  return (c.meeting_count ?? 0) * 3
+       + (c.transcript_count ?? 0) * 2
+       + (c.email_thread_count ?? 0)
+       + waCount * 0.05
+       + recencyBoost(c.last_seen_at);
+}
+
+type PageProps = { searchParams: Promise<{ mode?: string }> };
+
+export default async function HallContactsPage({ searchParams }: PageProps) {
   await requireAdmin();
-  const [contacts, rollup] = await Promise.all([
+  const { mode: modeParam } = await searchParams;
+  const mode: "browse" | "classify" = modeParam === "classify" ? "classify" : "browse";
+
+  const [contacts, rollup, waCounts] = await Promise.all([
     getContacts(),
     getOrganizationRollup(2),
+    getWhatsappCountsBySender(),
   ]);
+
+  // Enrich every contact with their WhatsApp count + intensity score
+  const enriched = contacts.map(c => {
+    const wa_count  = waCountFor(c.display_name, waCounts);
+    const intensity = intensityOf(c, wa_count);
+    const total_touches = (c.meeting_count ?? 0) + (c.email_thread_count ?? 0) + (c.transcript_count ?? 0);
+    return { ...c, wa_count, intensity, total_touches };
+  });
+
+  const browse = [...enriched].filter(c => !c.dismissed_at).sort((a, b) => b.intensity - a.intensity);
 
   const active     = contacts.filter(c => !c.dismissed_at);
   const dismissed  = contacts.filter(c =>  c.dismissed_at);
@@ -120,12 +184,13 @@ export default async function HallContactsPage() {
           <div className="flex items-end justify-between">
             <div>
               <h1 className="text-[2.6rem] font-light text-white tracking-[-1.5px] leading-none">
-                Calendar <em className="font-black italic text-[#c8f55a]">Contacts</em>
+                <em className="font-black italic text-[#c8f55a]">Contacts</em>
               </h1>
               <p className="text-sm text-white/40 mt-3 max-w-2xl">
-                Who appears in your meetings — and how the system should treat them.
-                Tagged contacts drive Suggested Time Blocks: personal meetings skip prep,
-                VIP meetings get urgency boost.
+                {mode === "browse"
+                  ? "People who appear across your calendar, email, meeting transcripts and WhatsApp — ranked by relationship intensity. Click a name to dive in."
+                  : "Classify attendees so Suggested Time Blocks treats them correctly: personal meetings skip prep, VIP meetings get urgency boost."
+                }
               </p>
             </div>
             <div className="flex items-center gap-5 pb-1">
@@ -141,13 +206,42 @@ export default async function HallContactsPage() {
         </header>
 
         <div className="px-12 py-9 max-w-5xl space-y-8">
-          {/* Auto-sync status */}
-          <div className="flex items-center justify-between">
-            <p className="text-[10px] font-bold tracking-widest uppercase text-[#131218]/40">
-              Live view — syncs your calendar on load
-            </p>
+          {/* Tab navigation */}
+          <div className="flex items-center gap-1 border-b border-[#E0E0D8]">
+            <Link
+              href="?mode=browse"
+              prefetch={false}
+              className={`px-4 py-2.5 text-[11px] font-bold tracking-widest uppercase border-b-2 transition-colors ${
+                mode === "browse"
+                  ? "border-[#131218] text-[#131218]"
+                  : "border-transparent text-[#131218]/40 hover:text-[#131218]/70"
+              }`}
+            >
+              Browse
+            </Link>
+            <Link
+              href="?mode=classify"
+              prefetch={false}
+              className={`px-4 py-2.5 text-[11px] font-bold tracking-widest uppercase border-b-2 transition-colors ${
+                mode === "classify"
+                  ? "border-[#131218] text-[#131218]"
+                  : "border-transparent text-[#131218]/40 hover:text-[#131218]/70"
+              }`}
+            >
+              Classify
+              {unclassified.length > 0 && (
+                <span className="ml-2 text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">
+                  {unclassified.length}
+                </span>
+              )}
+            </Link>
+            <div className="flex-1" />
             <HallContactsAutoRefresh />
           </div>
+
+          {mode === "browse" && <BrowseView contacts={browse} />}
+
+          {mode === "classify" && <>
 
           {/* Activation rule */}
           <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-3.5">
@@ -202,6 +296,7 @@ export default async function HallContactsPage() {
 
           {/* Dismissed (collapsed by default) */}
           <HallContactsDismissedToggle rows={dismissed} />
+          </>}
         </div>
       </main>
     </div>
@@ -214,5 +309,122 @@ function Stat({ label, value, color = "text-white" }: { label: string; value: nu
       <p className={`text-[2rem] font-black tracking-tight leading-none ${color}`}>{value}</p>
       <p className="text-[9px] font-bold tracking-[1.5px] uppercase text-white/30 mt-0.5">{label}</p>
     </div>
+  );
+}
+
+// ─── Browse view ─────────────────────────────────────────────────────────────
+
+type EnrichedContact = ContactRow & {
+  wa_count: number;
+  intensity: number;
+  total_touches: number;
+};
+
+function BrowseView({ contacts }: { contacts: EnrichedContact[] }) {
+  if (contacts.length === 0) {
+    return (
+      <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-10 text-center">
+        <p className="text-sm text-[#131218]/40">No contacts observed yet.</p>
+      </div>
+    );
+  }
+
+  // Three tiers by intensity, inspired by the warmth palette in PLATFORM-DESIGN.
+  const maxIntensity = Math.max(...contacts.map(c => c.intensity), 1);
+  const hotCutoff  = maxIntensity * 0.55;
+  const warmCutoff = maxIntensity * 0.20;
+
+  return (
+    <div className="space-y-4">
+      <p className="text-[10px] font-bold tracking-widest uppercase text-[#131218]/40">
+        Ranked by relationship intensity · {contacts.length} people
+      </p>
+      <div className="grid gap-3">
+        {contacts.map(c => (
+          <ContactCard
+            key={c.email}
+            contact={c}
+            maxIntensity={maxIntensity}
+            tier={c.intensity >= hotCutoff ? "hot" : c.intensity >= warmCutoff ? "warm" : "cool"}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ContactCard({
+  contact,
+  maxIntensity,
+  tier,
+}: {
+  contact: EnrichedContact;
+  maxIntensity: number;
+  tier: "hot" | "warm" | "cool";
+}) {
+  const barPct = Math.max(4, Math.round((contact.intensity / maxIntensity) * 100));
+  const barColor = tier === "hot" ? "bg-[#22c55e]" : tier === "warm" ? "bg-[#f59e0b]" : "bg-[#9ca3af]";
+  const display = contact.display_name || contact.email.split("@")[0];
+  const domain  = contact.email.split("@")[1] ?? "";
+  const initial = display.slice(0, 1).toUpperCase();
+  const classes = contact.relationship_classes ?? [];
+
+  return (
+    <Link
+      href={`/admin/hall/contacts/${encodeURIComponent(contact.email)}`}
+      prefetch={false}
+      className="group bg-white rounded-2xl border border-[#E0E0D8] hover:border-[#131218]/30 hover:shadow-sm transition-all px-5 py-4"
+    >
+      <div className="flex items-start gap-4">
+        <div className="w-10 h-10 rounded-full bg-[#131218] text-white flex items-center justify-center flex-shrink-0 font-bold text-sm">
+          {initial}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-baseline justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-[13px] font-bold text-[#131218] truncate group-hover:underline decoration-[#131218]/30 underline-offset-2">
+                {display}
+              </p>
+              <p className="text-[10px] text-[#131218]/45 truncate">
+                {domain || contact.email}
+              </p>
+            </div>
+            <div className="flex items-center gap-3 text-[10px] text-[#131218]/55 font-medium flex-shrink-0">
+              {contact.meeting_count     > 0 && <span>📅 {contact.meeting_count}</span>}
+              {contact.email_thread_count > 0 && <span>📧 {contact.email_thread_count}</span>}
+              {contact.transcript_count  > 0 && <span>🎙️ {contact.transcript_count}</span>}
+              {contact.wa_count          > 0 && <span>💬 {contact.wa_count}</span>}
+            </div>
+          </div>
+
+          {/* Intensity bar */}
+          <div className="mt-3 flex items-center gap-3">
+            <div className="flex-1 h-1 rounded-full bg-[#EFEFEA] overflow-hidden">
+              <div
+                className={`h-full ${barColor} transition-all`}
+                style={{ width: `${barPct}%` }}
+              />
+            </div>
+            <span className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30">
+              {Math.round(contact.intensity)}
+            </span>
+          </div>
+
+          {/* Classes */}
+          {classes.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1">
+              {classes.map(cls => (
+                <span
+                  key={cls}
+                  className="text-[8px] font-bold tracking-wide uppercase px-1.5 py-0.5 rounded bg-[#131218]/5 text-[#131218]/55"
+                >
+                  {cls}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </Link>
   );
 }
