@@ -388,7 +388,8 @@ Label each email as exactly one of:
 DEFAULT TO "FYI" when unsure. A Jose-intervention must be genuinely required.
 
 Mark "FYI" (do NOT surface) when:
-  • Email is a meeting confirmation, calendar link, Calendly/Zoom/Meet invite, or meeting-notes recap.
+  • Email is an auto-generated calendar invite / RSVP / Calendly/Zoom/Meet link, or a meeting-notes recap.
+  • Human meeting-scheduling thread where time AND location are ALREADY settled and no new question remains.
   • (joseStarted=true) → Jose opened the thread. Default to FYI unless the latest reply is a NEW direct question to Jose. Intros, forwards, pings, "looping you in" threads that Jose initiated do NOT need a reply just because someone thanked him. Surface only if the other party is now BLOCKED on Jose.
   • The last message is a "thanks" / "got it" / "sounds good" / acknowledgement with no new question.
   • The message is a passive FYI, forward, or loop-in with no ask.
@@ -400,10 +401,11 @@ Mark "Needs Reply" only when:
   • There is a clear question addressed to Jose.
   • A decision, approval, signature, or intervention from Jose is explicitly required.
   • A partner/investor/funder is waiting on Jose specifically.
+  • Human meeting-scheduling thread where time OR location is still open AND the proposed date is within the next 7 days — Jose must confirm to make it happen.
 
 Mark "Urgent" only when "Needs Reply" is true AND:
   • Sender is a retailer, funder, grant body, government, investor, board member, or strategic partner.
-  • OR there is an explicit deadline within 7 days.
+  • OR there is an explicit deadline within 7 days (including a meeting scheduled in the next 48h where logistics are not yet confirmed).
   • OR contract/money/legal decision is on the line.
 ${THRESHOLD_DAYS <= 2 ? "Cap Urgents at 3 total across the batch." : ""}
 
