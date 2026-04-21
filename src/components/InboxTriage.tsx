@@ -181,7 +181,7 @@ export function InboxTriage({ initialItems, initialScanned = 0 }: Props) {
     <div className="max-w-[760px]">
       <div
         className={`bg-white rounded-xl border border-[#E0E0D8] divide-y divide-[#E0E0D8] ${
-          overflow ? "max-h-[380px] overflow-y-auto" : ""
+          overflow ? "max-h-[60vh] sm:max-h-[380px] overflow-y-auto" : ""
         }`}
       >
         {visible.map((item) => (
