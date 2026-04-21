@@ -50,8 +50,10 @@ Restart the dev server after editing `.env.local`.
 
 1. On any web page, optionally select the text you want to save.
 2. Click the extension icon.
-3. Edit the selection, add notes, click **Clip**.
-4. The clipping lands in CH Sources with status `Ingested`. Downstream pipelines (`extract-meeting-evidence`, `evidence-to-knowledge`) pick it up on the next run.
+3. Either edit the selection manually, or click **Grab full page** to auto-extract the main article text (drops navs, footers, cookie banners, sidebars, ads). Edit to taste.
+4. Add a short note on **why** this matters (optional but useful).
+5. Click **Clip**.
+6. The clipping lands in CH Sources with status `Ingested`. Downstream pipelines (`extract-meeting-evidence`, `evidence-to-knowledge`) pick it up on the next run.
 
 ## Fields written to `CH Sources [OS v2]`
 

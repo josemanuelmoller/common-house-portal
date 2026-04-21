@@ -100,6 +100,25 @@
       padding: 10px;
       font-size: 12px;
     }
+    .label-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin: 8px 0 4px;
+    }
+    .label-row label { margin: 0; }
+    .linky {
+      background: none;
+      border: none;
+      color: var(--accent);
+      font-size: 11px;
+      cursor: pointer;
+      padding: 2px 0;
+      font-family: inherit;
+      font-weight: 500;
+    }
+    .linky:hover { text-decoration: underline; }
+    .linky:disabled { opacity: 0.5; cursor: wait; }
   </style>
 </head>
 <body>
@@ -113,7 +132,10 @@
         <div class="title" id="page-title">—</div>
         <div class="url" id="page-url">—</div>
       </div>
-      <label for="selection">Selection (editable)</label>
+      <div class="label-row">
+        <label for="selection">Selection (editable)</label>
+        <button type="button" class="linky" id="grab-full-btn" title="Extract the main article text from this page">Grab full page</button>
+      </div>
       <textarea id="selection" placeholder="Paste or edit the excerpt you want to save…"></textarea>
       <label for="notes">Notes</label>
       <textarea id="notes" placeholder="Why is this worth saving? (optional)"></textarea>

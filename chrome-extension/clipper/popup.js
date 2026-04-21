@@ -9,6 +9,7 @@ const els = {
   notes:      document.getElementById("notes"),
   clipBtn:    document.getElementById("clip-btn"),
   cancelBtn:  document.getElementById("cancel-btn"),
+  grabFull:   document.getElementById("grab-full-btn"),
   status:     document.getElementById("status"),
   openOpts:   document.getElementById("open-options"),
   settings:   document.getElementById("settings-link"),
@@ -49,6 +50,58 @@ async function readSelectionFromTab(tabId) {
   }
 }
 
+// Runs IN the page. Returns the main article text, cleaned of common noise.
+// Keep this function self-contained — chrome.scripting serializes it and
+// evaluates it in the page context, so outer-scope vars are not available.
+function extractArticleText() {
+  const selectors = [
+    "article",
+    "main [role='main']",
+    "main",
+    "[role='main']",
+    "[itemprop='articleBody']",
+    ".article-body",
+    ".post-content",
+    ".entry-content",
+    "#content",
+  ];
+  let root = document.body;
+  for (const sel of selectors) {
+    const el = document.querySelector(sel);
+    if (el && el.innerText && el.innerText.trim().length > 200) { root = el; break; }
+  }
+
+  const clone = root.cloneNode(true);
+  const dropSelectors = [
+    "nav", "header", "footer", "aside", "script", "style", "noscript",
+    "form", "iframe",
+    "[role='navigation']", "[role='banner']", "[role='contentinfo']",
+    "[aria-hidden='true']",
+    ".nav", ".navbar", ".menu", ".sidebar", ".footer", ".header",
+    ".cookie", ".cookies", ".consent", ".newsletter", ".subscribe",
+    ".share", ".social", ".comments", ".related", ".advertisement", ".ads", ".ad",
+  ];
+  clone.querySelectorAll(dropSelectors.join(",")).forEach(el => el.remove());
+
+  let text = (clone.innerText || "").replace(/\r/g, "").trim();
+  text = text.replace(/\n{3,}/g, "\n\n");
+  text = text.split("\n").map(line => line.replace(/[ \t]{2,}/g, " ").trimEnd()).join("\n");
+  return text;
+}
+
+async function grabFullPageFromTab(tabId) {
+  try {
+    const results = await chrome.scripting.executeScript({
+      target: { tabId },
+      func: extractArticleText,
+    });
+    return results?.[0]?.result ?? "";
+  } catch (err) {
+    console.warn("grabFullPage failed:", err);
+    return "";
+  }
+}
+
 function openOptions(e) {
   if (e) e.preventDefault();
   if (chrome.runtime.openOptionsPage) {
@@ -83,6 +136,29 @@ async function init() {
   els.selection.value = selection;
 
   els.clipBtn.addEventListener("click", () => submitClip(tab));
+  els.grabFull.addEventListener("click", () => grabFullPage(tab));
+}
+
+async function grabFullPage(tab) {
+  const original = els.grabFull.textContent;
+  els.grabFull.disabled = true;
+  els.grabFull.textContent = "Grabbing…";
+  try {
+    const text = await grabFullPageFromTab(tab.id);
+    if (!text) {
+      showStatus("Couldn't extract page text (restricted page?).", "err");
+      return;
+    }
+    // Cap at 8000 chars for the UI — the server caps at 1900 anyway, but
+    // we preserve more here so the user can trim before clipping.
+    const capped = text.slice(0, 8000);
+    els.selection.value = capped;
+    const truncated = text.length > 8000 ? ` (truncated from ${text.length})` : "";
+    showStatus(`Grabbed ${capped.length} chars${truncated}. Edit before clipping.`, "ok");
+  } finally {
+    els.grabFull.disabled = false;
+    els.grabFull.textContent = original;
+  }
 }
 
 async function submitClip(tab) {
