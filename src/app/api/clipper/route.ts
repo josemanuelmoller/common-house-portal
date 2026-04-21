@@ -238,8 +238,13 @@ async function handleWhatsappClip(body: ClipBody, req: NextRequest) {
   }
   const processedSummary = summaryLines.join("\n").slice(0, 1900);
 
+  // source_date = last message timestamp. This matches the pattern used for
+  // meetings (meeting date) and email threads (last message date). Full-history
+  // clips that span months still surface in "recent activity" views that way.
   const today      = new Date().toISOString().slice(0, 10);
-  const sourceDate = first.ts ? new Date(first.ts).toISOString().slice(0, 10) : today;
+  const sourceDate = last.ts ? new Date(last.ts).toISOString().slice(0, 10)
+                    : first.ts ? new Date(first.ts).toISOString().slice(0, 10)
+                    : today;
 
   // 1. Notion page
   const notionProps: Record<string, unknown> = {
