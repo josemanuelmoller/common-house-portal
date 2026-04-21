@@ -90,6 +90,42 @@ you have the right to share with the CH system.
   history may be truncated. The status line says "scroll timed out" in
   that case.
 
+## v0.6.0 — Delta capture
+
+After the first clip of a chat, subsequent clips only capture messages
+**newer** than the previous capture. The extension remembers the newest
+message timestamp per chat in `chrome.storage.local`, keyed by the
+sanitized chat title.
+
+**Button label** adapts:
+- First clip of a chat: "Clip conversation" (full scroll)
+- Subsequent clips: "Clip new · since Apr 18" (delta)
+
+**Extractor behaviour:**
+- Accepts a `sinceMs` argument (0 = full mode, epoch ms = delta mode).
+- In delta mode, scrolls up only until it sees at least one message older
+  than the cutoff, then stops — much faster than a full scroll.
+- Filters out pre-cutoff messages from the returned payload.
+- Returns `{ messageCount, totalVisibleCount, sinceMs, ... }` so the UI
+  can report "Read delta · 12 new in 3s" vs "Read full · 266 messages
+  in 30s".
+
+**Zero-new-messages UX:**
+If nothing new since the last clip, the status line shows
+"No new messages since Apr 18. You're up to date 🎉" and the Clip button
+is disabled. No Source record is created.
+
+**Delta chain in Supabase:**
+Each delta becomes its own `sources` row (new notion_id, new dedup_key,
+new raw_content). `conversation_messages` rows from each delta
+accumulate under the same person in the drawer timeline — the Supabase
+layer is the assembled source of truth, Notion stores incremental
+snapshots.
+
+**Resetting the delta window for a chat:**
+Clear chrome.storage from the extension options page, or on any browser
+where you haven't clipped before (fresh lastClipTs = 0 → full clip).
+
 ## v0.5.0 — what happens when you clip a WhatsApp conversation
 
 On submit, the extension sends the raw dump PLUS the structured message array

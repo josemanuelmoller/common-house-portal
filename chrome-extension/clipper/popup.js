@@ -43,6 +43,36 @@ function fmtClipStamp(d = new Date()) {
   return `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+function fmtShortDate(d) {
+  // "Apr 21" for status lines
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+// ─── Delta capture storage ────────────────────────────────────────────────────
+// For every WhatsApp chat we've clipped, we remember the timestamp of the most
+// recent message captured. Next clip on that chat extracts ONLY newer messages.
+// Key is the sanitized chat title; rename = delta resets (acceptable tradeoff).
+
+function chatKeyFor(title) {
+  return String(title || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80);
+}
+
+async function getLastClipTs(chatKey) {
+  if (!chatKey) return 0;
+  return new Promise(resolve => {
+    chrome.storage.local.get([`clipper:lastTs:${chatKey}`], res => {
+      resolve(res[`clipper:lastTs:${chatKey}`] || 0);
+    });
+  });
+}
+
+async function setLastClipTs(chatKey, ts) {
+  if (!chatKey || !ts) return;
+  return new Promise(resolve => {
+    chrome.storage.local.set({ [`clipper:lastTs:${chatKey}`]: ts }, resolve);
+  });
+}
+
 async function getSettings() {
   return new Promise((resolve) => {
     chrome.storage.local.get(["clipperToken", "clipperApiUrl"], (res) => {
@@ -129,7 +159,7 @@ async function grabFullPageFromTab(tabId) {
 // while harvesting messages by their `data-pre-plain-text` attribute (stable
 // across WhatsApp Web versions for years).
 
-async function extractWhatsAppConversation() {
+async function extractWhatsAppConversation(sinceMs = 0) {
   const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
   const main = document.querySelector("#main");
@@ -361,6 +391,16 @@ async function extractWhatsAppConversation() {
       if (!collected.has(key)) collected.set(key, parseMessage(el));
     });
 
+    // Delta early-exit — once we've scrolled far enough back that at least
+    // one visible message is older than the caller's cutoff, we can stop.
+    if (sinceMs > 0 && collected.size > 0) {
+      let oldestTs = Infinity;
+      for (const m of collected.values()) {
+        if (m.ts > 0 && m.ts < oldestTs) oldestTs = m.ts;
+      }
+      if (oldestTs <= sinceMs) break;
+    }
+
     // Try to load older messages
     const beforeHeight = container.scrollHeight;
     container.scrollTop = 0;
@@ -417,22 +457,29 @@ async function extractWhatsAppConversation() {
     if (msg) msg.reactions = [...emojiSet];
   });
 
-  const messages = Array.from(collected.values()).sort((a, b) => a.ts - b.ts);
+  // Sort and optionally filter to delta window
+  const allMessages = Array.from(collected.values()).sort((a, b) => a.ts - b.ts);
+  const messages = sinceMs > 0
+    ? allMessages.filter(m => m.ts > sinceMs)
+    : allMessages;
 
   return {
     title: chatTitle,
     messageCount: messages.length,
+    totalVisibleCount: allMessages.length,  // for delta diagnostics
+    sinceMs,
     elapsedMs: Date.now() - startTime,
     timedOut: (Date.now() - startTime) >= MAX_MS,
     messages,
   };
 }
 
-async function grabWhatsAppFromTab(tabId) {
+async function grabWhatsAppFromTab(tabId, sinceMs = 0) {
   try {
     const results = await chrome.scripting.executeScript({
       target: { tabId },
       func: extractWhatsAppConversation,
+      args:  [sinceMs],
     });
     return results?.[0]?.result ?? { error: "NO_RESULT" };
   } catch (err) {
@@ -500,12 +547,23 @@ async function init() {
   if (isWa) {
     // WA mode — show the chat name if the tab title exposes it
     const chatName = parseWaTabTitle(tab.title);
+    const chatKey  = chatName ? chatKeyFor(chatName) : null;
+    const lastTs   = chatKey  ? await getLastClipTs(chatKey) : 0;
+    window.__waChatKey = chatKey;
+    window.__waLastTs  = lastTs;
+
     els.pageTitle.textContent = chatName
       ? `${chatName} · WhatsApp · Clipped ${fmtClipStamp()}`
       : "WhatsApp conversation (open a chat first)";
     els.pageUrl.textContent   = tab.url || "";
-    els.grabFull.textContent  = "Clip conversation";
-    els.grabFull.title        = "Auto-scroll the open chat and capture all visible messages";
+    if (lastTs) {
+      const since = fmtShortDate(new Date(lastTs));
+      els.grabFull.textContent = `Clip new · since ${since}`;
+      els.grabFull.title       = `Capture only messages posted after your last clip of this chat (${new Date(lastTs).toLocaleString()})`;
+    } else {
+      els.grabFull.textContent = "Clip conversation";
+      els.grabFull.title       = "First clip of this chat — auto-scroll and capture the full visible history";
+    }
     els.selection.placeholder = "Conversation text will appear here after extraction…";
   } else {
     els.pageTitle.textContent = tab.title || "(no title)";
@@ -546,11 +604,18 @@ async function grabFullPage(tab) {
 
 async function grabWhatsApp(tab) {
   const original = els.grabFull.textContent;
+  const sinceMs  = window.__waLastTs || 0;
+  const deltaMode = sinceMs > 0;
+
   els.grabFull.disabled = true;
   els.grabFull.textContent = "Reading…";
-  showStatus("Scrolling through messages… this may take a few seconds.", "ok");
+  const scanMsg = deltaMode
+    ? `Looking for messages since ${fmtShortDate(new Date(sinceMs))}…`
+    : "Scrolling through messages… this may take a few seconds.";
+  showStatus(scanMsg, "ok");
+
   try {
-    const data = await grabWhatsAppFromTab(tab.id);
+    const data = await grabWhatsAppFromTab(tab.id, sinceMs);
 
     if (data?.error === "NO_CHAT_OPEN") {
       showStatus("Open a conversation in WhatsApp first, then try again.", "err");
@@ -564,25 +629,30 @@ async function grabWhatsApp(tab) {
       showStatus("WhatsApp extraction failed: " + (data.message || data.error), "err");
       return;
     }
+
     if (!data.messageCount) {
-      showStatus("No messages found in the open chat.", "err");
+      if (deltaMode) {
+        showStatus(`No new messages since ${fmtShortDate(new Date(sinceMs))}. You're up to date 🎉`, "ok");
+        els.clipBtn.disabled = true;
+      } else {
+        showStatus("No messages found in the open chat.", "err");
+      }
       return;
     }
 
     const chatName = data.title || parseWaTabTitle(tab.title) || "WhatsApp conversation";
     els.pageTitle.textContent = `${chatName} · WhatsApp · Clipped ${fmtClipStamp()}`;
     const dump = formatWhatsAppDump(data);
-    // Popup textarea cap — user can trim before clipping. Server persists the
-    // full dump to Supabase (sources.raw_content) so no truncation reaches the DB.
     const POPUP_CAP = 100000;
     const capped = dump.slice(0, POPUP_CAP);
     els.selection.value = capped;
-    // Stash the structured data for submitClip to pick up (sent as-is to the API).
     window.__waData = data;
+
     const truncated = dump.length > POPUP_CAP ? ` (shown truncated from ${dump.length})` : "";
     const elapsed = (data.elapsedMs / 1000).toFixed(1);
     const warn = data.timedOut ? " — scroll timed out, older messages may be missing" : "";
-    showStatus(`Read ${data.messageCount} messages in ${elapsed}s${warn}${truncated}. Review and Clip.`, "ok");
+    const modeLabel = deltaMode ? `delta · ${data.messageCount} new` : `full · ${data.messageCount} messages`;
+    showStatus(`Read ${modeLabel} in ${elapsed}s${warn}${truncated}. Review and Clip.`, "ok");
   } catch (err) {
     showStatus("Error: " + (err?.message || "unknown"), "err");
   } finally {
@@ -650,6 +720,14 @@ async function submitClip(tab) {
     } else {
       showStatus("Saved to Common House.", "ok");
     }
+
+    // Delta — persist the newest captured ts so the next clip knows the window
+    if (isWa && waData?.messages?.length) {
+      const chatKey = window.__waChatKey;
+      const newestTs = Math.max(...waData.messages.map(m => m.ts || 0));
+      if (chatKey && newestTs) await setLastClipTs(chatKey, newestTs);
+    }
+
     els.clipBtn.textContent = "Done";
     setTimeout(() => window.close(), 1500);
   } catch (err) {
