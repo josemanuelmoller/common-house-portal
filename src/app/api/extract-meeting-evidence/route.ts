@@ -276,6 +276,11 @@ Participants: ${t.participants.join(", ")}
 Summary: ${t.summary?.overview || t.summary?.shorthand_bullet || "none"}
 Action items: ${t.summary?.action_items || "none"}
 
+Language rule (IMPORTANT):
+- Write "title", "statement", and "excerpt" in the SAME language as the meeting. If the source summary/action items are in Spanish, return Spanish. If English, English. If mixed, use whichever language dominates. Do not translate.
+- Preserve original phrasing and nuance.
+- "type", "affected_theme", "geography", "topics", "confidence" stay in English (controlled vocabularies).
+
 Rules:
 - Each item is ONE atomic fact: a decision made, blocker identified, outcome achieved, requirement defined, risk flagged, or dependency created
 - Skip vague plans, scheduling, and meta-conversation
@@ -284,10 +289,10 @@ Rules:
 Return ONLY a JSON array:
 [
   {
-    "title": "Short factual title max 80 chars starting with the key fact",
+    "title": "Short factual title max 80 chars starting with the key fact, in the meeting language",
     "type": "Decision|Blocker|Outcome|Requirement|Dependency|Risk|Process Step",
-    "statement": "1-2 sentence factual description with specifics",
-    "excerpt": "Most relevant direct quote or paraphrase, max 100 chars",
+    "statement": "1-2 sentence factual description with specifics, in the meeting language",
+    "excerpt": "Most relevant direct quote or paraphrase (verbatim), max 100 chars",
     "confidence": "High|Medium|Low",
     "affected_theme": "Operations|Tech|Commercial|Legal|Procurement|Communications|Budget|Rollout|Metrics|Stakeholders|Governance",
     "geography": "UK|EU|LATAM|North America|Africa / MENA|Asia|Global",
