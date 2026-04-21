@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { getSelfEmails } from "@/lib/hall-self";
+import { HallCommitmentLedgerRows, type CommitmentLite } from "./HallCommitmentLedgerRows";
 
 /**
  * Commitment ledger — parses recent Dependency / Process Step / Requirement
@@ -92,72 +92,26 @@ async function loadCommitments(): Promise<Commitment[]> {
 
 export async function HallCommitmentLedger() {
   const all = await loadCommitments();
-  const joseCommits = all.filter(c => c.owner === "jose").slice(0, 5);
-  const othersCommits = all.filter(c => c.owner === "others").slice(0, 5);
+  // G2 — strip redundant "Jose Manuel must..." prefix from titles since the
+  // section label ("You committed") already establishes the actor.
+  const normalize = (c: Commitment): CommitmentLite => ({
+    id:        c.id,
+    // Keep entity name in title; strip only the verbose agent preamble.
+    title:     c.title.replace(/^Jose( Manuel( Moller)?)?\s+(must|will|to)\s+/i, "").replace(/^./, s => s.toUpperCase()),
+    snippet:   c.snippet.replace(/^Jose( Manuel( Moller)?)?\s+(must|will|to)\s+/i, ""),
+    daysAgo:   c.daysAgo,
+    owner:     c.owner,
+    notionUrl: c.notionUrl,
+  });
+
+  const joseCommits = all.filter(c => c.owner === "jose").slice(0, 5).map(normalize);
+  const othersCommits = all.filter(c => c.owner === "others").slice(0, 5).map(normalize);
 
   return (
-    <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-      <div className="flex items-center justify-between px-5 py-3 border-b border-[#EFEFEA]">
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] font-bold tracking-widest uppercase text-[#131218]/50">Commitments</span>
-          {joseCommits.length > 0 && (
-            <span className="text-[9px] font-bold bg-red-50 text-red-700 px-1.5 py-0.5 rounded-full">
-              {joseCommits.length} you owe
-            </span>
-          )}
-          {othersCommits.length > 0 && (
-            <span className="text-[9px] font-bold bg-[#131218]/6 text-[#131218]/60 px-1.5 py-0.5 rounded-full">
-              {othersCommits.length} owed to you
-            </span>
-          )}
-        </div>
-        <Link href="/admin/hall/commitments" className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/40 hover:text-[#131218]/80">
-          All →
-        </Link>
-      </div>
-
-      {all.length === 0 ? (
-        <div className="px-5 py-6 text-center">
-          <p className="text-[11px] text-[#131218]/35">No open action items from the last 60 days.</p>
-        </div>
-      ) : (
-        <>
-          {joseCommits.length > 0 && (
-            <div className="px-5 pt-3 pb-1">
-              <p className="text-[9px] font-bold uppercase tracking-widest text-red-700/80 mb-1">You committed</p>
-            </div>
-          )}
-          {joseCommits.map(c => <Row key={c.id} c={c} kind="jose" />)}
-
-          {othersCommits.length > 0 && (
-            <div className="px-5 pt-3 pb-1 border-t border-[#EFEFEA]">
-              <p className="text-[9px] font-bold uppercase tracking-widest text-[#131218]/50 mb-1">Owed to you</p>
-            </div>
-          )}
-          {othersCommits.map(c => <Row key={c.id} c={c} kind="others" />)}
-        </>
-      )}
-    </div>
-  );
-}
-
-function Row({ c, kind }: { c: Commitment; kind: "jose" | "others" }) {
-  const stale = c.daysAgo >= 21 ? "text-red-600" : c.daysAgo >= 10 ? "text-amber-700" : "text-[#131218]/50";
-  const borderColor = kind === "jose" ? "border-l-[3px] border-red-400" : "border-l-[3px] border-[#131218]/10";
-  return (
-    <a
-      href={c.notionUrl}
-      target="_blank"
-      rel="noopener noreferrer"
-      className={`flex items-start gap-3 px-5 py-2.5 hover:bg-[#EFEFEA]/40 transition-colors ${borderColor}`}
-    >
-      <div className="flex-1 min-w-0">
-        <p className="text-[11px] font-bold text-[#131218] line-clamp-1">{c.title}</p>
-        <p className="text-[9px] text-[#131218]/55 mt-0.5 line-clamp-2">{c.snippet}</p>
-      </div>
-      <span className={`text-[10px] font-bold shrink-0 ${stale}`}>
-        {c.daysAgo}d
-      </span>
-    </a>
+    <HallCommitmentLedgerRows
+      joseCommits={joseCommits}
+      othersCommits={othersCommits}
+      allUrl="/admin/hall/commitments"
+    />
   );
 }

@@ -118,38 +118,29 @@ function timeAgo(iso: string | null): string {
 
 export async function HallPortfolioPulse() {
   const rows = await loadPortfolio();
-  const cold = rows.filter(r => r.heat === "cold").length;
-  const warm = rows.filter(r => r.heat === "warm").length;
-  const hot  = rows.filter(r => r.heat === "hot").length;
+  // H1 — only surface cold portfolios as "check-ins needed". Active Portfolio
+  // section already covers stage/blockers/warmth for the full list, so keep
+  // this widget narrow and actionable (Pareto: 20% that change user behavior).
+  const cold = rows.filter(r => r.heat === "cold");
+
+  // U1 — if everything is warm or hot, hide the widget (Active Portfolio
+  // already shows the full list).
+  if (cold.length === 0) return null;
 
   return (
     <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
       <div className="flex items-center justify-between px-5 py-3 border-b border-[#EFEFEA]">
         <div className="flex items-center gap-2">
-          <span className="text-[10px] font-bold tracking-widest uppercase text-[#131218]/50">Portfolio pulse</span>
-          {cold > 0 && (
-            <span className="text-[9px] font-bold bg-red-50 text-red-700 px-1.5 py-0.5 rounded-full">{cold} cold</span>
-          )}
-          {warm > 0 && (
-            <span className="text-[9px] font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">{warm} warm</span>
-          )}
-          {hot > 0 && (
-            <span className="text-[9px] font-bold bg-[#B2FF59]/40 text-green-900 px-1.5 py-0.5 rounded-full">{hot} hot</span>
-          )}
+          <span className="text-[10px] font-bold tracking-widest uppercase text-[#131218]/50">Portfolio check-ins needed</span>
+          <span className="text-[9px] font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">{cold.length} cold</span>
         </div>
         <Link href="/admin/garage-view" className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/40 hover:text-[#131218]/80">
           Garage →
         </Link>
       </div>
-      {rows.length === 0 ? (
-        <div className="px-5 py-6 text-center">
-          <p className="text-[11px] text-[#131218]/35">No active portfolio startups.</p>
-        </div>
-      ) : (
-        <div className="divide-y divide-[#EFEFEA]">
-          {rows.map(r => <PulseRow key={r.project.notion_id} entry={r} />)}
-        </div>
-      )}
+      <div className="divide-y divide-[#EFEFEA]">
+        {cold.slice(0, 5).map(r => <PulseRow key={r.project.notion_id} entry={r} />)}
+      </div>
     </div>
   );
 }
