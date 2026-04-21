@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Common House Clipper",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Clip web pages into CH Sources [OS v2].",
   "icons": {
     "16":  "icons/icon-16.png",
