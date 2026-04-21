@@ -14,6 +14,8 @@ export type InboxItem = {
   label: "Urgent" | "Needs Reply" | "FYI";
   reason: string;
   gmailUrl: string;
+  /** D1 — 1-line Haiku summary of what the thread is about. Null while generating. */
+  summary?: string | null;
 };
 
 const LABEL_STYLE: Record<string, string> = {
@@ -193,10 +195,10 @@ export function InboxTriage({ initialItems, initialScanned = 0 }: Props) {
 
             <div className="flex-1 min-w-0">
               <div className="flex items-start gap-2">
-                {/* D2 — allow subject to wrap up to 2 lines so first ~80 chars
-                    always visible; ellipsis only fires on runaway subjects */}
+                {/* D1 — when Haiku summary exists, lead with it (clearer than subject);
+                    keep subject as a secondary cue. Falls back to subject when summary absent. */}
                 <span className="text-[12px] font-semibold text-[#131218] line-clamp-2 leading-snug">
-                  {item.subject}
+                  {item.summary ?? item.subject}
                 </span>
                 {item.isUnread && (
                   <span className="text-[8px] font-black uppercase tracking-widest text-[#131218]/30 bg-[#131218]/6 px-1.5 py-0.5 rounded-full shrink-0 mt-[1px]">
@@ -204,6 +206,11 @@ export function InboxTriage({ initialItems, initialScanned = 0 }: Props) {
                   </span>
                 )}
               </div>
+              {item.summary && item.subject && item.summary !== item.subject && (
+                <p className="text-[9.5px] text-[#131218]/35 truncate mt-0.5" title={item.subject}>
+                  re: {item.subject}
+                </p>
+              )}
               <p className="text-[10.5px] text-[#131218]/45 truncate mt-0.5">
                 <span className="font-semibold">{item.fromName}</span>
                 <span className="text-[#131218]/25"> · </span>

@@ -262,8 +262,16 @@ export function candidatesFromMeetings(
     // finding, but no prep/follow-up task is emitted.
     if (cls.is_personal) continue;
 
+    // Context gate: prep only makes sense when there is something to prepare
+    // from. Skip prep when the meeting has no agenda/description AND is not
+    // high-stakes (no VIP) AND is a small invite list. Solo calls, quick 1:1s
+    // with no notes, and generic catch-ups do not benefit from a prep block.
+    const hasDescription    = (m.description ?? "").length >= 30;
+    const isMultiParty      = cls.confirmed_count + cls.tentative_count >= 3;
+    const hasContext        = hasDescription || cls.has_vip || isMultiParty;
+
     // Prep candidate: needed if meeting is in next 3 days and has attendees
-    if (daysUntil <= 3) {
+    if (daysUntil <= 3 && hasContext) {
       // VIP boost: any non-self attendee in Investor / Funder / Portfolio
       const baseUrgency = daysUntil <= 1 ? 85 : 70;
       const vipBoost    = cls.has_vip ? 15 : 0;

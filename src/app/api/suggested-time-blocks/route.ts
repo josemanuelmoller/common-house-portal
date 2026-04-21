@@ -218,24 +218,32 @@ export async function GET(_req: NextRequest) {
       .eq("user_email", email)
       .eq("status", "suggested");
 
-    // Insert fresh rows
-    const inserted = matches.map(m => ({
-      user_email:           email,
-      title:                m.candidate.title,
-      linked_entity_type:   m.candidate.entity_type,
-      linked_entity_id:     m.candidate.entity_id,
-      linked_entity_label:  m.candidate.entity_label,
-      suggested_start_time: m.slot.start.toISOString(),
-      suggested_end_time:   m.slot.end.toISOString(),
-      duration_minutes:     Math.min(m.slot.durationMin, m.candidate.duration_min + 15),
-      task_type:            m.candidate.task_type,
-      urgency_score:        m.candidate.urgency_score,
-      confidence_score:     m.candidate.confidence_score,
-      why_now:              m.candidate.why_now,
-      expected_outcome:     m.candidate.expected_outcome,
-      fingerprint:          m.candidate.fingerprint,
-      status:               "suggested",
-    }));
+    // Insert fresh rows — cap the actual start/end to the right-sized block so
+    // the Google Calendar event we later create is never the full open slot.
+    // Without this cap, a 45-minute prep task dropped into a 4-hour slot would
+    // materialise on the calendar as a 4-hour event.
+    const inserted = matches.map(m => {
+      const cappedMin  = Math.min(m.slot.durationMin, m.candidate.duration_min + 15);
+      const startDate  = m.slot.start;
+      const endDate    = new Date(startDate.getTime() + cappedMin * 60_000);
+      return {
+        user_email:           email,
+        title:                m.candidate.title,
+        linked_entity_type:   m.candidate.entity_type,
+        linked_entity_id:     m.candidate.entity_id,
+        linked_entity_label:  m.candidate.entity_label,
+        suggested_start_time: startDate.toISOString(),
+        suggested_end_time:   endDate.toISOString(),
+        duration_minutes:     cappedMin,
+        task_type:            m.candidate.task_type,
+        urgency_score:        m.candidate.urgency_score,
+        confidence_score:     m.candidate.confidence_score,
+        why_now:              m.candidate.why_now,
+        expected_outcome:     m.candidate.expected_outcome,
+        fingerprint:          m.candidate.fingerprint,
+        status:               "suggested",
+      };
+    });
     const { data: saved, error: insertErr } = await sb
       .from("suggested_time_blocks")
       .insert(inserted)
@@ -319,6 +327,7 @@ async function listPastMeetings(daysBack: number) {
     out.push({
       id:             e.id,
       title:          e.summary || "(untitled meeting)",
+      description:    (e.description ?? "").trim(),
       start:          new Date(startIso),
       end:            new Date(endIso),
       attendeeCount:  structured.filter(a => a.responseStatus !== "declined").length,

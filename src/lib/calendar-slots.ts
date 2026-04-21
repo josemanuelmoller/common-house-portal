@@ -41,6 +41,10 @@ export type MeetingAttendee = {
 export type UpcomingMeeting = {
   id: string;
   title: string;
+  /** Raw meeting description from Google Calendar. Used to gate prep tasks:
+   * a meeting with no context (no description, no VIP, no multi-party invite
+   * list) does not deserve a prep block. */
+  description: string;
   start: Date;
   end: Date;
   attendeeCount: number;
@@ -161,6 +165,7 @@ export async function listUpcomingMeetings(daysAhead: number): Promise<UpcomingM
     out.push({
       id:             e.id,
       title:          e.summary || "(untitled meeting)",
+      description:    (e.description ?? "").trim(),
       start:          new Date(startIso),
       end:            new Date(endIso),
       attendeeCount:  structuredAttendees.filter(a => a.responseStatus !== "declined").length,

@@ -28,16 +28,20 @@ async function load(): Promise<Commitment[]> {
   const selfSet = await getSelfEmails();
   const since = new Date(Date.now() - 90 * 86400_000).toISOString().slice(0, 10);
 
-  const { data } = await sb
-    .from("evidence")
-    .select("notion_id, title, evidence_statement, evidence_type, project_notion_id, date_captured")
-    .in("evidence_type", ["Dependency", "Process Step", "Requirement"])
-    .eq("validation_status", "Validated")
-    .gte("date_captured", since)
-    .order("date_captured", { ascending: false })
-    .limit(300);
+  const [evRes, dismRes] = await Promise.all([
+    sb.from("evidence")
+      .select("notion_id, title, evidence_statement, evidence_type, project_notion_id, date_captured")
+      .in("evidence_type", ["Dependency", "Process Step", "Requirement"])
+      .eq("validation_status", "Validated")
+      .gte("date_captured", since)
+      .order("date_captured", { ascending: false })
+      .limit(300),
+    sb.from("hall_commitment_dismissals").select("notion_id"),
+  ]);
 
-  const rows = (data ?? []) as {
+  const dismissed = new Set(((dismRes.data ?? []) as { notion_id: string }[]).map(r => r.notion_id));
+
+  const rows = (evRes.data ?? []) as {
     notion_id: string; title: string; evidence_statement: string | null;
     evidence_type: string; project_notion_id: string | null; date_captured: string | null;
   }[];
@@ -45,6 +49,7 @@ async function load(): Promise<Commitment[]> {
   const out: Commitment[] = [];
   const now = Date.now();
   for (const r of rows) {
+    if (dismissed.has(r.notion_id)) continue;  // G3 — hide server-dismissed
     const stmt = (r.evidence_statement ?? r.title).trim();
     if (!stmt) continue;
     const lower = stmt.toLowerCase();

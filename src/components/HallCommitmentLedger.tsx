@@ -92,11 +92,20 @@ async function loadCommitments(): Promise<Commitment[]> {
 
 export async function HallCommitmentLedger() {
   const all = await loadCommitments();
+
+  // G3 write-back — fetch server-side dismissals so they hide across
+  // devices/refreshes. LocalStorage on the client is an optimistic
+  // overlay on top of this.
+  const sb = getSupabaseServerClient();
+  const { data: dismissedRows } = await sb
+    .from("hall_commitment_dismissals")
+    .select("notion_id");
+  const serverDismissed = new Set(((dismissedRows ?? []) as { notion_id: string }[]).map(r => r.notion_id));
+
   // G2 — strip redundant "Jose Manuel must..." prefix from titles since the
   // section label ("You committed") already establishes the actor.
   const normalize = (c: Commitment): CommitmentLite => ({
     id:        c.id,
-    // Keep entity name in title; strip only the verbose agent preamble.
     title:     c.title.replace(/^Jose( Manuel( Moller)?)?\s+(must|will|to)\s+/i, "").replace(/^./, s => s.toUpperCase()),
     snippet:   c.snippet.replace(/^Jose( Manuel( Moller)?)?\s+(must|will|to)\s+/i, ""),
     daysAgo:   c.daysAgo,
@@ -104,8 +113,12 @@ export async function HallCommitmentLedger() {
     notionUrl: c.notionUrl,
   });
 
-  const joseCommits = all.filter(c => c.owner === "jose").slice(0, 5).map(normalize);
-  const othersCommits = all.filter(c => c.owner === "others").slice(0, 5).map(normalize);
+  // Filter dismissed out of the initial render. The client-side "show done"
+  // toggle only reveals items the *current device* dismissed — server-side
+  // dismissals stay hidden (they're "archived" across the team).
+  const active = all.filter(c => !serverDismissed.has(c.id));
+  const joseCommits = active.filter(c => c.owner === "jose").slice(0, 5).map(normalize);
+  const othersCommits = active.filter(c => c.owner === "others").slice(0, 5).map(normalize);
 
   return (
     <HallCommitmentLedgerRows

@@ -68,13 +68,18 @@ export function HallCommitmentLedgerRows({
   const isHidden = (id: string) => !showDismissed && dismissed.has(id);
 
   const markDone = (id: string) => {
+    // Optimistic UI — apply locally first, then sync to server (G3 full write-back).
     const next = new Set(dismissed);
     next.add(id);
     setDismissed(next);
     writeDismissed(next);
     setRecentlyDismissed(id);
-    // Auto-clear undo toast after 5s (R3).
     setTimeout(() => setRecentlyDismissed(prev => prev === id ? null : prev), 5000);
+    // Fire-and-forget server sync.
+    fetch(`/api/hall/commitments/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      credentials: "include",
+    }).catch(() => { /* localStorage is authoritative fallback */ });
   };
 
   const undo = (id: string) => {
@@ -83,6 +88,11 @@ export function HallCommitmentLedgerRows({
     setDismissed(next);
     writeDismissed(next);
     setRecentlyDismissed(null);
+    // Server undo — DELETE reverses the dismissal.
+    fetch(`/api/hall/commitments/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+      credentials: "include",
+    }).catch(() => { /* local state is visible anyway */ });
   };
 
   const visibleJose   = joseCommits.filter(c => !isHidden(c.id));
@@ -159,7 +169,7 @@ export function HallCommitmentLedgerRows({
       {/* R3 — undo toast */}
       {recentlyDismissed && (
         <div className="px-5 py-2 bg-emerald-50 border-t border-emerald-200 flex items-center justify-between">
-          <p className="text-[10px] text-emerald-700">Marked done. Local-only — refine in Notion when fully resolved.</p>
+          <p className="text-[10px] text-emerald-700">Marked done · synced across your devices. Refine in Notion if permanent.</p>
           <button
             onClick={() => undo(recentlyDismissed)}
             className="text-[10px] font-bold text-emerald-700 hover:text-emerald-900 underline"

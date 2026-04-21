@@ -34,6 +34,7 @@ import { HallAskQueue } from "@/components/HallAskQueue";
 import { HallTimeAllocation } from "@/components/HallTimeAllocation";
 import { HallCommitmentLedger } from "@/components/HallCommitmentLedger";
 import { HallNextMeeting } from "@/components/HallNextMeeting";
+import { HallTabs } from "@/components/HallTabs";
 import OpportunityExplorer from "@/components/OpportunityExplorer";
 import {
   getProjectsOverview,
@@ -570,6 +571,12 @@ export default async function AdminPage() {
           </p>
         </div>
 
+        <HallTabs
+          badges={{
+            today:   (p1Decisions.length + imminentDeadlines.length) || undefined,
+            signals: undefined,
+          }}
+        >
         <div className="px-8 py-6 space-y-6 max-w-6xl mx-auto">
 
           {/* ── 1. Focus of the Day ───────────────────────────────────────── */}
@@ -820,16 +827,16 @@ export default async function AdminPage() {
             </div>
           </div>
 
-          {/* ── 4. Agent Queue ────────────────────────────────────────────── */}
+          {/* ── 4. Agent Queue (TODAY) ────────────────────────────────────── */}
           {agentDrafts.length > 0 && (
-            <div>
+            <div data-hall-tab="today">
               <SectionHeader label="Agent queue" count={agentDrafts.length} />
               <AgentQueueSection drafts={agentDrafts} />
             </div>
           )}
 
-          {/* ── 4b. Suggested Time Blocks — when to execute ─────────────── */}
-          <div>
+          {/* ── 4b. Suggested Time Blocks — TODAY ─────────────────────────── */}
+          <div data-hall-tab="today">
             <div className="flex items-center gap-3 mb-3">
               <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Suggested time blocks</p>
               <div className="flex-1 h-px bg-[#E0E0D8]" />
@@ -838,8 +845,8 @@ export default async function AdminPage() {
             <SuggestedTimeBlocks />
           </div>
 
-          {/* ── 4c. Inbox only on the left; drafts moved into CoS ─── */}
-          <div className="grid grid-cols-[1fr_340px] gap-6 items-start">
+          {/* ── 4c. Inbox + Meeting prep right column — lives in TODAY + SIGNALS ─── */}
+          <div data-hall-tab="today signals" className="grid grid-cols-[1fr_340px] gap-6 items-start">
             <div className="space-y-6 min-w-0">
               {/* Inbox Triage */}
               <div>
@@ -887,8 +894,8 @@ export default async function AdminPage() {
             </div>
           </div>
 
-          {/* ── Two-column main layout ─────────────────────────────────────── */}
-          <div className="grid grid-cols-[1fr_340px] gap-6 items-start">
+          {/* ── Two-column main layout — TODAY tab ─────── */}
+          <div data-hall-tab="today" className="grid grid-cols-[1fr_340px] gap-6 items-start">
 
             {/* ── LEFT COLUMN ───────────────────────────────────────────────── */}
             <div className="space-y-6">
@@ -1114,7 +1121,8 @@ export default async function AdminPage() {
               Two-column grid ends above. Everything below is full-width so the
               right rail never goes visually idle while the portfolio scrolls. */}
 
-          {/* ── 8. Active Portfolio — ranked + editorial summary ──────── */}
+          {/* ── 8. Active Portfolio — TODAY + PORTFOLIO tabs ──────── */}
+          <div data-hall-tab="today portfolio">
           {(() => {
             // Editorial summary counts — computed once so summary and rows agree.
             const projBlocked  = projects.filter(p => p.blockerCount > 0);
@@ -1311,8 +1319,10 @@ export default async function AdminPage() {
               </div>
             );
           })()}
+          </div>
 
-          {/* ── 9. Opportunities Explorer — O1: inline when few, collapsed when many ─────── */}
+          {/* ── 9. Opportunities Explorer — TODAY + PORTFOLIO tabs ─────── */}
+          <div data-hall-tab="today portfolio">
           {(() => {
             const total = filteredOpps.ch.length + filteredOpps.portfolio.length;
             if (total === 0) return null;
@@ -1361,10 +1371,11 @@ export default async function AdminPage() {
               </details>
             );
           })()}
+          </div>
 
-          {/* ── 10. Ready to Publish ─────────────────────────────────── */}
+          {/* ── 10. Ready to Publish — TODAY ─────────────────────────────── */}
           {readyContent.length > 0 && (
-            <div>
+            <div data-hall-tab="today">
               <SectionHeader label="Ready to publish" count={readyContent.length} />
               <div className="grid grid-cols-3 gap-3">
                 {readyContent.map(c => (
@@ -1388,7 +1399,54 @@ export default async function AdminPage() {
             </div>
           )}
 
+          {/* ── SIGNALS tab — focused feed of market + inbox + pipeline ─────── */}
+          <div data-hall-tab="signals" className="space-y-6">
+            <div className="flex items-center gap-3">
+              <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Market & pipeline signals</p>
+              <div className="flex-1 h-px bg-[#E0E0D8]" />
+            </div>
+            <MarketSignalsPanel
+              text={latestMarketSignals?.text ?? null}
+              date={latestMarketSignals?.date ?? null}
+              generatedAt={latestMarketSignals?.generatedAt ?? null}
+              briefs={marketSignalBriefs}
+            />
+            <InboxTriage initialItems={inboxData.items} initialScanned={inboxData.total_scanned} />
+            <HallAskQueue />
+            <HallOppFreshnessRadar />
+            <HallPortfolioPulse />
+          </div>
+
+          {/* ── RELATIONSHIPS tab — network, classes, time allocation ────── */}
+          <div data-hall-tab="relationships" className="space-y-6">
+            <div className="flex items-center gap-3">
+              <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Relationships</p>
+              <div className="flex-1 h-px bg-[#E0E0D8]" />
+              <Link href="/admin/hall/network" className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/40 hover:text-[#131218]/80">
+                Network graph →
+              </Link>
+            </div>
+            <HallTimeAllocation />
+            <HallOrgsColdRelations />
+            <HallOrgsClassMix />
+            <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-4 flex items-center justify-between">
+              <div>
+                <p className="text-[11px] font-bold text-[#131218]">Contacts & Organizations</p>
+                <p className="text-[10px] text-[#131218]/45 mt-0.5">Tag who's who · classify senders · maintain the registry</p>
+              </div>
+              <div className="flex gap-2">
+                <Link href="/admin/hall/contacts" className="text-[10px] font-bold uppercase tracking-wider bg-[#131218] text-white hover:bg-[#2a2938] px-3 py-1.5 rounded-md transition-colors">
+                  Contacts →
+                </Link>
+                <Link href="/admin/hall/organizations" className="text-[10px] font-bold uppercase tracking-wider bg-[#EFEFEA] text-[#131218] hover:bg-[#E0E0D8] px-3 py-1.5 rounded-md transition-colors">
+                  Orgs →
+                </Link>
+              </div>
+            </div>
+          </div>
+
         </div>
+        </HallTabs>
       </main>
     </div>
   );

@@ -497,5 +497,107 @@ Return ONLY a JSON array — no markdown, no explanation:
   const flagged = items.filter(i => i.label !== "FYI");
   const output  = flagged.length > 0 ? flagged.slice(0, 10) : items.slice(0, 5);
 
-  return NextResponse.json({ ok: true, items: output, total_scanned: candidates.length, calendar_filtered: candidates.length - actionable.length });
+  // D1 — enrich with 1-line Haiku summaries (cache-first, generates missing).
+  const enriched = await enrichWithSummaries(output);
+
+  return NextResponse.json({ ok: true, items: enriched, total_scanned: candidates.length, calendar_filtered: candidates.length - actionable.length });
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// D1 — thread summary enrichment
+// ────────────────────────────────────────────────────────────────────────────
+
+const SUMMARY_TTL_MS = 24 * 3600_000;
+const SUMMARY_MODEL  = "claude-haiku-4-5-20251001";
+
+function subjectHash(subject: string, snippet: string): string {
+  // Stable identity for cache — changes if snippet grows (new reply) or subject changes.
+  const raw = `${subject}|${snippet.slice(0, 120)}`;
+  let h = 5381;
+  for (let i = 0; i < raw.length; i++) h = ((h << 5) + h + raw.charCodeAt(i)) | 0;
+  return h.toString(36);
+}
+
+type OutputItem = {
+  threadId: string;
+  subject: string;
+  from: string;
+  fromName: string;
+  snippet: string;
+  daysWaiting: number;
+  isUnread: boolean;
+  label: string;
+  reason: string;
+  contact_classes: string[];
+  contact_override: string | null;
+  gmailUrl: string;
+  summary?: string | null;
+};
+
+async function enrichWithSummaries(items: OutputItem[]): Promise<OutputItem[]> {
+  if (items.length === 0) return items;
+  if (!process.env.ANTHROPIC_API_KEY) return items;
+
+  const sb = getSupabaseServerClient();
+  const ids = items.map(i => i.threadId);
+
+  const { data: cacheRows } = await sb
+    .from("hall_thread_summaries")
+    .select("thread_id, subject_hash, summary, generated_at")
+    .in("thread_id", ids);
+
+  const cache = new Map<string, { hash: string; summary: string; at: number }>();
+  for (const r of (cacheRows ?? []) as { thread_id: string; subject_hash: string; summary: string; generated_at: string }[]) {
+    cache.set(r.thread_id, {
+      hash: r.subject_hash,
+      summary: r.summary,
+      at: new Date(r.generated_at).getTime(),
+    });
+  }
+
+  const now = Date.now();
+  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+  const tasks = items.map(async (item) => {
+    const hash = subjectHash(item.subject, item.snippet);
+    const cached = cache.get(item.threadId);
+    if (cached && cached.hash === hash && (now - cached.at) < SUMMARY_TTL_MS) {
+      return { ...item, summary: cached.summary };
+    }
+
+    try {
+      const prompt =
+        `Subject: ${item.subject}\n` +
+        `From: ${item.fromName} <${item.from}>\n` +
+        `Snippet: ${item.snippet.slice(0, 400)}\n\n` +
+        `Summarize what this email is actually about in one sentence of 6-14 words. No preamble, no "This email is about". Output only the sentence.`;
+      const msg = await anthropic.messages.create({
+        model: SUMMARY_MODEL,
+        max_tokens: 80,
+        messages: [{ role: "user", content: prompt }],
+      });
+      const summary = ((msg.content[0] as { type: string; text?: string }).text ?? "")
+        .trim()
+        .replace(/^["']|["']$/g, "")
+        .slice(0, 160);
+
+      if (summary) {
+        // Fire-and-forget cache write.
+        sb.from("hall_thread_summaries")
+          .upsert({
+            thread_id: item.threadId,
+            subject_hash: hash,
+            summary,
+            model: SUMMARY_MODEL,
+            generated_at: new Date().toISOString(),
+          }, { onConflict: "thread_id" })
+          .then(() => {}, () => {});
+      }
+      return { ...item, summary: summary || null };
+    } catch {
+      return { ...item, summary: cached?.summary ?? null };
+    }
+  });
+
+  return Promise.all(tasks);
 }
