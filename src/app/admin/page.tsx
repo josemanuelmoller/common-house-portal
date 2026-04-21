@@ -735,26 +735,26 @@ export default async function AdminPage() {
             </div>
           )}
 
-          {/* ── 3. Stats row ──────────────────────────────────────────────── */}
-          <div className="grid grid-cols-3 gap-3 items-stretch">
+          {/* ── 3. Stats row — B6: hero tile wider, 2 satellites narrower. B7: expand abbreviations. ── */}
+          <div className="grid grid-cols-[1.6fr_1fr_1fr] gap-3 items-stretch">
 
-            {/* Tile 1 — Portfolio */}
-            <div className="bg-white rounded-xl border border-[#E0E0D8] px-3.5 py-2 flex flex-col">
-              <p className="text-[9px] font-bold text-[#131218]/25 uppercase tracking-widest mb-0.5">Active portfolio</p>
-              <div className="flex items-baseline gap-2">
-                <p className="text-[18px] font-[800] text-[#131218] tracking-tight leading-none">{projects.length}</p>
-                <span className="text-[9.5px] font-semibold text-[#131218]/40 leading-tight">
-                  {workroomCount}W · {garageCount}G{untypedCount > 0 ? ` · ${untypedCount} untyped` : ""}
+            {/* Tile 1 — Portfolio (hero) */}
+            <div className="bg-white rounded-xl border border-[#E0E0D8] px-4 py-3 flex flex-col">
+              <p className="text-[9px] font-bold text-[#131218]/25 uppercase tracking-widest mb-1">Active portfolio</p>
+              <div className="flex items-baseline gap-3">
+                <p className="text-[28px] font-[800] text-[#131218] tracking-tight leading-none">{projects.length}</p>
+                <span className="text-[10px] font-semibold text-[#131218]/50 leading-tight">
+                  {workroomCount} Workroom{workroomCount !== 1 ? "s" : ""} · {garageCount} Garage{untypedCount > 0 ? ` · ${untypedCount} untyped` : ""}
                 </span>
               </div>
-              <div className="mt-auto pt-1 flex items-center gap-2.5 text-[9.5px]">
+              <div className="mt-auto pt-1.5 flex items-center gap-2.5 text-[10px]">
                 {blockerCount > 0 ? (
                   <span className="flex items-center gap-1">
-                    <span className="w-1 h-1 rounded-full bg-red-400 shrink-0" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" />
                     <span className="font-bold text-red-500">{blockerCount} blocker{blockerCount !== 1 ? "s" : ""}</span>
                   </span>
                 ) : (
-                  <span className="text-[#131218]/25">No blockers</span>
+                  <span className="text-[#131218]/35">No blockers</span>
                 )}
                 {staleProjects.length > 0 && (
                   <span className="text-[#131218]/40">· {staleProjects.length} stale 30d+</span>
@@ -992,13 +992,22 @@ export default async function AdminPage() {
                         // N1 — differentiate P1/High/normal via icon glyph, not just color.
                         const priorityIcon = isP1 ? "⬤" : isHigh ? "◐" : "○";
                         const priorityLabel = isP1 ? "P1" : isHigh ? "P2" : "P3";
+                        // N2 — show 1-line preview of notes/context when available (first 100 chars).
+                        const preview = d.notes
+                          ? d.notes.replace(/\[[A-Z_]+:[^\]]+\]/g, "").replace(/\n+/g, " ").trim().slice(0, 110)
+                          : null;
                         return (
-                          <Link key={d.id} href="/admin/decisions" className={`flex items-center gap-3 px-5 py-3 hover:bg-[#EFEFEA]/40 transition-colors border-b border-[#EFEFEA] last:border-0 ${isP1 ? "border-l-2 border-l-red-400" : isHigh ? "border-l-2 border-l-amber-300" : ""}`}>
-                            <div className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 ${isP1 ? "bg-red-100" : isHigh ? "bg-amber-50" : "bg-[#EFEFEA]"}`}
+                          <Link key={d.id} href="/admin/decisions" className={`flex items-start gap-3 px-5 py-3 hover:bg-[#EFEFEA]/40 transition-colors border-b border-[#EFEFEA] last:border-0 ${isP1 ? "border-l-2 border-l-red-400" : isHigh ? "border-l-2 border-l-amber-300" : ""}`}>
+                            <div className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 mt-[1px] ${isP1 ? "bg-red-100" : isHigh ? "bg-amber-50" : "bg-[#EFEFEA]"}`}
                                  title={`${priorityLabel} priority`}>
                               <span className={`text-[10px] font-bold ${isP1 ? "text-red-600" : isHigh ? "text-amber-600" : "text-[#131218]/35"}`}>{priorityIcon}</span>
                             </div>
-                            <p className="text-[11.5px] font-medium text-[#131218] flex-1 min-w-0 truncate">{d.title}</p>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-[11.5px] font-medium text-[#131218] truncate">{d.title}</p>
+                              {preview && (
+                                <p className="text-[9.5px] text-[#131218]/45 truncate mt-0.5">{preview}{d.notes && d.notes.length > 110 ? "…" : ""}</p>
+                              )}
+                            </div>
                             <div className="flex items-center gap-2 shrink-0">
                               {d.dueDate && (
                                 <span className={`text-[9px] font-bold ${dueBadgeClass}`}>

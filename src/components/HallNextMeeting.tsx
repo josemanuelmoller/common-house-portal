@@ -159,12 +159,23 @@ export async function HallNextMeeting() {
           <div>
             <div className="flex items-start justify-between gap-3">
               <p className="text-[13px] font-bold text-[#131218] leading-snug">{m.title}</p>
-              {m.htmlLink && (
-                <a href={m.htmlLink} target="_blank" rel="noopener noreferrer"
-                   className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/40 hover:text-[#131218]/80 shrink-0">
-                  Open →
-                </a>
-              )}
+              {m.htmlLink && (() => {
+                // F1 — when meeting is imminent (<=15min), promote the "Open" link
+                // to a bright Join CTA. Past that, keep it quiet.
+                const minsAway = Math.round((m.startMs - Date.now()) / 60_000);
+                const imminent = minsAway >= 0 && minsAway <= 15;
+                return imminent ? (
+                  <a href={m.htmlLink} target="_blank" rel="noopener noreferrer"
+                     className="text-[10px] font-bold uppercase tracking-wider text-[#131218] bg-[#c8f55a] hover:bg-[#b2ea3f] px-2.5 py-1 rounded-md shrink-0 transition-colors">
+                    Join →
+                  </a>
+                ) : (
+                  <a href={m.htmlLink} target="_blank" rel="noopener noreferrer"
+                     className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/40 hover:text-[#131218]/80 shrink-0">
+                    Open →
+                  </a>
+                );
+              })()}
             </div>
             <p className="text-[10px] text-[#131218]/50 mt-0.5">{m.startLocal}</p>
           </div>
