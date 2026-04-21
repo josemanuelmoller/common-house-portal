@@ -195,15 +195,21 @@ Return ONLY a JSON array (no markdown, no code fences):
   }
 }
 
-// ─── Dedup: pre-load existing evidence titles for this source ───────────────
+// ─── Dedup: pre-load evidence titles already captured today ─────────────────
+// CH Evidence doesn't have a relation back to CH Sources; we key on
+// (title, date) pair same as extract-meeting-evidence does.
 
-async function loadExistingTitles(sourceNotionId: string | null): Promise<Set<string>> {
+async function loadExistingTitles(dateStr: string): Promise<Set<string>> {
   const out = new Set<string>();
-  if (!sourceNotionId) return out;
   try {
     const res = await notion.databases.query({
       database_id: EVIDENCE_DB,
-      filter: { property: "Source", relation: { contains: sourceNotionId } },
+      filter: {
+        and: [
+          { property: "Date Captured",   date:   { equals: dateStr } },
+          { property: "Legacy Source DB", select: { equals: "CH Sources [OS v2]" } },
+        ],
+      },
       page_size: 100,
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -218,11 +224,11 @@ async function loadExistingTitles(sourceNotionId: string | null): Promise<Set<st
 // ─── Write evidence to Notion ───────────────────────────────────────────────
 
 async function writeEvidence(
-  item:      EvidenceItem,
-  dateStr:   string,
-  sourceNotionId: string | null,
-  orgId:     string | null,
-  projectId: string | null,
+  item:             EvidenceItem,
+  dateStr:          string,
+  sourceNotionId:   string | null,
+  orgId:            string | null,
+  projectId:        string | null,
 ): Promise<string> {
   const type       = VALID_TYPES.has(item.type) ? item.type : "Outcome";
   const confidence = VALID_CONFIDENCE.has(item.confidence) ? item.confidence : "Medium";
@@ -230,12 +236,18 @@ async function writeEvidence(
   const theme      = VALID_THEMES.has(item.affected_theme) ? item.affected_theme : null;
   const topics     = (item.topics ?? []).filter(t => VALID_TOPICS.has(t));
 
+  // Embed the source notion page id into the excerpt so there's a trace back
+  // to the conversation, even though CH Evidence has no direct Source relation.
+  const excerptWithTrace = sourceNotionId
+    ? `${item.excerpt.slice(0, 360)}\n\n— from WhatsApp clip: https://www.notion.so/${sourceNotionId.replace(/-/g, "")}`
+    : item.excerpt;
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const properties: Record<string, any> = {
     "Evidence Title":     { title:     [{ text: { content: item.title.slice(0, 100) } }] },
     "Evidence Type":      { select:    { name: type } },
     "Evidence Statement": { rich_text: [{ text: { content: item.statement.slice(0, 2000) } }] },
-    "Source Excerpt":     { rich_text: [{ text: { content: item.excerpt.slice(0, 500) } }] },
+    "Source Excerpt":     { rich_text: [{ text: { content: excerptWithTrace.slice(0, 500) } }] },
     "Validation Status":  { select:    { name: "New" } },
     "Confidence Level":   { select:    { name: confidence } },
     "Sensitivity Level":  { select:    { name: "Internal" } },
@@ -245,7 +257,6 @@ async function writeEvidence(
   if (theme)       properties["Affected Theme"]  = { multi_select: [{ name: theme }] };
   if (geo)         properties["Geography"]       = { multi_select: [{ name: geo }] };
   if (topics.length) properties["Topics / Themes"] = { multi_select: topics.map(t => ({ name: t })) };
-  if (sourceNotionId) properties["Source"]      = { relation: [{ id: sourceNotionId }] };
   if (orgId)       properties["Organization"]    = { relation: [{ id: orgId }] };
   if (projectId)   properties["Project"]         = { relation: [{ id: projectId }] };
 
@@ -294,7 +305,7 @@ export async function POST(req: NextRequest) {
       try {
         const items = await extractConversationEvidence(src);
         const dateStr  = src.source_date ?? new Date().toISOString().slice(0, 10);
-        const existing = await loadExistingTitles(src.notion_id);
+        const existing = await loadExistingTitles(dateStr);
 
         // Inherit org/project from the source if set; otherwise resolve from title + content
         const srcHay   = (src.title + " " + (src.raw_content ?? "").slice(0, 2000)).toLowerCase();
