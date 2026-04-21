@@ -32,6 +32,7 @@ import { HallOppFreshnessRadar } from "@/components/HallOppFreshnessRadar";
 import { HallPortfolioPulse } from "@/components/HallPortfolioPulse";
 import { HallAskQueue } from "@/components/HallAskQueue";
 import { HallTimeAllocation } from "@/components/HallTimeAllocation";
+import { HallCommitmentLedger } from "@/components/HallCommitmentLedger";
 import OpportunityExplorer from "@/components/OpportunityExplorer";
 import {
   getProjectsOverview,
@@ -833,6 +834,7 @@ export default async function AdminPage() {
                 briefs={marketSignalBriefs}
               />
 
+              <HallCommitmentLedger />
               <HallPortfolioPulse />
               <HallOppFreshnessRadar />
               <HallAskQueue />
