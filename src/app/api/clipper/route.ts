@@ -207,7 +207,7 @@ async function handleWebClip(body: ClipBody) {
 
 // ─── WhatsApp clip handler ───────────────────────────────────────────────────
 
-async function handleWhatsappClip(body: ClipBody) {
+async function handleWhatsappClip(body: ClipBody, req: NextRequest) {
   const { url, chat_name, messages, raw_content, notes } = body;
   if (!messages?.length) return corsJson({ error: "messages array required" }, 400);
 
@@ -412,6 +412,25 @@ async function handleWhatsappClip(body: ClipBody) {
     }
   }
 
+  // 8. Fire-and-forget AI distill — Haiku extracts Evidence (Decisions,
+  // Blockers, Outcomes, Commitments, etc.) from raw_content in the background.
+  // Not awaited: the user sees "Saved" immediately, Evidence lands in Notion
+  // in ~30-60s via the extraction endpoint.
+  try {
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL
+      ?? `${req.nextUrl.protocol}//${req.nextUrl.host}`;
+    const agentKey = process.env.CRON_SECRET ?? "";
+    if (agentKey) {
+      fetch(`${appUrl}/api/extract-conversation-evidence`, {
+        method:  "POST",
+        headers: { "Content-Type": "application/json", "x-agent-key": agentKey },
+        body:    JSON.stringify({ source_id: sourceId }),
+      }).catch(() => { /* silence — extraction failure shouldn't break the clip */ });
+    }
+  } catch (e) {
+    console.warn("[clipper] AI distill trigger failed:", e);
+  }
+
   return corsJson({
     ok:               true,
     id:               notionId,
@@ -419,6 +438,7 @@ async function handleWhatsappClip(body: ClipBody) {
     messages_stored:  messagesStored,
     people_matched:   matchedPeopleCount,
     projects_matched: matchedProjects.size,
+    ai_distill:       "queued",
   });
 }
 
@@ -440,7 +460,7 @@ export async function POST(req: NextRequest) {
   }
 
   if (body.source_type === "whatsapp" && body.messages?.length) {
-    return handleWhatsappClip(body);
+    return handleWhatsappClip(body, req);
   }
 
   return handleWebClip(body);

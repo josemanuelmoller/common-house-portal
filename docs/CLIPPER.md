@@ -90,6 +90,27 @@ you have the right to share with the CH system.
   history may be truncated. The status line says "scroll timed out" in
   that case.
 
+## v0.7.0 — AI distill (server-side)
+
+After a successful WhatsApp clip, the clipper fires a background request to
+`/api/extract-conversation-evidence`. That endpoint reads the raw content
+from Supabase, calls Haiku 4.5, and writes structured Evidence records
+into `CH Evidence [OS v2]`.
+
+**What gets extracted:** Decisions, Blockers, Outcomes, Requirements,
+Dependencies, Risks, Process Steps (commitments). Same types as
+meeting-evidence — new WhatsApp clips plug into the existing OS v2 loop.
+
+**Timing:** 30-60 seconds after Clip. User sees "Saved" immediately;
+Evidence surfaces later in `/admin/os`, the drawer, daily briefings.
+
+**Safety net:** a daily cron (`0 4 * * 1-5`) sweeps any source with
+`evidence_extracted=false` in the last 48h, so if the fire-and-forget
+misses, the sweep catches up.
+
+**No extension change required** — the extension just sends the clip to
+`/api/clipper` as before; the server orchestrates extraction.
+
 ## v0.6.0 — Delta capture
 
 After the first clip of a chat, subsequent clips only capture messages

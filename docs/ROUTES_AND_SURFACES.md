@@ -120,6 +120,7 @@ All accept `Authorization: Bearer <CRON_SECRET>` or `x-agent-key: <CRON_SECRET>`
 | `/api/generate-daily-briefing` | Weekdays 07:30 UTC | AI daily brief → Daily Briefings [OS v2] |
 | `/api/competitive-monitor` | Mondays 07:00 UTC | Web search for competitive/sector signals |
 | `/api/grant-radar` | Biweekly Wednesdays 07:00 UTC | Web search for open grant calls |
+| `/api/extract-conversation-evidence` | Weekdays 04:00 UTC + fire-and-forget from clipper | WhatsApp sources → Evidence records via Haiku |
 | `/api/sync-loops` | Weekdays 08:00 UTC | Sync Notion → Supabase (action loops) |
 | `/api/sync-opportunities` | Weekdays 09:00 UTC | Sync Notion → Supabase (opportunities) |
 | `/api/sync-projects` | Weekdays 10:00 UTC | Sync Notion → Supabase (projects) |
