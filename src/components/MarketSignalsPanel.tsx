@@ -77,11 +77,22 @@ export function MarketSignalsPanel({ text, date, generatedAt, briefs = [] }: Pro
             <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-full whitespace-nowrap">
               Updated · refreshed
             </span>
-          ) : (
-            <span className="text-[9px] font-semibold text-[#131218]/35 whitespace-nowrap" title={stamp}>
-              {age ?? stamp}
-            </span>
-          )}
+          ) : (() => {
+            // E6 — "Fresh" pill when <1h old (lime), otherwise quiet timestamp.
+            const isFresh = generatedAt && (Date.now() - new Date(generatedAt).getTime() < 3600_000);
+            if (isFresh) {
+              return (
+                <span className="text-[9px] font-bold text-[#131218] bg-[#c8f55a]/50 border border-[#c8f55a] px-1.5 py-0.5 rounded-full whitespace-nowrap" title={stamp}>
+                  Fresh · {age}
+                </span>
+              );
+            }
+            return (
+              <span className="text-[9px] font-semibold text-[#131218]/35 whitespace-nowrap" title={stamp}>
+                {age ?? stamp}
+              </span>
+            );
+          })()}
         </div>
         <button
           onClick={refresh}

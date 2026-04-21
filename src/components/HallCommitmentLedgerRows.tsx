@@ -194,7 +194,7 @@ function CommitmentRow({
         className="flex-1 min-w-0"
       >
         <p className={`text-[11px] font-bold text-[#131218] line-clamp-1 ${isDone ? "line-through" : ""}`}>{c.title}</p>
-        <p className="text-[9px] text-[#131218]/55 mt-0.5 line-clamp-2">{c.snippet}</p>
+        <p className="text-[9px] text-[#131218]/55 mt-0.5 line-clamp-1" title={c.snippet}>{c.snippet}</p>
       </a>
       <div className="flex items-center gap-2 shrink-0">
         <span className={`text-[10px] font-bold tabular-nums ${staleColor(c.daysAgo)}`}>

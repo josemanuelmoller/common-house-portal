@@ -156,12 +156,17 @@ export function InboxTriage({ initialItems, initialScanned = 0 }: Props) {
   }
 
   if (visible.length === 0) {
+    // B3 — Inbox zero celebration. Green dot + positive copy rewards the state.
     return (
-      <div className="max-w-[760px] flex items-center justify-between py-3 px-4 bg-white rounded-xl border border-[#E0E0D8]">
-        <p className="text-[12px] text-[#131218]/35">Inbox clear — nothing waiting on Jose.</p>
+      <div className="max-w-[760px] flex items-center justify-between py-3 px-4 bg-emerald-50/40 rounded-xl border border-emerald-200/60">
+        <div className="flex items-center gap-2.5">
+          <span className="w-2 h-2 rounded-full bg-emerald-500" />
+          <p className="text-[12px] font-semibold text-emerald-900">Inbox zero</p>
+          <p className="text-[11px] text-emerald-900/60">— nothing waiting on you.</p>
+        </div>
         <button
           onClick={refresh}
-          className="text-[9px] font-bold text-[#131218]/25 hover:text-[#131218] transition-colors uppercase tracking-widest"
+          className="text-[9px] font-bold text-emerald-700/60 hover:text-emerald-900 transition-colors uppercase tracking-widest"
         >
           Refresh
         </button>
@@ -272,7 +277,9 @@ export function InboxTriage({ initialItems, initialScanned = 0 }: Props) {
       <div className="flex items-center justify-between pt-1.5 px-1">
         <p className="text-[9px] text-[#131218]/25">
           {visible.length} flagged
-          {overflow && <span className="text-[#131218]/35"> · scroll for more</span>}
+          {overflow && (
+            <span className="text-[#131218]/55"> — {visible.length - MAX_VISIBLE_ROWS} more below (scroll)</span>
+          )}
           <span className="text-[#131218]/15"> · {scanned} scanned</span>
         </p>
         <button

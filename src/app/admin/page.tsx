@@ -76,12 +76,14 @@ function bestActivity(p: { lastUpdate: string | null; lastEvidenceDate?: string 
     .pop() ?? null;
 }
 
+// Q4 — "Hot" is a HEALTHY state (recent activity), so it should be green,
+// not red. Red is reserved for alarming signals (blockers, stale >30d).
 function warmthLabel(days: number | null): { label: string; dot: string; text: string } {
   if (days === null) return { label: "Dormant", dot: "bg-[#131218]/15", text: "text-[#131218]/35" };
-  if (days <= 3)  return { label: "Hot",     dot: "bg-red-500",    text: "text-red-600" };
-  if (days <= 10) return { label: "Warm",    dot: "bg-amber-400",  text: "text-amber-600" };
-  if (days <= 21) return { label: "Warm",    dot: "bg-amber-300",  text: "text-amber-500" };
-  if (days <= 35) return { label: "Cold",    dot: "bg-blue-400",   text: "text-blue-500" };
+  if (days <= 3)  return { label: "Hot",     dot: "bg-emerald-500",  text: "text-emerald-700" };
+  if (days <= 10) return { label: "Warm",    dot: "bg-[#c8f55a]",    text: "text-[#131218]/70" };
+  if (days <= 21) return { label: "Warm",    dot: "bg-amber-300",    text: "text-amber-600" };
+  if (days <= 35) return { label: "Cold",    dot: "bg-blue-400",     text: "text-blue-500" };
   return              { label: "Dormant", dot: "bg-[#131218]/15", text: "text-[#131218]/35" };
 }
 
@@ -1009,12 +1011,14 @@ export default async function AdminPage() {
                               )}
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
-                              {d.dueDate && (
-                                <span className={`text-[9px] font-bold ${dueBadgeClass}`}>
-                                  {new Date(d.dueDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
-                                </span>
-                              )}
-                              <span className="text-[9px] font-bold text-[#131218]/25">{d.decisionType}</span>
+                              {/* N4 — always reserve due-date column; show "no SLA" when missing */}
+                              <span className={`text-[9px] font-bold ${dueBadgeClass} w-14 text-right`}>
+                                {d.dueDate
+                                  ? new Date(d.dueDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })
+                                  : <span className="text-[#131218]/20 italic">no SLA</span>}
+                              </span>
+                              {/* N3 — move decision type to a dedicated column (right) so type pills align */}
+                              <span className="text-[9px] font-bold text-[#131218]/25 w-28 text-right truncate">{d.decisionType}</span>
                             </div>
                           </Link>
                         );
