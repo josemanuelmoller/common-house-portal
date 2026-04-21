@@ -20,3 +20,23 @@ body {
   font-family: 'Space Grotesk', sans-serif;
   -webkit-font-smoothing: antialiased;
 }
+
+/*
+ * Mobile readability floor.
+ *
+ * The Hall uses a dense typographic scale with arbitrary font sizes as low
+ * as 8px for labels, badges and timestamps. On desktop (≥640px) this is
+ * deliberate — it keeps the executive dashboard information-dense.
+ *
+ * On phones those same sizes fall below the WCAG / platform minimums and
+ * become unreadable. Rather than rewriting 137 text-[Npx] call sites, we
+ * raise the floor in one place: below sm (640px), any text-[8px] becomes
+ * 10px and any text-[9px] becomes 11px. Sizes ≥10px are left untouched
+ * because they already sit in the readable range on mobile.
+ */
+@media (max-width: 639px) {
+  .text-\[8px\]   { font-size: 10px; }
+  .text-\[8\.5px\] { font-size: 10.5px; }
+  .text-\[9px\]   { font-size: 11px; }
+  .text-\[9\.5px\] { font-size: 11.5px; }
+}
