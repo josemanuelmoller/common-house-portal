@@ -119,11 +119,23 @@ async function loadNext(): Promise<NextMeeting | null> {
 
     const startMs = new Date(r.event_start).getTime();
     const hoursAway = (startMs - Date.now()) / 3_600_000;
-    const talkingPoints = hoursAway < 12 ? await generateTalkingPoints(r.event_title, attFull, lastTouch) : null;
+    // F2 — normalize cryptic "Julia<>Cote" titles to "Julia Koskella & Cote"
+    // when attendees are matched. Pattern: `X<>Y` → "X & Y" readable form.
+    const cleanTitle = (raw: string): string => {
+      if (/^[\w.\s]+<>[\w.\s]+$/.test(raw)) {
+        const [a, b] = raw.split("<>").map(s => s.trim());
+        // If one of the parts matches an attendee's display name, use it directly.
+        const byName = attFull.find(at => at.name && a && at.name.toLowerCase().includes(a.toLowerCase()));
+        const lead = byName?.name ?? a;
+        return `${lead} · ${b}`;
+      }
+      return raw;
+    };
+    const talkingPoints = hoursAway < 12 ? await generateTalkingPoints(cleanTitle(r.event_title), attFull, lastTouch) : null;
 
     return {
       eventId:    r.event_id,
-      title:      r.event_title,
+      title:      cleanTitle(r.event_title),
       startMs,
       startLocal: new Date(r.event_start).toLocaleString("en-GB", {
         weekday: "short", hour: "2-digit", minute: "2-digit", day: "numeric", month: "short",

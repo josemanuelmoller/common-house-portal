@@ -102,28 +102,37 @@ export async function HallOrgsClassMix() {
       </div>
       <div className="px-5 py-4">
         {total === 0 ? (
-          <p className="text-[11px] text-[#131218]/35 text-center">No organisations registered yet.</p>
+          <div className="text-center">
+            <p className="text-[11px] text-[#131218]/35 mb-2">No organisations registered yet.</p>
+            <Link href="/admin/hall/organizations" className="text-[10px] font-bold tracking-wide uppercase text-[#131218] bg-[#c8f55a] hover:bg-[#b2ea3f] px-3 py-1.5 rounded-md transition-colors inline-block">
+              Add first organization →
+            </Link>
+          </div>
         ) : (
           <>
-            {/* Stacked bar */}
-            <div className="flex w-full h-2 rounded-full overflow-hidden bg-[#EFEFEA] mb-3">
+            {/* L2 — Stacked bar taller + ring so it's clearly visible (K1 learnings) */}
+            <div className="flex w-full h-3 rounded-full overflow-hidden bg-[#E0E0D8] ring-1 ring-[#E0E0D8] mb-3">
               {row.filter(r => r.count > 0).map(r => (
                 <div
                   key={r.label}
                   className={`h-full ${MIX_COLOR[r.label as typeof MIX_CLASSES[number]]}`}
-                  style={{ width: `${(r.count / total) * 100}%` }}
-                  title={`${r.label}: ${r.count}`}
+                  style={{ width: `${(r.count / total) * 100}%`, minWidth: "2px" }}
+                  title={`${r.label}: ${r.count} (${((r.count / total) * 100).toFixed(0)}%)`}
                 />
               ))}
             </div>
-            {/* Legend */}
+            {/* L1 — Legend entries are now links to filtered Organizations view */}
             <div className="grid grid-cols-2 gap-x-4 gap-y-1">
               {row.map(r => (
-                <div key={r.label} className="flex items-center gap-2 text-[10px] text-[#131218]/70">
+                <Link
+                  key={r.label}
+                  href={`/admin/hall/organizations?class=${encodeURIComponent(r.label)}`}
+                  className="flex items-center gap-2 text-[10px] text-[#131218]/70 hover:text-[#131218] transition-colors group"
+                >
                   <span className={`w-2 h-2 rounded-full ${MIX_COLOR[r.label as typeof MIX_CLASSES[number]]}`} />
-                  <span className="font-semibold">{r.label}</span>
-                  <span className="ml-auto text-[#131218]/50">{r.count}</span>
-                </div>
+                  <span className="font-semibold group-hover:underline decoration-dotted underline-offset-2">{r.label}</span>
+                  <span className="ml-auto tabular-nums text-[#131218]/50">{r.count}</span>
+                </Link>
               ))}
             </div>
           </>
