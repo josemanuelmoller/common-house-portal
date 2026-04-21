@@ -361,9 +361,19 @@ async function handleGet(req: NextRequest) {
   };
   const actionable = notIgnored.filter(c => !isCalendarNoise(c));
 
-  // Sort by days waiting descending before sending to Claude
-  actionable.sort((a, b) => b.daysWaiting - a.daysWaiting);
-  const top = actionable.slice(0, 15);
+  // Deadline-proximity boost. A thread asking "can we meet tomorrow?" is more
+  // urgent than an 8-day-old reply-pending thread, even though it's only been
+  // waiting 2 days. Without this boost the slice(0, 15) cap silently drops
+  // imminent-meeting threads before Haiku ever sees them.
+  const DEADLINE_HINT = /\b(tomorrow|tonight|today|mañana|hoy|esta noche|this (week|afternoon|evening|morning)|esta (semana|tarde|noche)|next (week|monday|tuesday|wednesday|thursday|friday)|la próxima semana|el (lunes|martes|miércoles|jueves|viernes) (que viene|próximo))\b/i;
+  const deadlineBoost = (c: typeof actionable[number]): number => {
+    const hay = `${c.subject} ${c.snippet}`;
+    return DEADLINE_HINT.test(hay) ? 100 : 0;
+  };
+
+  // Sort by (days waiting + deadline boost) descending before sending to Claude
+  actionable.sort((a, b) => (b.daysWaiting + deadlineBoost(b)) - (a.daysWaiting + deadlineBoost(a)));
+  const top = actionable.slice(0, 20);
 
   // Enrich with contact classes. One SELECT covers all 15 senders.
   const senderEmails = top.map(c => c.from);
