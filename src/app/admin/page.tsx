@@ -555,7 +555,16 @@ export default async function AdminPage() {
             {greeting}, <em className="font-[900] italic text-[#c8f55a] not-italic-fallback">{firstName}.</em>
           </h1>
           <p className="text-[12px] text-white/40 mt-2 leading-[1.5]">
-            What moves, what waits, and what needs your attention.
+            {(() => {
+              // B1 — dynamic subtitle replaces poetic copy with state at a glance.
+              const bits: string[] = [];
+              if (p1Decisions.length > 0) bits.push(`${p1Decisions.length} P1 decision${p1Decisions.length > 1 ? "s" : ""}`);
+              if (imminentDeadlines.length > 0 && p1Decisions.length === 0) bits.push(`${imminentDeadlines.length} deadline${imminentDeadlines.length > 1 ? "s" : ""} this week`);
+              const blocked = projects.filter(p => p.blockerCount > 0).length;
+              if (blocked > 0) bits.push(`${blocked} blocked project${blocked > 1 ? "s" : ""}`);
+              if (bits.length === 0) return "Queue is clear. Good window for deep work.";
+              return bits.join(" · ") + ".";
+            })()}
           </p>
         </div>
 
@@ -777,23 +786,35 @@ export default async function AdminPage() {
               </div>
             </Link>
 
-            {/* Tile 3 — OS activo */}
+            {/* Tile 3 — OS activity. B8 — only show non-zero metrics. */}
             <div className="bg-white rounded-xl border border-[#E0E0D8] px-3.5 py-2">
               <p className="text-[9px] font-bold text-[#131218]/25 uppercase tracking-widest mb-1">OS activity</p>
-              <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
-                {[
+              {(() => {
+                const metrics = [
                   { label: "Agent drafts",   count: agentDrafts.length,   activeColor: "text-[#131218]" },
                   { label: "CoS tasks",      count: cosTasks.length,      activeColor: "text-amber-500" },
                   { label: "Candidates",     count: candidates.length,    activeColor: "text-amber-400" },
                   { label: "Cold relations", count: coldOnly.length,      activeColor: "text-blue-500" },
                   { label: "Dormant",        count: dormantRelationships.length, activeColor: "text-[#131218]/40" },
-                ].map(({ label, count, activeColor }) => (
-                  <div key={label} className="flex items-center justify-between">
-                    <span className="text-[9.5px] text-[#131218]/50 truncate">{label}</span>
-                    <span className={`text-[10.5px] font-[800] ${count > 0 ? activeColor : "text-[#131218]/15"}`}>{count}</span>
+                ].filter(m => m.count > 0);
+
+                if (metrics.length === 0) {
+                  return (
+                    <p className="text-[10px] text-[#131218]/35 italic py-1">All queues clear.</p>
+                  );
+                }
+
+                return (
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
+                    {metrics.map(({ label, count, activeColor }) => (
+                      <div key={label} className="flex items-center justify-between">
+                        <span className="text-[9.5px] text-[#131218]/50 truncate">{label}</span>
+                        <span className={`text-[10.5px] font-[800] ${activeColor}`}>{count}</span>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                );
+              })()}
             </div>
           </div>
 
@@ -968,10 +989,14 @@ export default async function AdminPage() {
                           : daysToDue < 0 ? "text-red-600"
                           : daysToDue <= 3 ? "text-amber-600"
                           : "text-[#131218]/40";
+                        // N1 — differentiate P1/High/normal via icon glyph, not just color.
+                        const priorityIcon = isP1 ? "⬤" : isHigh ? "◐" : "○";
+                        const priorityLabel = isP1 ? "P1" : isHigh ? "P2" : "P3";
                         return (
-                          <Link key={d.id} href="/admin/decisions" className={`flex items-center gap-3 px-5 py-3 hover:bg-[#EFEFEA]/40 transition-colors border-b border-[#EFEFEA] last:border-0 ${isP1 ? "border-l-2 border-l-red-400" : ""}`}>
-                            <div className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 ${isP1 ? "bg-red-100" : isHigh ? "bg-amber-50" : "bg-[#EFEFEA]"}`}>
-                              <span className={`text-[9px] font-bold ${isP1 ? "text-red-600" : isHigh ? "text-amber-600" : "text-[#131218]/35"}`}>!</span>
+                          <Link key={d.id} href="/admin/decisions" className={`flex items-center gap-3 px-5 py-3 hover:bg-[#EFEFEA]/40 transition-colors border-b border-[#EFEFEA] last:border-0 ${isP1 ? "border-l-2 border-l-red-400" : isHigh ? "border-l-2 border-l-amber-300" : ""}`}>
+                            <div className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 ${isP1 ? "bg-red-100" : isHigh ? "bg-amber-50" : "bg-[#EFEFEA]"}`}
+                                 title={`${priorityLabel} priority`}>
+                              <span className={`text-[10px] font-bold ${isP1 ? "text-red-600" : isHigh ? "text-amber-600" : "text-[#131218]/35"}`}>{priorityIcon}</span>
                             </div>
                             <p className="text-[11.5px] font-medium text-[#131218] flex-1 min-w-0 truncate">{d.title}</p>
                             <div className="flex items-center gap-2 shrink-0">
@@ -1145,10 +1170,16 @@ export default async function AdminPage() {
                   )}
                 </div>
 
-                {/* Denser list — 4 columns, type baked into project cell */}
+                {/* Denser list — 4 columns, type baked into project cell.
+                    H4 — collapse dormant (>60d) rows into a single tail row. */}
+                {(() => {
+                  const dormantIds = new Set(projDormant.map(p => p.id));
+                  const actionableRows = ranked.filter(p => !dormantIds.has(p.id));
+                  const dormantRows = ranked.filter(p => dormantIds.has(p.id));
+                  return (
                 <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
                   <div className="divide-y divide-[#EFEFEA]">
-                    {ranked.map(p => {
+                    {actionableRows.map(p => {
                       const activityDate = bestActivity(p);
                       const days    = daysSince(activityDate);
                       const warmth  = warmthLabel(days);
@@ -1220,36 +1251,103 @@ export default async function AdminPage() {
                         <p className="text-[11px] text-[#131218]/25 font-medium">No active projects</p>
                       </div>
                     )}
+                    {/* H4 — collapsed dormant tail */}
+                    {dormantRows.length > 0 && (
+                      <details className="group">
+                        <summary className="list-none cursor-pointer px-5 py-2.5 flex items-center gap-3 hover:bg-[#EFEFEA]/40 transition-colors">
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#131218]/20 shrink-0" />
+                          <span className="text-[10px] font-semibold text-[#131218]/45">
+                            + {dormantRows.length} dormant
+                          </span>
+                          <span className="text-[9px] text-[#131218]/30 group-open:hidden">show →</span>
+                          <span className="text-[9px] text-[#131218]/30 hidden group-open:inline">hide ↑</span>
+                        </summary>
+                        <div className="divide-y divide-[#EFEFEA] border-t border-[#EFEFEA]">
+                          {dormantRows.map(p => {
+                            const typeLbl = projectTypeLabel(p.primaryWorkspace);
+                            const typeCls = projectTypeBadge(p.primaryWorkspace);
+                            const activityDate = bestActivity(p);
+                            const days = daysSince(activityDate);
+                            return (
+                              <Link key={p.id} href={`/admin/projects/${p.id}`}
+                                    className="grid grid-cols-[minmax(0,2.2fr)_minmax(0,1fr)_110px_110px_24px] gap-3 px-5 py-2.5 hover:bg-[#EFEFEA]/50 transition-colors items-center opacity-60">
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <p className="text-[11.5px] text-[#131218]/70 truncate">{p.name}</p>
+                                    {typeLbl !== "—" && (
+                                      <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${typeCls}`}>{typeLbl}</span>
+                                    )}
+                                  </div>
+                                </div>
+                                <div>
+                                  {p.stage && <span className={`inline-block text-[9px] font-bold px-2 py-0.5 rounded-full ${STAGE_COLORS[p.stage] ?? "bg-[#EFEFEA] text-[#131218]/50"}`}>{p.stage}</span>}
+                                </div>
+                                <div className="text-[10px] text-[#131218]/35">Dormant</div>
+                                <div className="text-right text-[10px] text-[#131218]/30">{days != null ? `${days}d silent` : "—"}</div>
+                                <div className="text-[#131218]/15 text-sm text-right">→</div>
+                              </Link>
+                            );
+                          })}
+                        </div>
+                      </details>
+                    )}
                   </div>
                 </div>
+                  );
+                })()}
               </div>
             );
           })()}
 
-          {/* ── 9. Opportunities Explorer — low-profile footprint ──────── */}
-          {(filteredOpps.ch.length > 0 || filteredOpps.portfolio.length > 0) && (
-            <details className="group">
-              <summary className="list-none cursor-pointer flex items-center gap-3 px-1 py-2 hover:opacity-80 transition-opacity">
-                <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Opportunities — explore</p>
-                <span className="text-[9px] font-bold bg-[#131218]/6 text-[#131218]/40 px-1.5 py-0.5 rounded-full">
-                  {filteredOpps.ch.length + filteredOpps.portfolio.length}
-                </span>
-                <div className="flex-1 h-px bg-[#E0E0D8]" />
-                <span className="text-[9px] font-bold text-[#131218]/30 uppercase tracking-widest whitespace-nowrap group-open:hidden">
-                  Show →
-                </span>
-                <span className="text-[9px] font-bold text-[#131218]/30 uppercase tracking-widest whitespace-nowrap hidden group-open:inline">
-                  Hide ↑
-                </span>
-              </summary>
-              <div className="mt-2">
-                <p className="text-[10px] text-[#131218]/30 mb-2 px-1">
-                  Low-pressure exploration. Nothing requires action — flag anything that looks worth pursuing.
-                </p>
-                <OpportunityExplorer ch={filteredOpps.ch} portfolio={filteredOpps.portfolio} />
-              </div>
-            </details>
-          )}
+          {/* ── 9. Opportunities Explorer — O1: inline when few, collapsed when many ─────── */}
+          {(() => {
+            const total = filteredOpps.ch.length + filteredOpps.portfolio.length;
+            if (total === 0) return null;
+            // O1 — if ≤3 opps, render inline so the section has visible content
+            // (fixes page-9-blank peak-end). Above 3, keep collapsed details.
+            const renderInline = total <= 3;
+
+            if (renderInline) {
+              return (
+                <div>
+                  <div className="flex items-center gap-3 px-1 py-2">
+                    <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Opportunities — explore</p>
+                    <span className="text-[9px] font-bold bg-[#131218]/6 text-[#131218]/40 px-1.5 py-0.5 rounded-full">
+                      {total}
+                    </span>
+                    <div className="flex-1 h-px bg-[#E0E0D8]" />
+                  </div>
+                  <div className="mt-2">
+                    <OpportunityExplorer ch={filteredOpps.ch} portfolio={filteredOpps.portfolio} />
+                  </div>
+                </div>
+              );
+            }
+
+            return (
+              <details className="group">
+                <summary className="list-none cursor-pointer flex items-center gap-3 px-1 py-2 hover:opacity-80 transition-opacity">
+                  <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Opportunities — explore</p>
+                  <span className="text-[9px] font-bold bg-[#131218]/6 text-[#131218]/40 px-1.5 py-0.5 rounded-full">
+                    {total}
+                  </span>
+                  <div className="flex-1 h-px bg-[#E0E0D8]" />
+                  <span className="text-[9px] font-bold text-[#131218]/30 uppercase tracking-widest whitespace-nowrap group-open:hidden">
+                    Show →
+                  </span>
+                  <span className="text-[9px] font-bold text-[#131218]/30 uppercase tracking-widest whitespace-nowrap hidden group-open:inline">
+                    Hide ↑
+                  </span>
+                </summary>
+                <div className="mt-2">
+                  <p className="text-[10px] text-[#131218]/30 mb-2 px-1">
+                    Low-pressure exploration. Nothing requires action — flag anything that looks worth pursuing.
+                  </p>
+                  <OpportunityExplorer ch={filteredOpps.ch} portfolio={filteredOpps.portfolio} />
+                </div>
+              </details>
+            );
+          })()}
 
           {/* ── 10. Ready to Publish ─────────────────────────────────── */}
           {readyContent.length > 0 && (

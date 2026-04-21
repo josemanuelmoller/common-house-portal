@@ -187,17 +187,19 @@ export function InboxTriage({ initialItems, initialScanned = 0 }: Props) {
             <span className={`mt-[5px] w-1.5 h-1.5 rounded-full shrink-0 ${LABEL_DOT[item.label]}`} />
 
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="text-[12px] font-semibold text-[#131218] truncate">
+              <div className="flex items-start gap-2">
+                {/* D2 — allow subject to wrap up to 2 lines so first ~80 chars
+                    always visible; ellipsis only fires on runaway subjects */}
+                <span className="text-[12px] font-semibold text-[#131218] line-clamp-2 leading-snug">
                   {item.subject}
                 </span>
                 {item.isUnread && (
-                  <span className="text-[8px] font-black uppercase tracking-widest text-[#131218]/30 bg-[#131218]/6 px-1.5 py-0.5 rounded-full shrink-0">
+                  <span className="text-[8px] font-black uppercase tracking-widest text-[#131218]/30 bg-[#131218]/6 px-1.5 py-0.5 rounded-full shrink-0 mt-[1px]">
                     Unread
                   </span>
                 )}
               </div>
-              <p className="text-[10.5px] text-[#131218]/45 truncate">
+              <p className="text-[10.5px] text-[#131218]/45 truncate mt-0.5">
                 <span className="font-semibold">{item.fromName}</span>
                 <span className="text-[#131218]/25"> · </span>
                 <span className={item.daysWaiting >= 5 ? "text-red-500 font-bold" : "text-[#131218]/35"}>
@@ -228,15 +230,15 @@ export function InboxTriage({ initialItems, initialScanned = 0 }: Props) {
                 Open →
               </a>
 
-              {/* SECONDARY — candidate creation, small icon-only */}
+              {/* SECONDARY — candidate creation, 24x24 hit area (D3) */}
               {created.has(item.threadId) ? (
-                <span className="text-[10px] font-bold text-green-600 w-5 text-center" title="Candidate created">✓</span>
+                <span className="text-[11px] font-bold text-emerald-600 w-6 h-6 flex items-center justify-center" title="Candidate created">✓</span>
               ) : failed.has(item.threadId) ? (
                 <button
                   onClick={() => createCandidate(item)}
                   disabled={creating === item.threadId}
                   title="Failed — click to retry"
-                  className="text-[11px] font-bold text-red-500 hover:text-red-700 transition-colors disabled:opacity-40 w-5 text-center"
+                  className="w-6 h-6 flex items-center justify-center rounded-md text-[11px] font-bold text-red-500 hover:text-red-700 hover:bg-red-50 transition-colors disabled:opacity-40"
                 >
                   {creating === item.threadId ? "…" : "↻"}
                 </button>
@@ -246,19 +248,19 @@ export function InboxTriage({ initialItems, initialScanned = 0 }: Props) {
                   disabled={creating === item.threadId}
                   title="Create opportunity candidate from this email"
                   aria-label="Create opportunity candidate"
-                  className="text-[12px] font-bold text-[#131218]/30 hover:text-amber-500 transition-colors disabled:opacity-40 w-5 text-center leading-none"
+                  className="w-6 h-6 flex items-center justify-center rounded-md text-[13px] font-bold text-[#131218]/30 hover:text-amber-600 hover:bg-amber-50 transition-colors disabled:opacity-40 leading-none"
                 >
                   {creating === item.threadId ? "…" : "+"}
                 </button>
               )}
 
-              {/* TERTIARY — quiet dismiss */}
+              {/* TERTIARY — quiet dismiss, 24x24 hit area (D3) */}
               <button
                 onClick={() => ignoreItem(item)}
                 disabled={ignoring === item.threadId}
                 title="Ignore this thread — won't resurface"
                 aria-label="Ignore"
-                className="text-[11px] text-[#131218]/25 hover:text-[#131218]/70 transition-colors disabled:opacity-40 w-5 text-center leading-none"
+                className="w-6 h-6 flex items-center justify-center rounded-md text-[12px] text-[#131218]/25 hover:text-[#131218]/80 hover:bg-[#EFEFEA] transition-colors disabled:opacity-40 leading-none"
               >
                 {ignoring === item.threadId ? "…" : "×"}
               </button>
