@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { requireAdmin } from "@/lib/require-admin";
+import { adminGuardApi } from "@/lib/require-admin";
 import { notion, DB } from "@/lib/notion";
 import { classifyFile } from "../classify";
 
@@ -14,7 +14,8 @@ function getSupabase() {
 // POST — after direct browser→Supabase upload, create signed read URLs + Notion Data Room records
 // Body: { projectName, orgId?, uploads: Array<{ name, storagePath }> }
 export async function POST(req: NextRequest) {
-  await requireAdmin();
+  const guard = await adminGuardApi();
+  if (guard) return guard;
 
   const { projectName, projectId, orgId, uploads } = await req.json() as {
     projectName: string;

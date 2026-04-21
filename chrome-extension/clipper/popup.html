@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Clip to Common House</title>
+  <style>
+    :root {
+      --bg: #0f0f10;
+      --fg: #f5f5f3;
+      --muted: #9a9a97;
+      --card: #1a1a1c;
+      --border: #2a2a2d;
+      --accent: #c7f464;
+      --accent-fg: #0f0f10;
+      --danger: #f87171;
+    }
+    html, body { margin: 0; padding: 0; }
+    body {
+      width: 360px;
+      font-family: -apple-system, BlinkMacSystemFont, "Inter", Segoe UI, sans-serif;
+      background: var(--bg);
+      color: var(--fg);
+      font-size: 13px;
+    }
+    .wrap { padding: 14px; }
+    h1 {
+      font-size: 13px;
+      font-weight: 600;
+      margin: 0 0 10px 0;
+      letter-spacing: 0.2px;
+    }
+    .meta {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 10px;
+      margin-bottom: 10px;
+    }
+    .meta .title { font-weight: 500; margin-bottom: 2px; word-break: break-word; }
+    .meta .url { color: var(--muted); font-size: 11px; word-break: break-all; }
+    label {
+      display: block;
+      font-size: 11px;
+      color: var(--muted);
+      margin: 8px 0 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+    textarea {
+      width: 100%;
+      box-sizing: border-box;
+      background: var(--card);
+      color: var(--fg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px;
+      font-family: inherit;
+      font-size: 12px;
+      resize: vertical;
+    }
+    textarea#selection { min-height: 70px; }
+    textarea#notes { min-height: 50px; }
+    .row { display: flex; gap: 8px; margin-top: 10px; }
+    button {
+      flex: 1;
+      padding: 8px 12px;
+      border: none;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    button.primary { background: var(--accent); color: var(--accent-fg); }
+    button.primary:disabled { opacity: 0.5; cursor: not-allowed; }
+    button.secondary { background: var(--card); color: var(--fg); border: 1px solid var(--border); }
+    .status {
+      margin-top: 10px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      font-size: 12px;
+      display: none;
+    }
+    .status.ok { background: rgba(199, 244, 100, 0.12); color: var(--accent); border: 1px solid rgba(199, 244, 100, 0.3); display: block; }
+    .status.err { background: rgba(248, 113, 113, 0.12); color: var(--danger); border: 1px solid rgba(248, 113, 113, 0.3); display: block; }
+    .settings-link {
+      display: block;
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 11px;
+      text-decoration: none;
+      text-align: right;
+    }
+    .settings-link:hover { color: var(--fg); }
+    .setup-notice {
+      background: rgba(248, 113, 113, 0.08);
+      border: 1px solid rgba(248, 113, 113, 0.3);
+      color: var(--danger);
+      border-radius: 8px;
+      padding: 10px;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Clip to Common House</h1>
+    <div id="setup" class="setup-notice" style="display:none">
+      Clipper is not configured yet. <a href="#" id="open-options" style="color:inherit;text-decoration:underline">Open settings</a> to set your token.
+    </div>
+    <div id="main" style="display:none">
+      <div class="meta">
+        <div class="title" id="page-title">—</div>
+        <div class="url" id="page-url">—</div>
+      </div>
+      <label for="selection">Selection (editable)</label>
+      <textarea id="selection" placeholder="Paste or edit the excerpt you want to save…"></textarea>
+      <label for="notes">Notes</label>
+      <textarea id="notes" placeholder="Why is this worth saving? (optional)"></textarea>
+      <div class="row">
+        <button class="primary" id="clip-btn">Clip</button>
+        <button class="secondary" id="cancel-btn">Close</button>
+      </div>
+      <div class="status" id="status"></div>
+      <a href="#" class="settings-link" id="settings-link">Settings</a>
+    </div>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>

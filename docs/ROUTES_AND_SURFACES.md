@@ -1,6 +1,6 @@
 # Routes and Surfaces
 
-Last reviewed: 2026-04-14
+Last reviewed: 2026-04-21
 
 Status tags used below:
 - **live** -- implemented, rendering real data, in active use
@@ -71,11 +71,11 @@ All routes require admin auth via `requireAdmin()`.
 | `/api/grants-data` | GET | Admin | Grant opportunities |
 | `/api/offers-data` | GET | Admin | Offers list |
 | `/api/decisions-queue` | GET | Admin | Decision items queue |
-| `/api/living-room` | GET | Public | Living Room main data |
-| `/api/living-room/milestones` | GET | Public | Living Room milestones |
-| `/api/living-room/people` | GET | Public | Living Room featured people |
-| `/api/living-room/signals` | GET | Public | Living Room signals |
-| `/api/living-room/themes` | GET | Public | Living Room themes |
+| `/api/living-room` | PATCH | Admin | Living Room curation writes (toggle shareToLivingRoom, etc.) |
+| `/api/living-room/milestones` | GET | Admin | All projects for admin curation (unfiltered) |
+| `/api/living-room/people` | GET | Admin | All people for admin curation (unfiltered) |
+| `/api/living-room/signals` | GET | Admin | All insight briefs for admin curation (unfiltered) |
+| `/api/living-room/themes` | GET | Admin | All knowledge assets for admin curation (unfiltered) |
 | `/api/meeting-detail/[id]` | GET | Auth | Meeting detail by ID |
 | `/api/content/[id]` | GET | Admin | Content item by ID |
 
@@ -101,7 +101,7 @@ All routes require admin auth via `requireAdmin()`.
 | `/api/garage-upload/finalize` | POST | Admin | Create Notion record after upload |
 | `/api/garage-ingest` | POST | Admin | Ingest uploaded garage document via Claude |
 | `/api/garage-investor-update` | POST | Admin | Generate investor update for startup |
-| `/api/upload` | POST | Admin | General file upload |
+| `/api/upload` | POST | Auth + project ownership | General file upload (any signed-in user with access to the target project) |
 
 ### Cron / AI pipeline routes (also callable manually)
 
@@ -120,8 +120,17 @@ All accept `Authorization: Bearer <CRON_SECRET>` or `x-agent-key: <CRON_SECRET>`
 | `/api/generate-daily-briefing` | Weekdays 07:30 UTC | AI daily brief → Daily Briefings [OS v2] |
 | `/api/competitive-monitor` | Mondays 07:00 UTC | Web search for competitive/sector signals |
 | `/api/grant-radar` | Biweekly Wednesdays 07:00 UTC | Web search for open grant calls |
+| `/api/sync-loops` | Weekdays 08:00 UTC | Sync Notion → Supabase (action loops) |
+| `/api/sync-opportunities` | Weekdays 09:00 UTC | Sync Notion → Supabase (opportunities) |
+| `/api/sync-projects` | Weekdays 10:00 UTC | Sync Notion → Supabase (projects) |
+| `/api/sync-evidence` | Weekdays 07:30 UTC | Sync Notion → Supabase (evidence) |
+| `/api/sync-sources` | Weekdays 11:00 UTC | Sync Notion → Supabase (sources) |
+| `/api/sync-organizations` | Weekdays 12:00 UTC | Sync Notion → Supabase (organizations) |
+| `/api/sync-people` | Weekdays 12:00 UTC | Sync Notion → Supabase (people) |
+| `/api/cron/observe-calendar` | Daily 06:00 UTC | Observe Google Calendar for suggested time blocks |
+| `/api/plan/compute-kpi` | Daily 03:15 UTC | Compute KPI rollups for `strategic_objectives` |
 
-12 cron entries are defined in `vercel.json`. `ingest-meetings` accounts for two entries (18:00 and 00:00 UTC).
+20 cron entries are defined in `vercel.json`. `ingest-meetings` accounts for two entries (18:00 and 00:00 UTC).
 
 ### Skill runner routes (user-triggered Claude tasks)
 
@@ -141,8 +150,17 @@ All accept `Authorization: Bearer <CRON_SECRET>` or `x-agent-key: <CRON_SECRET>`
 | `/api/create-project-folders` | POST | Admin | Create Google Drive folder structure |
 | `/api/setup-all-drives` | POST | Admin | Setup Drive folders for all projects |
 | `/api/seed-grant-sources` | POST | Admin | Seed Grant Sources database |
-| `/api/ingest-library` | POST | Super-admin | Ingest document into Library (Supabase + Notion) |
-| `/api/inbox-triage` | POST | Admin | Triage inbox items |
+| `/api/ingest-library` | POST, DELETE | Admin (super-admin intent; gate not yet differentiated) | Ingest document into Library (Supabase + Notion) |
+| `/api/inbox-triage` | GET | Admin or Cron | Triage inbox items |
+| `/api/scan-opportunity-candidates` | POST | Admin or Cron | Scan recent evidence for opportunity candidates |
+
+### Strategic Plan routes
+
+| Route | Method | Auth | Description |
+|---|---|---|---|
+| `/api/plan/objectives` | GET, POST | Admin | List or create `strategic_objectives` |
+| `/api/plan/objectives/[id]` | GET, PATCH, DELETE | Admin | Read, update, or soft-delete a strategic objective |
+| `/api/plan/compute-kpi` | POST, GET | Cron/Admin | Compute KPI rollups (also scheduled — see cron table) |
 
 ---
 

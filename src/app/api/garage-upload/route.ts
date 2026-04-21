@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { requireAdmin } from "@/lib/require-admin";
+import { adminGuardApi } from "@/lib/require-admin";
 import { notion, DB } from "@/lib/notion";
 
 function getSupabase() {
@@ -14,7 +14,8 @@ function getSupabase() {
 // Body: { projectId, files: Array<{ name: string; type: string }> }
 // Returns: { results: Array<{ name, storagePath, signedUrl }> }
 export async function POST(req: NextRequest) {
-  await requireAdmin();
+  const guard = await adminGuardApi();
+  if (guard) return guard;
 
   const { projectId, files } = await req.json() as {
     projectId: string;
@@ -47,7 +48,8 @@ export async function POST(req: NextRequest) {
 
 // DELETE — remove a specific Data Room item (Notion record + Supabase file)
 export async function DELETE(req: NextRequest) {
-  await requireAdmin();
+  const guard = await adminGuardApi();
+  if (guard) return guard;
 
   const { notionId, storagePath } = await req.json();
   const errs: string[] = [];
