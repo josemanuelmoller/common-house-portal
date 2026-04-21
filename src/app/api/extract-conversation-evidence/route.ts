@@ -154,6 +154,12 @@ async function extractConversationEvidence(src: WaSource): Promise<EvidenceItem[
 Conversation title: ${src.title}
 Date: ${src.source_date ?? "unknown"}
 
+Language rule (IMPORTANT):
+- Write "title", "statement", and "excerpt" in the SAME language as the conversation. If the chat is in Spanish, return Spanish. If English, English. If mixed, use whichever language dominates. Do not translate.
+- Preserve original nuance, chilenismos, and any informal phrasing the participants used — the evidence should feel like a note the participants themselves would have written.
+- "excerpt" should be a direct quote from the messages whenever possible.
+- "type", "affected_theme", "geography", "topics", "confidence" stay in English (they are controlled vocabularies).
+
 Rules:
 - Each record is ONE atomic fact: a decision made, commitment assumed, blocker raised, outcome achieved, requirement defined, risk flagged, or process step agreed.
 - Skip casual chat, greetings, emoji-only messages, scheduling unless the scheduled topic itself is substantive.
@@ -167,10 +173,10 @@ ${content}
 Return ONLY a JSON array (no markdown, no code fences):
 [
   {
-    "title":          "Short factual title, max 80 chars",
+    "title":          "Short factual title, max 80 chars, in the conversation language",
     "type":           "Decision|Blocker|Outcome|Requirement|Dependency|Risk|Process Step",
-    "statement":      "1–2 sentences, factual, cite who said/decided/committed",
-    "excerpt":        "Most relevant direct quote from the conversation, max 120 chars",
+    "statement":      "1–2 sentences, factual, cite who said/decided/committed, in the conversation language",
+    "excerpt":        "Most relevant direct quote from the conversation (verbatim), max 120 chars",
     "confidence":     "High|Medium|Low",
     "affected_theme": "Operations|Tech|Commercial|Legal|Procurement|Communications|Budget|Rollout|Metrics|Stakeholders|Governance",
     "geography":      "UK|EU|LATAM|North America|Africa / MENA|Asia|Global",
