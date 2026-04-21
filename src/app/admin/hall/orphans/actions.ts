@@ -24,13 +24,33 @@ export async function approveOrphanCandidate(candidateId: string) {
   if (candErr || !cand) throw new Error("Candidate not found");
   if (cand.status !== "pending") return;
 
+  // Authoritative backfill — approve wins over any existing value.
   const { error: updErr } = await sb
     .from("conversation_messages")
     .update({ sender_person_id: cand.candidate_person_id })
     .eq("source_id", cand.source_id)
-    .ilike("sender_name", cand.sender_name)
-    .is("sender_person_id", null);
+    .ilike("sender_name", cand.sender_name);
   if (updErr) throw new Error("Backfill failed: " + updErr.message);
+
+  // Learn — add the sender_name variant to the person's aliases so the next
+  // clipper clip resolves at higher confidence and skips candidate filing.
+  try {
+    const { data: personRow } = await sb
+      .from("people")
+      .select("aliases")
+      .eq("id", cand.candidate_person_id)
+      .maybeSingle();
+    const currentAliases = ((personRow?.aliases ?? []) as string[]).map(a => a.toLowerCase());
+    const newAlias = cand.sender_name.toLowerCase();
+    if (!currentAliases.includes(newAlias)) {
+      await sb
+        .from("people")
+        .update({ aliases: [...currentAliases, newAlias] })
+        .eq("id", cand.candidate_person_id);
+    }
+  } catch (e) {
+    console.warn("[orphans] alias learn failed — approval still applied:", e);
+  }
 
   await sb
     .from("orphan_match_candidates")
@@ -47,6 +67,25 @@ export async function approveOrphanCandidate(candidateId: string) {
 export async function rejectOrphanCandidate(candidateId: string) {
   const user = await requireAdminAction();
   const sb = getSupabase();
+
+  const { data: cand } = await sb
+    .from("orphan_match_candidates")
+    .select("source_id, sender_name, candidate_person_id")
+    .eq("id", candidateId)
+    .maybeSingle();
+
+  // Revert any optimistic link the clipper wrote to the person this candidate
+  // suggested. Only touch rows where person_id = the candidate's suggestion
+  // (don't clobber legit links to a different person).
+  if (cand) {
+    await sb
+      .from("conversation_messages")
+      .update({ sender_person_id: null })
+      .eq("source_id", cand.source_id)
+      .ilike("sender_name", cand.sender_name)
+      .eq("sender_person_id", cand.candidate_person_id);
+  }
+
   await sb
     .from("orphan_match_candidates")
     .update({

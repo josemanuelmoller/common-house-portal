@@ -44,6 +44,8 @@ Nothing committed yet for the next sprint. Pick from Ideas → Active.
 | C-8 | **Audio transcription** — Whisper on voice memos detected in WA clips | 6-10h | High (voice memos are ~30% of WA) | Med |
 | C-9 | **Orphan re-matching** — re-process sender_person_id nulls via orphan_match_candidates + admin review UI | 3-4h | High (diagnosed: 644/644 orphans today due to full_name vs name column bug) | **Active** |
 | C-10 | **Explicit mode indicator in popup** — top badge "WhatsApp mode" / "Article mode" / "Document mode". Today the mode is implicit from tab URL and UX differs silently. Make it visible. | 1-2h | Med (clarity) | Low |
+| C-11 | **Configurable auto-accept threshold** — settings option "Auto-accept matches ≥ X%". Today 0.8 is hardcoded. Some users may want 0.7 (more aggressive) or 0.9 (more conservative). Persist in chrome.storage or admin settings. | 30min | Low | Low |
+| C-12 | **Bulk approve-all on orphan review page** — when a re-scan produces 50+ candidates, one-click "approve every candidate at or above X% confidence" saves time. | 45min | Med | Med |
 
 ## Ideas — intelligence on top of conversation_messages
 

@@ -368,10 +368,12 @@ async function handleWhatsappClip(body: ClipBody) {
     const rows: Array<Record<string, unknown>> = [];
     for (const [senderKey, info] of bySender) {
       if (!senderKey || info.match.is_self) continue;
-      // Only record candidates that have a candidate person OR a failed match
-      // we want the admin to know about. Confidence 1 = definitely right,
-      // skip. Confidence 0 with no candidate = nothing to suggest yet.
-      if (info.match.confidence >= 1) continue;
+      // Only file candidates for LOW-to-MEDIUM confidence matches (0.6-0.8).
+      // Higher confidence (email=1.0, exact_full_name=0.95, alias=0.85) are
+      // trusted → no admin review needed. On approve, the system adds the
+      // sender_name as an alias so the next clip resolves at higher confidence
+      // and skips this path entirely (the "learning" loop).
+      if (info.match.confidence >= 0.8) continue;
       if (!info.match.person_id) continue;
       rows.push({
         source_id:           sourceId,

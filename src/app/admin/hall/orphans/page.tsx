@@ -108,9 +108,11 @@ export default async function OrphansPage() {
                 Orphan <em className="font-black italic text-[#c8f55a]">matches</em>
               </h1>
               <p className="text-sm text-white/40 mt-3 max-w-2xl">
-                Messages where the clipper couldn&apos;t link the sender to a Person
-                at write time. A re-scan suggests matches; you approve the
-                backfill for each one.
+                Medium-confidence sender matches that the clipper surfaced for
+                your review. <strong className="text-white/70">Approving teaches
+                the system</strong> — the sender name is added as an alias on
+                the Person, so the next clip resolves at higher confidence and
+                skips this review entirely.
               </p>
             </div>
             <div className="flex items-center gap-5 pb-1">
@@ -126,17 +128,21 @@ export default async function OrphansPage() {
         </header>
 
         <div className="px-12 py-9 max-w-5xl space-y-6">
-          <div className="flex items-center justify-between">
-            <p className="text-[11px] text-[#131218]/60 leading-snug max-w-3xl">
-              Re-scan walks through every conversation_messages row with{" "}
-              <code className="text-[10px] bg-white px-1 rounded border border-[#E0E0D8]">sender_person_id = null</code>,{" "}
-              runs the current person-resolver, and files any new candidates here.
-              Safe to re-run.
-            </p>
+          <div className="flex items-start justify-between gap-6">
+            <div className="flex-1">
+              <p className="text-[11px] text-[#131218]/60 leading-snug max-w-3xl">
+                <strong>Approve</strong> = apply the match + save <em>{`"sender name"`}</em>{" "}
+                as an alias on the Person. Next clip auto-links at higher confidence.{" "}
+                <strong>Reject</strong> = revert the optimistic link + don&apos;t learn.{" "}
+                <strong>Re-scan</strong> scans all{" "}
+                <code className="text-[10px] bg-white px-1 rounded border border-[#E0E0D8]">sender_person_id=null</code>{" "}
+                rows and files new candidates.
+              </p>
+            </div>
             <form action={rescanAction}>
               <button
                 type="submit"
-                className="bg-[#131218] text-white text-[11px] font-bold uppercase tracking-widest px-4 py-2 rounded-lg hover:bg-[#2a2a2d] transition-colors"
+                className="bg-[#131218] text-white text-[11px] font-bold uppercase tracking-widest px-4 py-2 rounded-lg hover:bg-[#2a2a2d] transition-colors whitespace-nowrap"
               >
                 Re-scan orphans
               </button>
