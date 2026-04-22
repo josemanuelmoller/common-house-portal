@@ -86,6 +86,7 @@ async function doPOST(req: NextRequest) {
 
   let body: {
     email?: string;
+    person_id?: string;
     relationship_class?: string | null;
     relationship_classes?: string[] | null;
     action?: "dismiss" | "undismiss" | "tag";
@@ -93,10 +94,26 @@ async function doPOST(req: NextRequest) {
   };
   try { body = await req.json(); } catch { return NextResponse.json({ error: "Invalid JSON" }, { status: 400 }); }
 
-  const email = (body.email ?? "").trim().toLowerCase();
-  if (!email || !/.+@.+\..+/.test(email)) {
-    return NextResponse.json({ error: "valid email required" }, { status: 400 });
+  // Accept either email or person_id as identifier — WhatsApp-first contacts
+  // without an email need to be addressable by id.
+  const email    = (body.email ?? "").trim().toLowerCase();
+  const personId = (body.person_id ?? "").trim();
+  const hasEmail = !!email && /.+@.+\..+/.test(email);
+  const hasId    = !!personId;
+  if (!hasEmail && !hasId) {
+    return NextResponse.json({ error: "email or person_id required" }, { status: 400 });
   }
+
+  // Resolve to a unique row via whichever key was provided.
+  const sbLookup = getSupabaseServerClient();
+  const lookupQ  = hasEmail
+    ? sbLookup.from("people").select("id, email").eq("email", email).maybeSingle()
+    : sbLookup.from("people").select("id, email").eq("id", personId).maybeSingle();
+  const { data: found } = await lookupQ;
+  if (!found) {
+    return NextResponse.json({ error: "person not found" }, { status: 404 });
+  }
+  const rowId = (found as { id: string; email: string | null }).id;
 
   // ── Dismiss / undismiss shortcut path — no classes needed ─────────────────
   if (body.action === "dismiss" || body.action === "undismiss") {
@@ -111,8 +128,8 @@ async function doPOST(req: NextRequest) {
         dismissed_reason: isDismiss ? (body.reason ?? null) : null,
         updated_at:       nowIso,
       })
-      .eq("email", email)
-      .select("email, dismissed_at, dismissed_by, dismissed_reason")
+      .eq("id", rowId)
+      .select("id, email, dismissed_at, dismissed_by, dismissed_reason")
       .maybeSingle();
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ ok: true, action: body.action, contact: data });
@@ -139,20 +156,22 @@ async function doPOST(req: NextRequest) {
   const sb = getSupabaseServerClient();
 
   // Resolve the Google resourceName: (1) check cache, (2) search People API.
+  // Only possible when we have an email — WA-first contacts skip Google sync.
   let resourceName: string | null = null;
   let displayNameCached: string | null = null;
   try {
     const { data: existing } = await sb
       .from("people")
-      .select("google_resource_name, display_name")
-      .eq("email", email)
+      .select("google_resource_name, display_name, email")
+      .eq("id", rowId)
       .maybeSingle();
-    const row = existing as { google_resource_name: string | null; display_name: string | null } | null;
+    const row = existing as { google_resource_name: string | null; display_name: string | null; email: string | null } | null;
     resourceName = row?.google_resource_name ?? null;
     displayNameCached = row?.display_name ?? null;
-    if (!resourceName) {
-      const resolved = await lookupByEmails([email]);
-      const hit = resolved.get(email);
+    const addressableEmail = row?.email ?? (hasEmail ? email : null);
+    if (!resourceName && addressableEmail) {
+      const resolved = await lookupByEmails([addressableEmail]);
+      const hit = resolved.get(addressableEmail);
       resourceName = hit?.resourceName ?? null;
       if (hit?.displayName) displayNameCached = hit.displayName;
     }
@@ -171,8 +190,8 @@ async function doPOST(req: NextRequest) {
     = "skipped";
   let googleError: string | undefined;
 
-  if (!resourceName && classes.length > 0) {
-    // Path A
+  if (!resourceName && classes.length > 0 && hasEmail) {
+    // Path A — only possible if we have an email to create a Google contact from
     const created = await createContactFromEmail(email, displayNameCached);
     if (created.ok) { resourceName = created.resourceName; googleSyncOutcome = "created"; }
     else { googleError = created.reason; googleSyncOutcome = "failed"; }
@@ -203,23 +222,21 @@ async function doPOST(req: NextRequest) {
   }
 
   try {
+    // Update by id so the email-null path works. The row already exists
+    // because we resolved rowId earlier.
     const { data, error } = await sb
       .from("people")
-      .upsert(
-        {
-          email,
-          relationship_classes:  classes,
-          classified_at:         classes.length > 0 ? nowIso : null,
-          classified_by:         classes.length > 0 ? actor  : null,
-          google_resource_name:  resourceName,
-          // Any successful write path (synced / created / promoted) counts.
-          google_last_write_at:  ["synced", "created", "promoted"].includes(googleSyncOutcome) ? nowIso : null,
-          google_synced_at:      ["synced", "created", "promoted"].includes(googleSyncOutcome) ? nowIso : null,
-          updated_at:            nowIso,
-        },
-        { onConflict: "email" },
-      )
-      .select("email, relationship_class, relationship_classes, classified_at, classified_by, google_resource_name, google_last_write_at")
+      .update({
+        relationship_classes:  classes,
+        classified_at:         classes.length > 0 ? nowIso : null,
+        classified_by:         classes.length > 0 ? actor  : null,
+        google_resource_name:  resourceName,
+        google_last_write_at:  ["synced", "created", "promoted"].includes(googleSyncOutcome) ? nowIso : null,
+        google_synced_at:      ["synced", "created", "promoted"].includes(googleSyncOutcome) ? nowIso : null,
+        updated_at:            nowIso,
+      })
+      .eq("id", rowId)
+      .select("id, email, relationship_class, relationship_classes, classified_at, classified_by, google_resource_name, google_last_write_at")
       .maybeSingle();
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({

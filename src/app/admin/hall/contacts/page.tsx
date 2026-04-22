@@ -9,11 +9,14 @@ import { HallContactsAutoRefresh } from "@/components/HallContactsAutoRefresh";
 import { HallContactsCollapsibleList } from "@/components/HallContactsCollapsibleList";
 import { HallContactsDismissedToggle } from "@/components/HallContactsDismissedToggle";
 import { HallContactsByOrg } from "@/components/HallContactsByOrg";
+import { HallContactsSearchable, type SearchableContact } from "@/components/HallContactsSearchable";
 
 export const dynamic = "force-dynamic";
 
 type ContactRow = {
-  email: string;
+  id: string;
+  email: string | null;
+  full_name: string | null;
   display_name: string | null;
   relationship_class:   string | null;
   relationship_classes: string[] | null;
@@ -37,17 +40,20 @@ type ContactRow = {
 
 async function getContacts(): Promise<ContactRow[]> {
   const sb = getSupabaseServerClient();
+  // Contacts can originate from 4 channels now (Calendar, Gmail, Fireflies,
+  // WhatsApp). WA-first contacts have no email and aren't observed via
+  // calendar, so the last_seen_at window is widened and the email-is-null
+  // rows are allowed through.
   const { data } = await sb
     .from("people")
-    .select("email, display_name, relationship_class, relationship_classes, auto_suggested, last_meeting_title, meeting_count, email_thread_count, transcript_count, last_seen_at, first_seen_at, classified_at, classified_by, google_resource_name, google_source, google_labels, google_synced_at, google_last_write_at, dismissed_at, dismissed_reason")
-    .gte("last_seen_at", new Date(Date.now() - 120 * 86400_000).toISOString())
+    .select("id, email, full_name, display_name, relationship_class, relationship_classes, auto_suggested, last_meeting_title, meeting_count, email_thread_count, transcript_count, last_seen_at, first_seen_at, classified_at, classified_by, google_resource_name, google_source, google_labels, google_synced_at, google_last_write_at, dismissed_at, dismissed_reason")
+    .gte("last_seen_at", new Date(Date.now() - 180 * 86400_000).toISOString())
     .order("meeting_count", { ascending: false })
     .order("last_seen_at", { ascending: false })
-    .limit(400);
+    .limit(800);
   const rows = (data ?? []) as ContactRow[];
-  // Filter out Jose's own identities — he should never see himself as a contact.
   const self = await getSelfEmails();
-  return rows.filter(r => !self.has(r.email));
+  return rows.filter(r => !(r.email && self.has(r.email)));
 }
 
 // Aggregate WhatsApp message counts by sender_name (lowercased).
@@ -240,14 +246,19 @@ export default async function HallContactsPage({ searchParams }: PageProps) {
     const wa_count  = waCountFor(c.display_name, waCounts);
     const intensity = intensityOf(c, wa_count);
     const total_touches = (c.meeting_count ?? 0) + (c.email_thread_count ?? 0) + (c.transcript_count ?? 0);
-    const suggestion = orgSuggestions.get(c.email) ?? null;
+    const suggestion = c.email ? (orgSuggestions.get(c.email) ?? null) : null;
     return { ...c, wa_count, intensity, total_touches, suggestion };
   });
 
   const browse = [...enriched].filter(c => !c.dismissed_at).sort((a, b) => b.intensity - a.intensity);
 
-  const active     = contacts.filter(c => !c.dismissed_at);
-  const dismissed  = contacts.filter(c =>  c.dismissed_at);
+  // Classify mode surfaces render HallContactRow, which requires email: string.
+  // WA-only contacts (email is null) are intentionally excluded here — they
+  // show up in Browse mode's dedicated "WhatsApp-only" section instead.
+  type ContactRowWithEmail = ContactRow & { email: string };
+  const hasEmail = (c: ContactRow): c is ContactRowWithEmail => !!c.email;
+  const active: ContactRowWithEmail[]    = contacts.filter((c): c is ContactRowWithEmail => !c.dismissed_at && hasEmail(c));
+  const dismissed: ContactRowWithEmail[] = contacts.filter((c): c is ContactRowWithEmail =>  !!c.dismissed_at && hasEmail(c));
 
   // Shape the rollup for the client component. Each org's contacts are
   // converted to the HallContactRow props shape so the existing editor
@@ -373,7 +384,29 @@ export default async function HallContactsPage({ searchParams }: PageProps) {
             <HallContactsAutoRefresh />
           </div>
 
-          {mode === "browse" && <BrowseView contacts={browse} />}
+          {mode === "browse" && (
+            <HallContactsSearchable
+              contacts={browse.map<SearchableContact>(c => ({
+                id:                   c.id,
+                email:                c.email,
+                full_name:            c.full_name,
+                display_name:         c.display_name,
+                relationship_classes: c.relationship_classes,
+                auto_suggested:       c.auto_suggested,
+                meeting_count:        c.meeting_count,
+                email_thread_count:   c.email_thread_count,
+                transcript_count:     c.transcript_count,
+                wa_count:             c.wa_count,
+                total_touches:        c.total_touches,
+                intensity:            c.intensity,
+                last_seen_at:         c.last_seen_at,
+                last_meeting_title:   c.last_meeting_title,
+                suggestion:           c.suggestion
+                  ? { domain: c.suggestion.domain, orgName: c.suggestion.orgName ?? null }
+                  : null,
+              }))}
+            />
+          )}
 
           {mode === "classify" && <>
 
@@ -506,7 +539,7 @@ function ContactCard({
 
   return (
     <Link
-      href={`/admin/hall/contacts/${encodeURIComponent(contact.email)}`}
+      href={`/admin/hall/contacts/${encodeURIComponent(contact.email ?? contact.id)}`}
       prefetch={false}
       className="group bg-white rounded-2xl border border-[#E0E0D8] hover:border-[#131218]/30 hover:shadow-sm transition-all px-5 py-4"
     >
