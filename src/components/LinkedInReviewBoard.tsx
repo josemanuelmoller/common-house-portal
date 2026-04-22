@@ -16,6 +16,8 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { CollapsibleList } from "./CollapsibleList";
 
 type Row = {
   id:                   string;
@@ -58,7 +60,25 @@ export type LinkedInCoverage = {
   attempted:    number;   // agent has tried (enriched OR filed no_match)
 };
 
-export function LinkedInReviewBoard({ rows, coverage }: { rows: Row[]; coverage?: LinkedInCoverage }) {
+type NoMatchRow = {
+  id:                       string;
+  email:                    string | null;
+  full_name:                string | null;
+  display_name:             string | null;
+  relationship_classes:     string[] | null;
+  meeting_count:            number | null;
+  linkedin_last_attempt_at: string | null;
+};
+
+export function LinkedInReviewBoard({
+  rows,
+  noMatch = [],
+  coverage,
+}: {
+  rows:      Row[];
+  noMatch?:  NoMatchRow[];
+  coverage?: LinkedInCoverage;
+}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [running, setRunning] = useState(false);
@@ -199,8 +219,73 @@ export function LinkedInReviewBoard({ rows, coverage }: { rows: Row[]; coverage?
           </div>
         )}
       </section>
+
+      {/* No-match queue — agent tried but found nothing. Complete manually. */}
+      {noMatch.length > 0 && (
+        <section>
+          <div className="flex items-center gap-3 mb-3">
+            <h2 className="text-[11px] font-bold tracking-widest uppercase text-[#131218]/60">
+              No match found — complete manually
+            </h2>
+            <div className="flex-1 h-px bg-[#E0E0D8]" />
+            <span className="text-[10px] text-[#131218]/40 tabular-nums">{noMatch.length}</span>
+          </div>
+          <p className="text-[10.5px] text-[#131218]/50 mb-3 leading-snug">
+            The agent searched but couldn&apos;t confidently match these contacts to a LinkedIn profile — usually because the name is too generic, missing a surname, or the person has a weak public footprint. Click a row to open their profile, then use <em>Edit identity</em> to paste the LinkedIn URL yourself (it gets marked as manual — the agent won&apos;t overwrite it).
+          </p>
+          <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden divide-y divide-[#EFEFEA]">
+            <CollapsibleList
+              initialVisible={5}
+              moreLabel={noMatch.length - 5 === 1 ? "more contact" : "more contacts"}
+            >
+              {noMatch.map(c => {
+                const display = c.full_name ?? c.display_name ?? (c.email ?? "").split("@")[0] ?? "(no name)";
+                const classes = c.relationship_classes ?? [];
+                const attempt = c.linkedin_last_attempt_at;
+                return (
+                  <Link
+                    key={c.id}
+                    href={`/admin/hall/contacts/${encodeURIComponent(c.email ?? c.id)}`}
+                    prefetch={false}
+                    className="flex items-center gap-4 px-5 py-3 hover:bg-[#EFEFEA]/40 transition-colors"
+                  >
+                    <div className="w-8 h-8 rounded-full bg-[#131218] text-white flex items-center justify-center font-bold text-[11px] shrink-0">
+                      {display.slice(0, 1).toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[12.5px] font-semibold text-[#131218] truncate">{display}</p>
+                      <p className="text-[10.5px] text-[#131218]/45 mt-0.5 truncate">
+                        {c.email}
+                        {classes.length > 0 && <span className="ml-2">· {classes.join(", ")}</span>}
+                        {(c.meeting_count ?? 0) > 0 && <span className="ml-2">· 📅 {c.meeting_count}</span>}
+                      </p>
+                    </div>
+                    <span className="text-[10px] text-[#131218]/30 shrink-0">
+                      {attempt ? `tried ${timeAgoShort(attempt)}` : "—"}
+                    </span>
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-[#131218]/40">
+                      Open →
+                    </span>
+                  </Link>
+                );
+              })}
+            </CollapsibleList>
+          </div>
+        </section>
+      )}
     </div>
   );
+}
+
+function timeAgoShort(iso: string): string {
+  const ms = Date.now() - new Date(iso).getTime();
+  const d = Math.floor(ms / 86400_000);
+  if (d === 0) return "today";
+  if (d === 1) return "1d ago";
+  if (d < 30) return `${d}d ago`;
+  const mo = Math.floor(d / 30);
+  if (mo < 12) return `${mo}mo ago`;
+  return `${Math.floor(mo / 12)}y ago`;
 }
 
 function ReviewRow({ row }: { row: Row }) {

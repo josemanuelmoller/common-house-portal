@@ -24,6 +24,16 @@ type Row = {
   function_area:        string | null;
 };
 
+type NoMatchRow = {
+  id:                       string;
+  email:                    string | null;
+  full_name:                string | null;
+  display_name:             string | null;
+  relationship_classes:     string[] | null;
+  meeting_count:            number | null;
+  linkedin_last_attempt_at: string | null;
+};
+
 export async function LinkedInReviewSection() {
   const sb = getSupabaseServerClient();
 
@@ -33,6 +43,19 @@ export async function LinkedInReviewSection() {
     .select("id, email, full_name, display_name, linkedin, linkedin_confidence, linkedin_source, linkedin_enriched_at, relationship_classes, meeting_count, job_title, role_category, function_area")
     .eq("linkedin_needs_review", true)
     .order("linkedin_confidence", { ascending: false })
+    .limit(200);
+
+  // No-match queue — agent tried but found nothing. Fill manually via the
+  // contact profile's Edit identity. Prioritised same way as the enrichment
+  // queue (tagged VIP/Investor/Client/Partner first, then by meeting_count).
+  const noMatchRes = await sb
+    .from("people")
+    .select("id, email, full_name, display_name, relationship_classes, meeting_count, linkedin_last_attempt_at")
+    .not("email", "is", null)
+    .is("dismissed_at", null)
+    .is("linkedin", null)
+    .not("linkedin_last_attempt_at", "is", null)
+    .order("meeting_count", { ascending: false })
     .limit(200);
 
   // Coverage stats — addressable = has email + not dismissed.
@@ -72,5 +95,11 @@ export async function LinkedInReviewSection() {
     attempted:     attemptedRes.count     ?? 0,
   };
 
-  return <LinkedInReviewBoard rows={(reviewRes.data ?? []) as Row[]} coverage={coverage} />;
+  return (
+    <LinkedInReviewBoard
+      rows={(reviewRes.data ?? []) as Row[]}
+      noMatch={(noMatchRes.data ?? []) as NoMatchRow[]}
+      coverage={coverage}
+    />
+  );
 }
