@@ -17,56 +17,208 @@ function daysSince(iso: string | null): number | null {
   return Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
 }
 
-function TreeRow({ node, depth = 0 }: { node: TreeNode; depth?: number }) {
-  const isLeaf = node.children.length === 0;
-  const dEvidence = daysSince(node.last_evidence_at);
-  const href = `/admin/knowledge/${node.path}`;
-  const indent = depth * 16;
+// Extract the first paragraph under "## Overview" as a preview (first 240 chars).
+function extractOverviewPreview(body_md: string): string | null {
+  const m = body_md.match(/^##\s+Overview\s*\n+([^\n#][\s\S]*?)(?=\n##\s|\n$)/m);
+  if (!m) return null;
+  const cleaned = m[1]
+    .replace(/_\([^)]*\)_/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (cleaned.length < 20) return null;
+  return cleaned.length > 240 ? cleaned.slice(0, 240).trimEnd() + "…" : cleaned;
+}
+
+// Parse case codes from a body_md to show chips on the leaf card.
+function extractCaseCodes(body_md: string): string[] {
+  const matches = body_md.match(/\[[A-Z0-9]+-[A-Z]{2,3}-\d{4}\]/g) ?? [];
+  return [...new Set(matches.map(c => c.slice(1, -1)))].sort();
+}
+
+// Count bullets: lines starting with "-" at any indent.
+function countBullets(body_md: string): number {
+  return (body_md.match(/^[ \t]*-\s+/gm) ?? []).length;
+}
+
+function freshnessClass(dEvidence: number | null): { pill: string; label: string } {
+  if (dEvidence === null) return { pill: "bg-[#EFEFEA] text-[#131218]/25", label: "empty" };
+  if (dEvidence === 0)    return { pill: "bg-[#131218] text-[#B2FF59]",    label: "Today" };
+  if (dEvidence <= 7)     return { pill: "bg-[#B2FF59] text-[#131218]",    label: `${dEvidence}d ago` };
+  if (dEvidence <= 30)    return { pill: "bg-[#EFEFEA] text-[#131218]/70", label: `${dEvidence}d ago` };
+  if (dEvidence <= 60)    return { pill: "bg-amber-50 text-amber-700",     label: `${dEvidence}d ago` };
+  return { pill: "bg-red-50 text-red-600",                                 label: `${dEvidence}d · stale` };
+}
+
+/** Populated leaf — full card with preview + cases + meta. */
+function LeafCard({ leaf }: { leaf: TreeNode }) {
+  const dEvidence = daysSince(leaf.last_evidence_at);
+  const freshness = freshnessClass(dEvidence);
+  const preview = extractOverviewPreview(leaf.body_md);
+  const cases = extractCaseCodes(leaf.body_md);
+  const bulletCount = countBullets(leaf.body_md);
+  const isHot = dEvidence !== null && dEvidence <= 7;
+  const isStale = dEvidence !== null && dEvidence > 60;
 
   return (
-    <>
-      <Link
-        href={href}
-        className={`flex items-center gap-3 pr-6 py-3 border-b border-[#EFEFEA] hover:bg-[#EFEFEA]/40 transition-colors ${
-          isLeaf ? "" : "bg-[#F7F7F2]/50"
-        }`}
-        style={{ paddingLeft: 24 + indent }}
-      >
-        <span className={`text-xs font-bold shrink-0 ${isLeaf ? "text-[#B2FF59]" : "text-[#131218]/30"}`}>
-          {isLeaf ? "◉" : "▸"}
-        </span>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-baseline gap-2 flex-wrap">
-            <p className={`truncate ${isLeaf ? "text-sm font-semibold text-[#131218]" : "text-[13px] font-bold text-[#131218]/90 uppercase tracking-wide"}`}>
-              {node.title}
-            </p>
-            {isLeaf && node.tags.slice(0, 3).map(t => (
-              <span key={t} className="text-[9px] font-bold bg-[#EFEFEA] text-[#131218]/40 px-2 py-0.5 rounded-full uppercase tracking-widest">
-                {t}
+    <Link
+      href={`/admin/knowledge/${leaf.path}`}
+      className={`group relative flex flex-col bg-white rounded-[14px] border transition-all duration-150 ease-out hover:-translate-y-[2px] hover:border-[#131218]/30 ${
+        isStale ? "border-amber-200" : "border-[#E0E0D8]"
+      }`}
+    >
+      {isHot && (
+        <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-[#B2FF59] via-[#B2FF59] to-transparent rounded-t-[14px]" />
+      )}
+      <div className="p-5 flex-1 flex flex-col min-h-0">
+        {/* Path breadcrumb */}
+        <p className="text-[9px] font-bold font-mono text-[#131218]/25 uppercase tracking-widest mb-2 truncate">
+          {leaf.path.split("/").slice(0, -1).join(" › ") || leaf.path}
+        </p>
+
+        {/* Title */}
+        <h3 className="text-[22px] font-semibold tracking-tight text-[#131218] leading-tight mb-3 group-hover:text-[#131218]">
+          {leaf.title}
+        </h3>
+
+        {/* Preview or summary */}
+        <p className="text-[12.5px] text-[#131218]/55 leading-relaxed line-clamp-3 flex-1">
+          {preview ?? leaf.summary ?? "—"}
+        </p>
+
+        {/* Case chips */}
+        {cases.length > 0 && (
+          <div className="mt-4 flex items-center gap-1.5 flex-wrap">
+            {cases.slice(0, 3).map(c => (
+              <span
+                key={c}
+                className="text-[9.5px] font-mono font-medium text-[#131218]/55 bg-[#F7F7F2] px-2 py-0.5 rounded border border-[#EFEFEA] tracking-tight"
+              >
+                {c}
               </span>
             ))}
-          </div>
-          {node.summary && (
-            <p className="text-[11px] text-[#131218]/40 truncate mt-0.5">{node.summary}</p>
-          )}
-        </div>
-        {isLeaf && (
-          <div className="flex items-center gap-4 shrink-0">
-            <div className="text-right">
-              <p className={`text-[10px] font-bold uppercase tracking-widest ${dEvidence === null ? "text-[#131218]/20" : dEvidence <= 14 ? "text-[#B2FF59] bg-[#131218] px-2 py-0.5 rounded-full" : "text-[#131218]/30"}`}>
-                {dEvidence === null ? "— empty" : dEvidence === 0 ? "Today" : `${dEvidence}d ago`}
-              </p>
-              <p className="text-[9px] text-[#131218]/30 uppercase tracking-widest mt-0.5">last evidence</p>
-            </div>
-            <div className="text-right">
-              <p className="text-sm font-bold text-[#131218]">{node.reference_count}</p>
-              <p className="text-[9px] text-[#131218]/30 uppercase tracking-widest">cited</p>
-            </div>
+            {cases.length > 3 && (
+              <span className="text-[9.5px] font-mono text-[#131218]/40">+{cases.length - 3}</span>
+            )}
           </div>
         )}
-      </Link>
-      {node.children.map(c => <TreeRow key={c.id} node={c} depth={depth + 1} />)}
-    </>
+      </div>
+
+      {/* Footer meta */}
+      <div className="px-5 py-3 border-t border-[#EFEFEA] flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 text-[10px] font-bold uppercase tracking-widest text-[#131218]/35">
+          <span>{bulletCount} bullet{bulletCount !== 1 ? "s" : ""}</span>
+          {cases.length > 0 && <span className="text-[#131218]/15">·</span>}
+          {cases.length > 0 && <span>{cases.length} case{cases.length !== 1 ? "s" : ""}</span>}
+          {leaf.reference_count > 0 && <span className="text-[#131218]/15">·</span>}
+          {leaf.reference_count > 0 && <span>{leaf.reference_count} cited</span>}
+        </div>
+        <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-widest ${freshness.pill}`}>
+          {freshness.label}
+        </span>
+      </div>
+    </Link>
+  );
+}
+
+/** Empty leaf — slim chip, collapsed visual weight. */
+function EmptyLeafChip({ leaf }: { leaf: TreeNode }) {
+  return (
+    <Link
+      href={`/admin/knowledge/${leaf.path}`}
+      className="inline-flex items-center gap-2 px-3 py-1.5 bg-[#EFEFEA]/60 border border-dashed border-[#E0E0D8] rounded-full hover:bg-[#EFEFEA] transition-colors"
+    >
+      <span className="text-[9px] font-bold text-[#131218]/25 uppercase tracking-widest">
+        {leaf.title}
+      </span>
+      <span className="text-[8px] font-bold text-[#131218]/20 uppercase tracking-widest">
+        empty
+      </span>
+    </Link>
+  );
+}
+
+type SubthemeGroup = { subtheme: TreeNode; populatedLeaves: TreeNode[]; emptyLeaves: TreeNode[] };
+
+function ThemeSection({ theme }: { theme: TreeNode }) {
+  // Flatten this theme's descendants and organise by subtheme
+  const groups: SubthemeGroup[] = [];
+  const orphans: TreeNode[] = [];
+
+  for (const child of theme.children) {
+    if (child.children.length > 0) {
+      // Treat this child as a subtheme; its children are leaves
+      const populatedLeaves = child.children.filter(l => l.body_md.trim().length > 200 || l.last_evidence_at);
+      const emptyLeaves     = child.children.filter(l => !(l.body_md.trim().length > 200 || l.last_evidence_at));
+      groups.push({ subtheme: child, populatedLeaves, emptyLeaves });
+    } else {
+      // Child is itself a leaf (direct under the theme)
+      orphans.push(child);
+    }
+  }
+
+  // Stats
+  const allLeaves = theme.children.flatMap(c => c.children.length > 0 ? c.children : [c]);
+  const populatedTotal = allLeaves.filter(l => l.body_md.trim().length > 200 || l.last_evidence_at).length;
+  const totalLeaves = allLeaves.length;
+  const totalBullets = allLeaves.reduce((sum, l) => sum + countBullets(l.body_md), 0);
+  const uniqueCases = new Set(allLeaves.flatMap(l => extractCaseCodes(l.body_md)));
+
+  return (
+    <section className="space-y-5">
+      <header className="flex items-baseline justify-between gap-4 pb-2 border-b-2 border-[#131218]">
+        <div>
+          <h2 className="text-[28px] font-[300] tracking-tight text-[#131218] leading-none">
+            <em className="font-[900] italic text-[#131218]">{theme.title}</em>
+          </h2>
+          {theme.summary && (
+            <p className="text-[12px] text-[#131218]/45 mt-1.5 leading-relaxed max-w-[560px]">
+              {theme.summary}
+            </p>
+          )}
+        </div>
+        <div className="shrink-0 text-right">
+          <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">
+            {populatedTotal}/{totalLeaves} populated
+          </p>
+          <p className="text-[10px] text-[#131218]/25 mt-0.5 font-mono">
+            {totalBullets} bullets · {uniqueCases.size} case{uniqueCases.size !== 1 ? "s" : ""}
+          </p>
+        </div>
+      </header>
+
+      {groups.map(g => (
+        <div key={g.subtheme.id} className="space-y-3">
+          <div className="flex items-baseline justify-between">
+            <Link href={`/admin/knowledge/${g.subtheme.path}`} className="text-[10px] font-bold text-[#131218]/40 uppercase tracking-[2px] hover:text-[#131218] transition-colors">
+              {g.subtheme.title}
+            </Link>
+            <p className="text-[9px] text-[#131218]/25 font-mono">
+              {g.populatedLeaves.length}/{g.populatedLeaves.length + g.emptyLeaves.length}
+            </p>
+          </div>
+          {g.populatedLeaves.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {g.populatedLeaves.map(l => <LeafCard key={l.id} leaf={l} />)}
+            </div>
+          )}
+          {g.emptyLeaves.length > 0 && (
+            <div className="flex items-center gap-2 flex-wrap">
+              {g.emptyLeaves.map(l => <EmptyLeafChip key={l.id} leaf={l} />)}
+            </div>
+          )}
+        </div>
+      ))}
+
+      {/* Orphan leaves (direct children of the theme with no subtheme) */}
+      {orphans.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {orphans.map(l => (l.body_md.trim().length > 200 || l.last_evidence_at)
+            ? <LeafCard key={l.id} leaf={l} />
+            : <EmptyLeafChip key={l.id} leaf={l} />
+          )}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -127,27 +279,17 @@ export default async function KnowledgePage() {
             <MetricCard label="Stale (60d+)"       value={staleLeaves.length}            color={staleLeaves.length > 0 ? "yellow" : "default"} sub="hojas sin updates" />
           </div>
 
-          {/* Tree — PRIMARY SURFACE. This is what you come here to consume. */}
-          <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-            <div className="h-1 bg-[#B2FF59]" />
-            <div className="px-6 py-4 border-b border-[#EFEFEA]">
-              <h2 className="text-sm font-bold text-[#131218] tracking-tight">Knowledge tree</h2>
-              <p className="text-xs text-[#131218]/40 mt-0.5">
-                Click en cualquier nodo para abrir. Leaf pages (◉) tienen contenido consumible. Categorías (▸) agrupan.
-              </p>
+          {/* Themes — primary surface. Theme sections with leaf cards. */}
+          {tree.length === 0 ? (
+            <div className="bg-white rounded-[14px] border border-[#E0E0D8] px-6 py-10 text-center">
+              <p className="text-sm font-medium text-[#131218]/30">El árbol está vacío.</p>
+              <p className="text-xs text-[#131218]/20 mt-1">Seed el schema con nodos iniciales para empezar.</p>
             </div>
-
-            {tree.length === 0 ? (
-              <div className="px-6 py-10 text-center">
-                <p className="text-sm font-medium text-[#131218]/30">El árbol está vacío.</p>
-                <p className="text-xs text-[#131218]/20 mt-1">Seed el schema con nodos iniciales para empezar.</p>
-              </div>
-            ) : (
-              <div>
-                {tree.map(root => <TreeRow key={root.id} node={root} depth={0} />)}
-              </div>
-            )}
-          </div>
+          ) : (
+            <div className="space-y-10">
+              {tree.map(root => <ThemeSection key={root.id} theme={root} />)}
+            </div>
+          )}
 
           {/* Activity — everything operational lives here, collapsed by default */}
           {(proposals.length > 0 || recentLog.length > 0) && (
@@ -322,17 +464,20 @@ export default async function KnowledgePage() {
             </div>
           )}
 
-          {/* How it works */}
-          <div className="bg-white rounded-2xl border border-[#E0E0D8] p-6">
-            <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest mb-2">How it works</p>
-            <ul className="text-[12px] text-[#131218]/60 space-y-1.5 leading-relaxed">
+          {/* How it works — collapsed, foot-of-page reference */}
+          <details className="bg-white rounded-[14px] border border-[#E0E0D8] group">
+            <summary className="px-6 py-3 cursor-pointer list-none flex items-center gap-2 hover:bg-[#EFEFEA]/40 transition-colors">
+              <span className="text-[10px] opacity-40 group-open:rotate-90 transition-transform">▶</span>
+              <span className="text-[10px] font-bold text-[#131218]/40 uppercase tracking-widest">How it works</span>
+            </summary>
+            <ul className="px-6 pb-5 pt-1 text-[12px] text-[#131218]/60 space-y-1.5 leading-relaxed border-t border-[#EFEFEA]">
               <li>• <strong>Cada reu validada</strong> pasa por el <code className="text-[11px] bg-[#EFEFEA] px-1 py-0.5 rounded">knowledge-curator</code> agent.</li>
               <li>• El agent decide si la evidencia contiene un <em>insight de dominio</em> (generaliza) o solo un <em>project fact</em> (se ignora).</li>
-              <li>• Los insights se escriben en la hoja relevante bajo la sección correcta (Available solutions / How to implement / Anti-patterns / Case studies).</li>
-              <li>• Cada acción del agent queda en el changelog de la hoja con razón, diff y source.</li>
-              <li>• Cuando otros agents (proposal-brief, prep-brief) citan una hoja, incrementa <code className="text-[11px] bg-[#EFEFEA] px-1 py-0.5 rounded">reference_count</code> — señal de valor real.</li>
+              <li>• Cada bullet lleva un código de case (ej. <code className="text-[11px] bg-[#EFEFEA] px-1 py-0.5 rounded">[AUTOMERCADO-CR-2026]</code>) para identificar la instancia concreta.</li>
+              <li>• El synthesizer genera playbooks prosa agrupando por modalidad y case. El árbol acumula bullets; el playbook narra.</li>
+              <li>• Cuando otros agents (prep-brief, proposal-brief) citan una hoja, incrementa <code className="text-[11px] bg-[#EFEFEA] px-1 py-0.5 rounded">reference_count</code> — señal de valor real.</li>
             </ul>
-          </div>
+          </details>
 
         </div>
       </main>
