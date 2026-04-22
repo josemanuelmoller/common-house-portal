@@ -34,7 +34,19 @@ export type SearchableContact = {
   last_seen_at:         string | null;
   last_meeting_title:   string | null;
   suggestion:           { domain: string; orgName: string | null } | null;
+  // Enrichment fields (from LinkedIn agent)
+  linkedin:             string | null;
+  job_title:            string | null;
+  role_category:        string | null;
+  function_area:        string | null;
 };
+
+const ROLE_CATEGORIES = ["Founder", "Executive", "Manager", "IC", "Investor", "Advisor", "Other"] as const;
+const FUNCTION_AREAS  = [
+  "Marketing", "Sales", "Product", "Engineering", "Design",
+  "Operations", "Finance", "People", "Legal", "Strategy",
+  "Sustainability", "Data", "General", "Research", "CustomerSuccess", "Other",
+] as const;
 
 function displayFor(c: SearchableContact): string {
   return (
@@ -55,6 +67,9 @@ function matches(c: SearchableContact, q: string): boolean {
     c.suggestion?.domain ?? "",
     c.suggestion?.orgName ?? "",
     c.auto_suggested ?? "",
+    c.job_title ?? "",
+    c.role_category ?? "",
+    c.function_area ?? "",
   ].join(" ").toLowerCase();
   // Every whitespace-separated token in the query must appear in the haystack.
   // Accent-insensitive via NFD + combining-mark strip.
@@ -69,12 +84,38 @@ export function HallContactsSearchable({
 }: {
   contacts: SearchableContact[];
 }) {
-  const [query, setQuery] = useState("");
+  const [query, setQuery]               = useState("");
+  const [tierFilter, setTierFilter]     = useState<string>("");
+  const [areaFilter, setAreaFilter]     = useState<string>("");
+  const [classFilter, setClassFilter]   = useState<string>("");
+
+  // The filter dropdowns only offer values that actually appear in the
+  // current dataset. Prevents an empty "Founder" filter if there are none yet.
+  const availableTiers = useMemo(
+    () => ROLE_CATEGORIES.filter(t => contacts.some(c => c.role_category === t)),
+    [contacts],
+  );
+  const availableAreas = useMemo(
+    () => FUNCTION_AREAS.filter(a => contacts.some(c => c.function_area === a)),
+    [contacts],
+  );
+  const availableClasses = useMemo(() => {
+    const s = new Set<string>();
+    for (const c of contacts) for (const cls of (c.relationship_classes ?? [])) s.add(cls);
+    return [...s].sort();
+  }, [contacts]);
 
   const filtered = useMemo(
-    () => contacts.filter(c => matches(c, query)),
-    [contacts, query],
+    () => contacts.filter(c => {
+      if (!matches(c, query)) return false;
+      if (tierFilter  && c.role_category !== tierFilter) return false;
+      if (areaFilter  && c.function_area !== areaFilter) return false;
+      if (classFilter && !(c.relationship_classes ?? []).includes(classFilter)) return false;
+      return true;
+    }),
+    [contacts, query, tierFilter, areaFilter, classFilter],
   );
+  const anyFilterActive = !!(query || tierFilter || areaFilter || classFilter);
 
   // Split into "WA-only / no email" + the rest. WA-only rows go first because
   // they're the most likely to still need classification.
@@ -87,31 +128,63 @@ export function HallContactsSearchable({
 
   return (
     <div className="space-y-5">
-      {/* Search input */}
-      <div className="bg-white rounded-2xl border border-[#E0E0D8] px-4 py-3 flex items-center gap-3">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="text-[#131218]/40 shrink-0">
-          <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" />
-          <path d="M20 20l-3.5-3.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-        </svg>
-        <input
-          type="search"
-          value={query}
-          onChange={e => setQuery(e.target.value)}
-          placeholder="Search by name, email, class, or organisation…"
-          className="flex-1 text-[12px] text-[#131218] placeholder:text-[#131218]/35 bg-transparent outline-none"
-          autoComplete="off"
-        />
-        {query && (
-          <button
-            onClick={() => setQuery("")}
-            className="text-[9px] font-bold uppercase tracking-widest text-[#131218]/40 hover:text-[#131218]"
-          >
-            Clear
-          </button>
+      {/* Search + filter bar */}
+      <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
+        <div className="px-4 py-3 flex items-center gap-3">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="text-[#131218]/40 shrink-0">
+            <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" />
+            <path d="M20 20l-3.5-3.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          </svg>
+          <input
+            type="search"
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder="Search by name, email, class, organisation, title or area…"
+            className="flex-1 text-[12px] text-[#131218] placeholder:text-[#131218]/35 bg-transparent outline-none"
+            autoComplete="off"
+          />
+          {anyFilterActive && (
+            <button
+              onClick={() => { setQuery(""); setTierFilter(""); setAreaFilter(""); setClassFilter(""); }}
+              className="text-[9px] font-bold uppercase tracking-widest text-[#131218]/40 hover:text-[#131218]"
+            >
+              Clear all
+            </button>
+          )}
+          <span className="text-[10px] text-[#131218]/40 tabular-nums">
+            {filtered.length}/{contacts.length}
+          </span>
+        </div>
+        {/* Filter dropdowns — only shown when we have values to filter by */}
+        {(availableTiers.length > 0 || availableAreas.length > 0 || availableClasses.length > 0) && (
+          <div className="flex items-center gap-2 px-4 py-2 border-t border-[#EFEFEA] bg-[#FAFAF6]">
+            <span className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/40">Filter</span>
+            {availableClasses.length > 0 && (
+              <FilterSelect
+                label="Class"
+                value={classFilter}
+                onChange={setClassFilter}
+                options={availableClasses}
+              />
+            )}
+            {availableTiers.length > 0 && (
+              <FilterSelect
+                label="Tier"
+                value={tierFilter}
+                onChange={setTierFilter}
+                options={availableTiers}
+              />
+            )}
+            {availableAreas.length > 0 && (
+              <FilterSelect
+                label="Area"
+                value={areaFilter}
+                onChange={setAreaFilter}
+                options={availableAreas}
+              />
+            )}
+          </div>
         )}
-        <span className="text-[10px] text-[#131218]/40 tabular-nums">
-          {filtered.length}/{contacts.length}
-        </span>
       </div>
 
       {/* WhatsApp-only — contacts with no email (and therefore no domain) */}
@@ -179,6 +252,41 @@ export function HallContactsSearchable({
   );
 }
 
+// ─── Filter dropdown ─────────────────────────────────────────────────────────
+
+function FilterSelect({
+  label, value, onChange, options,
+}: {
+  label:    string;
+  value:    string;
+  onChange: (v: string) => void;
+  options:  readonly string[];
+}) {
+  const active = !!value;
+  return (
+    <label className={`flex items-center gap-1.5 text-[10px] rounded-lg px-2 py-1 transition-colors ${
+      active ? "bg-[#131218] text-white" : "bg-white border border-[#E0E0D8] text-[#131218]/60 hover:text-[#131218]"
+    }`}>
+      <span className="font-bold uppercase tracking-widest text-[9px]">{label}</span>
+      <select
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        className={`bg-transparent outline-none text-[10.5px] ${active ? "text-white" : "text-[#131218]"}`}
+      >
+        <option value="">all</option>
+        {options.map(o => <option key={o} value={o}>{o}</option>)}
+      </select>
+      {active && (
+        <button
+          onClick={e => { e.preventDefault(); onChange(""); }}
+          className="text-[10px] opacity-70 hover:opacity-100 pl-0.5"
+          aria-label="Clear filter"
+        >×</button>
+      )}
+    </label>
+  );
+}
+
 // ─── Regular contact card ─────────────────────────────────────────────────────
 
 function WithEmailCard({
@@ -209,7 +317,14 @@ function WithEmailCard({
           <div className="flex items-baseline justify-between gap-4">
             <div className="min-w-0">
               <p className="text-[13px] font-semibold text-[#131218] truncate">{display}</p>
-              <p className="text-[10.5px] text-[#131218]/45 mt-0.5 truncate">{domain}</p>
+              <p className="text-[10.5px] text-[#131218]/45 mt-0.5 truncate">
+                {contact.job_title ? (
+                  <>
+                    <span className="text-[#131218]/70">{contact.job_title}</span>
+                    <span className="text-[#131218]/30"> · {domain}</span>
+                  </>
+                ) : domain}
+              </p>
             </div>
             <div className="flex items-center gap-3 text-[10px] text-[#131218]/50 shrink-0 tabular-nums">
               {contact.meeting_count  > 0 && <span title="Meetings">📅 {contact.meeting_count}</span>}
@@ -230,6 +345,16 @@ function WithEmailCard({
             {classes.length === 0 && (
               <span className="text-[9px] font-bold uppercase tracking-widest bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full">
                 Untagged
+              </span>
+            )}
+            {contact.role_category && (
+              <span className="text-[9px] font-bold uppercase tracking-widest bg-[#131218] text-white px-2 py-0.5 rounded-full" title="Seniority tier">
+                {contact.role_category}
+              </span>
+            )}
+            {contact.function_area && (
+              <span className="text-[9px] font-bold uppercase tracking-widest bg-[#c8f55a]/50 text-[#131218] px-2 py-0.5 rounded-full" title="Function area">
+                {contact.function_area}
               </span>
             )}
             {contact.suggestion && (

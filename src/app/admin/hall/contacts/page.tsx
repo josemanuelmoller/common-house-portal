@@ -38,6 +38,10 @@ type ContactRow = {
   google_last_write_at: string | null;
   dismissed_at: string | null;
   dismissed_reason: string | null;
+  linkedin: string | null;
+  job_title: string | null;
+  role_category: string | null;
+  function_area: string | null;
 };
 
 async function getContacts(): Promise<ContactRow[]> {
@@ -48,7 +52,7 @@ async function getContacts(): Promise<ContactRow[]> {
   // rows are allowed through.
   const { data } = await sb
     .from("people")
-    .select("id, email, full_name, display_name, relationship_class, relationship_classes, auto_suggested, last_meeting_title, meeting_count, email_thread_count, transcript_count, last_seen_at, first_seen_at, classified_at, classified_by, google_resource_name, google_source, google_labels, google_synced_at, google_last_write_at, dismissed_at, dismissed_reason")
+    .select("id, email, full_name, display_name, relationship_class, relationship_classes, auto_suggested, last_meeting_title, meeting_count, email_thread_count, transcript_count, last_seen_at, first_seen_at, classified_at, classified_by, google_resource_name, google_source, google_labels, google_synced_at, google_last_write_at, dismissed_at, dismissed_reason, linkedin, job_title, role_category, function_area")
     .gte("last_seen_at", new Date(Date.now() - 180 * 86400_000).toISOString())
     .order("meeting_count", { ascending: false })
     .order("last_seen_at", { ascending: false })
@@ -449,6 +453,10 @@ export default async function HallContactsPage({ searchParams }: PageProps) {
                 suggestion:           c.suggestion
                   ? { domain: c.suggestion.domain, orgName: c.suggestion.orgName ?? null }
                   : null,
+                linkedin:             c.linkedin,
+                job_title:            c.job_title,
+                role_category:        c.role_category,
+                function_area:        c.function_area,
               }))}
             />
           )}
