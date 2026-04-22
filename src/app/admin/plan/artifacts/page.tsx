@@ -1,15 +1,23 @@
 import { Sidebar } from "@/components/Sidebar";
 import { requireAdmin } from "@/lib/require-admin";
-import { getObjectiveArtifacts, type ArtifactStatus } from "@/lib/plan";
+import {
+  getEligibleObjectivesForV1,
+  getObjectiveArtifacts,
+  type ArtifactStatus,
+} from "@/lib/plan";
 import { PlanNav } from "@/components/plan/PlanNav";
 import { ArtifactRow } from "@/components/plan/ArtifactRow";
+import { CreateDraftPanel } from "@/components/plan/CreateDraftPanel";
 
 export const dynamic = "force-dynamic";
 
 export default async function PlanArtifactsPage() {
   await requireAdmin();
 
-  const artifacts = await getObjectiveArtifacts();
+  const [artifacts, eligibleObjectives] = await Promise.all([
+    getObjectiveArtifacts(),
+    getEligibleObjectivesForV1(),
+  ]);
 
   const counts: Record<ArtifactStatus, number> = {
     draft: 0,
@@ -66,6 +74,7 @@ export default async function PlanArtifactsPage() {
         </header>
 
         <div className="px-12 py-7">
+          <CreateDraftPanel objectives={eligibleObjectives} />
           {artifacts.length === 0 ? (
             <div className="bg-white rounded-2xl border border-[#E0E0D8] p-12 text-center">
               <p className="text-[14px] font-semibold text-[#131218] mb-2">

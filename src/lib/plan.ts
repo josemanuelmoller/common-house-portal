@@ -258,6 +258,84 @@ export async function getObjectiveArtifacts(): Promise<ObjectiveArtifactWithObje
   });
 }
 
+export type EligibleObjectiveForV1 = {
+  id: string;
+  year: number;
+  quarter: number | null;
+  area: ObjectiveArea;
+  objective_type: ObjectiveType;
+  tier: ObjectiveTier;
+  title: string;
+  description: string | null;
+  has_description: boolean;
+};
+
+/**
+ * Objectives that are candidates for v1 generation:
+ * - status = active
+ * - No artifact yet (no row in objective_artifacts)
+ * Description can be null — we just flag it for the UI to warn.
+ */
+export async function getEligibleObjectivesForV1(): Promise<EligibleObjectiveForV1[]> {
+  const client = supabaseAdmin();
+
+  const [objectivesRes, artifactsRes] = await Promise.all([
+    client
+      .from("strategic_objectives")
+      .select("id, year, quarter, area, objective_type, tier, title, description")
+      .eq("status", "active")
+      .order("year", { ascending: true })
+      .order("quarter", { ascending: true, nullsFirst: true })
+      .order("tier", { ascending: true }),
+    client.from("objective_artifacts").select("objective_id"),
+  ]);
+  if (objectivesRes.error)
+    throw new Error(`getEligibleObjectivesForV1 objectives: ${objectivesRes.error.message}`);
+  if (artifactsRes.error)
+    throw new Error(`getEligibleObjectivesForV1 artifacts: ${artifactsRes.error.message}`);
+
+  const withArtifact = new Set(
+    (artifactsRes.data ?? []).map((a) => a.objective_id as string)
+  );
+  type Row = {
+    id: string;
+    year: number;
+    quarter: number | null;
+    area: ObjectiveArea;
+    objective_type: ObjectiveType;
+    tier: ObjectiveTier;
+    title: string;
+    description: string | null;
+  };
+  return ((objectivesRes.data ?? []) as Row[])
+    .filter((o) => !withArtifact.has(o.id))
+    .map((o) => ({
+      ...o,
+      has_description: !!o.description?.trim(),
+    }));
+}
+
+/**
+ * Turn an objective title into a Drive-folder-safe slug.
+ * Kebab-case, first 60 chars, ASCII only.
+ */
+export function objectiveSlug(title: string): string {
+  return title
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") // strip accents
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 60);
+}
+
+/**
+ * `2026-Q2` or `2026-annual` for a given year + quarter.
+ */
+export function quarterSlug(year: number, quarter: number | null): string {
+  return quarter ? `${year}-Q${quarter}` : `${year}-annual`;
+}
+
 export async function getArtifactDetails(artifactId: string): Promise<{
   questions: ArtifactQuestion[];
   versions: ArtifactVersion[];

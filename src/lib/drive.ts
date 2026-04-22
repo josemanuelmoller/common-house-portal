@@ -47,6 +47,56 @@ export function getDriveClientOAuth() {
 }
 
 /**
+ * Resolve-or-create the `CH OS / Plan / {quarter} / {slug}` folder hierarchy
+ * for a given objective. Returns the terminal folder's ID (where files go).
+ *
+ * Uses the OAuth user (josemanuel@wearecommonhouse.com) as the file owner so
+ * the folder tree appears in their My Drive and matches v1 ownership for
+ * artifacts created earlier via the Drive MCP.
+ *
+ * Returns null if OAuth client not configured.
+ */
+export async function ensurePlanFolderPath(
+  quarterSlug: string,
+  objectiveSlug: string
+): Promise<string | null> {
+  const driveClient = getDriveClientOAuth();
+  if (!driveClient) return null;
+
+  async function findOrCreateFolder(
+    name: string,
+    parentId: string | null
+  ): Promise<string> {
+    const parentClause = parentId ? ` and '${parentId}' in parents` : "";
+    const q = `name = '${name.replace(/'/g, "\\'")}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false${parentClause}`;
+    const existing = await driveClient!.files.list({
+      q,
+      fields: "files(id, name)",
+      pageSize: 1,
+    });
+    const hit = existing.data.files?.[0];
+    if (hit?.id) return hit.id;
+
+    const created = await driveClient!.files.create({
+      requestBody: {
+        name,
+        mimeType: "application/vnd.google-apps.folder",
+        parents: parentId ? [parentId] : undefined,
+      },
+      fields: "id",
+    });
+    if (!created.data.id) throw new Error(`Failed to create folder: ${name}`);
+    return created.data.id;
+  }
+
+  const chOsId = await findOrCreateFolder("CH OS", null);
+  const planId = await findOrCreateFolder("Plan", chOsId);
+  const quarterId = await findOrCreateFolder(quarterSlug, planId);
+  const objectiveId = await findOrCreateFolder(objectiveSlug, quarterId);
+  return objectiveId;
+}
+
+/**
  * Upload a plain-text document into a specific Drive folder (identified by
  * folderId, typically the `drive_folder_id` stored on objective_artifacts).
  * Drive auto-converts text/plain to a native Google Doc, so the result is
