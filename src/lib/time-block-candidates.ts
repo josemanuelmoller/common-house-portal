@@ -339,12 +339,18 @@ export async function candidatesFromMeetings(
     const isMultiParty      = cls.confirmed_count + cls.tentative_count >= 3;
     const hasContext        = hasDescription || cls.has_vip || isMultiParty;
 
-    // Signal gate: at least one non-self attendee must pass the prep-signal
-    // check. External contacts with no WA / no warmth / no internal tag will
-    // produce a generic brief — skip the card altogether so JMM isn't asked
-    // to prep for contacts the system has nothing real to say about.
-    const nonSelf = m.attendees.filter(a => !a.self && a.email);
-    const hasSignal = nonSelf.some(a => prepWorthy.has(a.email.toLowerCase()));
+    // Signal gate: pass if EITHER at least one non-self attendee passes the
+    // contact-signal check (they're Internal / Warm+ / have WA linked) OR
+    // the meeting itself carries strong context (long description, VIP, or
+    // a multi-party coordination). The second path avoids over-suppressing
+    // real high-stakes meetings where attendees simply aren't populated in
+    // the people table yet (a common state for external partners).
+    const nonSelf         = m.attendees.filter(a => !a.self && a.email);
+    const hasContactSignal = nonSelf.some(a => prepWorthy.has(a.email.toLowerCase()));
+    const strongContext    = (m.description ?? "").length >= 200
+                             || cls.has_vip
+                             || cls.confirmed_count >= 3;
+    const hasSignal        = hasContactSignal || strongContext;
 
     // Prep candidate: needed if meeting is in next 3 days, has attendees, AND
     // we actually have signal on at least one of them.
