@@ -16,6 +16,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { WaOnlyContactRow } from "./WaOnlyContactRow";
 
 export type SearchableContact = {
   id:                   string;
@@ -132,7 +133,11 @@ export function HallContactsSearchable({
           </p>
           <div className="grid gap-2">
             {waOnly.map(c => (
-              <WaOnlyRow key={c.id} contact={c} />
+              <WaOnlyContactRow
+                key={c.id}
+                contact={c}
+                allContacts={withEmail}
+              />
             ))}
           </div>
         </section>
@@ -170,36 +175,6 @@ export function HallContactsSearchable({
           </p>
         </div>
       )}
-    </div>
-  );
-}
-
-// ─── WA-only row — compact, classify inline via person_id ─────────────────────
-
-function WaOnlyRow({ contact }: { contact: SearchableContact }) {
-  const display = displayFor(contact);
-  const initial = display.slice(0, 1).toUpperCase();
-  const classes = contact.relationship_classes ?? [];
-  return (
-    <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-3.5">
-      <div className="flex items-center gap-3">
-        <div className="w-9 h-9 rounded-full bg-[#131218] text-white flex items-center justify-center font-bold text-[12px] shrink-0">
-          {initial}
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-[12.5px] font-semibold text-[#131218] truncate">{display}</p>
-          <p className="text-[10px] text-[#131218]/45 mt-0.5">
-            <span className="inline-block bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 rounded-full text-[8px] font-bold uppercase tracking-widest mr-2">
-              WA
-            </span>
-            {contact.wa_count} messages ·{" "}
-            {classes.length > 0 ? classes.join(", ") : <span className="text-amber-700">untagged</span>}
-            {contact.auto_suggested && (
-              <span className="ml-2 text-[#131218]/35">· {contact.auto_suggested}</span>
-            )}
-          </p>
-        </div>
-      </div>
     </div>
   );
 }
