@@ -42,6 +42,10 @@ export type KnowledgeNode = {
   body_md: string;
   tags: string[];
   facets: Facet[];
+  context_axes: string[];
+  playbook_md: string | null;
+  playbook_generated_at: string | null;
+  playbook_source_count: number | null;
   status: NodeStatus;
   reference_count: number;
   last_evidence_at: string | null;
@@ -330,6 +334,24 @@ export async function markChangelogRejected(changelogId: string): Promise<void> 
   }).eq("id", changelogId);
   if (error) {
     console.error("[knowledge-nodes] markChangelogRejected:", error.message);
+    throw error;
+  }
+}
+
+/** Write the synthesised playbook onto a node. Triggers the updated_at timestamp. */
+export async function writePlaybook(
+  id: string,
+  playbook_md: string,
+  sourceCount: number,
+): Promise<void> {
+  const sb = getSupabaseServerClient();
+  const { error } = await sb.from("knowledge_nodes").update({
+    playbook_md,
+    playbook_generated_at: new Date().toISOString(),
+    playbook_source_count: sourceCount,
+  }).eq("id", id);
+  if (error) {
+    console.error("[knowledge-nodes] writePlaybook:", error.message);
     throw error;
   }
 }

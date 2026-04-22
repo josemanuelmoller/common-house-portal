@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Sidebar } from "@/components/Sidebar";
+import { LeafContentTabs } from "@/components/LeafContentTabs";
+import { SynthesizeLeafButton } from "@/components/SynthesizeLeafButton";
 import { NAV } from "../../page";
 import { requireAdmin } from "@/lib/require-admin";
 import {
@@ -185,6 +187,10 @@ export default async function KnowledgeDetailPage({
   const evidenceAge = daysSince(node.last_evidence_at);
   const reviewAge   = daysSince(node.last_reviewed_at);
 
+  const bulletsHtml   = renderMarkdown(node.body_md);
+  const playbookHtml  = node.playbook_md ? renderMarkdown(node.playbook_md) : null;
+  const currentSourceCount = (node.body_md.match(/^[ \t]*-\s+/gm) ?? []).length;
+
   return (
     <div className="flex min-h-screen bg-[#EFEFEA]">
       <Sidebar items={NAV} isAdmin />
@@ -234,6 +240,11 @@ export default async function KnowledgeDetailPage({
               <span className="text-[10px] text-amber-300/70 font-medium">Never reviewed by human</span>
             )}
           </div>
+          {isLeaf && currentSourceCount > 0 && (
+            <div className="mt-5">
+              <SynthesizeLeafButton path={node.path} hasPlaybook={Boolean(node.playbook_md)} />
+            </div>
+          )}
         </div>
 
         <div className="px-8 py-6 space-y-6 max-w-[960px]">
@@ -267,19 +278,27 @@ export default async function KnowledgeDetailPage({
             </div>
           )}
 
-          {/* Body (always shown for leaves; shown for categories if non-trivial) */}
+          {/* Content — Playbook (default) / Source bullets tabs for leaves */}
           {(isLeaf || node.body_md.trim().length > 100) && (
-            <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-              <div className="h-1 bg-[#B2FF59]" />
-              <div className="px-6 py-4 border-b border-[#EFEFEA] flex items-center justify-between">
-                <h2 className="text-sm font-bold text-[#131218] tracking-tight">Content</h2>
-                <span className="text-[10px] text-[#131218]/25 font-mono">{node.path}</span>
-              </div>
-              <div
-                className="px-8 py-6"
-                dangerouslySetInnerHTML={{ __html: renderMarkdown(node.body_md) }}
+            isLeaf ? (
+              <LeafContentTabs
+                playbookHtml={playbookHtml}
+                bulletsHtml={bulletsHtml}
+                playbookGeneratedAt={node.playbook_generated_at}
+                playbookSourceCount={node.playbook_source_count}
+                currentSourceCount={currentSourceCount}
+                leafPath={node.path}
               />
-            </div>
+            ) : (
+              <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
+                <div className="h-1 bg-[#B2FF59]" />
+                <div className="px-6 py-4 border-b border-[#EFEFEA] flex items-center justify-between">
+                  <h2 className="text-sm font-bold text-[#131218] tracking-tight">Content</h2>
+                  <span className="text-[10px] text-[#131218]/25 font-mono">{node.path}</span>
+                </div>
+                <div className="px-8 py-6" dangerouslySetInnerHTML={{ __html: bulletsHtml }} />
+              </div>
+            )
           )}
 
           {/* Changelog */}
