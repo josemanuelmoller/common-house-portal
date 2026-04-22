@@ -32,15 +32,17 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { currentUser } from "@clerk/nextjs/server";
-import { auth } from "@clerk/nextjs/server";
-import { isAdminUser } from "@/lib/clients";
+import { isAdminUser, isAdminEmail } from "@/lib/clients";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { findLinkedIn } from "@/lib/linkedin-enrichment";
 
 export const maxDuration = 300;
 export const dynamic = "force-dynamic";
 
-/** Allow either (a) admin session via Clerk or (b) CRON_SECRET header. */
+/** Allow either (a) admin session via Clerk or (b) CRON_SECRET header.
+ *  Matches the pattern used by grant-radar + other cron-hit endpoints:
+ *  checks both userId and email against the admin list (email is the one
+ *  actually populated in prod env — ADMIN_EMAILS is set, ADMIN_USER_IDS is not). */
 async function authCheck(req: NextRequest): Promise<boolean> {
   const agentKey  = req.headers.get("x-agent-key");
   const cronToken = req.headers.get("authorization");
@@ -48,8 +50,10 @@ async function authCheck(req: NextRequest): Promise<boolean> {
   if (expected && agentKey === expected)              return true;
   if (expected && cronToken === `Bearer ${expected}`) return true;
   try {
-    const { userId } = await auth();
-    if (userId && isAdminUser(userId)) return true;
+    const user = await currentUser();
+    if (!user) return false;
+    const email = user.primaryEmailAddress?.emailAddress ?? "";
+    if (isAdminUser(user.id) || isAdminEmail(email)) return true;
   } catch { /* no-op */ }
   return false;
 }
