@@ -72,6 +72,7 @@ export const ADMIN_NAV_V2: NavEntry[] = [
     items: [
       { label: "Agents",          href: "/admin/agents" },
       { label: "Intake / Decisions", href: "/admin/os" },
+      { label: "Prep Briefs",     href: "/admin/prep" },
       { label: "Content",         href: "/admin/content" },
       { label: "Knowledge",       href: "/admin/knowledge" },
       { label: "Contacts",        href: "/admin/hall/contacts" },
