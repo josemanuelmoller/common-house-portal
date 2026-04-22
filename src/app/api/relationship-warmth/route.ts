@@ -122,49 +122,36 @@ async function _POST(req: NextRequest) {
   const gmail      = getGmailClient();
   const gmailReady = gmail !== null;
 
-  // Load all people — Supabase-first (synced noon weekdays; 18h stale at most on Mon/Thu 6am run)
-  // Note: Supabase read has no "Status != Archived" filter — the people table has ~30 rows and
-  // processing archived people is benign (warmth/date write to archived Notion pages works fine).
+  // Load all people from Supabase — single source of truth after contact
+  // consolidation. Exclude soft-deleted rows.
   let allPeople: { id: string; name: string; email: string; currentWarmth: string | null; lastContactDate: string | null }[] = [];
 
   try {
     const sb = getSupabaseServerClient();
     const { data, error } = await sb
       .from("people")
-      .select("notion_id, full_name, email, contact_warmth, last_contact_date");
+      .select("id, full_name, display_name, email, contact_warmth, last_contact_date")
+      .is("dismissed_at", null);
 
     if (!error && data && data.length > 0) {
-      allPeople = data.map(p => ({
-        id:              p.notion_id,
-        name:            p.full_name      ?? "",
-        email:           p.email          ?? "",
-        currentWarmth:   p.contact_warmth ?? null,
-        lastContactDate: p.last_contact_date ?? null,
-      })).filter(p => p.name.trim() !== "");
+      allPeople = (data as Array<{ id: string; full_name: string | null; display_name: string | null; email: string | null; contact_warmth: string | null; last_contact_date: string | null }>)
+        .map(p => ({
+          id:              p.id,
+          name:            (p.full_name ?? p.display_name ?? "").trim(),
+          email:           p.email          ?? "",
+          currentWarmth:   p.contact_warmth ?? null,
+          lastContactDate: p.last_contact_date ?? null,
+        }))
+        .filter(p => p.name !== "");
     }
   } catch {
-    // Supabase unavailable — fall through to Notion
+    // Supabase unavailable — fall through
   }
 
+  // After contact consolidation, `people` is the only source. No Notion
+  // fallback — if Supabase is unavailable the job fails fast.
   if (allPeople.length === 0) {
-    // Notion fallback
-    try {
-      const res = await notion.databases.query({
-        database_id: PEOPLE_DB,
-        page_size: 200,
-        filter: { property: "Status", status: { does_not_equal: "Archived" } },
-      });
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      allPeople = (res.results as any[]).map((page: any) => ({
-        id:              page.id,
-        name:            page.properties?.["Full Name"]?.title?.[0]?.plain_text ?? "",
-        email:           page.properties?.["Email"]?.email ?? "",
-        currentWarmth:   page.properties?.["Contact Warmth"]?.select?.name ?? null,
-        lastContactDate: page.properties?.["Last Contact Date"]?.date?.start ?? null,
-      })).filter(p => p.name.trim() !== "");
-    } catch (err) {
-      return NextResponse.json({ error: "Failed to load people", detail: String(err) }, { status: 500 });
-    }
+    return NextResponse.json({ error: "No people in Supabase — check SUPABASE_* env" }, { status: 500 });
   }
 
   const afterTimestamp = Math.floor((Date.now() - LOOKBACK_DAYS * 24 * 60 * 60 * 1000) / 1000);
@@ -204,25 +191,16 @@ async function _POST(req: NextRequest) {
         continue;
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const properties: Record<string, any> = {
-        "Contact Warmth": { select: { name: newWarmth } },
-      };
-      if (dateChanged && newDateStr) {
-        properties["Last Contact Date"] = { date: { start: newDateStr } };
-      }
-
-      await notion.pages.update({ page_id: person.id, properties });
-
-      // Dual-write to Supabase — makes contact_warmth / last_contact_date live immediately
+      // Write to Supabase `people` — the single source of truth.
       try {
         const sbDual = getSupabaseServerClient();
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const sbFields: Record<string, any> = { updated_at: new Date().toISOString() };
         if (warmthChanged) sbFields.contact_warmth = newWarmth;
         if (dateChanged && newDateStr) sbFields.last_contact_date = newDateStr;
-        await sbDual.from("people").update(sbFields).eq("notion_id", person.id);
-      } catch { /* non-critical — Notion write already succeeded */ }
+        // person.id is the Supabase people.id (uuid) — Supabase-first loader.
+        await sbDual.from("people").update(sbFields).eq("id", person.id);
+      } catch { /* non-critical */ }
 
       results.updated++;
     } catch {

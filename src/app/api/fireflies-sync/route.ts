@@ -191,29 +191,32 @@ async function getExistingSourceUrls(fromDate: string): Promise<Set<string>> {
   }
 }
 
-// ─── CH People: update Last Contact Date ─────────────────────────────────────
+// ─── People: update Last Contact Date ────────────────────────────────────────
+// Writes directly to Supabase `people` (Notion Contacts is no longer the
+// source of truth after contact consolidation).
 
 async function updatePeopleLastContact(emails: string[], dateStr: string): Promise<number> {
-  let updated = 0;
-  for (const email of emails.slice(0, 30)) {
-    try {
-      const res = await notion.databases.query({
-        database_id: PEOPLE_DB,
-        filter: { property: "Email", email: { equals: email } },
-        page_size: 1,
-      });
-      if (res.results.length === 0) continue;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await notion.pages.update({
-        page_id: res.results[0].id,
-        properties: {
-          "Last Contact Date": { date: { start: dateStr } },
-        } as any, // eslint-disable-line @typescript-eslint/no-explicit-any
-      });
-      updated++;
-    } catch { /* skip on error — non-critical */ }
+  if (emails.length === 0) return 0;
+  try {
+    const { getSupabaseServerClient } = await import("@/lib/supabase-server");
+    const sb = getSupabaseServerClient();
+    const lowered = emails.slice(0, 60).map(e => e.toLowerCase());
+    // Fetch rows so we can filter "only set if new date is more recent".
+    const { data: rows } = await sb
+      .from("people")
+      .select("id, email, last_contact_date")
+      .in("email", lowered);
+    let updated = 0;
+    for (const r of (rows ?? []) as { id: string; email: string | null; last_contact_date: string | null }[]) {
+      if (!r.last_contact_date || r.last_contact_date < dateStr) {
+        await sb.from("people").update({ last_contact_date: dateStr, updated_at: new Date().toISOString() }).eq("id", r.id);
+        updated++;
+      }
+    }
+    return updated;
+  } catch {
+    return 0;
   }
-  return updated;
 }
 
 // ─── Handler ──────────────────────────────────────────────────────────────────

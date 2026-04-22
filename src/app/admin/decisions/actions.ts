@@ -432,19 +432,29 @@ export async function approveEntityCreation(
     })
     const orgId = orgPage.id
 
-    // Create person if contact info provided
+    // Create person if contact info provided — writes directly to Supabase
+    // `people` (Notion Contacts is no longer a source of truth).
     if (contactName && contactEmail) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const personProps: Record<string, any> = {
-        "Full Name": { title: [{ type: "text", text: { content: contactName } }] },
-        "Email": { email: contactEmail },
-        "Person Classification": { select: { name: "External" } },
-        "Primary Organization": { relation: [{ id: orgId }] },
+      try {
+        const { getSupabaseServerClient } = await import("@/lib/supabase-server")
+        const sb = getSupabaseServerClient()
+        const nowIso = new Date().toISOString()
+        await sb.from("people").insert({
+          email:                contactEmail.toLowerCase(),
+          full_name:            contactName,
+          display_name:         contactName,
+          relationship_class:   "External",
+          relationship_classes: ["External"],
+          org_notion_id:        orgId,
+          auto_suggested:       "decision_approval",
+          auto_suggested_at:    nowIso,
+          first_seen_at:        nowIso,
+          created_at:           nowIso,
+          updated_at:           nowIso,
+        })
+      } catch (e) {
+        console.warn("[approveEntityCreation] people insert failed:", e)
       }
-      await notion.pages.create({
-        parent: { database_id: "1bc0f96f33ca4a9e9ff26844377e81de" },
-        properties: personProps,
-      })
     }
 
     // Resolve Decision Item
@@ -489,23 +499,34 @@ export async function approvePersonCreation(
   try {
     await requireAdminAction()
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const personProps: Record<string, any> = {
-      "Full Name": { title: [{ type: "text", text: { content: personName } }] },
-      "Person Classification": { select: { name: "External" } },
-    }
-    if (personEmail) personProps["Email"] = { email: personEmail }
-    if (orgId) personProps["Primary Organization"] = { relation: [{ id: orgId }] }
-
-    const personPage = await notion.pages.create({
-      parent: { database_id: "1bc0f96f33ca4a9e9ff26844377e81de" },
-      properties: personProps,
-    })
+    // Create person directly in Supabase `people` (Notion Contacts no longer
+    // source of truth after the contact consolidation).
+    const { getSupabaseServerClient } = await import("@/lib/supabase-server")
+    const sb = getSupabaseServerClient()
+    const nowIso = new Date().toISOString()
+    const { data: inserted } = await sb
+      .from("people")
+      .insert({
+        email:                personEmail?.toLowerCase() ?? null,
+        full_name:            personName,
+        display_name:         personName,
+        relationship_class:   "External",
+        relationship_classes: ["External"],
+        org_notion_id:        orgId ?? null,
+        auto_suggested:       "decision_approval",
+        auto_suggested_at:    nowIso,
+        first_seen_at:        nowIso,
+        created_at:           nowIso,
+        updated_at:           nowIso,
+      })
+      .select("id")
+      .single()
+    const personPageId = inserted?.id ?? "(unknown)"
 
     try {
       await notion.comments.create({
         parent: { page_id: decisionId },
-        rich_text: [{ type: "text", text: { content: `Person created: ${personName} (${personPage.id})${orgName ? ` at ${orgName}` : ""}` } }],
+        rich_text: [{ type: "text", text: { content: `Person created: ${personName} (supabase: ${personPageId})${orgName ? ` at ${orgName}` : ""}` } }],
       })
     } catch { /* comment permissions optional */ }
 
@@ -515,9 +536,10 @@ export async function approvePersonCreation(
     })
 
     revalidatePath("/admin/decisions")
-  revalidatePath("/admin")
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return { personUrl: (personPage as any).url ?? undefined }
+    revalidatePath("/admin")
+    // No Notion URL — person is now a Supabase row. Return the admin path
+    // if we want to link to the contact page later.
+    return { personUrl: personPageId === "(unknown)" ? undefined : `/admin/hall/contacts` }
   } catch (err) {
     console.error("[approvePersonCreation] error:", err)
     const msg = err instanceof Error ? err.message

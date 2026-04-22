@@ -82,10 +82,6 @@
       "schedule": "0 12 * * 1-5"
     },
     {
-      "path": "/api/sync-people",
-      "schedule": "0 12 * * 1-5"
-    },
-    {
       "path": "/api/cron/observe-calendar",
       "schedule": "0 6 * * *"
     },
