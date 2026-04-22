@@ -92,7 +92,7 @@ export default async function ContactDrawerPage({ params }: Props) {
   if (!contact) return notFound();
 
   const [whatsappClips, sharedProjects, coAttendees, organizations] = await Promise.all([
-    getContactWhatsappClips(contact.display_name, 10),
+    getContactWhatsappClips({ person_id: enrichment?.id ?? null, display_name: contact.display_name }, 10),
     getSharedProjects(email),
     getCoAttendees(email, 8),
     getContactOrganizations(email, enrichment),

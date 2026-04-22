@@ -153,45 +153,108 @@ export type WhatsappClip = {
 };
 
 // Returns WhatsApp conversation clips where the given contact appears as a
-// sender (matched by display_name ILIKE). Used to surface cross-channel
-// activity beyond calendar/email/meetings on the contact drawer page.
+// sender. Two resolution paths:
+//   (a) if `person_id` is provided — filter by sender_person_id. This is
+//       the authoritative path: set by the clipper when it can match, and
+//       backfilled by the orphan-scanner approve flow. Covers cases where
+//       the WA handle differs from the contact's display_name (e.g. a
+//       contact named "Kiumarz Goharriz" who appears as "Kiu" on WA —
+//       after approving the orphan match, person_id points to the right
+//       row even though sender_name says "Kiu").
+//   (b) falls back to an ILIKE probe on `sender_name` for legacy /
+//       not-yet-linked messages, using the longest token from
+//       display_name as the probe. Preserves behaviour for contacts
+//       whose messages haven't been re-linked yet.
 export async function getContactWhatsappClips(
-  displayName: string | null,
+  opts: { person_id?: string | null; display_name?: string | null } | string | null,
   limit = 10,
 ): Promise<WhatsappClip[]> {
-  const name = (displayName ?? "").trim();
-  if (!name || name.length < 3) return [];
+  // Back-compat: if caller passed a bare string (old signature), treat it
+  // as display_name with no person_id.
+  const normOpts = typeof opts === "string" || opts == null
+    ? { person_id: null, display_name: opts ?? null }
+    : opts;
+  const personId = (normOpts.person_id ?? "").trim() || null;
+  const name     = (normOpts.display_name ?? "").trim();
+
   const sb = getSupabaseServerClient();
 
-  // Tokenize around spaces/commas/dots so "Correa, Cristobal" and "J.M. Moller"
-  // produce clean tokens. Pick the longest token as the most distinctive
-  // (surnames are usually rarer than first names, and rare tokens reduce
-  // false-positive matches across the DB).
-  const tokens = name
-    .split(/[\s,.]+/)
-    .map(t => t.trim())
-    .filter(t => t.length >= 3);
-  if (tokens.length === 0) return [];
-  const probe = tokens.slice().sort((a, b) => b.length - a.length)[0];
-  const pattern = `%${probe}%`;
-
-  const { data, error } = await sb
-    .from("conversation_messages")
-    .select("source_id, ts, sender_name, text, sources!inner(notion_id, title, source_url, source_platform)")
-    .ilike("sender_name", pattern)
-    .order("ts", { ascending: false })
-    .limit(500);
-
-  if (error || !data) return [];
-
   type Row = {
-    source_id: string;
-    ts: string;
+    source_id:   string;
+    ts:          string;
     sender_name: string;
-    text: string;
-    sources: { notion_id: string | null; title: string | null; source_url: string | null; source_platform: string | null } | null;
+    text:        string;
+    sources:     { notion_id: string | null; title: string | null; source_url: string | null; source_platform: string | null } | null;
   };
-  const rows = (data as unknown as Row[]).filter(r => r.sources?.source_platform === "WhatsApp");
+
+  let rows: Row[] = [];
+
+  // Path (a) — person_id is authoritative. Fetch by sender_person_id.
+  if (personId) {
+    const { data, error } = await sb
+      .from("conversation_messages")
+      .select("source_id, ts, sender_name, text, sources!inner(notion_id, title, source_url, source_platform)")
+      .eq("sender_person_id", personId)
+      .order("ts", { ascending: false })
+      .limit(500);
+    if (!error && data) {
+      rows = (data as unknown as Row[]).filter(r => r.sources?.source_platform === "WhatsApp");
+    }
+  }
+
+  // Path (b) — fall back to (or also merge with) ILIKE probes on sender_name.
+  // Two kinds of probes:
+  //   - the longest token of display_name  ("Kiumarz Goharriz" → "Goharriz")
+  //   - every alias stored on people.aliases (approving an orphan match
+  //     adds the WA sender variant here; "Kiu" ends up in aliases after
+  //     you approve the first match). This fixes the case where the
+  //     orphan-scanner approved Kiu → Kiumarz for one source but other
+  //     unrelated WA conversations where he still shows as "Kiu" were
+  //     never re-linked to his person_id.
+  const probes = new Set<string>();
+  if (name.length >= 3) {
+    const tokens = name
+      .split(/[\s,.]+/)
+      .map(t => t.trim())
+      .filter(t => t.length >= 3);
+    if (tokens.length > 0) {
+      probes.add(tokens.slice().sort((a, b) => b.length - a.length)[0]);
+    }
+  }
+  if (personId) {
+    const { data: aliasRow } = await sb
+      .from("people")
+      .select("aliases")
+      .eq("id", personId)
+      .maybeSingle();
+    const aliases = ((aliasRow as { aliases: string[] | null } | null)?.aliases ?? []) as string[];
+    for (const a of aliases) {
+      const cleaned = (a ?? "").trim();
+      if (cleaned.length >= 3) probes.add(cleaned);
+    }
+  }
+
+  if (probes.size > 0) {
+    const seen = new Set(rows.map(r => `${r.source_id}::${r.ts}`));
+    for (const probe of probes) {
+      const pattern = `%${probe}%`;
+      const { data, error } = await sb
+        .from("conversation_messages")
+        .select("source_id, ts, sender_name, text, sources!inner(notion_id, title, source_url, source_platform)")
+        .ilike("sender_name", pattern)
+        .order("ts", { ascending: false })
+        .limit(500);
+      if (!error && data) {
+        const extra = (data as unknown as Row[]).filter(r => r.sources?.source_platform === "WhatsApp");
+        for (const r of extra) {
+          const k = `${r.source_id}::${r.ts}`;
+          if (!seen.has(k)) { rows.push(r); seen.add(k); }
+        }
+      }
+    }
+  }
+
+  if (rows.length === 0) return [];
 
   // Group by source_id
   const bySource = new Map<string, Row[]>();
