@@ -282,9 +282,11 @@ export function appendBullet(
     return { body: body_md, changed: false, before: null, after: null };
   }
 
-  // Strip placeholder text when adding first real content
-  const placeholder = /_\(Por (?:construir|poblar)\.?\)_|_\(Aún no documentado\.?\)_[^\n]*/g;
-  const strippedBody = target.body.replace(placeholder, "").trim();
+  // Strip placeholder text when adding first real content. Convention: seed
+  // stubs are italic parentheticals on their own line (e.g. "_(Por construir.)_").
+  // Match any line that is exclusively such a marker.
+  const placeholder = /^[ \t]*_\([^\n)]*\)_[ \t]*$/gm;
+  const strippedBody = target.body.replace(placeholder, "").replace(/\n{3,}/g, "\n\n").trim();
 
   const before = target.body;
   target.body = strippedBody
