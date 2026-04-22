@@ -19,6 +19,7 @@ import {
 import { HallContactRow } from "@/components/HallContactRow";
 import { ReEnrichButton } from "@/components/ReEnrichButton";
 import { SynthesizeTopicsButton } from "@/components/SynthesizeTopicsButton";
+import { CollapsibleList } from "@/components/CollapsibleList";
 
 export const dynamic = "force-dynamic";
 
@@ -48,6 +49,20 @@ function entryGlyph(kind: TimelineEntry["kind"]): string {
   if (kind === "meeting")    return "📅";
   if (kind === "transcript") return "🎙️";
   return "📧";
+}
+
+function labelForSource(source: string): string {
+  // Human labels for the various enrichment sources we track. Some are
+  // historical (google_cse_snippet predates the pivot to Anthropic web search).
+  const map: Record<string, string> = {
+    manual:                 "entered manually",
+    google_cse_snippet:     "inferred from web search",
+    anthropic_web_search:   "inferred from web search",
+    clearbit:               "via Clearbit",
+    apollo:                 "via Apollo",
+    linkedin_api:           "via LinkedIn API",
+  };
+  return map[source] ?? source.replace(/_/g, " ");
 }
 
 function warmthFromLastSeen(iso: string | null): { label: string; tone: string } {
@@ -218,7 +233,7 @@ export default async function ContactDrawerPage({ params }: Props) {
                     <p className="text-[11.5px] text-[#131218]/70">
                       {enrichment.job_title}
                       {enrichment.job_title_source && (
-                        <span className="text-[10px] text-[#131218]/40"> · source {enrichment.job_title_source.replace(/_/g, " ")}</span>
+                        <span className="text-[10px] text-[#131218]/40"> · {labelForSource(enrichment.job_title_source)}</span>
                       )}
                       {enrichment.job_title_updated_at && (
                         <span className="text-[10px] text-[#131218]/40"> · {timeAgo(enrichment.job_title_updated_at)}</span>
@@ -257,21 +272,26 @@ export default async function ContactDrawerPage({ params }: Props) {
 
             {/* Shared projects / recurring meetings */}
             {sharedProjects.length > 0 && (
-              <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-4 mb-3">
-                <p className="text-[9px] font-bold uppercase tracking-widest text-[#131218]/45 mb-2">
+              <div className="bg-white rounded-2xl border border-[#E0E0D8] mb-3 overflow-hidden">
+                <p className="px-5 pt-4 pb-2 text-[9px] font-bold uppercase tracking-widest text-[#131218]/45">
                   Projects & recurring meetings
                 </p>
-                <ul className="space-y-1.5">
-                  {sharedProjects.map(p => (
-                    <li key={p.project_name} className="flex items-center gap-3 text-[12px]">
-                      <span className="flex-1 truncate text-[#131218]">{p.project_name}</span>
-                      <span className="text-[10.5px] text-[#131218]/50 shrink-0 tabular-nums">
-                        {p.meeting_count > 0 && <>📅 {p.meeting_count} </>}
-                        {p.transcript_count > 0 && <>🎙️ {p.transcript_count} </>}
-                        · {timeAgo(p.last_ts)}
-                      </span>
-                    </li>
-                  ))}
+                <ul className="divide-y divide-[#EFEFEA]">
+                  <CollapsibleList
+                    items={sharedProjects}
+                    initialVisible={5}
+                    moreLabel="more"
+                    render={p => (
+                      <li key={p.project_name} className="flex items-center gap-3 px-5 py-2.5 text-[12px]">
+                        <span className="flex-1 truncate text-[#131218]">{p.project_name}</span>
+                        <span className="text-[10.5px] text-[#131218]/50 shrink-0 tabular-nums">
+                          {p.meeting_count > 0 && <>📅 {p.meeting_count} </>}
+                          {p.transcript_count > 0 && <>🎙️ {p.transcript_count} </>}
+                          · {timeAgo(p.last_ts)}
+                        </span>
+                      </li>
+                    )}
+                  />
                 </ul>
               </div>
             )}
@@ -314,51 +334,56 @@ export default async function ContactDrawerPage({ params }: Props) {
                 <span className="text-[10px] text-[#131218]/40 tabular-nums">{organizations.length}</span>
               </div>
               <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden divide-y divide-[#EFEFEA]">
-                {organizations.map((o, i) => (
-                  <div key={`${o.domain || "enrichment"}:${i}`} className="px-5 py-4">
-                    <div className="flex items-baseline justify-between gap-3">
-                      <div className="min-w-0 flex items-baseline gap-2 flex-wrap">
-                        <span className="text-[13px] font-semibold text-[#131218] truncate">
-                          🏢 {o.org_name ?? o.domain}
-                        </span>
-                        {o.is_primary && (
-                          <span className="text-[9px] font-bold uppercase tracking-widest bg-[#c8f55a] text-[#131218] px-2 py-0.5 rounded-full">
-                            Primary
+                <CollapsibleList
+                  items={organizations}
+                  initialVisible={5}
+                  moreLabel={organizations.length - 5 === 1 ? "more organization" : "more organizations"}
+                  render={(o, i) => (
+                    <div key={`${o.domain || "enrichment"}:${i}`} className="px-5 py-4">
+                      <div className="flex items-baseline justify-between gap-3">
+                        <div className="min-w-0 flex items-baseline gap-2 flex-wrap">
+                          <span className="text-[13px] font-semibold text-[#131218] truncate">
+                            🏢 {o.org_name ?? o.domain}
                           </span>
-                        )}
-                        {o.is_ch && (
-                          <span className="text-[9px] font-bold uppercase tracking-widest bg-[#131218] text-white px-2 py-0.5 rounded-full">
-                            Common House
+                          {o.is_primary && (
+                            <span className="text-[9px] font-bold uppercase tracking-widest bg-[#c8f55a] text-[#131218] px-2 py-0.5 rounded-full">
+                              Primary
+                            </span>
+                          )}
+                          {o.is_ch && (
+                            <span className="text-[9px] font-bold uppercase tracking-widest bg-[#131218] text-white px-2 py-0.5 rounded-full">
+                              Common House
+                            </span>
+                          )}
+                          {o.domain && o.domain !== o.org_name && (
+                            <span className="text-[10px] text-[#131218]/40">{o.domain}</span>
+                          )}
+                        </div>
+                        <div className="text-[10px] text-[#131218]/50 shrink-0 tabular-nums">
+                          {o.shared_meetings > 0 && <>🎙️ {o.shared_meetings} shared </>}
+                          {o.last_ts && <>· {timeAgo(o.last_ts)}</>}
+                        </div>
+                      </div>
+                      {o.other_contacts.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          <span className="text-[9px] font-bold uppercase tracking-widest text-[#131218]/40 self-center">
+                            You also know
                           </span>
-                        )}
-                        {o.domain && o.domain !== o.org_name && (
-                          <span className="text-[10px] text-[#131218]/40">{o.domain}</span>
-                        )}
-                      </div>
-                      <div className="text-[10px] text-[#131218]/50 shrink-0 tabular-nums">
-                        {o.shared_meetings > 0 && <>🎙️ {o.shared_meetings} shared </>}
-                        {o.last_ts && <>· {timeAgo(o.last_ts)}</>}
-                      </div>
+                          {o.other_contacts.map(c => (
+                            <Link
+                              key={c.email}
+                              href={`/admin/hall/contacts/${encodeURIComponent(c.email)}`}
+                              prefetch={false}
+                              className="text-[10.5px] bg-[#EFEFEA] text-[#131218]/80 hover:text-[#131218] hover:bg-[#E0E0D8] px-2 py-0.5 rounded-full transition-colors"
+                            >
+                              {c.display_name ?? c.email.split("@")[0]}
+                            </Link>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                    {o.other_contacts.length > 0 && (
-                      <div className="mt-2 flex flex-wrap gap-1.5">
-                        <span className="text-[9px] font-bold uppercase tracking-widest text-[#131218]/40 self-center">
-                          You also know
-                        </span>
-                        {o.other_contacts.map(c => (
-                          <Link
-                            key={c.email}
-                            href={`/admin/hall/contacts/${encodeURIComponent(c.email)}`}
-                            prefetch={false}
-                            className="text-[10.5px] bg-[#EFEFEA] text-[#131218]/80 hover:text-[#131218] hover:bg-[#E0E0D8] px-2 py-0.5 rounded-full transition-colors"
-                          >
-                            {c.display_name ?? c.email.split("@")[0]}
-                          </Link>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))}
+                  )}
+                />
               </div>
             </section>
           )}
@@ -403,7 +428,11 @@ export default async function ContactDrawerPage({ params }: Props) {
                   WhatsApp conversations · {whatsappClips.length}
                 </p>
                 <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden divide-y divide-[#EFEFEA]">
-                  {whatsappClips.map((clip) => {
+                  <CollapsibleList
+                    items={whatsappClips}
+                    initialVisible={3}
+                    moreLabel={whatsappClips.length - 3 === 1 ? "more conversation" : "more conversations"}
+                    render={(clip) => {
                     const first = new Date(clip.first_ts);
                     const last  = new Date(clip.last_ts);
                     const sameDay = first.toDateString() === last.toDateString();
@@ -444,7 +473,8 @@ export default async function ContactDrawerPage({ params }: Props) {
                         </div>
                       </div>
                     );
-                  })}
+                  }}
+                  />
                 </div>
               </div>
             )}
@@ -460,25 +490,30 @@ export default async function ContactDrawerPage({ params }: Props) {
                 </div>
               ) : (
                 <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden divide-y divide-[#EFEFEA]">
-                  {timeline.map((entry, idx) => (
-                    <div key={`${entry.kind}:${idx}`} className="flex items-start gap-4 px-5 py-3.5 hover:bg-[#EFEFEA]/40 transition-colors">
-                      <span className="text-[15px] leading-none mt-0.5">{entryGlyph(entry.kind)}</span>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[12px] font-semibold text-[#131218] truncate">{entry.title}</p>
-                        <p className="text-[10px] text-[#131218]/45 mt-0.5">
-                          <span className="uppercase tracking-wide font-bold">{entry.kind}</span>
-                          {" · "}{formatWhen(entry.at)}
-                          {" · "}{timeAgo(entry.at)}
-                          {entry.kind === "meeting" && ` · ${entry.attendee_count} attendee${entry.attendee_count === 1 ? "" : "s"}`}
-                        </p>
+                  <CollapsibleList
+                    items={timeline}
+                    initialVisible={5}
+                    moreLabel={timeline.length - 5 === 1 ? "more event" : "more events"}
+                    render={(entry, idx) => (
+                      <div key={`${entry.kind}:${idx}`} className="flex items-start gap-4 px-5 py-3.5 hover:bg-[#EFEFEA]/40 transition-colors">
+                        <span className="text-[15px] leading-none mt-0.5">{entryGlyph(entry.kind)}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[12px] font-semibold text-[#131218] truncate">{entry.title}</p>
+                          <p className="text-[10px] text-[#131218]/45 mt-0.5">
+                            <span className="uppercase tracking-wide font-bold">{entry.kind}</span>
+                            {" · "}{formatWhen(entry.at)}
+                            {" · "}{timeAgo(entry.at)}
+                            {entry.kind === "meeting" && ` · ${entry.attendee_count} attendee${entry.attendee_count === 1 ? "" : "s"}`}
+                          </p>
+                        </div>
+                        {entry.kind === "transcript" && entry.meeting_link && (
+                          <a href={entry.meeting_link} target="_blank" rel="noopener noreferrer" className="text-[9px] font-bold uppercase tracking-widest text-[#131218]/40 hover:text-[#131218]/80 self-center">
+                            Open ↗
+                          </a>
+                        )}
                       </div>
-                      {entry.kind === "transcript" && entry.meeting_link && (
-                        <a href={entry.meeting_link} target="_blank" rel="noopener noreferrer" className="text-[9px] font-bold uppercase tracking-widest text-[#131218]/40 hover:text-[#131218]/80 self-center">
-                          Open ↗
-                        </a>
-                      )}
-                    </div>
-                  ))}
+                    )}
+                  />
                 </div>
               )}
             </div>
