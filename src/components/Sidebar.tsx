@@ -70,9 +70,8 @@ export const ADMIN_NAV_V2: NavEntry[] = [
   {
     kind: "group", label: "Control Room", icon: "◫",
     items: [
-      { label: "Decisions",       href: "/admin/decisions" },
       { label: "Agents",          href: "/admin/agents" },
-      { label: "Intake / OS",     href: "/admin/os" },
+      { label: "Intake / Decisions", href: "/admin/os" },
       { label: "Content",         href: "/admin/content" },
       { label: "Knowledge",       href: "/admin/knowledge" },
       { label: "Contacts",        href: "/admin/hall/contacts" },

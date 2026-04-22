@@ -24,9 +24,8 @@ export const ADMIN_NAV = [
   { label: "Offers & Proposals",  href: "/admin/offers",         icon: "◫", section: "Desks" },
 
   // ── Control Room ──────────────────────────────────────────────────────────
-  { label: "Decisions",           href: "/admin/decisions",      icon: "✓", section: "Control Room" },
   { label: "Agents",              href: "/admin/agents",         icon: "⬡", section: "Control Room" },
-  { label: "Intake / Exceptions", href: "/admin/os",             icon: "▤", section: "Control Room" },
+  { label: "Intake / Decisions",  href: "/admin/os",             icon: "▤", section: "Control Room" },
   { label: "Content Pipeline",    href: "/admin/content",        icon: "◫", section: "Control Room" },
   { label: "Knowledge Assets",    href: "/admin/knowledge",      icon: "◉", section: "Control Room" },
   { label: "System Health",       href: "/admin/health",         icon: "◎", section: "Control Room" },

@@ -1,19 +1,111 @@
-import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/Sidebar";
 import { StatusBadge } from "@/components/StatusBadge";
 import { MetricCard } from "@/components/MetricCard";
 import { EvidenceQueueTable, EvidenceQueueReadOnlyTable } from "@/components/EvidenceQueueTable";
-import { getAllEvidence, getAllSources, getAllProjects } from "@/lib/notion";
+import { DecisionActions } from "@/components/DecisionActions";
+import { getAllEvidence, getAllSources, getAllProjects, getDecisionItems, type DecisionItem } from "@/lib/notion";
 import { NAV } from "../page";
 import { requireAdmin } from "@/lib/require-admin";
+
+const PRIORITY_RANK: Record<string, number> = {
+  "P1 Critical": 0,
+  "High": 1,
+  "Medium": 2,
+  "Low": 3,
+};
+
+const PRIORITY_DOT: Record<string, string> = {
+  "P1 Critical": "bg-red-500",
+  "High":        "bg-amber-400",
+  "Medium":      "bg-blue-400",
+  "Low":         "bg-[#131218]/15",
+};
+
+const TYPE_ICON: Record<string, { icon: string; color: string }> = {
+  "Approval":                   { icon: "✓", color: "text-green-600 bg-green-50" },
+  "Missing Input":              { icon: "?", color: "text-amber-600 bg-amber-50" },
+  "Ambiguity Resolution":       { icon: "⊡", color: "text-blue-600 bg-blue-50" },
+  "Policy/Automation Decision": { icon: "◎", color: "text-purple-600 bg-purple-50" },
+  "Draft Review":               { icon: "▤", color: "text-[#131218] bg-[#EFEFEA]" },
+};
+
+function daysSince(iso: string | null): number {
+  if (!iso) return 999;
+  return Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
+}
+
+function DecisionCard({ d }: { d: DecisionItem }) {
+  const needsExecute = d.requiresExecute && !d.executeApproved;
+  const tCfg = TYPE_ICON[d.decisionType] ?? { icon: "·", color: "text-[#131218]/40 bg-[#EFEFEA]" };
+  const overdue = d.dueDate && daysSince(d.dueDate) > 0;
+  return (
+    <div className={`px-6 py-4 flex items-start gap-4 ${needsExecute ? "bg-red-50/30" : ""}`}>
+      <div className="mt-1 shrink-0">
+        <span className={`w-2 h-2 rounded-full inline-block ${PRIORITY_DOT[d.priority] ?? PRIORITY_DOT["Low"]}`} />
+      </div>
+      <div className={`w-6 h-6 rounded-lg flex items-center justify-center text-[11px] font-bold shrink-0 ${tCfg.color}`}>
+        {tCfg.icon}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-start gap-2 flex-wrap">
+          <p className="text-sm font-semibold text-[#131218] leading-snug">{d.title}</p>
+          {needsExecute && (
+            <span className="text-[9px] font-bold bg-red-100 text-red-700 border border-red-200 px-2 py-0.5 rounded-full uppercase tracking-widest">
+              × Execute blocked
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+          <span className="text-[10px] text-[#131218]/30 font-medium">{d.decisionType}</span>
+          {d.sourceAgent && <span className="text-[10px] text-[#131218]/25 font-medium">via {d.sourceAgent}</span>}
+          {d.dueDate && (
+            <span className={`text-[10px] font-bold ${overdue ? "text-red-500" : "text-[#131218]/25"}`}>
+              {overdue ? "! Overdue" : "Due"} {new Date(d.dueDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+            </span>
+          )}
+        </div>
+        {d.notes ? (
+          <p className="text-[12px] text-[#131218]/65 mt-2 leading-relaxed">{d.notes}</p>
+        ) : (
+          <p className="text-[11px] text-[#131218]/25 italic mt-1.5">No context provided.</p>
+        )}
+        <DecisionActions
+          id={d.id}
+          requiresExecute={d.requiresExecute}
+          executeApproved={d.executeApproved}
+          status={d.status}
+          decisionType={d.decisionType}
+          sourceAgent={d.sourceAgent}
+          notionUrl={d.notionUrl}
+          relatedEntityId={d.relatedEntityId}
+          relatedField={d.relatedField}
+          relatedResolutionType={d.relatedResolutionType}
+          relatedSearchDb={d.relatedSearchDb}
+          relatedFields={d.relatedFields}
+          entityAction={d.entityAction}
+          entityName={d.entityName}
+          entityDomain={d.entityDomain}
+          entityCategory={d.entityCategory}
+          contactName={d.contactName}
+          contactEmail={d.contactEmail}
+          personName={d.personName}
+          personEmail={d.personEmail}
+          personOrgId={d.personOrgId}
+          personOrgName={d.personOrgName}
+        />
+      </div>
+    </div>
+  );
+}
 
 export default async function OSPage() {
   await requireAdmin();
 
-  const [allEvidence, sources, projects] = await Promise.all([
+  const [allEvidence, sources, projects, allDecisions] = await Promise.all([
     getAllEvidence(),
     getAllSources(),
     getAllProjects(),
+    getDecisionItems(),
   ]);
 
   // Build project name lookup
@@ -21,10 +113,28 @@ export default async function OSPage() {
   for (const p of projects) projectNames[p.id] = p.name;
 
   const newEvidence       = allEvidence.filter(e => e.validationStatus === "New");
-  const reviewEvidence    = allEvidence.filter(e => e.validationStatus === "Reviewed");
+  const reviewEvidenceRaw = allEvidence.filter(e => e.validationStatus === "Reviewed");
+  // "Passing through" — only last 14 days. Older Reviewed items are archived by
+  // the engine (validation-operator ARCHIVE tier) and don't belong in the queue.
+  const reviewEvidence    = reviewEvidenceRaw.filter(e =>
+    e.dateCaptured ? daysSince(e.dateCaptured) <= 14 : false,
+  );
   const validatedEvidence = allEvidence.filter(e => e.validationStatus === "Validated");
   const blockers          = allEvidence.filter(e => e.type === "Blocker" && e.validationStatus === "Validated");
-  const totalPending      = newEvidence.length + reviewEvidence.length;
+
+  // Open decisions — sorted by severity: Execute Gate > P1 > priority
+  const openDecisions = allDecisions
+    .filter(d => d.status === "Open" || !d.status)
+    .sort((a, b) => {
+      const aGate = a.requiresExecute && !a.executeApproved ? 0 : 1;
+      const bGate = b.requiresExecute && !b.executeApproved ? 0 : 1;
+      if (aGate !== bGate) return aGate - bGate;
+      return (PRIORITY_RANK[a.priority] ?? 99) - (PRIORITY_RANK[b.priority] ?? 99);
+    });
+  const executeGateCount = openDecisions.filter(d => d.requiresExecute && !d.executeApproved).length;
+  const p1DecisionCount  = openDecisions.filter(d => d.priority === "P1 Critical").length;
+
+  const totalPending = newEvidence.length + reviewEvidence.length + openDecisions.length;
 
   const validationRate = allEvidence.length > 0
     ? Math.round((validatedEvidence.length / allEvidence.length) * 100)
@@ -66,7 +176,7 @@ export default async function OSPage() {
             Intake &amp; <em className="font-[900] italic text-[#c8f55a]">Exceptions</em>
           </h1>
           <p className="text-[12.5px] text-white/40 mt-3 max-w-[520px] leading-[1.65]">
-            Sources → Evidence → Validation · Review queue and pending items.
+            Decisions · Evidence · Sources. Todo lo que el engine no pudo resolver solo.
           </p>
         </div>
 
@@ -74,12 +184,12 @@ export default async function OSPage() {
 
           {/* Pipeline metrics */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-            <MetricCard label="Sources"    value={sources.length}           sub={ingestedSources > 0 ? `${ingestedSources} ingested` : undefined} />
-            <MetricCard label="New"        value={newEvidence.length}       color={newEvidence.length > 0 ? "yellow" : "default"} sub="needs human review" />
-            <MetricCard label="Reviewed"   value={reviewEvidence.length}    color={reviewEvidence.length > 0 ? "yellow" : "default"} sub="awaiting engine" />
-            <MetricCard label="Validated"  value={validatedEvidence.length} color="green" />
-            <MetricCard label="Blockers"   value={blockers.length}          color={blockers.length > 0 ? "red" : "default"} />
-            <MetricCard label="Val. Rate"  value={`${validationRate}%`}     color="green" />
+            <MetricCard label="Decisions"  value={openDecisions.length}      color={openDecisions.length > 0 ? "yellow" : "default"} sub={executeGateCount > 0 ? `${executeGateCount} blocked` : undefined} />
+            <MetricCard label="Sources"    value={sources.length}            sub={ingestedSources > 0 ? `${ingestedSources} ingested` : undefined} />
+            <MetricCard label="New"        value={newEvidence.length}        color={newEvidence.length > 0 ? "yellow" : "default"} sub="needs human" />
+            <MetricCard label="Validated"  value={validatedEvidence.length}  color="green" />
+            <MetricCard label="Blockers"   value={blockers.length}           color={blockers.length > 0 ? "red" : "default"} />
+            <MetricCard label="Val. Rate"  value={`${validationRate}%`}      color="green" />
           </div>
 
           {/* Active blockers — shown prominently if any */}
@@ -127,17 +237,17 @@ export default async function OSPage() {
             </div>
           )}
 
-          {/* Needs Your Call — exceptions only */}
+          {/* Needs Your Call — unified: decisions + flagged evidence + passing through */}
           <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
             <div className="h-1 bg-amber-400" />
             <div className="px-6 py-4 border-b border-[#EFEFEA] flex items-center justify-between">
               <div>
                 <h2 className="text-sm font-bold text-[#131218] tracking-tight">Needs Your Call</h2>
-                <p className="text-xs text-[#131218]/40 mt-0.5">Exceptions the engine couldn&apos;t auto-validate — everything else already passed through</p>
+                <p className="text-xs text-[#131218]/40 mt-0.5">Decisions + exceptions que el engine no pudo resolver solo</p>
               </div>
               {totalPending > 0 ? (
                 <span className="text-[10px] font-bold bg-amber-100 text-amber-700 px-2.5 py-1 rounded-full uppercase tracking-widest">
-                  {totalPending} flagged
+                  {totalPending} pending
                 </span>
               ) : (
                 <span className="text-[10px] font-bold bg-[#EFEFEA] text-[#131218]/30 px-2.5 py-1 rounded-full uppercase tracking-widest">
@@ -146,12 +256,33 @@ export default async function OSPage() {
               )}
             </div>
 
-            {/* Flagged — action required */}
+            {/* Decisions — top priority */}
+            {openDecisions.length > 0 && (
+              <div className="border-b border-[#EFEFEA]">
+                <div className="px-6 py-2 bg-red-50/40 border-b border-red-100 flex items-center justify-between">
+                  <p className="text-[9px] font-bold text-red-600 uppercase tracking-widest">
+                    Decisions · {openDecisions.length} item{openDecisions.length !== 1 ? "s" : ""}
+                  </p>
+                  {(executeGateCount > 0 || p1DecisionCount > 0) && (
+                    <p className="text-[9px] font-bold text-red-500 uppercase tracking-widest">
+                      {executeGateCount > 0 && `${executeGateCount} × execute blocked`}
+                      {executeGateCount > 0 && p1DecisionCount > 0 && " · "}
+                      {p1DecisionCount > 0 && `${p1DecisionCount} P1`}
+                    </p>
+                  )}
+                </div>
+                <div className="divide-y divide-[#EFEFEA]">
+                  {openDecisions.map(d => <DecisionCard key={d.id} d={d} />)}
+                </div>
+              </div>
+            )}
+
+            {/* Flagged evidence — action required */}
             {newEvidence.length > 0 && (
               <div className="border-b border-[#EFEFEA]">
                 <div className="px-6 py-2 bg-amber-50/60 border-b border-amber-100">
                   <p className="text-[9px] font-bold text-amber-600 uppercase tracking-widest">
-                    Flagged · {newEvidence.length} item{newEvidence.length !== 1 ? "s" : ""}
+                    Flagged evidence · {newEvidence.length} item{newEvidence.length !== 1 ? "s" : ""}
                   </p>
                 </div>
                 <EvidenceQueueTable
@@ -161,7 +292,7 @@ export default async function OSPage() {
               </div>
             )}
 
-            {/* In Review — waiting for validation engine, no human action needed */}
+            {/* In Review — recent (<=14d), engine will validate */}
             {reviewEvidence.length > 0 && (
               <>
                 <div className="px-6 py-2 bg-[#EFEFEA]/60 border-y border-[#EFEFEA] flex items-center justify-between">
@@ -176,14 +307,14 @@ export default async function OSPage() {
 
             {totalPending === 0 && (
               <div className="px-6 py-10 text-center">
-                <p className="text-sm font-medium text-[#131218]/30">Nothing flagged — engine handled everything ✓</p>
+                <p className="text-sm font-medium text-[#131218]/30">Nothing pending — engine handled everything ✓</p>
               </div>
             )}
 
             {totalPending > 0 && (
               <div className="px-6 py-3 border-t border-[#EFEFEA]">
                 <p className="text-[10px] text-[#131218]/25 font-bold uppercase tracking-widest">
-                  {totalPending} pending · {validatedEvidence.length} validated · {validationRate}% rate
+                  {openDecisions.length} decisions · {newEvidence.length} flagged · {reviewEvidence.length} passing · {validatedEvidence.length} validated ({validationRate}% rate)
                 </p>
               </div>
             )}
