@@ -367,6 +367,10 @@ async function _POST(req: NextRequest) {
               reasoning: c.reasoning,
               status: "applied",
             });
+            // Reflect the write back onto the in-memory node so subsequent
+            // APPENDs within the same run build on top of it (instead of
+            // starting from the original body and overwriting each other).
+            node.body_md = newBody;
           }
           item.status = "applied";
           item.section = sectionLabel;
