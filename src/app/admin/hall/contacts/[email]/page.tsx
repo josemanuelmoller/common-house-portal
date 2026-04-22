@@ -20,6 +20,7 @@ import { HallContactRow } from "@/components/HallContactRow";
 import { ReEnrichButton } from "@/components/ReEnrichButton";
 import { SynthesizeTopicsButton } from "@/components/SynthesizeTopicsButton";
 import { CollapsibleList } from "@/components/CollapsibleList";
+import { ContactIdentityEditor } from "@/components/ContactIdentityEditor";
 
 export const dynamic = "force-dynamic";
 
@@ -191,7 +192,24 @@ export default async function ContactDrawerPage({ params }: Props) {
             <div className="flex items-center gap-3 mb-3">
               <h2 className="text-[11px] font-bold tracking-widest uppercase text-[#131218]/60">Identity</h2>
               <div className="flex-1 h-px bg-[#E0E0D8]" />
-              {enrichment && <ReEnrichButton personId={enrichment.id} />}
+              {enrichment && (
+                <>
+                  <ContactIdentityEditor
+                    personId={enrichment.id}
+                    initial={{
+                      full_name:    enrichment.full_name,
+                      display_name: enrichment.display_name,
+                      linkedin:     enrichment.linkedin,
+                      job_title:    enrichment.job_title,
+                      phone:        enrichment.phone,
+                      notes:        enrichment.notes,
+                      city:         enrichment.city,
+                      country:      enrichment.country,
+                    }}
+                  />
+                  <ReEnrichButton personId={enrichment.id} />
+                </>
+              )}
             </div>
             <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-4 space-y-3">
               {!hasLinkedIn && !hasRoleSignal ? (
@@ -277,11 +295,8 @@ export default async function ContactDrawerPage({ params }: Props) {
                   Projects & recurring meetings
                 </p>
                 <ul className="divide-y divide-[#EFEFEA]">
-                  <CollapsibleList
-                    items={sharedProjects}
-                    initialVisible={5}
-                    moreLabel="more"
-                    render={p => (
+                  <CollapsibleList initialVisible={5} moreLabel="more">
+                    {sharedProjects.map(p => (
                       <li key={p.project_name} className="flex items-center gap-3 px-5 py-2.5 text-[12px]">
                         <span className="flex-1 truncate text-[#131218]">{p.project_name}</span>
                         <span className="text-[10.5px] text-[#131218]/50 shrink-0 tabular-nums">
@@ -290,8 +305,8 @@ export default async function ContactDrawerPage({ params }: Props) {
                           · {timeAgo(p.last_ts)}
                         </span>
                       </li>
-                    )}
-                  />
+                    ))}
+                  </CollapsibleList>
                 </ul>
               </div>
             )}
@@ -335,10 +350,10 @@ export default async function ContactDrawerPage({ params }: Props) {
               </div>
               <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden divide-y divide-[#EFEFEA]">
                 <CollapsibleList
-                  items={organizations}
                   initialVisible={5}
                   moreLabel={organizations.length - 5 === 1 ? "more organization" : "more organizations"}
-                  render={(o, i) => (
+                >
+                  {organizations.map((o, i) => (
                     <div key={`${o.domain || "enrichment"}:${i}`} className="px-5 py-4">
                       <div className="flex items-baseline justify-between gap-3">
                         <div className="min-w-0 flex items-baseline gap-2 flex-wrap">
@@ -382,8 +397,8 @@ export default async function ContactDrawerPage({ params }: Props) {
                         </div>
                       )}
                     </div>
-                  )}
-                />
+                  ))}
+                </CollapsibleList>
               </div>
             </section>
           )}
@@ -429,10 +444,10 @@ export default async function ContactDrawerPage({ params }: Props) {
                 </p>
                 <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden divide-y divide-[#EFEFEA]">
                   <CollapsibleList
-                    items={whatsappClips}
                     initialVisible={3}
                     moreLabel={whatsappClips.length - 3 === 1 ? "more conversation" : "more conversations"}
-                    render={(clip) => {
+                  >
+                    {whatsappClips.map((clip) => {
                     const first = new Date(clip.first_ts);
                     const last  = new Date(clip.last_ts);
                     const sameDay = first.toDateString() === last.toDateString();
@@ -473,8 +488,8 @@ export default async function ContactDrawerPage({ params }: Props) {
                         </div>
                       </div>
                     );
-                  }}
-                  />
+                  })}
+                  </CollapsibleList>
                 </div>
               </div>
             )}
@@ -491,10 +506,10 @@ export default async function ContactDrawerPage({ params }: Props) {
               ) : (
                 <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden divide-y divide-[#EFEFEA]">
                   <CollapsibleList
-                    items={timeline}
                     initialVisible={5}
                     moreLabel={timeline.length - 5 === 1 ? "more event" : "more events"}
-                    render={(entry, idx) => (
+                  >
+                    {timeline.map((entry, idx) => (
                       <div key={`${entry.kind}:${idx}`} className="flex items-start gap-4 px-5 py-3.5 hover:bg-[#EFEFEA]/40 transition-colors">
                         <span className="text-[15px] leading-none mt-0.5">{entryGlyph(entry.kind)}</span>
                         <div className="flex-1 min-w-0">
@@ -512,8 +527,8 @@ export default async function ContactDrawerPage({ params }: Props) {
                           </a>
                         )}
                       </div>
-                    )}
-                  />
+                    ))}
+                  </CollapsibleList>
                 </div>
               )}
             </div>
