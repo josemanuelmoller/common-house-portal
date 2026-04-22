@@ -56,11 +56,20 @@ const PORT = 53682;
 const REDIRECT_URI = `http://localhost:${PORT}/oauth2-callback`;
 
 const oauth2 = new google.auth.OAuth2(CLIENT_ID, CLIENT_SECRET, REDIRECT_URI);
-const authUrl = oauth2.generateAuthUrl({
+
+// Build auth URL manually — avoids any library version quirks where
+// response_type doesn't get serialised into the final URL.
+const authParams = new URLSearchParams({
+  client_id: CLIENT_ID,
+  redirect_uri: REDIRECT_URI,
+  response_type: "code",
+  scope: "https://www.googleapis.com/auth/drive",
   access_type: "offline",
-  prompt: "consent",
-  scope: ["https://www.googleapis.com/auth/drive"],
+  prompt: "select_account consent",
+  login_hint: "josemanuel@wearecommonhouse.com",
+  include_granted_scopes: "true",
 });
+const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${authParams.toString()}`;
 
 const server = createServer(async (req, res) => {
   if (!req.url?.startsWith("/oauth2-callback")) {
