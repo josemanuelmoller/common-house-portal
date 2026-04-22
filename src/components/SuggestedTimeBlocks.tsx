@@ -253,7 +253,7 @@ export function SuggestedTimeBlocks() {
                 {item.task_type === "prep" && item.entity_type === "meeting_prep" && (
                   <button
                     onClick={() => setBriefOpen({ eventId: item.entity_id, title: item.entity_label })}
-                    className="text-[9px] font-bold text-[#131218]/55 hover:text-[#131218] uppercase tracking-widest"
+                    className="text-[10px] font-bold text-[#131218] bg-white border border-[#131218] hover:bg-[#131218] hover:text-white transition-colors px-3 py-1.5 rounded-md whitespace-nowrap"
                   >
                     Open brief →
                   </button>
