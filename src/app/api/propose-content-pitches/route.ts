@@ -240,7 +240,21 @@ Respond ONLY with the JSON array. Nothing else.`;
   }));
 
   if (dryRun) {
-    return NextResponse.json({ ok: true, mode: "dry_run", pitches: toInsert });
+    // Hydrate IDs with human-readable names so the UI can render staging
+    // cards identical to the persisted pitch cards.
+    const pillarById   = new Map(pillars.map(p   => [p.id, p]));
+    const audienceById = new Map(audiences.map(a => [a.id, a]));
+    const channelById  = new Map(channels.map(c  => [c.id, c]));
+
+    const hydrated = toInsert.map(p => ({
+      ...p,
+      pillar_name:   p.pillar_id   ? pillarById.get(p.pillar_id)?.name    ?? null : null,
+      pillar_tier:   p.pillar_id   ? pillarById.get(p.pillar_id)?.tier    ?? null : null,
+      audience_name: p.audience_id ? audienceById.get(p.audience_id)?.name ?? null : null,
+      channel_name:  p.channel_id  ? channelById.get(p.channel_id)?.name   ?? null : null,
+    }));
+
+    return NextResponse.json({ ok: true, mode: "dry_run", pitches: hydrated });
   }
 
   let written = 0;

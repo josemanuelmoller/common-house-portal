@@ -110,9 +110,27 @@ export default function CommsView({ pillars, audiences, channels, pitches, outco
   const [outcomeForm,  setOutcomeForm]  = useState<{ worth_repeating: boolean | null; impressions: string; comments: string; dms: string; notes: string }>({
     worth_repeating: null, impressions: "", comments: "", dms: "", notes: "",
   });
-  const [generating,   setGenerating]   = useState<"preview" | "generate" | null>(null);
-  const [previewJson,  setPreviewJson]  = useState<unknown>(null);
-  const [genError,     setGenError]     = useState<string | null>(null);
+  // Staging = dry_run pitches that haven't been persisted yet. User can strike
+  // individual ones with ✕ and then Save the remainder, Regenerate the batch,
+  // or Discard entirely.
+  type StagingPitch = {
+    proposed_for_date: string;
+    pillar_id:         string | null;
+    audience_id:       string | null;
+    channel_id:        string | null;
+    trigger:           string | null;
+    angle:             string;
+    headline:          string | null;
+    pillar_name:       string | null;
+    pillar_tier:       string | null;
+    audience_name:     string | null;
+    channel_name:      string | null;
+  };
+
+  const [generating,      setGenerating]      = useState<"generate" | "save" | null>(null);
+  const [staging,         setStaging]         = useState<StagingPitch[] | null>(null);
+  const [strikeIdx,       setStrikeIdx]       = useState<Set<number>>(new Set());
+  const [genError,        setGenError]        = useState<string | null>(null);
 
   const primaryChannel = channels.find(c => c.active) ?? channels[0];
   const today = new Date();
@@ -231,28 +249,64 @@ export default function CommsView({ pillars, audiences, channels, pitches, outco
     }
   }
 
-  async function runGenerator(mode: "preview" | "generate") {
-    setGenerating(mode);
+  async function runGenerate() {
+    setGenerating("generate");
     setGenError(null);
-    setPreviewJson(null);
     try {
-      const qs = mode === "preview" ? "?force=1&mode=dry_run" : "?force=1";
-      const res = await fetch(`/api/propose-content-pitches${qs}`, { method: "POST" });
+      const res  = await fetch("/api/propose-content-pitches?force=1&mode=dry_run", { method: "POST" });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setGenError(data?.error ?? `HTTP ${res.status}`);
         return;
       }
-      if (mode === "preview") {
-        setPreviewJson(data?.pitches ?? data);
-      } else {
-        router.refresh();
-      }
+      const batch: StagingPitch[] = Array.isArray(data?.pitches) ? data.pitches : [];
+      setStaging(batch);
+      setStrikeIdx(new Set());
     } catch (e) {
       setGenError(String(e));
     } finally {
       setGenerating(null);
     }
+  }
+
+  async function saveStaging() {
+    if (!staging) return;
+    const keep = staging.filter((_, i) => !strikeIdx.has(i));
+    if (keep.length === 0) { setStaging(null); setStrikeIdx(new Set()); return; }
+    setGenerating("save");
+    setGenError(null);
+    try {
+      const res = await fetch("/api/save-pitch-batch", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ pitches: keep }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setGenError(data?.error ?? `HTTP ${res.status}`);
+        return;
+      }
+      setStaging(null);
+      setStrikeIdx(new Set());
+      router.refresh();
+    } catch (e) {
+      setGenError(String(e));
+    } finally {
+      setGenerating(null);
+    }
+  }
+
+  function discardStaging() {
+    setStaging(null);
+    setStrikeIdx(new Set());
+  }
+
+  function toggleStrike(idx: number) {
+    setStrikeIdx(prev => {
+      const next = new Set(prev);
+      if (next.has(idx)) next.delete(idx); else next.add(idx);
+      return next;
+    });
   }
 
   // ─── Render ────────────────────────────────────────────────────────────────
@@ -328,30 +382,23 @@ export default function CommsView({ pillars, audiences, channels, pitches, outco
       </section>
 
       {/* ── Generator controls ──────────────────────────────────────────── */}
-      <section className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-3 flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3 min-w-0">
-          <span className="text-[9px] font-bold uppercase tracking-[2.5px] text-[#131218]/40">Generator</span>
-          <p className="text-[11px] text-[#131218]/55">
-            Corre automático el último viernes de mes. Dispara manual si ocurre algo digno de postear antes.
-          </p>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
+      {staging === null && (
+        <section className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-3 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="text-[9px] font-bold uppercase tracking-[2.5px] text-[#131218]/40">Generator</span>
+            <p className="text-[11px] text-[#131218]/55">
+              Corre automático el último viernes de mes. Dispará manual si ocurre algo digno de postear antes.
+            </p>
+          </div>
           <button
-            onClick={() => runGenerator("preview")}
-            disabled={generating !== null}
-            className="text-[10px] font-bold text-[#131218]/60 hover:text-[#131218] border border-[#E0E0D8] rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50"
-          >
-            {generating === "preview" ? "…" : "Preview"}
-          </button>
-          <button
-            onClick={() => runGenerator("generate")}
+            onClick={runGenerate}
             disabled={generating !== null}
             className="text-[10px] font-bold bg-[#131218] text-white rounded-lg px-3 py-1.5 hover:bg-[#2a2938] transition-colors disabled:opacity-50"
           >
-            {generating === "generate" ? "Generating…" : "Generate now"}
+            {generating === "generate" ? "Generating…" : "Generate batch"}
           </button>
-        </div>
-      </section>
+        </section>
+      )}
 
       {genError && (
         <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-2 text-[11px] text-red-700">
@@ -359,16 +406,95 @@ export default function CommsView({ pillars, audiences, channels, pitches, outco
         </div>
       )}
 
-      {previewJson != null && (
-        <div className="bg-[#131218] rounded-2xl px-5 py-4">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-[9px] font-bold uppercase tracking-[2.5px] text-[#c8f55a]">Preview (no persistido)</p>
-            <button onClick={() => setPreviewJson(null)} className="text-[10px] text-white/50 hover:text-white transition-colors">close</button>
+      {/* ── Staging area (dry_run batch awaiting Save / Regenerate / Discard) ── */}
+      {staging !== null && (
+        <section className="bg-[#FAF8EE] border-2 border-dashed border-[#c8f55a] rounded-2xl overflow-hidden">
+          <div className="px-5 py-3 border-b border-dashed border-[#c8f55a]/50 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3 min-w-0">
+              <span className="text-[9px] font-bold uppercase tracking-[2.5px] text-[#131218] bg-[#c8f55a] px-2 py-0.5 rounded">
+                Preview · sin guardar
+              </span>
+              <p className="text-[11px] text-[#131218]/60">
+                {staging.length - strikeIdx.size} de {staging.length} se guardarán · usa ✕ para excluir alguno
+              </p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={runGenerate}
+                disabled={generating !== null}
+                className="text-[10px] font-bold text-[#131218]/60 hover:text-[#131218] border border-[#131218]/20 rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50"
+              >
+                {generating === "generate" ? "…" : "Regenerate"}
+              </button>
+              <button
+                onClick={discardStaging}
+                disabled={generating !== null}
+                className="text-[10px] font-bold text-[#131218]/60 hover:text-red-600 border border-[#131218]/20 rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50"
+              >
+                Discard
+              </button>
+              <button
+                onClick={saveStaging}
+                disabled={generating !== null || staging.length - strikeIdx.size === 0}
+                className="text-[10px] font-bold bg-[#131218] text-white rounded-lg px-3 py-1.5 hover:bg-[#2a2938] transition-colors disabled:opacity-50"
+              >
+                {generating === "save" ? "Saving…" : `Save ${staging.length - strikeIdx.size}`}
+              </button>
+            </div>
           </div>
-          <pre className="text-[10.5px] text-white/80 leading-[1.55] whitespace-pre-wrap max-h-96 overflow-y-auto font-sans">
-            {JSON.stringify(previewJson, null, 2)}
-          </pre>
-        </div>
+
+          <ul className="divide-y divide-[#c8f55a]/30">
+            {staging.map((p, i) => {
+              const struck = strikeIdx.has(i);
+              return (
+                <li key={i} className={`px-5 py-3 flex items-start gap-4 ${struck ? "opacity-40" : ""}`}>
+                  <div className="shrink-0 w-24">
+                    <p className={`text-[11px] font-bold text-[#131218] ${struck ? "line-through" : ""}`}>
+                      {fmtDate(p.proposed_for_date)}
+                    </p>
+                    {p.channel_name && (
+                      <p className="text-[9px] text-[#131218]/40 mt-0.5">{p.channel_name}</p>
+                    )}
+                  </div>
+                  <div className="shrink-0 flex flex-col gap-1">
+                    {p.pillar_tier && p.pillar_name && (
+                      <span className={`text-[8.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded w-fit ${TIER_COLOR[p.pillar_tier]}`}>
+                        {p.pillar_name}
+                      </span>
+                    )}
+                    {p.audience_name && (
+                      <span className="text-[9px] text-[#131218]/50 bg-white/60 px-1.5 py-0.5 rounded w-fit">
+                        → {p.audience_name}
+                      </span>
+                    )}
+                  </div>
+                  <div className={`flex-1 min-w-0 ${struck ? "line-through" : ""}`}>
+                    {p.headline && (
+                      <p className="text-[12.5px] font-semibold text-[#131218] leading-snug">{p.headline}</p>
+                    )}
+                    <p className="text-[11px] text-[#131218]/65 leading-[1.55] mt-1">{p.angle}</p>
+                    {p.trigger && (
+                      <p className="text-[9.5px] text-[#131218]/35 leading-snug mt-1.5">
+                        <span className="font-bold uppercase tracking-wider">Trigger</span> · {p.trigger}
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => toggleStrike(i)}
+                    className={`shrink-0 text-[12px] font-bold w-7 h-7 rounded-full flex items-center justify-center transition-colors ${
+                      struck
+                        ? "bg-[#131218] text-white hover:bg-[#2a2938]"
+                        : "text-[#131218]/30 hover:text-red-600 hover:bg-red-50"
+                    }`}
+                    title={struck ? "Re-incluir este pitch" : "Excluir este pitch del save"}
+                  >
+                    {struck ? "↺" : "✕"}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
       )}
 
       {/* ── Pitch queue (weekly buckets) ────────────────────────────────── */}
