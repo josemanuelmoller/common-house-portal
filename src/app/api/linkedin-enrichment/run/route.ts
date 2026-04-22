@@ -108,14 +108,18 @@ export async function POST(req: NextRequest) {
 
   // 3. Process each row. Write audit + (optionally) apply result.
   type Outcome = {
-    person_id:  string;
-    name:       string;
-    email:      string | null;
-    confidence: number;
-    url:        string | null;
-    reasoning:  string;
-    action:     "auto_apply" | "queued_review" | "no_match" | "skipped" | "error";
-    error?:     string;
+    person_id:      string;
+    name:           string;
+    email:          string | null;
+    confidence:     number;
+    url:            string | null;
+    reasoning:      string;
+    action:         "auto_apply" | "queued_review" | "no_match" | "skipped" | "error";
+    job_title?:     string | null;
+    role_category?: string | null;
+    function_area?: string | null;
+    role_confidence?: number;
+    error?:         string;
   };
   const outcomes: Outcome[] = [];
   const nowIso = new Date().toISOString();
@@ -166,6 +170,26 @@ export async function POST(req: NextRequest) {
           patch.linkedin_source      = hit.source;
           patch.linkedin_enriched_at = nowIso;
           patch.linkedin_needs_review = !autoApply;
+
+          // Role extraction — only write the bucket fields when Haiku was
+          // confident enough AND we're not stomping a manually-entered
+          // job_title. Check job_title_source: if "manual" we never touch.
+          const { data: existing } = await sb
+            .from("people")
+            .select("job_title, job_title_source, role_category, function_area")
+            .eq("id", row.id)
+            .maybeSingle();
+          const manualTitle = (existing as { job_title_source: string | null } | null)?.job_title_source === "manual";
+          const roleGoodEnough = hit.role_confidence >= 0.5;
+
+          if (roleGoodEnough && !manualTitle) {
+            if (hit.job_title)     patch.job_title            = hit.job_title;
+            if (hit.role_category) patch.role_category        = hit.role_category;
+            if (hit.function_area) patch.function_area        = hit.function_area;
+            patch.job_title_confidence = hit.role_confidence;
+            patch.job_title_source     = "google_cse_snippet";
+            patch.job_title_updated_at = nowIso;
+          }
         }
         await sb.from("people").update(patch).eq("id", row.id);
         await sb.from("linkedin_enrichment_audit").insert({
@@ -182,13 +206,17 @@ export async function POST(req: NextRequest) {
       }
 
       outcomes.push({
-        person_id:  row.id,
+        person_id:       row.id,
         name,
-        email:      row.email,
-        confidence: hit.confidence,
-        url:        hit.url,
-        reasoning:  hit.reasoning,
-        action:     autoApply ? "auto_apply" : willWrite ? "queued_review" : "no_match",
+        email:           row.email,
+        confidence:      hit.confidence,
+        url:             hit.url,
+        reasoning:       hit.reasoning,
+        action:          autoApply ? "auto_apply" : willWrite ? "queued_review" : "no_match",
+        job_title:       hit.job_title,
+        role_category:   hit.role_category,
+        function_area:   hit.function_area,
+        role_confidence: hit.role_confidence,
       });
     } catch (err) {
       outcomes.push({

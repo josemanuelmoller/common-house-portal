@@ -28,7 +28,17 @@ type Row = {
   linkedin_enriched_at: string | null;
   relationship_classes: string[] | null;
   meeting_count:        number | null;
+  job_title:            string | null;
+  role_category:        string | null;
+  function_area:        string | null;
 };
+
+const ROLE_CATEGORIES = ["Founder", "Executive", "Manager", "IC", "Investor", "Advisor", "Other"] as const;
+const FUNCTION_AREAS  = [
+  "Marketing", "Sales", "Product", "Engineering", "Design",
+  "Operations", "Finance", "People", "Legal", "Strategy",
+  "Sustainability", "Data", "General", "Research", "CustomerSuccess", "Other",
+] as const;
 
 type RunSummary = {
   processed:     number;
@@ -139,6 +149,12 @@ function ReviewRow({ row }: { row: Row }) {
   const [overrideUrl, setOverrideUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
 
+  // Role fields are editable inline. Seed from the agent's current proposal.
+  const [editingRole, setEditingRole] = useState(false);
+  const [jobTitle, setJobTitle]           = useState(row.job_title      ?? "");
+  const [roleCategory, setRoleCategory]   = useState(row.role_category  ?? "");
+  const [functionArea, setFunctionArea]   = useState(row.function_area  ?? "");
+
   const display = row.full_name ?? row.display_name ?? (row.email ?? "").split("@")[0] ?? "(no name)";
   const classes = row.relationship_classes ?? [];
   const conf = row.linkedin_confidence ?? 0;
@@ -149,10 +165,21 @@ function ReviewRow({ row }: { row: Row }) {
   async function act(action: "approve" | "reject" | "override", url?: string) {
     setError(null);
     try {
+      const payload: Record<string, string | null | undefined> = { person_id: row.id, action };
+      if (action === "override") payload.url = url;
+      // Approve + Override both carry whatever the reviewer currently has in
+      // the role fields. If the reviewer hasn't touched them, we still send
+      // through the current values so the agent proposal is locked in as
+      // manual (not re-overwritable by the next run).
+      if (action !== "reject") {
+        payload.job_title     = jobTitle.trim()    || null;
+        payload.role_category = roleCategory       || null;
+        payload.function_area = functionArea       || null;
+      }
       const res = await fetch("/api/linkedin-enrichment/review", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ person_id: row.id, action, url }),
+        body: JSON.stringify(payload),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "review failed");
@@ -193,6 +220,68 @@ function ReviewRow({ row }: { row: Row }) {
               {row.linkedin}
             </a>
           )}
+
+          {/* Role proposal — shown compact, editable inline */}
+          <div className="mt-2">
+            {!editingRole ? (
+              <div className="flex items-center gap-2 flex-wrap text-[11px]">
+                {jobTitle ? (
+                  <span className="text-[#131218]">{jobTitle}</span>
+                ) : (
+                  <span className="text-[#131218]/30 italic">no title extracted</span>
+                )}
+                {roleCategory && (
+                  <span className="text-[9px] font-bold uppercase tracking-widest bg-[#EFEFEA] text-[#131218]/70 px-2 py-0.5 rounded-full">
+                    {roleCategory}
+                  </span>
+                )}
+                {functionArea && (
+                  <span className="text-[9px] font-bold uppercase tracking-widest bg-[#c8f55a]/30 text-[#131218]/80 px-2 py-0.5 rounded-full">
+                    {functionArea}
+                  </span>
+                )}
+                <button
+                  onClick={() => setEditingRole(true)}
+                  disabled={pending}
+                  className="text-[9px] font-bold uppercase tracking-widest text-[#131218]/40 hover:text-[#131218] underline decoration-dotted"
+                >
+                  edit
+                </button>
+              </div>
+            ) : (
+              <div className="mt-1 grid grid-cols-3 gap-2">
+                <input
+                  type="text"
+                  value={jobTitle}
+                  onChange={e => setJobTitle(e.target.value)}
+                  placeholder="Job title"
+                  className="text-[11px] px-2 py-1 rounded-lg border border-[#E0E0D8] bg-white outline-none focus:border-[#131218]/30"
+                />
+                <select
+                  value={roleCategory}
+                  onChange={e => setRoleCategory(e.target.value)}
+                  className="text-[11px] px-2 py-1 rounded-lg border border-[#E0E0D8] bg-white outline-none focus:border-[#131218]/30"
+                >
+                  <option value="">— tier —</option>
+                  {ROLE_CATEGORIES.map(v => <option key={v} value={v}>{v}</option>)}
+                </select>
+                <select
+                  value={functionArea}
+                  onChange={e => setFunctionArea(e.target.value)}
+                  className="text-[11px] px-2 py-1 rounded-lg border border-[#E0E0D8] bg-white outline-none focus:border-[#131218]/30"
+                >
+                  <option value="">— area —</option>
+                  {FUNCTION_AREAS.map(v => <option key={v} value={v}>{v}</option>)}
+                </select>
+                <button
+                  onClick={() => setEditingRole(false)}
+                  className="col-span-3 text-[9px] font-bold uppercase tracking-widest text-[#131218]/50 hover:text-[#131218] underline decoration-dotted justify-self-start"
+                >
+                  done editing
+                </button>
+              </div>
+            )}
+          </div>
 
           {error && (
             <p className="mt-2 text-[10.5px] text-red-700 bg-red-50 border border-red-200 rounded-lg px-2 py-1">

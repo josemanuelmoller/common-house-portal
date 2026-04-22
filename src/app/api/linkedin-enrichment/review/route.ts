@@ -20,12 +20,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { currentUser } from "@clerk/nextjs/server";
 import { adminGuardApi } from "@/lib/require-admin";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
-import { cleanLinkedInUrl } from "@/lib/linkedin-enrichment";
+import { cleanLinkedInUrl, ROLE_CATEGORIES, FUNCTION_AREAS } from "@/lib/linkedin-enrichment";
 
 type Body = {
-  person_id?: string;
-  action?:    "approve" | "reject" | "override";
-  url?:       string;
+  person_id?:     string;
+  action?:        "approve" | "reject" | "override";
+  url?:           string;
+  job_title?:     string | null;
+  role_category?: string | null;
+  function_area?: string | null;
 };
 
 export async function POST(req: NextRequest) {
@@ -60,21 +63,67 @@ export async function POST(req: NextRequest) {
     patch.linkedin_confidence  = 1;
     patch.linkedin_source      = "manual";
     patch.linkedin_enriched_at = nowIso;
+    // If the reviewer edited role/area inline before approving, persist those
+    // edits and mark source as manual so the agent never overwrites them.
+    if (body.job_title !== undefined) {
+      patch.job_title            = body.job_title;
+      patch.job_title_source     = "manual";
+      patch.job_title_confidence = 1;
+      patch.job_title_updated_at = nowIso;
+    }
+    if (body.role_category !== undefined) {
+      const v = body.role_category;
+      if (v == null || v === "" || (ROLE_CATEGORIES as string[]).includes(v)) {
+        patch.role_category = v || null;
+      } else {
+        return NextResponse.json({ error: `invalid role_category. Allowed: ${ROLE_CATEGORIES.join(" | ")}` }, { status: 400 });
+      }
+    }
+    if (body.function_area !== undefined) {
+      const v = body.function_area;
+      if (v == null || v === "" || (FUNCTION_AREAS as string[]).includes(v)) {
+        patch.function_area = v || null;
+      } else {
+        return NextResponse.json({ error: `invalid function_area. Allowed: ${FUNCTION_AREAS.join(" | ")}` }, { status: 400 });
+      }
+    }
     auditReason = "human approved";
   } else if (action === "reject") {
     patch.linkedin             = null;
     patch.linkedin_confidence  = null;
     patch.linkedin_source      = null;
     patch.linkedin_enriched_at = null;
+    // Rejecting the LinkedIn match also clears any auto-extracted role
+    // unless the reviewer had manually set it earlier.
+    patch.role_category        = null;
+    patch.function_area        = null;
     auditReason = "human rejected";
   } else {
-    // override — reviewer pasted a different URL
+    // override — reviewer pasted a different URL (and optionally edited role)
     const cleaned = cleanLinkedInUrl((body.url ?? "").trim());
     if (!cleaned) return NextResponse.json({ error: "url must be a linkedin.com/in/… profile" }, { status: 400 });
     patch.linkedin             = cleaned;
     patch.linkedin_confidence  = 1;
     patch.linkedin_source      = "manual";
     patch.linkedin_enriched_at = nowIso;
+    if (body.job_title !== undefined) {
+      patch.job_title            = body.job_title;
+      patch.job_title_source     = "manual";
+      patch.job_title_confidence = 1;
+      patch.job_title_updated_at = nowIso;
+    }
+    if (body.role_category !== undefined) {
+      const v = body.role_category;
+      if (v == null || v === "" || (ROLE_CATEGORIES as string[]).includes(v)) {
+        patch.role_category = v || null;
+      }
+    }
+    if (body.function_area !== undefined) {
+      const v = body.function_area;
+      if (v == null || v === "" || (FUNCTION_AREAS as string[]).includes(v)) {
+        patch.function_area = v || null;
+      }
+    }
     auditReason = `human override (${cleaned})`;
   }
 
@@ -82,7 +131,7 @@ export async function POST(req: NextRequest) {
     .from("people")
     .update(patch)
     .eq("id", personId)
-    .select("id, email, full_name, linkedin, linkedin_confidence, linkedin_source, linkedin_needs_review")
+    .select("id, email, full_name, linkedin, linkedin_confidence, linkedin_source, linkedin_needs_review, job_title, role_category, function_area")
     .maybeSingle();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!data)  return NextResponse.json({ error: "person not found" }, { status: 404 });
