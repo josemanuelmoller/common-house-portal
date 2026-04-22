@@ -15,23 +15,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminGuardApi } from "@/lib/require-admin";
 import { updatePitchStatus } from "@/lib/comms-strategy";
+import { withRoutineLog } from "@/lib/routine-log";
 
 type Action = "approve" | "reject" | "skip";
 
 const VALID_ACTIONS: Action[] = ["approve", "reject", "skip"];
 
-export async function POST(req: NextRequest) {
+async function _POST(req: NextRequest) {
   const guard = await adminGuardApi();
   if (guard) return guard;
 
   const body = await req.json().catch(() => ({}));
-  const pitchId: string = body.pitchId;
+  const pitchIds: string[] = Array.isArray(body.pitchIds) ? body.pitchIds : (body.pitchId ? [body.pitchId] : []);
   const action: Action  = body.action;
   const reason: string | undefined = body.reason;
 
-  if (!pitchId || !VALID_ACTIONS.includes(action)) {
+  if (pitchIds.length === 0 || !VALID_ACTIONS.includes(action)) {
     return NextResponse.json(
-      { error: "pitchId and action (approve|reject|skip) required" },
+      { error: "pitchId (or pitchIds[]) and action (approve|reject|skip) required" },
       { status: 400 }
     );
   }
@@ -41,16 +42,28 @@ export async function POST(req: NextRequest) {
     reject:  "rejected",
     skip:    "skipped",
   } as const;
+  const newStatus = statusMap[action];
 
-  try {
-    await updatePitchStatus(pitchId, statusMap[action], {
-      rejected_reason: action === "reject" ? (reason ?? null) : undefined,
-    });
-    return NextResponse.json({ ok: true, status: statusMap[action] });
-  } catch (e) {
-    return NextResponse.json(
-      { error: "update error", detail: String(e) },
-      { status: 500 }
-    );
+  const errors: Array<{ id: string; error: string }> = [];
+  let written = 0;
+  for (const id of pitchIds) {
+    try {
+      await updatePitchStatus(id, newStatus, {
+        rejected_reason: action === "reject" ? (reason ?? null) : undefined,
+      });
+      written++;
+    } catch (e) {
+      errors.push({ id, error: String(e) });
+    }
   }
+
+  return NextResponse.json({
+    ok: errors.length === 0,
+    status: newStatus,
+    records_read: pitchIds.length,
+    records_written: written,
+    errors: errors.length > 0 ? errors : undefined,
+  });
 }
+
+export const POST = withRoutineLog("approve-pitch", _POST);

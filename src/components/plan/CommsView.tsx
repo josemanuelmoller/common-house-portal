@@ -1,15 +1,18 @@
 "use client";
 
 /**
- * CommsView — /admin/plan Comms tab.
+ * CommsView v2 — /admin/plan Comms tab.
  *
- * Read-only strategy header (pillars · audiences · channels) plus the 30-day
- * pitch queue from Supabase content_pitches. Each pitch at status=proposed
- * shows [Approve] [Skip] [Reject]; approved/drafted/published are surfaced as
- * terminal states with the right affordance.
+ * Strategy header (read-only, quarterly) + pitch queue for the next 30 days,
+ * grouped by week, with bulk approve, inline edit, and post-publication
+ * outcome logging. Also exposes a manual trigger for the generator (Preview
+ * shows JSON from dry_run; Generate inserts persistent pitches).
  *
- * Writes go through /api/approve-pitch. After a successful write, we do an
- * optimistic local status update + router.refresh() to re-pull server data.
+ * Writes:
+ *  - /api/approve-pitch       (single or bulk approve/skip/reject)
+ *  - /api/edit-pitch          (update angle + headline)
+ *  - /api/mark-pitch-outcome  (mark worth_repeating + numbers after publish)
+ *  - /api/propose-content-pitches?force=1[&mode=dry_run] (manual trigger)
  */
 
 import { useState, useMemo } from "react";
@@ -20,6 +23,7 @@ import type {
   Channel,
   PitchWithContext,
   PitchStatus,
+  PitchOutcome,
 } from "@/lib/comms-strategy";
 
 type Props = {
@@ -27,6 +31,7 @@ type Props = {
   audiences: Audience[];
   channels:  Channel[];
   pitches:   PitchWithContext[];
+  outcomes:  Record<string, PitchOutcome>;
 };
 
 const TIER_LABEL: Record<string, string> = {
@@ -61,41 +66,97 @@ const STATUS_COLOR: Record<PitchStatus, string> = {
   rejected:  "text-[#131218]/40 bg-[#EFEFEA] border-[#E0E0D8]",
 };
 
+// ─── Date helpers ─────────────────────────────────────────────────────────────
+
+function parseDate(iso: string): Date { return new Date(iso + "T00:00:00"); }
+
 function fmtDate(iso: string): string {
-  const d = new Date(iso + "T00:00:00");
-  return d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
+  return parseDate(iso).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
 }
 
-export default function CommsView({ pillars, audiences, channels, pitches }: Props) {
+// ISO week start (Monday) for a given date — used to bucket pitches.
+function weekStart(d: Date): string {
+  const copy = new Date(d);
+  const day = copy.getDay(); // 0 Sun .. 6 Sat
+  const offsetToMon = day === 0 ? -6 : 1 - day;
+  copy.setDate(copy.getDate() + offsetToMon);
+  return copy.toISOString().slice(0, 10);
+}
+
+function weekLabel(isoMonday: string, thisMonday: string): string {
+  const diffDays = Math.round((parseDate(isoMonday).getTime() - parseDate(thisMonday).getTime()) / 86400_000);
+  if (diffDays === 0) return "Esta semana";
+  if (diffDays === 7) return "Próxima semana";
+  if (diffDays < 0)   return "Pasada";
+  const d = parseDate(isoMonday);
+  return `Semana del ${d.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`;
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
+export default function CommsView({ pillars, audiences, channels, pitches, outcomes }: Props) {
   const router = useRouter();
 
-  // Per-pitch local status for optimistic updates while the server refetch is in flight.
+  // Optimistic overrides while server data refetches.
   const [localStatus,  setLocalStatus]  = useState<Record<string, PitchStatus>>({});
+  const [localAngle,   setLocalAngle]   = useState<Record<string, { angle: string; headline: string | null }>>({});
   const [actingId,     setActingId]     = useState<string | null>(null);
   const [rejectingId,  setRejectingId]  = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
+  const [editingId,    setEditingId]    = useState<string | null>(null);
+  const [editAngle,    setEditAngle]    = useState("");
+  const [editHeadline, setEditHeadline] = useState("");
+  const [outcomeId,    setOutcomeId]    = useState<string | null>(null);
+  const [outcomeForm,  setOutcomeForm]  = useState<{ worth_repeating: boolean | null; impressions: string; comments: string; dms: string; notes: string }>({
+    worth_repeating: null, impressions: "", comments: "", dms: "", notes: "",
+  });
+  const [generating,   setGenerating]   = useState<"preview" | "generate" | null>(null);
+  const [previewJson,  setPreviewJson]  = useState<unknown>(null);
+  const [genError,     setGenError]     = useState<string | null>(null);
 
   const primaryChannel = channels.find(c => c.active) ?? channels[0];
+  const today = new Date();
+  const thisMonday = weekStart(today);
 
-  // Count proposed pitches — used for the prompt at the top.
+  // ─── Bucket pitches by week ────────────────────────────────────────────────
+  const weekBuckets = useMemo(() => {
+    const buckets = new Map<string, PitchWithContext[]>();
+    for (const p of pitches) {
+      const wk = weekStart(parseDate(p.proposed_for_date));
+      if (!buckets.has(wk)) buckets.set(wk, []);
+      buckets.get(wk)!.push(p);
+    }
+    return [...buckets.entries()].sort(([a], [b]) => a.localeCompare(b));
+  }, [pitches]);
+
   const proposedCount = useMemo(
     () => pitches.filter(p => (localStatus[p.id] ?? p.status) === "proposed").length,
     [pitches, localStatus]
   );
 
-  async function handleAction(pitchId: string, action: "approve" | "skip" | "reject", reason?: string) {
-    setActingId(pitchId);
+  // ─── Action handlers ───────────────────────────────────────────────────────
+  async function handleAction(
+    pitchIds: string[],
+    action: "approve" | "skip" | "reject",
+    reason?: string
+  ) {
+    const idForSpinner = pitchIds[0] ?? "bulk";
+    setActingId(idForSpinner);
     try {
       const res = await fetch("/api/approve-pitch", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ pitchId, action, reason }),
+        body:    JSON.stringify({ pitchIds, action, reason }),
       });
       if (res.ok) {
         const newStatus: PitchStatus =
           action === "approve" ? "approved" :
           action === "skip"    ? "skipped"  : "rejected";
-        setLocalStatus(s => ({ ...s, [pitchId]: newStatus }));
+        setLocalStatus(prev => {
+          const next = { ...prev };
+          for (const id of pitchIds) next[id] = newStatus;
+          return next;
+        });
         setRejectingId(null);
         setRejectReason("");
         router.refresh();
@@ -105,6 +166,96 @@ export default function CommsView({ pillars, audiences, channels, pitches }: Pro
     }
   }
 
+  function startEdit(p: PitchWithContext) {
+    const working = localAngle[p.id] ?? { angle: p.angle, headline: p.headline };
+    setEditingId(p.id);
+    setEditAngle(working.angle);
+    setEditHeadline(working.headline ?? "");
+  }
+
+  async function saveEdit(pitchId: string) {
+    if (editAngle.trim().length === 0) return;
+    setActingId(pitchId);
+    try {
+      const res = await fetch("/api/edit-pitch", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ pitchId, angle: editAngle, headline: editHeadline || null }),
+      });
+      if (res.ok) {
+        setLocalAngle(prev => ({ ...prev, [pitchId]: { angle: editAngle, headline: editHeadline || null } }));
+        setEditingId(null);
+        router.refresh();
+      }
+    } finally {
+      setActingId(null);
+    }
+  }
+
+  function openOutcome(p: PitchWithContext) {
+    const existing = outcomes[p.id];
+    setOutcomeId(p.id);
+    setOutcomeForm({
+      worth_repeating: existing?.worth_repeating ?? null,
+      impressions:     existing?.impressions?.toString()    ?? "",
+      comments:        existing?.comments_count?.toString() ?? "",
+      dms:             existing?.dms_received?.toString()   ?? "",
+      notes:           existing?.notes ?? "",
+    });
+  }
+
+  async function saveOutcome(pitchId: string, advanceStatus = false) {
+    setActingId(pitchId);
+    try {
+      const payload: Record<string, unknown> = {
+        pitchId,
+        worth_repeating: outcomeForm.worth_repeating,
+        impressions:     outcomeForm.impressions ? Number(outcomeForm.impressions) : null,
+        comments_count:  outcomeForm.comments    ? Number(outcomeForm.comments)    : null,
+        dms_received:    outcomeForm.dms         ? Number(outcomeForm.dms)         : null,
+        notes:           outcomeForm.notes || null,
+      };
+      if (advanceStatus) payload.advance_status = true;
+      const res = await fetch("/api/mark-pitch-outcome", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify(payload),
+      });
+      if (res.ok) {
+        if (advanceStatus) setLocalStatus(prev => ({ ...prev, [pitchId]: "published" }));
+        setOutcomeId(null);
+        router.refresh();
+      }
+    } finally {
+      setActingId(null);
+    }
+  }
+
+  async function runGenerator(mode: "preview" | "generate") {
+    setGenerating(mode);
+    setGenError(null);
+    setPreviewJson(null);
+    try {
+      const qs = mode === "preview" ? "?force=1&mode=dry_run" : "?force=1";
+      const res = await fetch(`/api/propose-content-pitches${qs}`, { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setGenError(data?.error ?? `HTTP ${res.status}`);
+        return;
+      }
+      if (mode === "preview") {
+        setPreviewJson(data?.pitches ?? data);
+      } else {
+        router.refresh();
+      }
+    } catch (e) {
+      setGenError(String(e));
+    } finally {
+      setGenerating(null);
+    }
+  }
+
+  // ─── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-8">
 
@@ -115,7 +266,6 @@ export default function CommsView({ pillars, audiences, channels, pitches }: Pro
         </div>
         <div className="grid grid-cols-[1fr_1fr_1fr] gap-0 divide-x divide-[#EFEFEA]">
 
-          {/* Pillars */}
           <div className="px-6 py-4">
             <p className="text-[9px] font-bold uppercase tracking-[2.5px] text-[#131218]/40 mb-3">
               Pilares · {pillars.length}
@@ -137,7 +287,6 @@ export default function CommsView({ pillars, audiences, channels, pitches }: Pro
             </ul>
           </div>
 
-          {/* Audiences */}
           <div className="px-6 py-4">
             <p className="text-[9px] font-bold uppercase tracking-[2.5px] text-[#131218]/40 mb-3">
               Audiencias · {audiences.length}
@@ -159,7 +308,6 @@ export default function CommsView({ pillars, audiences, channels, pitches }: Pro
             </ul>
           </div>
 
-          {/* Channels */}
           <div className="px-6 py-4">
             <p className="text-[9px] font-bold uppercase tracking-[2.5px] text-[#131218]/40 mb-3">
               Canales · {channels.length}
@@ -179,7 +327,51 @@ export default function CommsView({ pillars, audiences, channels, pitches }: Pro
         </div>
       </section>
 
-      {/* ── Pitch queue ──────────────────────────────────────────────────── */}
+      {/* ── Generator controls ──────────────────────────────────────────── */}
+      <section className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-3 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="text-[9px] font-bold uppercase tracking-[2.5px] text-[#131218]/40">Generator</span>
+          <p className="text-[11px] text-[#131218]/55">
+            Corre automático el último viernes de mes. Dispara manual si ocurre algo digno de postear antes.
+          </p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => runGenerator("preview")}
+            disabled={generating !== null}
+            className="text-[10px] font-bold text-[#131218]/60 hover:text-[#131218] border border-[#E0E0D8] rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50"
+          >
+            {generating === "preview" ? "…" : "Preview"}
+          </button>
+          <button
+            onClick={() => runGenerator("generate")}
+            disabled={generating !== null}
+            className="text-[10px] font-bold bg-[#131218] text-white rounded-lg px-3 py-1.5 hover:bg-[#2a2938] transition-colors disabled:opacity-50"
+          >
+            {generating === "generate" ? "Generating…" : "Generate now"}
+          </button>
+        </div>
+      </section>
+
+      {genError && (
+        <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-2 text-[11px] text-red-700">
+          Error: {genError}
+        </div>
+      )}
+
+      {previewJson != null && (
+        <div className="bg-[#131218] rounded-2xl px-5 py-4">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-[9px] font-bold uppercase tracking-[2.5px] text-[#c8f55a]">Preview (no persistido)</p>
+            <button onClick={() => setPreviewJson(null)} className="text-[10px] text-white/50 hover:text-white transition-colors">close</button>
+          </div>
+          <pre className="text-[10.5px] text-white/80 leading-[1.55] whitespace-pre-wrap max-h-96 overflow-y-auto font-sans">
+            {JSON.stringify(previewJson, null, 2)}
+          </pre>
+        </div>
+      )}
+
+      {/* ── Pitch queue (weekly buckets) ────────────────────────────────── */}
       <section>
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3">
@@ -199,143 +391,321 @@ export default function CommsView({ pillars, audiences, channels, pitches }: Pro
           <div className="bg-white rounded-2xl border border-[#E0E0D8] px-6 py-10 text-center">
             <p className="text-[12px] font-semibold text-[#131218] mb-1">Sin pitches todavía</p>
             <p className="text-[11px] text-[#131218]/50 leading-relaxed max-w-md mx-auto">
-              El agente <code className="bg-[#EFEFEA] px-1 rounded">propose-content-pitches</code> corre
-              el último viernes de cada mes. También podés invocarlo manualmente cuando quieras ver
-              propuestas antes.
+              Usá <span className="font-bold">Generate now</span> arriba para crear un batch ya, o esperá al cron del último viernes de mes.
             </p>
           </div>
         ) : (
-          <ul className="space-y-2">
-            {pitches.map(p => {
-              const status = localStatus[p.id] ?? p.status;
-              const isActing = actingId === p.id;
-              const isRejecting = rejectingId === p.id;
-
+          <div className="space-y-6">
+            {weekBuckets.map(([wk, weekPitches]) => {
+              const proposedInWeek = weekPitches.filter(p => (localStatus[p.id] ?? p.status) === "proposed");
+              const canBulkApprove = proposedInWeek.length > 1;
               return (
-                <li key={p.id} className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-                  <div className="px-5 py-4">
-                    <div className="flex items-start gap-4">
-
-                      {/* Date */}
-                      <div className="shrink-0 w-24">
-                        <p className="text-[11px] font-bold text-[#131218]">{fmtDate(p.proposed_for_date)}</p>
-                        {p.channel_name && (
-                          <p className="text-[9px] text-[#131218]/40 mt-0.5">{p.channel_name}</p>
-                        )}
-                      </div>
-
-                      {/* Tags */}
-                      <div className="shrink-0 flex flex-col gap-1">
-                        {p.pillar_tier && p.pillar_name && (
-                          <span className={`text-[8.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded w-fit ${TIER_COLOR[p.pillar_tier]}`}>
-                            {p.pillar_name}
-                          </span>
-                        )}
-                        {p.audience_name && (
-                          <span className="text-[9px] text-[#131218]/50 bg-[#EFEFEA] px-1.5 py-0.5 rounded w-fit">
-                            → {p.audience_name}
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Content */}
-                      <div className="flex-1 min-w-0">
-                        {p.headline && (
-                          <p className="text-[12.5px] font-semibold text-[#131218] leading-snug">{p.headline}</p>
-                        )}
-                        <p className="text-[11px] text-[#131218]/60 leading-[1.55] mt-1">{p.angle}</p>
-                        {p.trigger && (
-                          <p className="text-[9.5px] text-[#131218]/35 leading-snug mt-1.5">
-                            <span className="font-bold uppercase tracking-wider">Trigger</span> · {p.trigger}
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Status + actions */}
-                      <div className="shrink-0 flex flex-col items-end gap-1.5 min-w-[130px]">
-                        <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${STATUS_COLOR[status]}`}>
-                          {STATUS_LABEL[status]}
-                        </span>
-
-                        {status === "proposed" && !isRejecting && (
-                          <div className="flex gap-1 mt-1">
-                            <button
-                              disabled={isActing}
-                              onClick={() => handleAction(p.id, "approve")}
-                              className="text-[10px] font-bold bg-[#c8f55a] text-[#131218] rounded px-2 py-1 hover:bg-[#b8e54a] transition-colors disabled:opacity-50"
-                            >
-                              Approve
-                            </button>
-                            <button
-                              disabled={isActing}
-                              onClick={() => handleAction(p.id, "skip")}
-                              className="text-[10px] font-bold text-[#131218]/50 hover:text-[#131218] border border-[#E0E0D8] rounded px-2 py-1 transition-colors disabled:opacity-50"
-                            >
-                              Skip
-                            </button>
-                            <button
-                              disabled={isActing}
-                              onClick={() => setRejectingId(p.id)}
-                              className="text-[10px] font-bold text-red-500/70 hover:text-red-600 border border-[#E0E0D8] rounded px-2 py-1 transition-colors disabled:opacity-50"
-                            >
-                              Reject
-                            </button>
-                          </div>
-                        )}
-
-                        {status === "proposed" && isRejecting && (
-                          <div className="flex flex-col gap-1 mt-1 w-full">
-                            <input
-                              autoFocus
-                              type="text"
-                              value={rejectReason}
-                              onChange={e => setRejectReason(e.target.value)}
-                              placeholder="Why?"
-                              className="text-[10px] border border-[#E0E0D8] rounded px-2 py-1 outline-none focus:border-[#131218]"
-                            />
-                            <div className="flex gap-1">
-                              <button
-                                disabled={isActing}
-                                onClick={() => handleAction(p.id, "reject", rejectReason)}
-                                className="flex-1 text-[10px] font-bold bg-red-500 text-white rounded px-2 py-1 hover:bg-red-600 transition-colors disabled:opacity-50"
-                              >
-                                Reject
-                              </button>
-                              <button
-                                disabled={isActing}
-                                onClick={() => { setRejectingId(null); setRejectReason(""); }}
-                                className="text-[10px] font-bold text-[#131218]/40 hover:text-[#131218] transition-colors"
-                              >
-                                Cancel
-                              </button>
-                            </div>
-                          </div>
-                        )}
-
-                        {status === "drafted" && p.draft_notion_id && (
-                          <a
-                            href={`https://www.notion.so/${p.draft_notion_id.replace(/-/g, "")}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-[10px] font-bold text-[#131218] hover:text-[#131218]/70 transition-colors mt-1"
-                          >
-                            Open in Notion ↗
-                          </a>
-                        )}
-
-                        {p.rejected_reason && status === "rejected" && (
-                          <p className="text-[9px] text-[#131218]/40 italic leading-tight mt-1 max-w-[130px] text-right">
-                            &ldquo;{p.rejected_reason}&rdquo;
-                          </p>
-                        )}
-                      </div>
-
-                    </div>
+                <div key={wk}>
+                  <div className="flex items-center justify-between mb-2 px-1">
+                    <p className="text-[10px] font-bold uppercase tracking-[2.5px] text-[#131218]/40">
+                      {weekLabel(wk, thisMonday)} · {weekPitches.length} pitch{weekPitches.length === 1 ? "" : "es"}
+                    </p>
+                    {canBulkApprove && (
+                      <button
+                        disabled={actingId !== null}
+                        onClick={() => handleAction(proposedInWeek.map(p => p.id), "approve")}
+                        className="text-[10px] font-bold bg-[#c8f55a] text-[#131218] rounded px-2.5 py-1 hover:bg-[#b8e54a] transition-colors disabled:opacity-50"
+                      >
+                        ✓ Aprobar {proposedInWeek.length} de esta semana
+                      </button>
+                    )}
                   </div>
-                </li>
+
+                  <ul className="space-y-2">
+                    {weekPitches.map(p => {
+                      const status       = localStatus[p.id] ?? p.status;
+                      const isActing     = actingId === p.id;
+                      const isRejecting  = rejectingId === p.id;
+                      const isEditing    = editingId === p.id;
+                      const isMarking    = outcomeId === p.id;
+                      const working      = localAngle[p.id];
+                      const displayAngle    = working?.angle    ?? p.angle;
+                      const displayHeadline = working?.headline ?? p.headline;
+                      const outcome      = outcomes[p.id];
+
+                      return (
+                        <li key={p.id} className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
+                          <div className="px-5 py-4">
+                            <div className="flex items-start gap-4">
+
+                              <div className="shrink-0 w-24">
+                                <p className="text-[11px] font-bold text-[#131218]">{fmtDate(p.proposed_for_date)}</p>
+                                {p.channel_name && (
+                                  <p className="text-[9px] text-[#131218]/40 mt-0.5">{p.channel_name}</p>
+                                )}
+                              </div>
+
+                              <div className="shrink-0 flex flex-col gap-1">
+                                {p.pillar_tier && p.pillar_name && (
+                                  <span className={`text-[8.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded w-fit ${TIER_COLOR[p.pillar_tier]}`}>
+                                    {p.pillar_name}
+                                  </span>
+                                )}
+                                {p.audience_name && (
+                                  <span className="text-[9px] text-[#131218]/50 bg-[#EFEFEA] px-1.5 py-0.5 rounded w-fit">
+                                    → {p.audience_name}
+                                  </span>
+                                )}
+                              </div>
+
+                              <div className="flex-1 min-w-0">
+                                {isEditing ? (
+                                  <div className="space-y-2">
+                                    <input
+                                      autoFocus
+                                      type="text"
+                                      value={editHeadline}
+                                      onChange={e => setEditHeadline(e.target.value)}
+                                      placeholder="Headline (optional)"
+                                      className="w-full text-[12.5px] font-semibold text-[#131218] border border-[#131218]/20 rounded px-2 py-1 outline-none focus:border-[#131218]"
+                                    />
+                                    <textarea
+                                      value={editAngle}
+                                      onChange={e => setEditAngle(e.target.value)}
+                                      className="w-full text-[11px] text-[#131218] leading-[1.55] border border-[#131218]/20 rounded px-2 py-1.5 outline-none focus:border-[#131218] min-h-[80px] resize-y"
+                                    />
+                                    <div className="flex items-center gap-3">
+                                      <button
+                                        disabled={isActing}
+                                        onClick={() => saveEdit(p.id)}
+                                        className="text-[10px] font-bold text-[#131218] hover:text-emerald-700 transition-colors disabled:opacity-50"
+                                      >
+                                        {isActing ? "Saving…" : "Save edit"}
+                                      </button>
+                                      <button
+                                        disabled={isActing}
+                                        onClick={() => setEditingId(null)}
+                                        className="text-[10px] font-bold text-[#131218]/30 hover:text-[#131218] transition-colors disabled:opacity-50"
+                                      >
+                                        Cancel
+                                      </button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <>
+                                    {displayHeadline && (
+                                      <p className="text-[12.5px] font-semibold text-[#131218] leading-snug">{displayHeadline}</p>
+                                    )}
+                                    <p className="text-[11px] text-[#131218]/60 leading-[1.55] mt-1">{displayAngle}</p>
+                                    {p.trigger && (
+                                      <p className="text-[9.5px] text-[#131218]/35 leading-snug mt-1.5">
+                                        <span className="font-bold uppercase tracking-wider">Trigger</span> · {p.trigger}
+                                      </p>
+                                    )}
+                                    {(status === "drafted" || status === "published") && outcome && (
+                                      <p className="text-[9.5px] text-[#131218]/50 leading-snug mt-1.5">
+                                        <span className="font-bold uppercase tracking-wider">Outcome</span>
+                                        {outcome.worth_repeating === true  && " · 👍 worth repeating"}
+                                        {outcome.worth_repeating === false && " · 👎 skip next time"}
+                                        {outcome.impressions    != null && ` · ${outcome.impressions} impressions`}
+                                        {outcome.comments_count != null && ` · ${outcome.comments_count} comments`}
+                                        {outcome.dms_received   != null && ` · ${outcome.dms_received} DMs`}
+                                      </p>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+
+                              <div className="shrink-0 flex flex-col items-end gap-1.5 min-w-[140px]">
+                                <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${STATUS_COLOR[status]}`}>
+                                  {STATUS_LABEL[status]}
+                                </span>
+
+                                {status === "proposed" && !isRejecting && !isEditing && (
+                                  <div className="flex flex-col items-end gap-1 mt-1">
+                                    <div className="flex gap-1">
+                                      <button
+                                        disabled={isActing}
+                                        onClick={() => handleAction([p.id], "approve")}
+                                        className="text-[10px] font-bold bg-[#c8f55a] text-[#131218] rounded px-2 py-1 hover:bg-[#b8e54a] transition-colors disabled:opacity-50"
+                                      >
+                                        Approve
+                                      </button>
+                                      <button
+                                        disabled={isActing}
+                                        onClick={() => startEdit(p)}
+                                        className="text-[10px] font-bold text-[#131218]/70 hover:text-[#131218] border border-[#E0E0D8] rounded px-2 py-1 transition-colors disabled:opacity-50"
+                                      >
+                                        Edit
+                                      </button>
+                                    </div>
+                                    <div className="flex gap-1">
+                                      <button
+                                        disabled={isActing}
+                                        onClick={() => handleAction([p.id], "skip")}
+                                        className="text-[10px] font-bold text-[#131218]/50 hover:text-[#131218] border border-[#E0E0D8] rounded px-2 py-1 transition-colors disabled:opacity-50"
+                                      >
+                                        Skip
+                                      </button>
+                                      <button
+                                        disabled={isActing}
+                                        onClick={() => setRejectingId(p.id)}
+                                        className="text-[10px] font-bold text-red-500/70 hover:text-red-600 border border-[#E0E0D8] rounded px-2 py-1 transition-colors disabled:opacity-50"
+                                      >
+                                        Reject
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+
+                                {status === "proposed" && isRejecting && (
+                                  <div className="flex flex-col gap-1 mt-1 w-full">
+                                    <input
+                                      autoFocus
+                                      type="text"
+                                      value={rejectReason}
+                                      onChange={e => setRejectReason(e.target.value)}
+                                      placeholder="Why?"
+                                      className="text-[10px] border border-[#E0E0D8] rounded px-2 py-1 outline-none focus:border-[#131218]"
+                                    />
+                                    <div className="flex gap-1">
+                                      <button
+                                        disabled={isActing}
+                                        onClick={() => handleAction([p.id], "reject", rejectReason)}
+                                        className="flex-1 text-[10px] font-bold bg-red-500 text-white rounded px-2 py-1 hover:bg-red-600 transition-colors disabled:opacity-50"
+                                      >
+                                        Reject
+                                      </button>
+                                      <button
+                                        disabled={isActing}
+                                        onClick={() => { setRejectingId(null); setRejectReason(""); }}
+                                        className="text-[10px] font-bold text-[#131218]/40 hover:text-[#131218] transition-colors"
+                                      >
+                                        Cancel
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+
+                                {status === "drafted" && p.draft_notion_id && (
+                                  <div className="flex flex-col items-end gap-1 mt-1">
+                                    <a
+                                      href={`https://www.notion.so/${p.draft_notion_id.replace(/-/g, "")}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-[10px] font-bold text-[#131218] hover:text-[#131218]/70 transition-colors"
+                                    >
+                                      Open in Notion ↗
+                                    </a>
+                                    <button
+                                      onClick={() => openOutcome(p)}
+                                      className="text-[10px] font-bold text-[#131218]/60 hover:text-[#131218] border border-[#E0E0D8] rounded px-2 py-1 transition-colors"
+                                    >
+                                      {outcome ? "Edit outcome" : "Mark outcome"}
+                                    </button>
+                                  </div>
+                                )}
+
+                                {status === "published" && (
+                                  <button
+                                    onClick={() => openOutcome(p)}
+                                    className="text-[10px] font-bold text-[#131218]/60 hover:text-[#131218] border border-[#E0E0D8] rounded px-2 py-1 transition-colors mt-1"
+                                  >
+                                    {outcome ? "Edit outcome" : "Log outcome"}
+                                  </button>
+                                )}
+
+                                {p.rejected_reason && status === "rejected" && (
+                                  <p className="text-[9px] text-[#131218]/40 italic leading-tight mt-1 max-w-[140px] text-right">
+                                    &ldquo;{p.rejected_reason}&rdquo;
+                                  </p>
+                                )}
+                              </div>
+
+                            </div>
+
+                            {/* Outcome form — expands below the row when active */}
+                            {isMarking && (
+                              <div className="mt-4 pt-4 border-t border-[#EFEFEA] space-y-3">
+                                <div className="flex items-center gap-3">
+                                  <p className="text-[10px] font-bold uppercase tracking-widest text-[#131218]/40">
+                                    Outcome
+                                  </p>
+                                  <div className="flex gap-1.5">
+                                    <button
+                                      onClick={() => setOutcomeForm(f => ({ ...f, worth_repeating: f.worth_repeating === true ? null : true }))}
+                                      className={`text-[10px] font-bold px-2.5 py-1 rounded border transition-colors ${
+                                        outcomeForm.worth_repeating === true
+                                          ? "bg-emerald-500 text-white border-emerald-500"
+                                          : "text-[#131218]/60 border-[#E0E0D8] hover:text-[#131218]"
+                                      }`}
+                                    >
+                                      👍 Worth repeating
+                                    </button>
+                                    <button
+                                      onClick={() => setOutcomeForm(f => ({ ...f, worth_repeating: f.worth_repeating === false ? null : false }))}
+                                      className={`text-[10px] font-bold px-2.5 py-1 rounded border transition-colors ${
+                                        outcomeForm.worth_repeating === false
+                                          ? "bg-red-500 text-white border-red-500"
+                                          : "text-[#131218]/60 border-[#E0E0D8] hover:text-[#131218]"
+                                      }`}
+                                    >
+                                      👎 Skip next time
+                                    </button>
+                                  </div>
+                                </div>
+                                <div className="grid grid-cols-3 gap-3">
+                                  <label className="flex flex-col gap-1">
+                                    <span className="text-[9px] font-bold uppercase tracking-wider text-[#131218]/40">Impressions</span>
+                                    <input type="number" value={outcomeForm.impressions} onChange={e => setOutcomeForm(f => ({ ...f, impressions: e.target.value }))} className="text-[11px] border border-[#E0E0D8] rounded px-2 py-1 outline-none focus:border-[#131218]" />
+                                  </label>
+                                  <label className="flex flex-col gap-1">
+                                    <span className="text-[9px] font-bold uppercase tracking-wider text-[#131218]/40">Comments</span>
+                                    <input type="number" value={outcomeForm.comments} onChange={e => setOutcomeForm(f => ({ ...f, comments: e.target.value }))} className="text-[11px] border border-[#E0E0D8] rounded px-2 py-1 outline-none focus:border-[#131218]" />
+                                  </label>
+                                  <label className="flex flex-col gap-1">
+                                    <span className="text-[9px] font-bold uppercase tracking-wider text-[#131218]/40">DMs</span>
+                                    <input type="number" value={outcomeForm.dms} onChange={e => setOutcomeForm(f => ({ ...f, dms: e.target.value }))} className="text-[11px] border border-[#E0E0D8] rounded px-2 py-1 outline-none focus:border-[#131218]" />
+                                  </label>
+                                </div>
+                                <textarea
+                                  value={outcomeForm.notes}
+                                  onChange={e => setOutcomeForm(f => ({ ...f, notes: e.target.value }))}
+                                  placeholder="What happened? Lessons?"
+                                  className="w-full text-[11px] border border-[#E0E0D8] rounded px-2 py-1.5 outline-none focus:border-[#131218] min-h-[48px] resize-y"
+                                />
+                                <div className="flex items-center gap-3 justify-end">
+                                  {status === "drafted" && (
+                                    <button
+                                      disabled={isActing}
+                                      onClick={() => saveOutcome(p.id, true)}
+                                      className="text-[10px] font-bold bg-[#131218] text-white rounded px-3 py-1.5 hover:bg-[#2a2938] transition-colors disabled:opacity-50"
+                                    >
+                                      Mark published + save
+                                    </button>
+                                  )}
+                                  <button
+                                    disabled={isActing}
+                                    onClick={() => saveOutcome(p.id, false)}
+                                    className="text-[10px] font-bold text-[#131218] border border-[#E0E0D8] rounded px-3 py-1.5 hover:bg-[#EFEFEA] transition-colors disabled:opacity-50"
+                                  >
+                                    Save
+                                  </button>
+                                  <button
+                                    disabled={isActing}
+                                    onClick={() => setOutcomeId(null)}
+                                    className="text-[10px] font-bold text-[#131218]/40 hover:text-[#131218] transition-colors"
+                                  >
+                                    Close
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
               );
             })}
-          </ul>
+          </div>
         )}
       </section>
 

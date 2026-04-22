@@ -238,3 +238,92 @@ export async function updatePitchStatus(
     .eq("id", id);
   if (error) throw new Error(`updatePitchStatus: ${error.message}`);
 }
+
+export async function updatePitchAngle(id: string, angle: string, headline?: string | null): Promise<void> {
+  const sb = supabaseAdmin();
+  const payload: Record<string, unknown> = { angle: angle.slice(0, 1000) };
+  if (headline !== undefined) payload.headline = headline?.slice(0, 200) ?? null;
+  const { error } = await sb
+    .from("content_pitches")
+    .update(payload)
+    .eq("id", id);
+  if (error) throw new Error(`updatePitchAngle: ${error.message}`);
+}
+
+// ─── Outcomes (post-publication feedback loop) ────────────────────────────────
+
+export type PitchOutcome = {
+  pitch_id:         string;
+  published_at:     string | null;
+  impressions:      number | null;
+  comments_count:   number | null;
+  dms_received:     number | null;
+  worth_repeating:  boolean | null;
+  notes:            string | null;
+};
+
+export async function upsertPitchOutcome(
+  pitchId: string,
+  outcome: Partial<Omit<PitchOutcome, "pitch_id">>
+): Promise<void> {
+  const sb = supabaseAdmin();
+  const { error } = await sb
+    .from("content_pitch_outcomes")
+    .upsert({ pitch_id: pitchId, ...outcome }, { onConflict: "pitch_id" });
+  if (error) throw new Error(`upsertPitchOutcome: ${error.message}`);
+}
+
+export async function getOutcomesForPitches(pitchIds: string[]): Promise<Map<string, PitchOutcome>> {
+  if (pitchIds.length === 0) return new Map();
+  const sb = supabaseAdmin();
+  const { data, error } = await sb
+    .from("content_pitch_outcomes")
+    .select("pitch_id, published_at, impressions, comments_count, dms_received, worth_repeating, notes")
+    .in("pitch_id", pitchIds);
+  if (error || !data) return new Map();
+  return new Map((data as PitchOutcome[]).map(o => [o.pitch_id, o]));
+}
+
+// ─── Recent published pitches (anti-repetition context for the generator) ────
+
+export async function getRecentlyPublishedPitches(days = 60, limit = 20): Promise<PitchWithContext[]> {
+  const sb = supabaseAdmin();
+  const since = new Date(Date.now() - days * 86400_000).toISOString();
+  const { data, error } = await sb
+    .from("content_pitches")
+    .select(`
+      id, proposed_for_date, pillar_id, audience_id, channel_id,
+      trigger, angle, headline, status, draft_notion_id, rejected_reason,
+      created_at, updated_at,
+      comms_pillars(name, tier),
+      comms_audiences(name),
+      comms_channels(name)
+    `)
+    .in("status", ["published", "drafted"])
+    .gte("updated_at", since)
+    .order("updated_at", { ascending: false })
+    .limit(limit);
+
+  if (error || !data) return [];
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (data as any[]).map(row => ({
+    id:                row.id,
+    proposed_for_date: row.proposed_for_date,
+    pillar_id:         row.pillar_id,
+    audience_id:       row.audience_id,
+    channel_id:        row.channel_id,
+    trigger:           row.trigger,
+    angle:             row.angle,
+    headline:          row.headline,
+    status:            row.status,
+    draft_notion_id:   row.draft_notion_id,
+    rejected_reason:   row.rejected_reason,
+    created_at:        row.created_at,
+    updated_at:        row.updated_at,
+    pillar_name:       row.comms_pillars?.name   ?? null,
+    pillar_tier:       row.comms_pillars?.tier   ?? null,
+    audience_name:     row.comms_audiences?.name ?? null,
+    channel_name:      row.comms_channels?.name  ?? null,
+  }));
+}

@@ -25,6 +25,7 @@ import {
   getActivePillars,
   getActiveAudiences,
   getActiveChannels,
+  getRecentlyPublishedPitches,
   insertPitches,
   type NewPitch,
 } from "@/lib/comms-strategy";
@@ -109,10 +110,11 @@ async function _POST(req: NextRequest) {
     });
   }
 
-  const [pillars, audiences, channels] = await Promise.all([
+  const [pillars, audiences, channels, recentPublished] = await Promise.all([
     getActivePillars(),
     getActiveAudiences(),
     getActiveChannels(),
+    getRecentlyPublishedPitches(60, 20), // Anti-repetition: last 60 days, 20 posts.
   ]);
 
   if (pillars.length === 0 || audiences.length === 0 || channels.length === 0) {
@@ -171,6 +173,13 @@ Priority 1 audiences dominate; every active audience gets ≥1 pitch across the 
 
 ## Recent CH / ecosystem signals
 ${briefContext}
+
+## Anti-repetition — recently published or drafted (avoid overlapping angles)
+${recentPublished.length === 0
+  ? "(no recent posts on file)"
+  : recentPublished.map(p => `- [${p.pillar_name ?? "—"}] ${p.headline ?? p.angle.slice(0, 80)}`).join("\n")}
+
+If your proposed pitches significantly overlap with any of the above (same pillar + very similar angle), adjust or replace them. Variety within a pillar is fine; repetition is not.
 
 ## Output format (strict JSON — no markdown fence, no commentary)
 

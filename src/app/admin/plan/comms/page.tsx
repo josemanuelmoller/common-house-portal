@@ -5,6 +5,7 @@ import {
   getActiveAudiences,
   getActiveChannels,
   getPitchesForWindow,
+  getOutcomesForPitches,
 } from "@/lib/comms-strategy";
 import CommsView from "@/components/plan/CommsView";
 import { PlanNav } from "@/components/plan/PlanNav";
@@ -20,6 +21,14 @@ export default async function PlanCommsPage() {
     getActiveChannels(),
     getPitchesForWindow(), // default: today → +30d
   ]);
+
+  // Outcomes keyed by pitch_id — only fetch for pitches in terminal "post-publish"
+  // states where metrics would be meaningful.
+  const outcomeEligibleIds = pitches
+    .filter(p => p.status === "drafted" || p.status === "published")
+    .map(p => p.id);
+  const outcomesMap = await getOutcomesForPitches(outcomeEligibleIds);
+  const outcomes = Object.fromEntries(outcomesMap);
 
   return (
     <div className="flex min-h-screen bg-[#EFEFEA]">
@@ -53,6 +62,7 @@ export default async function PlanCommsPage() {
             audiences={audiences}
             channels={channels}
             pitches={pitches}
+            outcomes={outcomes}
           />
         </div>
       </main>
