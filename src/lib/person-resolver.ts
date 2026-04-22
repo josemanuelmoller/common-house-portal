@@ -56,6 +56,13 @@ export type ResolutionResult = {
 
 const SELF_MARKER_RE = /^(tú|tu|you|yo)$/i;
 
+/** Lowercase + strip diacritics. Makes "Cristóbal" match "Cristobal".
+ *  Both the index side and the query side go through this, so comparisons
+ *  are consistently accent-insensitive. */
+function norm(s: string): string {
+  return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+}
+
 const NO_MATCH: ResolutionResult = {
   person_id: null,
   is_self: false,
@@ -93,10 +100,10 @@ export async function buildPersonIndex(sb: SupabaseClient): Promise<PersonIndex>
     const entry: PersonEntry = { id: p.id, full_name: fullName, email: p.email, aliases: p.aliases ?? [] };
     idx.byId.set(p.id, entry);
 
-    const fnLower = fullName.toLowerCase();
-    idx.byExactName.set(fnLower, p.id);
+    const fnNorm = norm(fullName);
+    idx.byExactName.set(fnNorm, p.id);
 
-    const firstName = fnLower.split(/\s+/)[0];
+    const firstName = fnNorm.split(/\s+/)[0];
     if (firstName && firstName.length >= 3) {
       const list = idx.byFirstName.get(firstName) ?? [];
       list.push(p.id);
@@ -104,7 +111,7 @@ export async function buildPersonIndex(sb: SupabaseClient): Promise<PersonIndex>
     }
 
     for (const a of entry.aliases) {
-      const al = String(a ?? "").toLowerCase().trim();
+      const al = norm(String(a ?? ""));
       if (al) idx.byAlias.set(al, p.id);
     }
 
@@ -122,7 +129,7 @@ export function resolvePerson(
   opts: { name?: string | null; email?: string | null },
   idx: PersonIndex,
 ): ResolutionResult {
-  const name  = (opts.name  ?? "").toLowerCase().trim();
+  const name  = norm(opts.name ?? "");
   const email = (opts.email ?? "").toLowerCase().trim();
 
   // 1. Email exact
@@ -181,8 +188,9 @@ export function resolvePerson(
   }
 
   // 5. Bidirectional substring ("Francisco Cerda L" ↔ "Francisco Cerda")
+  //    Both sides normalised (accent-insensitive) for matching.
   for (const entry of idx.byId.values()) {
-    const fn = entry.full_name.toLowerCase();
+    const fn = norm(entry.full_name);
     if (fn.length < 3) continue;
     if (name.includes(fn) || fn.includes(name)) {
       return {
@@ -192,6 +200,31 @@ export function resolvePerson(
         confidence: 0.7,
         full_name:  entry.full_name,
       };
+    }
+  }
+
+  // 5b. Token-set match: handles "Correa, Cristobal" vs "Cristóbal Correa"
+  //     and similar reorderings / punctuation variants. Requires ≥2 token
+  //     overlap AND full subset containment (no extra tokens in the query
+  //     that aren't in the candidate), to avoid false positives like
+  //     "Cristian Bustos" matching "Cristian Perez".
+  const tokenize = (s: string) => new Set(s.split(/[\s,.\-_()]+/).filter(t => t.length >= 3));
+  const qTokens = tokenize(name);
+  if (qTokens.size >= 2) {
+    for (const entry of idx.byId.values()) {
+      const fTokens = tokenize(norm(entry.full_name));
+      if (fTokens.size < 2) continue;
+      let overlap = 0;
+      for (const t of qTokens) if (fTokens.has(t)) overlap++;
+      if (overlap >= 2 && overlap === Math.min(qTokens.size, fTokens.size)) {
+        return {
+          person_id:  entry.id,
+          is_self:    idx.selfPersonIds.has(entry.id),
+          matched_by: "substring",   // keep same reason for the 0.7 tier
+          confidence: 0.8,            // slightly higher — exact token-set match
+          full_name:  entry.full_name,
+        };
+      }
     }
   }
 

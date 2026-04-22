@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
   // Load target rows — active, non-self, matching domain.
   const selfSet = await getSelfEmails();
   const { data: rows, error } = await sb
-    .from("hall_attendees")
+    .from("people")
     .select("email, relationship_classes, google_resource_name, display_name")
     .ilike("email", `%@${domain}`)
     .is("dismissed_at", null);
@@ -140,7 +140,7 @@ export async function POST(req: NextRequest) {
 
     // Persist local classification
     const { error: upErr } = await sb
-      .from("hall_attendees")
+      .from("people")
       .update({
         relationship_classes: targetClasses,
         classified_at:        targetClasses.length > 0 ? nowIso : null,

@@ -118,7 +118,7 @@ export async function POST(req: NextRequest) {
   let name = (body.name ?? "").trim();
   if (!name) {
     const { data: contacts } = await sb
-      .from("hall_attendees")
+      .from("people")
       .select("display_name")
       .ilike("email", `%@${domain}`)
       .is("dismissed_at", null)
@@ -165,7 +165,7 @@ export async function POST(req: NextRequest) {
   if (body.cascade) {
     const selfSet = await getSelfEmails();
     const { data: rows } = await sb
-      .from("hall_attendees")
+      .from("people")
       .select("email, relationship_classes, google_resource_name, display_name")
       .ilike("email", `%@${domain}`)
       .is("dismissed_at", null);
@@ -213,7 +213,7 @@ export async function POST(req: NextRequest) {
         outcome = "read_only";
       }
 
-      await sb.from("hall_attendees").update({
+      await sb.from("people").update({
         relationship_classes: targetClasses,
         classified_at:        targetClasses.length > 0 ? nowIso : null,
         classified_by:        targetClasses.length > 0 ? actor : null,

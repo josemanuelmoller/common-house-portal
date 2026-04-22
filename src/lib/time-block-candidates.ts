@@ -264,25 +264,44 @@ async function counterpartsWithPrepSignal(emails: string[]): Promise<Set<string>
   const sb = getSupabaseServerClient();
   const lowerEmails = emails.map(e => e.toLowerCase());
 
-  // 1. Check people table (Notion-synced contacts)
+  // Single-table query against unified `people`. Pass conditions (any):
+  //   - Meaningful relationship_class / relationship_classes (human-classified
+  //     Partner/Investor/Client/Team/Portfolio/Funder/Vendor/VIP)
+  //   - Hot or Warm warmth
+  //   - Legacy Internal classification (pre-migration)
+  //   - Whatsapp messages linked to this person (sender_person_id)
   const { data: people } = await sb
     .from("people")
-    .select("id, email, person_classification, contact_warmth")
+    .select("id, email, person_classification, contact_warmth, relationship_class, relationship_classes")
     .in("email", lowerEmails);
 
+  const MEANINGFUL = new Set(["partner", "investor", "funder", "client", "portfolio", "vendor", "team", "vip"]);
   const personIdByEmail = new Map<string, string>();
-  for (const p of (people ?? []) as Array<{ id: string; email: string | null; person_classification: string | null; contact_warmth: string | null }>) {
+  for (const p of (people ?? []) as Array<{
+    id: string;
+    email: string | null;
+    person_classification: string | null;
+    contact_warmth:        string | null;
+    relationship_class:    string | null;
+    relationship_classes:  string[] | null;
+  }>) {
     const em = (p.email ?? "").toLowerCase();
     if (!em) continue;
     personIdByEmail.set(em, p.id);
-    const cls = (p.person_classification ?? "").toLowerCase();
-    const warmth = (p.contact_warmth ?? "").toLowerCase();
-    if (cls === "internal" || warmth === "hot" || warmth === "warm") {
+
+    const cls       = (p.person_classification ?? "").toLowerCase();
+    const warmth    = (p.contact_warmth ?? "").toLowerCase();
+    const primary   = (p.relationship_class ?? "").toLowerCase();
+    const allClasses = (p.relationship_classes ?? []).map(c => (c ?? "").toLowerCase());
+    const hasMeaningfulClass = [primary, ...allClasses].some(c => MEANINGFUL.has(c));
+
+    if (cls === "internal" || warmth === "hot" || warmth === "warm" || hasMeaningfulClass) {
       ok.add(em);
     }
   }
 
-  // 2. For people not yet passing, check WhatsApp FK-linked messages.
+  // Secondary pass: WhatsApp FK. A person with linked WA messages has
+  // substantive signal regardless of classification.
   const idsToCheck = [...personIdByEmail.entries()]
     .filter(([em]) => !ok.has(em))
     .map(([, id]) => id);
@@ -293,30 +312,11 @@ async function counterpartsWithPrepSignal(emails: string[]): Promise<Set<string>
       .eq("platform", "whatsapp")
       .in("sender_person_id", idsToCheck)
       .limit(idsToCheck.length * 2);
-    const linkedIds = new Set((waLinked ?? []).map(r => (r as { sender_person_id: string | null }).sender_person_id).filter(Boolean) as string[]);
+    const linkedIds = new Set(
+      (waLinked ?? []).map(r => (r as { sender_person_id: string | null }).sender_person_id).filter(Boolean) as string[]
+    );
     for (const [em, id] of personIdByEmail.entries()) {
       if (linkedIds.has(id)) ok.add(em);
-    }
-  }
-
-  // 3. Check hall_attendees — calendar-derived contacts classified by JMM.
-  //    A human-applied relationship_class (Partner / VIP / Investor / Team /
-  //    Client / Funder / Portfolio / Vendor) is strong evidence the counterpart
-  //    is prep-worthy, even if they don't have a Notion contact record.
-  const stillMissing = lowerEmails.filter(em => !ok.has(em));
-  if (stillMissing.length > 0) {
-    const { data: hallRows } = await sb
-      .from("hall_attendees")
-      .select("email, relationship_class, relationship_classes")
-      .in("email", stillMissing);
-    for (const h of (hallRows ?? []) as Array<{ email: string; relationship_class: string | null; relationship_classes: string[] | null }>) {
-      const primary = (h.relationship_class ?? "").toLowerCase();
-      const all     = (h.relationship_classes ?? []).map(c => (c ?? "").toLowerCase());
-      const anyClass = [primary, ...all].filter(Boolean);
-      const meaningful = anyClass.some(c =>
-        ["partner", "investor", "funder", "client", "portfolio", "vendor", "team", "vip"].includes(c)
-      );
-      if (meaningful) ok.add((h.email ?? "").toLowerCase());
     }
   }
 

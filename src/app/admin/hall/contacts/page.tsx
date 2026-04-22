@@ -38,7 +38,7 @@ type ContactRow = {
 async function getContacts(): Promise<ContactRow[]> {
   const sb = getSupabaseServerClient();
   const { data } = await sb
-    .from("hall_attendees")
+    .from("people")
     .select("email, display_name, relationship_class, relationship_classes, auto_suggested, last_meeting_title, meeting_count, email_thread_count, transcript_count, last_seen_at, first_seen_at, classified_at, classified_by, google_resource_name, google_source, google_labels, google_synced_at, google_last_write_at, dismissed_at, dismissed_reason")
     .gte("last_seen_at", new Date(Date.now() - 120 * 86400_000).toISOString())
     .order("meeting_count", { ascending: false })

@@ -1,8 +1,8 @@
 /**
  * contacts.ts — Unified read API for Hall contacts.
  *
- * Every consumer of hall_attendees (inbox triage, daily briefing, drawer
- * page, STB classifier, CH People sync, evidence enrichment, …) goes
+ * Every consumer of the unified `people` table (inbox triage, daily briefing,
+ * drawer page, STB classifier, Hall contact views, evidence enrichment, …) goes
  * through this file. Central place to:
  *   - Look up a contact by email
  *   - Stitch a cross-channel timeline (calendar + email + transcript)
@@ -48,7 +48,7 @@ export async function getContactByEmail(email: string): Promise<ContactView | nu
   const key = email.toLowerCase();
   const sb = getSupabaseServerClient();
   const { data } = await sb
-    .from("hall_attendees")
+    .from("people")
     .select(ALL_FIELDS)
     .eq("email", key)
     .maybeSingle();
@@ -77,7 +77,7 @@ export async function getContactsByEmails(emails: string[]): Promise<Map<string,
   const domains = [...new Set(keys.map(e => (e.split("@")[1] ?? "").toLowerCase()).filter(Boolean))];
 
   const [contactsRes, orgsRes] = await Promise.all([
-    sb.from("hall_attendees").select(ALL_FIELDS).in("email", keys),
+    sb.from("people").select(ALL_FIELDS).in("email", keys),
     domains.length > 0
       ? sb.from("hall_organizations")
           .select("domain, relationship_classes")
@@ -104,7 +104,7 @@ export async function getContactsByEmails(emails: string[]): Promise<Map<string,
     });
   }
 
-  // Also synthesize views for emails that are NOT in hall_attendees yet but
+  // Also synthesize views for emails that are NOT in people yet but
   // whose org IS tagged — e.g. a cold email from someone at a Client org.
   for (const email of keys) {
     if (out.has(email)) continue;
@@ -367,7 +367,7 @@ export function isPersonalDomain(domain: string): boolean {
 }
 
 /**
- * Groups hall_attendees by email domain. Sorts by total touches descending
+ * Groups people by email domain. Sorts by total touches descending
  * so the orgs you interact with most land on top.
  *
  * Filters applied:
@@ -386,7 +386,7 @@ export async function getOrganizationRollup(minContacts = 2): Promise<{
   const selfSet = await getSelfEmails();
 
   const [contactsRes, orgsRes] = await Promise.all([
-    sb.from("hall_attendees")
+    sb.from("people")
       .select(ALL_FIELDS)
       .is("dismissed_at", null)
       .gte("last_seen_at", new Date(Date.now() - 120 * 86400_000).toISOString())
@@ -493,7 +493,7 @@ export async function getOrganizationsList(): Promise<OrganizationListEntry[]> {
     sb.from("hall_organizations")
       .select("domain, name, relationship_classes, notion_id, notion_synced_at, notes, dismissed_at, dismissed_reason")
       .order("updated_at", { ascending: false }),
-    sb.from("hall_attendees")
+    sb.from("people")
       .select("email, meeting_count, email_thread_count, transcript_count, last_seen_at, relationship_classes")
       .is("dismissed_at", null),
   ]);
@@ -556,7 +556,7 @@ export async function getProposedOrganizations(minContacts = 3): Promise<Propose
 
   const [orgsRes, attendeesRes] = await Promise.all([
     sb.from("hall_organizations").select("domain"),
-    sb.from("hall_attendees")
+    sb.from("people")
       .select("email, display_name, meeting_count, email_thread_count, transcript_count, last_seen_at, relationship_classes")
       .is("dismissed_at", null)
       .gte("last_seen_at", new Date(Date.now() - 180 * 86400_000).toISOString()),
@@ -618,7 +618,7 @@ export async function getOrganizationDetail(domain: string, timelineLimit = 30):
       .select("domain, name, relationship_classes, notion_id, notion_synced_at, notes, dismissed_at, dismissed_reason")
       .eq("domain", d)
       .maybeSingle(),
-    sb.from("hall_attendees")
+    sb.from("people")
       .select(ALL_FIELDS)
       .ilike("email", `%@${d}`)
       .is("dismissed_at", null)

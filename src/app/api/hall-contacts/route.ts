@@ -46,7 +46,7 @@ export async function GET(req: NextRequest) {
   try {
     const sb = getSupabaseServerClient();
     let query = sb
-      .from("hall_attendees")
+      .from("people")
       .select("email, display_name, relationship_class, relationship_classes, auto_suggested, last_meeting_title, meeting_count, first_seen_at, last_seen_at, classified_at, classified_by, dismissed_at, dismissed_reason")
       .gte("last_seen_at", cutoff)
       .order("meeting_count", { ascending: false })
@@ -104,7 +104,7 @@ async function doPOST(req: NextRequest) {
     const nowIso = new Date().toISOString();
     const isDismiss = body.action === "dismiss";
     const { data, error } = await sb
-      .from("hall_attendees")
+      .from("people")
       .update({
         dismissed_at:     isDismiss ? nowIso : null,
         dismissed_by:     isDismiss ? actor  : null,
@@ -143,7 +143,7 @@ async function doPOST(req: NextRequest) {
   let displayNameCached: string | null = null;
   try {
     const { data: existing } = await sb
-      .from("hall_attendees")
+      .from("people")
       .select("google_resource_name, display_name")
       .eq("email", email)
       .maybeSingle();
@@ -204,7 +204,7 @@ async function doPOST(req: NextRequest) {
 
   try {
     const { data, error } = await sb
-      .from("hall_attendees")
+      .from("people")
       .upsert(
         {
           email,

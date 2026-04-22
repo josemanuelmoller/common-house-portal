@@ -103,45 +103,42 @@ async function fetchCalendarEvent(eventId: string): Promise<MeetingMeta | null> 
 
 type PeopleRow = {
   id: string;
-  notion_id: string;
-  full_name: string;
+  notion_id: string | null;
+  full_name: string | null;
+  display_name: string | null;
   email: string | null;
   aliases: string[] | null;
-  person_classification: string | null;
-  relationship_roles: string | null;
+  person_classification: string | null;   // legacy, being phased out
+  relationship_roles: string | null;      // legacy JSON array
+  relationship_class: string | null;      // primary class: Partner/Client/Team/...
+  relationship_classes: string[] | null;  // all classes this contact fits
   contact_warmth: string | null;
   last_contact_date: string | null;
 };
 
-type HallAttendeeRow = {
-  email: string;
-  display_name: string | null;
-  relationship_class: string | null;
-  relationship_classes: string[] | null;
-  last_seen_at: string | null;
-  last_meeting_title: string | null;
-};
-
+/**
+ * Derive trust tier from the relationship axes. Single source of truth is
+ * `relationship_classes` (populated by the Hall contact UI and by observers).
+ * The legacy `person_classification` = "Internal" is honoured for rows that
+ * haven't been migrated yet.
+ */
 function deriveTrustTier(p: PeopleRow): TrustTier {
-  const cls = (p.person_classification ?? "").toLowerCase();
-  const roles = (p.relationship_roles ?? "").toLowerCase();
-  if (cls === "internal" || roles.includes("founder") || roles.includes("core team")) {
-    return "inner";
-  }
-  const warmth = (p.contact_warmth ?? "").toLowerCase();
-  if (warmth === "hot" || warmth === "warm") return "trusted";
-  return "external";
-}
+  const classes = new Set<string>(
+    [(p.relationship_class ?? "").toLowerCase(), ...(p.relationship_classes ?? []).map(c => (c ?? "").toLowerCase())]
+      .filter(Boolean)
+  );
+  // Legacy fallback: Internal or Core Team tags imply Team
+  if ((p.person_classification ?? "").toLowerCase() === "internal") classes.add("team");
+  if (/founder|core\s*team/i.test(p.relationship_roles ?? "")) classes.add("team");
 
-function deriveTrustTierFromHall(h: HallAttendeeRow): TrustTier {
-  const classes = new Set((h.relationship_classes ?? [])
-    .map(c => (c ?? "").toLowerCase()));
-  const primary = (h.relationship_class ?? "").toLowerCase();
-  classes.add(primary);
   if (classes.has("team") || classes.has("family")) return "inner";
-  // Partner, Investor, Funder, Client, Portfolio, Vendor → trusted business relationship
+  // Trusted business relationships
   const trustedClasses = ["partner", "investor", "funder", "client", "portfolio", "vendor"];
   if (trustedClasses.some(c => classes.has(c))) return "trusted";
+
+  // Soft signal: Hot/Warm warmth promotes to trusted
+  const warmth = (p.contact_warmth ?? "").toLowerCase();
+  if (warmth === "hot" || warmth === "warm") return "trusted";
   return "external";
 }
 
@@ -176,56 +173,31 @@ async function resolveCounterpart(email: string): Promise<Counterpart> {
   const sb = getSupabaseServerClient();
   const lower = email.toLowerCase().trim();
 
-  // Strategy 1: look up in people (Notion-synced, rich with roles/warmth/aliases)
+  // After the contact consolidation (Phase 1-3), `people` is the single
+  // source of truth — any email observed by Calendar/Gmail/Fireflies/WA is
+  // here. Strategy 1 = exact email. Strategy 2 = local-part fuzzy fallback
+  // for cases where the contact exists under a slightly different email.
   let row: PeopleRow | null = null;
   let method: Counterpart["resolution_method"] = "none";
   const byEmail = await sb
     .from("people")
-    .select("id, notion_id, full_name, email, aliases, person_classification, relationship_roles, contact_warmth, last_contact_date")
+    .select("id, notion_id, full_name, email, aliases, person_classification, relationship_roles, contact_warmth, last_contact_date, relationship_class, relationship_classes, display_name")
     .eq("email", lower)
     .maybeSingle();
   if (byEmail.data) { row = byEmail.data as PeopleRow; method = "email"; }
 
-  // Strategy 2: people fuzzy on local-part (e.g. jo@morrama.com → "jo" in full_name)
   if (!row) {
     const local = lower.split("@")[0].replace(/\./g, " ");
     if (local.length >= 3) {
       const { data: fuzzy } = await sb
         .from("people")
-        .select("id, notion_id, full_name, email, aliases, person_classification, relationship_roles, contact_warmth, last_contact_date")
+        .select("id, notion_id, full_name, email, aliases, person_classification, relationship_roles, contact_warmth, last_contact_date, relationship_class, relationship_classes, display_name")
         .ilike("full_name", `%${local}%`)
         .limit(5);
       if (fuzzy && fuzzy.length === 1) {
         row = fuzzy[0] as PeopleRow;
         method = "fuzzy_name";
       }
-    }
-  }
-
-  // Strategy 3: hall_attendees — calendar-derived contacts. Cristóbal lives
-  // here (Partner/VIP classified) but doesn't have a Notion contact record.
-  // Last-resort lookup so the prep-brief still knows who this person is.
-  if (!row) {
-    const { data: hallRow } = await sb
-      .from("hall_attendees")
-      .select("email, display_name, relationship_class, relationship_classes, last_seen_at, last_meeting_title, person_notion_id")
-      .eq("email", lower)
-      .maybeSingle();
-    if (hallRow) {
-      const h = hallRow as HallAttendeeRow & { person_notion_id: string | null };
-      return {
-        person_id:          null,  // no people.id for this tier
-        notion_id:          h.person_notion_id ?? null,
-        full_name:          h.display_name ?? lower,
-        email:              lower,
-        aliases:            [],
-        classification:     h.relationship_class ?? null,
-        relationship_roles: h.relationship_classes ?? [],
-        contact_warmth:     null,
-        last_contact_date:  h.last_seen_at,
-        trust_tier:         deriveTrustTierFromHall(h),
-        resolution_method:  "email",
-      };
     }
   }
 
@@ -246,16 +218,24 @@ async function resolveCounterpart(email: string): Promise<Counterpart> {
   }
 
   const tier = deriveTrustTier(row);
-  let roles: string[] = [];
-  try { roles = JSON.parse(row.relationship_roles ?? "[]"); } catch { /* ignore */ }
+
+  // Legacy relationship_roles was a stringified JSON array ('["Founder"]');
+  // new relationship_classes is a proper text[]. Prefer the typed one.
+  let roles: string[] = row.relationship_classes ?? [];
+  if (roles.length === 0 && row.relationship_roles) {
+    try {
+      const parsed = JSON.parse(row.relationship_roles);
+      if (Array.isArray(parsed)) roles = parsed.map(String);
+    } catch { /* ignore */ }
+  }
 
   return {
     person_id:          row.id,
     notion_id:          row.notion_id,
-    full_name:          row.full_name,
+    full_name:          row.full_name ?? row.display_name ?? lower,
     email:              row.email ?? lower,
     aliases:            row.aliases ?? [],
-    classification:     row.person_classification,
+    classification:     row.relationship_class ?? row.person_classification,
     relationship_roles: roles,
     contact_warmth:     row.contact_warmth,
     last_contact_date:  row.last_contact_date,

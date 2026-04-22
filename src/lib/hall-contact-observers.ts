@@ -25,6 +25,69 @@ import { getSupabaseServerClient } from "./supabase-server";
 
 type SBClient = SupabaseClient;
 
+// ─── Shared upsert helper ────────────────────────────────────────────────────
+// Apply a per-email patch to the unified `people` table. Splits into INSERT
+// (for new emails) vs UPDATE (for existing). This replaces the previous
+// per-observer upserts into `hall_attendees`. A partial-unique index on
+// lower(email) backs this — rows without an email (WhatsApp-first contacts)
+// are allowed and ignored here.
+type PeopleEmailPatch = {
+  email:    string;
+  patch:    Record<string, unknown>;
+  /** For inserts: how to hydrate the new row's identity fields. */
+  insert_defaults?: Record<string, unknown>;
+  /** Tag for auto_suggested on first insert. */
+  auto_suggested_source?: string;
+};
+
+export async function applyPeopleEmailPatches(
+  sb: SBClient,
+  patches: PeopleEmailPatch[],
+): Promise<void> {
+  const emails = [...new Set(patches.map(p => p.email.toLowerCase()).filter(Boolean))];
+  if (emails.length === 0) return;
+  const nowIso = new Date().toISOString();
+
+  const { data: existing } = await sb
+    .from("people")
+    .select("id, email")
+    .in("email", emails);
+  const idByEmail = new Map<string, string>();
+  for (const r of (existing ?? []) as { id: string; email: string | null }[]) {
+    const em = (r.email ?? "").toLowerCase();
+    if (em) idByEmail.set(em, r.id);
+  }
+
+  const toInsert: Array<Record<string, unknown>> = [];
+  for (const p of patches) {
+    const email = p.email.toLowerCase();
+    const id = idByEmail.get(email);
+    if (id) {
+      // Update existing row. Strip undefined so we don't overwrite with nulls.
+      const patch: Record<string, unknown> = { ...p.patch, updated_at: nowIso };
+      for (const k of Object.keys(patch)) if (patch[k] === undefined) delete patch[k];
+      await sb.from("people").update(patch).eq("id", id);
+    } else {
+      // Insert new row with identity defaults + first-time observation tag.
+      const row: Record<string, unknown> = {
+        email,
+        full_name:       (p.insert_defaults?.display_name as string | undefined) ?? email,
+        ...p.insert_defaults,
+        ...p.patch,
+        first_seen_at:    nowIso,
+        auto_suggested:   p.auto_suggested_source ?? "observer",
+        auto_suggested_at: nowIso,
+        created_at:       nowIso,
+        updated_at:       nowIso,
+      };
+      // Remove undefined keys
+      for (const k of Object.keys(row)) if (row[k] === undefined) delete row[k];
+      toInsert.push(row);
+    }
+  }
+  if (toInsert.length > 0) await sb.from("people").insert(toInsert);
+}
+
 // ─── Gmail ───────────────────────────────────────────────────────────────────
 
 export type GmailObservation = {
@@ -75,29 +138,33 @@ export async function observeGmailThread(
 
   if (bumpEmails.length === 0) return { newObservation: false, incremented: 0 };
 
+  // Read existing email-thread-count from unified `people` table.
   const { data: existing } = await sb
-    .from("hall_attendees")
+    .from("people")
     .select("email, email_thread_count, last_email_at")
     .in("email", bumpEmails);
   const byEmail = new Map<string, { count: number; last_at: string | null }>();
-  for (const r of (existing ?? []) as { email: string; email_thread_count: number; last_email_at: string | null }[]) {
-    byEmail.set(r.email, { count: r.email_thread_count ?? 0, last_at: r.last_email_at });
+  for (const r of (existing ?? []) as { email: string | null; email_thread_count: number | null; last_email_at: string | null }[]) {
+    const em = (r.email ?? "").toLowerCase();
+    if (em) byEmail.set(em, { count: r.email_thread_count ?? 0, last_at: r.last_email_at });
   }
 
-  const rows = bumpEmails.map(email => {
+  const patches: PeopleEmailPatch[] = bumpEmails.map(email => {
     const current = byEmail.get(email);
     const newerTime = !current?.last_at || obs.lastMessageAt.toISOString() > current.last_at;
     return {
       email,
-      email_thread_count: (current?.count ?? 0) + 1,
-      last_email_at:      newerTime ? obs.lastMessageAt.toISOString() : current!.last_at,
-      last_email_subject: newerTime ? obs.subject.slice(0, 500) : undefined,
-      last_seen_at:       newerTime ? obs.lastMessageAt.toISOString() : undefined,
-      updated_at:         nowIso,
+      patch: {
+        email_thread_count: (current?.count ?? 0) + 1,
+        last_email_at:      newerTime ? obs.lastMessageAt.toISOString() : current?.last_at ?? null,
+        last_email_subject: newerTime ? obs.subject.slice(0, 500) : undefined,
+        last_seen_at:       newerTime ? obs.lastMessageAt.toISOString() : undefined,
+      },
+      auto_suggested_source: "gmail",
     };
   });
 
-  await sb.from("hall_attendees").upsert(rows, { onConflict: "email", ignoreDuplicates: false });
+  await applyPeopleEmailPatches(sb, patches);
   return { newObservation: isNew, incremented: bumpEmails.length };
 }
 
@@ -139,28 +206,32 @@ export async function observeTranscript(
 
   if (!isNew) return { newObservation: false, incremented: 0 };
 
+  // Read existing transcript counts from unified `people` table.
   const { data: existing } = await sb
-    .from("hall_attendees")
+    .from("people")
     .select("email, transcript_count, last_transcript_at")
     .in("email", emails);
   const byEmail = new Map<string, { count: number; last_at: string | null }>();
-  for (const r of (existing ?? []) as { email: string; transcript_count: number; last_transcript_at: string | null }[]) {
-    byEmail.set(r.email, { count: r.transcript_count ?? 0, last_at: r.last_transcript_at });
+  for (const r of (existing ?? []) as { email: string | null; transcript_count: number | null; last_transcript_at: string | null }[]) {
+    const em = (r.email ?? "").toLowerCase();
+    if (em) byEmail.set(em, { count: r.transcript_count ?? 0, last_at: r.last_transcript_at });
   }
 
-  const rows = emails.map(email => {
+  const patches: PeopleEmailPatch[] = emails.map(email => {
     const current = byEmail.get(email);
     const newerTime = !current?.last_at || obs.meetingAt.toISOString() > current.last_at;
     return {
       email,
-      transcript_count:      (current?.count ?? 0) + 1,
-      last_transcript_at:    newerTime ? obs.meetingAt.toISOString() : current!.last_at,
-      last_transcript_title: newerTime ? obs.title.slice(0, 500) : undefined,
-      last_seen_at:          newerTime ? obs.meetingAt.toISOString() : undefined,
-      updated_at:            nowIso,
+      patch: {
+        transcript_count:      (current?.count ?? 0) + 1,
+        last_transcript_at:    newerTime ? obs.meetingAt.toISOString() : current?.last_at ?? null,
+        last_transcript_title: newerTime ? obs.title.slice(0, 500) : undefined,
+        last_seen_at:          newerTime ? obs.meetingAt.toISOString() : undefined,
+      },
+      auto_suggested_source: "fireflies",
     };
   });
 
-  await sb.from("hall_attendees").upsert(rows, { onConflict: "email", ignoreDuplicates: false });
+  await applyPeopleEmailPatches(sb, patches);
   return { newObservation: true, incremented: emails.length };
 }

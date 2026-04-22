@@ -322,18 +322,36 @@ async function handleWhatsappClip(body: ClipBody, req: NextRequest) {
   // orphan_match_candidates when sender_person_id lands null at write time.
   const matchedProjects = new Set<string>();
   let matchedPeopleCount = 0;
-  const bySender: Map<string, { count: number; match: ReturnType<typeof resolvePerson> }> = new Map();
+  // Track per-sender state — count, resolver result, original-case name, and
+  // first/last message timestamps. The first/last ts lets us stamp the
+  // newly-created `people` rows with first_seen_at / last_seen_at accurately.
+  const bySender: Map<string, {
+    count: number;
+    match: ReturnType<typeof resolvePerson>;
+    displayName: string;
+    first_ts: string | null;
+    last_ts:  string | null;
+  }> = new Map();
   const messageRows = messages.map((m, i) => {
     const match = resolvePerson({ name: m.sender }, peopleIdx);
     if (match.person_id) matchedPeopleCount++;
 
     const senderKey = (m.sender || "").toLowerCase().trim();
+    const ts = m.ts ? new Date(m.ts).toISOString() : null;
     const prev = bySender.get(senderKey);
-    if (!prev) bySender.set(senderKey, { count: 1, match });
-    else       prev.count += 1;
+    if (!prev) {
+      bySender.set(senderKey, {
+        count: 1, match,
+        displayName: m.sender || "(unknown)",
+        first_ts: ts, last_ts: ts,
+      });
+    } else {
+      prev.count += 1;
+      if (ts && (!prev.first_ts || ts < prev.first_ts)) prev.first_ts = ts;
+      if (ts && (!prev.last_ts  || ts > prev.last_ts))  prev.last_ts  = ts;
+    }
 
     for (const pid of detectProjects(m.text, projectIdx)) matchedProjects.add(pid);
-    const ts = m.ts ? new Date(m.ts).toISOString() : null;
     return {
       source_id:        sourceId,
       notion_id:        notionId,
@@ -366,7 +384,42 @@ async function handleWhatsappClip(body: ClipBody, req: NextRequest) {
     }
   }
 
-  // 6. For any sender that resolved with confidence < 1 (or not at all),
+  // 6a. New senders with NO match — create a "suggested" people row.
+  // This closes the gap where a WA-first contact would otherwise stay
+  // invisible until they appeared in Calendar/Gmail/Fireflies. The row is
+  // marked auto_suggested="whatsapp_clipper" so the admin can review / classify
+  // it at /admin/hall/contacts. Until classified, the person is not yet in
+  // the person-resolver index (buildPersonIndex re-reads each clip).
+  try {
+    const newPeopleRows: Array<Record<string, unknown>> = [];
+    const nowIso = new Date().toISOString();
+    for (const [senderKey, info] of bySender) {
+      if (!senderKey || info.match.is_self) continue;
+      if (info.match.person_id) continue;           // matched or orphan candidate → skip
+      if (senderKey.length < 2) continue;            // skip "?" and other placeholders
+      newPeopleRows.push({
+        email:             null,
+        full_name:         info.displayName,
+        display_name:      info.displayName,
+        aliases:           [senderKey],
+        auto_suggested:    "whatsapp_clipper",
+        auto_suggested_at: nowIso,
+        first_seen_at:     info.first_ts ?? nowIso,
+        last_seen_at:      info.last_ts  ?? nowIso,
+        created_at:        nowIso,
+        updated_at:        nowIso,
+      });
+    }
+    if (newPeopleRows.length) {
+      // Best-effort. Dupes (same sender clipped twice) are handled at review
+      // time by the admin / orphan-match flow.
+      await sb.from("people").insert(newPeopleRows);
+    }
+  } catch (e) {
+    console.warn("[clipper] people suggest (whatsapp_clipper) failed:", e);
+  }
+
+  // 6b. For any sender that resolved with medium confidence (< 0.8),
   // file an orphan_match_candidate so it can be reviewed and approved later
   // without blocking the clip. Exact-email matches (conf 1) skip this.
   try {

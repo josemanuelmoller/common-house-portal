@@ -200,7 +200,7 @@ async function applyEventsToAttendees(
 
   const emails = emailsAffected.map(([e]) => e);
   const { data: existingAttendees } = await sb
-    .from("hall_attendees")
+    .from("people")
     .select("email, meeting_count, first_seen_at")
     .in("email", emails);
   const existingByEmail = new Map<string, { meeting_count: number; first_seen_at: string | null }>();
@@ -243,7 +243,7 @@ async function applyEventsToAttendees(
     return row;
   });
 
-  await sb.from("hall_attendees").upsert(rows, { onConflict: "email", ignoreDuplicates: false });
+  await sb.from("people").upsert(rows, { onConflict: "email", ignoreDuplicates: false });
   stats.attendee_upserts += rows.length;
 }
 

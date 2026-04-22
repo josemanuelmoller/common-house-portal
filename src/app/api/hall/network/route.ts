@@ -38,7 +38,7 @@ export async function GET() {
   const since = new Date(Date.now() - 180 * 86400_000).toISOString();
 
   const [attRes, evRes] = await Promise.all([
-    sb.from("hall_attendees")
+    sb.from("people")
       .select("email, display_name, relationship_classes, meeting_count, transcript_count, email_thread_count")
       .not("relationship_classes", "is", null),
     sb.from("hall_calendar_events")

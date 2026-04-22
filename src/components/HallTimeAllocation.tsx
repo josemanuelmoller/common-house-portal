@@ -40,7 +40,7 @@ async function loadAllocation(): Promise<{ bucket: typeof BUCKETS[number]; hours
       .select("event_id, event_title, event_start, event_end, attendee_emails")
       .gte("event_start", since)
       .eq("is_cancelled", false),
-    sb.from("hall_attendees").select("email, relationship_classes"),
+    sb.from("people").select("email, relationship_classes"),
   ]);
 
   const classesByEmail = new Map<string, string[]>();

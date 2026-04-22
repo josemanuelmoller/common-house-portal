@@ -90,7 +90,7 @@ export async function loadAttendeeClasses(emails: string[]): Promise<AttendeeLoo
   if (sb) {
     try {
       const { data } = await sb
-        .from("hall_attendees")
+        .from("people")
         .select("email, relationship_class, relationship_classes, google_synced_at")
         .in("email", unique);
       rows = (data ?? []) as Row[];
@@ -194,24 +194,53 @@ export async function loadAttendeeClasses(emails: string[]): Promise<AttendeeLoo
   if (sb && updates.length > 0) {
     try {
       // Never clobber a human-set tag set: if the row already has any
-      // relationship_classes, skip the classes field in the upsert for that row.
+      // relationship_classes, skip the classes field for that row.
       const { data: existing } = await sb
-        .from("hall_attendees")
-        .select("email, relationship_classes")
-        .in("email", updates.map(u => u.email));
-      const humanSet = new Set(
-        ((existing ?? []) as { email: string; relationship_classes: string[] | null }[])
-          .filter(r => (r.relationship_classes ?? []).length > 0)
-          .map(r => r.email),
-      );
-      const safeUpdates = updates.map(u =>
-        humanSet.has(u.email)
-          ? { ...u, relationship_classes: undefined }
-          : u,
-      );
-      await sb
-        .from("hall_attendees")
-        .upsert(safeUpdates, { onConflict: "email", ignoreDuplicates: false });
+        .from("people")
+        .select("id, email, relationship_classes")
+        .in("email", updates.map(u => u.email.toLowerCase()));
+      const humanSet  = new Set<string>();
+      const idByEmail = new Map<string, string>();
+      for (const r of (existing ?? []) as { id: string; email: string | null; relationship_classes: string[] | null }[]) {
+        const em = (r.email ?? "").toLowerCase();
+        if (!em) continue;
+        idByEmail.set(em, r.id);
+        if ((r.relationship_classes ?? []).length > 0) humanSet.add(em);
+      }
+
+      // Partial-unique index on lower(email) → split insert vs update.
+      const toInsert: Array<Record<string, unknown>> = [];
+      for (const u of updates) {
+        const email = u.email.toLowerCase();
+        const id = idByEmail.get(email);
+        const patch: Record<string, unknown> = {
+          google_synced_at: u.google_synced_at,
+          google_resource_name: u.google_resource_name,
+          google_source:    u.google_source,
+          google_labels:    u.google_labels,
+          updated_at:      nowIso,
+        };
+        if (!humanSet.has(email) && u.relationship_classes) {
+          patch.relationship_classes = u.relationship_classes;
+          patch.relationship_class   = (u.relationship_classes as string[])[0] ?? null;
+        }
+        for (const k of Object.keys(patch)) if (patch[k] === undefined) delete patch[k];
+
+        if (id) {
+          await sb.from("people").update(patch).eq("id", id);
+        } else {
+          toInsert.push({
+            email,
+            full_name:       email,
+            ...patch,
+            auto_suggested:    "google_contacts",
+            auto_suggested_at: nowIso,
+            first_seen_at:     nowIso,
+            created_at:        nowIso,
+          });
+        }
+      }
+      if (toInsert.length > 0) await sb.from("people").insert(toInsert);
     } catch { /* cache write failures are non-critical */ }
   }
 
@@ -376,39 +405,71 @@ export async function observeAttendees(meetings: UpcomingMeeting[]): Promise<voi
     }
   } catch { /* best-effort */ }
 
-  // 4) Apply attendee delta (only non-zero).
+  // 4) Apply attendee delta (only non-zero). Writes to `people` — the unified
+  //    contact table. Handles both existing rows (update meeting_count delta)
+  //    and new rows (insert with auto_suggested="calendar").
   const emailsAffected = [...net.entries()].filter(([, d]) => d !== 0);
   if (emailsAffected.length === 0) return;
 
   try {
-    const emails = emailsAffected.map(([e]) => e);
+    const emails = emailsAffected.map(([e]) => e.toLowerCase());
     const { data: existing } = await sb
-      .from("hall_attendees")
-      .select("email, meeting_count")
+      .from("people")
+      .select("id, email, meeting_count")
       .in("email", emails);
-    const countByEmail = new Map<string, number>();
-    for (const r of (existing ?? []) as { email: string; meeting_count: number }[]) {
-      countByEmail.set(r.email, r.meeting_count ?? 0);
+    const byEmail = new Map<string, { id: string; meeting_count: number }>();
+    for (const r of (existing ?? []) as { id: string; email: string | null; meeting_count: number | null }[]) {
+      const em = (r.email ?? "").toLowerCase();
+      if (em) byEmail.set(em, { id: r.id, meeting_count: r.meeting_count ?? 0 });
     }
 
-    const rows = emailsAffected.map(([email, delta]) => {
-      const next = Math.max(0, (countByEmail.get(email) ?? 0) + delta);
-      const m = meta.get(email);
-      const row: Record<string, unknown> = {
-        email,
-        meeting_count: next,
-        updated_at:    nowIso,
-      };
-      if (m) {
-        row.display_name       = m.display_name;
-        row.last_meeting_title = m.last_meeting_title;
-        row.last_seen_at       = m.last_seen_at;
-      }
-      return row;
-    });
+    // Split into inserts + updates. Upsert with a partial-unique index on
+    // lower(email) doesn't play cleanly with supabase-js onConflict, so we
+    // split explicitly.
+    const toInsert: Array<Record<string, unknown>> = [];
+    const toUpdate: Array<{ id: string; patch: Record<string, unknown> }> = [];
 
-    await sb
-      .from("hall_attendees")
-      .upsert(rows, { onConflict: "email", ignoreDuplicates: false });
-  } catch { /* best-effort */ }
+    for (const [emailRaw, delta] of emailsAffected) {
+      const email = emailRaw.toLowerCase();
+      const prior = byEmail.get(email);
+      const m = meta.get(emailRaw);
+      const next = Math.max(0, (prior?.meeting_count ?? 0) + delta);
+
+      if (prior) {
+        const patch: Record<string, unknown> = {
+          meeting_count: next,
+          updated_at:    nowIso,
+        };
+        if (m) {
+          patch.display_name       = m.display_name;
+          patch.last_meeting_title = m.last_meeting_title;
+          patch.last_seen_at       = m.last_seen_at;
+        }
+        toUpdate.push({ id: prior.id, patch });
+      } else {
+        toInsert.push({
+          email,
+          full_name:          m?.display_name ?? email,
+          display_name:       m?.display_name ?? null,
+          meeting_count:      next,
+          last_meeting_title: m?.last_meeting_title ?? null,
+          last_seen_at:       m?.last_seen_at ?? nowIso,
+          first_seen_at:      m?.last_seen_at ?? nowIso,
+          auto_suggested:     "calendar",
+          auto_suggested_at:  nowIso,
+          created_at:         nowIso,
+          updated_at:         nowIso,
+        });
+      }
+    }
+
+    if (toInsert.length > 0) {
+      await sb.from("people").insert(toInsert);
+    }
+    for (const u of toUpdate) {
+      await sb.from("people").update(u.patch).eq("id", u.id);
+    }
+  } catch (e) {
+    console.warn("[observeAttendees] people upsert failed:", e);
+  }
 }
