@@ -364,6 +364,12 @@ export default async function HallContactsPage({ searchParams }: PageProps) {
               )}
             </Link>
             <div className="flex-1" />
+            <Link
+              href="/admin/hall/orphans"
+              className="text-[10px] font-bold text-[#131218]/50 hover:text-[#131218] uppercase tracking-widest mr-3"
+            >
+              Orphan matches →
+            </Link>
             <HallContactsAutoRefresh />
           </div>
 
