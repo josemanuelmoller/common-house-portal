@@ -69,6 +69,7 @@ type EvidenceRow = {
   affected_theme: string | null;
   geography: string | null;
   stakeholder_function: string | null;
+  workstream: string | null;
   project_notion_id: string | null;
   source_notion_id: string | null;
   date_captured: string | null;
@@ -101,7 +102,7 @@ async function fetchEvidence(
   const sb = getSupabaseServerClient();
 
   let q = sb.from("evidence")
-    .select("notion_id, title, evidence_type, validation_status, confidence_level, reusability_level, evidence_statement, source_excerpt, topics, affected_theme, geography, stakeholder_function, project_notion_id, source_notion_id, date_captured")
+    .select("notion_id, title, evidence_type, validation_status, confidence_level, reusability_level, evidence_statement, source_excerpt, topics, affected_theme, geography, stakeholder_function, workstream, project_notion_id, source_notion_id, date_captured")
     .eq("validation_status", "Validated");
 
   if (evidenceIds && evidenceIds.length > 0) {
@@ -186,6 +187,7 @@ Rules:
 - Affected theme: ${ev.affected_theme ?? "—"}
 - Topics: ${ev.topics ?? "—"}
 - Geography: ${ev.geography ?? "—"}
+- Workstream (sub-team this evidence comes from): ${ev.workstream ?? "—"}
 - Stakeholder function (if pre-tagged): ${ev.stakeholder_function ?? "—"}
 - Confidence: ${ev.confidence_level ?? "—"}
 - Notion ID: ${ev.notion_id}
@@ -326,8 +328,18 @@ async function _POST(req: NextRequest) {
         if (!node) throw new Error(`target_path not found: ${c.target_path}`);
 
         const isConcernSection = c.section.toLowerCase() === "stakeholder concerns";
+        // Preference order for the subsection when writing a Concern:
+        //   1) explicit subsection from the classifier response
+        //   2) stakeholder_function already on the evidence row
+        //   3) workstream on the evidence row (matches canonical function, e.g. "Quality")
+        //   4) "Other"
+        const STD_FNS = new Set([
+          "IT","Quality","Operations","Legal","Finance","Marketing",
+          "Executive","Procurement","Sales","Customer Service","Supply Chain","Other",
+        ]);
+        const workstreamAsFn = ev.workstream && STD_FNS.has(ev.workstream) ? ev.workstream : null;
         const subsection = isConcernSection
-          ? (c.subsection ?? ev.stakeholder_function ?? "Other")
+          ? (c.subsection ?? ev.stakeholder_function ?? workstreamAsFn ?? "Other")
           : null;
 
         const writeResult = isConcernSection && subsection
