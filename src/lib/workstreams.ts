@@ -30,7 +30,10 @@ const CANONICAL_FUNCTIONS = [
 
 /** Keyword lexicon for fast rule-based classification. Keys map to a canonical label. */
 const KEYWORD_MAP: Array<{ label: string; patterns: RegExp[] }> = [
-  { label: "IT",            patterns: [/\bit\b/i, /\binfosec\b/i, /\btech\b/i, /\bdevops\b/i, /\bintegra(tion|cion)\b/i, /\bplatform alignment\b/i] },
+  // Note: do NOT use /\bit\b/ — the pronoun "it" triggers everywhere in
+  // processed_summary and produces false positives on person-name WhatsApp
+  // chat titles. Only IT-specific jargon words.
+  { label: "IT",            patterns: [/\binfosec\b/i, /\bdevops\b/i, /\bsecurity\b/i, /\bintegra(tion|cion)\b/i, /\bAPI\b/, /\bbackend\b/i, /\bQR code\b/i] },
   { label: "Quality",       patterns: [/\bquality\b/i, /\bcalidad\b/i, /\bQA\b/, /\bsanitary\b/i] },
   { label: "Operations",    patterns: [/\boperations\b/i, /\bops\b/i, /\bopera(tions|ciones)\b/i, /\bpilot ops\b/i, /\brollout\b/i] },
   { label: "Legal",         patterns: [/\blegal\b/i, /\bcontract(s|ing)?\b/i, /\bcompliance\b/i] },
