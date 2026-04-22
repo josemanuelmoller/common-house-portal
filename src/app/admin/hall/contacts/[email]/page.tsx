@@ -2,7 +2,6 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Sidebar } from "@/components/Sidebar";
 import { requireAdmin } from "@/lib/require-admin";
-import { getSupabaseServerClient } from "@/lib/supabase-server";
 import {
   getContactByEmail,
   getContactTimeline,
@@ -11,76 +10,19 @@ import {
   isVipContact,
   type TimelineEntry,
 } from "@/lib/contacts";
+import {
+  getEnrichmentByEmail,
+  getSharedProjects,
+  getCoAttendees,
+  getContactOrganizations,
+} from "@/lib/contact-profile";
 import { HallContactRow } from "@/components/HallContactRow";
-
-// Domains we treat as personal inboxes — a user on one of these needs an
-// explicit org assignment, their domain alone says nothing about affiliation.
-const PERSONAL_DOMAINS = new Set([
-  "gmail.com", "googlemail.com",
-  "hotmail.com", "outlook.com", "live.com", "msn.com",
-  "yahoo.com", "yahoo.co.uk", "ymail.com",
-  "icloud.com", "me.com", "mac.com",
-  "protonmail.com", "proton.me", "pm.me",
-  "aol.com", "gmx.com",
-]);
-
-type OrgSuggestion = {
-  domain: string;
-  orgName: string | null;
-  matches: number;
-  total: number;
-};
-
-async function suggestOrgForPersonalContact(email: string): Promise<OrgSuggestion | null> {
-  const domain = (email.split("@")[1] ?? "").toLowerCase();
-  if (!PERSONAL_DOMAINS.has(domain)) return null;
-
-  const sb = getSupabaseServerClient();
-  const { data: transcripts } = await sb
-    .from("hall_transcript_observations")
-    .select("participant_emails")
-    .contains("participant_emails", [email]);
-
-  const counts = new Map<string, number>();
-  let total = 0;
-  for (const r of (transcripts ?? []) as { participant_emails: string[] | null }[]) {
-    const emails = (r.participant_emails ?? []).map(e => e.toLowerCase());
-    if (!emails.includes(email)) continue;
-    total++;
-    const domainsInThis = new Set<string>();
-    for (const e of emails) {
-      if (e === email) continue;
-      const d = (e.split("@")[1] ?? "").toLowerCase();
-      if (!d || PERSONAL_DOMAINS.has(d)) continue;
-      domainsInThis.add(d);
-    }
-    for (const d of domainsInThis) counts.set(d, (counts.get(d) ?? 0) + 1);
-  }
-  if (total < 2) return null;
-
-  let bestDomain: string | null = null;
-  let bestCount = 0;
-  for (const [d, n] of counts) {
-    if (n > bestCount) { bestDomain = d; bestCount = n; }
-  }
-  if (!bestDomain || bestCount < 2 || bestCount / total < 0.5) return null;
-
-  const { data: orgRow } = await sb
-    .from("hall_organizations")
-    .select("org_name")
-    .eq("domain", bestDomain)
-    .is("dismissed_at", null)
-    .maybeSingle();
-
-  return {
-    domain: bestDomain,
-    orgName: (orgRow?.org_name as string | null) ?? null,
-    matches: bestCount,
-    total,
-  };
-}
+import { ReEnrichButton } from "@/components/ReEnrichButton";
+import { SynthesizeTopicsButton } from "@/components/SynthesizeTopicsButton";
 
 export const dynamic = "force-dynamic";
+
+// ─── formatters ───────────────────────────────────────────────────────────────
 
 function timeAgo(iso: string | null): string {
   if (!iso) return "never";
@@ -108,6 +50,17 @@ function entryGlyph(kind: TimelineEntry["kind"]): string {
   return "📧";
 }
 
+function warmthFromLastSeen(iso: string | null): { label: string; tone: string } {
+  if (!iso) return { label: "Cold", tone: "text-[#131218]/40" };
+  const days = (Date.now() - new Date(iso).getTime()) / 86400_000;
+  if (days < 7)   return { label: "🔥 Hot",  tone: "text-emerald-700" };
+  if (days < 30)  return { label: "Warm",   tone: "text-amber-700"  };
+  if (days < 90)  return { label: "Cooling", tone: "text-[#131218]/50" };
+  return { label: "Cold", tone: "text-[#131218]/40" };
+}
+
+// ─── page ─────────────────────────────────────────────────────────────────────
+
 type Props = { params: Promise<{ email: string }> };
 
 export default async function ContactDrawerPage({ params }: Props) {
@@ -115,24 +68,27 @@ export default async function ContactDrawerPage({ params }: Props) {
   const { email: rawEmail } = await params;
   const email = decodeURIComponent(rawEmail).toLowerCase();
 
-  const [contact, timeline] = await Promise.all([
+  const [contact, timeline, enrichment] = await Promise.all([
     getContactByEmail(email),
     getContactTimeline(email, 25),
+    getEnrichmentByEmail(email),
   ]);
-
   if (!contact) return notFound();
 
-  const [whatsappClips, orgSuggestion] = await Promise.all([
+  const [whatsappClips, sharedProjects, coAttendees, organizations] = await Promise.all([
     getContactWhatsappClips(contact.display_name, 10),
-    suggestOrgForPersonalContact(email),
+    getSharedProjects(email),
+    getCoAttendees(email, 8),
+    getContactOrganizations(email, enrichment),
   ]);
 
-  const personal = isPersonalContact(contact);
-  const vip      = isVipContact(contact);
+  const personal      = isPersonalContact(contact);
+  const vip           = isVipContact(contact);
+  const totalTouches  = contact.meeting_count + contact.email_thread_count + contact.transcript_count;
+  const warmth        = warmthFromLastSeen(contact.last_seen_at);
+  const hasLinkedIn   = !!enrichment?.linkedin;
+  const hasRoleSignal = !!(enrichment?.job_title || enrichment?.role_category || enrichment?.function_area);
 
-  const totalTouches = contact.meeting_count + contact.email_thread_count + contact.transcript_count;
-
-  // Row data for the inline HallContactRow (chip editor, reuses existing code)
   const rowProps = {
     email:                 contact.email,
     display_name:          contact.display_name,
@@ -156,7 +112,7 @@ export default async function ContactDrawerPage({ params }: Props) {
         {/* Dark header */}
         <header className="bg-[#131218] px-12 pt-10 pb-11">
           <div className="flex items-center gap-3 text-[10px] font-bold uppercase tracking-widest text-white/30 mb-3">
-            <Link href="/admin/hall/contacts" className="hover:text-white/80 transition-colors">Calendar Contacts</Link>
+            <Link href="/admin/hall/contacts" className="hover:text-white/80 transition-colors">Contacts</Link>
             <span>›</span>
             <span className="text-white/50">{contact.display_name || email.split("@")[0]}</span>
           </div>
@@ -167,6 +123,9 @@ export default async function ContactDrawerPage({ params }: Props) {
                   <em className="font-black italic text-[#c8f55a]">{email.split("@")[0]}</em>
                 )}
               </h1>
+              {enrichment?.job_title && (
+                <p className="text-[13px] text-white/70 mt-2 truncate">{enrichment.job_title}</p>
+              )}
               <p className="text-sm text-white/40 mt-3 truncate">{email}</p>
               <div className="flex items-center gap-2 mt-4 flex-wrap">
                 {contact.relationship_classes.map(cls => (
@@ -181,7 +140,17 @@ export default async function ContactDrawerPage({ params }: Props) {
                     {cls}
                   </span>
                 ))}
-                {contact.relationship_classes.length === 0 && (
+                {enrichment?.role_category && (
+                  <span className="text-[9px] font-bold tracking-wide uppercase px-2 py-0.5 rounded bg-white text-[#131218]">
+                    {enrichment.role_category}
+                  </span>
+                )}
+                {enrichment?.function_area && (
+                  <span className="text-[9px] font-bold tracking-wide uppercase px-2 py-0.5 rounded bg-[#c8f55a] text-[#131218]">
+                    {enrichment.function_area}
+                  </span>
+                )}
+                {contact.relationship_classes.length === 0 && !hasRoleSignal && (
                   <span className="text-[9px] font-bold tracking-widest uppercase text-amber-400/80">
                     Untagged — no relationship class set
                   </span>
@@ -189,11 +158,11 @@ export default async function ContactDrawerPage({ params }: Props) {
               </div>
             </div>
             <div className="flex items-center gap-5 pb-1">
-              <Stat label="Meetings"    value={contact.meeting_count} />
+              <Stat label="Meetings"      value={contact.meeting_count} />
               <div className="w-px h-10 bg-white/10" />
               <Stat label="Email threads" value={contact.email_thread_count} />
               <div className="w-px h-10 bg-white/10" />
-              <Stat label="Transcripts" value={contact.transcript_count} />
+              <Stat label="Transcripts"   value={contact.transcript_count} />
               <div className="w-px h-10 bg-white/10" />
               <Stat label="Total touches" value={totalTouches} color="text-[#c8f55a]" />
             </div>
@@ -202,145 +171,317 @@ export default async function ContactDrawerPage({ params }: Props) {
 
         <div className="px-12 py-9 max-w-5xl space-y-8">
 
-          {/* Org suggestion banner — gmail/personal user who co-attends with a single org */}
-          {orgSuggestion && (
-            <div className="bg-[#c8f55a]/20 border border-[#c8f55a] rounded-2xl px-5 py-4 flex items-start gap-3">
-              <span className="text-[18px] leading-none">🔗</span>
-              <div className="flex-1 min-w-0">
-                <p className="text-[13px] font-bold text-[#131218] leading-snug">
-                  Likely affiliated with{" "}
-                  <span className="underline decoration-[#131218]/30 underline-offset-2">
-                    {orgSuggestion.orgName ?? orgSuggestion.domain}
-                  </span>
-                </p>
-                <p className="text-[11px] text-[#131218]/70 mt-1 leading-snug">
-                  This contact is on a personal email, but{" "}
-                  <strong>{orgSuggestion.matches}/{orgSuggestion.total}</strong>{" "}
-                  of their recorded meetings include participants from{" "}
-                  <code className="text-[10px] bg-white/60 px-1 rounded">{orgSuggestion.domain}</code>.
-                  Consider adding <strong>{contact.display_name || email.split("@")[0]}</strong> to that organization manually.
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Summary card */}
-          <div className="grid grid-cols-3 gap-4">
-            <Card label="First seen"      value={timeAgo(contact.first_seen_at)}   subtitle={formatWhen(contact.first_seen_at)} />
-            <Card label="Last interaction" value={timeAgo(contact.last_seen_at)}   subtitle={contact.last_seen_at ? formatWhen(contact.last_seen_at) : "—"} />
-            <Card
-              label="Google Contacts"
-              value={contact.google_resource_name
-                ? (contact.google_resource_name.startsWith("otherContacts/") ? "Auto-saved" : "Saved")
-                : "Not yet"}
-              subtitle={contact.google_labels && contact.google_labels.length > 0 ? contact.google_labels.join(" · ") : "—"}
-            />
-          </div>
-
-          {/* Tag editor (reuses row UI) */}
+          {/* ═══ Block 1 · Identity ═══════════════════════════════════════════ */}
           <section>
-            <h2 className="text-[10px] font-bold uppercase tracking-widest text-[#131218]/40 mb-3">Classification</h2>
+            <div className="flex items-center gap-3 mb-3">
+              <h2 className="text-[11px] font-bold tracking-widest uppercase text-[#131218]/60">Identity</h2>
+              <div className="flex-1 h-px bg-[#E0E0D8]" />
+              {enrichment && <ReEnrichButton personId={enrichment.id} />}
+            </div>
+            <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-4 space-y-3">
+              {!hasLinkedIn && !hasRoleSignal ? (
+                <p className="text-[11.5px] text-[#131218]/50 leading-snug">
+                  Not enriched yet. Click <em>Re-enrich</em> above to have the agent search LinkedIn for this contact and extract their current role. This is also scheduled weekly via cron.
+                </p>
+              ) : (
+                <>
+                  {enrichment?.linkedin && (
+                    <div className="flex items-center gap-2 text-[12px]">
+                      <span className="text-[#131218]/40">🔗</span>
+                      <a
+                        href={enrichment.linkedin}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[#131218] underline decoration-[#131218]/30 underline-offset-2 hover:decoration-[#131218]/80 break-all"
+                      >
+                        {enrichment.linkedin.replace(/^https?:\/\//, "")}
+                      </a>
+                      {enrichment.linkedin_confidence != null && (
+                        <span className="text-[9px] font-bold uppercase tracking-widest bg-[#EFEFEA] text-[#131218]/70 px-2 py-0.5 rounded-full ml-1">
+                          {Math.round(enrichment.linkedin_confidence * 100)}%
+                        </span>
+                      )}
+                      {enrichment.linkedin_needs_review && (
+                        <span className="text-[9px] font-bold uppercase tracking-widest bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">
+                          Needs review
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  {enrichment?.organization_detected && (
+                    <p className="text-[11.5px] text-[#131218]/70">
+                      🏢 <span className="font-semibold">{enrichment.organization_detected}</span>
+                      <span className="text-[#131218]/40"> — detected from LinkedIn</span>
+                    </p>
+                  )}
+                  {enrichment?.job_title && (
+                    <p className="text-[11.5px] text-[#131218]/70">
+                      {enrichment.job_title}
+                      {enrichment.job_title_source && (
+                        <span className="text-[10px] text-[#131218]/40"> · source {enrichment.job_title_source.replace(/_/g, " ")}</span>
+                      )}
+                      {enrichment.job_title_updated_at && (
+                        <span className="text-[10px] text-[#131218]/40"> · {timeAgo(enrichment.job_title_updated_at)}</span>
+                      )}
+                    </p>
+                  )}
+                  {enrichment?.phone && (
+                    <p className="text-[11.5px] text-[#131218]/70">📞 {enrichment.phone}</p>
+                  )}
+                  {(enrichment?.city || enrichment?.country) && (
+                    <p className="text-[11.5px] text-[#131218]/70">📍 {[enrichment.city, enrichment.country].filter(Boolean).join(", ")}</p>
+                  )}
+                  {enrichment?.notes && (
+                    <div className="mt-2 pt-3 border-t border-[#EFEFEA]">
+                      <p className="text-[9px] font-bold uppercase tracking-widest text-[#131218]/45 mb-1">Notes</p>
+                      <p className="text-[11.5px] text-[#131218]/70 whitespace-pre-wrap leading-snug">{enrichment.notes}</p>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </section>
+
+          {/* ═══ Block 2 · Relationship with CH ════════════════════════════════ */}
+          <section>
+            <div className="flex items-center gap-3 mb-3">
+              <h2 className="text-[11px] font-bold tracking-widest uppercase text-[#131218]/60">Relationship</h2>
+              <div className="flex-1 h-px bg-[#E0E0D8]" />
+            </div>
+
+            <div className="grid grid-cols-3 gap-3 mb-4">
+              <Card label="First seen"      value={timeAgo(contact.first_seen_at)} subtitle={formatWhen(contact.first_seen_at)} />
+              <Card label="Last interaction" value={timeAgo(contact.last_seen_at)} subtitle={contact.last_seen_at ? formatWhen(contact.last_seen_at) : "—"} />
+              <Card label="Warmth"          value={warmth.label} subtitle={`${totalTouches} touches total`} valueClass={warmth.tone} />
+            </div>
+
+            {/* Shared projects / recurring meetings */}
+            {sharedProjects.length > 0 && (
+              <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-4 mb-3">
+                <p className="text-[9px] font-bold uppercase tracking-widest text-[#131218]/45 mb-2">
+                  Projects & recurring meetings
+                </p>
+                <ul className="space-y-1.5">
+                  {sharedProjects.map(p => (
+                    <li key={p.project_name} className="flex items-center gap-3 text-[12px]">
+                      <span className="flex-1 truncate text-[#131218]">{p.project_name}</span>
+                      <span className="text-[10.5px] text-[#131218]/50 shrink-0 tabular-nums">
+                        {p.meeting_count > 0 && <>📅 {p.meeting_count} </>}
+                        {p.transcript_count > 0 && <>🎙️ {p.transcript_count} </>}
+                        · {timeAgo(p.last_ts)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Co-attendees on CH side */}
+            {coAttendees.some(a => a.is_self) && (
+              <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-4 mb-3">
+                <p className="text-[9px] font-bold uppercase tracking-widest text-[#131218]/45 mb-2">
+                  Co-attended with (CH side)
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {coAttendees.filter(a => a.is_self).map(a => (
+                    <span key={a.email} className="text-[11px] bg-[#131218] text-white px-2.5 py-1 rounded-full">
+                      {a.display_name ?? a.email.split("@")[0]}{" "}
+                      <span className="text-white/50 text-[10px]">· {a.shared_touches}</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Classification editor (existing UI) */}
             <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
               <HallContactRow {...rowProps} />
             </div>
-            <p className="text-[10px] text-[#131218]/50 mt-2 leading-snug">
-              {personal && "All classes are personal — meetings with this contact skip prep in Suggested Time Blocks."}
-              {vip && " This contact is a decision-maker: prep urgency is boosted +15."}
-            </p>
+            {(personal || vip) && (
+              <p className="text-[10px] text-[#131218]/50 mt-2 leading-snug">
+                {personal && "All classes are personal — meetings with this contact skip prep in Suggested Time Blocks."}
+                {vip && " This contact is a decision-maker: prep urgency is boosted +15."}
+              </p>
+            )}
           </section>
 
-          {/* WhatsApp clips */}
-          {whatsappClips.length > 0 && (
+          {/* ═══ Block 3 · Organizations network ═══════════════════════════════ */}
+          {organizations.length > 0 && (
             <section>
-              <h2 className="text-[10px] font-bold uppercase tracking-widest text-[#131218]/40 mb-3">
-                WhatsApp conversations · {whatsappClips.length}
-              </h2>
+              <div className="flex items-center gap-3 mb-3">
+                <h2 className="text-[11px] font-bold tracking-widest uppercase text-[#131218]/60">Organizations</h2>
+                <div className="flex-1 h-px bg-[#E0E0D8]" />
+                <span className="text-[10px] text-[#131218]/40 tabular-nums">{organizations.length}</span>
+              </div>
               <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden divide-y divide-[#EFEFEA]">
-                {whatsappClips.map((clip) => {
-                  const first = new Date(clip.first_ts);
-                  const last  = new Date(clip.last_ts);
-                  const sameDay = first.toDateString() === last.toDateString();
-                  const range = sameDay
-                    ? formatWhen(clip.last_ts)
-                    : `${formatWhen(clip.first_ts)} → ${formatWhen(clip.last_ts)}`;
-                  const notionHref = clip.notion_id
-                    ? `https://www.notion.so/${clip.notion_id.replace(/-/g, "")}`
-                    : null;
-                  return (
-                    <div key={clip.source_id} className="px-5 py-4 hover:bg-[#EFEFEA]/40 transition-colors">
-                      <div className="flex items-start gap-4">
-                        <span className="text-[15px] leading-none mt-0.5">💬</span>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[12px] font-semibold text-[#131218] truncate">
-                            {clip.title}
-                          </p>
-                          <p className="text-[10px] text-[#131218]/45 mt-0.5">
-                            <span className="uppercase tracking-wide font-bold">WhatsApp</span>
-                            {" · "}{range}
-                            {" · "}{timeAgo(clip.last_ts)}
-                            {" · "}{clip.their_count}/{clip.total_count} msgs
-                          </p>
-                          {clip.preview.length > 0 && (
-                            <div className="mt-2 space-y-1">
-                              {clip.preview.map((p, i) => (
-                                <p key={i} className="text-[11px] text-[#131218]/60 leading-snug">
-                                  <span className="font-semibold text-[#131218]/80">{p.sender}:</span>{" "}
-                                  {p.text}
-                                </p>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                        {notionHref && (
-                          <a
-                            href={notionHref}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-[9px] font-bold uppercase tracking-widest text-[#131218]/40 hover:text-[#131218]/80 self-center"
-                          >
-                            Open ↗
-                          </a>
+                {organizations.map((o, i) => (
+                  <div key={`${o.domain || "enrichment"}:${i}`} className="px-5 py-4">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <div className="min-w-0 flex items-baseline gap-2 flex-wrap">
+                        <span className="text-[13px] font-semibold text-[#131218] truncate">
+                          🏢 {o.org_name ?? o.domain}
+                        </span>
+                        {o.is_primary && (
+                          <span className="text-[9px] font-bold uppercase tracking-widest bg-[#c8f55a] text-[#131218] px-2 py-0.5 rounded-full">
+                            Primary
+                          </span>
+                        )}
+                        {o.is_ch && (
+                          <span className="text-[9px] font-bold uppercase tracking-widest bg-[#131218] text-white px-2 py-0.5 rounded-full">
+                            Common House
+                          </span>
+                        )}
+                        {o.domain && o.domain !== o.org_name && (
+                          <span className="text-[10px] text-[#131218]/40">{o.domain}</span>
                         )}
                       </div>
+                      <div className="text-[10px] text-[#131218]/50 shrink-0 tabular-nums">
+                        {o.shared_meetings > 0 && <>🎙️ {o.shared_meetings} shared </>}
+                        {o.last_ts && <>· {timeAgo(o.last_ts)}</>}
+                      </div>
                     </div>
-                  );
-                })}
-              </div>
-            </section>
-          )}
-
-          {/* Timeline */}
-          <section>
-            <h2 className="text-[10px] font-bold uppercase tracking-widest text-[#131218]/40 mb-3">
-              Recent activity · last {timeline.length}
-            </h2>
-            {timeline.length === 0 ? (
-              <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-8 text-center">
-                <p className="text-sm text-[#131218]/25">No cross-channel activity recorded yet.</p>
-              </div>
-            ) : (
-              <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden divide-y divide-[#EFEFEA]">
-                {timeline.map((entry, idx) => (
-                  <div key={`${entry.kind}:${idx}`} className="flex items-start gap-4 px-5 py-3.5 hover:bg-[#EFEFEA]/40 transition-colors">
-                    <span className="text-[15px] leading-none mt-0.5">{entryGlyph(entry.kind)}</span>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[12px] font-semibold text-[#131218] truncate">{entry.title}</p>
-                      <p className="text-[10px] text-[#131218]/45 mt-0.5">
-                        <span className="uppercase tracking-wide font-bold">{entry.kind}</span>
-                        {" · "}{formatWhen(entry.at)}
-                        {" · "}{timeAgo(entry.at)}
-                        {entry.kind === "meeting"    && ` · ${entry.attendee_count} attendee${entry.attendee_count === 1 ? "" : "s"}`}
-                      </p>
-                    </div>
-                    {entry.kind === "transcript" && entry.meeting_link && (
-                      <a href={entry.meeting_link} target="_blank" rel="noopener noreferrer" className="text-[9px] font-bold uppercase tracking-widest text-[#131218]/40 hover:text-[#131218]/80 self-center">
-                        Open ↗
-                      </a>
+                    {o.other_contacts.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        <span className="text-[9px] font-bold uppercase tracking-widest text-[#131218]/40 self-center">
+                          You also know
+                        </span>
+                        {o.other_contacts.map(c => (
+                          <Link
+                            key={c.email}
+                            href={`/admin/hall/contacts/${encodeURIComponent(c.email)}`}
+                            prefetch={false}
+                            className="text-[10.5px] bg-[#EFEFEA] text-[#131218]/80 hover:text-[#131218] hover:bg-[#E0E0D8] px-2 py-0.5 rounded-full transition-colors"
+                          >
+                            {c.display_name ?? c.email.split("@")[0]}
+                          </Link>
+                        ))}
+                      </div>
                     )}
                   </div>
                 ))}
               </div>
+            </section>
+          )}
+
+          {/* ═══ Block 4 · Conversation intelligence ═══════════════════════════ */}
+          <section>
+            <div className="flex items-center gap-3 mb-3">
+              <h2 className="text-[11px] font-bold tracking-widest uppercase text-[#131218]/60">Conversation</h2>
+              <div className="flex-1 h-px bg-[#E0E0D8]" />
+              {enrichment && (
+                <SynthesizeTopicsButton
+                  personId={enrichment.id}
+                  label={enrichment.recurring_topics && enrichment.recurring_topics.length > 0 ? "Refresh topics" : "Synthesise topics"}
+                  force={!!(enrichment.recurring_topics && enrichment.recurring_topics.length > 0)}
+                />
+              )}
+            </div>
+
+            {/* Topics */}
+            {enrichment?.recurring_topics && enrichment.recurring_topics.length > 0 && (
+              <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-4 mb-3">
+                <p className="text-[9px] font-bold uppercase tracking-widest text-[#131218]/45 mb-2">
+                  Recurring topics
+                  {enrichment.recurring_topics_updated_at && (
+                    <span className="text-[#131218]/30"> · {timeAgo(enrichment.recurring_topics_updated_at)}</span>
+                  )}
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {enrichment.recurring_topics.map(t => (
+                    <span key={t} className="text-[11px] bg-[#c8f55a]/30 text-[#131218] px-2.5 py-1 rounded-full">
+                      {t}
+                    </span>
+                  ))}
+                </div>
+              </div>
             )}
+
+            {/* WhatsApp clips */}
+            {whatsappClips.length > 0 && (
+              <div className="mb-3">
+                <p className="text-[9px] font-bold uppercase tracking-widest text-[#131218]/45 mb-2">
+                  WhatsApp conversations · {whatsappClips.length}
+                </p>
+                <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden divide-y divide-[#EFEFEA]">
+                  {whatsappClips.map((clip) => {
+                    const first = new Date(clip.first_ts);
+                    const last  = new Date(clip.last_ts);
+                    const sameDay = first.toDateString() === last.toDateString();
+                    const range = sameDay
+                      ? formatWhen(clip.last_ts)
+                      : `${formatWhen(clip.first_ts)} → ${formatWhen(clip.last_ts)}`;
+                    const notionHref = clip.notion_id
+                      ? `https://www.notion.so/${clip.notion_id.replace(/-/g, "")}`
+                      : null;
+                    return (
+                      <div key={clip.source_id} className="px-5 py-4 hover:bg-[#EFEFEA]/40 transition-colors">
+                        <div className="flex items-start gap-4">
+                          <span className="text-[15px] leading-none mt-0.5">💬</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[12px] font-semibold text-[#131218] truncate">{clip.title}</p>
+                            <p className="text-[10px] text-[#131218]/45 mt-0.5">
+                              <span className="uppercase tracking-wide font-bold">WhatsApp</span>
+                              {" · "}{range}
+                              {" · "}{timeAgo(clip.last_ts)}
+                              {" · "}{clip.their_count}/{clip.total_count} msgs
+                            </p>
+                            {clip.preview.length > 0 && (
+                              <div className="mt-2 space-y-1">
+                                {clip.preview.map((p, i) => (
+                                  <p key={i} className="text-[11px] text-[#131218]/60 leading-snug">
+                                    <span className="font-semibold text-[#131218]/80">{p.sender}:</span>{" "}
+                                    {p.text}
+                                  </p>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                          {notionHref && (
+                            <a href={notionHref} target="_blank" rel="noopener noreferrer" className="text-[9px] font-bold uppercase tracking-widest text-[#131218]/40 hover:text-[#131218]/80 self-center">
+                              Open ↗
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Timeline */}
+            <div>
+              <p className="text-[9px] font-bold uppercase tracking-widest text-[#131218]/45 mb-2">
+                Recent activity · last {timeline.length}
+              </p>
+              {timeline.length === 0 ? (
+                <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-8 text-center">
+                  <p className="text-sm text-[#131218]/25">No cross-channel activity recorded yet.</p>
+                </div>
+              ) : (
+                <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden divide-y divide-[#EFEFEA]">
+                  {timeline.map((entry, idx) => (
+                    <div key={`${entry.kind}:${idx}`} className="flex items-start gap-4 px-5 py-3.5 hover:bg-[#EFEFEA]/40 transition-colors">
+                      <span className="text-[15px] leading-none mt-0.5">{entryGlyph(entry.kind)}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[12px] font-semibold text-[#131218] truncate">{entry.title}</p>
+                        <p className="text-[10px] text-[#131218]/45 mt-0.5">
+                          <span className="uppercase tracking-wide font-bold">{entry.kind}</span>
+                          {" · "}{formatWhen(entry.at)}
+                          {" · "}{timeAgo(entry.at)}
+                          {entry.kind === "meeting" && ` · ${entry.attendee_count} attendee${entry.attendee_count === 1 ? "" : "s"}`}
+                        </p>
+                      </div>
+                      {entry.kind === "transcript" && entry.meeting_link && (
+                        <a href={entry.meeting_link} target="_blank" rel="noopener noreferrer" className="text-[9px] font-bold uppercase tracking-widest text-[#131218]/40 hover:text-[#131218]/80 self-center">
+                          Open ↗
+                        </a>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </section>
 
         </div>
@@ -348,6 +489,8 @@ export default async function ContactDrawerPage({ params }: Props) {
     </div>
   );
 }
+
+// ─── helpers ──────────────────────────────────────────────────────────────────
 
 function Stat({ label, value, color = "text-white" }: { label: string; value: number; color?: string }) {
   return (
@@ -358,13 +501,19 @@ function Stat({ label, value, color = "text-white" }: { label: string; value: nu
   );
 }
 
-function Card({ label, value, subtitle }: { label: string; value: string; subtitle: string }) {
+function Card({
+  label, value, subtitle, valueClass = "text-[#131218]",
+}: {
+  label: string;
+  value: string;
+  subtitle: string;
+  valueClass?: string;
+}) {
   return (
     <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-4">
       <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30 mb-2">{label}</p>
-      <p className="text-[18px] font-bold text-[#131218] tracking-tight">{value}</p>
+      <p className={`text-[18px] font-bold tracking-tight ${valueClass}`}>{value}</p>
       <p className="text-[10px] text-[#131218]/40 font-medium mt-1.5">{subtitle}</p>
     </div>
   );
 }
-
