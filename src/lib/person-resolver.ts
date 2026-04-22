@@ -208,7 +208,11 @@ export function resolvePerson(
   //     overlap AND full subset containment (no extra tokens in the query
   //     that aren't in the candidate), to avoid false positives like
   //     "Cristian Bustos" matching "Cristian Perez".
-  const tokenize = (s: string) => new Set(s.split(/[\s,.\-_()]+/).filter(t => t.length >= 3));
+  //     Split chars include `@` and `/` so full_names that leaked email-like
+  //     strings (pre-backfill fallback was "user@domain.tld") still tokenise
+  //     cleanly. "carolina.urmeneta@globalmethanehub.org" → {carolina, urmeneta,
+  //     globalmethanehub, org}.
+  const tokenize = (s: string) => new Set(s.split(/[\s,.\-_@/()]+/).filter(t => t.length >= 3));
   const qTokens = tokenize(name);
   if (qTokens.size >= 2) {
     for (const entry of idx.byId.values()) {
