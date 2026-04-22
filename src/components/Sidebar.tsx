@@ -76,6 +76,7 @@ export const ADMIN_NAV_V2: NavEntry[] = [
       { label: "Knowledge",       href: "/admin/knowledge" },
       { label: "Contacts",        href: "/admin/hall/contacts" },
       { label: "Orphan matches",  href: "/admin/hall/orphans"  },
+      { label: "LinkedIn review", href: "/admin/hall/linkedin-review" },
       { label: "Organizations",   href: "/admin/hall/organizations" },
       { label: "Network",         href: "/admin/hall/network" },
       { label: "Commitments",     href: "/admin/hall/commitments" },
