@@ -24,30 +24,49 @@ export type ScanResult = {
 };
 
 export async function scanOrphans(sb: SupabaseClient): Promise<ScanResult> {
-  const { data: orphans, error: orphErr } = await sb
-    .from("conversation_messages")
-    .select("source_id, sender_name")
-    .is("sender_person_id", null)
-    .eq("sender_is_self", false)
-    .limit(20000);
-
-  if (orphErr) {
-    return {
-      ok: false, error: orphErr.message,
-      scanned_groups: 0, total_orphan_messages: 0, candidates_filed: 0,
-      self_groups: 0, no_match_groups: 0, by_reason: {},
-    };
-  }
-
+  // PostgREST caps single-page reads at 1000 rows by default. Paginate so the
+  // scanner sees every orphan, not just the first page. Without this, any
+  // sender_name whose messages are beyond row 1000 of the orphan list (e.g.
+  // Cristóbal Correa's 169 messages) never get considered.
   type OrphanRow = { source_id: string; sender_name: string };
+  const PAGE = 1000;
+  let offset = 0;
+  let totalRead = 0;
   const groups = new Map<string, { source_id: string; sender_name: string; count: number }>();
-  for (const r of (orphans ?? []) as OrphanRow[]) {
-    const name = (r.sender_name ?? "").trim();
-    if (!name) continue;
-    const key = `${r.source_id}::${name.toLowerCase()}`;
-    const prev = groups.get(key);
-    if (!prev) groups.set(key, { source_id: r.source_id, sender_name: name, count: 1 });
-    else prev.count++;
+
+  while (true) {
+    const { data: page, error: orphErr } = await sb
+      .from("conversation_messages")
+      .select("source_id, sender_name")
+      .is("sender_person_id", null)
+      .eq("sender_is_self", false)
+      .order("id", { ascending: true })
+      .range(offset, offset + PAGE - 1);
+
+    if (orphErr) {
+      return {
+        ok: false, error: orphErr.message,
+        scanned_groups: groups.size, total_orphan_messages: totalRead, candidates_filed: 0,
+        self_groups: 0, no_match_groups: 0, by_reason: {},
+      };
+    }
+    const rows = (page ?? []) as OrphanRow[];
+    if (rows.length === 0) break;
+    totalRead += rows.length;
+
+    for (const r of rows) {
+      const name = (r.sender_name ?? "").trim();
+      if (!name) continue;
+      const key = `${r.source_id}::${name.toLowerCase()}`;
+      const prev = groups.get(key);
+      if (!prev) groups.set(key, { source_id: r.source_id, sender_name: name, count: 1 });
+      else prev.count++;
+    }
+
+    if (rows.length < PAGE) break;
+    offset += PAGE;
+    // Safety cap — shouldn't ever hit in practice, but prevents runaway loops.
+    if (offset >= 200_000) break;
   }
 
   const idx = await buildPersonIndex(sb);
@@ -84,7 +103,7 @@ export async function scanOrphans(sb: SupabaseClient): Promise<ScanResult> {
       return {
         ok: false, error: upsertErr.message,
         scanned_groups: groups.size,
-        total_orphan_messages: orphans?.length ?? 0,
+        total_orphan_messages: totalRead,
         candidates_filed: 0,
         self_groups: selfCount, no_match_groups: noMatchCount, by_reason: byReason,
       };
@@ -95,7 +114,7 @@ export async function scanOrphans(sb: SupabaseClient): Promise<ScanResult> {
   return {
     ok: true,
     scanned_groups:        groups.size,
-    total_orphan_messages: orphans?.length ?? 0,
+    total_orphan_messages: totalRead,
     candidates_filed:      filed,
     self_groups:           selfCount,
     no_match_groups:       noMatchCount,
