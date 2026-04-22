@@ -163,7 +163,7 @@ export function HallContactRow(props: Props) {
             className="text-[12px] font-bold text-[#131218] truncate hover:underline decoration-[#131218]/30 underline-offset-2"
             title={`Open ${props.display_name || props.email} detail`}
           >
-            {props.display_name || props.email.split("@")[0]}
+            {props.display_name || (props.email ?? "").split("@")[0] || "(no name)"}
           </Link>
           {selected.map(cls => {
             const kind = CLASSES.find(c => c.v === cls)?.kind;

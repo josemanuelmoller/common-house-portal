@@ -499,8 +499,8 @@ function ContactCard({
 }) {
   const barPct = Math.max(4, Math.round((contact.intensity / maxIntensity) * 100));
   const barColor = tier === "hot" ? "bg-[#22c55e]" : tier === "warm" ? "bg-[#f59e0b]" : "bg-[#9ca3af]";
-  const display = contact.display_name || contact.email.split("@")[0];
-  const domain  = contact.email.split("@")[1] ?? "";
+  const display = contact.display_name || (contact.email ?? "").split("@")[0] || "(no name)";
+  const domain  = (contact.email ?? "").split("@")[1] ?? "";
   const initial = display.slice(0, 1).toUpperCase();
   const classes = contact.relationship_classes ?? [];
 

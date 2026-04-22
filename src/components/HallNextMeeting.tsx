@@ -200,7 +200,7 @@ export async function HallNextMeeting() {
                 const cls = top ? pillColor(top) : "bg-[#EFEFEA] text-[#131218]/50";
                 return (
                   <span key={a.email} className={`text-[9px] font-semibold px-2 py-0.5 rounded ${cls}`}>
-                    {a.name ?? a.email.split("@")[0]}
+                    {a.name ?? (a.email ?? "").split("@")[0]}
                     {top && <span className="ml-1 opacity-70">· {top}</span>}
                   </span>
                 );

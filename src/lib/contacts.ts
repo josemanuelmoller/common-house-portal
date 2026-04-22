@@ -94,7 +94,7 @@ export async function getContactsByEmails(emails: string[]): Promise<Map<string,
   }
 
   for (const r of (contactsRes.data ?? []) as unknown as ContactView[]) {
-    const domain = (r.email.split("@")[1] ?? "").toLowerCase();
+    const domain = ((r.email ?? "").split("@")[1] ?? "").toLowerCase();
     const orgClasses = orgByDomain.get(domain) ?? [];
     const union = [...new Set([...(r.relationship_classes ?? []), ...orgClasses])];
     out.set(r.email, {
@@ -405,7 +405,7 @@ export async function getOrganizationRollup(minContacts = 2): Promise<{
 
   const byDomain = new Map<string, ContactView[]>();
   for (const c of rows) {
-    const domain = (c.email.split("@")[1] ?? "").toLowerCase();
+    const domain = ((c.email ?? "").split("@")[1] ?? "").toLowerCase();
     if (!domain) continue;
     const bucket = byDomain.get(domain) ?? [];
     bucket.push({
@@ -502,7 +502,7 @@ export async function getOrganizationsList(): Promise<OrganizationListEntry[]> {
   const byDomain = new Map<string, AggBucket>();
   for (const r of (attendeesRes.data ?? []) as { email: string; meeting_count: number; email_thread_count: number; transcript_count: number; last_seen_at: string | null; relationship_classes: string[] | null }[]) {
     if (selfSet.has(r.email)) continue;
-    const d = (r.email.split("@")[1] ?? "").toLowerCase();
+    const d = ((r.email ?? "").split("@")[1] ?? "").toLowerCase();
     if (!d) continue;
     const b = byDomain.get(d) ?? { count: 0, meetings: 0, emails: 0, transcripts: 0, vip: 0, latest: null };
     b.count++;
@@ -568,7 +568,7 @@ export async function getProposedOrganizations(minContacts = 3): Promise<Propose
   const byDomain = new Map<string, Bucket>();
   for (const r of (attendeesRes.data ?? []) as { email: string; display_name: string | null; meeting_count: number; email_thread_count: number; transcript_count: number; last_seen_at: string | null; relationship_classes: string[] | null }[]) {
     if (selfSet.has(r.email)) continue;
-    const d = (r.email.split("@")[1] ?? "").toLowerCase();
+    const d = ((r.email ?? "").split("@")[1] ?? "").toLowerCase();
     if (!d) continue;
     if (existing.has(d)) continue;
     if (PERSONAL_DOMAINS.has(d)) continue;
