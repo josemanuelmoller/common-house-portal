@@ -18,14 +18,18 @@ Generate one high-quality LinkedIn post draft based on current knowledge assets,
 
 ## Target databases
 
-| DB | DS ID | Access |
-|----|-------|--------|
-| Agent Drafts [OS v2] | `collection://e41e1599-0c89-483f-b271-c078c33898ce` | Write |
-| Style Profiles [OS v2] | `collection://3119b5c0-3b8b-4c17-bde0-2772fc9ba4a6` | Read |
-| Insight Briefs [OS v2] | `collection://839cafc7-d52d-442f-a784-197a5ea34810` | Read |
-| CH Knowledge Assets [OS v2] | `collection://e7d711a5-f441-4cc8-96c1-bd33151c09b8` | Read |
-| Content Pipeline [OS v2] | `collection://29db8c9b-6738-41ab-bf0a-3a5f06c568a0` | Read |
+| DB | DS ID / location | Access |
+|----|------------------|--------|
+| Agent Drafts [OS v2] | Notion `collection://e41e1599-0c89-483f-b271-c078c33898ce` | Write |
+| Style Profiles [OS v2] | Notion `collection://3119b5c0-3b8b-4c17-bde0-2772fc9ba4a6` | Read |
+| Insight Briefs [OS v2] | Notion `collection://839cafc7-d52d-442f-a784-197a5ea34810` | Read |
+| CH Knowledge Assets [OS v2] | Notion `collection://e7d711a5-f441-4cc8-96c1-bd33151c09b8` | Read |
+| Content Pipeline [OS v2] | Notion `collection://29db8c9b-6738-41ab-bf0a-3a5f06c568a0` | Read |
 | Fireflies (via MCP) | — | Read |
+| **content_pitches**  | **Supabase `public.content_pitches`**  | **Read + Write status/draft_notion_id** |
+| **comms_pillars**    | **Supabase `public.comms_pillars`**    | **Read** |
+| **comms_audiences**  | **Supabase `public.comms_audiences`**  | **Read** |
+| **comms_channels**   | **Supabase `public.comms_channels`**   | **Read** |
 
 ---
 
@@ -33,13 +37,16 @@ Generate one high-quality LinkedIn post draft based on current knowledge assets,
 
 ```
 mode: execute                    # always execute — skill writes draft to Notion
-topic_hint: [optional string]    # if provided, bias topic selection toward this theme
+pitch_id: [optional uuid]        # if provided, redact this approved pitch from content_pitches (preferred path)
+topic_hint: [optional string]    # legacy fallback — only used when no pitch_id is given
 date_context: [ISO date]         # defaults to today
 voice: jmm                       # always JMM for this skill
 format:
   length: medium                 # short (~150w) | medium (~250w) | long (~400w)
   style: reflective              # reflective | provocative | educational | story
 ```
+
+**Preferred trigger**: this skill is called by `/api/approve-pitch` with a `pitch_id`. That path uses the pillar / audience / angle already approved by JMM — do NOT re-select topic when pitch_id is present. The legacy topic-hint path remains for ad-hoc manual runs.
 
 ---
 
@@ -57,19 +64,33 @@ Extract:
 - Formats that perform well for JMM
 - Things to avoid (hype language, generic startup jargon, vague calls to action)
 
-### Step 2 — Select topic
+### Step 2 — Resolve topic (pitch-first, with legacy fallback)
 
-If `topic_hint` is provided → use it as primary seed.
+**Preferred path — `pitch_id` provided:**
 
-Otherwise, select topic from:
-1. Most recent Insight Brief marked `Community Relevant = true` — pick the freshest angle
-2. Most recently updated Knowledge Asset with `Living Room Theme = true`
-3. Recent Fireflies transcript with a notable signal or insight (last 7 days)
-4. Active CH Project with a milestone worth sharing
+Load the approved pitch from Supabase `content_pitches` joined with `comms_pillars`, `comms_audiences`, `comms_channels`. You will receive:
+- `angle`    — the already-approved angle JMM signed off on
+- `trigger`  — the real signal anchoring the post
+- `headline` — the proposed title
+- `pillar_name` + `pillar_tier` — which pillar this post sits in
+- `audience_name` — who the post is speaking to
+- `channel_name` — where it will be published
 
-Priority order: Fireflies signal > Insight Brief > Knowledge Asset > Project milestone
+The angle and pillar are **already decided**. Do NOT re-select topic. Do NOT override the angle. Your job is to redact this pitch into a full post that respects the tier-tone rules (Step 4).
 
-**Topic selection rule:** Pick one specific, concrete topic. Not "retail innovation" — "why UK refill regulation is moving faster than supermarkets can adapt."
+**Tier-tone rules — applied strictly:**
+
+| pillar_tier | Tone | Do | Don't |
+|---|---|---|---|
+| `core`         | Confident, opinionated | Cite specific wins, make clear claims, take a stance | Hedge, soften, equivocate |
+| `building`     | Curious, learning      | "What I'm seeing in [pillar]", share a question as much as an answer | Sound like an authority |
+| `experimental` | Observational          | "A pattern worth watching", surface tensions, invite input | Claim expertise, recommend action |
+
+**Legacy fallback — no `pitch_id`:**
+
+If no pitch_id (manual ad-hoc run), use `topic_hint` as primary seed. Otherwise, select topic from the old priority order (Fireflies signal > Insight Brief > Knowledge Asset > Project milestone). In this path, infer which pillar best fits the topic and apply the same tier-tone rules.
+
+**Topic selection rule (both paths):** One specific, concrete topic. Not "retail innovation" — "why UK refill regulation is moving faster than supermarkets can adapt."
 
 ### Step 3 — Gather supporting content
 
@@ -116,6 +137,21 @@ Create a new page in Agent Drafts:
 | Related Entity | [page ID of source Insight Brief or KA, if applicable] |
 | Created Date | date_context |
 | Platform | LinkedIn |
+
+### Step 7 — Close the pitch loop in Supabase
+
+If `pitch_id` was provided in input, update `content_pitches`:
+
+```sql
+update public.content_pitches
+set status = 'drafted',
+    draft_notion_id = $new_agent_draft_page_id
+where id = $pitch_id;
+```
+
+This closes the planning → production handoff. The `/admin/plan` Comms tab (Fase B) reads `status = drafted` to show the pitch as redacted with a link to the Notion draft.
+
+If `pitch_id` was NOT provided (legacy ad-hoc run), skip this step — there is no pitch to close.
 
 ---
 
