@@ -95,11 +95,11 @@ export default async function LibraryPage() {
               THE LIBRARY · COMMON HOUSE
             </p>
             <h1 className="text-[2.6rem] font-[300] text-white leading-[1] tracking-[-1.5px]">
-              Institutional <em className="font-[900] italic text-[#c8f55a]">Intelligence</em>
+              External <em className="font-[900] italic text-[#c8f55a]">references</em>
             </h1>
-            <p className="text-[12.5px] text-white/40 mt-3 max-w-[520px] leading-[1.65]">
-              Curated knowledge from across the Common House network — signals, cases,
-              viewpoints, and patterns that accumulate as the work deepens.
+            <p className="text-[12.5px] text-white/40 mt-3 max-w-[560px] leading-[1.65]">
+              Papers, reports, playbooks y documentos externos subidos manualmente.
+              Para conocimiento destilado desde reuniones y emails por el OS, ver <a href="/admin/knowledge" className="underline decoration-[#c8f55a] decoration-2 underline-offset-2 text-white/70 hover:text-[#c8f55a]">Knowledge</a>.
             </p>
             {totalItems > 0 && (
               <div className="flex items-center gap-2 mt-5">

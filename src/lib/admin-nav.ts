@@ -23,11 +23,13 @@ export const ADMIN_NAV = [
   { label: "Insights",            href: "/admin/insights",       icon: "◓", section: "Desks" },
   { label: "Offers & Proposals",  href: "/admin/offers",         icon: "◫", section: "Desks" },
 
+  // ── Knowledge layer (top-level) ─────────────────────────────────────────
+  { label: "Knowledge",           href: "/admin/knowledge",      icon: "◉" },
+
   // ── Control Room ──────────────────────────────────────────────────────────
   { label: "Agents",              href: "/admin/agents",         icon: "⬡", section: "Control Room" },
   { label: "Intake / Decisions",  href: "/admin/os",             icon: "▤", section: "Control Room" },
   { label: "Content Pipeline",    href: "/admin/content",        icon: "◫", section: "Control Room" },
-  { label: "Knowledge Assets",    href: "/admin/knowledge",      icon: "◉", section: "Control Room" },
   { label: "System Health",       href: "/admin/health",         icon: "◎", section: "Control Room" },
   { label: "Routine Runs",        href: "/admin/routines",       icon: "⟳", section: "Control Room" },
 

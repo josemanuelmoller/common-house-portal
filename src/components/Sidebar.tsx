@@ -66,6 +66,7 @@ export const ADMIN_NAV_V2: NavEntry[] = [
       { label: "Offers & Proposals", href: "/admin/offers" },
     ],
   },
+  { kind: "link",  label: "Knowledge",    href: "/admin/knowledge", icon: "◉" },
   { kind: "link",  label: "Library",      href: "/library",       icon: "▤" },
   {
     kind: "group", label: "Control Room", icon: "◫",
@@ -74,7 +75,6 @@ export const ADMIN_NAV_V2: NavEntry[] = [
       { label: "Intake / Decisions", href: "/admin/os" },
       { label: "Prep Briefs",     href: "/admin/prep" },
       { label: "Content",         href: "/admin/content" },
-      { label: "Knowledge",       href: "/admin/knowledge" },
       { label: "Contacts",        href: "/admin/hall/contacts" },
       { label: "Organizations",   href: "/admin/hall/organizations" },
       { label: "Network",         href: "/admin/hall/network" },

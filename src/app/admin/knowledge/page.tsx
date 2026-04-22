@@ -111,7 +111,8 @@ export default async function KnowledgePage() {
             Knowledge <em className="font-[900] italic text-[#c8f55a]">tree</em>
           </h1>
           <p className="text-[12.5px] text-white/40 mt-3 max-w-[560px] leading-[1.65]">
-            Themes → subthemes → topics. Cada hoja es una página consumible que se va nutriendo con insights de las reuniones y evidencias validadas.
+            Conocimiento destilado por el OS desde reuniones, emails y whatsapp validados. Árbol: themes → subthemes → topics; cada hoja es una página consumible que crece con cada reu.
+            Para documentos externos (papers, reports, PDFs subidos), ver <a href="/library" className="underline decoration-[#c8f55a] decoration-2 underline-offset-2 text-white/70 hover:text-[#c8f55a]">Library</a>.
           </p>
         </div>
 
