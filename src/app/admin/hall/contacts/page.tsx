@@ -10,6 +10,8 @@ import { HallContactsCollapsibleList } from "@/components/HallContactsCollapsibl
 import { HallContactsDismissedToggle } from "@/components/HallContactsDismissedToggle";
 import { HallContactsByOrg } from "@/components/HallContactsByOrg";
 import { HallContactsSearchable, type SearchableContact } from "@/components/HallContactsSearchable";
+import { OrphansReviewSection } from "@/components/OrphansReviewSection";
+import { LinkedInReviewSection } from "@/components/LinkedInReviewSection";
 
 export const dynamic = "force-dynamic";
 
@@ -232,7 +234,20 @@ type PageProps = { searchParams: Promise<{ mode?: string }> };
 export default async function HallContactsPage({ searchParams }: PageProps) {
   await requireAdmin();
   const { mode: modeParam } = await searchParams;
-  const mode: "browse" | "classify" = modeParam === "classify" ? "classify" : "browse";
+  const mode: "browse" | "classify" | "orphans" | "linkedin" =
+      modeParam === "classify"  ? "classify"
+    : modeParam === "orphans"   ? "orphans"
+    : modeParam === "linkedin"  ? "linkedin"
+    :                              "browse";
+
+  // Counts for tab badges — orphans pending + linkedin needs_review
+  const sb = getSupabaseServerClient();
+  const [orphanCountRes, linkedinCountRes] = await Promise.all([
+    sb.from("orphan_match_candidates").select("id", { count: "exact", head: true }).eq("status", "pending"),
+    sb.from("people").select("id", { count: "exact", head: true }).eq("linkedin_needs_review", true),
+  ]);
+  const orphanPending   = orphanCountRes.count ?? 0;
+  const linkedinPending = linkedinCountRes.count ?? 0;
 
   const [contacts, rollup, waCounts, orgSuggestions] = await Promise.all([
     getContacts(),
@@ -328,7 +343,11 @@ export default async function HallContactsPage({ searchParams }: PageProps) {
               <p className="text-sm text-white/40 mt-3 max-w-2xl">
                 {mode === "browse"
                   ? "People who appear across your calendar, email, meeting transcripts and WhatsApp — ranked by relationship intensity. Click a name to dive in."
-                  : "Classify attendees so Suggested Time Blocks treats them correctly: personal meetings skip prep, VIP meetings get urgency boost."
+                  : mode === "classify"
+                  ? "Classify attendees so Suggested Time Blocks treats them correctly: personal meetings skip prep, VIP meetings get urgency boost."
+                  : mode === "orphans"
+                  ? "WhatsApp and Fireflies senders the clipper flagged as medium-confidence matches to existing contacts. Approve to backfill + teach the resolver."
+                  : "Candidates from the LinkedIn enrichment agent with confidence between 0.4 and 0.8 — one click to approve, override, or reject."
                 }
               </p>
             </div>
@@ -374,13 +393,39 @@ export default async function HallContactsPage({ searchParams }: PageProps) {
                 </span>
               )}
             </Link>
-            <div className="flex-1" />
             <Link
-              href="/admin/hall/orphans"
-              className="text-[10px] font-bold text-[#131218]/50 hover:text-[#131218] uppercase tracking-widest mr-3"
+              href="?mode=orphans"
+              prefetch={false}
+              className={`px-4 py-2.5 text-[11px] font-bold tracking-widest uppercase border-b-2 transition-colors ${
+                mode === "orphans"
+                  ? "border-[#131218] text-[#131218]"
+                  : "border-transparent text-[#131218]/40 hover:text-[#131218]/70"
+              }`}
             >
-              Orphan matches →
+              Orphans
+              {orphanPending > 0 && (
+                <span className="ml-2 text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">
+                  {orphanPending}
+                </span>
+              )}
             </Link>
+            <Link
+              href="?mode=linkedin"
+              prefetch={false}
+              className={`px-4 py-2.5 text-[11px] font-bold tracking-widest uppercase border-b-2 transition-colors ${
+                mode === "linkedin"
+                  ? "border-[#131218] text-[#131218]"
+                  : "border-transparent text-[#131218]/40 hover:text-[#131218]/70"
+              }`}
+            >
+              LinkedIn
+              {linkedinPending > 0 && (
+                <span className="ml-2 text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">
+                  {linkedinPending}
+                </span>
+              )}
+            </Link>
+            <div className="flex-1" />
             <HallContactsAutoRefresh />
           </div>
 
@@ -464,6 +509,9 @@ export default async function HallContactsPage({ searchParams }: PageProps) {
           {/* Dismissed (collapsed by default) */}
           <HallContactsDismissedToggle rows={dismissed} />
           </>}
+
+          {mode === "orphans"  && <OrphansReviewSection />}
+          {mode === "linkedin" && <LinkedInReviewSection />}
         </div>
       </main>
     </div>
