@@ -322,4 +322,12 @@ export const ROUTINE_CATALOG: Record<string, RoutineCatalogEntry> = {
     visible_in_product: true,
     priority: 2,
   },
+  "propose-content-pitches": {
+    schedule: "09:00 Fri (self-gates to last Friday of month)",
+    reads: "Supabase comms_pillars/audiences/channels + Notion Insight Briefs",
+    writes: "Supabase content_pitches (status=proposed)",
+    output_surface: "/admin/plan/comms",
+    visible_in_product: true,
+    priority: 2,
+  },
 };

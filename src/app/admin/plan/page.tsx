@@ -7,6 +7,7 @@ import {
   currentQuarter,
 } from "@/lib/plan";
 import PlanView from "@/components/plan/PlanView";
+import { PlanNav } from "@/components/plan/PlanNav";
 
 export const dynamic = "force-dynamic";
 
@@ -27,7 +28,7 @@ export default async function PlanPage() {
       <Sidebar adminNav />
 
       <main className="flex-1 ml-[228px] overflow-auto">
-        <header className="bg-[#131218] text-white px-12 pt-10 pb-11">
+        <header className="bg-[#131218] text-white px-12 pt-10 pb-0">
           <p className="text-[8px] font-bold tracking-[2.5px] uppercase text-white/40 mb-3.5">
             Control Room · Strategic Plan
           </p>
@@ -51,6 +52,9 @@ export default async function PlanPage() {
                 ▲ Quarter Close
               </button>
             </div>
+          </div>
+          <div className="mt-8 border-b border-white/10">
+            <PlanNav active="objectives" />
           </div>
         </header>
 
