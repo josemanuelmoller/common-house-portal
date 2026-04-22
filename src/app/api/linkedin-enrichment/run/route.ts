@@ -24,16 +24,35 @@
  *
  * Every call writes to linkedin_enrichment_audit regardless of outcome.
  *
- * Auth: adminGuardApi()
+ * Auth: x-agent-key / CRON_SECRET header OR authenticated admin session.
+ * Called by Vercel cron every Monday at 07:15 UTC.
  *
  * Budget cap: if the `limit` × CSE cost (100/day free tier) would exceed the
  * quota, the route stops early and returns a `remaining_budget` hint.
  */
 import { NextRequest, NextResponse } from "next/server";
 import { currentUser } from "@clerk/nextjs/server";
-import { adminGuardApi } from "@/lib/require-admin";
+import { auth } from "@clerk/nextjs/server";
+import { isAdminUser } from "@/lib/clients";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { findLinkedIn } from "@/lib/linkedin-enrichment";
+
+export const maxDuration = 300;
+export const dynamic = "force-dynamic";
+
+/** Allow either (a) admin session via Clerk or (b) CRON_SECRET header. */
+async function authCheck(req: NextRequest): Promise<boolean> {
+  const agentKey  = req.headers.get("x-agent-key");
+  const cronToken = req.headers.get("authorization");
+  const expected  = process.env.CRON_SECRET;
+  if (expected && agentKey === expected)              return true;
+  if (expected && cronToken === `Bearer ${expected}`) return true;
+  try {
+    const { userId } = await auth();
+    if (userId && isAdminUser(userId)) return true;
+  } catch { /* no-op */ }
+  return false;
+}
 
 const AUTO_APPLY_THRESHOLD = 0.8;
 const REVIEW_THRESHOLD     = 0.4;
@@ -51,11 +70,12 @@ type QueueRow = {
 };
 
 export async function POST(req: NextRequest) {
-  const guard = await adminGuardApi();
-  if (guard) return guard;
+  const ok = await authCheck(req);
+  if (!ok) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
-  const user  = await currentUser();
-  const actor = user?.primaryEmailAddress?.emailAddress ?? "unknown";
+  const isCron = !!req.headers.get("x-agent-key") || req.headers.get("authorization")?.startsWith("Bearer ");
+  const user   = isCron ? null : await currentUser();
+  const actor  = isCron ? "cron" : (user?.primaryEmailAddress?.emailAddress ?? "unknown");
 
   const { searchParams } = new URL(req.url);
   const dryRun = searchParams.get("dry_run") === "1";
@@ -250,3 +270,6 @@ export async function POST(req: NextRequest) {
     outcomes,
   });
 }
+
+// Vercel cron hits the endpoint with GET. Alias so the same handler runs.
+export { POST as GET };
