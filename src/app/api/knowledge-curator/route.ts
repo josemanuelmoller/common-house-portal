@@ -71,6 +71,7 @@ type EvidenceRow = {
   geography: string | null;
   stakeholder_function: string | null;
   workstream: string | null;
+  case_code: string | null;
   project_notion_id: string | null;
   source_notion_id: string | null;
   date_captured: string | null;
@@ -103,7 +104,7 @@ async function fetchEvidence(
   const sb = getSupabaseServerClient();
 
   let q = sb.from("evidence")
-    .select("notion_id, title, evidence_type, validation_status, confidence_level, reusability_level, evidence_statement, source_excerpt, topics, affected_theme, geography, stakeholder_function, workstream, project_notion_id, source_notion_id, date_captured")
+    .select("notion_id, title, evidence_type, validation_status, confidence_level, reusability_level, evidence_statement, source_excerpt, topics, affected_theme, geography, stakeholder_function, workstream, case_code, project_notion_id, source_notion_id, date_captured")
     .eq("validation_status", "Validated");
 
   if (evidenceIds && evidenceIds.length > 0) {
@@ -181,6 +182,8 @@ Two kinds of domain knowledge matter:
 
 FACETS — a target leaf may declare REQUIRED subsection vocabularies for some sections (see "Facets for <leaf>" blocks below). When the target_path + section has facets declared, you MUST pick subsection_key from the facet's subsection keys. Use the provided hints to match evidence to modality. This is how we separate e.g. dispenser vs applicator refill — they have different unit economics and concerns.
 
+CASE CODES — every bullet must begin with the evidence's case_code in square brackets, e.g. "[AUTOMERCADO-CR-2026] ...insight...". This lets us later group bullets by concrete project instance across multiple countries/clients. If the evidence has no case_code, omit the prefix (never invent one).
+
 Sections for APPEND/AMEND (pick one):
 ${VALID_SECTIONS.map(s => `- ${s}`).join("\n")}
 
@@ -206,6 +209,7 @@ Rules:
 - Geography: ${ev.geography ?? "—"}
 - Workstream (sub-team this evidence comes from): ${ev.workstream ?? "—"}
 - Stakeholder function (if pre-tagged): ${ev.stakeholder_function ?? "—"}
+- Case code (stable project identifier — USE THIS AS BULLET PREFIX): ${ev.case_code ?? "—"}
 - Confidence: ${ev.confidence_level ?? "—"}
 - Notion ID: ${ev.notion_id}
 - Source Notion ID: ${ev.source_notion_id ?? "—"}
@@ -224,7 +228,7 @@ Respond with JSON:
   "suggested_title": "Refill" (only for SPLIT),
   "section": "Available solutions" | "Stakeholder concerns" | ... | null,
   "subsection": "dispenser-in-store" | "IT" | ... | null   // REQUIRED when section has a facet or when section="Stakeholder concerns"; use the subsection_key, not the title
-  "bullet": "1-line synthesis (no Source Excerpt verbatim). (Source: <source_notion_id>/<evidence_notion_id>)" | null,
+  "bullet": "[<CASE_CODE>] 1-line synthesis (no Source Excerpt verbatim). (Source: <source_notion_id>/<evidence_notion_id>)" | null,     // Prepend the evidence's case_code in brackets; omit prefix if case_code is "—"
   "replaces": "original bullet text to replace" | null,
   "reasoning": "1-2 sentences why"
 }`;

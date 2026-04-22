@@ -100,6 +100,26 @@ async function _POST(req: NextRequest) {
   const facetsBlock = buildFacetsBlock(node);
   const axesBlock   = buildContextAxesBlock(node);
 
+  // Extract case codes from body_md (lines of form "- [CODE-XX-2026] ...")
+  const caseMatches = node.body_md.match(/\[[A-Z0-9]+-[A-Z]{2,3}-\d{4}\]/g) ?? [];
+  const uniqueCases = [...new Set(caseMatches.map(c => c.slice(1, -1)))].sort();
+
+  // Fetch case metadata if we have any
+  let casesBlock = "(no case codes present in bullets)";
+  if (uniqueCases.length > 0) {
+    const { data } = await sb.from("knowledge_cases")
+      .select("code, title, project_name, geography, year, evidence_count")
+      .in("code", uniqueCases);
+    const rows = (data as Array<{ code: string; title: string; project_name: string | null; geography: string | null; year: number | null; evidence_count: number }>) ?? [];
+    if (rows.length > 0) {
+      casesBlock = rows.map(c =>
+        `  - ${c.code}: ${c.project_name ?? c.code} · ${c.geography ?? "?"} · ${c.year ?? "?"} · ${c.evidence_count} bullets`
+      ).join("\n");
+    } else {
+      casesBlock = uniqueCases.map(c => `  - ${c}: (no registry row yet)`).join("\n");
+    }
+  }
+
   const sys = `You are a senior knowledge synthesiser for Common House. Your job: read raw evidence bullets captured from validated meetings/emails/whatsapp across multiple projects and produce ONE cohesive prose playbook that a Common House team member can read in 3 minutes before a conversation.
 
 HARD RULES — follow without exception:
@@ -110,18 +130,30 @@ HARD RULES — follow without exception:
 
 3. RESPECT the facet structure. When the leaf declares facets (modality subsections), organise the playbook sections around those facets. Do NOT mix modalities into the same paragraph. Example: Dispenser (in-store) and Applicator + solid refill must be discussed separately — they are different architectures.
 
-4. DETECT convergence vs. divergence along the declared context_axes. After the per-facet sections, include a "Patterns across contexts" section that explicitly states:
-   - What converges across evidence (claims supported by multiple projects/geographies/etc.)
-   - What varies by which axis ("in LATAM X, in Africa Y")
+4. GROUP by case code within each modality. Bullets carry a case code prefix like [AUTOMERCADO-CR-2026]. Under each modality section, write a sub-section per case when ≥2 cases exist, e.g.:
+
+      ### Applicator + solid refill
+
+      #### SUFI (AR, 2026)
+      Narrative about this specific instance...
+
+      #### (other case when it exists)
+
+   When only 1 case exists for a modality, write a single narrative and tag each citation with the case code — no need for sub-sub-headings.
+
+5. DETECT convergence vs. divergence along the declared context_axes. After the per-facet sections, include a "Patterns across contexts" section that explicitly states:
+   - What converges across cases (claims supported by multiple case_codes)
+   - What varies by which axis ("in LATAM X, in Africa Y") — cite the specific case_codes
    - What is only a single data point (flag as hypothesis, not principle)
+   - Reference cases by their case_code (e.g., "SUFI-AR-2026 vs AUTOMERCADO-CR-2026") not prose descriptions
 
-5. NARRATIVE, not bullets. Write flowing paragraphs. Use sub-headings (### ) to structure. Bullets only where a genuine list is clearer (e.g., step-by-step implementation sequences, or a short enumeration). The WHOLE document must not read as a pile of bullets.
+6. NARRATIVE, not bullets. Write flowing paragraphs. Use sub-headings (### and ####) to structure. Bullets only where a genuine list is clearer (e.g., step-by-step implementation sequences, or a short enumeration). The WHOLE document must not read as a pile of bullets.
 
-6. OMIT dimensions without evidence. If the leaf has a "Case studies" facet but no actual case study evidence, skip it entirely. Do NOT write "(no data yet)" — just omit.
+7. OMIT dimensions without evidence. If the leaf has a "Case studies" facet but no actual case study evidence, skip it entirely. Do NOT write "(no data yet)" — just omit.
 
-7. USE the original language / register of the domain. Spanish terms (refill, envase, piloto, retail) can stay in Spanish if they are the natural vocabulary. No over-translation.
+8. USE the original language / register of the domain. Spanish terms (refill, envase, piloto, retail) can stay in Spanish if they are the natural vocabulary. No over-translation.
 
-8. LENGTH: target 800-1800 words depending on how much evidence you have. Fewer bullets → shorter playbook. More evidence → more detail, up to the cap.
+9. LENGTH: target 800-2000 words depending on how much evidence you have. Fewer bullets → shorter playbook. More evidence → more detail, up to the cap.
 
 OUTPUT: pure markdown, starting with a top-level # title, then sections. No wrapping prose, no code fence.`;
 
@@ -138,6 +170,9 @@ ${facetsBlock}
 
 === CONTEXT AXES (detect convergence/divergence along these) ===
 ${axesBlock}
+
+=== CASES PRESENT IN EVIDENCE (group playbook by these within each facet) ===
+${casesBlock}
 
 === SOURCE BULLETS (the ONLY material you may use) ===
 ${node.body_md}
