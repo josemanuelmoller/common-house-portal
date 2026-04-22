@@ -102,6 +102,216 @@ export async function getRevenueEventsForYear(year: number): Promise<RevenueEven
   return (data ?? []) as RevenueEvent[];
 }
 
+// ─── Objective artifacts (plan-master-agent output) ──────────────────────────
+
+export type ArtifactType =
+  | "draft_doc"
+  | "proposal"
+  | "brief"
+  | "slide_deck"
+  | "sheet"
+  | "pdf"
+  | "other";
+
+export type ArtifactStatus =
+  | "draft"
+  | "in_review"
+  | "approved"
+  | "sent"
+  | "archived";
+
+export type ObjectiveArtifact = {
+  id: string;
+  objective_id: string;
+  artifact_type: ArtifactType;
+  title: string;
+  drive_url: string | null;
+  drive_file_id: string | null;
+  drive_folder_id: string | null;
+  status: ArtifactStatus;
+  generated_by: string | null;
+  evidence_basis: string[];
+  calendar_event_id: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  sent_at: string | null;
+};
+
+export type ObjectiveArtifactWithObjective = ObjectiveArtifact & {
+  objective_title: string;
+  objective_tier: ObjectiveTier;
+  objective_area: ObjectiveArea;
+  objective_type: ObjectiveType;
+  objective_year: number;
+  objective_quarter: number | null;
+  current_version_id: string | null;
+  latest_version_number: number | null;
+  open_questions_count: number;
+  answered_questions_count: number;
+};
+
+export type QuestionStatus = "open" | "answered" | "dropped" | "superseded";
+
+export type ArtifactQuestion = {
+  id: string;
+  artifact_id: string;
+  version_introduced: number;
+  question: string;
+  rationale: string | null;
+  status: QuestionStatus;
+  answer: string | null;
+  answered_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ArtifactVersion = {
+  id: string;
+  artifact_id: string;
+  version_number: number;
+  drive_file_id: string | null;
+  drive_url: string | null;
+  summary_of_changes: string | null;
+  generated_by: string | null;
+  content: string | null;
+  answers_used: Array<{ question_id: string; question: string; answer: string }>;
+  model: string | null;
+  tokens_used: number | null;
+  created_at: string;
+};
+
+export async function getObjectiveArtifacts(): Promise<ObjectiveArtifactWithObjective[]> {
+  const client = supabaseAdmin();
+
+  const { data: artifactRows, error } = await client
+    .from("objective_artifacts")
+    .select(
+      `
+      *,
+      strategic_objectives!inner (
+        title, tier, area, objective_type, year, quarter
+      )
+    `
+    )
+    .order("created_at", { ascending: false });
+  if (error) throw new Error(`getObjectiveArtifacts: ${error.message}`);
+
+  type ArtifactRow = ObjectiveArtifact & {
+    current_version_id: string | null;
+    strategic_objectives: {
+      title: string;
+      tier: ObjectiveTier;
+      area: ObjectiveArea;
+      objective_type: ObjectiveType;
+      year: number;
+      quarter: number | null;
+    };
+  };
+  const rows = (artifactRows ?? []) as ArtifactRow[];
+  if (rows.length === 0) return [];
+
+  const artifactIds = rows.map((r) => r.id);
+
+  // Pull version numbers + question counts in two lightweight side-queries
+  const [versionsRes, questionsRes] = await Promise.all([
+    client
+      .from("artifact_versions")
+      .select("artifact_id, version_number")
+      .in("artifact_id", artifactIds),
+    client
+      .from("artifact_questions")
+      .select("artifact_id, status")
+      .in("artifact_id", artifactIds),
+  ]);
+  if (versionsRes.error) throw new Error(`artifact_versions: ${versionsRes.error.message}`);
+  if (questionsRes.error) throw new Error(`artifact_questions: ${questionsRes.error.message}`);
+
+  const latestByArtifact = new Map<string, number>();
+  for (const v of versionsRes.data ?? []) {
+    const prev = latestByArtifact.get(v.artifact_id) ?? 0;
+    if (v.version_number > prev) latestByArtifact.set(v.artifact_id, v.version_number);
+  }
+  const countsByArtifact = new Map<string, { open: number; answered: number }>();
+  for (const q of questionsRes.data ?? []) {
+    const c = countsByArtifact.get(q.artifact_id) ?? { open: 0, answered: 0 };
+    if (q.status === "open") c.open += 1;
+    else if (q.status === "answered") c.answered += 1;
+    countsByArtifact.set(q.artifact_id, c);
+  }
+
+  return rows.map((row) => {
+    const counts = countsByArtifact.get(row.id) ?? { open: 0, answered: 0 };
+    return {
+      ...row,
+      objective_title: row.strategic_objectives.title,
+      objective_tier: row.strategic_objectives.tier,
+      objective_area: row.strategic_objectives.area,
+      objective_type: row.strategic_objectives.objective_type,
+      objective_year: row.strategic_objectives.year,
+      objective_quarter: row.strategic_objectives.quarter,
+      current_version_id: row.current_version_id,
+      latest_version_number: latestByArtifact.get(row.id) ?? null,
+      open_questions_count: counts.open,
+      answered_questions_count: counts.answered,
+    };
+  });
+}
+
+export async function getArtifactDetails(artifactId: string): Promise<{
+  questions: ArtifactQuestion[];
+  versions: ArtifactVersion[];
+}> {
+  const client = supabaseAdmin();
+  const [qRes, vRes] = await Promise.all([
+    client
+      .from("artifact_questions")
+      .select("*")
+      .eq("artifact_id", artifactId)
+      .order("version_introduced", { ascending: true })
+      .order("created_at", { ascending: true }),
+    client
+      .from("artifact_versions")
+      .select("*")
+      .eq("artifact_id", artifactId)
+      .order("version_number", { ascending: false }),
+  ]);
+  if (qRes.error) throw new Error(`getArtifactDetails questions: ${qRes.error.message}`);
+  if (vRes.error) throw new Error(`getArtifactDetails versions: ${vRes.error.message}`);
+  return {
+    questions: (qRes.data ?? []) as ArtifactQuestion[],
+    versions: (vRes.data ?? []) as ArtifactVersion[],
+  };
+}
+
+export function artifactTypeLabel(t: ArtifactType): string {
+  return {
+    draft_doc: "Draft",
+    proposal: "Proposal",
+    brief: "Brief",
+    slide_deck: "Slide deck",
+    sheet: "Sheet",
+    pdf: "PDF",
+    other: "Other",
+  }[t];
+}
+
+export function artifactStatusLabel(s: ArtifactStatus): string {
+  return {
+    draft: "Draft",
+    in_review: "In review",
+    approved: "Approved",
+    sent: "Sent",
+    archived: "Archived",
+  }[s];
+}
+
+export function calendarEventUrl(eventId: string): string {
+  // Google Calendar event links use base64-encoded eid. The raw event.id from
+  // the API can be opened via the /r/eventedit/{id} pattern for the organizer.
+  return `https://calendar.google.com/calendar/u/0/r/eventedit/${eventId}`;
+}
+
 export type QuarterRevenueSummary = {
   quarter: number | null;
   target: number | null;

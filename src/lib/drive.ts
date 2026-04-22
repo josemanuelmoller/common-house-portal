@@ -20,6 +20,75 @@ function getDriveClient() {
   return google.drive({ version: "v3", auth });
 }
 
+/**
+ * OAuth-based Drive client. Uses the user's personal refresh token so that
+ * files created by the server are owned by the user (not the service account).
+ * This is what the plan-master-agent regenerate loop uses to sync v{N+1} into
+ * the same `CH OS / Plan / ...` folder hierarchy that v1 lives in.
+ *
+ * Env vars:
+ *   DRIVE_OAUTH_CLIENT_ID      — Google Cloud OAuth 2.0 Client ID
+ *   DRIVE_OAUTH_CLIENT_SECRET  — matching secret
+ *   DRIVE_OAUTH_REFRESH_TOKEN  — refresh token obtained via one-time OAuth dance
+ *                                with scope https://www.googleapis.com/auth/drive
+ *
+ * Returns null if env vars are not configured — callers should handle
+ * gracefully (skip Drive sync, keep content in DB only).
+ */
+export function getDriveClientOAuth() {
+  const clientId     = process.env.DRIVE_OAUTH_CLIENT_ID;
+  const clientSecret = process.env.DRIVE_OAUTH_CLIENT_SECRET;
+  const refreshToken = process.env.DRIVE_OAUTH_REFRESH_TOKEN;
+  if (!clientId || !clientSecret || !refreshToken) return null;
+
+  const auth = new google.auth.OAuth2(clientId, clientSecret);
+  auth.setCredentials({ refresh_token: refreshToken });
+  return google.drive({ version: "v3", auth });
+}
+
+/**
+ * Upload a plain-text document into a specific Drive folder (identified by
+ * folderId, typically the `drive_folder_id` stored on objective_artifacts).
+ * Drive auto-converts text/plain to a native Google Doc, so the result is
+ * editable in-browser.
+ *
+ * Returns { fileId, webViewLink } on success, or null if the OAuth client
+ * is not configured. Throws on actual Drive API errors.
+ */
+export async function uploadTextToDriveFolder(
+  folderId: string,
+  title: string,
+  content: string
+): Promise<{ fileId: string; webViewLink: string } | null> {
+  const drive = getDriveClientOAuth();
+  if (!drive) return null;
+
+  const { Readable } = await import("stream");
+  const stream = Readable.from(Buffer.from(content, "utf-8"));
+
+  const res = await drive.files.create({
+    requestBody: {
+      name: title,
+      parents: [folderId],
+      mimeType: "application/vnd.google-apps.document",
+    },
+    media: {
+      mimeType: "text/plain",
+      body: stream,
+    },
+    fields: "id, webViewLink",
+  });
+
+  const fileId = res.data.id;
+  if (!fileId) throw new Error("Drive upload returned no fileId");
+
+  return {
+    fileId,
+    webViewLink:
+      res.data.webViewLink ?? `https://docs.google.com/document/d/${fileId}/edit`,
+  };
+}
+
 // ─── Folder structure ─────────────────────────────────────────────────────────
 
 
