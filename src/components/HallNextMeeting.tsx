@@ -98,8 +98,8 @@ async function loadNext(): Promise<NextMeeting | null> {
 
     const [txRes, mailRes] = await Promise.all([
       sb.from("hall_transcript_observations")
-        .select("transcript_id, title, meeting_at, attendee_emails")
-        .overlaps("attendee_emails", attendees)
+        .select("transcript_id, title, meeting_at, participant_emails")
+        .overlaps("participant_emails", attendees)
         .order("meeting_at", { ascending: false })
         .limit(1),
       sb.from("hall_email_observations")
