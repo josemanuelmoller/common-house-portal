@@ -26,7 +26,10 @@ import { adminGuardApi } from "@/lib/require-admin";
 import { uploadTextToDriveFolder } from "@/lib/drive";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+// 300s is the Vercel Pro maxDuration ceiling. Sonnet can take 60-120s to
+// generate a 7-10k char v{N+1} with full context, and Drive upload adds
+// a few seconds on top — 60s was consistently hitting the edge.
+export const maxDuration = 300;
 
 const MODEL = "claude-sonnet-4-6";
 const MIN_ANSWERS_PER_REGEN = 3;
