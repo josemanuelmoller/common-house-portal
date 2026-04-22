@@ -35,12 +35,22 @@ For each evidence record, pull from Supabase `public.evidence`:
 ## Three-phase procedure (per evidence record)
 
 ### Phase 1 — MINE
-Ask yourself: does this evidence contain a statement that generalises beyond the specific project?
-- A project outcome ("Co-op approved Phase 2") → does NOT generalise → IGNORE
-- A domain insight ("UK grocery refill retention drops below 20% without in-store education") → DOES generalise → proceed
-- A mix ("Co-op Phase 2 approved after showing 40% refill return rate on POC") → extract only the insight part ("UK grocery refill POCs reaching 40% return rate unlocks retailer commitment")
+Ask yourself: does this evidence contain something that generalises beyond the specific project?
 
-Synthesize the insight in 1-2 lines. Do NOT copy source_excerpt verbatim.
+Two kinds of generalising content to capture:
+
+**(a) Domain insights** — statements about how the domain works ("UK grocery refill retention drops below 20% without in-store education"). Synthesize in 1-2 lines. Route to Available solutions / How to implement / Anti-patterns / Case studies.
+
+**(b) Stakeholder concerns** — worries, open questions, apprehensions, or Q&A raised by a function/role. These repeat across clients and are highly reusable (IT always asks similar integration Qs, Quality always raises contamination, etc.). Signals:
+- `evidence_type = Concern` OR `Objection` OR `Risk`
+- Phrasing like "what if", "how will you", "I'm worried that", "my concern is", "not sure if"
+- Operational dimension tied to a function
+
+Route stakeholder concerns to section "Stakeholder concerns" with a subsection equal to the stakeholder function (IT / Quality / Operations / Legal / Finance / Marketing / Executive / Procurement / Sales / Customer Service / Supply Chain / Other).
+
+Project-specific outcomes with no generalisation → IGNORE.
+
+Do NOT copy source_excerpt verbatim — always synthesize.
 
 ### Phase 2 — ROUTE
 Find the target leaf node using `getAllNodes()`:

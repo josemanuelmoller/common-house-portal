@@ -42,7 +42,12 @@ Do not sweep databases. Do not expand scope beyond what was specified.
 ## CH Evidence [OS v2] — exact schema values
 
 **Evidence Type** (select — choose one):
-`Approval`, `Blocker`, `Process Step`, `Stakeholder`, `Risk`, `Objection`, `Decision`, `Requirement`, `Dependency`, `Outcome`, `Assumption`, `Contradiction`, `Insight Candidate`
+`Approval`, `Blocker`, `Concern`, `Process Step`, `Stakeholder`, `Risk`, `Objection`, `Decision`, `Requirement`, `Dependency`, `Outcome`, `Assumption`, `Contradiction`, `Insight Candidate`
+
+**Stakeholder Function** (optional text — populate especially for `Concern`, `Objection`, `Risk`, `Requirement` types):
+Free text describing which function/role raised the item. Preferred values:
+`IT`, `Quality`, `Operations`, `Legal`, `Finance`, `Marketing`, `Executive`, `Procurement`, `Sales`, `Customer Service`, `Supply Chain`, `Other`.
+Infer from the speaker's name, role, or team mentioned in Processed Summary / Sanitized Notes. If unclear, leave empty — never guess. The knowledge-curator uses this to group cross-project concern patterns (e.g., "IT concerns on refill" across retailers).
 
 **Validation Status** (select — use `New` for all newly created records):
 `New`, `Reviewed`, `Validated`, `Rejected`, `Superseded`
@@ -95,6 +100,20 @@ If a duplicate is found: skip creation and report it. Do not create a near-dupli
 
 ### Mixed relationship threads
 If a thread involves multiple organizations in different roles (e.g., client + vendor + funder), extract only the evidence that is clearly relevant to the project scope provided. Do not create org-level evidence for every participant.
+
+### Concerns and Objections — capture separately from Blockers
+`Concern` is NOT the same as `Blocker`. A `Concern` is a worry, open question, or apprehension raised by a stakeholder that does not currently stop the project — but would if unaddressed. Signals in the transcript:
+- Questions beginning with "what if", "how will you", "what about", "I'm worried that", "my concern is"
+- Expressions of uncertainty about integration, safety, quality, compliance, ownership, or operations
+- Requests for clarification or assurance about a specific dimension
+
+When you detect a Concern:
+1. Set `Evidence Type = Concern`
+2. Populate `Stakeholder Function` with the function/role that raised it (e.g., "IT", "Quality", "Operations") — inferred from who is speaking or whose team they represent
+3. Populate `Affected Theme` with the operational dimension (e.g., Tech, Operations, Legal) — different from the function
+4. Evidence Statement should articulate the concern neutrally in 1-2 sentences, not paraphrase as a decision or requirement
+
+`Objection` is stronger than `Concern` — an explicit push-back or rejection. Reserve `Objection` for those cases. Everything softer goes as `Concern`.
 
 ### Weak evidence that should stay out
 Do not create evidence for:

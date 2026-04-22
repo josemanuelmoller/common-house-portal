@@ -29,6 +29,7 @@ import {
   appendChangelog,
   updateNodeBody,
   appendBullet,
+  appendBulletInSubsection,
   type KnowledgeNode,
   type ChangelogAction,
   type ChangelogStatus,
@@ -46,7 +47,13 @@ const VALID_SECTIONS = [
   "How to implement",
   "Anti-patterns",
   "Case studies",
+  "Stakeholder concerns",
   "References",
+] as const;
+
+const STAKEHOLDER_FUNCTIONS = [
+  "IT", "Quality", "Operations", "Legal", "Finance", "Marketing",
+  "Executive", "Procurement", "Sales", "Customer Service", "Supply Chain", "Other",
 ] as const;
 
 type EvidenceRow = {
@@ -61,6 +68,7 @@ type EvidenceRow = {
   topics: string | null;
   affected_theme: string | null;
   geography: string | null;
+  stakeholder_function: string | null;
   project_notion_id: string | null;
   source_notion_id: string | null;
   date_captured: string | null;
@@ -72,6 +80,7 @@ type Classification = {
   suggested_path?: string;       // only when SPLIT
   suggested_title?: string;      // only when SPLIT
   section: string | null;        // target section for APPEND/AMEND
+  subsection?: string | null;    // for "Stakeholder concerns" grouping by function
   bullet: string | null;         // 1-line synthesis for APPEND
   replaces: string | null;       // AMEND: original bullet to replace
   reasoning: string;
@@ -92,7 +101,7 @@ async function fetchEvidence(
   const sb = getSupabaseServerClient();
 
   let q = sb.from("evidence")
-    .select("notion_id, title, evidence_type, validation_status, confidence_level, reusability_level, evidence_statement, source_excerpt, topics, affected_theme, geography, project_notion_id, source_notion_id, date_captured")
+    .select("notion_id, title, evidence_type, validation_status, confidence_level, reusability_level, evidence_statement, source_excerpt, topics, affected_theme, geography, stakeholder_function, project_notion_id, source_notion_id, date_captured")
     .eq("validation_status", "Validated");
 
   if (evidenceIds && evidenceIds.length > 0) {
@@ -142,19 +151,31 @@ async function classifyEvidence(
     return !hasChild;
   }).map(n => n.path);
 
-  const sys = `You are the knowledge curator for Common House. Your job is to decide if a piece of evidence contains a DOMAIN INSIGHT (a statement about how the domain works — "refill retention drops below 20% without in-store education") as opposed to a PROJECT FACT ("Co-op approved Phase 2").
+  const sys = `You are the knowledge curator for Common House. Your job is to decide if a piece of evidence contains reusable DOMAIN KNOWLEDGE as opposed to a one-off PROJECT FACT.
 
-You route domain insights into one leaf of the knowledge tree, under one section. You do NOT create new tree nodes — you can only propose (SPLIT) for human review.
+Two kinds of domain knowledge matter:
 
-Sections (pick one for APPEND/AMEND):
+1) DOMAIN INSIGHTS — statements about how the domain works ("refill retention drops below 20% without in-store education"). Route these to Available solutions / How to implement / Anti-patterns / Case studies / References as appropriate.
+
+2) STAKEHOLDER CONCERNS — worries, open questions, or apprehensions raised by a function/role. These are HIGHLY reusable because they repeat across clients (IT always asks similar integration questions, Quality always raises contamination, etc.).
+   - Detect from evidence_type=Concern or evidence_type=Objection/Risk, or from Q&A phrasing ("what if", "how will you", "I'm worried that", "my concern is", "not sure if")
+   - For these: action=APPEND, section="Stakeholder concerns", subsection = stakeholder_function (IT / Quality / Operations / Legal / Finance / Marketing / Executive / Procurement / Sales / Customer Service / Supply Chain / Other)
+   - If stakeholder_function on the evidence is populated, USE IT as subsection
+   - If it's null, INFER from evidence_statement / source_excerpt / topics. Only pick a function name you can justify from content. If nothing supports a specific function, use "Other"
+
+Sections for APPEND/AMEND (pick one):
 ${VALID_SECTIONS.map(s => `- ${s}`).join("\n")}
 
+Subsection is REQUIRED when section = "Stakeholder concerns", and must be one of:
+${STAKEHOLDER_FUNCTIONS.map(f => `- ${f}`).join("\n")}
+
 Rules:
-- If the evidence is a project fact with no domain generalisation → IGNORE
-- If the evidence contains a domain insight AND a matching leaf exists → APPEND (auto-apply), pick path + section + compose a 1-line synthesis bullet (no verbatim excerpt)
-- If the insight contradicts something likely in an existing leaf → AMEND, specify 'replaces' text
-- If the insight fits a theme/subtheme but no leaf exists → SPLIT, name closest parent path + suggested new slug
-- Low confidence evidence → IGNORE with reason "low confidence"
+- Pure project fact with no generalisation → IGNORE
+- Concern / apprehension / open question from a function → APPEND to "Stakeholder concerns" with subsection
+- Domain insight → APPEND to the appropriate section (no subsection)
+- Contradicts existing content → AMEND, specify 'replaces'
+- No matching leaf exists → SPLIT, name closest parent path + suggested new slug
+- Low confidence → IGNORE with reason "low confidence"
 - Respond with strict JSON only, no prose wrapper.`;
 
   const user = `Evidence:
@@ -165,6 +186,7 @@ Rules:
 - Affected theme: ${ev.affected_theme ?? "—"}
 - Topics: ${ev.topics ?? "—"}
 - Geography: ${ev.geography ?? "—"}
+- Stakeholder function (if pre-tagged): ${ev.stakeholder_function ?? "—"}
 - Confidence: ${ev.confidence_level ?? "—"}
 - Notion ID: ${ev.notion_id}
 - Source Notion ID: ${ev.source_notion_id ?? "—"}
@@ -181,8 +203,9 @@ Respond with JSON:
   "target_path": "reuse/packaging/refill" | null,
   "suggested_path": "reuse/packaging/refill" (only for SPLIT),
   "suggested_title": "Refill" (only for SPLIT),
-  "section": "Available solutions" | null,
-  "bullet": "1-line insight synthesis (no Source Excerpt verbatim). (Source: <source_notion_id>/<evidence_notion_id>)" | null,
+  "section": "Available solutions" | "Stakeholder concerns" | ... | null,
+  "subsection": "IT" | "Quality" | ... | null   // REQUIRED when section = "Stakeholder concerns"
+  "bullet": "1-line synthesis (no Source Excerpt verbatim). (Source: <source_notion_id>/<evidence_notion_id>)" | null,
   "replaces": "original bullet text to replace" | null,
   "reasoning": "1-2 sentences why"
 }`;
@@ -301,7 +324,20 @@ async function _POST(req: NextRequest) {
       else if (c.action === "APPEND" && c.target_path && c.section && c.bullet) {
         const node = nodeByPath.get(c.target_path);
         if (!node) throw new Error(`target_path not found: ${c.target_path}`);
-        const { body: newBody, changed, before, after } = appendBullet(node.body_md, c.section, c.bullet);
+
+        const isConcernSection = c.section.toLowerCase() === "stakeholder concerns";
+        const subsection = isConcernSection
+          ? (c.subsection ?? ev.stakeholder_function ?? "Other")
+          : null;
+
+        const writeResult = isConcernSection && subsection
+          ? appendBulletInSubsection(node.body_md, c.section, subsection, c.bullet)
+          : appendBullet(node.body_md, c.section, c.bullet);
+        const { body: newBody, changed, before, after } = writeResult;
+
+        // Reflect subsection in the logged section string so the UI shows it
+        const sectionLabel = subsection ? `${c.section} > ${subsection}` : c.section;
+
         if (!changed) {
           // Dedup → downgrade to IGNORE
           if (!dryRun) {
@@ -309,13 +345,14 @@ async function _POST(req: NextRequest) {
               node_id: node.id,
               evidence_notion_id: ev.notion_id,
               action: "IGNORE",
-              section: c.section,
+              section: sectionLabel,
               reasoning: "duplicate — already present in section",
               status: "applied",
             });
           }
           item.action = "IGNORE";
           item.status = "applied";
+          item.section = sectionLabel;
           result.ignored++;
         } else {
           if (!dryRun) {
@@ -324,7 +361,7 @@ async function _POST(req: NextRequest) {
               node_id: node.id,
               evidence_notion_id: ev.notion_id,
               action: "APPEND",
-              section: c.section,
+              section: sectionLabel,
               diff_before: before,
               diff_after: after,
               reasoning: c.reasoning,
@@ -332,6 +369,7 @@ async function _POST(req: NextRequest) {
             });
           }
           item.status = "applied";
+          item.section = sectionLabel;
           result.applied_append++;
         }
       }

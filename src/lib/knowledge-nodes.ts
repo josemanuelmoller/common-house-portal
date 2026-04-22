@@ -223,20 +223,20 @@ export async function getLeafNodes(): Promise<KnowledgeNode[]> {
 
 // ─── Markdown section helpers (used by the curator) ────────────────────────────
 
-/** Split body_md into ordered {heading, body} sections (headings by `##`). */
+/** Split body_md into ordered {heading, body} sections (headings by `##`).
+ *  `###` subheadings are preserved inside the section body. */
 export function parseSections(body_md: string): { heading: string; body: string }[] {
   const lines = body_md.split(/\r?\n/);
   const sections: { heading: string; body: string }[] = [];
   let current: { heading: string; body: string } | null = null;
   for (const line of lines) {
-    const m = line.match(/^##\s+(.+)$/);
+    const m = line.match(/^##\s+(?!#)(.+)$/);
     if (m) {
       if (current) sections.push(current);
       current = { heading: m[1].trim(), body: "" };
     } else if (current) {
       current.body += (current.body ? "\n" : "") + line;
     } else {
-      // Preamble before any section — treated as implicit Overview
       current = { heading: "Overview", body: line };
     }
   }
@@ -249,6 +249,34 @@ export function serializeSections(sections: { heading: string; body: string }[])
   return sections
     .map(s => `## ${s.heading}\n\n${s.body.trim()}\n`)
     .join("\n");
+}
+
+/** Parse a section body into ordered {subheading, body} blocks (by `###`).
+ *  Content before the first `###` is kept under the synthetic subheading "_preamble". */
+function parseSubsections(body: string): { subheading: string; body: string }[] {
+  const lines = body.split(/\r?\n/);
+  const out: { subheading: string; body: string }[] = [];
+  let current: { subheading: string; body: string } = { subheading: "_preamble", body: "" };
+  for (const line of lines) {
+    const m = line.match(/^###\s+(.+)$/);
+    if (m) {
+      out.push(current);
+      current = { subheading: m[1].trim(), body: "" };
+    } else {
+      current.body += (current.body ? "\n" : "") + line;
+    }
+  }
+  out.push(current);
+  return out;
+}
+
+function serializeSubsections(subs: { subheading: string; body: string }[]): string {
+  return subs
+    .map(s => s.subheading === "_preamble"
+      ? s.body.trim()
+      : `### ${s.subheading}\n\n${s.body.trim()}\n`)
+    .filter(Boolean)
+    .join("\n\n");
 }
 
 /**
@@ -292,6 +320,59 @@ export function appendBullet(
   target.body = strippedBody
     ? `${strippedBody}\n${bulletLine}`
     : bulletLine;
+
+  return {
+    body: serializeSections(sections),
+    changed: true,
+    before,
+    after: target.body,
+  };
+}
+
+/**
+ * Append a bullet inside a nested subsection (### subheading) under a parent
+ * section (## heading). Used by the curator to group Concern-type evidence
+ * under "Stakeholder concerns > IT", "... > Quality", etc.
+ *
+ * If the parent section doesn't exist → falls back to appendBullet.
+ * If the subsection doesn't exist → creates it under the parent section.
+ * Dedup-aware: if the same bullet line already exists anywhere inside the
+ * parent section, returns changed=false.
+ */
+export function appendBulletInSubsection(
+  body_md: string,
+  heading: string,
+  subheading: string,
+  bullet: string,
+): { body: string; changed: boolean; before: string | null; after: string | null } {
+  const sections = parseSections(body_md);
+  const target = sections.find(s => s.heading.toLowerCase() === heading.toLowerCase());
+  if (!target) return appendBullet(body_md, heading, bullet);
+
+  const bulletLine = bullet.startsWith("- ") ? bullet : `- ${bullet}`;
+
+  // Dedup across the whole parent section body
+  if (target.body.includes(bulletLine)) {
+    return { body: body_md, changed: false, before: null, after: null };
+  }
+
+  // Strip italic placeholder lines inside this section first
+  const placeholder = /^[ \t]*_\([^\n)]*\)_[ \t]*$/gm;
+  const cleaned = target.body.replace(placeholder, "").replace(/\n{3,}/g, "\n\n").trim();
+
+  const before = target.body;
+
+  const subs = parseSubsections(cleaned);
+  const sub = subs.find(s => s.subheading.toLowerCase() === subheading.toLowerCase());
+  if (sub) {
+    sub.body = sub.body.trim()
+      ? `${sub.body.trim()}\n${bulletLine}`
+      : bulletLine;
+  } else {
+    subs.push({ subheading, body: bulletLine });
+  }
+
+  target.body = serializeSubsections(subs);
 
   return {
     body: serializeSections(sections),
