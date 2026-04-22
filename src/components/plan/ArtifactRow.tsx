@@ -257,6 +257,11 @@ function ArtifactDetails({
   const router = useRouter();
   const [regenPending, setRegenPending] = useState(false);
   const [regenError, setRegenError] = useState<string | null>(null);
+  const [regenProgress, setRegenProgress] = useState<{
+    stage: string;
+    chars?: number;
+    tokens?: number;
+  } | null>(null);
   const [previewVersion, setPreviewVersion] = useState<ArtifactVersion | null>(null);
 
   const latestVersionNumber = versions[0]?.version_number ?? 1;
@@ -268,21 +273,89 @@ function ArtifactDetails({
   async function regenerate(force = false) {
     setRegenPending(true);
     setRegenError(null);
+    setRegenProgress({ stage: "connecting" });
+
     try {
       const res = await fetch(`/api/plan/artifacts/${artifactId}/regenerate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ force }),
       });
-      if (!res.ok) {
+
+      // Non-stream error responses (400 gate, 404 artifact, etc.) still come
+      // as JSON with the old shape.
+      if (!res.ok || !res.body) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error ?? `HTTP ${res.status}`);
       }
-      router.refresh();
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        // Parse SSE: events separated by "\n\n"
+        const parts = buffer.split("\n\n");
+        buffer = parts.pop() ?? "";
+
+        for (const raw of parts) {
+          if (!raw.trim()) continue;
+          const lines = raw.split("\n");
+          const eventLine = lines.find((l) => l.startsWith("event: "));
+          const dataLine = lines.find((l) => l.startsWith("data: "));
+          if (!eventLine || !dataLine) continue;
+          const event = eventLine.slice(7).trim();
+          let data: Record<string, unknown>;
+          try {
+            data = JSON.parse(dataLine.slice(6));
+          } catch {
+            continue;
+          }
+
+          switch (event) {
+            case "start":
+              setRegenProgress({ stage: "generating" });
+              break;
+            case "token":
+              setRegenProgress({
+                stage: "generating",
+                chars: typeof data.chars === "number" ? data.chars : undefined,
+              });
+              break;
+            case "parsing":
+              setRegenProgress({
+                stage: "parsing",
+                chars: typeof data.total_chars === "number" ? data.total_chars : undefined,
+                tokens: typeof data.tokens === "number" ? data.tokens : undefined,
+              });
+              break;
+            case "saving":
+              setRegenProgress({
+                stage:
+                  typeof data.stage === "string" ? `saving:${data.stage}` : "saving",
+              });
+              break;
+            case "done":
+              setRegenProgress(null);
+              router.refresh();
+              break;
+            case "error":
+              throw new Error(
+                (typeof data.error === "string" ? data.error : "Regeneration failed") +
+                  (data.detail ? ` — ${data.detail}` : "")
+              );
+          }
+        }
+      }
     } catch (err) {
       setRegenError(err instanceof Error ? err.message : "Unknown error");
     } finally {
       setRegenPending(false);
+      setRegenProgress(null);
     }
   }
 
@@ -420,13 +493,35 @@ function ArtifactDetails({
           {regenError && (
             <p className="text-[10px] text-[#FF8A80] leading-relaxed">{regenError}</p>
           )}
+          {regenProgress && (
+            <div className="text-[10px] text-[#B2FF59] leading-relaxed font-mono">
+              {regenProgress.stage === "connecting" && "◉ connecting to agent…"}
+              {regenProgress.stage === "generating" && (
+                <>
+                  ◉ generating
+                  {typeof regenProgress.chars === "number" &&
+                    ` · ${regenProgress.chars.toLocaleString()} chars`}
+                </>
+              )}
+              {regenProgress.stage === "parsing" && (
+                <>
+                  ◉ parsing
+                  {typeof regenProgress.tokens === "number" &&
+                    ` · ${regenProgress.tokens.toLocaleString()} tokens`}
+                </>
+              )}
+              {regenProgress.stage.startsWith("saving") && (
+                <>◉ saving {regenProgress.stage.split(":")[1] ?? ""}</>
+              )}
+            </div>
+          )}
           <div className="flex gap-2">
             <button
               onClick={() => regenerate(false)}
               disabled={regenPending || !canRegenerate}
               className="text-[10px] font-bold text-[#131218] bg-[#B2FF59] hover:bg-[#a3ef50] disabled:opacity-30 disabled:cursor-not-allowed px-3 py-1.5 rounded-md"
             >
-              {regenPending ? "Regenerating…" : `Regenerate v${latestVersionNumber + 1}`}
+              {regenPending ? "Working…" : `Regenerate v${latestVersionNumber + 1}`}
             </button>
             {!canRegenerate && (
               <button

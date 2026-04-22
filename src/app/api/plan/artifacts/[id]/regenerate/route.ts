@@ -244,153 +244,210 @@ ${body.additional_notes ? `\n# Additional notes from user\n\n${body.additional_n
 
 Produce v${nextVersionNumber} as strict JSON per the system format.`;
 
-  // 4. Call Claude with per-type template
+  // 4. Stream Claude response + do DB writes at end.
+  //    Client receives SSE events: { event: "start" | "token" | "done" | "error" }
+  //    Heartbeats keep Vercel edge / proxies from closing the stream during
+  //    the 40-90s generation window. Client shows token count live for UX.
   const systemPrompt = buildSystemPrompt(obj.objective_type);
   const anthropic = new Anthropic({ apiKey: anthropicKey });
-  let generated: {
-    content: string;
-    summary_of_changes: string;
-    new_questions: Array<{ question: string; rationale?: string }>;
-  };
-  let tokensUsed: number | null = null;
-  try {
-    const msg = await anthropic.messages.create({
-      model: MODEL,
-      max_tokens: 8000,
-      system: [
-        {
-          type: "text",
-          text: systemPrompt,
-          cache_control: { type: "ephemeral" },
-        },
-      ],
-      messages: [{ role: "user", content: userMessage }],
-    });
-    tokensUsed = (msg.usage?.input_tokens ?? 0) + (msg.usage?.output_tokens ?? 0);
-    const textBlock = msg.content.find((b) => b.type === "text");
-    if (!textBlock || textBlock.type !== "text") {
-      throw new Error("Claude returned no text block");
-    }
-    const raw = textBlock.text.trim();
-    const jsonStart = raw.indexOf("{");
-    const jsonEnd = raw.lastIndexOf("}");
-    if (jsonStart === -1 || jsonEnd === -1) {
-      throw new Error("No JSON object in Claude response");
-    }
-    const parsed = JSON.parse(raw.slice(jsonStart, jsonEnd + 1));
-    if (typeof parsed.content !== "string" || !Array.isArray(parsed.new_questions)) {
-      throw new Error("Response missing required fields");
-    }
-    generated = parsed;
-  } catch (err) {
-    return NextResponse.json(
-      {
-        error: "Regeneration failed",
-        detail: err instanceof Error ? err.message : String(err),
-      },
-      { status: 502 }
-    );
-  }
 
-  // 5. Insert new version row
   const answersUsed = answeredSinceLastRegen.map((q) => ({
     question_id: q.id,
     question: q.question,
     answer: q.answer,
   }));
 
-  const { data: newVersion, error: nvErr } = await client
-    .from("artifact_versions")
-    .insert({
-      artifact_id: id,
-      version_number: nextVersionNumber,
-      content: generated.content,
-      summary_of_changes: generated.summary_of_changes ?? null,
-      generated_by: "plan-master-agent",
-      answers_used: answersUsed,
-      model: MODEL,
-      tokens_used: tokensUsed,
-    })
-    .select("*")
-    .single();
-  if (nvErr || !newVersion) {
-    return NextResponse.json(
-      { error: nvErr?.message ?? "failed to insert new version" },
-      { status: 500 }
-    );
-  }
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream({
+    async start(controller) {
+      const send = (event: string, data: Record<string, unknown>) => {
+        controller.enqueue(
+          encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
+        );
+      };
 
-  // 6. Attempt Drive upload (OAuth). Backfills drive_url + drive_file_id on
-  //    the version row if successful. Falls back gracefully if env vars are
-  //    not set — content already lives in DB, UI shows "Drive sync pending".
-  let driveUploaded = false;
-  if (artifact.drive_folder_id) {
-    try {
-      const upload = await uploadTextToDriveFolder(
-        artifact.drive_folder_id,
-        `${artifact.title} — v${nextVersionNumber}`,
-        generated.content
-      );
-      if (upload) {
-        const { error: driveBackfillErr } = await client
-          .from("artifact_versions")
-          .update({
-            drive_url: upload.webViewLink,
-            drive_file_id: upload.fileId,
-          })
-          .eq("id", newVersion.id);
-        if (driveBackfillErr) {
-          console.error("drive backfill failed:", driveBackfillErr.message);
-        } else {
-          driveUploaded = true;
-          newVersion.drive_url = upload.webViewLink;
-          newVersion.drive_file_id = upload.fileId;
+      try {
+        send("start", {
+          version_number: nextVersionNumber,
+          model: MODEL,
+        });
+
+        // Stream tokens from Anthropic
+        const anthropicStream = anthropic.messages.stream({
+          model: MODEL,
+          max_tokens: 8000,
+          system: [
+            {
+              type: "text",
+              text: systemPrompt,
+              cache_control: { type: "ephemeral" },
+            },
+          ],
+          messages: [{ role: "user", content: userMessage }],
+        });
+
+        let fullText = "";
+        let tokenCount = 0;
+        let lastPing = Date.now();
+
+        for await (const event of anthropicStream) {
+          if (
+            event.type === "content_block_delta" &&
+            event.delta.type === "text_delta"
+          ) {
+            fullText += event.delta.text;
+            tokenCount += 1;
+            // Throttle token events to every 10 deltas or 250ms, whichever
+            // comes first — keeps the SSE stream alive without flooding.
+            if (tokenCount % 10 === 0 || Date.now() - lastPing > 250) {
+              send("token", {
+                count: tokenCount,
+                chars: fullText.length,
+              });
+              lastPing = Date.now();
+            }
+          }
         }
+
+        const finalMessage = await anthropicStream.finalMessage();
+        const tokensUsed =
+          (finalMessage.usage?.input_tokens ?? 0) +
+          (finalMessage.usage?.output_tokens ?? 0);
+
+        send("parsing", { total_chars: fullText.length, tokens: tokensUsed });
+
+        // Parse strict JSON
+        const raw = fullText.trim();
+        const jsonStart = raw.indexOf("{");
+        const jsonEnd = raw.lastIndexOf("}");
+        if (jsonStart === -1 || jsonEnd === -1) {
+          throw new Error("No JSON object in Claude response");
+        }
+        const generated = JSON.parse(raw.slice(jsonStart, jsonEnd + 1)) as {
+          content: string;
+          summary_of_changes?: string;
+          new_questions?: Array<{ question: string; rationale?: string }>;
+        };
+        if (
+          typeof generated.content !== "string" ||
+          !Array.isArray(generated.new_questions)
+        ) {
+          throw new Error("Response missing required fields");
+        }
+
+        send("saving", { stage: "version" });
+
+        // Insert new version row
+        const { data: newVersion, error: nvErr } = await client
+          .from("artifact_versions")
+          .insert({
+            artifact_id: id,
+            version_number: nextVersionNumber,
+            content: generated.content,
+            summary_of_changes: generated.summary_of_changes ?? null,
+            generated_by: "plan-master-agent",
+            answers_used: answersUsed,
+            model: MODEL,
+            tokens_used: tokensUsed,
+          })
+          .select("*")
+          .single();
+        if (nvErr || !newVersion) {
+          throw new Error(nvErr?.message ?? "failed to insert new version");
+        }
+
+        // Drive upload
+        send("saving", { stage: "drive" });
+        let driveUploaded = false;
+        let driveUrl: string | null = null;
+        if (artifact.drive_folder_id) {
+          try {
+            const upload = await uploadTextToDriveFolder(
+              artifact.drive_folder_id,
+              `${artifact.title} — v${nextVersionNumber}`,
+              generated.content
+            );
+            if (upload) {
+              const { error: driveBackfillErr } = await client
+                .from("artifact_versions")
+                .update({
+                  drive_url: upload.webViewLink,
+                  drive_file_id: upload.fileId,
+                })
+                .eq("id", newVersion.id);
+              if (!driveBackfillErr) {
+                driveUploaded = true;
+                driveUrl = upload.webViewLink;
+              }
+            }
+          } catch (err) {
+            console.error(
+              "Drive upload failed (non-fatal):",
+              err instanceof Error ? err.message : String(err)
+            );
+          }
+        }
+
+        // Insert new questions
+        send("saving", { stage: "questions" });
+        if (generated.new_questions && generated.new_questions.length > 0) {
+          const toInsert = generated.new_questions
+            .filter(
+              (q) =>
+                typeof q.question === "string" && q.question.trim().length > 0
+            )
+            .map((q) => ({
+              artifact_id: id,
+              version_introduced: nextVersionNumber,
+              question: q.question.trim(),
+              rationale: q.rationale ?? null,
+              status: "open" as const,
+            }));
+          if (toInsert.length > 0) {
+            const { error: qInsErr } = await client
+              .from("artifact_questions")
+              .insert(toInsert);
+            if (qInsErr) {
+              console.error("new_questions insert failed:", qInsErr.message);
+            }
+          }
+        }
+
+        // Update current_version_id pointer
+        await client
+          .from("objective_artifacts")
+          .update({
+            current_version_id: newVersion.id,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", id);
+
+        send("done", {
+          version_id: newVersion.id,
+          version_number: nextVersionNumber,
+          drive_uploaded: driveUploaded,
+          drive_url: driveUrl,
+          new_questions_count: generated.new_questions?.length ?? 0,
+          tokens_used: tokensUsed,
+        });
+        controller.close();
+      } catch (err) {
+        send("error", {
+          error: "Regeneration failed",
+          detail: err instanceof Error ? err.message : String(err),
+        });
+        controller.close();
       }
-    } catch (err) {
-      // Non-fatal. Version row exists, content is in DB, UI will show preview.
-      console.error(
-        "Drive upload failed (non-fatal):",
-        err instanceof Error ? err.message : String(err)
-      );
-    }
-  }
+    },
+  });
 
-  // 7. Insert new questions
-  if (generated.new_questions.length > 0) {
-    const toInsert = generated.new_questions
-      .filter((q) => typeof q.question === "string" && q.question.trim().length > 0)
-      .map((q) => ({
-        artifact_id: id,
-        version_introduced: nextVersionNumber,
-        question: q.question.trim(),
-        rationale: q.rationale ?? null,
-        status: "open" as const,
-      }));
-    if (toInsert.length > 0) {
-      const { error: qInsErr } = await client.from("artifact_questions").insert(toInsert);
-      if (qInsErr) {
-        // Non-fatal — version is already saved; log and return partial success
-        console.error("new_questions insert failed:", qInsErr.message);
-      }
-    }
-  }
-
-  // 8. Update current_version_id pointer
-  const { error: updErr } = await client
-    .from("objective_artifacts")
-    .update({ current_version_id: newVersion.id, updated_at: new Date().toISOString() })
-    .eq("id", id);
-  if (updErr) {
-    console.error("current_version_id update failed:", updErr.message);
-  }
-
-  return NextResponse.json({
-    ok: true,
-    version: newVersion,
-    new_questions_count: generated.new_questions.length,
-    answers_used_count: answersUsed.length,
-    tokens_used: tokensUsed,
-    drive_uploaded: driveUploaded,
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/event-stream; charset=utf-8",
+      "Cache-Control": "no-cache, no-transform",
+      Connection: "keep-alive",
+      "X-Accel-Buffering": "no",
+    },
   });
 }
+
