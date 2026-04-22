@@ -113,6 +113,15 @@ type PeopleRow = {
   last_contact_date: string | null;
 };
 
+type HallAttendeeRow = {
+  email: string;
+  display_name: string | null;
+  relationship_class: string | null;
+  relationship_classes: string[] | null;
+  last_seen_at: string | null;
+  last_meeting_title: string | null;
+};
+
 function deriveTrustTier(p: PeopleRow): TrustTier {
   const cls = (p.person_classification ?? "").toLowerCase();
   const roles = (p.relationship_roles ?? "").toLowerCase();
@@ -121,6 +130,18 @@ function deriveTrustTier(p: PeopleRow): TrustTier {
   }
   const warmth = (p.contact_warmth ?? "").toLowerCase();
   if (warmth === "hot" || warmth === "warm") return "trusted";
+  return "external";
+}
+
+function deriveTrustTierFromHall(h: HallAttendeeRow): TrustTier {
+  const classes = new Set((h.relationship_classes ?? [])
+    .map(c => (c ?? "").toLowerCase()));
+  const primary = (h.relationship_class ?? "").toLowerCase();
+  classes.add(primary);
+  if (classes.has("team") || classes.has("family")) return "inner";
+  // Partner, Investor, Funder, Client, Portfolio, Vendor → trusted business relationship
+  const trustedClasses = ["partner", "investor", "funder", "client", "portfolio", "vendor"];
+  if (trustedClasses.some(c => classes.has(c))) return "trusted";
   return "external";
 }
 
@@ -155,10 +176,9 @@ async function resolveCounterpart(email: string): Promise<Counterpart> {
   const sb = getSupabaseServerClient();
   const lower = email.toLowerCase().trim();
 
-  // Strategy 1: exact email match
+  // Strategy 1: look up in people (Notion-synced, rich with roles/warmth/aliases)
   let row: PeopleRow | null = null;
   let method: Counterpart["resolution_method"] = "none";
-
   const byEmail = await sb
     .from("people")
     .select("id, notion_id, full_name, email, aliases, person_classification, relationship_roles, contact_warmth, last_contact_date")
@@ -166,8 +186,7 @@ async function resolveCounterpart(email: string): Promise<Counterpart> {
     .maybeSingle();
   if (byEmail.data) { row = byEmail.data as PeopleRow; method = "email"; }
 
-  // Strategy 2: local-part fuzzy (e.g. jo@morrama.com → look for "jo" in full_name)
-  // Only if Strategy 1 failed. Conservative: require local part >= 3 chars.
+  // Strategy 2: people fuzzy on local-part (e.g. jo@morrama.com → "jo" in full_name)
   if (!row) {
     const local = lower.split("@")[0].replace(/\./g, " ");
     if (local.length >= 3) {
@@ -180,6 +199,33 @@ async function resolveCounterpart(email: string): Promise<Counterpart> {
         row = fuzzy[0] as PeopleRow;
         method = "fuzzy_name";
       }
+    }
+  }
+
+  // Strategy 3: hall_attendees — calendar-derived contacts. Cristóbal lives
+  // here (Partner/VIP classified) but doesn't have a Notion contact record.
+  // Last-resort lookup so the prep-brief still knows who this person is.
+  if (!row) {
+    const { data: hallRow } = await sb
+      .from("hall_attendees")
+      .select("email, display_name, relationship_class, relationship_classes, last_seen_at, last_meeting_title, person_notion_id")
+      .eq("email", lower)
+      .maybeSingle();
+    if (hallRow) {
+      const h = hallRow as HallAttendeeRow & { person_notion_id: string | null };
+      return {
+        person_id:          null,  // no people.id for this tier
+        notion_id:          h.person_notion_id ?? null,
+        full_name:          h.display_name ?? lower,
+        email:              lower,
+        aliases:            [],
+        classification:     h.relationship_class ?? null,
+        relationship_roles: h.relationship_classes ?? [],
+        contact_warmth:     null,
+        last_contact_date:  h.last_seen_at,
+        trust_tier:         deriveTrustTierFromHall(h),
+        resolution_method:  "email",
+      };
     }
   }
 
@@ -396,14 +442,24 @@ async function fetchWhatsappSignal(cp: Counterpart): Promise<WhatsappSignal> {
     }
   }
 
-  // Path 2: fuzzy on sender_name against counterpart names/aliases
-  const nameCandidates = [cp.full_name, ...cp.aliases].filter(Boolean).map(n => n.toLowerCase());
-  if (nameCandidates.length === 0) return empty;
-
-  // Use ILIKE OR list — build a single query with `.or()`
-  const orClause = nameCandidates
-    .map(n => `sender_name.ilike.%${n.replace(/[,()]/g, "")}%`)
+  // Path 2: fuzzy on sender_name against counterpart names/aliases.
+  // Postgres ILIKE is accent-sensitive — "Cristobal" won't match "Cristóbal".
+  // So we OR ALL viable tokens (≥3 chars) rather than just the longest: the
+  // unaccented surname ("Correa") still matches even when the first-name
+  // token ("Cristobal") fails on the accent.
+  const nameCandidates = [cp.full_name, ...cp.aliases].filter(Boolean);
+  const tokenSet = new Set<string>();
+  for (const n of nameCandidates) {
+    for (const t of n.split(/[\s,.]+/).map(x => x.trim()).filter(x => x.length >= 3)) {
+      tokenSet.add(t.toLowerCase());
+    }
+  }
+  const tokens = [...tokenSet];
+  if (tokens.length === 0) return empty;
+  const orClause = tokens
+    .map(t => `sender_name.ilike.%${t.replace(/[,()%]/g, "")}%`)
     .join(",");
+
   const { data, error } = await sb
     .from("conversation_messages")
     .select("ts, direction, text, source_id, sender_name")

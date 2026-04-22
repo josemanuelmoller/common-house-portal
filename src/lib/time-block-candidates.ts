@@ -262,11 +262,13 @@ async function counterpartsWithPrepSignal(emails: string[]): Promise<Set<string>
   const ok = new Set<string>();
   if (emails.length === 0) return ok;
   const sb = getSupabaseServerClient();
+  const lowerEmails = emails.map(e => e.toLowerCase());
 
+  // 1. Check people table (Notion-synced contacts)
   const { data: people } = await sb
     .from("people")
     .select("id, email, person_classification, contact_warmth")
-    .in("email", emails.map(e => e.toLowerCase()));
+    .in("email", lowerEmails);
 
   const personIdByEmail = new Map<string, string>();
   for (const p of (people ?? []) as Array<{ id: string; email: string | null; person_classification: string | null; contact_warmth: string | null }>) {
@@ -280,22 +282,42 @@ async function counterpartsWithPrepSignal(emails: string[]): Promise<Set<string>
     }
   }
 
-  // For people not yet passing, check whether ANY WhatsApp messages are linked.
+  // 2. For people not yet passing, check WhatsApp FK-linked messages.
   const idsToCheck = [...personIdByEmail.entries()]
     .filter(([em]) => !ok.has(em))
     .map(([, id]) => id);
-  if (idsToCheck.length === 0) return ok;
+  if (idsToCheck.length > 0) {
+    const { data: waLinked } = await sb
+      .from("conversation_messages")
+      .select("sender_person_id")
+      .eq("platform", "whatsapp")
+      .in("sender_person_id", idsToCheck)
+      .limit(idsToCheck.length * 2);
+    const linkedIds = new Set((waLinked ?? []).map(r => (r as { sender_person_id: string | null }).sender_person_id).filter(Boolean) as string[]);
+    for (const [em, id] of personIdByEmail.entries()) {
+      if (linkedIds.has(id)) ok.add(em);
+    }
+  }
 
-  const { data: waLinked } = await sb
-    .from("conversation_messages")
-    .select("sender_person_id")
-    .eq("platform", "whatsapp")
-    .in("sender_person_id", idsToCheck)
-    .limit(idsToCheck.length * 2);
-
-  const linkedIds = new Set((waLinked ?? []).map(r => (r as { sender_person_id: string | null }).sender_person_id).filter(Boolean) as string[]);
-  for (const [em, id] of personIdByEmail.entries()) {
-    if (linkedIds.has(id)) ok.add(em);
+  // 3. Check hall_attendees — calendar-derived contacts classified by JMM.
+  //    A human-applied relationship_class (Partner / VIP / Investor / Team /
+  //    Client / Funder / Portfolio / Vendor) is strong evidence the counterpart
+  //    is prep-worthy, even if they don't have a Notion contact record.
+  const stillMissing = lowerEmails.filter(em => !ok.has(em));
+  if (stillMissing.length > 0) {
+    const { data: hallRows } = await sb
+      .from("hall_attendees")
+      .select("email, relationship_class, relationship_classes")
+      .in("email", stillMissing);
+    for (const h of (hallRows ?? []) as Array<{ email: string; relationship_class: string | null; relationship_classes: string[] | null }>) {
+      const primary = (h.relationship_class ?? "").toLowerCase();
+      const all     = (h.relationship_classes ?? []).map(c => (c ?? "").toLowerCase());
+      const anyClass = [primary, ...all].filter(Boolean);
+      const meaningful = anyClass.some(c =>
+        ["partner", "investor", "funder", "client", "portfolio", "vendor", "team", "vip"].includes(c)
+      );
+      if (meaningful) ok.add((h.email ?? "").toLowerCase());
+    }
   }
 
   return ok;
