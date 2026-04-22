@@ -1,9 +1,16 @@
 import Link from "next/link";
 import { Sidebar } from "@/components/Sidebar";
 import { MetricCard } from "@/components/MetricCard";
+import { ProposalActions } from "@/components/ProposalActions";
 import { NAV } from "../page";
 import { requireAdmin } from "@/lib/require-admin";
-import { getTree, type TreeNode } from "@/lib/knowledge-nodes";
+import {
+  getTree,
+  getRecentChangelog,
+  getPendingProposals,
+  parseSplitSuggestion,
+  type TreeNode,
+} from "@/lib/knowledge-nodes";
 
 function daysSince(iso: string | null): number | null {
   if (!iso) return null;
@@ -66,7 +73,11 @@ function TreeRow({ node, depth = 0 }: { node: TreeNode; depth?: number }) {
 export default async function KnowledgePage() {
   await requireAdmin();
 
-  const tree = await getTree();
+  const [tree, recentLog, proposals] = await Promise.all([
+    getTree(),
+    getRecentChangelog(7, 40),
+    getPendingProposals(),
+  ]);
 
   // Flatten to count leaves + totals
   const allFlat: TreeNode[] = [];
@@ -81,6 +92,10 @@ export default async function KnowledgePage() {
     const d = daysSince(n.last_evidence_at);
     return d !== null && d > 60;
   });
+
+  const appendsThisWeek = recentLog.filter(e => e.action === "APPEND").length;
+  const proposalsThisWeek = recentLog.filter(e => e.status === "proposed").length;
+  const ignoresThisWeek = recentLog.filter(e => e.action === "IGNORE").length;
 
   return (
     <div className="flex min-h-screen bg-[#EFEFEA]">
@@ -103,12 +118,134 @@ export default async function KnowledgePage() {
         <div className="px-8 py-6 space-y-6">
 
           {/* Metrics */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
             <MetricCard label="Nodes total"        value={allFlat.length}               />
             <MetricCard label="Leaf pages"         value={leaves.length}                 color="green" sub={`${leavesWithEvidence.length} con evidencia`} />
-            <MetricCard label="Citations"          value={totalCitations}                color="blue"  sub="veces leídas por agentes" />
+            <MetricCard label="New this week"      value={appendsThisWeek}               color={appendsThisWeek > 0 ? "green" : "default"} sub="APPENDs aplicados" />
+            <MetricCard label="Pending review"     value={proposals.length}              color={proposals.length > 0 ? "yellow" : "default"} sub="SPLIT / AMEND propuestos" />
             <MetricCard label="Stale (60d+)"       value={staleLeaves.length}            color={staleLeaves.length > 0 ? "yellow" : "default"} sub="hojas sin updates" />
           </div>
+
+          {/* Proposals — pending human review */}
+          {proposals.length > 0 && (
+            <div className="bg-white rounded-2xl border border-amber-200 overflow-hidden">
+              <div className="h-1 bg-amber-400" />
+              <div className="px-6 py-4 border-b border-[#EFEFEA] flex items-center justify-between">
+                <div>
+                  <h2 className="text-sm font-bold text-[#131218] tracking-tight">Pending proposals</h2>
+                  <p className="text-xs text-[#131218]/40 mt-0.5">
+                    El curator propuso crear nodos nuevos (SPLIT) o modificar contenido existente (AMEND). Necesitan tu ojo.
+                  </p>
+                </div>
+                <span className="text-[10px] font-bold bg-amber-100 text-amber-700 px-2.5 py-1 rounded-full uppercase tracking-widest">
+                  {proposals.length} pending
+                </span>
+              </div>
+              <div className="divide-y divide-[#EFEFEA]">
+                {proposals.map(p => {
+                  const split = p.action === "SPLIT" ? parseSplitSuggestion(p.reasoning) : null;
+                  return (
+                    <div key={p.id} className="px-6 py-4">
+                      <div className="flex items-start gap-3">
+                        <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-widest shrink-0 ${
+                          p.action === "SPLIT" ? "bg-purple-50 text-purple-700 border-purple-200"
+                          : "bg-orange-50 text-orange-700 border-orange-200"
+                        }`}>
+                          {p.action}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          {p.action === "SPLIT" && split ? (
+                            <p className="text-sm font-semibold text-[#131218]">
+                              <span className="text-[#131218]/40 font-mono text-xs">{split.path}</span>
+                              {" — "}
+                              {split.title}
+                            </p>
+                          ) : (
+                            <p className="text-sm font-semibold text-[#131218]">
+                              <Link href={`/admin/knowledge/${p.node_path}`} className="hover:underline">
+                                {p.node_title}
+                              </Link>
+                              {p.section && <span className="text-[#131218]/40 ml-2">→ {p.section}</span>}
+                            </p>
+                          )}
+                          <p className="text-[12px] text-[#131218]/60 mt-1 leading-relaxed">{p.reasoning}</p>
+                          {p.action === "AMEND" && p.diff_before && (
+                            <p className="text-[11px] text-red-600/70 bg-red-50/50 px-3 py-2 rounded-lg border border-red-100 mt-2 line-through">
+                              {p.diff_before}
+                            </p>
+                          )}
+                          {p.action === "AMEND" && p.diff_after && (
+                            <p className="text-[11px] text-green-700 bg-green-50/50 px-3 py-2 rounded-lg border border-green-100 mt-1">
+                              {p.diff_after}
+                            </p>
+                          )}
+                          <ProposalActions
+                            changelogId={p.id}
+                            action={p.action === "SPLIT" ? "SPLIT" : "AMEND"}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* What's new — recent curator activity across the tree */}
+          {recentLog.length > 0 && (
+            <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
+              <div className="h-1 bg-[#B2FF59]" />
+              <div className="px-6 py-4 border-b border-[#EFEFEA] flex items-center justify-between">
+                <div>
+                  <h2 className="text-sm font-bold text-[#131218] tracking-tight">What&apos;s new this week</h2>
+                  <p className="text-xs text-[#131218]/40 mt-0.5">
+                    Últimos cambios del curator: qué se agregó, dónde, con qué razón.
+                  </p>
+                </div>
+                <p className="text-[10px] text-[#131218]/30 font-bold uppercase tracking-widest">
+                  {appendsThisWeek} appended · {ignoresThisWeek} ignored · {proposalsThisWeek} proposed
+                </p>
+              </div>
+              <div className="divide-y divide-[#EFEFEA] max-h-[500px] overflow-y-auto">
+                {recentLog
+                  .filter(e => e.action !== "IGNORE")
+                  .slice(0, 30)
+                  .map(e => {
+                    const d = new Date(e.created_at);
+                    return (
+                      <Link
+                        key={e.id}
+                        href={`/admin/knowledge/${e.node_path}`}
+                        className="block px-6 py-3 hover:bg-[#EFEFEA]/40 transition-colors"
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="shrink-0 w-14 text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest pt-0.5">
+                            {d.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-widest ${
+                                e.action === "APPEND" ? "bg-green-50 text-green-700 border border-green-200"
+                                : e.action === "AMEND" ? "bg-orange-50 text-orange-700 border border-orange-200"
+                                : e.action === "SPLIT" ? "bg-purple-50 text-purple-700 border border-purple-200"
+                                : e.action === "CREATED" ? "bg-blue-50 text-blue-700 border border-blue-200"
+                                : "bg-[#EFEFEA] text-[#131218]/40"
+                              }`}>
+                                {e.action}
+                              </span>
+                              <span className="text-xs font-semibold text-[#131218]">{e.node_title}</span>
+                              {e.section && <span className="text-[10px] text-[#131218]/40">→ {e.section}</span>}
+                            </div>
+                            <p className="text-[12px] text-[#131218]/55 mt-1 line-clamp-2 leading-relaxed">{e.reasoning}</p>
+                          </div>
+                        </div>
+                      </Link>
+                    );
+                  })}
+              </div>
+            </div>
+          )}
 
           {/* Tree */}
           <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">

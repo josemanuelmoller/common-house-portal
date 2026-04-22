@@ -207,6 +207,133 @@ export async function updateNodeBody(
   }
 }
 
+/** Fetch recent changelog entries across the whole tree. Used for "What's new".
+ *  Joined with node title/path for render without extra client-side lookups. */
+export async function getRecentChangelog(
+  sinceDays = 7,
+  limit = 60,
+): Promise<Array<NodeChangelogEntry & { node_path: string; node_title: string }>> {
+  const sb = getSupabaseServerClient();
+  const since = new Date(Date.now() - sinceDays * 86_400_000).toISOString();
+  const { data, error } = await sb
+    .from("knowledge_node_changelog")
+    .select("*, knowledge_nodes!inner(path, title)")
+    .gte("created_at", since)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) {
+    console.error("[knowledge-nodes] getRecentChangelog:", error.message);
+    return [];
+  }
+  return (data as Array<NodeChangelogEntry & { knowledge_nodes: { path: string; title: string } }>)
+    .map(r => ({
+      ...r,
+      node_path: r.knowledge_nodes.path,
+      node_title: r.knowledge_nodes.title,
+    }));
+}
+
+/** Fetch pending proposals (status = "proposed") across the tree. */
+export async function getPendingProposals(): Promise<
+  Array<NodeChangelogEntry & { node_path: string; node_title: string }>
+> {
+  const sb = getSupabaseServerClient();
+  const { data, error } = await sb
+    .from("knowledge_node_changelog")
+    .select("*, knowledge_nodes!inner(path, title)")
+    .eq("status", "proposed")
+    .order("created_at", { ascending: false })
+    .limit(50);
+  if (error) {
+    console.error("[knowledge-nodes] getPendingProposals:", error.message);
+    return [];
+  }
+  return (data as Array<NodeChangelogEntry & { knowledge_nodes: { path: string; title: string } }>)
+    .map(r => ({
+      ...r,
+      node_path: r.knowledge_nodes.path,
+      node_title: r.knowledge_nodes.title,
+    }));
+}
+
+/** Parse SPLIT reasoning to extract the suggested new leaf path + title.
+ *  The curator writes reasoning as: "Proposed new leaf: <path> (<title>). ..." */
+export function parseSplitSuggestion(reasoning: string): { path: string; title: string } | null {
+  const m = reasoning.match(/Proposed new leaf:\s*([^\s]+)\s*\(([^)]+)\)/);
+  if (!m) return null;
+  return { path: m[1], title: m[2] };
+}
+
+/** Create a new leaf under a parent resolved from the proposed path.
+ *  Returns the new node id. */
+export async function createLeafFromPath(input: {
+  path: string;
+  title: string;
+  summary?: string;
+}): Promise<string | null> {
+  const sb = getSupabaseServerClient();
+
+  // Resolve parent by dropping the last segment
+  const parts = input.path.split("/");
+  if (parts.length < 2) {
+    console.error("[knowledge-nodes] createLeafFromPath: path too shallow", input.path);
+    return null;
+  }
+  const parentPath = parts.slice(0, -1).join("/");
+  const slug = parts[parts.length - 1];
+
+  const { data: parent } = await sb.from("knowledge_nodes")
+    .select("id, depth").eq("path", parentPath).maybeSingle();
+  if (!parent) {
+    console.error("[knowledge-nodes] createLeafFromPath: parent not found", parentPath);
+    return null;
+  }
+
+  const parentRow = parent as { id: string; depth: number };
+  const { data: created, error } = await sb.from("knowledge_nodes").insert({
+    path: input.path,
+    slug,
+    parent_id: parentRow.id,
+    depth: parentRow.depth + 1,
+    title: input.title,
+    summary: input.summary ?? "",
+    body_md: `## Overview\n\n_(Creado por propuesta SPLIT del curator — agrega contexto manualmente o deja que el curator la pueble con la siguiente pasada.)_\n\n## Available solutions\n\n_(Por construir.)_\n\n## How to implement\n\n_(Por construir.)_\n\n## Anti-patterns\n\n_(Por construir.)_\n\n## Case studies\n\n_(Por poblar.)_\n\n## Stakeholder concerns\n\n_(Preguntas y preocupaciones agrupadas por función.)_\n\n## References\n\n_(Por poblar.)_\n`,
+  }).select("id").single();
+
+  if (error) {
+    console.error("[knowledge-nodes] createLeafFromPath insert:", error.message);
+    return null;
+  }
+  return (created as { id: string }).id;
+}
+
+/** Mark a changelog entry as applied — used when accepting a proposal after
+ *  having performed the side-effect (create leaf, update body, etc). */
+export async function markChangelogApplied(changelogId: string): Promise<void> {
+  const sb = getSupabaseServerClient();
+  const { error } = await sb.from("knowledge_node_changelog").update({
+    status: "applied",
+    applied_at: new Date().toISOString(),
+  }).eq("id", changelogId);
+  if (error) {
+    console.error("[knowledge-nodes] markChangelogApplied:", error.message);
+    throw error;
+  }
+}
+
+/** Mark a changelog entry as rejected. */
+export async function markChangelogRejected(changelogId: string): Promise<void> {
+  const sb = getSupabaseServerClient();
+  const { error } = await sb.from("knowledge_node_changelog").update({
+    status: "rejected",
+    applied_at: new Date().toISOString(),
+  }).eq("id", changelogId);
+  if (error) {
+    console.error("[knowledge-nodes] markChangelogRejected:", error.message);
+    throw error;
+  }
+}
+
 /** Mark a node as reviewed by a human — resets the "stale" clock. */
 export async function markReviewed(id: string): Promise<void> {
   const sb = getSupabaseServerClient();
@@ -360,8 +487,10 @@ function normaliseForFuzzy(text: string): string {
 }
 
 /** Bag-of-tokens overlap after normalisation. Returns true when the new bullet
- *  matches an existing one with ≥70% token overlap AND the existing one is at
- *  least 30 characters (to avoid flagging short bullets like "- note"). */
+ *  matches an existing one with ≥60% token overlap AND the existing one is at
+ *  least 30 characters (to avoid flagging short bullets like "- note").
+ *  Threshold tuned to catch paraphrases like "lowest tooling cost" vs
+ *  "lowest tooling investment" that kept slipping through. */
 function isFuzzyDuplicate(body: string, newBullet: string): boolean {
   const newNorm = normaliseForFuzzy(newBullet);
   const newTokens = new Set(newNorm.split(" ").filter(t => t.length >= 4));
@@ -377,7 +506,7 @@ function isFuzzyDuplicate(body: string, newBullet: string): boolean {
     let overlap = 0;
     for (const t of newTokens) if (existingTokens.has(t)) overlap++;
     const smaller = Math.min(newTokens.size, existingTokens.size);
-    if (overlap / smaller >= 0.7) return true;
+    if (overlap / smaller >= 0.6) return true;
   }
   return false;
 }
