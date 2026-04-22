@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 
 /**
  * Inline button that re-runs the LinkedIn enrichment agent for a single
- * person. Bypasses the 14-day cooldown. Used on the contact profile page.
+ * person. Bypasses the 6-month cooldown. Used on the contact profile page.
  */
 export function ReEnrichButton({ personId }: { personId: string }) {
   const router = useRouter();

@@ -2,7 +2,7 @@
  * POST /api/linkedin-enrichment/re-enrich
  *
  * Force a fresh enrichment run for a single `people` row, bypassing the
- * 14-day cooldown. Used by the "Re-enrich" button on the contact profile.
+ * 6-month cooldown. Used by the "Re-enrich" button on the contact profile.
  *
  * Body: { person_id?: string, email?: string }   (one of the two required)
  *

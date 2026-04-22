@@ -60,7 +60,11 @@ async function authCheck(req: NextRequest): Promise<boolean> {
 
 const AUTO_APPLY_THRESHOLD = 0.8;
 const REVIEW_THRESHOLD     = 0.4;
-const COOLDOWN_DAYS        = 14;
+// 6 months. LinkedIn profiles change rarely (avg tenure 3-4 years), so daily
+// or biweekly re-enrichment wastes tokens. The Re-enrich button on a
+// contact's profile always bypasses this, and the weekly cron just rolls
+// through the backlog of unenriched contacts until it's empty.
+const COOLDOWN_DAYS        = 180;
 
 type QueueRow = {
   id:                       string;

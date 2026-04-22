@@ -80,7 +80,7 @@ export function LinkedInReviewBoard({ rows }: { rows: Row[] }) {
           <p className="text-[12.5px] font-semibold text-[#131218]">Run enrichment now</p>
           <p className="text-[10.5px] text-[#131218]/50 mt-0.5">
             Scans contacts without a LinkedIn URL, searches Google Custom Search, and asks Haiku to confirm.
-            Cooldown: 14 days between attempts per contact.
+            Cooldown: 6 months between attempts per contact (LinkedIn profiles rarely change).
           </p>
         </div>
         <button
