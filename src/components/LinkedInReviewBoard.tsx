@@ -49,7 +49,16 @@ type RunSummary = {
   skipped:       number;
 };
 
-export function LinkedInReviewBoard({ rows }: { rows: Row[] }) {
+export type LinkedInCoverage = {
+  total:        number;   // addressable contacts (has email + not dismissed)
+  filled:       number;   // have a LinkedIn URL
+  manual:       number;   // filled, source=manual
+  auto:         number;   // filled, source=agent
+  needs_review: number;   // flagged for human
+  attempted:    number;   // agent has tried (enriched OR filed no_match)
+};
+
+export function LinkedInReviewBoard({ rows, coverage }: { rows: Row[]; coverage?: LinkedInCoverage }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [running, setRunning] = useState(false);
@@ -98,6 +107,58 @@ export function LinkedInReviewBoard({ rows }: { rows: Row[] }) {
           {running ? "Running…" : "Run 25"}
         </button>
       </div>
+
+      {coverage && coverage.total > 0 && (
+        <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-4">
+          <div className="flex items-baseline justify-between gap-4 mb-2">
+            <p className="text-[10px] font-bold tracking-widest uppercase text-[#131218]/45">Coverage</p>
+            <p className="text-[11px] text-[#131218]/60 tabular-nums">
+              <strong className="text-[#131218]">{coverage.filled}</strong>
+              <span className="text-[#131218]/40"> / {coverage.total} contacts</span>
+              <span className="text-[#131218]/40 ml-2">· </span>
+              <strong className="text-[#131218]">{Math.round((coverage.filled / coverage.total) * 100)}%</strong>
+            </p>
+          </div>
+          <div className="h-2 w-full bg-[#EFEFEA] rounded-full overflow-hidden flex">
+            {coverage.auto > 0 && (
+              <div
+                className="h-full bg-[#c8f55a]"
+                style={{ width: `${(coverage.auto / coverage.total) * 100}%` }}
+                title={`${coverage.auto} auto-applied`}
+              />
+            )}
+            {coverage.manual > 0 && (
+              <div
+                className="h-full bg-[#131218]"
+                style={{ width: `${(coverage.manual / coverage.total) * 100}%` }}
+                title={`${coverage.manual} manual`}
+              />
+            )}
+            {coverage.needs_review > 0 && (
+              <div
+                className="h-full bg-amber-400"
+                style={{ width: `${(coverage.needs_review / coverage.total) * 100}%` }}
+                title={`${coverage.needs_review} need review`}
+              />
+            )}
+          </div>
+          <div className="flex items-center gap-4 mt-2 text-[10px] text-[#131218]/55">
+            <span className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-[#c8f55a]" /> Auto · <strong>{coverage.auto}</strong>
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-[#131218]" /> Manual · <strong>{coverage.manual}</strong>
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-amber-400" /> Needs review · <strong>{coverage.needs_review}</strong>
+            </span>
+            <span className="ml-auto text-[#131218]/40">
+              {coverage.attempted - coverage.filled} tried but no match ·{" "}
+              {coverage.total - coverage.attempted} not yet attempted
+            </span>
+          </div>
+        </div>
+      )}
 
       {runError && (
         <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-[11px] text-red-700">
