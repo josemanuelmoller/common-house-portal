@@ -154,7 +154,7 @@ export async function GET(_req: NextRequest) {
     const attendeeLookup = await loadAttendeeClasses(attendeeEmails);
     void observeAttendees([...upcoming, ...recent]);
 
-    const prepCands      = candidatesFromMeetings(upcoming, now, attendeeLookup);
+    const prepCands      = await candidatesFromMeetings(upcoming, now, attendeeLookup);
     const followUpCands  = candidatesFromRecentMeetings(recent, now, attendeeLookup);
 
     // Fingerprint blacklist: dismissed in last 24h, snoozed until future

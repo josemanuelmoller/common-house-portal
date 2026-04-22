@@ -39,7 +39,7 @@ export type ValidationIssue = {
 
 export function validateProse(prose: BriefProse, fact: FactSheet): { passed: boolean; issues: ValidationIssue[] } {
   const issues: ValidationIssue[] = [];
-  const fields: (keyof BriefProse)[] = ["suggested_angle", "agenda_outline", "risks", "opening_line"];
+  const fields: (keyof BriefProse)[] = ["prep_actions", "key_context", "opener"];
 
   // Build allowed relative-time phrases (from fact sheet itself)
   const allowedPhrases: string[] = [];

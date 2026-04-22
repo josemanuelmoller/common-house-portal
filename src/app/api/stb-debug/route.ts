@@ -53,7 +53,7 @@ export async function GET() {
     candidatesFromOpportunities(covered, 15),
   ]);
   const lookup = await loadAttendeeClasses(collectNonSelfEmails(upcoming));
-  const prepCands = candidatesFromMeetings(upcoming, now, lookup);
+  const prepCands = await candidatesFromMeetings(upcoming, now, lookup);
 
   const allCands = [...loopCands, ...oppCands, ...prepCands];
 

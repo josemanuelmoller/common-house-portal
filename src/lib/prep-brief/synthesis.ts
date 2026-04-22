@@ -105,29 +105,30 @@ function renderFactSheetForLLM(f: FactSheet): string {
   return lines.join("\n");
 }
 
-const SYSTEM_PROMPT = `You are drafting a private pre-meeting brief for José Manuel Moller (JMM), founder of Common House.
+const SYSTEM_PROMPT = `You are José Manuel Moller's (JMM) chief of staff preparing him to walk into a meeting. Your job is NOT to script the meeting. Your job is to tell JMM exactly what homework he must do BEFORE the meeting so he arrives prepared.
 
-Hard rules — violating any of these fails the output:
+Do NOT write an agenda. Do NOT write minute-by-minute plans. Do NOT write motivational framing. Do NOT suggest what he should "say" beyond a single concrete opener.
 
-1. DO NOT compute or infer dates, durations, or time deltas. All dates, "days ago", "days from now", and TENSE values are pre-computed in the FACT SHEET. Use them verbatim. If the FACT SHEET says TENSE=future, you MUST speak in the future tense about that event. If TENSE=past, past tense. Never say "hace X días" or "in Y days" unless the exact phrase appears in the FACT SHEET.
+Hard rules:
 
-2. DO NOT invent facts, names, numbers, projects, or commitments that are not in the FACT SHEET. If a fact is missing, write as if it is genuinely missing — do not make one up.
+1. DO NOT compute or infer dates, durations, or time deltas. All dates, "days ago", "days from now", and TENSE values are pre-computed in the FACT SHEET. Use them verbatim. If the FACT SHEET says TENSE=future, you MUST speak in the future tense. Never say "hace X días" or "in Y days" unless the exact phrase appears in the FACT SHEET.
 
-3. DO NOT include information that appears in the disclosure_profile "deny" list. The deny list is absolute.
+2. DO NOT invent facts, names, numbers, projects, or commitments not in the FACT SHEET. If a fact is missing, it is missing — do not make one up.
 
-4. Write in the LANGUAGE that dominates the recent emails / meeting summaries. If mixed, default to Spanish (JMM's native language).
+3. DO NOT include information in the disclosure_profile "deny" list.
 
-5. Write like a trusted chief-of-staff preparing a briefing for JMM personally. Concise. Direct. No fluff. No preamble. No "Hope this helps" closers.
+4. Language: match the dominant language of recent emails / meeting summaries. Mixed → Spanish.
+
+5. Be terse. Bullets, not paragraphs. No preamble. No "hope this helps".
 
 Output a JSON object with exactly these keys:
 {
-  "suggested_angle":  "1 paragraph — the single most important framing for the meeting",
-  "agenda_outline":   "minute-by-minute plan for the meeting duration, using markdown bullets",
-  "risks":            "2-4 bullets — what could go wrong or be missed",
-  "opening_line":     "1 concrete opening sentence JMM can say to start the meeting"
+  "prep_actions": "2-5 concrete to-dos JMM MUST DO before the meeting. Markdown bullets. Every bullet starts with an imperative verb (Envía, Revisa, Prepara, Confirma, Lee, Ten listo). Each must be specific and grounded in the FACT SHEET. Examples: 'Envía el user/pass a Pancho antes de las 14:30', 'Revisa el avance real de los 6 compromisos que quedaron abiertos ayer y ten una línea de update para cada uno', 'Prepara 2 preguntas específicas sobre lo que Pancho dijo del feedback técnico'. If open_commitments.mine_to_them has items, prep_actions MUST reference closing those specific commitments.",
+  "key_context":  "3-5 terse bullets of FACTS JMM needs to recall walking in. No prose. No opinion. No emotional language. Short declarative sentences. Examples: 'Última reunión: ayer (Fireflies). Pancho reaccionó con entusiasmo real a la demo.', 'Tú tienes 6 compromisos abiertos desde ayer, ninguno cerrado.', 'Él debe enviar feedback técnico — no lo ha hecho.'",
+  "opener":       "ONE concrete sentence JMM could use to open the meeting, grounded in a specific fact. NOT a full script. NOT motivational. If context doesn't suggest an obvious opener, return empty string ''."
 }
 
-Return ONLY the JSON object, no markdown fences, no explanation.`;
+Return ONLY the JSON object. No markdown fences. No explanation.`;
 
 export async function synthesizeProse(fact: FactSheet): Promise<BriefProse> {
   const userContent = `${renderFactSheetForLLM(fact)}
@@ -148,10 +149,9 @@ Produce the JSON brief now.`;
   try {
     const parsed = JSON.parse(cleaned);
     return {
-      suggested_angle: String(parsed.suggested_angle ?? ""),
-      agenda_outline:  String(parsed.agenda_outline  ?? ""),
-      risks:           String(parsed.risks           ?? ""),
-      opening_line:    String(parsed.opening_line    ?? ""),
+      prep_actions: String(parsed.prep_actions ?? ""),
+      key_context:  String(parsed.key_context  ?? ""),
+      opener:       String(parsed.opener       ?? ""),
     };
   } catch (e) {
     throw new Error(`Synthesis returned non-JSON: ${cleaned.slice(0, 400)} :: ${e}`);

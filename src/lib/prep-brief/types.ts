@@ -149,10 +149,12 @@ export type FactSheet = {
 };
 
 export type BriefProse = {
-  suggested_angle: string;
-  agenda_outline: string;              // minute-by-minute plan
-  risks: string;
-  opening_line: string;                 // suggested opener
+  /** 2-5 concrete to-dos JMM must do BEFORE the meeting. Markdown bullets. */
+  prep_actions: string;
+  /** 3-5 bullets of facts JMM needs to recall. Terse, not prose. */
+  key_context:  string;
+  /** Single sentence opener JMM can use. Empty when no strong hook. */
+  opener:       string;
 };
 
 export type Brief = {

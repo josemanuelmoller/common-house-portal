@@ -243,12 +243,81 @@ export async function candidatesFromOpportunities(
 
 // ─── Meetings → Prep + Follow-up Candidates ─────────────────────────────────
 
-export function candidatesFromMeetings(
+/**
+ * Signal gate: for each attendee email, returns whether the counterpart has
+ * enough historical signal that a prep brief would produce something useful.
+ * Bar is intentionally low — we only want to suppress the "total strangers
+ * with 2 emails" case. Passing the gate doesn't guarantee a great brief, it
+ * guarantees it won't be generic.
+ *
+ * Pass conditions (ANY one is enough):
+ *   - person_classification = Internal (founders, team — always prep-worthy)
+ *   - contact_warmth = Hot or Warm
+ *   - At least 1 WhatsApp message exists in conversation_messages FK'd to
+ *     this person_id
+ *
+ * Fail: external contact with no WA history, no warmth mark, not internal.
+ */
+async function counterpartsWithPrepSignal(emails: string[]): Promise<Set<string>> {
+  const ok = new Set<string>();
+  if (emails.length === 0) return ok;
+  const sb = getSupabaseServerClient();
+
+  const { data: people } = await sb
+    .from("people")
+    .select("id, email, person_classification, contact_warmth")
+    .in("email", emails.map(e => e.toLowerCase()));
+
+  const personIdByEmail = new Map<string, string>();
+  for (const p of (people ?? []) as Array<{ id: string; email: string | null; person_classification: string | null; contact_warmth: string | null }>) {
+    const em = (p.email ?? "").toLowerCase();
+    if (!em) continue;
+    personIdByEmail.set(em, p.id);
+    const cls = (p.person_classification ?? "").toLowerCase();
+    const warmth = (p.contact_warmth ?? "").toLowerCase();
+    if (cls === "internal" || warmth === "hot" || warmth === "warm") {
+      ok.add(em);
+    }
+  }
+
+  // For people not yet passing, check whether ANY WhatsApp messages are linked.
+  const idsToCheck = [...personIdByEmail.entries()]
+    .filter(([em]) => !ok.has(em))
+    .map(([, id]) => id);
+  if (idsToCheck.length === 0) return ok;
+
+  const { data: waLinked } = await sb
+    .from("conversation_messages")
+    .select("sender_person_id")
+    .eq("platform", "whatsapp")
+    .in("sender_person_id", idsToCheck)
+    .limit(idsToCheck.length * 2);
+
+  const linkedIds = new Set((waLinked ?? []).map(r => (r as { sender_person_id: string | null }).sender_person_id).filter(Boolean) as string[]);
+  for (const [em, id] of personIdByEmail.entries()) {
+    if (linkedIds.has(id)) ok.add(em);
+  }
+
+  return ok;
+}
+
+export async function candidatesFromMeetings(
   meetings: UpcomingMeeting[],
   now: Date,
   lookup: AttendeeLookup = new Map(),
-): Candidate[] {
+): Promise<Candidate[]> {
   const out: Candidate[] = [];
+
+  // Pre-compute prep-signal gate for all non-self attendees across all meetings
+  // in one batch, so we don't make per-meeting DB calls.
+  const allAttendeeEmails = new Set<string>();
+  for (const m of meetings) {
+    for (const a of m.attendees) {
+      if (!a.self && a.email) allAttendeeEmails.add(a.email.toLowerCase());
+    }
+  }
+  const prepWorthy = await counterpartsWithPrepSignal([...allAttendeeEmails]);
+
   for (const m of meetings) {
     const msUntil = m.start.getTime() - now.getTime();
     const daysUntil = msUntil / 86_400_000;
@@ -270,8 +339,16 @@ export function candidatesFromMeetings(
     const isMultiParty      = cls.confirmed_count + cls.tentative_count >= 3;
     const hasContext        = hasDescription || cls.has_vip || isMultiParty;
 
-    // Prep candidate: needed if meeting is in next 3 days and has attendees
-    if (daysUntil <= 3 && hasContext) {
+    // Signal gate: at least one non-self attendee must pass the prep-signal
+    // check. External contacts with no WA / no warmth / no internal tag will
+    // produce a generic brief — skip the card altogether so JMM isn't asked
+    // to prep for contacts the system has nothing real to say about.
+    const nonSelf = m.attendees.filter(a => !a.self && a.email);
+    const hasSignal = nonSelf.some(a => prepWorthy.has(a.email.toLowerCase()));
+
+    // Prep candidate: needed if meeting is in next 3 days, has attendees, AND
+    // we actually have signal on at least one of them.
+    if (daysUntil <= 3 && hasContext && hasSignal) {
       // VIP boost: any non-self attendee in Investor / Funder / Portfolio
       const baseUrgency = daysUntil <= 1 ? 85 : 70;
       const vipBoost    = cls.has_vip ? 15 : 0;
@@ -296,7 +373,7 @@ export function candidatesFromMeetings(
         urgency_score:    urgency,
         confidence_score: 80,
         why_now:          whyParts.join(" · ") + ".",
-        expected_outcome: `Agenda + 3 desired outcomes + open questions written into the meeting notes.`,
+        expected_outcome: `Review open commitments with counterpart; walk in with prep actions decided.`,
         fingerprint:      `meeting_prep:${m.id}:prep`,
         hard_time_constraint: { kind: "before", reference: m.start, withinMs: 24 * 3600_000 },
       });

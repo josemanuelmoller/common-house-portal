@@ -25,7 +25,7 @@ export async function generatePrepBrief(opts: {
   if (opts.factsOnly) {
     return {
       fact_sheet: fact,
-      prose: { suggested_angle: "", agenda_outline: "", risks: "", opening_line: "" },
+      prose: { prep_actions: "", key_context: "", opener: "" },
       validation: { passed: true, issues: [] },
     };
   }

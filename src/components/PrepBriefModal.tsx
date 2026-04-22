@@ -17,10 +17,9 @@
 import { useEffect, useRef, useState } from "react";
 
 type BriefProse = {
-  suggested_angle: string;
-  agenda_outline:  string;
-  risks:           string;
-  opening_line:    string;
+  prep_actions: string;
+  key_context:  string;
+  opener:       string;
 };
 
 type OpenCommitment = {
@@ -208,24 +207,19 @@ function BriefBody({
 
   return (
     <div className="space-y-5">
-      {/* Opening line — most actionable, goes first */}
-      <Section label="Opening line" emphasis>
-        <p className="text-[12px] italic text-[#131218]/90 leading-relaxed">“{prose.opening_line}”</p>
+      {/* Prep actions — the primary output: what JMM must do before the meeting */}
+      <Section label="Do before the meeting" emphasis>
+        <Markdown text={prose.prep_actions} onDark />
       </Section>
 
-      <Section label="Suggested angle">
-        <p className="text-[11.5px] text-[#131218]/80 leading-relaxed">{prose.suggested_angle}</p>
-      </Section>
+      {/* Key context — terse facts to recall, no prose */}
+      {prose.key_context && (
+        <Section label="Key context">
+          <Markdown text={prose.key_context} />
+        </Section>
+      )}
 
-      <Section label="Agenda outline">
-        <Markdown text={prose.agenda_outline} />
-      </Section>
-
-      <Section label="Risks">
-        <Markdown text={prose.risks} />
-      </Section>
-
-      {/* Commitments — structured facts, not prose */}
+      {/* Commitments — structured facts, not prose. Keep — these drive the prep actions. */}
       {fact_sheet.open_commitments.length > 0 && (
         <Section label={`Open commitments (${fact_sheet.open_commitments.length})`}>
           <ul className="space-y-1.5">
@@ -245,6 +239,13 @@ function BriefBody({
               </li>
             ))}
           </ul>
+        </Section>
+      )}
+
+      {/* Opener — only when the LLM found a strong, concrete one */}
+      {prose.opener && prose.opener.trim().length > 0 && (
+        <Section label="Opener (optional)">
+          <p className="text-[11.5px] italic text-[#131218]/70 leading-relaxed">“{prose.opener}”</p>
         </Section>
       )}
 
@@ -296,10 +297,12 @@ function Section({ label, emphasis, children }: { label: string; emphasis?: bool
 }
 
 /** Minimal markdown: bullets and bold only. No external dep. */
-function Markdown({ text }: { text: string }) {
+function Markdown({ text, onDark }: { text: string; onDark?: boolean }) {
   const lines = text.split(/\r?\n/);
+  const textColor = onDark ? "text-white/90" : "text-[#131218]/80";
+  const bulletColor = onDark ? "text-[#c8f55a]" : "text-[#131218]/30";
   return (
-    <div className="space-y-1 text-[11.5px] text-[#131218]/80 leading-relaxed">
+    <div className={`space-y-1.5 text-[11.5px] ${textColor} leading-relaxed`}>
       {lines.map((line, i) => {
         const trimmed = line.trim();
         if (!trimmed) return null;
@@ -307,21 +310,22 @@ function Markdown({ text }: { text: string }) {
           const content = trimmed.replace(/^[-*]\s+/, "");
           return (
             <div key={i} className="flex gap-2">
-              <span className="text-[#131218]/30 mt-0.5">•</span>
-              <span dangerouslySetInnerHTML={{ __html: boldify(content) }} />
+              <span className={`${bulletColor} mt-0.5 shrink-0`}>•</span>
+              <span dangerouslySetInnerHTML={{ __html: boldify(content, onDark) }} />
             </div>
           );
         }
-        return <p key={i} dangerouslySetInnerHTML={{ __html: boldify(trimmed) }} />;
+        return <p key={i} dangerouslySetInnerHTML={{ __html: boldify(trimmed, onDark) }} />;
       })}
     </div>
   );
 }
 
-function boldify(s: string): string {
+function boldify(s: string, onDark?: boolean): string {
+  const strongClass = onDark ? "text-white font-semibold" : "text-[#131218] font-semibold";
   return s
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
-    .replace(/\*\*(.+?)\*\*/g, '<strong class="text-[#131218] font-semibold">$1</strong>');
+    .replace(/\*\*(.+?)\*\*/g, `<strong class="${strongClass}">$1</strong>`);
 }
