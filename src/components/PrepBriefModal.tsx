@@ -17,8 +17,8 @@
 import { useEffect, useRef, useState } from "react";
 
 type BriefProse = {
+  briefing:     string;
   prep_actions: string;
-  key_context:  string;
   opener:       string;
 };
 
@@ -207,19 +207,12 @@ function BriefBody({
 
   return (
     <div className="space-y-5">
-      {/* Prep actions — the primary output: what JMM must do before the meeting */}
-      <Section label="Do before the meeting" emphasis>
-        <Markdown text={prose.prep_actions} onDark />
+      {/* Briefing — the primary output: conclusions the system drew. */}
+      <Section label="Briefing — what we found out for you" emphasis>
+        <Markdown text={prose.briefing} onDark />
       </Section>
 
-      {/* Key context — terse facts to recall, no prose */}
-      {prose.key_context && (
-        <Section label="Key context">
-          <Markdown text={prose.key_context} />
-        </Section>
-      )}
-
-      {/* Commitments — structured facts, not prose. Keep — these drive the prep actions. */}
+      {/* Open commitments — structured facts. Always useful when present. */}
       {fact_sheet.open_commitments.length > 0 && (
         <Section label={`Open commitments (${fact_sheet.open_commitments.length})`}>
           <ul className="space-y-1.5">
@@ -239,6 +232,13 @@ function BriefBody({
               </li>
             ))}
           </ul>
+        </Section>
+      )}
+
+      {/* Prep actions — only if there's genuine Jose-only work. Empty is fine. */}
+      {prose.prep_actions && prose.prep_actions.trim().length > 0 && (
+        <Section label="Only you can do">
+          <Markdown text={prose.prep_actions} />
         </Section>
       )}
 

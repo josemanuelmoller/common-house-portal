@@ -149,10 +149,17 @@ export type FactSheet = {
 };
 
 export type BriefProse = {
-  /** 2-5 concrete to-dos JMM must do BEFORE the meeting. Markdown bullets. */
+  /** 3-6 bullets of CONCLUSIONS the system drew from the fact sheet.
+   *  Facts and analysis, not tasks. This is the chief-of-staff's research
+   *  output: who the counterpart is, status of the relationship, what the
+   *  recent signals say. Never "Revisa X" — always "X is Y, and Z happened". */
+  briefing:     string;
+  /** 0-3 bullets of things JMM MUST DECIDE or CREATE that cannot be done by
+   *  reading. Acceptable verbs: Decide, Crea, Prepara (algo nuevo), Lleva
+   *  listo, Envía. BANNED: Revisa, Lee, Confirma, Entiende — those are the
+   *  system's job and belong in briefing. Empty string if nothing Jose-only
+   *  is required. An empty prep_actions is correct when the briefing is enough. */
   prep_actions: string;
-  /** 3-5 bullets of facts JMM needs to recall. Terse, not prose. */
-  key_context:  string;
   /** Single sentence opener JMM can use. Empty when no strong hook. */
   opener:       string;
 };

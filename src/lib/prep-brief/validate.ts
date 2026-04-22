@@ -31,15 +31,19 @@ const DISCLOSURE_KEYWORDS: Record<string, RegExp[]> = {
 
 export type ValidationIssue = {
   severity: "block" | "warn";
-  kind:     "relative_time" | "disclosure" | "invented_event";
+  kind:     "relative_time" | "disclosure" | "invented_event" | "delegating_verb";
   field:    keyof BriefProse;
   match:    string;
   note:     string;
 };
 
+// Verbs that delegate research back to JMM. These belong in briefing (as
+// conclusions the system already drew), NOT in prep_actions.
+const DELEGATING_VERBS = /^\s*[-*•]?\s*(Revisa|Lee|Confirma|Entiende|Investiga|Verifica|Repasa|Chequea|Lee\b)\b/im;
+
 export function validateProse(prose: BriefProse, fact: FactSheet): { passed: boolean; issues: ValidationIssue[] } {
   const issues: ValidationIssue[] = [];
-  const fields: (keyof BriefProse)[] = ["prep_actions", "key_context", "opener"];
+  const fields: (keyof BriefProse)[] = ["briefing", "prep_actions", "opener"];
 
   // Build allowed relative-time phrases (from fact sheet itself)
   const allowedPhrases: string[] = [];
@@ -88,7 +92,24 @@ export function validateProse(prose: BriefProse, fact: FactSheet): { passed: boo
       }
     }
 
-    // 3. Invented personal-event tenses — if text says "el maratón fue" but
+    // 3. Delegating verbs in prep_actions — Revisa/Lee/Confirma etc. belong
+    //    in briefing, not in prep_actions. One bullet per line check.
+    if (field === "prep_actions") {
+      for (const line of text.split(/\r?\n/)) {
+        const m = DELEGATING_VERBS.exec(line);
+        if (m) {
+          issues.push({
+            severity: "warn",
+            kind:     "delegating_verb",
+            field,
+            match:    m[1],
+            note:     `"${m[1]}" belongs in briefing (system researches, presents conclusions). prep_actions should only contain Decide / Crea / Prepara / Lleva listo / Envía.`,
+          });
+        }
+      }
+    }
+
+    // 4. Invented personal-event tenses — if text says "el maratón fue" but
     //    the event tense is "future", flag. Very light heuristic.
     for (const e of fact.personal_events) {
       const keyword = e.event.slice(0, 18).toLowerCase();
