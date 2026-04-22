@@ -72,6 +72,20 @@ export function WaOnlyContactRow({
   const [classes, setClasses]         = useState<string[]>(contact.relationship_classes ?? []);
   const [pending, startTransition]    = useTransition();
 
+  // Profile form (4th panel — "make this a full contact").
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profile, setProfile] = useState({
+    email:        "",
+    full_name:    contact.full_name ?? contact.display_name ?? "",
+    display_name: contact.display_name ?? "",
+    linkedin:     "",
+    job_title:    "",
+    phone:        "",
+    notes:        "",
+  });
+  const [profileConflict, setProfileConflict] = useState<{ full_name: string | null; display_name: string | null; email: string } | null>(null);
+
   const display = displayFor(contact);
   const initial = display.slice(0, 1).toUpperCase();
 
@@ -110,6 +124,48 @@ export function WaOnlyContactRow({
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       setLoading(false);
+    }
+  }
+
+  async function saveProfile() {
+    setProfileSaving(true);
+    setProfileConflict(null);
+    setError(null);
+    try {
+      // Only send fields the user actually filled in. An empty string means
+      // "don't touch this field" (except for email, which we want to clear if
+      // left empty — but we won't clear email here, we only set it from null).
+      const payload: Record<string, string | null> = { person_id: contact.id };
+      if (profile.email.trim())        payload.email        = profile.email.trim();
+      if (profile.full_name.trim())    payload.full_name    = profile.full_name.trim();
+      if (profile.display_name.trim()) payload.display_name = profile.display_name.trim();
+      if (profile.linkedin.trim())     payload.linkedin     = profile.linkedin.trim();
+      if (profile.job_title.trim())    payload.job_title    = profile.job_title.trim();
+      if (profile.phone.trim())        payload.phone        = profile.phone.trim();
+      if (profile.notes.trim())        payload.notes        = profile.notes.trim();
+      if (Object.keys(payload).length <= 1) {
+        throw new Error("Add at least one field before saving");
+      }
+
+      const res = await fetch(`/api/hall-contacts/profile`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json();
+      if (res.status === 409 && json.conflict_with) {
+        setProfileConflict(json.conflict_with);
+        throw new Error("That email already belongs to another contact. Merge instead?");
+      }
+      if (!res.ok) throw new Error(json.error ?? "profile update failed");
+
+      // Success: tell the server to re-render the page. If an email was added,
+      // the row graduates from WA-only → All contacts on refresh.
+      startTransition(() => router.refresh());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setProfileSaving(false);
     }
   }
 
@@ -292,10 +348,100 @@ export function WaOnlyContactRow({
               Tagging a WA-only contact is fine — Google Contacts sync is skipped until you add an email.
             </p>
           </section>
+
+          {/* ─── Make it a full contact ─── */}
+          <section>
+            <button
+              onClick={() => setProfileOpen(v => !v)}
+              className="text-[10px] font-bold tracking-widest uppercase text-[#131218]/60 hover:text-[#131218] flex items-center gap-2"
+            >
+              ✨ Make them a full contact
+              <span className={`text-[8px] opacity-40 transition-transform ${profileOpen ? "rotate-180" : ""}`}>▾</span>
+            </button>
+            {profileOpen && (
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <Input label="Email"        value={profile.email}        onChange={v => setProfile(p => ({ ...p, email: v }))}        placeholder="nacho@rivera.com"  type="email" />
+                <Input label="Full name"    value={profile.full_name}    onChange={v => setProfile(p => ({ ...p, full_name: v }))}    placeholder="Nacho Rivera" />
+                <Input label="LinkedIn"     value={profile.linkedin}     onChange={v => setProfile(p => ({ ...p, linkedin: v }))}     placeholder="linkedin.com/in/…" />
+                <Input label="Job title"    value={profile.job_title}    onChange={v => setProfile(p => ({ ...p, job_title: v }))}    placeholder="CEO at …" />
+                <Input label="Phone"        value={profile.phone}        onChange={v => setProfile(p => ({ ...p, phone: v }))}        placeholder="+56 9 …" />
+                <Input label="Display name" value={profile.display_name} onChange={v => setProfile(p => ({ ...p, display_name: v }))} placeholder="(how it appears)" />
+                <div className="col-span-2">
+                  <label className="text-[9px] font-bold uppercase tracking-widest text-[#131218]/45 mb-1 block">Notes</label>
+                  <textarea
+                    value={profile.notes}
+                    onChange={e => setProfile(p => ({ ...p, notes: e.target.value }))}
+                    placeholder="Context, how you met, shared projects, etc."
+                    rows={3}
+                    className="w-full text-[12px] px-3 py-2 rounded-lg border border-[#E0E0D8] bg-white outline-none focus:border-[#131218]/30 resize-y"
+                  />
+                </div>
+                {profileConflict && (
+                  <div className="col-span-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                    <p className="text-[11px] text-amber-800">
+                      Email collision — <strong>{profileConflict.full_name ?? profileConflict.display_name ?? profileConflict.email}</strong> already uses this email.
+                    </p>
+                    <button
+                      onClick={() => { setProfileConflict(null); scrollToMerge(); }}
+                      className="mt-1 text-[10px] font-bold uppercase tracking-widest text-amber-800 hover:underline"
+                    >
+                      Scroll up to merge instead →
+                    </button>
+                  </div>
+                )}
+                <div className="col-span-2 flex items-center gap-2 pt-1">
+                  <button
+                    onClick={saveProfile}
+                    disabled={profileSaving}
+                    className="text-[10px] font-bold uppercase tracking-widest bg-[#131218] text-white px-4 py-2 rounded-lg hover:bg-[#131218]/80 disabled:opacity-40"
+                  >
+                    {profileSaving ? "Saving…" : "✓ Create contact"}
+                  </button>
+                  <button
+                    onClick={() => setProfileOpen(false)}
+                    disabled={profileSaving}
+                    className="text-[10px] font-bold uppercase tracking-widest text-[#131218]/50 hover:text-[#131218] px-2"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+          </section>
         </div>
       )}
     </div>
   );
+}
+
+function Input({
+  label, value, onChange, placeholder, type = "text",
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  type?: string;
+}) {
+  return (
+    <div>
+      <label className="text-[9px] font-bold uppercase tracking-widest text-[#131218]/45 mb-1 block">
+        {label}
+      </label>
+      <input
+        type={type}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="w-full text-[12px] px-3 py-1.5 rounded-lg border border-[#E0E0D8] bg-white outline-none focus:border-[#131218]/30"
+      />
+    </div>
+  );
+}
+
+function scrollToMerge() {
+  // Best-effort: return user to the top of the accordion where merge suggestions live.
+  if (typeof window !== "undefined") window.scrollBy({ top: -300, behavior: "smooth" });
 }
 
 function pctBadge(conf: number): string {
