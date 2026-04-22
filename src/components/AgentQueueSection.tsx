@@ -16,12 +16,28 @@ const DRAFT_TYPE_ICON: Record<string, string> = {
 type DraftState = "pending" | "approving" | "approved" | "revision" | "sending" | "sent" | "send_error";
 type PersonOption = { id: string; name: string; email: string };
 
+// Gmail draft URL — opens the draft directly in Gmail's web UI.
+const gmailDraftUrl = (gmailId: string) => `https://mail.google.com/mail/u/0/#drafts/${gmailId}`;
+
 export function AgentQueueSection({ drafts }: { drafts: AgentDraft[] }) {
   // ─── Core draft state ──────────────────────────────────────────────────────
   const [expandedId, setExpandedId]   = useState<string | null>(null);
   const [states, setStates]           = useState<Record<string, DraftState>>({});
   const [dismissed, setDismissed]     = useState<Set<string>>(new Set());
   const router = useRouter();
+
+  // ─── Inline edit state ─────────────────────────────────────────────────────
+  // A draft enters edit mode when the user clicks "Edit". The textarea holds
+  // the working copy. Save PATCHes Notion; Cancel discards the edit.
+  const [editingId, setEditingId]     = useState<string | null>(null);
+  const [editText, setEditText]       = useState<string>("");
+  const [savingEdit, setSavingEdit]   = useState(false);
+  const [localText, setLocalText]     = useState<Record<string, string>>({});
+
+  // ─── Sent-state context ────────────────────────────────────────────────────
+  // After handleSend succeeds, we keep the returned Gmail draft ID so the
+  // post-approval action bar can show "Open in Gmail ↗".
+  const [gmailIds, setGmailIds]       = useState<Record<string, string>>({});
 
   // ─── Contact assignment state ──────────────────────────────────────────────
   // pickerDraftId  — which card currently has the picker open (only one at a time)
@@ -76,14 +92,52 @@ export function AgentQueueSection({ drafts }: { drafts: AgentDraft[] }) {
         body: JSON.stringify({ draftId }),
       });
       if (res.ok) {
+        const data = await res.json().catch(() => ({}));
+        if (data.gmailId) {
+          setGmailIds((ids) => ({ ...ids, [draftId]: data.gmailId as string }));
+        }
         setStates((s) => ({ ...s, [draftId]: "sent" }));
-        setTimeout(() => setDismissed((prev) => new Set(prev).add(draftId)), 1500);
+        // Keep the card visible longer so user can click "Open in Gmail".
+        setTimeout(() => setDismissed((prev) => new Set(prev).add(draftId)), 6000);
         router.refresh();
       } else {
         setStates((s) => ({ ...s, [draftId]: "send_error" }));
       }
     } catch {
       setStates((s) => ({ ...s, [draftId]: "send_error" }));
+    }
+  }
+
+  // ─── Inline edit ──────────────────────────────────────────────────────────
+  function startEdit(draftId: string, currentText: string) {
+    setEditingId(draftId);
+    setEditText(currentText);
+    setExpandedId(draftId); // expand so the textarea has room
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setEditText("");
+  }
+
+  async function saveEdit(draftId: string) {
+    if (editText.length === 0) return;
+    setSavingEdit(true);
+    try {
+      const res = await fetch("/api/update-draft", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ draftId, content: editText }),
+      });
+      if (res.ok) {
+        // Optimistic: show the edited text immediately, then refresh server data.
+        setLocalText((t) => ({ ...t, [draftId]: editText }));
+        setEditingId(null);
+        setEditText("");
+        router.refresh();
+      }
+    } finally {
+      setSavingEdit(false);
     }
   }
 
@@ -192,27 +246,72 @@ export function AgentQueueSection({ drafts }: { drafts: AgentDraft[] }) {
                 </div>
               </div>
 
-              {/* Preview / Expanded */}
-              {draft.draftText && (
-                <div className="mt-2.5">
-                  {isExpanded ? (
-                    <pre className="text-[10.5px] text-[#131218]/60 leading-[1.6] whitespace-pre-wrap font-sans max-h-48 overflow-y-auto">
-                      {draft.draftText}
-                    </pre>
-                  ) : (
-                    <p className="text-[11px] text-[#131218]/45 leading-[1.55] line-clamp-3">
-                      {draft.draftText.slice(0, 180)}
-                      {draft.draftText.length > 180 ? "…" : ""}
-                    </p>
-                  )}
-                  <button
-                    onClick={() => setExpandedId(isExpanded ? null : draft.id)}
-                    className="mt-1.5 text-[9px] font-bold text-[#131218]/30 hover:text-[#131218] transition-colors"
-                  >
-                    {isExpanded ? "Collapse ↑" : "Expand ↓"}
-                  </button>
-                </div>
-              )}
+              {/* Preview / Expanded / Editing */}
+              {(draft.draftText || editingId === draft.id) && (() => {
+                // Effective text: local optimistic override (after inline save) > server value.
+                const effectiveText = localText[draft.id] ?? draft.draftText;
+                const isEditing = editingId === draft.id;
+
+                return (
+                  <div className="mt-2.5">
+                    {isEditing ? (
+                      <textarea
+                        autoFocus
+                        value={editText}
+                        onChange={(e) => setEditText(e.target.value)}
+                        className="w-full text-[10.5px] text-[#131218] leading-[1.6] font-sans border border-[#131218]/20 rounded-lg px-2 py-1.5 outline-none focus:border-[#131218] min-h-[180px] bg-white resize-y"
+                      />
+                    ) : isExpanded ? (
+                      <pre className="text-[10.5px] text-[#131218]/60 leading-[1.6] whitespace-pre-wrap font-sans max-h-48 overflow-y-auto">
+                        {effectiveText}
+                      </pre>
+                    ) : (
+                      <p className="text-[11px] text-[#131218]/45 leading-[1.55] line-clamp-3">
+                        {effectiveText.slice(0, 180)}
+                        {effectiveText.length > 180 ? "…" : ""}
+                      </p>
+                    )}
+
+                    <div className="mt-1.5 flex items-center gap-3">
+                      {isEditing ? (
+                        <>
+                          <button
+                            onClick={() => saveEdit(draft.id)}
+                            disabled={savingEdit}
+                            className="text-[9px] font-bold text-[#131218] hover:text-emerald-700 transition-colors disabled:opacity-50"
+                          >
+                            {savingEdit ? "Saving…" : "Save edit"}
+                          </button>
+                          <button
+                            onClick={cancelEdit}
+                            disabled={savingEdit}
+                            className="text-[9px] font-bold text-[#131218]/30 hover:text-[#131218] transition-colors disabled:opacity-50"
+                          >
+                            Cancel
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => setExpandedId(isExpanded ? null : draft.id)}
+                            className="text-[9px] font-bold text-[#131218]/30 hover:text-[#131218] transition-colors"
+                          >
+                            {isExpanded ? "Collapse ↑" : "Expand ↓"}
+                          </button>
+                          {state === "pending" && (
+                            <button
+                              onClick={() => startEdit(draft.id, effectiveText)}
+                              className="text-[9px] font-bold text-[#131218]/30 hover:text-[#131218] transition-colors"
+                            >
+                              Edit
+                            </button>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* ── Actions ────────────────────────────────────────────────── */}
@@ -220,9 +319,25 @@ export function AgentQueueSection({ drafts }: { drafts: AgentDraft[] }) {
 
               {/* Terminal states */}
               {state === "sent" ? (
-                <span className="text-center text-[10px] font-bold text-emerald-600">
-                  ✓ Enviado a Gmail
-                </span>
+                gmailIds[draft.id] ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold text-emerald-600 shrink-0">
+                      ✓ Draft in Gmail
+                    </span>
+                    <a
+                      href={gmailDraftUrl(gmailIds[draft.id])}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 text-center text-[10px] font-bold bg-[#131218] text-white rounded-lg py-1.5 hover:bg-[#2a2938] transition-colors"
+                    >
+                      Open in Gmail ↗
+                    </a>
+                  </div>
+                ) : (
+                  <span className="text-center text-[10px] font-bold text-emerald-600">
+                    ✓ Enviado a Gmail
+                  </span>
+                )
               ) : state === "send_error" ? (
                 <span className="text-center text-[10px] font-bold text-red-500">
                   ✗ Error al enviar

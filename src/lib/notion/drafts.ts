@@ -5,7 +5,7 @@ import { notion, DB, prop, text, select, date, relationFirst } from "./core";
 export type AgentDraft = {
   id: string;
   title: string;
-  draftType: string;    // LinkedIn Post | Follow-up Email | Check-in Email
+  draftType: string;    // LinkedIn Post | Follow-up Email | Check-in Email | Delegation Brief
   // Full lifecycle: Pending Review → Approved → Sent | Draft Created | Revision Requested | Superseded
   // "Sent" and "Draft Created" are terminal statuses written by /api/send-draft after Gmail delivery.
   // These drafts no longer appear in the default getAgentDrafts("Pending Review") queue.
@@ -18,6 +18,17 @@ export type AgentDraft = {
   createdDate: string | null;
   notionUrl: string;
 };
+
+// Outbox: draft types that require human sign-off because they leave the building
+// (published to LinkedIn, emailed externally, etc.). Internal artifacts like
+// "Market Signal" (meeting intel digest) and "Quick Win Scan" (opportunity scan)
+// surface elsewhere in the Hall — not in the Outbox.
+export const OUTBOX_DRAFT_TYPES = new Set<string>([
+  "LinkedIn Post",
+  "Follow-up Email",
+  "Check-in Email",
+  "Delegation Brief",
+]);
 
 export async function getAgentDrafts(statusFilter = "Pending Review"): Promise<AgentDraft[]> {
   try {
@@ -47,4 +58,10 @@ export async function getAgentDrafts(statusFilter = "Pending Review"): Promise<A
   } catch {
     return [];
   }
+}
+
+// Outbox-only view: pending drafts whose approval triggers an external action.
+export async function getOutboxDrafts(): Promise<AgentDraft[]> {
+  const all = await getAgentDrafts("Pending Review");
+  return all.filter(d => OUTBOX_DRAFT_TYPES.has(d.draftType));
 }

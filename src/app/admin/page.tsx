@@ -34,6 +34,7 @@ import { HallAskQueue } from "@/components/HallAskQueue";
 import { HallTimeAllocation } from "@/components/HallTimeAllocation";
 import { HallCommitmentLedger } from "@/components/HallCommitmentLedger";
 import { HallNextMeeting } from "@/components/HallNextMeeting";
+import { HallAutopilotLog } from "@/components/HallAutopilotLog";
 import { HallTabs } from "@/components/HallTabs";
 import OpportunityExplorer from "@/components/OpportunityExplorer";
 import {
@@ -43,6 +44,7 @@ import {
   getLatestMarketSignals,
   getRecentInsightBriefBriefs,
   getAgentDrafts,
+  getOutboxDrafts,
   getCoSTasks,
   getParkedLoops,
   getRadarLoops,
@@ -465,7 +467,10 @@ export default async function AdminPage() {
     getDailyBriefing(),
     getLatestMarketSignals(),
     getRecentInsightBriefBriefs(),
-    getAgentDrafts("Pending Review"),
+    // Outbox: only Pending Review drafts whose approval triggers an external
+    // action (LinkedIn, email, delegation). Market Signal + Quick Win Scan are
+    // filtered out — they surface in their own Hall sections, not in approval.
+    getOutboxDrafts(),
     getAgentDrafts("Draft Created"),
     getAgentDrafts("Approved"),
     getCoSTasks(),
@@ -800,7 +805,7 @@ export default async function AdminPage() {
               <p className="text-[9px] font-bold text-[#131218]/25 uppercase tracking-widest mb-1">OS activity</p>
               {(() => {
                 const metrics = [
-                  { label: "Agent drafts",   count: agentDrafts.length,   activeColor: "text-[#131218]" },
+                  { label: "Outbox",         count: agentDrafts.length,   activeColor: "text-[#131218]" },
                   { label: "CoS tasks",      count: cosTasks.length,      activeColor: "text-amber-500" },
                   { label: "Candidates",     count: candidates.length,    activeColor: "text-amber-400" },
                   { label: "Cold relations", count: coldOnly.length,      activeColor: "text-blue-500" },
@@ -827,10 +832,13 @@ export default async function AdminPage() {
             </div>
           </div>
 
-          {/* ── 4. Agent Queue (TODAY) ────────────────────────────────────── */}
+          {/* ── 4. Outbox (TODAY) ──────────────────────────────────────────
+             Drafts whose approval sends something out of the house —
+             LinkedIn posts, emails, delegation briefs. Internal digests
+             (Market Signal, Quick Win Scan) surface in their own panels. */}
           {agentDrafts.length > 0 && (
             <div data-hall-tab="today">
-              <SectionHeader label="Agent queue" count={agentDrafts.length} />
+              <SectionHeader label="Outbox" count={agentDrafts.length} />
               <AgentQueueSection drafts={agentDrafts} />
             </div>
           )}
@@ -878,6 +886,7 @@ export default async function AdminPage() {
               />
 
               <HallNextMeeting />
+              <HallAutopilotLog />
               <HallCommitmentLedger />
               <HallPortfolioPulse />
               <HallOppFreshnessRadar />
