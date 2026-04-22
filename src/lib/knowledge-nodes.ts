@@ -1,0 +1,300 @@
+/**
+ * knowledge-nodes.ts — Supabase helpers for the hierarchical knowledge tree.
+ *
+ * Server-only module. Do NOT import from "use client" components.
+ *
+ * Schema (migration replace_playbooks_with_knowledge_nodes):
+ *   - public.knowledge_nodes            — tree of themes → subthemes → topics (leaves)
+ *   - public.knowledge_node_changelog   — every curator action, with reasoning
+ *   - public.knowledge_node_citations   — when other agents/skills read a node
+ *
+ * Path convention:
+ *   Theme   (depth 0) — "reuse"
+ *   Subtheme (depth 1) — "reuse/packaging"
+ *   Leaf    (depth 2+) — "reuse/packaging/refill"
+ */
+
+import { getSupabaseServerClient } from "./supabase-server";
+
+export type NodeStatus = "Active" | "Stale" | "Archived";
+export type ChangelogAction = "CREATED" | "APPEND" | "AMEND" | "SPLIT" | "IGNORE";
+export type ChangelogStatus = "applied" | "proposed" | "rejected";
+
+export type KnowledgeNode = {
+  id: string;
+  path: string;
+  slug: string;
+  parent_id: string | null;
+  depth: number;
+  title: string;
+  summary: string;
+  body_md: string;
+  tags: string[];
+  status: NodeStatus;
+  reference_count: number;
+  last_evidence_at: string | null;
+  last_reviewed_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type NodeChangelogEntry = {
+  id: string;
+  node_id: string;
+  evidence_notion_id: string | null;
+  action: ChangelogAction;
+  section: string | null;
+  diff_before: string | null;
+  diff_after: string | null;
+  reasoning: string;
+  status: ChangelogStatus;
+  applied_by: string;
+  created_at: string;
+  applied_at: string | null;
+};
+
+/** Tree node for UI rendering — same shape + children array + has_body indicator. */
+export type TreeNode = KnowledgeNode & {
+  children: TreeNode[];
+};
+
+/** Fetch all active nodes, flat. Sorted by path (hierarchical order). */
+export async function getAllNodes(): Promise<KnowledgeNode[]> {
+  const sb = getSupabaseServerClient();
+  const { data, error } = await sb
+    .from("knowledge_nodes")
+    .select("*")
+    .neq("status", "Archived")
+    .order("path", { ascending: true });
+  if (error) {
+    console.error("[knowledge-nodes] getAllNodes:", error.message);
+    return [];
+  }
+  return (data as KnowledgeNode[]) ?? [];
+}
+
+/** Fetch the full tree (nested). Roots first. */
+export async function getTree(): Promise<TreeNode[]> {
+  const flat = await getAllNodes();
+  const byId = new Map<string, TreeNode>();
+  for (const n of flat) byId.set(n.id, { ...n, children: [] });
+  const roots: TreeNode[] = [];
+  for (const n of flat) {
+    const node = byId.get(n.id)!;
+    if (n.parent_id && byId.has(n.parent_id)) {
+      byId.get(n.parent_id)!.children.push(node);
+    } else {
+      roots.push(node);
+    }
+  }
+  return roots;
+}
+
+/** Fetch a single node by path. Returns null if missing. */
+export async function getNodeByPath(path: string): Promise<KnowledgeNode | null> {
+  const sb = getSupabaseServerClient();
+  const { data, error } = await sb
+    .from("knowledge_nodes")
+    .select("*")
+    .eq("path", path)
+    .maybeSingle();
+  if (error) {
+    console.error("[knowledge-nodes] getNodeByPath:", error.message);
+    return null;
+  }
+  return (data as KnowledgeNode) ?? null;
+}
+
+/** Fetch direct children of a node (for breadcrumb siblings / category views). */
+export async function getChildren(parentId: string): Promise<KnowledgeNode[]> {
+  const sb = getSupabaseServerClient();
+  const { data, error } = await sb
+    .from("knowledge_nodes")
+    .select("*")
+    .eq("parent_id", parentId)
+    .neq("status", "Archived")
+    .order("slug", { ascending: true });
+  if (error) {
+    console.error("[knowledge-nodes] getChildren:", error.message);
+    return [];
+  }
+  return (data as KnowledgeNode[]) ?? [];
+}
+
+/** Fetch changelog entries for a node. Most recent first. */
+export async function getNodeChangelog(
+  nodeId: string,
+  limit = 30,
+): Promise<NodeChangelogEntry[]> {
+  const sb = getSupabaseServerClient();
+  const { data, error } = await sb
+    .from("knowledge_node_changelog")
+    .select("*")
+    .eq("node_id", nodeId)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) {
+    console.error("[knowledge-nodes] getNodeChangelog:", error.message);
+    return [];
+  }
+  return (data as NodeChangelogEntry[]) ?? [];
+}
+
+/** Append a changelog entry. Status "applied" by default; pass "proposed" for human-review path. */
+export async function appendChangelog(entry: {
+  node_id: string;
+  evidence_notion_id?: string | null;
+  action: ChangelogAction;
+  section?: string | null;
+  diff_before?: string | null;
+  diff_after?: string | null;
+  reasoning: string;
+  status?: ChangelogStatus;
+  applied_by?: string;
+}): Promise<void> {
+  const sb = getSupabaseServerClient();
+  const { error } = await sb.from("knowledge_node_changelog").insert({
+    node_id: entry.node_id,
+    evidence_notion_id: entry.evidence_notion_id ?? null,
+    action: entry.action,
+    section: entry.section ?? null,
+    diff_before: entry.diff_before ?? null,
+    diff_after: entry.diff_after ?? null,
+    reasoning: entry.reasoning,
+    status: entry.status ?? "applied",
+    applied_by: entry.applied_by ?? "agent:knowledge-curator",
+    applied_at: entry.status === "proposed" ? null : new Date().toISOString(),
+  });
+  if (error) {
+    console.error("[knowledge-nodes] appendChangelog:", error.message);
+    throw error;
+  }
+}
+
+/** Overwrite body_md + mark last_evidence_at. Trigger keeps updated_at fresh. */
+export async function updateNodeBody(
+  id: string,
+  body_md: string,
+  options?: { summary?: string; markEvidenceAt?: boolean },
+): Promise<void> {
+  const sb = getSupabaseServerClient();
+  const patch: Record<string, unknown> = { body_md };
+  if (options?.summary !== undefined) patch.summary = options.summary;
+  if (options?.markEvidenceAt) patch.last_evidence_at = new Date().toISOString();
+
+  const { error } = await sb.from("knowledge_nodes").update(patch).eq("id", id);
+  if (error) {
+    console.error("[knowledge-nodes] updateNodeBody:", error.message);
+    throw error;
+  }
+}
+
+/** Mark a node as reviewed by a human — resets the "stale" clock. */
+export async function markReviewed(id: string): Promise<void> {
+  const sb = getSupabaseServerClient();
+  const { error } = await sb
+    .from("knowledge_nodes")
+    .update({ last_reviewed_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) console.error("[knowledge-nodes] markReviewed:", error.message);
+}
+
+/** Log a citation — called when another agent/skill loads a node for context. */
+export async function logCitation(
+  nodeId: string,
+  citedBy: string,
+  context?: string,
+): Promise<void> {
+  const sb = getSupabaseServerClient();
+  const { error } = await sb.from("knowledge_node_citations").insert({
+    node_id: nodeId,
+    cited_by: citedBy,
+    context: context ?? null,
+  });
+  if (error) console.error("[knowledge-nodes] logCitation:", error.message);
+}
+
+/** Leaves only — nodes with no children (the consumable product pages). */
+export async function getLeafNodes(): Promise<KnowledgeNode[]> {
+  const flat = await getAllNodes();
+  const hasChildren = new Set(flat.map(n => n.parent_id).filter(Boolean));
+  return flat.filter(n => !hasChildren.has(n.id));
+}
+
+// ─── Markdown section helpers (used by the curator) ────────────────────────────
+
+/** Split body_md into ordered {heading, body} sections (headings by `##`). */
+export function parseSections(body_md: string): { heading: string; body: string }[] {
+  const lines = body_md.split(/\r?\n/);
+  const sections: { heading: string; body: string }[] = [];
+  let current: { heading: string; body: string } | null = null;
+  for (const line of lines) {
+    const m = line.match(/^##\s+(.+)$/);
+    if (m) {
+      if (current) sections.push(current);
+      current = { heading: m[1].trim(), body: "" };
+    } else if (current) {
+      current.body += (current.body ? "\n" : "") + line;
+    } else {
+      // Preamble before any section — treated as implicit Overview
+      current = { heading: "Overview", body: line };
+    }
+  }
+  if (current) sections.push(current);
+  return sections;
+}
+
+/** Serialise sections back to markdown. */
+export function serializeSections(sections: { heading: string; body: string }[]): string {
+  return sections
+    .map(s => `## ${s.heading}\n\n${s.body.trim()}\n`)
+    .join("\n");
+}
+
+/**
+ * Append a bullet under a target section heading. Idempotent: if the same bullet
+ * text already exists, no duplicate is added (returns false).
+ *
+ * Strips placeholder lines like `_(Por construir.)_` or `_(Por poblar.)_` when
+ * the first real content is added, so leaves stop looking empty.
+ */
+export function appendBullet(
+  body_md: string,
+  heading: string,
+  bullet: string,
+): { body: string; changed: boolean; before: string | null; after: string | null } {
+  const sections = parseSections(body_md);
+  let target = sections.find(s => s.heading.toLowerCase() === heading.toLowerCase());
+  if (!target) {
+    // Fall back to References
+    target = sections.find(s => s.heading.toLowerCase() === "references");
+    if (!target) {
+      // Create References at end
+      target = { heading: "References", body: "" };
+      sections.push(target);
+    }
+  }
+
+  const bulletLine = bullet.startsWith("- ") ? bullet : `- ${bullet}`;
+
+  // Dedup: exact substring match on the bullet text
+  if (target.body.includes(bulletLine)) {
+    return { body: body_md, changed: false, before: null, after: null };
+  }
+
+  // Strip placeholder text when adding first real content
+  const placeholder = /_\(Por (?:construir|poblar)\.?\)_|_\(Aún no documentado\.?\)_[^\n]*/g;
+  const strippedBody = target.body.replace(placeholder, "").trim();
+
+  const before = target.body;
+  target.body = strippedBody
+    ? `${strippedBody}\n${bulletLine}`
+    : bulletLine;
+
+  return {
+    body: serializeSections(sections),
+    changed: true,
+    before,
+    after: target.body,
+  };
+}

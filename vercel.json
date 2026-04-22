@@ -42,6 +42,10 @@
       "schedule": "0 3 * * 1-5"
     },
     {
+      "path": "/api/knowledge-curator",
+      "schedule": "30 3 * * 1-5"
+    },
+    {
       "path": "/api/relationship-warmth",
       "schedule": "0 6 * * 1,4"
     },

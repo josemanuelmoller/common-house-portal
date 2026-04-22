@@ -1,52 +1,86 @@
-import { redirect } from "next/navigation";
+import Link from "next/link";
 import { Sidebar } from "@/components/Sidebar";
-import { StatusBadge } from "@/components/StatusBadge";
 import { MetricCard } from "@/components/MetricCard";
-import { getKnowledgeAssets, getReusableEvidence, getAllProjects, getAllEvidence } from "@/lib/notion";
 import { NAV } from "../page";
 import { requireAdmin } from "@/lib/require-admin";
+import { getTree, type TreeNode } from "@/lib/knowledge-nodes";
+
+function daysSince(iso: string | null): number | null {
+  if (!iso) return null;
+  return Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
+}
+
+function TreeRow({ node, depth = 0 }: { node: TreeNode; depth?: number }) {
+  const isLeaf = node.children.length === 0;
+  const dEvidence = daysSince(node.last_evidence_at);
+  const href = `/admin/knowledge/${node.path}`;
+  const indent = depth * 16;
+
+  return (
+    <>
+      <Link
+        href={href}
+        className={`flex items-center gap-3 pr-6 py-3 border-b border-[#EFEFEA] hover:bg-[#EFEFEA]/40 transition-colors ${
+          isLeaf ? "" : "bg-[#F7F7F2]/50"
+        }`}
+        style={{ paddingLeft: 24 + indent }}
+      >
+        <span className={`text-xs font-bold shrink-0 ${isLeaf ? "text-[#B2FF59]" : "text-[#131218]/30"}`}>
+          {isLeaf ? "◉" : "▸"}
+        </span>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-baseline gap-2 flex-wrap">
+            <p className={`truncate ${isLeaf ? "text-sm font-semibold text-[#131218]" : "text-[13px] font-bold text-[#131218]/90 uppercase tracking-wide"}`}>
+              {node.title}
+            </p>
+            {isLeaf && node.tags.slice(0, 3).map(t => (
+              <span key={t} className="text-[9px] font-bold bg-[#EFEFEA] text-[#131218]/40 px-2 py-0.5 rounded-full uppercase tracking-widest">
+                {t}
+              </span>
+            ))}
+          </div>
+          {node.summary && (
+            <p className="text-[11px] text-[#131218]/40 truncate mt-0.5">{node.summary}</p>
+          )}
+        </div>
+        {isLeaf && (
+          <div className="flex items-center gap-4 shrink-0">
+            <div className="text-right">
+              <p className={`text-[10px] font-bold uppercase tracking-widest ${dEvidence === null ? "text-[#131218]/20" : dEvidence <= 14 ? "text-[#B2FF59] bg-[#131218] px-2 py-0.5 rounded-full" : "text-[#131218]/30"}`}>
+                {dEvidence === null ? "— empty" : dEvidence === 0 ? "Today" : `${dEvidence}d ago`}
+              </p>
+              <p className="text-[9px] text-[#131218]/30 uppercase tracking-widest mt-0.5">last evidence</p>
+            </div>
+            <div className="text-right">
+              <p className="text-sm font-bold text-[#131218]">{node.reference_count}</p>
+              <p className="text-[9px] text-[#131218]/30 uppercase tracking-widest">cited</p>
+            </div>
+          </div>
+        )}
+      </Link>
+      {node.children.map(c => <TreeRow key={c.id} node={c} depth={depth + 1} />)}
+    </>
+  );
+}
 
 export default async function KnowledgePage() {
   await requireAdmin();
 
-  const [assets, reusable, projects, allEvidence] = await Promise.all([
-    getKnowledgeAssets(),
-    getReusableEvidence(),
-    getAllProjects(),
-    getAllEvidence(),
-  ]);
+  const tree = await getTree();
 
-  // Build project name lookup
-  const projectNames: Record<string, string> = {};
-  for (const p of projects) projectNames[p.id] = p.name;
+  // Flatten to count leaves + totals
+  const allFlat: TreeNode[] = [];
+  const walk = (nodes: TreeNode[]) => nodes.forEach(n => { allFlat.push(n); walk(n.children); });
+  walk(tree);
 
-  // Evidence per project (for breakdown table)
-  const evidenceByProject: Record<string, {
-    name: string;
-    total: number;
-    validated: number;
-    reusable: number;
-    types: Record<string, number>;
-  }> = {};
-
-  for (const p of projects) {
-    evidenceByProject[p.id] = { name: p.name, total: 0, validated: 0, reusable: 0, types: {} };
-  }
-
-  for (const e of allEvidence) {
-    const pid = e.projectId ?? "";
-    if (!evidenceByProject[pid]) continue;
-    evidenceByProject[pid].total++;
-    if (e.validationStatus === "Validated") evidenceByProject[pid].validated++;
-    if ((e.reusability === "Reusable" || e.reusability === "Canonical") && e.validationStatus === "Validated") evidenceByProject[pid].reusable++;
-    const t = e.type || "Other";
-    evidenceByProject[pid].types[t] = (evidenceByProject[pid].types[t] ?? 0) + 1;
-  }
-
-  const canonicalEvidence     = reusable.filter(e => e.reusability === "Canonical");
-  const trueReusableEvidence  = reusable.filter(e => e.reusability === "Reusable");
-
-  const topTypes = ["Decision", "Outcome", "Requirement", "Process Step", "Blocker", "Dependency"];
+  const leaves = allFlat.filter(n => n.children.length === 0);
+  const leavesWithEvidence = leaves.filter(n => n.last_evidence_at);
+  const totalCitations = allFlat.reduce((sum, n) => sum + n.reference_count, 0);
+  const staleLeaves = leaves.filter(n => {
+    if (!n.last_evidence_at) return false;
+    const d = daysSince(n.last_evidence_at);
+    return d !== null && d > 60;
+  });
 
   return (
     <div className="flex min-h-screen bg-[#EFEFEA]">
@@ -59,10 +93,10 @@ export default async function KnowledgePage() {
             CONTROL ROOM · KNOWLEDGE
           </p>
           <h1 className="text-[2.6rem] font-[300] text-white leading-[1] tracking-[-1.5px]">
-            Knowledge <em className="font-[900] italic text-[#c8f55a]">Assets</em>
+            Knowledge <em className="font-[900] italic text-[#c8f55a]">tree</em>
           </h1>
-          <p className="text-[12.5px] text-white/40 mt-3 max-w-[520px] leading-[1.65]">
-            Canonical assets, reusable evidence, and cross-project intelligence.
+          <p className="text-[12.5px] text-white/40 mt-3 max-w-[560px] leading-[1.65]">
+            Themes → subthemes → topics. Cada hoja es una página consumible que se va nutriendo con insights de las reuniones y evidencias validadas.
           </p>
         </div>
 
@@ -70,226 +104,44 @@ export default async function KnowledgePage() {
 
           {/* Metrics */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <MetricCard label="Knowledge Assets"  value={assets.length}                   color="green" />
-            <MetricCard label="Canonical"          value={canonicalEvidence.length}        color="blue"  sub="highest reusability tier" />
-            <MetricCard label="Reusable"           value={trueReusableEvidence.length}     color="green" sub="cross-project evidence" />
-            <MetricCard label="Total Evidence"     value={allEvidence.length}              />
+            <MetricCard label="Nodes total"        value={allFlat.length}               />
+            <MetricCard label="Leaf pages"         value={leaves.length}                 color="green" sub={`${leavesWithEvidence.length} con evidencia`} />
+            <MetricCard label="Citations"          value={totalCitations}                color="blue"  sub="veces leídas por agentes" />
+            <MetricCard label="Stale (60d+)"       value={staleLeaves.length}            color={staleLeaves.length > 0 ? "yellow" : "default"} sub="hojas sin updates" />
           </div>
 
-          {/* Knowledge Assets — primary view */}
-          <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-            <div className="h-1 bg-[#131218]" />
-            <div className="px-6 py-4 border-b border-[#EFEFEA] flex items-center justify-between">
-              <div>
-                <h2 className="text-sm font-bold text-[#131218] tracking-tight">Knowledge Assets</h2>
-                <p className="text-xs text-[#131218]/40 mt-0.5">Canonical assets maintained and updated by the OS engine</p>
-              </div>
-              <p className="text-[10px] text-[#131218]/30 font-bold uppercase tracking-widest">{assets.length} asset{assets.length !== 1 ? "s" : ""}</p>
-            </div>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-[#EFEFEA]">
-                  <th className="text-left px-6 py-3 text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Asset</th>
-                  <th className="text-left px-4 py-3 text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Category</th>
-                  <th className="text-left px-4 py-3 text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Type</th>
-                  <th className="text-left px-4 py-3 text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Status</th>
-                  <th className="text-left px-4 py-3 text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Last Updated</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#EFEFEA]">
-                {assets.map(a => (
-                  <tr key={a.id} className="hover:bg-[#EFEFEA]/60 transition-colors">
-                    <td className="px-6 py-3 font-semibold text-[#131218] text-sm">{a.name}</td>
-                    <td className="px-4 py-3"><StatusBadge value={a.category} /></td>
-                    <td className="px-4 py-3"><StatusBadge value={a.assetType} /></td>
-                    <td className="px-4 py-3"><StatusBadge value={a.status} /></td>
-                    <td className="px-4 py-3 text-xs text-[#131218]/35 font-medium">
-                      {a.lastUpdated
-                        ? new Date(a.lastUpdated).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
-                        : "—"}
-                    </td>
-                  </tr>
-                ))}
-                {assets.length === 0 && (
-                  <tr>
-                    <td colSpan={5} className="px-6 py-10 text-center">
-                      <p className="text-sm font-medium text-[#131218]/30">No knowledge assets yet</p>
-                      <p className="text-xs text-[#131218]/20 mt-1">Assets are built from validated, reusable evidence</p>
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-            <div className="px-6 py-3 border-t border-[#EFEFEA]">
-              <p className="text-[10px] text-[#131218]/25 font-bold uppercase tracking-widest">COUNT {assets.length}</p>
-            </div>
-          </div>
-
-          {/* Reusable Evidence */}
+          {/* Tree */}
           <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
             <div className="h-1 bg-[#B2FF59]" />
-            <div className="px-6 py-4 border-b border-[#EFEFEA] flex items-center justify-between">
-              <div>
-                <h2 className="text-sm font-bold text-[#131218] tracking-tight">Reusable Evidence</h2>
-                <p className="text-xs text-[#131218]/40 mt-0.5">Validated evidence flagged as reusable across projects</p>
-              </div>
-              <div className="flex items-center gap-2">
-                {canonicalEvidence.length > 0 && (
-                  <span className="inline-block bg-[#131218] text-[#B2FF59] text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-widest">
-                    {canonicalEvidence.length} canonical
-                  </span>
-                )}
-                {trueReusableEvidence.length > 0 && (
-                  <span className="inline-block bg-[#B2FF59] text-[#131218] text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-widest">
-                    {trueReusableEvidence.length} reusable
-                  </span>
-                )}
-              </div>
-            </div>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-[#EFEFEA]">
-                  <th className="text-left px-6 py-3 text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Evidence</th>
-                  <th className="text-left px-4 py-3 text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Project</th>
-                  <th className="text-left px-4 py-3 text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Type</th>
-                  <th className="text-left px-4 py-3 text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Tier</th>
-                  <th className="text-left px-4 py-3 text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Confidence</th>
-                  <th className="text-left px-4 py-3 text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Captured</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#EFEFEA]">
-                {reusable.map(e => (
-                  <tr key={e.id} className="hover:bg-[#EFEFEA]/60 transition-colors">
-                    <td className="px-6 py-3">
-                      <p className="font-semibold text-[#131218] text-sm">{e.title}</p>
-                      {e.excerpt && <p className="text-xs text-[#131218]/35 mt-0.5 line-clamp-1 max-w-sm">{e.excerpt}</p>}
-                    </td>
-                    <td className="px-4 py-3 text-xs font-medium text-[#131218]/50">
-                      {e.projectId ? (projectNames[e.projectId] ?? "—") : "—"}
-                    </td>
-                    <td className="px-4 py-3"><StatusBadge value={e.type} /></td>
-                    <td className="px-4 py-3"><StatusBadge value={e.reusability} /></td>
-                    <td className="px-4 py-3"><StatusBadge value={e.confidence} /></td>
-                    <td className="px-4 py-3 text-xs text-[#131218]/35 font-medium">
-                      {e.dateCaptured
-                        ? new Date(e.dateCaptured).toLocaleDateString("en-GB", { day: "numeric", month: "short" })
-                        : "—"}
-                    </td>
-                  </tr>
-                ))}
-                {reusable.length === 0 && (
-                  <tr>
-                    <td colSpan={6} className="px-6 py-10 text-center">
-                      <p className="text-sm font-medium text-[#131218]/30">No reusable evidence validated yet</p>
-                      <p className="text-xs text-[#131218]/20 mt-1">Evidence marked Reusable or Canonical will appear here after validation</p>
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-            <div className="px-6 py-3 border-t border-[#EFEFEA]">
-              <p className="text-[10px] text-[#131218]/25 font-bold uppercase tracking-widest">
-                COUNT {reusable.length} · {canonicalEvidence.length} canonical · {trueReusableEvidence.length} reusable
+            <div className="px-6 py-4 border-b border-[#EFEFEA]">
+              <h2 className="text-sm font-bold text-[#131218] tracking-tight">Knowledge tree</h2>
+              <p className="text-xs text-[#131218]/40 mt-0.5">
+                Click en cualquier nodo para abrir. Leaf pages (◉) tienen contenido consumible. Categorías (▸) agrupan.
               </p>
             </div>
+
+            {tree.length === 0 ? (
+              <div className="px-6 py-10 text-center">
+                <p className="text-sm font-medium text-[#131218]/30">El árbol está vacío.</p>
+                <p className="text-xs text-[#131218]/20 mt-1">Seed el schema con nodos iniciales para empezar.</p>
+              </div>
+            ) : (
+              <div>
+                {tree.map(root => <TreeRow key={root.id} node={root} depth={0} />)}
+              </div>
+            )}
           </div>
 
-          {/* Evidence breakdown per project — detail view */}
-          <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-            <div className="h-1 bg-[#EFEFEA]" />
-            <div className="px-6 py-4 border-b border-[#EFEFEA]">
-              <h2 className="text-sm font-bold text-[#131218] tracking-tight">Evidence Contribution — by Project</h2>
-              <p className="text-xs text-[#131218]/40 mt-0.5">How much evidence each project has generated and how much is reusable</p>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-[#EFEFEA]">
-                    <th className="text-left px-6 py-3 text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Project</th>
-                    <th className="text-center px-4 py-3 text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Evidence</th>
-                    <th className="text-center px-4 py-3 text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Validated</th>
-                    <th className="text-center px-4 py-3 text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Reusable</th>
-                    {topTypes.map(t => (
-                      <th key={t} className="text-center px-3 py-3 text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest whitespace-nowrap">
-                        {t}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#EFEFEA]">
-                  {projects.map(p => {
-                    const stats = evidenceByProject[p.id];
-                    if (!stats) return null;
-                    return (
-                      <tr key={p.id} className="hover:bg-[#EFEFEA]/60 transition-colors">
-                        <td className="px-6 py-4">
-                          <p className="font-semibold text-[#131218] tracking-tight">{p.name}</p>
-                          <div className="flex items-center gap-1 mt-1">
-                            <StatusBadge value={p.stage} />
-                          </div>
-                        </td>
-                        <td className="px-4 py-4 text-center">
-                          <span className="text-base font-bold text-[#131218]">{stats.total || "—"}</span>
-                        </td>
-                        <td className="px-4 py-4 text-center">
-                          <span className={`text-base font-bold ${stats.validated > 0 ? "text-[#131218]" : "text-[#131218]/20"}`}>
-                            {stats.validated || "—"}
-                          </span>
-                        </td>
-                        <td className="px-4 py-4 text-center">
-                          {stats.reusable > 0 ? (
-                            <span className="inline-block bg-[#B2FF59] text-[#131218] text-xs font-bold px-2 py-0.5 rounded-full">
-                              {stats.reusable}
-                            </span>
-                          ) : (
-                            <span className="text-[#131218]/15 text-sm">—</span>
-                          )}
-                        </td>
-                        {topTypes.map(t => (
-                          <td key={t} className="px-3 py-4 text-center text-sm">
-                            {stats.types[t] ? (
-                              <span className="font-semibold text-[#131218]/60">{stats.types[t]}</span>
-                            ) : (
-                              <span className="text-[#131218]/15">—</span>
-                            )}
-                          </td>
-                        ))}
-                      </tr>
-                    );
-                  })}
-                  {projects.length === 0 && (
-                    <tr>
-                      <td colSpan={4 + topTypes.length} className="px-6 py-8 text-center text-sm text-[#131218]/30">
-                        No projects found.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-                {/* Totals row */}
-                <tfoot>
-                  <tr className="border-t-2 border-[#EFEFEA] bg-[#EFEFEA]/50">
-                    <td className="px-6 py-3 text-[10px] font-bold text-[#131218]/40 uppercase tracking-widest">Total</td>
-                    <td className="px-4 py-3 text-center font-bold text-[#131218]">{allEvidence.length}</td>
-                    <td className="px-4 py-3 text-center font-bold text-[#131218]">
-                      {allEvidence.filter(e => e.validationStatus === "Validated").length}
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <span className="inline-block bg-[#B2FF59] text-[#131218] text-xs font-bold px-2 py-0.5 rounded-full">
-                        {reusable.length}
-                      </span>
-                    </td>
-                    {topTypes.map(t => {
-                      const count = allEvidence.filter(e => e.type === t).length;
-                      return (
-                        <td key={t} className="px-3 py-3 text-center text-sm font-bold text-[#131218]/40">
-                          {count || "—"}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
+          {/* How it works */}
+          <div className="bg-white rounded-2xl border border-[#E0E0D8] p-6">
+            <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest mb-2">How it works</p>
+            <ul className="text-[12px] text-[#131218]/60 space-y-1.5 leading-relaxed">
+              <li>• <strong>Cada reu validada</strong> pasa por el <code className="text-[11px] bg-[#EFEFEA] px-1 py-0.5 rounded">knowledge-curator</code> agent.</li>
+              <li>• El agent decide si la evidencia contiene un <em>insight de dominio</em> (generaliza) o solo un <em>project fact</em> (se ignora).</li>
+              <li>• Los insights se escriben en la hoja relevante bajo la sección correcta (Available solutions / How to implement / Anti-patterns / Case studies).</li>
+              <li>• Cada acción del agent queda en el changelog de la hoja con razón, diff y source.</li>
+              <li>• Cuando otros agents (proposal-brief, prep-brief) citan una hoja, incrementa <code className="text-[11px] bg-[#EFEFEA] px-1 py-0.5 rounded">reference_count</code> — señal de valor real.</li>
+            </ul>
           </div>
 
         </div>
