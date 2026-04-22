@@ -62,9 +62,13 @@ const COUNTRY_NAME_TO_ISO: Record<string, string> = {
   "asia":      "INT",
 };
 
+// Kept short on purpose: we only strip tokens that are almost never part of
+// the distinctive project name. "Auto" is NOT here because "Auto Mercado" is
+// one brand name — stripping "Auto" produces MERCADO, which is wrong. Similarly
+// we keep company words like "Mercado", "House", etc.
 const SKIP_TOKENS = new Set([
-  "the", "auto", "refill", "project", "pilot", "piloto", "fase", "proyecto", "programa",
-  "the plan", "for", "all", "platform", "initiative", "co", "sl", "inc", "ltd", "corp",
+  "the", "a", "an", "for", "all", "of", "and", "y", "del", "de", "la", "el",
+  "project", "pilot", "piloto", "fase", "proyecto", "programa", "initiative",
 ]);
 
 function stripAccents(s: string): string {
@@ -120,13 +124,18 @@ export function geographyToCountry(geo: string | null | undefined): string {
   }
 
   if (parts.length === 0) return "X";
-  if (parts.length > 1) {
-    // Multi-country → check if all resolve to the same ISO-2
-    const isos = parts.map(p => COUNTRY_NAME_TO_ISO[p.toLowerCase()] ?? null);
-    const unique = new Set(isos.filter(Boolean));
-    if (unique.size === 1) return [...unique][0]!;
-    return "INT";
-  }
+
+  // Prefer the first concrete country over regions/blocs. Regions (LATAM, EU,
+  // Europe, Asia, etc.) are stored as "INT" in the lexicon — treat those as
+  // fallbacks, never primary if there is a specific country in the same list.
+  const regionalFallbacks = new Set(["INT"]);
+  const mapped = parts.map(p => COUNTRY_NAME_TO_ISO[p.toLowerCase()] ?? null);
+
+  const firstSpecific = mapped.find(iso => iso !== null && !regionalFallbacks.has(iso));
+  if (firstSpecific) return firstSpecific;
+
+  const firstAny = mapped.find(iso => iso !== null);
+  if (firstAny) return firstAny;
 
   const iso = COUNTRY_NAME_TO_ISO[parts[0].toLowerCase()];
   if (iso) return iso;
