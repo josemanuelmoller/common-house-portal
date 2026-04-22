@@ -12,6 +12,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { PrepBriefModal, type BriefResponse } from "./PrepBriefModal";
 
 type Suggestion = {
   id: string;
@@ -61,6 +62,9 @@ export function SuggestedTimeBlocks() {
   const [acting, setActing]     = useState<string | null>(null);
   const [toast, setToast]       = useState<string | null>(null);
   const [emptyReason, setEmpty] = useState<string | null>(null);
+  // Prep-brief modal state — eventId + title open the modal; briefCache avoids re-fetch on reopen.
+  const [briefOpen, setBriefOpen] = useState<{ eventId: string; title: string } | null>(null);
+  const [briefCache, setBriefCache] = useState<Record<string, BriefResponse["brief"]>>({});
 
   async function load(force = false) {
     setLoading(true);
@@ -246,6 +250,14 @@ export function SuggestedTimeBlocks() {
                 >
                   Block time →
                 </button>
+                {item.task_type === "prep" && item.entity_type === "meeting_prep" && (
+                  <button
+                    onClick={() => setBriefOpen({ eventId: item.entity_id, title: item.entity_label })}
+                    className="text-[9px] font-bold text-[#131218]/55 hover:text-[#131218] uppercase tracking-widest"
+                  >
+                    Open brief →
+                  </button>
+                )}
                 <div className="flex items-center gap-1 mt-0.5">
                   <button
                     onClick={() => act(item.id, "snooze", 24)}
@@ -270,6 +282,17 @@ export function SuggestedTimeBlocks() {
           </div>
         ))}
       </div>
+      {briefOpen && (
+        <PrepBriefModal
+          eventId={briefOpen.eventId}
+          meetingTitle={briefOpen.title}
+          cachedBrief={briefCache[briefOpen.eventId]}
+          onBriefFetched={(eventId, brief) => {
+            if (brief) setBriefCache(prev => ({ ...prev, [eventId]: brief }));
+          }}
+          onClose={() => setBriefOpen(null)}
+        />
+      )}
     </div>
   );
 }
