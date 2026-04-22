@@ -30,6 +30,7 @@ import {
   updateNodeBody,
   appendBullet,
   appendBulletInSubsection,
+  findFacet,
   type KnowledgeNode,
   type ChangelogAction,
   type ChangelogStatus,
@@ -132,6 +133,23 @@ function buildTreeSummary(nodes: KnowledgeNode[]): string {
     .join("\n");
 }
 
+/** Serialise leaf facets for the prompt so the LLM knows which subsections are
+ *  valid under each facetted section of each leaf. Non-facetted leaves omitted. */
+function buildFacetsGuide(nodes: KnowledgeNode[]): string {
+  const chunks: string[] = [];
+  for (const n of nodes) {
+    if (!n.facets || n.facets.length === 0) continue;
+    chunks.push(`\n### Facets for \`${n.path}\``);
+    for (const f of n.facets) {
+      chunks.push(`  Section "${f.section}" subsections (pick exactly one key when writing here):`);
+      for (const s of f.subsections) {
+        chunks.push(`    - key=\`${s.key}\` → title="${s.title}" — ${s.hint}`);
+      }
+    }
+  }
+  return chunks.length ? chunks.join("\n") : "(no facets declared on any leaf)";
+}
+
 function buildLeafBodyPreview(node: KnowledgeNode | undefined): string {
   if (!node) return "(no leaf selected)";
   // Trim to ~1500 chars so we don't blow the prompt budget
@@ -146,6 +164,7 @@ async function classifyEvidence(
   tree: KnowledgeNode[],
 ): Promise<Classification> {
   const treeSummary = buildTreeSummary(tree);
+  const facetsGuide = buildFacetsGuide(tree);
   const leafPaths = tree.filter(n => {
     // A leaf = node with no children
     const hasChild = tree.some(c => c.parent_id === n.id);
@@ -156,24 +175,22 @@ async function classifyEvidence(
 
 Two kinds of domain knowledge matter:
 
-1) DOMAIN INSIGHTS — statements about how the domain works ("refill retention drops below 20% without in-store education"). Route these to Available solutions / How to implement / Anti-patterns / Case studies / References as appropriate.
+1) DOMAIN INSIGHTS — statements about how the domain works. Route these to Available solutions / How to implement / Anti-patterns / Case studies / References as appropriate.
 
-2) STAKEHOLDER CONCERNS — worries, open questions, or apprehensions raised by a function/role. These are HIGHLY reusable because they repeat across clients (IT always asks similar integration questions, Quality always raises contamination, etc.).
-   - Detect from evidence_type=Concern or evidence_type=Objection/Risk, or from Q&A phrasing ("what if", "how will you", "I'm worried that", "my concern is", "not sure if")
-   - For these: action=APPEND, section="Stakeholder concerns", subsection = stakeholder_function (IT / Quality / Operations / Legal / Finance / Marketing / Executive / Procurement / Sales / Customer Service / Supply Chain / Other)
-   - If stakeholder_function on the evidence is populated, USE IT as subsection
-   - If it's null, INFER from evidence_statement / source_excerpt / topics. Only pick a function name you can justify from content. If nothing supports a specific function, use "Other"
+2) STAKEHOLDER CONCERNS — worries, open questions, or apprehensions raised by a function/role. Detect from evidence_type=Concern/Objection/Risk or Q&A phrasing. Route: section="Stakeholder concerns", subsection_key = stakeholder_function (IT / Quality / Operations / Legal / Finance / Marketing / Executive / Procurement / Sales / Customer Service / Supply Chain / Other).
+
+FACETS — a target leaf may declare REQUIRED subsection vocabularies for some sections (see "Facets for <leaf>" blocks below). When the target_path + section has facets declared, you MUST pick subsection_key from the facet's subsection keys. Use the provided hints to match evidence to modality. This is how we separate e.g. dispenser vs applicator refill — they have different unit economics and concerns.
 
 Sections for APPEND/AMEND (pick one):
 ${VALID_SECTIONS.map(s => `- ${s}`).join("\n")}
 
-Subsection is REQUIRED when section = "Stakeholder concerns", and must be one of:
-${STAKEHOLDER_FUNCTIONS.map(f => `- ${f}`).join("\n")}
+Subsection vocabulary per leaf (when facets exist):
+${facetsGuide}
 
 Rules:
 - Pure project fact with no generalisation → IGNORE
-- Concern / apprehension / open question from a function → APPEND to "Stakeholder concerns" with subsection
-- Domain insight → APPEND to the appropriate section (no subsection)
+- Concern / apprehension / open question from a function → APPEND to "Stakeholder concerns" with subsection_key = function name
+- Domain insight → APPEND to appropriate section; if that section has facets on the target leaf, pick the facet subsection_key
 - Contradicts existing content → AMEND, specify 'replaces'
 - No matching leaf exists → SPLIT, name closest parent path + suggested new slug
 - Low confidence → IGNORE with reason "low confidence"
@@ -206,7 +223,7 @@ Respond with JSON:
   "suggested_path": "reuse/packaging/refill" (only for SPLIT),
   "suggested_title": "Refill" (only for SPLIT),
   "section": "Available solutions" | "Stakeholder concerns" | ... | null,
-  "subsection": "IT" | "Quality" | ... | null   // REQUIRED when section = "Stakeholder concerns"
+  "subsection": "dispenser-in-store" | "IT" | ... | null   // REQUIRED when section has a facet or when section="Stakeholder concerns"; use the subsection_key, not the title
   "bullet": "1-line synthesis (no Source Excerpt verbatim). (Source: <source_notion_id>/<evidence_notion_id>)" | null,
   "replaces": "original bullet text to replace" | null,
   "reasoning": "1-2 sentences why"
@@ -328,27 +345,38 @@ async function _POST(req: NextRequest) {
         if (!node) throw new Error(`target_path not found: ${c.target_path}`);
 
         const isConcernSection = c.section.toLowerCase() === "stakeholder concerns";
-        // Preference order for the subsection when writing a Concern:
-        //   1) explicit subsection from the classifier response
-        //   2) stakeholder_function already on the evidence row
-        //   3) workstream on the evidence row (matches canonical function, e.g. "Quality")
-        //   4) "Other"
+
+        // Resolve the subsection header to write under. Three paths:
+        //   1) Section has a facet → subsection must be a facet key; resolve to the facet's title.
+        //   2) Section is "Stakeholder concerns" → subsection is a canonical function name.
+        //   3) No subsection needed → plain appendBullet.
         const STD_FNS = new Set([
           "IT","Quality","Operations","Legal","Finance","Marketing",
           "Executive","Procurement","Sales","Customer Service","Supply Chain","Other",
         ]);
         const workstreamAsFn = ev.workstream && STD_FNS.has(ev.workstream) ? ev.workstream : null;
-        const subsection = isConcernSection
-          ? (c.subsection ?? ev.stakeholder_function ?? workstreamAsFn ?? "Other")
-          : null;
 
-        const writeResult = isConcernSection && subsection
-          ? appendBulletInSubsection(node.body_md, c.section, subsection, c.bullet)
+        const facet = findFacet(node, c.section);
+        let subsectionHeader: string | null = null;
+
+        if (facet) {
+          // Find facet entry by key; fall back to the "general" bucket when
+          // the classifier didn't pick one or picked an invalid key.
+          const picked = facet.subsections.find(s => s.key === c.subsection)
+            ?? facet.subsections.find(s => s.key === "general")
+            ?? facet.subsections[0];
+          subsectionHeader = picked?.title ?? null;
+        } else if (isConcernSection) {
+          subsectionHeader = c.subsection ?? ev.stakeholder_function ?? workstreamAsFn ?? "Other";
+        }
+
+        const writeResult = subsectionHeader
+          ? appendBulletInSubsection(node.body_md, c.section, subsectionHeader, c.bullet)
           : appendBullet(node.body_md, c.section, c.bullet);
         const { body: newBody, changed, before, after } = writeResult;
 
         // Reflect subsection in the logged section string so the UI shows it
-        const sectionLabel = subsection ? `${c.section} > ${subsection}` : c.section;
+        const sectionLabel = subsectionHeader ? `${c.section} > ${subsectionHeader}` : c.section;
 
         if (!changed) {
           // Dedup → downgrade to IGNORE

@@ -130,19 +130,41 @@ async function _POST(req: NextRequest) {
     COMMIT_PATTERNS.test(`${e.title ?? ""} ${e.evidence_statement ?? ""}`)
   );
 
-  // Knowledge leaves relevant: those with matching workstream tag OR
-  // whose path contains a keyword from the project name (very rough v1)
-  const projectNameKey = (project.name ?? "").toLowerCase();
-  const relevantLeaves = knowledgeNodes.filter(n => {
-    const hasTaggedWorkstream = n.tags.some(t =>
-      Object.keys(workstreamCounts).some(w => t.toLowerCase().includes(w.toLowerCase()))
-    );
-    const nameMatch = projectNameKey &&
-      (n.path.toLowerCase().includes(projectNameKey.split(" ")[0]) ||
-       n.title.toLowerCase().includes(projectNameKey.split(" ")[0]));
-    const isLeaf = !knowledgeNodes.some(c => c.parent_id === n.id);
-    return isLeaf && (hasTaggedWorkstream || nameMatch);
-  }).slice(0, 8);
+  // Knowledge leaves relevant: score each leaf against the project's signal
+  // (evidence titles/statements + workstreams + project name). The leaf with
+  // the most keyword hits wins. This is much stronger than matching only
+  // workstream tags (which rarely overlap with leaf tags in practice).
+  const STOP = new Set([
+    "the","and","for","with","from","that","this","what","will","have","has","had","about","which","where","when","who","how","why","can","does","did","project","meeting","email","update","sent","sesion","sesión","reunion","reunión","para","por","con","sin","sobre","fwd","also",
+  ]);
+  const projectName = project?.name ?? "";
+  function projectKeywords(): Set<string> {
+    const bag: string[] = [];
+    bag.push(projectName.toLowerCase());
+    for (const s of sources) bag.push((s as { title?: string | null }).title?.toLowerCase() ?? "");
+    for (const e of evidence) {
+      bag.push((e.title ?? "").toLowerCase());
+      bag.push((e.evidence_statement ?? "").slice(0, 300).toLowerCase());
+    }
+    for (const w of Object.keys(workstreamCounts)) bag.push(w.toLowerCase());
+    const text = bag.join(" ").replace(/[^\p{L}\p{N}\s]/gu, " ");
+    return new Set(text.split(/\s+/).filter(t => t.length >= 4 && !STOP.has(t)));
+  }
+  const projKw = projectKeywords();
+
+  function scoreLeaf(n: typeof knowledgeNodes[number]): number {
+    const haystack = `${n.path} ${n.title} ${n.summary} ${n.tags.join(" ")} ${n.body_md}`.toLowerCase();
+    let score = 0;
+    for (const t of projKw) if (haystack.includes(t)) score++;
+    return score;
+  }
+  const leaves = knowledgeNodes.filter(n => !knowledgeNodes.some(c => c.parent_id === n.id));
+  const relevantLeaves = leaves
+    .map(n => ({ n, score: scoreLeaf(n) }))
+    .filter(x => x.score >= 3)               // require meaningful overlap
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 8)
+    .map(x => x.n);
 
   // Summarise evidence by function (heat map input)
   const functionHeat: Record<string, number> = {};

@@ -20,6 +20,17 @@ export type NodeStatus = "Active" | "Stale" | "Archived";
 export type ChangelogAction = "CREATED" | "APPEND" | "AMEND" | "SPLIT" | "IGNORE";
 export type ChangelogStatus = "applied" | "proposed" | "rejected";
 
+export type FacetSubsection = {
+  key: string;     // stable identifier, e.g. "dispenser-in-store"
+  title: string;   // human-readable header written into the body, e.g. "Dispenser (in-store)"
+  hint: string;    // signal vocabulary the curator uses to classify evidence
+};
+
+export type Facet = {
+  section: string;                  // parent section heading (## heading)
+  subsections: FacetSubsection[];   // required vocabulary for ### subsections
+};
+
 export type KnowledgeNode = {
   id: string;
   path: string;
@@ -30,6 +41,7 @@ export type KnowledgeNode = {
   summary: string;
   body_md: string;
   tags: string[];
+  facets: Facet[];
   status: NodeStatus;
   reference_count: number;
   last_evidence_at: string | null;
@@ -37,6 +49,12 @@ export type KnowledgeNode = {
   created_at: string;
   updated_at: string;
 };
+
+/** Returns the facet for a given section, or null if the section isn't facetted. */
+export function findFacet(node: KnowledgeNode, sectionHeading: string): Facet | null {
+  if (!node.facets || node.facets.length === 0) return null;
+  return node.facets.find(f => f.section.toLowerCase() === sectionHeading.toLowerCase()) ?? null;
+}
 
 export type NodeChangelogEntry = {
   id: string;
@@ -305,8 +323,8 @@ export function appendBullet(
 
   const bulletLine = bullet.startsWith("- ") ? bullet : `- ${bullet}`;
 
-  // Dedup: exact substring match on the bullet text
-  if (target.body.includes(bulletLine)) {
+  // Dedup: exact substring OR fuzzy (normalised numbers + tokens ≥ 70% overlap)
+  if (target.body.includes(bulletLine) || isFuzzyDuplicate(target.body, bulletLine)) {
     return { body: body_md, changed: false, before: null, after: null };
   }
 
@@ -327,6 +345,41 @@ export function appendBullet(
     before,
     after: target.body,
   };
+}
+
+/** Normalise a bullet for fuzzy comparison: lowercase, strip punctuation,
+ *  collapse numbers to "#" so "0.16–0.20" ≈ "0.155–0.197", drop Source refs. */
+function normaliseForFuzzy(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/\(source:[^)]*\)/g, "")               // drop Source: ... cite
+    .replace(/\d+(?:[.,]\d+)?/g, "#")               // collapse numbers
+    .replace(/[^\p{L}\p{N}\s#]/gu, " ")             // drop punctuation
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Bag-of-tokens overlap after normalisation. Returns true when the new bullet
+ *  matches an existing one with ≥70% token overlap AND the existing one is at
+ *  least 30 characters (to avoid flagging short bullets like "- note"). */
+function isFuzzyDuplicate(body: string, newBullet: string): boolean {
+  const newNorm = normaliseForFuzzy(newBullet);
+  const newTokens = new Set(newNorm.split(" ").filter(t => t.length >= 4));
+  if (newTokens.size < 4) return false;
+
+  for (const line of body.split(/\r?\n/)) {
+    if (!line.trim().startsWith("- ")) continue;
+    if (line.length < 30) continue;
+    const existingNorm = normaliseForFuzzy(line);
+    const existingTokens = new Set(existingNorm.split(" ").filter(t => t.length >= 4));
+    if (existingTokens.size < 4) continue;
+
+    let overlap = 0;
+    for (const t of newTokens) if (existingTokens.has(t)) overlap++;
+    const smaller = Math.min(newTokens.size, existingTokens.size);
+    if (overlap / smaller >= 0.7) return true;
+  }
+  return false;
 }
 
 /**
@@ -351,8 +404,8 @@ export function appendBulletInSubsection(
 
   const bulletLine = bullet.startsWith("- ") ? bullet : `- ${bullet}`;
 
-  // Dedup across the whole parent section body
-  if (target.body.includes(bulletLine)) {
+  // Dedup across the whole parent section body (exact + fuzzy)
+  if (target.body.includes(bulletLine) || isFuzzyDuplicate(target.body, bulletLine)) {
     return { body: body_md, changed: false, before: null, after: null };
   }
 
