@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import type {
   ArtifactQuestion,
   ArtifactStatus,
@@ -584,10 +586,12 @@ function VersionPreviewModal({
             ✕
           </button>
         </div>
-        <div className="overflow-auto px-6 py-5">
-          <pre className="whitespace-pre-wrap text-[12px] text-[#131218] leading-relaxed font-sans">
-            {version.content}
-          </pre>
+        <div className="overflow-auto px-8 py-7">
+          <article className="ch-artifact-prose max-w-none text-[#131218]">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              {version.content ?? ""}
+            </ReactMarkdown>
+          </article>
         </div>
         {version.answers_used?.length > 0 && (
           <div className="px-6 py-3 border-t border-[#E0E0D8] bg-[#F7F7F3]">

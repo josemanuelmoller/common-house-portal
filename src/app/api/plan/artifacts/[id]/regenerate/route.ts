@@ -45,9 +45,17 @@ Rules of the refinement:
 - Keep the structure recognizable: same major section headings as the prior version unless an answer explicitly reshaped scope.
 - Write in the same language as the prior version (Spanish unless it's clearly English).
 
+Prose over punctuation:
+- Write **natural paragraphs** as the default voice of each section. A paragraph is 2-5 sentences that connect ideas, explain reasoning, and read like a PM thinking out loud — not like a slide.
+- Use **bullets only for genuinely enumerable items**: lists of people, lists of deliverables, steps in a sequence, risks with mitigations. If a section has 2-3 things that flow together, write them as prose.
+- Use **tables only when the comparison is the point** — e.g. a role vs responsibility matrix, or candidate slots with their status. One table per section max. If the data can be written in a sentence, do that.
+- **Never** emit a document that is >70% bullets/tables. If the prior version was bullet-heavy, rewrite in prose on this pass — your job is to mature the draft.
+- Open with a **lead paragraph** under each main section that sets context in plain prose before any list or table.
+- Close with a **next-step paragraph** (prose, not bullets) that tells the reader what to do after reading this section.
+
 Output format — strict JSON only, no prose outside the JSON:
 {
-  "content": "full text of the new version, including all sections",
+  "content": "full text of the new version, including all sections. Markdown allowed (# headings, **bold**, tables, bullets) but use bullets sparingly per the Prose rule above.",
   "summary_of_changes": "one paragraph (2-4 sentences) explaining what changed from the prior version and why",
   "new_questions": [
     {
@@ -57,7 +65,7 @@ Output format — strict JSON only, no prose outside the JSON:
   ]
 }
 
-Return valid JSON. No markdown code fences. No commentary before or after.`;
+Return valid JSON. No markdown code fences wrapping the JSON itself. No commentary before or after the JSON.`;
 
 /**
  * Per-type template appendix. Each objective_type gets its own guardrails and

@@ -20,3 +20,164 @@ body {
   font-family: 'Space Grotesk', sans-serif;
   -webkit-font-smoothing: antialiased;
 }
+
+/* ─── CH Artifact prose ──────────────────────────────────────────────────────
+   Styling for rendered markdown inside the Preview modal of plan artifacts.
+   Uses CH brand tokens: Space Grotesk, --ch-dark, --ch-green accents. */
+.ch-artifact-prose {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--ch-dark);
+}
+.ch-artifact-prose h1,
+.ch-artifact-prose h2,
+.ch-artifact-prose h3,
+.ch-artifact-prose h4 {
+  color: var(--ch-dark);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin-top: 1.75em;
+  margin-bottom: 0.55em;
+  line-height: 1.2;
+}
+.ch-artifact-prose h1 {
+  font-size: 26px;
+  letter-spacing: -0.03em;
+  padding-bottom: 12px;
+  border-bottom: 2px solid var(--ch-green);
+  margin-top: 0;
+  margin-bottom: 0.8em;
+}
+.ch-artifact-prose h2 {
+  font-size: 19px;
+  padding-left: 10px;
+  border-left: 3px solid var(--ch-green);
+}
+.ch-artifact-prose h3 {
+  font-size: 15px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #6B6B60;
+}
+.ch-artifact-prose h4 {
+  font-size: 14px;
+}
+.ch-artifact-prose p {
+  margin: 0.8em 0;
+}
+.ch-artifact-prose strong {
+  color: var(--ch-dark);
+  font-weight: 700;
+}
+.ch-artifact-prose em {
+  color: #6B6B60;
+  font-style: italic;
+}
+.ch-artifact-prose a {
+  color: var(--ch-dark);
+  text-decoration: underline;
+  text-decoration-color: var(--ch-green);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+.ch-artifact-prose a:hover {
+  background: var(--ch-green);
+}
+.ch-artifact-prose ul,
+.ch-artifact-prose ol {
+  margin: 0.8em 0;
+  padding-left: 1.4em;
+}
+.ch-artifact-prose ul li {
+  list-style: none;
+  position: relative;
+  margin: 0.3em 0;
+}
+.ch-artifact-prose ul li::before {
+  content: '';
+  position: absolute;
+  left: -1.1em;
+  top: 0.65em;
+  width: 6px;
+  height: 6px;
+  background: var(--ch-green);
+  border-radius: 50%;
+}
+.ch-artifact-prose ol li {
+  margin: 0.3em 0;
+}
+.ch-artifact-prose ol li::marker {
+  color: #6B6B60;
+  font-weight: 700;
+  font-size: 0.9em;
+}
+.ch-artifact-prose hr {
+  border: none;
+  height: 1px;
+  background: #E0E0D8;
+  margin: 2em 0;
+}
+.ch-artifact-prose blockquote {
+  border-left: 3px solid var(--ch-green);
+  padding: 0.3em 0 0.3em 1em;
+  margin: 1em 0;
+  color: #6B6B60;
+  font-style: italic;
+  background: #F7F7F3;
+}
+.ch-artifact-prose code {
+  font-family: 'JetBrains Mono', 'Courier New', monospace;
+  font-size: 12px;
+  background: #EFEFEA;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.ch-artifact-prose pre {
+  background: var(--ch-dark);
+  color: var(--ch-green);
+  padding: 14px 16px;
+  border-radius: 8px;
+  overflow-x: auto;
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 1em 0;
+}
+.ch-artifact-prose pre code {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+}
+.ch-artifact-prose table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.2em 0;
+  font-size: 13px;
+  overflow: hidden;
+  border-radius: 8px;
+  border: 1px solid #E0E0D8;
+}
+.ch-artifact-prose table thead {
+  background: var(--ch-dark);
+}
+.ch-artifact-prose table th {
+  color: var(--ch-green);
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  padding: 10px 14px;
+  text-align: left;
+  border-bottom: 2px solid var(--ch-green);
+}
+.ch-artifact-prose table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid #EFEFEA;
+  vertical-align: top;
+}
+.ch-artifact-prose table tbody tr:last-child td {
+  border-bottom: none;
+}
+.ch-artifact-prose table tbody tr:hover {
+  background: #F7F7F3;
+}
