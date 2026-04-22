@@ -58,6 +58,7 @@ function LeafCard({ leaf }: { leaf: TreeNode }) {
   const bulletCount = countBullets(leaf.body_md);
   const isHot = dEvidence !== null && dEvidence <= 7;
   const isStale = dEvidence !== null && dEvidence > 60;
+  const hasChildren = leaf.children.length > 0;
 
   return (
     <Link
@@ -76,17 +77,38 @@ function LeafCard({ leaf }: { leaf: TreeNode }) {
         </p>
 
         {/* Title */}
-        <h3 className="text-[22px] font-semibold tracking-tight text-[#131218] leading-tight mb-3 group-hover:text-[#131218]">
-          {leaf.title}
-        </h3>
+        <div className="flex items-start justify-between gap-2 mb-3">
+          <h3 className="text-[22px] font-semibold tracking-tight text-[#131218] leading-tight group-hover:text-[#131218]">
+            {leaf.title}
+          </h3>
+          {hasChildren && (
+            <span className="shrink-0 text-[9px] font-bold bg-[#131218] text-[#B2FF59] px-2 py-0.5 rounded-full uppercase tracking-widest">
+              {leaf.children.length} modes
+            </span>
+          )}
+        </div>
 
         {/* Preview or summary */}
         <p className="text-[12.5px] text-[#131218]/55 leading-relaxed line-clamp-3 flex-1">
           {preview ?? leaf.summary ?? "—"}
         </p>
 
+        {/* Sub-mode chips (when this card is a category with children) */}
+        {hasChildren && (
+          <div className="mt-4 flex items-center gap-1.5 flex-wrap">
+            {leaf.children.map(c => (
+              <span
+                key={c.id}
+                className="text-[10px] font-semibold text-[#131218] bg-[#EFEFEA] px-2.5 py-1 rounded-full border border-[#E0E0D8]"
+              >
+                → {c.title}
+              </span>
+            ))}
+          </div>
+        )}
+
         {/* Case chips */}
-        {cases.length > 0 && (
+        {!hasChildren && cases.length > 0 && (
           <div className="mt-4 flex items-center gap-1.5 flex-wrap">
             {cases.slice(0, 3).map(c => (
               <span
