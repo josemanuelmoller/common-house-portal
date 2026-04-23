@@ -15,7 +15,7 @@
  */
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { WaOnlyContactRow } from "./WaOnlyContactRow";
 
 export type SearchableContact = {
@@ -57,27 +57,112 @@ function displayFor(c: SearchableContact): string {
   );
 }
 
-function matches(c: SearchableContact, q: string): boolean {
-  if (!q) return true;
-  const hay = [
-    c.display_name ?? "",
-    c.full_name    ?? "",
-    c.email        ?? "",
-    (c.relationship_classes ?? []).join(" "),
-    c.suggestion?.domain ?? "",
-    c.suggestion?.orgName ?? "",
-    c.auto_suggested ?? "",
-    c.job_title ?? "",
-    c.role_category ?? "",
-    c.function_area ?? "",
-  ].join(" ").toLowerCase();
-  // Every whitespace-separated token in the query must appear in the haystack.
-  // Accent-insensitive via NFD + combining-mark strip.
-  const norm = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  const nq = norm(q.toLowerCase());
-  const nh = norm(hay);
-  return nq.split(/\s+/).filter(Boolean).every(t => nh.includes(t));
+// Normalise: accent-strip + lowercase so Spanish/Portuguese names match.
+function norm(s: string): string {
+  return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 }
+
+function warmthOf(c: SearchableContact): "hot" | "warm" | "cooling" | "cold" {
+  if (!c.last_seen_at) return "cold";
+  const days = (Date.now() - new Date(c.last_seen_at).getTime()) / 86400_000;
+  if (days < 7)  return "hot";
+  if (days < 30) return "warm";
+  if (days < 90) return "cooling";
+  return "cold";
+}
+
+/**
+ * Filter a contact against a free-text query. Supports operators:
+ *   tier:founder   — role_category exact (case-insensitive)
+ *   area:marketing — function_area exact
+ *   class:vip      — at least one relationship_class matches
+ *   warmth:hot|warm|cooling|cold — derived from last_seen_at
+ *   has:linkedin | missing:linkedin — enrichment state
+ *   org:gudcompany — domain or suggested org contains
+ *
+ * Non-operator tokens must all appear somewhere in the name / email /
+ * title / area / org haystack (accent-insensitive, AND-ed).
+ */
+function matches(c: SearchableContact, q: string): boolean {
+  if (!q.trim()) return true;
+  const operators: Record<string, string> = {};
+  const freeTokens: string[] = [];
+
+  for (const raw of q.split(/\s+/).filter(Boolean)) {
+    const colon = raw.indexOf(":");
+    if (colon > 0 && colon < raw.length - 1) {
+      const key   = raw.slice(0, colon).toLowerCase();
+      const value = raw.slice(colon + 1).toLowerCase();
+      operators[key] = value;
+    } else {
+      freeTokens.push(raw);
+    }
+  }
+
+  // Operator checks
+  if (operators.tier) {
+    if ((c.role_category ?? "").toLowerCase() !== operators.tier) return false;
+  }
+  if (operators.area) {
+    if ((c.function_area ?? "").toLowerCase() !== operators.area) return false;
+  }
+  if (operators.class) {
+    const cls = (c.relationship_classes ?? []).map(x => x.toLowerCase());
+    if (!cls.includes(operators.class)) return false;
+  }
+  if (operators.warmth) {
+    if (warmthOf(c) !== operators.warmth) return false;
+  }
+  if (operators.has === "linkedin")     { if (!c.linkedin) return false; }
+  if (operators.missing === "linkedin") { if (c.linkedin)  return false; }
+  if (operators.has === "title")        { if (!c.job_title) return false; }
+  if (operators.missing === "title")    { if (c.job_title)  return false; }
+  if (operators.org) {
+    const dom = (c.suggestion?.domain ?? "").toLowerCase();
+    const nm  = (c.suggestion?.orgName ?? "").toLowerCase();
+    const email = (c.email ?? "").toLowerCase();
+    if (!dom.includes(operators.org) && !nm.includes(operators.org) && !email.includes(operators.org)) return false;
+  }
+
+  // Free-text haystack
+  if (freeTokens.length > 0) {
+    const hay = norm([
+      c.display_name ?? "",
+      c.full_name    ?? "",
+      c.email        ?? "",
+      (c.relationship_classes ?? []).join(" "),
+      c.suggestion?.domain ?? "",
+      c.suggestion?.orgName ?? "",
+      c.auto_suggested ?? "",
+      c.job_title ?? "",
+      c.role_category ?? "",
+      c.function_area ?? "",
+    ].join(" "));
+    for (const t of freeTokens) {
+      if (!hay.includes(norm(t))) return false;
+    }
+  }
+
+  return true;
+}
+
+type Preset = {
+  id:     string;
+  label:  string;
+  query:  string;
+  hint?:  string;
+};
+
+const PRESETS: Preset[] = [
+  { id: "vips",         label: "My VIPs",          query: "class:vip",                           hint: "Decision-makers" },
+  { id: "founders",     label: "Founders",         query: "tier:founder",                        hint: "All founders/CEOs" },
+  { id: "investors",    label: "Investors",        query: "tier:investor",                       hint: "Partners, GPs, LPs" },
+  { id: "cold_vips",    label: "Cold VIPs",        query: "class:vip warmth:cold",               hint: "Reconnect candidates" },
+  { id: "no_linkedin",  label: "Missing LinkedIn", query: "missing:linkedin",                    hint: "Need manual fill" },
+  { id: "no_title",     label: "Missing title",    query: "missing:title",                       hint: "Role unknown" },
+  { id: "marketing",    label: "Marketing",        query: "area:marketing",                      hint: "All marketing people" },
+  { id: "hot",          label: "Hot contacts",     query: "warmth:hot",                          hint: "Talked in last 7 days" },
+];
 
 export function HallContactsSearchable({
   contacts,
@@ -88,6 +173,40 @@ export function HallContactsSearchable({
   const [tierFilter, setTierFilter]     = useState<string>("");
   const [areaFilter, setAreaFilter]     = useState<string>("");
   const [classFilter, setClassFilter]   = useState<string>("");
+  const [density, setDensity]           = useState<"card" | "compact">("card");
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  // Keyboard shortcuts:
+  //   /         → focus the search input
+  //   Escape    → clear the search + filters (when input is focused or no input)
+  //   ⌘/Ctrl+K  → also focuses search (common convention)
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const target = e.target as HTMLElement | null;
+      const inEditable = !!target && (
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.tagName === "SELECT" ||
+        target.isContentEditable
+      );
+      if (e.key === "/" && !inEditable) {
+        e.preventDefault();
+        searchRef.current?.focus();
+        return;
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        searchRef.current?.focus();
+        return;
+      }
+      if (e.key === "Escape" && target === searchRef.current) {
+        setQuery("");
+        searchRef.current?.blur();
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   // The filter dropdowns only offer values that actually appear in the
   // current dataset. Prevents an empty "Founder" filter if there are none yet.
@@ -136,10 +255,11 @@ export function HallContactsSearchable({
             <path d="M20 20l-3.5-3.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
           </svg>
           <input
+            ref={searchRef}
             type="search"
             value={query}
             onChange={e => setQuery(e.target.value)}
-            placeholder="Search by name, email, class, organisation, title or area…"
+            placeholder="Search… or tier:founder area:marketing warmth:cold  ( / to focus)"
             className="flex-1 text-[12px] text-[#131218] placeholder:text-[#131218]/35 bg-transparent outline-none"
             autoComplete="off"
           />
@@ -154,6 +274,43 @@ export function HallContactsSearchable({
           <span className="text-[10px] text-[#131218]/40 tabular-nums">
             {filtered.length}/{contacts.length}
           </span>
+          <div className="flex items-center gap-0.5 ml-2 border border-[#E0E0D8] rounded-lg overflow-hidden">
+            <button
+              onClick={() => setDensity("card")}
+              className={`px-2 py-1 text-[9px] font-bold uppercase tracking-widest transition-colors ${density === "card" ? "bg-[#131218] text-white" : "text-[#131218]/40 hover:text-[#131218]"}`}
+              title="Card view"
+            >
+              Cards
+            </button>
+            <button
+              onClick={() => setDensity("compact")}
+              className={`px-2 py-1 text-[9px] font-bold uppercase tracking-widest transition-colors ${density === "compact" ? "bg-[#131218] text-white" : "text-[#131218]/40 hover:text-[#131218]"}`}
+              title="Compact list view"
+            >
+              List
+            </button>
+          </div>
+        </div>
+        {/* Preset pills */}
+        <div className="flex items-center gap-1.5 px-4 py-2 border-t border-[#EFEFEA] bg-[#FAFAF6] flex-wrap">
+          <span className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/40 mr-1">Presets</span>
+          {PRESETS.map(p => {
+            const active = query === p.query;
+            return (
+              <button
+                key={p.id}
+                onClick={() => setQuery(active ? "" : p.query)}
+                title={p.hint}
+                className={`text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full transition-colors ${
+                  active
+                    ? "bg-[#131218] text-white"
+                    : "bg-white border border-[#E0E0D8] text-[#131218]/60 hover:text-[#131218] hover:border-[#131218]/30"
+                }`}
+              >
+                {p.label}
+              </button>
+            );
+          })}
         </div>
         {/* Filter dropdowns — only shown when we have values to filter by */}
         {(availableTiers.length > 0 || availableAreas.length > 0 || availableClasses.length > 0) && (
@@ -228,16 +385,28 @@ export function HallContactsSearchable({
               {withEmail.length}
             </span>
           </div>
-          <div className="grid gap-3">
-            {withEmail.map(c => (
-              <WithEmailCard
-                key={c.id}
-                contact={c}
-                maxIntensity={maxIntensity}
-                tier={c.intensity >= hotCutoff ? "hot" : c.intensity >= warmCutoff ? "warm" : "cool"}
-              />
-            ))}
-          </div>
+          {density === "card" ? (
+            <div className="grid gap-3">
+              {withEmail.map(c => (
+                <WithEmailCard
+                  key={c.id}
+                  contact={c}
+                  maxIntensity={maxIntensity}
+                  tier={c.intensity >= hotCutoff ? "hot" : c.intensity >= warmCutoff ? "warm" : "cool"}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden divide-y divide-[#EFEFEA]">
+              {withEmail.map(c => (
+                <CompactRow
+                  key={c.id}
+                  contact={c}
+                  tier={c.intensity >= hotCutoff ? "hot" : c.intensity >= warmCutoff ? "warm" : "cool"}
+                />
+              ))}
+            </div>
+          )}
         </section>
       )}
 
@@ -364,6 +533,52 @@ function WithEmailCard({
             )}
           </div>
         </div>
+      </div>
+    </Link>
+  );
+}
+
+// ─── Compact row (list view) ──────────────────────────────────────────────────
+
+function CompactRow({
+  contact, tier,
+}: {
+  contact: SearchableContact;
+  tier:    "hot" | "warm" | "cool";
+}) {
+  const display = displayFor(contact);
+  const domain  = (contact.email ?? "").split("@")[1] ?? "";
+  const dotColor = tier === "hot" ? "bg-[#22c55e]" : tier === "warm" ? "bg-[#f59e0b]" : "bg-[#9ca3af]";
+  const classes  = contact.relationship_classes ?? [];
+  return (
+    <Link
+      href={`/admin/hall/contacts/${encodeURIComponent(contact.email ?? contact.id)}`}
+      prefetch={false}
+      className="flex items-center gap-3 px-4 py-2 hover:bg-[#EFEFEA]/40 transition-colors"
+    >
+      <span className={`w-2 h-2 rounded-full shrink-0 ${dotColor}`} title={`Warmth: ${tier}`} />
+      <span className="flex-1 min-w-0 flex items-baseline gap-2">
+        <span className="text-[12.5px] font-semibold text-[#131218] truncate">{display}</span>
+        {contact.job_title && (
+          <span className="text-[10.5px] text-[#131218]/55 truncate">· {contact.job_title}</span>
+        )}
+        <span className="text-[10px] text-[#131218]/35 truncate">· {domain}</span>
+      </span>
+      <div className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest shrink-0">
+        {contact.role_category && (
+          <span className="bg-[#131218] text-white px-1.5 py-0.5 rounded">{contact.role_category}</span>
+        )}
+        {contact.function_area && (
+          <span className="bg-[#c8f55a]/50 text-[#131218] px-1.5 py-0.5 rounded">{contact.function_area}</span>
+        )}
+        {classes.slice(0, 2).map(cls => (
+          <span key={cls} className="bg-[#EFEFEA] text-[#131218]/70 px-1.5 py-0.5 rounded">{cls}</span>
+        ))}
+      </div>
+      <div className="flex items-center gap-2 text-[10px] text-[#131218]/45 tabular-nums shrink-0">
+        {contact.meeting_count  > 0 && <span title="Meetings">📅 {contact.meeting_count}</span>}
+        {contact.email_thread_count > 0 && <span title="Email threads">✉ {contact.email_thread_count}</span>}
+        {contact.wa_count > 0 && <span title="WhatsApp" className="text-emerald-700">💬 {contact.wa_count}</span>}
       </div>
     </Link>
   );
