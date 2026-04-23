@@ -12,6 +12,7 @@ import { HallContactsByOrg } from "@/components/HallContactsByOrg";
 import { HallContactsSearchable, type SearchableContact } from "@/components/HallContactsSearchable";
 import { OrphansReviewSection } from "@/components/OrphansReviewSection";
 import { LinkedInReviewSection } from "@/components/LinkedInReviewSection";
+import { NeedsAttentionSection } from "@/components/NeedsAttentionSection";
 
 export const dynamic = "force-dynamic";
 
@@ -238,20 +239,31 @@ type PageProps = { searchParams: Promise<{ mode?: string }> };
 export default async function HallContactsPage({ searchParams }: PageProps) {
   await requireAdmin();
   const { mode: modeParam } = await searchParams;
-  const mode: "browse" | "classify" | "orphans" | "linkedin" =
-      modeParam === "classify"  ? "classify"
+  const mode: "attention" | "browse" | "classify" | "orphans" | "linkedin" =
+      modeParam === "attention" ? "attention"
+    : modeParam === "classify"  ? "classify"
     : modeParam === "orphans"   ? "orphans"
     : modeParam === "linkedin"  ? "linkedin"
     :                              "browse";
 
-  // Counts for tab badges — orphans pending + linkedin needs_review
+  // Counts for tab badges — orphans pending + linkedin needs_review + attention total
   const sb = getSupabaseServerClient();
-  const [orphanCountRes, linkedinCountRes] = await Promise.all([
+  const sixtyDaysAgo = new Date(Date.now() - 60 * 86400_000).toISOString();
+  const [orphanCountRes, linkedinCountRes, untaggedCountRes, coldVipCountRes] = await Promise.all([
     sb.from("orphan_match_candidates").select("id", { count: "exact", head: true }).eq("status", "pending"),
     sb.from("people").select("id", { count: "exact", head: true }).eq("linkedin_needs_review", true),
+    sb.from("people").select("id", { count: "exact", head: true })
+      .not("email", "is", null).is("dismissed_at", null)
+      .or("relationship_classes.is.null,relationship_classes.eq.{}")
+      .gt("meeting_count", 0),
+    sb.from("people").select("id", { count: "exact", head: true })
+      .not("email", "is", null).is("dismissed_at", null)
+      .contains("relationship_classes", ["VIP"])
+      .lt("last_seen_at", sixtyDaysAgo),
   ]);
   const orphanPending   = orphanCountRes.count ?? 0;
   const linkedinPending = linkedinCountRes.count ?? 0;
+  const attentionCount  = (untaggedCountRes.count ?? 0) + orphanPending + linkedinPending + (coldVipCountRes.count ?? 0);
 
   const [contacts, rollup, waCounts, orgSuggestions] = await Promise.all([
     getContacts(),
@@ -345,7 +357,9 @@ export default async function HallContactsPage({ searchParams }: PageProps) {
                 <em className="font-black italic text-[#c8f55a]">Contacts</em>
               </h1>
               <p className="text-sm text-white/40 mt-3 max-w-2xl">
-                {mode === "browse"
+                {mode === "attention"
+                  ? "Everything in your contact base that needs a decision — untagged people, matches to approve, VIPs gone cold. Aggregated from all the other tabs so you have one ritual to keep the base clean."
+                  : mode === "browse"
                   ? "People who appear across your calendar, email, meeting transcripts and WhatsApp — ranked by relationship intensity. Click a name to dive in."
                   : mode === "classify"
                   ? "Classify attendees so Suggested Time Blocks treats them correctly: personal meetings skip prep, VIP meetings get urgency boost."
@@ -370,6 +384,22 @@ export default async function HallContactsPage({ searchParams }: PageProps) {
         <div className="px-12 py-9 max-w-5xl space-y-8">
           {/* Tab navigation */}
           <div className="flex items-center gap-1 border-b border-[#E0E0D8]">
+            <Link
+              href="?mode=attention"
+              prefetch={false}
+              className={`px-4 py-2.5 text-[11px] font-bold tracking-widest uppercase border-b-2 transition-colors ${
+                mode === "attention"
+                  ? "border-[#131218] text-[#131218]"
+                  : "border-transparent text-[#131218]/40 hover:text-[#131218]/70"
+              }`}
+            >
+              Attention
+              {attentionCount > 0 && (
+                <span className="ml-2 text-[10px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full">
+                  {attentionCount}
+                </span>
+              )}
+            </Link>
             <Link
               href="?mode=browse"
               prefetch={false}
@@ -518,8 +548,9 @@ export default async function HallContactsPage({ searchParams }: PageProps) {
           <HallContactsDismissedToggle rows={dismissed} />
           </>}
 
-          {mode === "orphans"  && <OrphansReviewSection />}
-          {mode === "linkedin" && <LinkedInReviewSection />}
+          {mode === "attention" && <NeedsAttentionSection />}
+          {mode === "orphans"   && <OrphansReviewSection />}
+          {mode === "linkedin"  && <LinkedInReviewSection />}
         </div>
       </main>
     </div>
