@@ -11,6 +11,48 @@
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { getSelfEmails } from "@/lib/hall-self";
 
+// ─── Adjacent contacts (prev/next navigation) ────────────────────────────────
+
+export type AdjacentContact = {
+  email:        string;
+  display_name: string | null;
+  full_name:    string | null;
+};
+
+/**
+ * Returns the previous + next contact in the default Browse ordering
+ * (ranked by meeting_count DESC, then by last_seen DESC). Used for the
+ * ← / → navigation in the profile header.
+ */
+export async function getAdjacentContacts(email: string): Promise<{
+  prev: AdjacentContact | null;
+  next: AdjacentContact | null;
+  position: number | null;
+  total: number;
+}> {
+  const sb = getSupabaseServerClient();
+  const key = email.toLowerCase();
+
+  const { data } = await sb
+    .from("people")
+    .select("email, display_name, full_name, meeting_count, last_seen_at")
+    .not("email", "is", null)
+    .is("dismissed_at", null)
+    .order("meeting_count", { ascending: false })
+    .order("last_seen_at",  { ascending: false })
+    .limit(1000);
+
+  const rows = (data ?? []) as AdjacentContact[];
+  const idx = rows.findIndex(r => (r.email ?? "").toLowerCase() === key);
+  if (idx < 0) return { prev: null, next: null, position: null, total: rows.length };
+  return {
+    prev:     idx > 0 ? rows[idx - 1] : null,
+    next:     idx < rows.length - 1 ? rows[idx + 1] : null,
+    position: idx + 1,
+    total:    rows.length,
+  };
+}
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export type EnrichmentFields = {
@@ -36,13 +78,24 @@ export type EnrichmentFields = {
   city:                     string | null;
   recurring_topics:         string[] | null;
   recurring_topics_updated_at: string | null;
+  ai_summary:               string | null;
+  ai_summary_updated_at:    string | null;
+  open_loops:               Array<{
+    direction:  "promised_by_you" | "awaiting_from_them";
+    text:       string;
+    source:     "transcript" | "whatsapp" | "email" | "meeting";
+    source_ref: string | null;
+    ts:         string | null;
+    resolved:   boolean;
+  }> | null;
+  open_loops_updated_at:    string | null;
 };
 
 export async function getEnrichmentByEmail(email: string): Promise<EnrichmentFields | null> {
   const sb = getSupabaseServerClient();
   const { data } = await sb
     .from("people")
-    .select("id, full_name, display_name, linkedin, job_title, role_category, function_area, organization_detected, linkedin_confidence, linkedin_source, linkedin_enriched_at, linkedin_needs_review, linkedin_last_attempt_at, job_title_confidence, job_title_source, job_title_updated_at, notes, phone, country, city, recurring_topics, recurring_topics_updated_at")
+    .select("id, full_name, display_name, linkedin, job_title, role_category, function_area, organization_detected, linkedin_confidence, linkedin_source, linkedin_enriched_at, linkedin_needs_review, linkedin_last_attempt_at, job_title_confidence, job_title_source, job_title_updated_at, notes, phone, country, city, recurring_topics, recurring_topics_updated_at, ai_summary, ai_summary_updated_at, open_loops, open_loops_updated_at")
     .eq("email", email.toLowerCase())
     .maybeSingle();
   return (data ?? null) as EnrichmentFields | null;

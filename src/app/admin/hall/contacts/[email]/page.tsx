@@ -15,12 +15,15 @@ import {
   getSharedProjects,
   getCoAttendees,
   getContactOrganizations,
+  getAdjacentContacts,
 } from "@/lib/contact-profile";
 import { HallContactRow } from "@/components/HallContactRow";
 import { ReEnrichButton } from "@/components/ReEnrichButton";
 import { SynthesizeTopicsButton } from "@/components/SynthesizeTopicsButton";
 import { CollapsibleList } from "@/components/CollapsibleList";
 import { ContactIdentityEditor } from "@/components/ContactIdentityEditor";
+import { ContactAISummary } from "@/components/ContactAISummary";
+import { ContactOpenLoops } from "@/components/ContactOpenLoops";
 
 export const dynamic = "force-dynamic";
 
@@ -91,11 +94,12 @@ export default async function ContactDrawerPage({ params }: Props) {
   ]);
   if (!contact) return notFound();
 
-  const [whatsappClips, sharedProjects, coAttendees, organizations] = await Promise.all([
+  const [whatsappClips, sharedProjects, coAttendees, organizations, adjacent] = await Promise.all([
     getContactWhatsappClips({ person_id: enrichment?.id ?? null, display_name: contact.display_name }, 10),
     getSharedProjects(email),
     getCoAttendees(email, 8),
     getContactOrganizations(email, enrichment),
+    getAdjacentContacts(email),
   ]);
 
   const personal      = isPersonalContact(contact);
@@ -131,6 +135,36 @@ export default async function ContactDrawerPage({ params }: Props) {
             <Link href="/admin/hall/contacts" className="hover:text-white/80 transition-colors">Contacts</Link>
             <span>›</span>
             <span className="text-white/50">{contact.display_name || email.split("@")[0]}</span>
+            <div className="flex-1" />
+            {adjacent.position != null && (
+              <span className="text-white/30 tabular-nums">
+                {adjacent.position} / {adjacent.total}
+              </span>
+            )}
+            {adjacent.prev ? (
+              <Link
+                href={`/admin/hall/contacts/${encodeURIComponent(adjacent.prev.email)}`}
+                prefetch={false}
+                className="text-white/50 hover:text-white border border-white/10 hover:border-white/30 rounded-lg px-2 py-1"
+                title={`← ${adjacent.prev.display_name ?? adjacent.prev.full_name ?? adjacent.prev.email}`}
+              >
+                ← Prev
+              </Link>
+            ) : (
+              <span className="text-white/15 border border-white/5 rounded-lg px-2 py-1">← Prev</span>
+            )}
+            {adjacent.next ? (
+              <Link
+                href={`/admin/hall/contacts/${encodeURIComponent(adjacent.next.email)}`}
+                prefetch={false}
+                className="text-white/50 hover:text-white border border-white/10 hover:border-white/30 rounded-lg px-2 py-1"
+                title={`${adjacent.next.display_name ?? adjacent.next.full_name ?? adjacent.next.email} →`}
+              >
+                Next →
+              </Link>
+            ) : (
+              <span className="text-white/15 border border-white/5 rounded-lg px-2 py-1">Next →</span>
+            )}
           </div>
           <div className="flex items-end justify-between gap-6">
             <div className="min-w-0">
@@ -186,6 +220,22 @@ export default async function ContactDrawerPage({ params }: Props) {
         </header>
 
         <div className="px-12 py-9 max-w-5xl space-y-8">
+
+          {/* ═══ Block 0 · AI summary + Open loops (briefing strip) ═════════════ */}
+          {enrichment && (
+            <div className="space-y-3">
+              <ContactAISummary
+                personId={enrichment.id}
+                summary={enrichment.ai_summary}
+                updatedAt={enrichment.ai_summary_updated_at}
+              />
+              <ContactOpenLoops
+                personId={enrichment.id}
+                loops={enrichment.open_loops}
+                updatedAt={enrichment.open_loops_updated_at}
+              />
+            </div>
+          )}
 
           {/* ═══ Block 1 · Identity ═══════════════════════════════════════════ */}
           <section>
