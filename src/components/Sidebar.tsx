@@ -80,6 +80,7 @@ export const ADMIN_NAV_V2: NavEntry[] = [
       { label: "Network",         href: "/admin/hall/network" },
       { label: "Commitments",     href: "/admin/hall/commitments" },
       { label: "System Health",   href: "/admin/health" },
+      { label: "AI Grounding",    href: "/admin/settings/identity" },
     ],
   },
   { kind: "link",  label: "Living Room",  href: "/living-room",   icon: "◐" },

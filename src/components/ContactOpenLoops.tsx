@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { CorrectionButton } from "./CorrectionButton";
 
 type Loop = {
   direction:  "promised_by_you" | "awaiting_from_them";
@@ -10,6 +11,15 @@ type Loop = {
   source_ref: string | null;
   ts:         string | null;
   resolved:   boolean;
+};
+
+type Correction = {
+  id: string;
+  scope: "summary" | "open_loops" | "topics" | "news" | "enrichment" | "general";
+  what_is_wrong: string;
+  what_is_correct: string;
+  created_at: string;
+  created_by: string | null;
 };
 
 /**
@@ -23,10 +33,12 @@ export function ContactOpenLoops({
   personId,
   loops,
   updatedAt,
+  corrections,
 }: {
-  personId:  string;
-  loops:     Loop[] | null;
-  updatedAt: string | null;
+  personId:    string;
+  loops:       Loop[] | null;
+  updatedAt:   string | null;
+  corrections: Correction[];
 }) {
   const router = useRouter();
   const [running, setRunning] = useState(false);
@@ -85,6 +97,13 @@ export function ContactOpenLoops({
           {updatedAt && <span className="text-[#131218]/30"> · {timeAgoShort(updatedAt)}</span>}
         </p>
         <div className="flex-1 h-px bg-[#EFEFEA]" />
+        <CorrectionButton
+          personId={personId}
+          defaultScope="open_loops"
+          knownCorrections={corrections}
+          regenerateUrl="/api/contact-intelligence/open-loops"
+          compact
+        />
         <button
           onClick={() => run(true)}
           disabled={running}

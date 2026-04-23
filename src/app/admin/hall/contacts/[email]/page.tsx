@@ -27,6 +27,7 @@ import { ContactOpenLoops } from "@/components/ContactOpenLoops";
 import { ContactAvatar } from "@/components/ContactAvatar";
 import { ContactNewsMentions } from "@/components/ContactNewsMentions";
 import { ScanNewsButton } from "@/components/ScanNewsButton";
+import { CorrectionButton } from "@/components/CorrectionButton";
 
 export const dynamic = "force-dynamic";
 
@@ -239,11 +240,13 @@ export default async function ContactDrawerPage({ params }: Props) {
                 personId={enrichment.id}
                 summary={enrichment.ai_summary}
                 updatedAt={enrichment.ai_summary_updated_at}
+                corrections={enrichment.corrections}
               />
               <ContactOpenLoops
                 personId={enrichment.id}
                 loops={enrichment.open_loops}
                 updatedAt={enrichment.open_loops_updated_at}
+                corrections={enrichment.corrections}
               />
             </div>
           )}
@@ -470,6 +473,12 @@ export default async function ContactDrawerPage({ params }: Props) {
               <div className="flex items-center gap-3 mb-3">
                 <h2 className="text-[11px] font-bold tracking-widest uppercase text-[#131218]/60">News & activity</h2>
                 <div className="flex-1 h-px bg-[#E0E0D8]" />
+                <CorrectionButton
+                  personId={enrichment.id}
+                  defaultScope="news"
+                  knownCorrections={enrichment.corrections}
+                  regenerateUrl="/api/contact-news/scan"
+                />
                 <ScanNewsButton personId={enrichment.id} />
               </div>
               <ContactNewsMentions personId={enrichment.id} lastScanAt={enrichment.last_news_scan_at} />
@@ -482,11 +491,20 @@ export default async function ContactDrawerPage({ params }: Props) {
               <h2 className="text-[11px] font-bold tracking-widest uppercase text-[#131218]/60">Conversation</h2>
               <div className="flex-1 h-px bg-[#E0E0D8]" />
               {enrichment && (
-                <SynthesizeTopicsButton
-                  personId={enrichment.id}
-                  label={enrichment.recurring_topics && enrichment.recurring_topics.length > 0 ? "Refresh topics" : "Synthesise topics"}
-                  force={!!(enrichment.recurring_topics && enrichment.recurring_topics.length > 0)}
-                />
+                <>
+                  <CorrectionButton
+                    personId={enrichment.id}
+                    defaultScope="topics"
+                    knownCorrections={enrichment.corrections}
+                    regenerateUrl="/api/contact-topics/synthesize"
+                    compact
+                  />
+                  <SynthesizeTopicsButton
+                    personId={enrichment.id}
+                    label={enrichment.recurring_topics && enrichment.recurring_topics.length > 0 ? "Refresh topics" : "Synthesise topics"}
+                    force={!!(enrichment.recurring_topics && enrichment.recurring_topics.length > 0)}
+                  />
+                </>
               )}
             </div>
 

@@ -18,6 +18,7 @@ import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { adminGuardApi } from "@/lib/require-admin";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
+import { buildGroundingPrompt } from "@/lib/user-identity";
 
 export const maxDuration = 60;
 export const dynamic     = "force-dynamic";
@@ -131,13 +132,16 @@ export async function POST(req: NextRequest) {
 
   const userPrompt = `Contact: ${name}\n\nData:\n${material.map(m => `- ${m}`).join("\n")}\n\nReturn the operating brief as JSON.`;
 
+  const grounding  = await buildGroundingPrompt(p.id, ["summary"]);
+  const fullSystem = grounding ? `${grounding}\n\n---\n\n${SYSTEM_PROMPT}` : SYSTEM_PROMPT;
+
   let summary: string;
   try {
     const resp = await anthropic.messages.create({
       model:      "claude-haiku-4-5-20251001",
       max_tokens: 400,
       temperature: 0,
-      system:     SYSTEM_PROMPT,
+      system:     fullSystem,
       messages:   [{ role: "user", content: userPrompt }],
     });
     const block = resp.content[0];

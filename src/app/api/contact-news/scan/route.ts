@@ -27,6 +27,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { currentUser } from "@clerk/nextjs/server";
 import { isAdminUser, isAdminEmail } from "@/lib/clients";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
+import { buildGroundingPrompt } from "@/lib/user-identity";
 
 export const maxDuration = 300;
 export const dynamic     = "force-dynamic";
@@ -174,6 +175,9 @@ Email domain: ${domain || "unknown"}
 
 Find recent public activity (news, LinkedIn posts, blog posts, podcasts, org announcements) about this person from the last 60 days. Prefer recent over older, relevant over tangential.`;
 
+      const grounding  = await buildGroundingPrompt(p.id, ["news"]);
+      const fullSystem = grounding ? `${grounding}\n\n---\n\n${SYSTEM_PROMPT}` : SYSTEM_PROMPT;
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const resp = await (anthropic as any).beta.messages.create({
         model:       "claude-haiku-4-5-20251001",
@@ -181,7 +185,7 @@ Find recent public activity (news, LinkedIn posts, blog posts, podcasts, org ann
         temperature: 0,
         betas:       ["web-search-2025-03-05"],
         tools:       [{ type: "web_search_20250305", name: "web_search", max_uses: 4 }],
-        system:      SYSTEM_PROMPT,
+        system:      fullSystem,
         messages:    [{ role: "user", content: userPrompt }],
       });
 

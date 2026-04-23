@@ -10,6 +10,7 @@
 
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { getSelfEmails } from "@/lib/hall-self";
+import { normaliseCorrections } from "@/lib/user-identity";
 
 // ─── Organization cross-reference (pipeline + projects) ─────────────────────
 
@@ -202,16 +203,29 @@ export type EnrichmentFields = {
   }> | null;
   open_loops_updated_at:    string | null;
   last_news_scan_at:        string | null;
+  corrections:              Array<{
+    id:              string;
+    scope:           "summary" | "open_loops" | "topics" | "news" | "enrichment" | "general";
+    what_is_wrong:   string;
+    what_is_correct: string;
+    created_at:      string;
+    created_by:      string | null;
+  }>;
 };
 
 export async function getEnrichmentByEmail(email: string): Promise<EnrichmentFields | null> {
   const sb = getSupabaseServerClient();
   const { data } = await sb
     .from("people")
-    .select("id, full_name, display_name, photo_url, photo_source, linkedin, job_title, role_category, function_area, organization_detected, linkedin_confidence, linkedin_source, linkedin_enriched_at, linkedin_needs_review, linkedin_last_attempt_at, job_title_confidence, job_title_source, job_title_updated_at, notes, phone, country, city, recurring_topics, recurring_topics_updated_at, ai_summary, ai_summary_updated_at, open_loops, open_loops_updated_at, last_news_scan_at")
+    .select("id, full_name, display_name, photo_url, photo_source, linkedin, job_title, role_category, function_area, organization_detected, linkedin_confidence, linkedin_source, linkedin_enriched_at, linkedin_needs_review, linkedin_last_attempt_at, job_title_confidence, job_title_source, job_title_updated_at, notes, phone, country, city, recurring_topics, recurring_topics_updated_at, ai_summary, ai_summary_updated_at, open_loops, open_loops_updated_at, last_news_scan_at, corrections")
     .eq("email", email.toLowerCase())
     .maybeSingle();
-  return (data ?? null) as EnrichmentFields | null;
+  if (!data) return null;
+  const row = data as Omit<EnrichmentFields, "corrections"> & { corrections: unknown };
+  return {
+    ...row,
+    corrections: normaliseCorrections(row.corrections),
+  };
 }
 
 // ─── Shared projects ─────────────────────────────────────────────────────────

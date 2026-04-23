@@ -2,6 +2,16 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { CorrectionButton } from "./CorrectionButton";
+
+type Correction = {
+  id: string;
+  scope: "summary" | "open_loops" | "topics" | "news" | "enrichment" | "general";
+  what_is_wrong: string;
+  what_is_correct: string;
+  created_at: string;
+  created_by: string | null;
+};
 
 /**
  * AI-generated operating brief that sits at the top of the contact profile.
@@ -11,10 +21,12 @@ export function ContactAISummary({
   personId,
   summary,
   updatedAt,
+  corrections,
 }: {
-  personId:   string;
-  summary:    string | null;
-  updatedAt:  string | null;
+  personId:    string;
+  summary:     string | null;
+  updatedAt:   string | null;
+  corrections: Correction[];
 }) {
   const router = useRouter();
   const [running, setRunning] = useState(false);
@@ -71,13 +83,22 @@ export function ContactAISummary({
           </p>
           <p className="text-[13px] text-[#131218] leading-relaxed">{summary}</p>
         </div>
-        <button
-          onClick={() => run(true)}
-          disabled={running}
-          className="text-[9px] font-bold uppercase tracking-widest text-[#131218]/40 hover:text-[#131218] underline decoration-dotted shrink-0 mt-1"
-        >
-          {running ? "Refreshing…" : "Refresh"}
-        </button>
+        <div className="flex items-center gap-3 shrink-0 mt-1">
+          <CorrectionButton
+            personId={personId}
+            defaultScope="summary"
+            knownCorrections={corrections}
+            regenerateUrl="/api/contact-intelligence/summarize"
+            compact
+          />
+          <button
+            onClick={() => run(true)}
+            disabled={running}
+            className="text-[9px] font-bold uppercase tracking-widest text-[#131218]/40 hover:text-[#131218] underline decoration-dotted"
+          >
+            {running ? "Refreshing…" : "Refresh"}
+          </button>
+        </div>
       </div>
       {err && <p className="mt-2 text-[10px] text-red-600">{err}</p>}
     </div>
