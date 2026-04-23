@@ -11,6 +11,116 @@
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { getSelfEmails } from "@/lib/hall-self";
 
+// ─── Organization cross-reference (pipeline + projects) ─────────────────────
+
+export type OrgOpportunity = {
+  id:                 string;
+  title:              string;
+  status:             string | null;
+  pending_action:     string | null;
+  opportunity_score:  number | null;
+  probability:        number | null;
+  value_estimate:     number | null;
+  expected_close_date: string | null;
+  next_meeting_at:    string | null;
+  suggested_next_step: string | null;
+};
+
+export type OrgProject = {
+  id:                 string;
+  name:               string | null;
+  project_status:     string | null;
+  current_stage:      string | null;
+  hall_current_focus: string | null;
+  last_meeting_date:  string | null;
+};
+
+export type OrgCrossRef = {
+  opportunities: OrgOpportunity[];
+  projects:      OrgProject[];
+};
+
+/**
+ * For an organisation identified by its Notion ID, pull active
+ * opportunities and projects. Returns empty arrays when the org isn't
+ * registered in Notion or has nothing in the pipeline.
+ */
+export async function getOrgCrossRef(orgNotionId: string | null): Promise<OrgCrossRef> {
+  if (!orgNotionId) return { opportunities: [], projects: [] };
+  const sb = getSupabaseServerClient();
+
+  const [oppsRes, projsRes] = await Promise.all([
+    sb.from("opportunities")
+      .select("id, title, status, pending_action, opportunity_score, probability, value_estimate, expected_close_date, next_meeting_at, suggested_next_step, is_active, is_archived")
+      .eq("org_notion_id", orgNotionId)
+      .eq("is_archived", false)
+      .order("opportunity_score", { ascending: false, nullsFirst: false })
+      .limit(20),
+    sb.from("projects")
+      .select("id, name, project_status, current_stage, hall_current_focus, last_meeting_date")
+      .eq("primary_org_notion_id", orgNotionId)
+      .neq("project_status", "Archived")
+      .order("last_meeting_date", { ascending: false, nullsFirst: false })
+      .limit(15),
+  ]);
+
+  const opportunities = ((oppsRes.data ?? []) as OrgOpportunity[]);
+  const projects      = ((projsRes.data ?? []) as OrgProject[]);
+
+  return { opportunities, projects };
+}
+
+/**
+ * Returns CH-side contacts who have co-attended the most meetings with
+ * people at this organisation. Useful to answer "who on our team has
+ * the strongest relationship with X?".
+ */
+export async function getOrgStrongestRelationships(orgDomain: string): Promise<Array<{
+  email:        string;
+  display_name: string | null;
+  shared_touches: number;
+}>> {
+  const sb = getSupabaseServerClient();
+  const domain = orgDomain.toLowerCase();
+
+  // Pull every transcript where at least one participant's email ends in @domain
+  const { data: transcripts } = await sb
+    .from("hall_transcript_observations")
+    .select("participant_emails, meeting_at")
+    .order("meeting_at", { ascending: false })
+    .limit(1000);
+
+  const selfSet = await getSelfEmails();
+  const tally = new Map<string, number>();
+
+  for (const r of (transcripts ?? []) as { participant_emails: string[] | null }[]) {
+    const emails = (r.participant_emails ?? []).map(e => e.toLowerCase());
+    const touchesDomain = emails.some(e => (e.split("@")[1] ?? "").toLowerCase() === domain);
+    if (!touchesDomain) continue;
+    for (const e of emails) {
+      if (!selfSet.has(e)) continue;
+      tally.set(e, (tally.get(e) ?? 0) + 1);
+    }
+  }
+
+  if (tally.size === 0) return [];
+
+  const emails = [...tally.keys()];
+  const { data: people } = await sb
+    .from("people")
+    .select("email, display_name, full_name")
+    .in("email", emails);
+  const nameByEmail = new Map<string, string | null>();
+  for (const p of (people ?? []) as { email: string; display_name: string | null; full_name: string | null }[]) {
+    nameByEmail.set(p.email, p.display_name ?? p.full_name ?? null);
+  }
+
+  return [...tally.entries()]
+    .map(([e, c]) => ({ email: e, display_name: nameByEmail.get(e) ?? null, shared_touches: c }))
+    .sort((a, b) => b.shared_touches - a.shared_touches)
+    .slice(0, 5);
+}
+
 // ─── Adjacent contacts (prev/next navigation) ────────────────────────────────
 
 export type AdjacentContact = {
