@@ -1,19 +1,25 @@
 /**
- * case-codes.ts — Deterministic generator for evidence case codes.
+ * case-codes.ts — Deterministic generator + parser for evidence case codes.
  *
- * Convention: <PROJECT_ABBREV>-<COUNTRY>-<YEAR>
- *   PROJECT_ABBREV — uppercase, accent-stripped, first significant token of
- *                    project name, capped at 14 chars
- *   COUNTRY        — ISO-2 code inferred from geography (CR, AR, UK, etc.).
- *                    Multi-country → INT. Unknown → X.
- *   YEAR           — year portion of date_captured
+ * Scalable family for ALL knowledge sources, not just project instances.
  *
- * Examples:
- *   Auto Mercado - Fase 2 · Costa Rica · 2026-04  → AUTOMERCADO-CR-2026
- *   SUFI · Argentina · 2026-03                    → SUFI-AR-2026
- *   ZWF Forum 2026 · Turkey · 2026-04              → ZWF-TR-2026
+ * Full shape: <TYPE>:<IDENTIFIER>-<SCOPE>-<YEAR>
  *
- * When a required component is missing (no project or no date), returns null —
+ * TYPE:
+ *   PRJ — Project instance (active or historical pilot)        → PRJ:AUTOMERCADO-CR-2026
+ *   DOC — External reference doc (report, paper, guide)        → DOC:EMF-UK-2023
+ *   REG — Regulation or policy                                  → REG:EPR-UK-2024
+ *   STD — Standard / certification                              → STD:BPI-US-2023
+ *   BCH — Benchmark / dataset                                   → BCH:IDEMAT-INT-2022
+ *   BOK — Book / chapter                                        → BOK:RAWORTH-UK-2017
+ *   NEW — News / article / blog                                 → NEW:FASTCO-US-2024
+ *   ITV — Cited interview                                       → ITV:BOCKEN-NL-2024
+ *   INT — Internal CH artifact (past deck/proposal)             → INT:CH-UK-2024
+ *
+ * Backcompat: codes without a prefix are treated as implicit PRJ:.
+ *   "AUTOMERCADO-CR-2026" is equivalent to "PRJ:AUTOMERCADO-CR-2026".
+ *
+ * When a required component is missing (no identifier or no year), returns null —
  * caller decides whether to skip or escalate.
  */
 
@@ -170,13 +176,86 @@ export function generateCaseCode(input: {
   return `${abbrev}-${country}-${year}`;
 }
 
-/** Parse a case code back into parts. Returns null when malformed. */
+export type CaseType = "PRJ" | "DOC" | "REG" | "STD" | "BCH" | "BOK" | "NEW" | "ITV" | "INT";
+
+export const CASE_TYPES: CaseType[] = ["PRJ", "DOC", "REG", "STD", "BCH", "BOK", "NEW", "ITV", "INT"];
+
+export const CASE_TYPE_LABELS: Record<CaseType, string> = {
+  PRJ: "Project",
+  DOC: "Reference doc",
+  REG: "Regulation",
+  STD: "Standard",
+  BCH: "Benchmark",
+  BOK: "Book",
+  NEW: "News / article",
+  ITV: "Interview",
+  INT: "Internal (CH)",
+};
+
+/** Parse a case code (with or without prefix) into parts. Returns null when malformed. */
 export function parseCaseCode(code: string): {
-  project: string;
-  country: string;
+  type: CaseType;
+  identifier: string;
+  scope: string;
   year: number;
 } | null {
-  const m = code.match(/^([A-Z0-9]+)-([A-Z]{2,3})-(\d{4})$/);
-  if (!m) return null;
-  return { project: m[1], country: m[2], year: parseInt(m[3], 10) };
+  // Try prefixed form first
+  const prefixed = code.match(/^(PRJ|DOC|REG|STD|BCH|BOK|NEW|ITV|INT):([A-Z0-9]+)-([A-Z]{2,3})-(\d{4})$/);
+  if (prefixed) {
+    return {
+      type: prefixed[1] as CaseType,
+      identifier: prefixed[2],
+      scope: prefixed[3],
+      year: parseInt(prefixed[4], 10),
+    };
+  }
+  // Legacy / backcompat: no prefix → implicit PRJ
+  const legacy = code.match(/^([A-Z0-9]+)-([A-Z]{2,3})-(\d{4})$/);
+  if (legacy) {
+    return {
+      type: "PRJ",
+      identifier: legacy[1],
+      scope: legacy[2],
+      year: parseInt(legacy[3], 10),
+    };
+  }
+  return null;
+}
+
+/** Normalise a (possibly unprefixed) case code to its canonical PRJ:/DOC:/etc form. */
+export function canonicaliseCaseCode(code: string): string | null {
+  const parsed = parseCaseCode(code);
+  if (!parsed) return null;
+  return `${parsed.type}:${parsed.identifier}-${parsed.scope}-${parsed.year}`;
+}
+
+/** Case code regex for markdown scanning. Captures codes WITH or WITHOUT prefix. */
+export const CASE_CODE_REGEX = /\[((?:PRJ|DOC|REG|STD|BCH|BOK|NEW|ITV|INT):)?([A-Z0-9]+-[A-Z]{2,3}-\d{4})\]/g;
+
+/** Generate a case code from metadata. For PRJ: the existing behaviour. For
+ *  other types: caller supplies identifier + scope + year directly (no
+ *  project-name heuristic — reference docs have explicit publishers, reg has
+ *  a formal name, etc). */
+export function generateTypedCaseCode(input: {
+  type: CaseType;
+  identifier: string;       // already uppercase + normalised
+  scope?: string | null;    // free-form; run through scope sanitiser
+  year: number;
+}): string {
+  const ident = input.identifier.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 14);
+  const scope = (input.scope ?? "X").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 3) || "X";
+  return `${input.type}:${ident}-${scope}-${input.year}`;
+}
+
+/** Sanitise a free-form identifier candidate (publisher, org, brand name)
+ *  into a 3-14 char uppercase token. Used by the Library ingest form. */
+export function sanitiseIdentifier(raw: string): string {
+  return stripAccents(raw)
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .trim()
+    .split(/\s+/)
+    .filter(t => !SKIP_TOKENS.has(t.toLowerCase()))
+    .join("")
+    .toUpperCase()
+    .slice(0, 14);
 }

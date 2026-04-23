@@ -364,6 +364,10 @@ export default async function KnowledgePage() {
           {/* Quick links row */}
           <div className="flex items-center gap-2 flex-wrap">
             <KnowledgeSearch items={searchItems} />
+            <Link href="/admin/knowledge/add" className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest bg-[#131218] text-[#B2FF59] hover:bg-[#131218]/85 px-3 py-1.5 rounded-full transition-colors">
+              <span className="text-[13px]">+</span>
+              Add external
+            </Link>
             <Link href="/admin/knowledge/cases" className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest bg-white border border-[#E0E0D8] hover:border-[#131218]/30 text-[#131218]/70 hover:text-[#131218] px-3 py-1.5 rounded-full transition-colors">
               <span className="text-[13px] text-[#131218]/40">◆</span>
               Cases
