@@ -112,6 +112,10 @@
     {
       "path": "/api/contact-photos/sync?limit=50",
       "schedule": "0 7 * * 2"
+    },
+    {
+      "path": "/api/contact-news/scan?limit=8",
+      "schedule": "0 8 * * 1"
     }
   ]
 }

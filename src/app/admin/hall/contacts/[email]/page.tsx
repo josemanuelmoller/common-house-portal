@@ -25,6 +25,8 @@ import { ContactIdentityEditor } from "@/components/ContactIdentityEditor";
 import { ContactAISummary } from "@/components/ContactAISummary";
 import { ContactOpenLoops } from "@/components/ContactOpenLoops";
 import { ContactAvatar } from "@/components/ContactAvatar";
+import { ContactNewsMentions } from "@/components/ContactNewsMentions";
+import { ScanNewsButton } from "@/components/ScanNewsButton";
 
 export const dynamic = "force-dynamic";
 
@@ -459,6 +461,18 @@ export default async function ContactDrawerPage({ params }: Props) {
                   ))}
                 </CollapsibleList>
               </div>
+            </section>
+          )}
+
+          {/* ═══ Block 3.5 · News & LinkedIn activity (VIPs only) ═════════════ */}
+          {enrichment && contact.relationship_classes.includes("VIP") && (
+            <section>
+              <div className="flex items-center gap-3 mb-3">
+                <h2 className="text-[11px] font-bold tracking-widest uppercase text-[#131218]/60">News & activity</h2>
+                <div className="flex-1 h-px bg-[#E0E0D8]" />
+                <ScanNewsButton personId={enrichment.id} />
+              </div>
+              <ContactNewsMentions personId={enrichment.id} lastScanAt={enrichment.last_news_scan_at} />
             </section>
           )}
 
