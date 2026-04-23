@@ -24,6 +24,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
+import { currentUser } from "@clerk/nextjs/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { adminGuardApi } from "@/lib/require-admin";
 import {
@@ -36,6 +37,7 @@ import {
   uploadTextToDriveFolder,
 } from "@/lib/drive";
 import { objectiveSlug, quarterSlug } from "@/lib/plan";
+import { createPlanBlock } from "@/lib/plan-calendar";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -48,6 +50,9 @@ export async function POST(_req: NextRequest, ctx: RouteCtx) {
   const guard = await adminGuardApi();
   if (guard) return guard;
   const { id } = await ctx.params;
+
+  const user = await currentUser();
+  const userEmail = user?.primaryEmailAddress?.emailAddress ?? "";
 
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
   if (!anthropicKey) {
@@ -316,6 +321,35 @@ Produce v1 of the artifact for this objective as strict JSON per the system form
           })
           .eq("id", newArtifact.id);
 
+        // 10. Propose a 90-min calendar block in the next 7 days (non-fatal)
+        send("saving", { stage: "calendar" });
+        let calendarEventId: string | null = null;
+        let calendarEventLink: string | null = null;
+        try {
+          const block = await createPlanBlock({
+            objectiveTitle: objective.title,
+            artifactTitle: artifactTitle,
+            driveUrl,
+            openQuestions: (generated.new_questions ?? [])
+              .map((q) => q.question?.trim())
+              .filter((q): q is string => Boolean(q && q.length > 0)),
+            userEmail,
+          });
+          if (block) {
+            calendarEventId = block.eventId;
+            calendarEventLink = block.eventLink;
+            await client
+              .from("objective_artifacts")
+              .update({ calendar_event_id: block.eventId })
+              .eq("id", newArtifact.id);
+          }
+        } catch (err) {
+          console.error(
+            "Calendar block creation failed (non-fatal):",
+            err instanceof Error ? err.message : String(err)
+          );
+        }
+
         send("done", {
           artifact_id: newArtifact.id,
           version_id: newVersion.id,
@@ -323,6 +357,8 @@ Produce v1 of the artifact for this objective as strict JSON per the system form
           drive_url: driveUrl,
           questions_count: generated.new_questions?.length ?? 0,
           tokens_used: tokensUsed,
+          calendar_event_id: calendarEventId,
+          calendar_event_link: calendarEventLink,
         });
         controller.close();
       } catch (err) {

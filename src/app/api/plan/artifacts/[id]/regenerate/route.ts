@@ -24,6 +24,8 @@ import Anthropic from "@anthropic-ai/sdk";
 import { supabaseAdmin } from "@/lib/supabase";
 import { adminGuardApi } from "@/lib/require-admin";
 import { uploadTextToDriveFolder } from "@/lib/drive";
+import { updatePlanBlock, createPlanBlock } from "@/lib/plan-calendar";
+import { currentUser } from "@clerk/nextjs/server";
 
 export const dynamic = "force-dynamic";
 // 300s is the Vercel Pro maxDuration ceiling. Sonnet can take 60-120s to
@@ -42,6 +44,9 @@ export async function POST(req: NextRequest, ctx: RouteCtx) {
   const guard = await adminGuardApi();
   if (guard) return guard;
   const { id } = await ctx.params;
+
+  const user = await currentUser();
+  const userEmail = user?.primaryEmailAddress?.emailAddress ?? "";
 
   let body: { force?: boolean; additional_notes?: string } = {};
   try {
@@ -342,6 +347,52 @@ Produce v${nextVersionNumber} as strict JSON per the system format.`;
           })
           .eq("id", id);
 
+        // Refresh (or create) the plan calendar block (non-fatal). For v1
+        // artifacts created before this feature, artifact.calendar_event_id is
+        // null — create a new block on first regenerate so the loop closes.
+        send("saving", { stage: "calendar" });
+        let calendarEventId: string | null = artifact.calendar_event_id ?? null;
+        let calendarEventLink: string | null = null;
+        const stillOpenQuestions = openQuestions.map((q) => q.question);
+        const newQuestionsText = (generated.new_questions ?? [])
+          .map((q) => q.question?.trim())
+          .filter((q): q is string => Boolean(q && q.length > 0));
+        const descriptionQuestions = [...stillOpenQuestions, ...newQuestionsText];
+
+        try {
+          if (calendarEventId) {
+            await updatePlanBlock({
+              eventId: calendarEventId,
+              objectiveTitle: obj.title,
+              artifactTitle: artifact.title,
+              driveUrl,
+              openQuestions: descriptionQuestions,
+              versionNumber: nextVersionNumber,
+            });
+          } else {
+            const block = await createPlanBlock({
+              objectiveTitle: obj.title,
+              artifactTitle: artifact.title,
+              driveUrl,
+              openQuestions: descriptionQuestions,
+              userEmail,
+            });
+            if (block) {
+              calendarEventId = block.eventId;
+              calendarEventLink = block.eventLink;
+              await client
+                .from("objective_artifacts")
+                .update({ calendar_event_id: block.eventId })
+                .eq("id", id);
+            }
+          }
+        } catch (err) {
+          console.error(
+            "Calendar block update failed (non-fatal):",
+            err instanceof Error ? err.message : String(err)
+          );
+        }
+
         send("done", {
           version_id: newVersion.id,
           version_number: nextVersionNumber,
@@ -349,6 +400,8 @@ Produce v${nextVersionNumber} as strict JSON per the system format.`;
           drive_url: driveUrl,
           new_questions_count: generated.new_questions?.length ?? 0,
           tokens_used: tokensUsed,
+          calendar_event_id: calendarEventId,
+          calendar_event_link: calendarEventLink,
         });
         controller.close();
       } catch (err) {
