@@ -30,6 +30,17 @@ function renderInline(text: string): string {
   out = out.replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '<em class="italic">$1</em>');
   // Markdown links [text](url)
   out = out.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-[#131218] underline decoration-[#B2FF59] decoration-2 underline-offset-2 hover:text-[#B2FF59]">$1</a>');
+  // Case code chips: [AUTOMERCADO-CR-2026] → small pill linking to case page
+  out = out.replace(/\[([A-Z0-9]+-[A-Z]{2,3}-\d{4})\]/g,
+    '<a href="/admin/knowledge/cases/$1" class="inline-block text-[10px] font-mono font-semibold text-[#131218]/70 bg-[#F7F7F2] px-1.5 py-0.5 rounded border border-[#EFEFEA] hover:bg-[#131218] hover:text-[#B2FF59] hover:border-[#131218] transition-colors align-middle no-underline">$1</a>');
+  // Cross-references to other leaves: `path/like/this` → link. The code regex
+  // above has already transformed unrelated backtick content into <code>, so
+  // we operate on remaining inline backticks that look like a knowledge path.
+  // Matches patterns like reuse/packaging/refill/at-home inside existing code blocks.
+  out = out.replace(
+    /<code class="[^"]+">((?:reuse|organics|new-materials)\/[a-z0-9-]+(?:\/[a-z0-9-]+)*)<\/code>/g,
+    '<a href="/admin/knowledge/$1" class="inline-block text-[11px] font-mono font-semibold text-[#131218]/70 bg-[#EFEFEA] px-1.5 py-0.5 rounded border border-[#E0E0D8] hover:bg-[#131218] hover:text-[#B2FF59] hover:border-[#131218] transition-colors no-underline">→ $1</a>',
+  );
   return out;
 }
 

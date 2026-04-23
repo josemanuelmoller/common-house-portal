@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Sidebar } from "@/components/Sidebar";
 import { MetricCard } from "@/components/MetricCard";
 import { ProposalActions } from "@/components/ProposalActions";
+import { KnowledgeSearch } from "@/components/KnowledgeSearch";
 import { NAV } from "../page";
 import { requireAdmin } from "@/lib/require-admin";
 import {
@@ -11,6 +12,7 @@ import {
   parseSplitSuggestion,
   type TreeNode,
 } from "@/lib/knowledge-nodes";
+import { getSupabaseServerClient } from "@/lib/supabase-server";
 
 function daysSince(iso: string | null): number | null {
   if (!iso) return null;
@@ -49,6 +51,33 @@ function freshnessClass(dEvidence: number | null): { pill: string; label: string
   return { pill: "bg-red-50 text-red-600",                                 label: `${dEvidence}d · stale` };
 }
 
+// Modality glyphs — Unicode icons that visually encode the node type.
+// Uses platform-agnostic geometric glyphs that render consistently across OS.
+function glyphForNode(path: string): string {
+  // Refill modalities
+  if (path.endsWith("/refill/on-the-go"))       return "◐"; // half-filled circle = liquid dispenser
+  if (path.endsWith("/refill/at-home"))         return "◘"; // solid block = solid refill cartridge
+  if (path.endsWith("/refill"))                 return "◉"; // generic refill category
+  // Return modalities
+  if (path.endsWith("/return/on-the-go"))       return "▲"; // drop-off (hand up)
+  if (path.endsWith("/return/from-home"))       return "▼"; // pickup (come down)
+  if (path.endsWith("/return"))                 return "⟲"; // generic return category
+  // Other packaging
+  if (path.endsWith("/transit"))                return "▦"; // pallet / transit
+  // Themes/subthemes
+  if (path === "reuse")                         return "◎";
+  if (path === "organics")                      return "◈";
+  if (path === "new-materials")                 return "◇";
+  if (path.startsWith("reuse/packaging"))       return "▤";
+  if (path.startsWith("reuse/electronics"))     return "◫";
+  if (path.startsWith("reuse/textile"))         return "◪";
+  if (path.startsWith("reuse/construction"))    return "◧";
+  if (path.startsWith("organics/compost"))      return "⬢";
+  if (path.startsWith("organics/biodigestor"))  return "⬣";
+  if (path.startsWith("new-materials/biomaterials")) return "◆";
+  return "◉";
+}
+
 /** Populated leaf — full card with preview + cases + meta. */
 function LeafCard({ leaf }: { leaf: TreeNode }) {
   const dEvidence = daysSince(leaf.last_evidence_at);
@@ -61,24 +90,32 @@ function LeafCard({ leaf }: { leaf: TreeNode }) {
   const hasChildren = leaf.children.length > 0;
 
   return (
-    <Link
-      href={`/admin/knowledge/${leaf.path}`}
+    <div
       className={`group relative flex flex-col bg-white rounded-[14px] border transition-all duration-150 ease-out hover:-translate-y-[2px] hover:border-[#131218]/30 ${
         isStale ? "border-amber-200" : "border-[#E0E0D8]"
       }`}
     >
+      {/* Card-wide navigation overlay (behind interactive children) */}
+      <Link
+        href={`/admin/knowledge/${leaf.path}`}
+        aria-label={`Open ${leaf.title}`}
+        className="absolute inset-0 rounded-[14px] z-0"
+      />
       {isHot && (
-        <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-[#B2FF59] via-[#B2FF59] to-transparent rounded-t-[14px]" />
+        <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-[#B2FF59] via-[#B2FF59] to-transparent rounded-t-[14px] pointer-events-none" />
       )}
-      <div className="p-5 flex-1 flex flex-col min-h-0">
-        {/* Path breadcrumb */}
-        <p className="text-[9px] font-bold font-mono text-[#131218]/25 uppercase tracking-widest mb-2 truncate">
-          {leaf.path.split("/").slice(0, -1).join(" › ") || leaf.path}
-        </p>
+      <div className="relative p-5 flex-1 flex flex-col min-h-0 pointer-events-none">
+        {/* Path breadcrumb with modality glyph */}
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-[14px] text-[#131218]/30 leading-none">{glyphForNode(leaf.path)}</span>
+          <p className="text-[9px] font-bold font-mono text-[#131218]/25 uppercase tracking-widest truncate">
+            {leaf.path.split("/").slice(0, -1).join(" › ") || leaf.path}
+          </p>
+        </div>
 
         {/* Title */}
         <div className="flex items-start justify-between gap-2 mb-3">
-          <h3 className="text-[22px] font-semibold tracking-tight text-[#131218] leading-tight group-hover:text-[#131218]">
+          <h3 className="text-[22px] font-semibold tracking-tight text-[#131218] leading-[1.15] group-hover:text-[#131218]">
             {leaf.title}
           </h3>
           {hasChildren && (
@@ -99,24 +136,26 @@ function LeafCard({ leaf }: { leaf: TreeNode }) {
             {leaf.children.map(c => (
               <span
                 key={c.id}
-                className="text-[10px] font-semibold text-[#131218] bg-[#EFEFEA] px-2.5 py-1 rounded-full border border-[#E0E0D8]"
+                className="inline-flex items-center gap-1.5 text-[10px] font-semibold text-[#131218] bg-[#EFEFEA] pl-2 pr-2.5 py-1 rounded-full border border-[#E0E0D8]"
               >
-                → {c.title}
+                <span className="text-[12px] text-[#131218]/50 leading-none">{glyphForNode(c.path)}</span>
+                {c.title}
               </span>
             ))}
           </div>
         )}
 
-        {/* Case chips */}
+        {/* Case chips — clickable to pivot to case detail (pointer-events re-enabled) */}
         {!hasChildren && cases.length > 0 && (
-          <div className="mt-4 flex items-center gap-1.5 flex-wrap">
+          <div className="mt-4 flex items-center gap-1.5 flex-wrap pointer-events-auto relative z-10">
             {cases.slice(0, 3).map(c => (
-              <span
+              <Link
                 key={c}
-                className="text-[9.5px] font-mono font-medium text-[#131218]/55 bg-[#F7F7F2] px-2 py-0.5 rounded border border-[#EFEFEA] tracking-tight"
+                href={`/admin/knowledge/cases/${encodeURIComponent(c)}`}
+                className="text-[9.5px] font-mono font-medium text-[#131218]/60 bg-[#F7F7F2] px-2 py-0.5 rounded border border-[#EFEFEA] tracking-tight hover:bg-[#131218] hover:text-[#B2FF59] hover:border-[#131218] transition-colors"
               >
                 {c}
-              </span>
+              </Link>
             ))}
             {cases.length > 3 && (
               <span className="text-[9.5px] font-mono text-[#131218]/40">+{cases.length - 3}</span>
@@ -126,7 +165,7 @@ function LeafCard({ leaf }: { leaf: TreeNode }) {
       </div>
 
       {/* Footer meta */}
-      <div className="px-5 py-3 border-t border-[#EFEFEA] flex items-center justify-between gap-3">
+      <div className="relative px-5 py-3 border-t border-[#EFEFEA] flex items-center justify-between gap-3 pointer-events-none">
         <div className="flex items-center gap-3 text-[10px] font-bold uppercase tracking-widest text-[#131218]/35">
           <span>{bulletCount} bullet{bulletCount !== 1 ? "s" : ""}</span>
           {cases.length > 0 && <span className="text-[#131218]/15">·</span>}
@@ -138,7 +177,7 @@ function LeafCard({ leaf }: { leaf: TreeNode }) {
           {freshness.label}
         </span>
       </div>
-    </Link>
+    </div>
   );
 }
 
@@ -247,10 +286,12 @@ function ThemeSection({ theme }: { theme: TreeNode }) {
 export default async function KnowledgePage() {
   await requireAdmin();
 
-  const [tree, recentLog, proposals] = await Promise.all([
+  const sb = getSupabaseServerClient();
+  const [tree, recentLog, proposals, { data: casesForSearch }] = await Promise.all([
     getTree(),
     getRecentChangelog(7, 40),
     getPendingProposals(),
+    sb.from("knowledge_cases").select("code, title, project_name, geography, year"),
   ]);
 
   // Flatten to count leaves + totals
@@ -270,6 +311,25 @@ export default async function KnowledgePage() {
   const appendsThisWeek = recentLog.filter(e => e.action === "APPEND").length;
   const proposalsThisWeek = recentLog.filter(e => e.status === "proposed").length;
   const ignoresThisWeek = recentLog.filter(e => e.action === "IGNORE").length;
+
+  // Build search index (nodes + cases)
+  const searchItems: Array<{ path: string; title: string; summary: string; body_preview: string; kind: "node" | "case"; case_code?: string }> = [
+    ...allFlat.map(n => ({
+      path: n.path,
+      title: n.title,
+      summary: n.summary,
+      body_preview: n.body_md.slice(0, 400),
+      kind: "node" as const,
+    })),
+    ...(((casesForSearch as { code: string; title: string; project_name: string | null; geography: string | null; year: number | null }[] | null) ?? []).map(c => ({
+      path: c.code,
+      title: `${c.project_name ?? c.code}${c.geography ? ` · ${c.geography}` : ""}${c.year ? ` · ${c.year}` : ""}`,
+      summary: c.title,
+      body_preview: "",
+      kind: "case" as const,
+      case_code: c.code,
+    }))),
+  ];
 
   return (
     <div className="flex min-h-screen bg-[#EFEFEA]">
@@ -299,6 +359,19 @@ export default async function KnowledgePage() {
             <MetricCard label="New this week"      value={appendsThisWeek}               color={appendsThisWeek > 0 ? "green" : "default"} sub="APPENDs aplicados" />
             <MetricCard label="Pending review"     value={proposals.length}              color={proposals.length > 0 ? "yellow" : "default"} sub="SPLIT / AMEND propuestos" />
             <MetricCard label="Stale (60d+)"       value={staleLeaves.length}            color={staleLeaves.length > 0 ? "yellow" : "default"} sub="hojas sin updates" />
+          </div>
+
+          {/* Quick links row */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <KnowledgeSearch items={searchItems} />
+            <Link href="/admin/knowledge/cases" className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest bg-white border border-[#E0E0D8] hover:border-[#131218]/30 text-[#131218]/70 hover:text-[#131218] px-3 py-1.5 rounded-full transition-colors">
+              <span className="text-[13px] text-[#131218]/40">◆</span>
+              Cases
+            </Link>
+            <Link href="/admin/knowledge/reading-room" className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest bg-white border border-[#E0E0D8] hover:border-[#131218]/30 text-[#131218]/70 hover:text-[#131218] px-3 py-1.5 rounded-full transition-colors">
+              <span className="text-[13px] text-[#131218]/40">◫</span>
+              Reading room
+            </Link>
           </div>
 
           {/* Themes — primary surface. Theme sections with leaf cards. */}

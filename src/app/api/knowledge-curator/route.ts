@@ -184,6 +184,16 @@ FACETS — a target leaf may declare REQUIRED subsection vocabularies for some s
 
 CASE CODES — every bullet must begin with the evidence's case_code in square brackets, e.g. "[AUTOMERCADO-CR-2026] ...insight...". This lets us later group bullets by concrete project instance across multiple countries/clients. If the evidence has no case_code, omit the prefix (never invent one).
 
+SPLIT DISCIPLINE — when proposing a new leaf, apply these strict rules:
+
+1. NEVER merge two existing sibling verticals into one path. If the evidence spans reuse/textile AND reuse/electronics, emit two SEPARATE proposals (APPEND to each existing leaf), or IGNORE with reason "spans too many verticals for a single append". Do NOT propose a merged path like "reuse/textile-electronics-tech".
+
+2. Before proposing a new leaf, check if the target vertical ALREADY EXISTS as an empty leaf in the tree. If yes, emit APPEND to that existing leaf instead of SPLIT. An "empty leaf" is one that appears in the tree summary but has no bullets (just stubs).
+
+3. Do not propose a leaf path that a previous pending SPLIT in this run has already proposed. The caller dedups SPLITs by suggested_path — if you emit two with the same path, only the first will be logged.
+
+4. Prefer narrow, specific leaves over umbrella ones. If in doubt between "reuse/textile" (exists) and "reuse/textile-refurb" (more specific), lean on the existing one unless the evidence warrants a genuinely distinct branch.
+
 Sections for APPEND/AMEND (pick one):
 ${VALID_SECTIONS.map(s => `- ${s}`).join("\n")}
 
@@ -297,12 +307,28 @@ async function _POST(req: NextRequest) {
   const sinceDays = body.since_days ?? 7;
   const dryRun = Boolean(body.dry_run);
 
+  const sb = getSupabaseServerClient();
   const [evidence, tree] = await Promise.all([
     fetchEvidence(evidenceIds, sinceDays),
     getAllNodes(),
   ]);
 
   const nodeByPath = new Map(tree.map(n => [n.path, n]));
+
+  // Dedup set: paths that already have a pending SPLIT proposal (from prior runs
+  // or earlier in this run). Seeded from DB so we don't duplicate across runs.
+  const proposedSplitPaths = new Set<string>();
+  try {
+    const { data: existingProposed } = await sb.from("knowledge_node_changelog")
+      .select("reasoning")
+      .eq("action", "SPLIT")
+      .eq("status", "proposed")
+      .limit(200);
+    for (const row of (existingProposed as { reasoning: string }[] | null) ?? []) {
+      const m = row.reasoning.match(/Proposed new leaf:\s*([^\s]+)/);
+      if (m) proposedSplitPaths.add(m[1]);
+    }
+  } catch { /* non-critical */ }
 
   const result: RunResult = {
     total: evidence.length,
@@ -440,6 +466,58 @@ async function _POST(req: NextRequest) {
         result.proposed_amend++;
       }
       else if (c.action === "SPLIT" && c.suggested_path) {
+        // Dedup 1: if suggested_path already exists as a node in the tree,
+        // downgrade to IGNORE — SPLIT is only valid for truly new branches.
+        // The curator prompt tells the LLM to APPEND when the leaf exists,
+        // but not every response respects that — enforce here.
+        if (nodeByPath.has(c.suggested_path)) {
+          if (!dryRun) {
+            const existing = nodeByPath.get(c.suggested_path)!;
+            await appendChangelog({
+              node_id: existing.id,
+              evidence_notion_id: ev.notion_id,
+              action: "IGNORE",
+              reasoning: `Classifier proposed SPLIT to ${c.suggested_path} but that leaf already exists. Routing as IGNORE — re-run the curator or APPEND manually.`,
+              status: "applied",
+            });
+          }
+          item.action = "IGNORE";
+          item.status = "applied";
+          item.path = c.suggested_path;
+          result.ignored++;
+          result.items.push(item);
+          continue;
+        }
+
+        // Dedup 2: if there is already a 'proposed' SPLIT with the same
+        // suggested_path (from this run or a previous one), skip writing a
+        // new duplicate. Preserves the first reasoning as the canonical.
+        if (proposedSplitPaths.has(c.suggested_path)) {
+          if (!dryRun) {
+            // Log the duplicate attempt as IGNORE against the closest parent
+            const parts = c.suggested_path.split("/");
+            let parent: KnowledgeNode | undefined;
+            for (let i = parts.length - 1; i >= 1 && !parent; i--) {
+              parent = nodeByPath.get(parts.slice(0, i).join("/"));
+            }
+            if (parent) {
+              await appendChangelog({
+                node_id: parent.id,
+                evidence_notion_id: ev.notion_id,
+                action: "IGNORE",
+                reasoning: `Duplicate SPLIT to ${c.suggested_path} — earlier proposal pending.`,
+                status: "applied",
+              });
+            }
+          }
+          item.action = "IGNORE";
+          item.status = "applied";
+          item.path = c.suggested_path;
+          result.ignored++;
+          result.items.push(item);
+          continue;
+        }
+
         // Log against the nearest existing parent so it's findable in the UI.
         const parts = c.suggested_path.split("/");
         let parent: KnowledgeNode | undefined;
@@ -455,6 +533,7 @@ async function _POST(req: NextRequest) {
             reasoning: `Proposed new leaf: ${c.suggested_path} (${c.suggested_title ?? "—"}). ${c.reasoning}`,
             status: "proposed",
           });
+          proposedSplitPaths.add(c.suggested_path);
         }
         item.status = "proposed";
         item.path = c.suggested_path;

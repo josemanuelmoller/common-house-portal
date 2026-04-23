@@ -194,6 +194,23 @@ Write the playbook now. Remember: prose with ### sub-headings where useful. Ever
   const playbook_md = block.text.trim();
 
   if (!dryRun) {
+    // Archive current playbook as a new version row before overwriting
+    if (node.playbook_md) {
+      const { data: lastVersion } = await sb.from("playbook_versions")
+        .select("version")
+        .eq("node_id", node.id)
+        .order("version", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const nextVersion = ((lastVersion as { version: number } | null)?.version ?? 0) + 1;
+      await sb.from("playbook_versions").insert({
+        node_id: node.id,
+        version: nextVersion,
+        content_md: node.playbook_md,
+        source_count: node.playbook_source_count,
+        generated_at: node.playbook_generated_at,
+      });
+    }
     await writePlaybook(node.id, playbook_md, sourceCount);
   }
 
