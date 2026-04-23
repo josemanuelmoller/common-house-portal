@@ -24,6 +24,7 @@ import { CollapsibleList } from "@/components/CollapsibleList";
 import { ContactIdentityEditor } from "@/components/ContactIdentityEditor";
 import { ContactAISummary } from "@/components/ContactAISummary";
 import { ContactOpenLoops } from "@/components/ContactOpenLoops";
+import { ContactAvatar } from "@/components/ContactAvatar";
 
 export const dynamic = "force-dynamic";
 
@@ -167,6 +168,13 @@ export default async function ContactDrawerPage({ params }: Props) {
             )}
           </div>
           <div className="flex items-end justify-between gap-6">
+            <div className="flex items-center gap-5 min-w-0">
+              <ContactAvatar
+                photoUrl={enrichment?.photo_url ?? null}
+                display={contact.display_name || email.split("@")[0] || "?"}
+                size={88}
+                rounded="lg"
+              />
             <div className="min-w-0">
               <h1 className="text-[2.6rem] font-light text-white tracking-[-1.5px] leading-none truncate">
                 {contact.display_name || (
@@ -206,6 +214,7 @@ export default async function ContactDrawerPage({ params }: Props) {
                   </span>
                 )}
               </div>
+            </div>
             </div>
             <div className="flex items-center gap-5 pb-1">
               <Stat label="Meetings"      value={contact.meeting_count} />

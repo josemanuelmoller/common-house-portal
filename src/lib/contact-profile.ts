@@ -169,6 +169,8 @@ export type EnrichmentFields = {
   id:                       string;
   full_name:                string | null;
   display_name:             string | null;
+  photo_url:                string | null;
+  photo_source:             string | null;
   linkedin:                 string | null;
   job_title:                string | null;
   role_category:            string | null;
@@ -205,7 +207,7 @@ export async function getEnrichmentByEmail(email: string): Promise<EnrichmentFie
   const sb = getSupabaseServerClient();
   const { data } = await sb
     .from("people")
-    .select("id, full_name, display_name, linkedin, job_title, role_category, function_area, organization_detected, linkedin_confidence, linkedin_source, linkedin_enriched_at, linkedin_needs_review, linkedin_last_attempt_at, job_title_confidence, job_title_source, job_title_updated_at, notes, phone, country, city, recurring_topics, recurring_topics_updated_at, ai_summary, ai_summary_updated_at, open_loops, open_loops_updated_at")
+    .select("id, full_name, display_name, photo_url, photo_source, linkedin, job_title, role_category, function_area, organization_detected, linkedin_confidence, linkedin_source, linkedin_enriched_at, linkedin_needs_review, linkedin_last_attempt_at, job_title_confidence, job_title_source, job_title_updated_at, notes, phone, country, city, recurring_topics, recurring_topics_updated_at, ai_summary, ai_summary_updated_at, open_loops, open_loops_updated_at")
     .eq("email", email.toLowerCase())
     .maybeSingle();
   return (data ?? null) as EnrichmentFields | null;

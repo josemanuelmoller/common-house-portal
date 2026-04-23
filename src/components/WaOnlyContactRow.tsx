@@ -23,6 +23,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { SearchableContact } from "./HallContactsSearchable";
+import { ContactAvatar } from "./ContactAvatar";
 
 const CLASSES = [
   { v: "VIP",              label: "VIP",              kind: "vip" },
@@ -218,9 +219,7 @@ export function WaOnlyContactRow({
         className="w-full px-5 py-3.5 text-left"
       >
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-full bg-[#131218] text-white flex items-center justify-center font-bold text-[12px] shrink-0">
-            {initial}
-          </div>
+          <ContactAvatar photoUrl={contact.photo_url} display={display} size={36} />
           <div className="flex-1 min-w-0">
             <p className="text-[12.5px] font-semibold text-[#131218] truncate">{display}</p>
             <p className="text-[10px] text-[#131218]/45 mt-0.5">

@@ -17,6 +17,7 @@
 import Link from "next/link";
 import { useMemo, useState, useEffect, useRef } from "react";
 import { WaOnlyContactRow } from "./WaOnlyContactRow";
+import { ContactAvatar } from "./ContactAvatar";
 
 export type SearchableContact = {
   id:                   string;
@@ -39,6 +40,8 @@ export type SearchableContact = {
   job_title:            string | null;
   role_category:        string | null;
   function_area:        string | null;
+  // Photo
+  photo_url:            string | null;
 };
 
 const ROLE_CATEGORIES = ["Founder", "Executive", "Manager", "IC", "Investor", "Advisor", "Other"] as const;
@@ -479,9 +482,7 @@ function WithEmailCard({
       className="group bg-white rounded-2xl border border-[#E0E0D8] hover:border-[#131218]/30 hover:shadow-sm transition-all px-5 py-4"
     >
       <div className="flex items-start gap-4">
-        <div className="w-10 h-10 rounded-full bg-[#131218] text-white flex items-center justify-center flex-shrink-0 font-bold text-sm">
-          {initial}
-        </div>
+        <ContactAvatar photoUrl={contact.photo_url} display={display} size={40} />
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline justify-between gap-4">
             <div className="min-w-0">
