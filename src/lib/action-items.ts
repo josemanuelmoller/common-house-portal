@@ -98,6 +98,9 @@ export async function getInboxActions(limit = DEFAULT_INBOX_LIMIT): Promise<Inbo
     const label: InboxActionView["label"] =
       score >= 70 ? "Urgent" : score >= 40 ? "Needs Reply" : "FYI";
     const nextAction = r.next_action ?? "";
+    // UX: summary (headline) = imperative next_action; snippet (subtitle) =
+    // original email subject, so the row reads "[what to do] / [who sent what]"
+    // instead of repeating the next_action twice.
     return {
       actionItemId: r.id,
       threadId: r.source_id,
@@ -106,7 +109,7 @@ export async function getInboxActions(limit = DEFAULT_INBOX_LIMIT): Promise<Inbo
         ? emailByContactId.get(r.counterparty_contact_id) ?? ""
         : "",
       fromName: r.counterparty ?? "",
-      snippet: nextAction,
+      snippet: r.subject,
       daysWaiting,
       isUnread: score >= 70,
       label,
