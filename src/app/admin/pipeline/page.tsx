@@ -24,31 +24,40 @@ const DUMMY_CLOSED: PipelineOpportunity[] = [
 // ── Sub-components ────────────────────────────────────────────────────────────
 
 function ScoreBadge({ score }: { score: number | null }) {
-  if (score === null) return <span className="text-[9px] font-bold text-[#131218]/20">—</span>;
-  const cls = score >= 70
-    ? "bg-[#B2FF59]/25 text-green-800"
+  if (score === null) return <span className="text-[9px] font-bold" style={{fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-3)"}}>—</span>;
+  const bg = score >= 70
+    ? "var(--hall-ok-soft)"
     : score >= 50
-    ? "bg-amber-100 text-amber-800"
-    : "bg-red-50 text-red-600";
-  return <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full tabular-nums ${cls}`}>{score}</span>;
+    ? "var(--hall-warn-soft)"
+    : "var(--hall-danger-soft)";
+  const fg = score >= 70
+    ? "var(--hall-ok)"
+    : score >= 50
+    ? "var(--hall-warn)"
+    : "var(--hall-danger)";
+  return (
+    <span
+      className="text-[9px] font-bold px-1.5 py-0.5 rounded-full tabular-nums"
+      style={{ fontFamily: "var(--font-hall-mono)", background: bg, color: fg }}
+    >
+      {score}
+    </span>
+  );
 }
 
 function FollowUpDot({ status }: { status: string }) {
-  if (status === "Needed")  return <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" title="Follow-up needed" />;
-  if (status === "Sent")    return <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" title="Sent" />;
-  if (status === "Waiting") return <span className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" title="Waiting" />;
+  if (status === "Needed")  return <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{background: "var(--hall-danger)"}} title="Follow-up needed" />;
+  if (status === "Sent")    return <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{background: "var(--hall-warn)"}} title="Sent" />;
+  if (status === "Waiting") return <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{background: "var(--hall-info)"}} title="Waiting" />;
   return <span className="w-1.5 h-1.5 shrink-0" />;
 }
 
 function TypePill({ type }: { type: string }) {
-  const colours: Record<string, string> = {
-    "CH Sale":       "bg-[#131218]/8 text-[#131218]/50",
-    "Grant":         "bg-[#B2FF59]/15 text-green-800",
-    "Partnership":   "bg-blue-50 text-blue-700",
-    "Investor Match":"bg-purple-50 text-purple-700",
-  };
   return (
-    <span className={`text-[7.5px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide ${colours[type] ?? "bg-[#EFEFEA] text-[#131218]/40"}`}>
+    <span
+      className="text-[7.5px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider"
+      style={{ fontFamily: "var(--font-hall-mono)", background: "var(--hall-fill-soft)", color: "var(--hall-ink-3)" }}
+    >
       {type}
     </span>
   );
@@ -60,21 +69,32 @@ function OppCard({ opp }: { opp: PipelineOpportunity }) {
       href={opp.notionUrl || "#"}
       target={opp.notionUrl && opp.notionUrl !== "#" ? "_blank" : undefined}
       rel="noopener noreferrer"
-      className="group bg-white rounded-xl border border-[#E0E0D8] px-3.5 py-3 hover:border-[#131218]/20 hover:-translate-y-0.5 transition-all duration-150 flex flex-col gap-2"
+      className="group px-3.5 py-3 transition-all duration-150 flex flex-col gap-2"
+      style={{
+        background: "var(--hall-paper-0)",
+        border: "1px solid var(--hall-line-soft)",
+        borderRadius: 3,
+      }}
     >
       <div className="flex items-start gap-2">
         <FollowUpDot status={opp.followUpStatus} />
-        <p className="text-[11.5px] font-bold text-[#131218] leading-tight flex-1 line-clamp-2">{opp.name}</p>
-        <span className="text-[#131218]/15 group-hover:text-[#131218]/40 transition-colors text-xs shrink-0">↗</span>
+        <p className="text-[11.5px] font-bold leading-tight flex-1 line-clamp-2" style={{color: "var(--hall-ink-0)"}}>{opp.name}</p>
+        <span className="text-xs shrink-0" style={{color: "var(--hall-muted-3)"}}>↗</span>
       </div>
       <div className="flex items-center justify-between gap-2 pl-3.5">
         <div className="flex items-center gap-1.5 flex-wrap">
-          {opp.orgName && <span className="text-[9px] text-[#131218]/35 font-medium">{opp.orgName}</span>}
+          {opp.orgName && <span className="text-[9px] font-medium" style={{color: "var(--hall-muted-3)"}}>{opp.orgName}</span>}
           <TypePill type={opp.type} />
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
           {opp.daysInStage !== null && (
-            <span className={`text-[8.5px] font-bold ${opp.daysInStage > 14 ? "text-red-400" : "text-[#131218]/25"}`}>
+            <span
+              className="text-[8.5px] font-bold tabular-nums"
+              style={{
+                fontFamily: "var(--font-hall-mono)",
+                color: opp.daysInStage > 14 ? "var(--hall-danger)" : "var(--hall-muted-3)",
+              }}
+            >
               {opp.daysInStage}d
             </span>
           )}
@@ -88,15 +108,31 @@ function OppCard({ opp }: { opp: PipelineOpportunity }) {
 function KanbanCol({ label, items, accent }: { label: string; items: PipelineOpportunity[]; accent: string }) {
   return (
     <div className="flex flex-col gap-3 min-w-0">
-      <div className="flex items-center gap-2">
-        <span className={`w-2 h-2 rounded-full shrink-0 ${accent}`} />
-        <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/40">{label}</p>
-        <div className="flex-1 h-px bg-[#E0E0D8]" />
-        <span className="text-[9px] font-bold text-[#131218]/25">{items.length}</span>
+      <div
+        className="flex items-baseline justify-between gap-3 pb-2"
+        style={{borderBottom: "1px solid var(--hall-ink-0)"}}
+      >
+        <div className="flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full shrink-0" style={{background: accent}} />
+          <h2
+            className="text-[19px] font-bold leading-none"
+            style={{letterSpacing: "-0.02em", color: "var(--hall-ink-0)"}}
+          >
+            {label}
+          </h2>
+        </div>
+        <span
+          style={{fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--hall-muted-2)", letterSpacing: "0.06em"}}
+        >
+          {items.length}
+        </span>
       </div>
       {items.length === 0 ? (
-        <div className="bg-white/60 rounded-xl border border-dashed border-[#E0E0D8] px-4 py-6 text-center">
-          <p className="text-[10px] text-[#131218]/20">—</p>
+        <div
+          className="px-4 py-6 text-center"
+          style={{ border: "1px dashed var(--hall-line-soft)", borderRadius: 3 }}
+        >
+          <p className="text-[10px]" style={{color: "var(--hall-muted-3)"}}>—</p>
         </div>
       ) : (
         <div className="flex flex-col gap-2">
@@ -124,84 +160,107 @@ export default async function PipelinePage() {
   const wonCount  = recentlyClosed.filter(o => o.stage === "Won").length;
   const lostCount = recentlyClosed.filter(o => o.stage === "Lost").length;
 
+  const eyebrowDate = new Date()
+    .toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })
+    .toUpperCase();
+
   return (
-    <div className="flex min-h-screen bg-[#EFEFEA]">
+    <div className="flex min-h-screen" style={{ background: "var(--hall-paper-0)" }}>
       <Sidebar adminNav />
 
-      <main className="flex-1 ml-[228px]">
+      <main
+        className="flex-1 ml-[228px]"
+        style={{ fontFamily: "var(--font-hall-sans)", background: "var(--hall-paper-0)" }}
+      >
 
-        {/* Dark header */}
-        <header className="bg-[#131218] px-12 pt-10 pb-11">
-          <p className="text-[8px] font-bold tracking-[2.5px] uppercase text-white/20 mb-3">
-            Commercial · Pursuit
-          </p>
-          <div className="flex items-end justify-between">
-            <div>
-              <h1 className="text-[2.6rem] font-light text-white tracking-[-1.5px] leading-none">
-                Commercial <em className="font-black italic text-[#c8f55a]">Pipeline.</em>
-              </h1>
-              <p className="text-sm text-white/40 mt-3">
-                Opportunities in active pursuit. Won → Workroom. Lost → out.
-              </p>
-            </div>
-            <div className="flex items-center gap-4 pb-1">
-              <div className="text-right">
-                <p className="text-[2rem] font-black text-white tracking-tight leading-none">{total}</p>
-                <p className="text-[9px] font-bold tracking-[1.5px] uppercase text-white/30 mt-0.5">In pursuit</p>
-              </div>
-              <div className="w-px h-10 bg-white/10" />
-              <div className="text-right">
-                <p className={`text-[2rem] font-black tracking-tight leading-none ${wonCount > 0 ? "text-[#c8f55a]" : "text-white/20"}`}>
-                  {wonCount}
-                </p>
-                <p className="text-[9px] font-bold tracking-[1.5px] uppercase text-white/30 mt-0.5">Won (30d)</p>
-              </div>
-              <div className="w-px h-10 bg-white/10" />
-              <div className="text-right">
-                <p className={`text-[2rem] font-black tracking-tight leading-none ${lostCount > 0 ? "text-red-400" : "text-white/20"}`}>
-                  {lostCount}
-                </p>
-                <p className="text-[9px] font-bold tracking-[1.5px] uppercase text-white/30 mt-0.5">Lost (30d)</p>
-              </div>
-            </div>
+        {/* K-v2 collapsed header */}
+        <header
+          className="flex items-center justify-between gap-6 px-9 py-3.5"
+          style={{ borderBottom: "1px solid var(--hall-ink-0)" }}
+        >
+          <div className="flex items-baseline gap-4 min-w-0">
+            <span
+              className="text-[10px] tracking-[0.08em] whitespace-nowrap"
+              style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+            >
+              PIPELINE · <b style={{ color: "var(--hall-ink-0)" }}>{eyebrowDate}</b>
+            </span>
+            <h1
+              className="text-[16px] font-medium tracking-[-0.01em] truncate"
+              style={{ color: "var(--hall-ink-0)" }}
+            >
+              Commercial <em className="hall-flourish">pipeline</em>
+            </h1>
+          </div>
+          <div
+            className="flex items-center gap-4"
+            style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--hall-muted-2)", letterSpacing: "0.06em" }}
+          >
+            <span>{total} IN PURSUIT</span>
+            <span style={{color: wonCount > 0 ? "var(--hall-ok)" : "var(--hall-muted-3)"}}>{wonCount} WON (30d)</span>
+            <span style={{color: lostCount > 0 ? "var(--hall-danger)" : "var(--hall-muted-3)"}}>{lostCount} LOST (30d)</span>
           </div>
         </header>
 
-        <div className="px-12 py-9 max-w-6xl space-y-8">
+        <div className="px-9 py-6 max-w-6xl space-y-8">
 
           {/* Kanban */}
           <div className="grid grid-cols-3 gap-5 items-start">
-            <KanbanCol label="Active"        items={active}       accent="bg-[#B2FF59]" />
-            <KanbanCol label="Proposal Sent" items={proposalSent} accent="bg-amber-400" />
-            <KanbanCol label="Negotiation"   items={negotiation}  accent="bg-orange-400" />
+            <KanbanCol label="Active"        items={active}       accent="var(--hall-ok)" />
+            <KanbanCol label="Proposal Sent" items={proposalSent} accent="var(--hall-warn)" />
+            <KanbanCol label="Negotiation"   items={negotiation}  accent="var(--hall-info)" />
           </div>
 
           {/* Recently closed */}
           {recentlyClosed.length > 0 && (
-            <div>
-              <div className="flex items-center gap-3 mb-3">
-                <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/25">Recently closed (30d)</p>
-                <div className="flex-1 h-px bg-[#E0E0D8]" />
+            <section>
+              <div
+                className="flex items-baseline justify-between gap-3 pb-2 mb-3.5"
+                style={{borderBottom: "1px solid var(--hall-ink-0)"}}
+              >
+                <h2
+                  className="text-[19px] font-bold leading-none"
+                  style={{letterSpacing: "-0.02em", color: "var(--hall-ink-0)"}}
+                >
+                  Recently <em className="hall-flourish">closed</em>
+                </h2>
+                <span
+                  style={{fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--hall-muted-2)", letterSpacing: "0.06em"}}
+                >
+                  LAST 30 DAYS
+                </span>
               </div>
-              <div className="flex flex-col gap-2">
-                {recentlyClosed.map(opp => (
-                  <Link
+              <ul className="flex flex-col">
+                {recentlyClosed.map((opp, idx) => (
+                  <li
                     key={opp.id}
-                    href={opp.notionUrl || "#"}
-                    target={opp.notionUrl && opp.notionUrl !== "#" ? "_blank" : undefined}
-                    rel="noopener noreferrer"
-                    className="group bg-white/60 rounded-xl border border-[#E0E0D8] px-4 py-2.5 flex items-center gap-3 hover:bg-white transition-colors"
+                    style={idx === 0 ? undefined : { borderTop: "1px solid var(--hall-line-soft)" }}
                   >
-                    <span className={`text-[8px] font-bold px-2 py-0.5 rounded-full ${opp.stage === "Won" ? "bg-[#B2FF59]/30 text-green-800" : "bg-red-50 text-red-500"}`}>
-                      {opp.stage === "Won" ? "WON → Workroom" : "LOST"}
-                    </span>
-                    <p className="text-[11px] font-semibold text-[#131218]/50 flex-1 truncate">{opp.name}</p>
-                    <span className="text-[9px] text-[#131218]/25">{opp.orgName}</span>
-                    <ScoreBadge score={opp.score} />
-                  </Link>
+                    <Link
+                      href={opp.notionUrl || "#"}
+                      target={opp.notionUrl && opp.notionUrl !== "#" ? "_blank" : undefined}
+                      rel="noopener noreferrer"
+                      className="group flex items-center gap-3 py-2.5 transition-colors"
+                    >
+                      <span
+                        className="text-[8px] font-bold px-2 py-0.5 rounded-full"
+                        style={{
+                          fontFamily: "var(--font-hall-mono)",
+                          letterSpacing: "0.06em",
+                          background: opp.stage === "Won" ? "var(--hall-ok-soft)" : "var(--hall-danger-soft)",
+                          color: opp.stage === "Won" ? "var(--hall-ok)" : "var(--hall-danger)",
+                        }}
+                      >
+                        {opp.stage === "Won" ? "WON → WORKROOM" : "LOST"}
+                      </span>
+                      <p className="text-[11px] font-semibold flex-1 truncate" style={{color: "var(--hall-muted-2)"}}>{opp.name}</p>
+                      <span className="text-[9px]" style={{color: "var(--hall-muted-3)"}}>{opp.orgName}</span>
+                      <ScoreBadge score={opp.score} />
+                    </Link>
+                  </li>
                 ))}
-              </div>
-            </div>
+              </ul>
+            </section>
           )}
 
         </div>

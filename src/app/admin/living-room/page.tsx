@@ -36,8 +36,15 @@ type DirtyState = {
 
 function InfoNote({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex gap-2.5 items-start bg-[rgba(200,245,90,0.08)] border border-[rgba(200,245,90,0.3)] rounded-xl px-4 py-3 text-[11px] text-[#3a6600] leading-relaxed mb-6">
-      <span className="shrink-0 mt-0.5">ℹ</span>
+    <div
+      className="flex gap-2.5 items-start px-4 py-3 text-[11px] leading-relaxed mb-6"
+      style={{
+        background: "var(--hall-warn-paper)",
+        border: "1px solid var(--hall-warn)",
+        color: "var(--hall-ink-3)",
+      }}
+    >
+      <span className="shrink-0 mt-0.5" style={{ color: "var(--hall-warn)" }}>ℹ</span>
       <span>{children}</span>
     </div>
   );
@@ -54,23 +61,34 @@ function StatPill({
   sub: string;
   color?: "lime" | "red" | "amber";
 }) {
-  const valCls =
+  const valColor =
     color === "lime"
-      ? "text-[#3a8c00]"
+      ? "var(--hall-ok)"
       : color === "red"
-      ? "text-red-500"
+      ? "var(--hall-danger)"
       : color === "amber"
-      ? "text-amber-500"
-      : "text-[#131218]";
+      ? "var(--hall-warn)"
+      : "var(--hall-ink-0)";
   return (
-    <div className="bg-white border border-[#D8D8D0] rounded-xl p-4">
-      <div className="text-[8px] font-bold tracking-[2px] uppercase text-[#131218]/25 mb-1.5">
+    <div className="p-4" style={{ border: "1px solid var(--hall-line)", background: "var(--hall-paper-0)" }}>
+      <div
+        className="mb-1.5"
+        style={{
+          fontFamily: "var(--font-hall-mono)",
+          fontSize: 10,
+          letterSpacing: "0.08em",
+          textTransform: "uppercase",
+          color: "var(--hall-muted-2)",
+        }}
+      >
         {label}
       </div>
-      <div className={`text-[1.6rem] font-black tracking-tight leading-none ${valCls}`}>
+      <div className="text-[1.6rem] font-black tracking-tight leading-none" style={{ color: valColor }}>
         {value}
       </div>
-      <div className="text-[10px] text-[#6b6b6b] mt-1.5">{sub}</div>
+      <div style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--hall-muted-2)", marginTop: 6 }}>
+        {sub}
+      </div>
     </div>
   );
 }
@@ -79,33 +97,18 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: () => void 
   return (
     <button
       onClick={onChange}
-      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors shrink-0 ${
-        checked ? "bg-[#3a8c00]" : "bg-[#D1D5DB]"
-      }`}
+      className="relative inline-flex h-5 w-9 items-center rounded-full transition-colors shrink-0"
+      style={{ background: checked ? "var(--hall-ok)" : "var(--hall-muted-3)" }}
       aria-checked={checked}
       role="switch"
     >
       <span
-        className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
+        className={`inline-block h-3.5 w-3.5 transform rounded-full shadow transition-transform ${
           checked ? "translate-x-4" : "translate-x-0.5"
         }`}
+        style={{ background: "var(--hall-paper-0)" }}
       />
     </button>
-  );
-}
-
-function ColHeader({ labels }: { labels: string[] }) {
-  return (
-    <div className="flex gap-3.5 pb-2.5 border-b border-[#D8D8D0] mb-0.5">
-      {labels.map((l) => (
-        <span
-          key={l}
-          className="text-[8px] font-bold tracking-[1.8px] uppercase text-[#131218]/22 flex-1 first:flex-[1.8]"
-        >
-          {l}
-        </span>
-      ))}
-    </div>
   );
 }
 
