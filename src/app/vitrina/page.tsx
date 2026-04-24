@@ -71,7 +71,7 @@ function SectionBar({
 }) {
   if (dark) {
     return (
-      <div className="bg-[rgba(200,245,90,0.07)] border-b border-[rgba(200,245,90,0.12)] px-12 py-3 flex items-center justify-between">
+      <div className="bg-[rgba(198,242,74,0.07)] border-b border-[rgba(198,242,74,0.12)] px-12 py-3 flex items-center justify-between">
         <span className="text-[11px] font-bold tracking-[1.5px] uppercase text-white/40">
           {label}
         </span>
@@ -82,7 +82,7 @@ function SectionBar({
     );
   }
   return (
-    <div className="bg-[#c8f55a] px-12 py-3 flex items-center justify-between">
+    <div className="bg-[#c6f24a] px-12 py-3 flex items-center justify-between">
       <span className="text-[11px] font-bold tracking-[1.5px] uppercase text-black">
         {label}
       </span>
@@ -100,7 +100,10 @@ export default async function VitrinaPage() {
   const residents = allPeople.slice(0, 6);
 
   return (
-    <div className="font-sans bg-[#eeeee8] text-[#0e0e0e]">
+    <div
+      className="bg-[#f4f4ef] text-[#0a0a0a]"
+      style={{ fontFamily: "var(--font-hall-sans)" }}
+    >
 
       {/* ── TOP NAV ─────────────────────────────────────────────────────────── */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-black h-[60px] flex items-center px-12 gap-0">
@@ -124,7 +127,7 @@ export default async function VitrinaPage() {
         </div>
         <a
           href="#cta"
-          className="ml-7 inline-flex items-center gap-1.5 bg-[#c8f55a] text-black text-[11px] font-bold tracking-[0.3px] px-4 py-2 rounded-md no-underline hover:opacity-90 transition-opacity shrink-0"
+          className="ml-7 inline-flex items-center gap-1.5 bg-[#c6f24a] text-black text-[11px] font-bold tracking-[0.3px] px-4 py-2 rounded-md no-underline hover:opacity-90 transition-opacity shrink-0"
         >
           Request a conversation
         </a>
@@ -140,7 +143,7 @@ export default async function VitrinaPage() {
             The house
             <br />
             is{" "}
-            <em className="font-black italic text-[#c8f55a]">ready</em>
+            <em className="italic font-[family-name:var(--font-hall-display)] font-normal text-[#c6f24a]">ready</em>
             <br />
             to work.
           </h1>
@@ -152,7 +155,7 @@ export default async function VitrinaPage() {
             <div className="flex items-center gap-3 shrink-0">
               <a
                 href="#residents"
-                className="inline-flex items-center gap-[7px] bg-[#c8f55a] text-black text-[12px] font-bold tracking-[0.2px] px-[22px] py-[13px] rounded-lg no-underline hover:opacity-90 transition-opacity"
+                className="inline-flex items-center gap-[7px] bg-[#c6f24a] text-black text-[12px] font-bold tracking-[0.2px] px-[22px] py-[13px] rounded-lg no-underline hover:opacity-90 transition-opacity"
               >
                 Explore Residents
                 <ArrowRight size={12} />
@@ -176,92 +179,92 @@ export default async function VitrinaPage() {
       <section id="capabilities" className="w-full">
         <SectionBar label="What the House does" num="01" />
         <div className="max-w-[1100px] mx-auto px-12 py-24">
-          <h2 className="text-[clamp(2rem,4vw,3.2rem)] font-light text-[#0e0e0e] tracking-[-1.5px] leading-[1.05]">
+          <h2 className="text-[clamp(2rem,4vw,3.2rem)] font-light text-[#0a0a0a] tracking-[-1.5px] leading-[1.05]">
             Five capabilities.
             <br />
-            <em className="font-black italic">One operating system.</em>
+            <em className="italic font-[family-name:var(--font-hall-display)] font-normal">One operating system.</em>
           </h2>
           <p className="text-[15px] text-[#6b6b6b] leading-[1.7] max-w-[520px] mt-4 font-normal">
             Every engagement activates the full House — not just a consultant or
             a tool, but a system that works together.
           </p>
 
-          <div className="mt-14 grid grid-cols-5 border border-[#d8d8d0] rounded-2xl overflow-hidden bg-white">
+          <div className="mt-14 grid grid-cols-5 border border-[#e4e4dd] rounded-2xl overflow-hidden bg-white">
             {/* Strategy */}
-            <div className="p-7 border-r border-[#d8d8d0] hover:bg-[#f9f9f6] transition-colors">
-              <div className="w-9 h-9 rounded-xl bg-[#c8f55a] flex items-center justify-center mb-4 shrink-0">
+            <div className="p-7 border-r border-[#e4e4dd] hover:bg-[#fafaf7] transition-colors">
+              <div className="w-9 h-9 rounded-xl bg-[#c6f24a] flex items-center justify-center mb-4 shrink-0">
                 <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="#000" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M10 2L2 7l8 5 8-5-8-5z" />
                   <path d="M2 12l8 5 8-5" />
                   <path d="M2 17l8 5 8-5" />
                 </svg>
               </div>
-              <p className="text-[13px] font-extrabold text-[#0e0e0e] tracking-[-0.3px] mb-2">Strategy & Operations</p>
+              <p className="text-[13px] font-extrabold text-[#0a0a0a] tracking-[-0.3px] mb-2">Strategy & Operations</p>
               <p className="text-[11.5px] text-[#6b6b6b] leading-[1.6]">
                 Project management, roadmaps, decision tracking, and governance — keeping the work moving.
               </p>
               <div className="flex flex-wrap gap-1.5 mt-3.5">
                 {["Workrooms", "Decisions", "Roadmaps"].map((t) => (
-                  <span key={t} className="text-[9.5px] font-semibold text-[#6b6b6b] border border-[#d8d8d0] rounded-full px-2 py-0.5">{t}</span>
+                  <span key={t} className="text-[9.5px] font-semibold text-[#6b6b6b] border border-[#e4e4dd] rounded-full px-2 py-0.5">{t}</span>
                 ))}
               </div>
             </div>
             {/* Design */}
-            <div className="p-7 border-r border-[#d8d8d0] hover:bg-[#f9f9f6] transition-colors">
+            <div className="p-7 border-r border-[#e4e4dd] hover:bg-[#fafaf7] transition-colors">
               <div className="w-9 h-9 rounded-xl bg-black flex items-center justify-center mb-4 shrink-0">
                 <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <rect x="2" y="3" width="16" height="13" rx="1" />
                   <path d="M6 7h8M6 10h5" />
                 </svg>
               </div>
-              <p className="text-[13px] font-extrabold text-[#0e0e0e] tracking-[-0.3px] mb-2">Design & Production</p>
+              <p className="text-[13px] font-extrabold text-[#0a0a0a] tracking-[-0.3px] mb-2">Design & Production</p>
               <p className="text-[11.5px] text-[#6b6b6b] leading-[1.6]">
                 Decks, one-pagers, proposals, reports and investor briefs — built to move conversations forward.
               </p>
               <div className="flex flex-wrap gap-1.5 mt-3.5">
                 {["Design Desk", "Comms Desk", "Brand Brain"].map((t) => (
-                  <span key={t} className="text-[9.5px] font-semibold text-[#6b6b6b] border border-[#d8d8d0] rounded-full px-2 py-0.5">{t}</span>
+                  <span key={t} className="text-[9.5px] font-semibold text-[#6b6b6b] border border-[#e4e4dd] rounded-full px-2 py-0.5">{t}</span>
                 ))}
               </div>
             </div>
             {/* Intelligence */}
-            <div className="p-7 border-r border-[#d8d8d0] hover:bg-[#f9f9f6] transition-colors">
+            <div className="p-7 border-r border-[#e4e4dd] hover:bg-[#fafaf7] transition-colors">
               <div className="w-9 h-9 rounded-xl bg-black flex items-center justify-center mb-4 shrink-0">
                 <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="10" cy="10" r="8" />
                   <path d="M10 6v4l3 2" />
                 </svg>
               </div>
-              <p className="text-[13px] font-extrabold text-[#0e0e0e] tracking-[-0.3px] mb-2">Intelligence</p>
+              <p className="text-[13px] font-extrabold text-[#0a0a0a] tracking-[-0.3px] mb-2">Intelligence</p>
               <p className="text-[11.5px] text-[#6b6b6b] leading-[1.6]">
                 Continuous synthesis of signals, sources, and conversations into actionable insight briefs.
               </p>
               <div className="flex flex-wrap gap-1.5 mt-3.5">
                 {["Insights Desk", "Knowledge", "Evidence"].map((t) => (
-                  <span key={t} className="text-[9.5px] font-semibold text-[#6b6b6b] border border-[#d8d8d0] rounded-full px-2 py-0.5">{t}</span>
+                  <span key={t} className="text-[9.5px] font-semibold text-[#6b6b6b] border border-[#e4e4dd] rounded-full px-2 py-0.5">{t}</span>
                 ))}
               </div>
             </div>
             {/* Grants */}
-            <div className="p-7 border-r border-[#d8d8d0] hover:bg-[#f9f9f6] transition-colors">
+            <div className="p-7 border-r border-[#e4e4dd] hover:bg-[#fafaf7] transition-colors">
               <div className="w-9 h-9 rounded-xl bg-black flex items-center justify-center mb-4 shrink-0">
                 <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M12 2H4a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V7z" />
                   <polyline points="12 2 12 7 17 7" />
                 </svg>
               </div>
-              <p className="text-[13px] font-extrabold text-[#0e0e0e] tracking-[-0.3px] mb-2">Grants & Funding</p>
+              <p className="text-[13px] font-extrabold text-[#0a0a0a] tracking-[-0.3px] mb-2">Grants & Funding</p>
               <p className="text-[11.5px] text-[#6b6b6b] leading-[1.6]">
                 Funder mapping, grant fit reviews, backlog management, and active monitoring across the portfolio.
               </p>
               <div className="flex flex-wrap gap-1.5 mt-3.5">
                 {["Grants Desk", "Pipeline", "Monitoring"].map((t) => (
-                  <span key={t} className="text-[9.5px] font-semibold text-[#6b6b6b] border border-[#d8d8d0] rounded-full px-2 py-0.5">{t}</span>
+                  <span key={t} className="text-[9.5px] font-semibold text-[#6b6b6b] border border-[#e4e4dd] rounded-full px-2 py-0.5">{t}</span>
                 ))}
               </div>
             </div>
             {/* Relationships */}
-            <div className="p-7 hover:bg-[#f9f9f6] transition-colors">
+            <div className="p-7 hover:bg-[#fafaf7] transition-colors">
               <div className="w-9 h-9 rounded-xl bg-black flex items-center justify-center mb-4 shrink-0">
                 <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
@@ -269,13 +272,13 @@ export default async function VitrinaPage() {
                   <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
                 </svg>
               </div>
-              <p className="text-[13px] font-extrabold text-[#0e0e0e] tracking-[-0.3px] mb-2">Relationships</p>
+              <p className="text-[13px] font-extrabold text-[#0a0a0a] tracking-[-0.3px] mb-2">Relationships</p>
               <p className="text-[11.5px] text-[#6b6b6b] leading-[1.6]">
                 Relationship warmth tracking, investor matching, and portfolio health — the relational layer of the system.
               </p>
               <div className="flex flex-wrap gap-1.5 mt-3.5">
                 {["Residents", "Garage", "Portfolio"].map((t) => (
-                  <span key={t} className="text-[9.5px] font-semibold text-[#6b6b6b] border border-[#d8d8d0] rounded-full px-2 py-0.5">{t}</span>
+                  <span key={t} className="text-[9.5px] font-semibold text-[#6b6b6b] border border-[#e4e4dd] rounded-full px-2 py-0.5">{t}</span>
                 ))}
               </div>
             </div>
@@ -285,20 +288,20 @@ export default async function VitrinaPage() {
 
       {/* ── 03. RESIDENTS PREVIEW ───────────────────────────────────────────── */}
       <section id="residents" className="w-full bg-black">
-        <div className="bg-[rgba(200,245,90,0.12)] border-b border-[rgba(200,245,90,0.2)] px-12 py-3 flex items-center justify-between">
+        <div className="bg-[rgba(198,242,74,0.12)] border-b border-[rgba(198,242,74,0.2)] px-12 py-3 flex items-center justify-between">
           <span className="text-[11px] font-bold tracking-[1.5px] uppercase text-white/50">Residents</span>
           <span className="text-[11px] font-extrabold text-white/30 tabular-nums tracking-[1px]">02</span>
         </div>
         <div className="max-w-[1100px] mx-auto px-12 py-24">
           <div className="flex items-end justify-between gap-6 mb-12 flex-wrap">
             <div>
-              <p className="text-[9.5px] font-bold tracking-[2.5px] uppercase text-[#c8f55a] mb-4">
+              <p className="text-[9.5px] font-bold tracking-[2.5px] uppercase text-[#c6f24a] mb-4">
                 Directorio vivo de capacidades
               </p>
               <h2 className="text-[clamp(2rem,4vw,3.2rem)] font-light text-white tracking-[-1.5px] leading-[1.05]">
                 Not a team page.
                 <br />
-                <em className="font-black italic text-[#c8f55a]">A living directory.</em>
+                <em className="italic font-[family-name:var(--font-hall-display)] font-normal text-[#c6f24a]">A living directory.</em>
               </h2>
             </div>
             <a
@@ -319,12 +322,12 @@ export default async function VitrinaPage() {
                 return (
                   <div
                     key={r.id}
-                    className="bg-white/4 border border-white/8 rounded-2xl p-[22px] hover:bg-white/7 hover:border-[rgba(200,245,90,0.25)] transition-all"
+                    className="bg-white/4 border border-white/8 rounded-2xl p-[22px] hover:bg-white/7 hover:border-[rgba(198,242,74,0.25)] transition-all"
                   >
                     <div
                       className={
                         isLime
-                          ? "w-11 h-11 rounded-full bg-[#c8f55a] text-black text-[13px] font-extrabold flex items-center justify-center mb-3.5 tracking-[-0.5px]"
+                          ? "w-11 h-11 rounded-full bg-[#c6f24a] text-black text-[13px] font-extrabold flex items-center justify-center mb-3.5 tracking-[-0.5px]"
                           : "w-11 h-11 rounded-full bg-white/10 text-white text-[13px] font-extrabold flex items-center justify-center mb-3.5 tracking-[-0.5px]"
                       }
                     >
@@ -339,7 +342,7 @@ export default async function VitrinaPage() {
                             key={tag}
                             className={
                               i === 0
-                                ? "text-[9px] font-semibold text-[#c8f55a] bg-[rgba(200,245,90,0.07)] border border-[rgba(200,245,90,0.2)] rounded-full px-[7px] py-0.5 tracking-[0.3px]"
+                                ? "text-[9px] font-semibold text-[#c6f24a] bg-[rgba(198,242,74,0.07)] border border-[rgba(198,242,74,0.2)] rounded-full px-[7px] py-0.5 tracking-[0.3px]"
                                 : "text-[9px] font-semibold text-white/30 bg-white/5 border border-white/8 rounded-full px-[7px] py-0.5 tracking-[0.3px]"
                             }
                           >
@@ -355,17 +358,17 @@ export default async function VitrinaPage() {
           )}
 
           {/* Digital agents row */}
-          <div className="mt-6 px-6 py-5 bg-[rgba(200,245,90,0.05)] border border-[rgba(200,245,90,0.15)] rounded-xl flex items-center justify-between flex-wrap gap-4">
+          <div className="mt-6 px-6 py-5 bg-[rgba(198,242,74,0.05)] border border-[rgba(198,242,74,0.15)] rounded-xl flex items-center justify-between flex-wrap gap-4">
             <div className="flex items-center gap-3.5">
-              <div className="w-8 h-8 rounded-full bg-[rgba(200,245,90,0.12)] border border-[rgba(200,245,90,0.25)] flex items-center justify-center shrink-0">
-                <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="rgba(200,245,90,0.6)" strokeWidth="1.8" strokeLinecap="round">
+              <div className="w-8 h-8 rounded-full bg-[rgba(198,242,74,0.12)] border border-[rgba(198,242,74,0.25)] flex items-center justify-center shrink-0">
+                <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="rgba(198,242,74,0.6)" strokeWidth="1.8" strokeLinecap="round">
                   <circle cx="8" cy="8" r="6" />
                   <path d="M8 5v3l2 1.5" />
                 </svg>
               </div>
               <p className="text-[13px] font-semibold text-white/60">
                 And{" "}
-                <strong className="text-[#c8f55a] font-bold">6 digital residents</strong>{" "}
+                <strong className="text-[#c6f24a] font-bold">6 digital residents</strong>{" "}
                 that run continuously — capturing, analysing, and maintaining the system.
               </p>
             </div>
@@ -380,7 +383,7 @@ export default async function VitrinaPage() {
               ].map((agent) => (
                 <span
                   key={agent}
-                  className="text-[9.5px] font-semibold text-[rgba(200,245,90,0.6)] bg-[rgba(200,245,90,0.06)] border border-[rgba(200,245,90,0.15)] rounded-full px-2.5 py-0.5 tracking-[0.3px]"
+                  className="text-[9.5px] font-semibold text-[rgba(198,242,74,0.6)] bg-[rgba(198,242,74,0.06)] border border-[rgba(198,242,74,0.15)] rounded-full px-2.5 py-0.5 tracking-[0.3px]"
                 >
                   {agent}
                 </span>
@@ -391,13 +394,13 @@ export default async function VitrinaPage() {
       </section>
 
       {/* ── 04. THE DESKS ───────────────────────────────────────────────────── */}
-      <section id="desks" className="w-full bg-[#eeeee8]">
+      <section id="desks" className="w-full bg-[#f4f4ef]">
         <SectionBar label="The Desks — Section Entry" num="03" />
         <div className="max-w-[1100px] mx-auto px-12 py-24">
-          <h2 className="text-[clamp(2rem,4vw,3.2rem)] font-light text-[#0e0e0e] tracking-[-1.5px] leading-[1.05]">
+          <h2 className="text-[clamp(2rem,4vw,3.2rem)] font-light text-[#0a0a0a] tracking-[-1.5px] leading-[1.05]">
             Go to the desk
             <br />
-            that fits <em className="font-black italic">the work.</em>
+            that fits <em className="italic font-[family-name:var(--font-hall-display)] font-normal">the work.</em>
           </h2>
           <p className="text-[15px] text-[#6b6b6b] leading-[1.7] max-w-[520px] mt-4 font-normal">
             Each desk is a contextual entry point. You go to the right team with
@@ -408,12 +411,12 @@ export default async function VitrinaPage() {
 
             {/* Design Desk — featured */}
             <div className="bg-white border-2 border-black rounded-2xl overflow-hidden flex flex-col">
-              <div className="px-[22px] pt-[22px] pb-[18px] border-b border-[#d8d8d0] flex items-start justify-between gap-2.5">
+              <div className="px-[22px] pt-[22px] pb-[18px] border-b border-[#e4e4dd] flex items-start justify-between gap-2.5">
                 <div>
-                  <p className="text-[15px] font-black text-[#0e0e0e] tracking-[-0.5px] mt-0.5">Design</p>
+                  <p className="text-[15px] font-black text-[#0a0a0a] tracking-[-0.5px] mt-0.5">Design</p>
                   <p className="text-[11px] text-[#6b6b6b] font-medium mt-0.5">Visual production & documents</p>
                 </div>
-                <div className="w-[38px] h-[38px] rounded-xl bg-[#c8f55a] flex items-center justify-center shrink-0">
+                <div className="w-[38px] h-[38px] rounded-xl bg-[#c6f24a] flex items-center justify-center shrink-0">
                   <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="#000" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <rect x="2" y="3" width="16" height="13" rx="1" />
                     <path d="M6 7h8M6 10h5" />
@@ -424,15 +427,15 @@ export default async function VitrinaPage() {
                 <p className="text-[8.5px] font-bold tracking-[2px] uppercase text-black/20 mb-2.5">What you can get</p>
                 <div className="flex flex-col gap-1.5 flex-1">
                   {["Deck / Presentation", "One-pager", "Proposal", "Investor brief", "Report skeleton"].map((item) => (
-                    <div key={item} className="flex items-center gap-2 text-[12px] font-semibold text-[#0e0e0e]">
-                      <span className="w-1 h-1 rounded-full bg-[#c8f55a] shrink-0 block" />
+                    <div key={item} className="flex items-center gap-2 text-[12px] font-semibold text-[#0a0a0a]">
+                      <span className="w-1 h-1 rounded-full bg-[#c6f24a] shrink-0 block" />
                       {item}
                     </div>
                   ))}
                 </div>
               </div>
               {/* Form */}
-              <div className="border-t border-[#d8d8d0] px-[22px] py-[18px] bg-[#f9f9f6]">
+              <div className="border-t border-[#e4e4dd] px-[22px] py-[18px] bg-[#fafaf7]">
                 <p className="text-[8.5px] font-bold tracking-[2px] uppercase text-black/25 mb-2">What type?</p>
                 <div className="flex flex-wrap gap-1.5 mb-3">
                   {["Deck", "One-pager", "Proposal", "Brief", "Report"].map((pill, i) => (
@@ -440,8 +443,8 @@ export default async function VitrinaPage() {
                       key={pill}
                       className={
                         i === 0
-                          ? "text-[10.5px] font-semibold text-black bg-[#c8f55a] border-2 border-[#c8f55a] rounded-full px-3 py-1 cursor-pointer"
-                          : "text-[10.5px] font-semibold text-[#0e0e0e] bg-white border-[1.5px] border-[#d8d8d0] rounded-full px-3 py-1 cursor-pointer"
+                          ? "text-[10.5px] font-semibold text-black bg-[#c6f24a] border-2 border-[#c6f24a] rounded-full px-3 py-1 cursor-pointer"
+                          : "text-[10.5px] font-semibold text-[#0a0a0a] bg-white border-[1.5px] border-[#e4e4dd] rounded-full px-3 py-1 cursor-pointer"
                       }
                     >
                       {pill}
@@ -449,25 +452,25 @@ export default async function VitrinaPage() {
                   ))}
                 </div>
                 <p className="text-[8.5px] font-bold tracking-[2px] uppercase text-black/25 mb-2 mt-2.5">Tell us more</p>
-                <div className="bg-white border-[1.5px] border-[#d8d8d0] rounded-lg px-3 py-2.5 text-[12px] text-[#aaa] leading-relaxed">
+                <div className="bg-white border-[1.5px] border-[#e4e4dd] rounded-lg px-3 py-2.5 text-[12px] text-[#9a9a9a] leading-relaxed">
                   What&apos;s it for, who&apos;s the audience, any references...
                 </div>
                 <div className="mt-2.5">
-                  <a href="#" className="flex items-center justify-center w-full bg-[#c8f55a] text-black text-[11px] font-bold px-3.5 py-2.5 rounded-lg no-underline hover:opacity-90 transition-opacity">
+                  <a href="#" className="flex items-center justify-center w-full bg-[#c6f24a] text-black text-[11px] font-bold px-3.5 py-2.5 rounded-lg no-underline hover:opacity-90 transition-opacity">
                     Send to Design desk →
                   </a>
                 </div>
               </div>
-              <div className="px-[22px] py-3 border-t border-[#d8d8d0] flex items-center justify-between">
+              <div className="px-[22px] py-3 border-t border-[#e4e4dd] flex items-center justify-between">
                 <span className="text-[9px] text-black/20 font-semibold tracking-[0.5px]">Feeds: Brand Brain · Design System</span>
               </div>
             </div>
 
             {/* Comms Desk */}
-            <div className="bg-white border-[1.5px] border-[#d8d8d0] rounded-2xl overflow-hidden flex flex-col hover:border-[#0e0e0e] transition-colors">
-              <div className="px-[22px] pt-[22px] pb-[18px] border-b border-[#d8d8d0] flex items-start justify-between gap-2.5">
+            <div className="bg-white border-[1.5px] border-[#e4e4dd] rounded-2xl overflow-hidden flex flex-col hover:border-[#0a0a0a] transition-colors">
+              <div className="px-[22px] pt-[22px] pb-[18px] border-b border-[#e4e4dd] flex items-start justify-between gap-2.5">
                 <div>
-                  <p className="text-[15px] font-black text-[#0e0e0e] tracking-[-0.5px] mt-0.5">Comms</p>
+                  <p className="text-[15px] font-black text-[#0a0a0a] tracking-[-0.5px] mt-0.5">Comms</p>
                   <p className="text-[11px] text-[#6b6b6b] font-medium mt-0.5">Voice, narrative & content</p>
                 </div>
                 <div className="w-[38px] h-[38px] rounded-xl bg-black flex items-center justify-center shrink-0">
@@ -480,14 +483,14 @@ export default async function VitrinaPage() {
                 <p className="text-[8.5px] font-bold tracking-[2px] uppercase text-black/20 mb-2.5">What you can get</p>
                 <div className="flex flex-col gap-1.5 flex-1">
                   {["Post / social copy", "Newsletter block", "Article angle", "Founder voice piece", "CH institutional piece"].map((item) => (
-                    <div key={item} className="flex items-center gap-2 text-[12px] font-semibold text-[#0e0e0e]">
-                      <span className="w-1 h-1 rounded-full bg-[#c8f55a] shrink-0 block" />
+                    <div key={item} className="flex items-center gap-2 text-[12px] font-semibold text-[#0a0a0a]">
+                      <span className="w-1 h-1 rounded-full bg-[#c6f24a] shrink-0 block" />
                       {item}
                     </div>
                   ))}
                 </div>
-                <div className="flex items-center justify-between mt-5 pt-4 border-t border-[#d8d8d0]">
-                  <a href="#" className="inline-flex items-center gap-1.5 bg-black text-white text-[10.5px] font-bold px-3.5 py-2 rounded-lg no-underline hover:bg-[#222] transition-colors">
+                <div className="flex items-center justify-between mt-5 pt-4 border-t border-[#e4e4dd]">
+                  <a href="#" className="inline-flex items-center gap-1.5 bg-black text-white text-[10.5px] font-bold px-3.5 py-2 rounded-lg no-underline hover:bg-[#141414] transition-colors">
                     Request from Comms →
                   </a>
                   <span className="text-[9px] text-black/20 font-semibold tracking-[0.5px]">Comms System · Voice</span>
@@ -496,10 +499,10 @@ export default async function VitrinaPage() {
             </div>
 
             {/* Insights Desk */}
-            <div className="bg-white border-[1.5px] border-[#d8d8d0] rounded-2xl overflow-hidden flex flex-col hover:border-[#0e0e0e] transition-colors">
-              <div className="px-[22px] pt-[22px] pb-[18px] border-b border-[#d8d8d0] flex items-start justify-between gap-2.5">
+            <div className="bg-white border-[1.5px] border-[#e4e4dd] rounded-2xl overflow-hidden flex flex-col hover:border-[#0a0a0a] transition-colors">
+              <div className="px-[22px] pt-[22px] pb-[18px] border-b border-[#e4e4dd] flex items-start justify-between gap-2.5">
                 <div>
-                  <p className="text-[15px] font-black text-[#0e0e0e] tracking-[-0.5px] mt-0.5">Insights</p>
+                  <p className="text-[15px] font-black text-[#0a0a0a] tracking-[-0.5px] mt-0.5">Insights</p>
                   <p className="text-[11px] text-[#6b6b6b] font-medium mt-0.5">Analysis & intelligence</p>
                 </div>
                 <div className="w-[38px] h-[38px] rounded-xl bg-black flex items-center justify-center shrink-0">
@@ -513,20 +516,20 @@ export default async function VitrinaPage() {
                 <p className="text-[8.5px] font-bold tracking-[2px] uppercase text-black/20 mb-2.5">What you can get</p>
                 <div className="flex flex-col gap-1.5 flex-1">
                   {["PDF / PPT digest", "Grant scan", "Project intel brief", "Open exploration"].map((item) => (
-                    <div key={item} className="flex items-center gap-2 text-[12px] font-semibold text-[#0e0e0e]">
-                      <span className="w-1 h-1 rounded-full bg-[#c8f55a] shrink-0 block" />
+                    <div key={item} className="flex items-center gap-2 text-[12px] font-semibold text-[#0a0a0a]">
+                      <span className="w-1 h-1 rounded-full bg-[#c6f24a] shrink-0 block" />
                       {item}
                     </div>
                   ))}
                 </div>
                 <div className="mt-3.5">
                   <p className="text-[8.5px] font-bold tracking-[2px] uppercase text-black/25 mb-2">Upload a source</p>
-                  <div className="bg-[#f5f5f2] border-[1.5px] border-dashed border-[#d0d0c8] rounded-lg p-3 text-center text-[10.5px] text-[#aaa]">
+                  <div className="bg-[#fafaf7] border-[1.5px] border-dashed border-[#d4d4cb] rounded-lg p-3 text-center text-[10.5px] text-[#9a9a9a]">
                     PDF · PPT · DOC · URL
                   </div>
                 </div>
-                <div className="flex items-center justify-between mt-5 pt-4 border-t border-[#d8d8d0]">
-                  <a href="#" className="inline-flex items-center gap-1.5 bg-black text-white text-[10.5px] font-bold px-3.5 py-2 rounded-lg no-underline hover:bg-[#222] transition-colors">
+                <div className="flex items-center justify-between mt-5 pt-4 border-t border-[#e4e4dd]">
+                  <a href="#" className="inline-flex items-center gap-1.5 bg-black text-white text-[10.5px] font-bold px-3.5 py-2 rounded-lg no-underline hover:bg-[#141414] transition-colors">
                     Go to Insights →
                   </a>
                   <span className="text-[9px] text-black/20 font-semibold tracking-[0.5px]">Insight Engine</span>
@@ -535,13 +538,13 @@ export default async function VitrinaPage() {
             </div>
 
             {/* Grants Desk */}
-            <div className="bg-white border-[1.5px] border-[#d8d8d0] rounded-2xl overflow-hidden flex flex-col hover:border-[#0e0e0e] transition-colors">
-              <div className="px-[22px] pt-[22px] pb-[18px] border-b border-[#d8d8d0] flex items-start justify-between gap-2.5">
+            <div className="bg-white border-[1.5px] border-[#e4e4dd] rounded-2xl overflow-hidden flex flex-col hover:border-[#0a0a0a] transition-colors">
+              <div className="px-[22px] pt-[22px] pb-[18px] border-b border-[#e4e4dd] flex items-start justify-between gap-2.5">
                 <div>
-                  <p className="text-[15px] font-black text-[#0e0e0e] tracking-[-0.5px] mt-0.5">Grants</p>
+                  <p className="text-[15px] font-black text-[#0a0a0a] tracking-[-0.5px] mt-0.5">Grants</p>
                   <p className="text-[11px] text-[#6b6b6b] font-medium mt-0.5">Funding fit & monitoring</p>
                 </div>
-                <div className="w-[38px] h-[38px] rounded-xl bg-[#1a3a08] flex items-center justify-center shrink-0">
+                <div className="w-[38px] h-[38px] rounded-xl bg-[#4d6b0b] flex items-center justify-center shrink-0">
                   <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="#c8f55a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M12 2H4a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V7z" />
                     <polyline points="12 2 12 7 17 7" />
@@ -552,14 +555,14 @@ export default async function VitrinaPage() {
                 <p className="text-[8.5px] font-bold tracking-[2px] uppercase text-black/20 mb-2.5">What you can get</p>
                 <div className="flex flex-col gap-1.5 flex-1">
                   {["Grant fit review", "Funding scan", "Funder mapping", "Grant backlog & next steps"].map((item) => (
-                    <div key={item} className="flex items-center gap-2 text-[12px] font-semibold text-[#0e0e0e]">
-                      <span className="w-1 h-1 rounded-full bg-[#c8f55a] shrink-0 block" />
+                    <div key={item} className="flex items-center gap-2 text-[12px] font-semibold text-[#0a0a0a]">
+                      <span className="w-1 h-1 rounded-full bg-[#c6f24a] shrink-0 block" />
                       {item}
                     </div>
                   ))}
                 </div>
-                <div className="flex items-center justify-between mt-5 pt-4 border-t border-[#d8d8d0]">
-                  <a href="#" className="inline-flex items-center gap-1.5 bg-black text-white text-[10.5px] font-bold px-3.5 py-2 rounded-lg no-underline hover:bg-[#222] transition-colors">
+                <div className="flex items-center justify-between mt-5 pt-4 border-t border-[#e4e4dd]">
+                  <a href="#" className="inline-flex items-center gap-1.5 bg-black text-white text-[10.5px] font-bold px-3.5 py-2 rounded-lg no-underline hover:bg-[#141414] transition-colors">
                     Go to Grants →
                   </a>
                   <span className="text-[9px] text-black/20 font-semibold tracking-[0.5px]">Grants System · OS v2</span>
@@ -573,7 +576,7 @@ export default async function VitrinaPage() {
 
       {/* ── 05. WHAT CLIENTS UNLOCK ─────────────────────────────────────────── */}
       <section id="unlock" className="w-full bg-black">
-        <div className="bg-[rgba(200,245,90,0.07)] border-b border-[rgba(200,245,90,0.12)] px-12 py-3 flex items-center justify-between">
+        <div className="bg-[rgba(198,242,74,0.07)] border-b border-[rgba(198,242,74,0.12)] px-12 py-3 flex items-center justify-between">
           <span className="text-[11px] font-bold tracking-[1.5px] uppercase text-white/40">What clients unlock</span>
           <span className="text-[11px] font-extrabold text-white/20 tabular-nums tracking-[1px]">04</span>
         </div>
@@ -581,7 +584,7 @@ export default async function VitrinaPage() {
           <h2 className="text-[clamp(2rem,4vw,3.2rem)] font-light text-white tracking-[-1.5px] leading-[1.05]">
             Inside the House,
             <br />
-            <em className="font-black italic text-[#c8f55a]">everything connects.</em>
+            <em className="italic font-[family-name:var(--font-hall-display)] font-normal text-[#c6f24a]">everything connects.</em>
           </h2>
           <p className="text-[15px] text-white/50 leading-[1.7] max-w-[520px] mt-4 font-normal">
             Once you&apos;re in, you have a home base — visibility into your project,
@@ -615,13 +618,13 @@ export default async function VitrinaPage() {
                 <div key={i} className="bg-white/7" />
               ) : (
                 <div key={i} className="px-7 py-8">
-                  <p className="text-[10px] font-extrabold tracking-[2px] text-[#c8f55a] mb-3.5 tabular-nums">{item.num}</p>
+                  <p className="text-[10px] font-extrabold tracking-[2px] text-[#c6f24a] mb-3.5 tabular-nums">{item.num}</p>
                   <p className="text-[16px] font-extrabold text-white tracking-[-0.4px] mb-2.5 leading-[1.3]">{item.title}</p>
                   <p className="text-[12px] text-white/40 leading-[1.65]">{item.desc}</p>
                   <div className="mt-3.5 flex flex-col gap-1.5">
                     {item.bullets.map((b) => (
                       <div key={b} className="text-[11px] text-white/35 flex items-center gap-1.5">
-                        <span className="w-[3px] h-[3px] rounded-full bg-[#c8f55a] shrink-0 block" />
+                        <span className="w-[3px] h-[3px] rounded-full bg-[#c6f24a] shrink-0 block" />
                         {b}
                       </div>
                     ))}
@@ -634,16 +637,16 @@ export default async function VitrinaPage() {
       </section>
 
       {/* ── 06. WORKROOM PREVIEW ────────────────────────────────────────────── */}
-      <section id="workroom" className="w-full bg-[#eeeee8]">
+      <section id="workroom" className="w-full bg-[#f4f4ef]">
         <SectionBar label="Workroom — inside view" num="05" />
         <div className="max-w-[1100px] mx-auto px-12 py-24">
-          <h2 className="text-[clamp(2rem,4vw,3.2rem)] font-light text-[#0e0e0e] tracking-[-1.5px] leading-[1.05]">
+          <h2 className="text-[clamp(2rem,4vw,3.2rem)] font-light text-[#0a0a0a] tracking-[-1.5px] leading-[1.05]">
             Where active work
             <br />
-            becomes <em className="font-black italic">visible.</em>
+            becomes <em className="italic font-[family-name:var(--font-hall-display)] font-normal">visible.</em>
           </h2>
 
-          <div className="mt-12 border-[1.5px] border-[#d8d8d0] rounded-2xl overflow-hidden bg-white relative">
+          <div className="mt-12 border-[1.5px] border-[#e4e4dd] rounded-2xl overflow-hidden bg-white relative">
             {/* Browser bar */}
             <div className="bg-black px-6 py-3.5 flex items-center gap-4">
               <div className="w-2 h-2 rounded-full bg-white/15" />
@@ -658,7 +661,7 @@ export default async function VitrinaPage() {
 
             {/* Body */}
             <div className="grid grid-cols-[180px_1fr] min-h-[340px]">
-              <div className="bg-[#f5f5f2] border-r border-[#d8d8d0] p-5">
+              <div className="bg-[#fafaf7] border-r border-[#e4e4dd] p-5">
                 {[
                   { label: "Overview", active: true },
                   { label: "In motion", active: false },
@@ -668,7 +671,7 @@ export default async function VitrinaPage() {
                   <div
                     key={item.label}
                     className={`flex items-center gap-2 px-2.5 py-2 rounded-lg text-[11px] font-semibold mb-0.5 cursor-default ${
-                      item.active ? "bg-black text-[#c8f55a]" : "text-[#888]"
+                      item.active ? "bg-black text-[#c6f24a]" : "text-[#6b6b6b]"
                     }`}
                   >
                     {item.label}
@@ -676,9 +679,9 @@ export default async function VitrinaPage() {
                 ))}
               </div>
               <div className="p-6 px-7">
-                <p className="text-[18px] font-black tracking-[-0.5px] text-[#0e0e0e] mb-1">
+                <p className="text-[18px] font-black tracking-[-0.5px] text-[#0a0a0a] mb-1">
                   Auto Mercado{" "}
-                  <em className="italic text-[#888]">Fase 2</em>
+                  <em className="italic font-[family-name:var(--font-hall-display)] font-normal text-[#6b6b6b]">Fase 2</em>
                 </p>
                 <p className="text-[10.5px] text-[#6b6b6b] mb-5">
                   Pilot Planning · Last updated 11 Apr 2026
@@ -692,10 +695,10 @@ export default async function VitrinaPage() {
                   ].map((card) => (
                     <div
                       key={card.label}
-                      className={`border-[1.5px] border-[#d8d8d0] rounded-xl p-3.5 bg-[#eeeee8] ${card.dim ? "opacity-50" : ""}`}
+                      className={`border-[1.5px] border-[#e4e4dd] rounded-xl p-3.5 bg-[#f4f4ef] ${card.dim ? "opacity-50" : ""}`}
                     >
                       <p className="text-[8px] font-bold tracking-[2px] uppercase text-black/20 mb-1.5">{card.label}</p>
-                      <p className="text-[13px] font-bold text-[#0e0e0e] leading-[1.4]">{card.val}</p>
+                      <p className="text-[13px] font-bold text-[#0a0a0a] leading-[1.4]">{card.val}</p>
                     </div>
                   ))}
                 </div>
@@ -723,15 +726,15 @@ export default async function VitrinaPage() {
       <section id="outputs" className="w-full bg-white">
         <SectionBar label="Sample outputs" num="06" />
         <div className="max-w-[1100px] mx-auto px-12 py-24">
-          <h2 className="text-[clamp(2rem,4vw,3.2rem)] font-light text-[#0e0e0e] tracking-[-1.5px] leading-[1.05]">
-            What the House <em className="font-black italic">produces.</em>
+          <h2 className="text-[clamp(2rem,4vw,3.2rem)] font-light text-[#0a0a0a] tracking-[-1.5px] leading-[1.05]">
+            What the House <em className="italic font-[family-name:var(--font-hall-display)] font-normal">produces.</em>
           </h2>
 
           <div className="grid grid-cols-4 gap-4 mt-[52px]">
             {/* Output 1 */}
-            <div className="border-[1.5px] border-[#d8d8d0] rounded-2xl overflow-hidden bg-[#eeeee8] hover:border-[#aaa] transition-colors">
+            <div className="border-[1.5px] border-[#e4e4dd] rounded-2xl overflow-hidden bg-[#f4f4ef] hover:border-[#9a9a9a] transition-colors">
               <div className="h-[120px] bg-black flex items-center justify-center p-5 relative">
-                <p className="text-[22px] font-black italic text-white/15 tracking-[-1px] leading-none text-center">
+                <p className="text-[22px] italic font-[family-name:var(--font-hall-display)] font-normal text-white/15 tracking-[-1px] leading-none text-center">
                   Propuesta
                   <br />
                   de trabajo
@@ -740,7 +743,7 @@ export default async function VitrinaPage() {
               </div>
               <div className="p-4 px-[18px]">
                 <p className="text-[8.5px] font-bold tracking-[2px] uppercase text-[#6b6b6b] mb-1.5">Design Desk</p>
-                <p className="text-[13px] font-bold text-[#0e0e0e] tracking-[-0.3px] leading-[1.3] mb-1.5">Pilot Scope & Proposal</p>
+                <p className="text-[13px] font-bold text-[#0a0a0a] tracking-[-0.3px] leading-[1.3] mb-1.5">Pilot Scope & Proposal</p>
                 <p className="text-[11px] text-[#6b6b6b] leading-[1.5]">Full engagement proposal with scope, timeline, team, and commercial model.</p>
                 <div className="flex items-center gap-1.5 mt-3">
                   <span className="text-[9px] font-bold text-[#6b6b6b] bg-black/5 rounded-full px-2 py-0.5 tracking-[0.3px]">Design</span>
@@ -750,9 +753,9 @@ export default async function VitrinaPage() {
             </div>
 
             {/* Output 2 */}
-            <div className="border-[1.5px] border-[#d8d8d0] rounded-2xl overflow-hidden bg-[#eeeee8] hover:border-[#aaa] transition-colors">
-              <div className="h-[120px] bg-[#c8f55a] flex items-center justify-center p-5 relative">
-                <p className="text-[22px] font-black italic text-black/12 tracking-[-1px] leading-none text-center">
+            <div className="border-[1.5px] border-[#e4e4dd] rounded-2xl overflow-hidden bg-[#f4f4ef] hover:border-[#9a9a9a] transition-colors">
+              <div className="h-[120px] bg-[#c6f24a] flex items-center justify-center p-5 relative">
+                <p className="text-[22px] italic font-[family-name:var(--font-hall-display)] font-normal text-black/12 tracking-[-1px] leading-none text-center">
                   Insight
                   <br />
                   Brief
@@ -761,7 +764,7 @@ export default async function VitrinaPage() {
               </div>
               <div className="p-4 px-[18px]">
                 <p className="text-[8.5px] font-bold tracking-[2px] uppercase text-[#6b6b6b] mb-1.5">Insights Desk</p>
-                <p className="text-[13px] font-bold text-[#0e0e0e] tracking-[-0.3px] leading-[1.3] mb-1.5">Circular Economy — LATAM 2026</p>
+                <p className="text-[13px] font-bold text-[#0a0a0a] tracking-[-0.3px] leading-[1.3] mb-1.5">Circular Economy — LATAM 2026</p>
                 <p className="text-[11px] text-[#6b6b6b] leading-[1.5]">Synthesis of 12 sources into a 4-point strategic brief with opportunities and risks.</p>
                 <div className="flex items-center gap-1.5 mt-3">
                   <span className="text-[9px] font-bold text-[#6b6b6b] bg-black/5 rounded-full px-2 py-0.5 tracking-[0.3px]">Insights</span>
@@ -771,20 +774,20 @@ export default async function VitrinaPage() {
             </div>
 
             {/* Output 3 */}
-            <div className="border-[1.5px] border-[#d8d8d0] rounded-2xl overflow-hidden bg-[#eeeee8] hover:border-[#aaa] transition-colors">
-              <div className="h-[120px] bg-[#eeeee8] border-b border-[#d8d8d0] flex items-start p-5">
+            <div className="border-[1.5px] border-[#e4e4dd] rounded-2xl overflow-hidden bg-[#f4f4ef] hover:border-[#9a9a9a] transition-colors">
+              <div className="h-[120px] bg-[#f4f4ef] border-b border-[#e4e4dd] flex items-start p-5">
                 <div>
-                  <p className="text-[8px] font-bold tracking-[2px] uppercase text-[#ccc] mb-2">Advocacy Strategy</p>
-                  <p className="text-[16px] font-black italic text-[#ddd] tracking-[-0.5px] leading-[1.1]">Chief x Common House</p>
+                  <p className="text-[8px] font-bold tracking-[2px] uppercase text-[#d4d4cb] mb-2">Advocacy Strategy</p>
+                  <p className="text-[16px] italic font-[family-name:var(--font-hall-display)] font-normal text-[#e8e8e8] tracking-[-0.5px] leading-[1.1]">Chief x Common House</p>
                   <div className="mt-2.5 flex flex-col gap-1.5">
-                    <div className="bg-[#eee] rounded h-1.5 w-4/5" />
-                    <div className="bg-[#eee] rounded h-1.5 w-3/5" />
+                    <div className="bg-[#e8e8e8] rounded h-1.5 w-4/5" />
+                    <div className="bg-[#e8e8e8] rounded h-1.5 w-3/5" />
                   </div>
                 </div>
               </div>
               <div className="p-4 px-[18px]">
                 <p className="text-[8.5px] font-bold tracking-[2px] uppercase text-[#6b6b6b] mb-1.5">Design + Comms</p>
-                <p className="text-[13px] font-bold text-[#0e0e0e] tracking-[-0.3px] leading-[1.3] mb-1.5">Advocacy Roadmap Deck</p>
+                <p className="text-[13px] font-bold text-[#0a0a0a] tracking-[-0.3px] leading-[1.3] mb-1.5">Advocacy Roadmap Deck</p>
                 <p className="text-[11px] text-[#6b6b6b] leading-[1.5]">Strategic deck translating operational impact into structural influence for board use.</p>
                 <div className="flex items-center gap-1.5 mt-3">
                   <span className="text-[9px] font-bold text-[#6b6b6b] bg-black/5 rounded-full px-2 py-0.5 tracking-[0.3px]">Design</span>
@@ -794,10 +797,10 @@ export default async function VitrinaPage() {
             </div>
 
             {/* Output 4 */}
-            <div className="border-[1.5px] border-[#d8d8d0] rounded-2xl overflow-hidden bg-[#eeeee8] hover:border-[#aaa] transition-colors">
-              <div className="h-[120px] bg-[#111] flex items-center justify-center p-5">
+            <div className="border-[1.5px] border-[#e4e4dd] rounded-2xl overflow-hidden bg-[#f4f4ef] hover:border-[#9a9a9a] transition-colors">
+              <div className="h-[120px] bg-[#0a0a0a] flex items-center justify-center p-5">
                 <div className="text-center">
-                  <p className="text-[11px] font-bold tracking-[2px] uppercase text-[rgba(200,245,90,0.3)] mb-1.5">Grant Landscape</p>
+                  <p className="text-[11px] font-bold tracking-[2px] uppercase text-[rgba(198,242,74,0.3)] mb-1.5">Grant Landscape</p>
                   <div className="flex flex-col gap-1">
                     {[
                       { w: "w-[100px]", score: "82%", bright: true },
@@ -805,9 +808,9 @@ export default async function VitrinaPage() {
                       { w: "w-[60px]", score: "51%", bright: false },
                     ].map((row, i) => (
                       <div key={i} className="flex items-center gap-1.5">
-                        <div className={`w-2 h-2 rounded-full ${row.bright ? "bg-[rgba(200,245,90,0.2)]" : "bg-white/8"}`} />
+                        <div className={`w-2 h-2 rounded-full ${row.bright ? "bg-[rgba(198,242,74,0.2)]" : "bg-white/8"}`} />
                         <div className={`${row.w} h-1.5 rounded bg-${row.bright ? "[rgba(255,255,255,0.06)]" : "[rgba(255,255,255,0.04)]"}`} />
-                        <span className={`text-[9px] font-bold ${row.bright ? "text-[rgba(200,245,90,0.3)]" : "text-white/20"}`}>{row.score}</span>
+                        <span className={`text-[9px] font-bold ${row.bright ? "text-[rgba(198,242,74,0.3)]" : "text-white/20"}`}>{row.score}</span>
                       </div>
                     ))}
                   </div>
@@ -815,7 +818,7 @@ export default async function VitrinaPage() {
               </div>
               <div className="p-4 px-[18px]">
                 <p className="text-[8.5px] font-bold tracking-[2px] uppercase text-[#6b6b6b] mb-1.5">Grants Desk</p>
-                <p className="text-[13px] font-bold text-[#0e0e0e] tracking-[-0.3px] leading-[1.3] mb-1.5">Funder Fit Mapping</p>
+                <p className="text-[13px] font-bold text-[#0a0a0a] tracking-[-0.3px] leading-[1.3] mb-1.5">Funder Fit Mapping</p>
                 <p className="text-[11px] text-[#6b6b6b] leading-[1.5]">Ranked funder landscape with fit scores, next steps, and application backlog.</p>
                 <div className="flex items-center gap-1.5 mt-3">
                   <span className="text-[9px] font-bold text-[#6b6b6b] bg-black/5 rounded-full px-2 py-0.5 tracking-[0.3px]">Grants</span>
@@ -829,13 +832,13 @@ export default async function VitrinaPage() {
 
       {/* ── 08. INTELLIGENCE PREVIEW ────────────────────────────────────────── */}
       <section id="intelligence" className="w-full bg-black">
-        <div className="bg-[rgba(200,245,90,0.07)] border-b border-[rgba(200,245,90,0.12)] px-12 py-3 flex items-center justify-between">
+        <div className="bg-[rgba(198,242,74,0.07)] border-b border-[rgba(198,242,74,0.12)] px-12 py-3 flex items-center justify-between">
           <span className="text-[11px] font-bold tracking-[1.5px] uppercase text-white/40">Intelligence layer — preview</span>
           <span className="text-[11px] font-extrabold text-white/20 tabular-nums tracking-[1px]">07</span>
         </div>
         <div className="max-w-[1100px] mx-auto px-12 py-24">
           <h2 className="text-[clamp(2rem,4vw,3.2rem)] font-light text-white tracking-[-1.5px] leading-[1.05]">
-            Signals that feed <em className="font-black italic text-[#c8f55a]">the work.</em>
+            Signals that feed <em className="italic font-[family-name:var(--font-hall-display)] font-normal text-[#c6f24a]">the work.</em>
           </h2>
           <p className="text-[15px] text-white/50 leading-[1.7] max-w-[520px] mt-4 font-normal">
             The system continuously monitors conversations, documents, and sources — surfacing what matters, when it matters.
@@ -853,7 +856,7 @@ export default async function VitrinaPage() {
               </p>
               <div className="flex items-center justify-between mt-3.5">
                 <span className="text-[9.5px] text-white/18 font-mono">9 Apr 2026</span>
-                <span className="inline-flex items-center gap-1 text-[9px] font-semibold text-[rgba(200,245,90,0.5)] tracking-[0.5px] uppercase">
+                <span className="inline-flex items-center gap-1 text-[9px] font-semibold text-[rgba(198,242,74,0.5)] tracking-[0.5px] uppercase">
                   <LockIcon /> Client-only
                 </span>
               </div>
@@ -870,7 +873,7 @@ export default async function VitrinaPage() {
               </p>
               <div className="flex items-center justify-between mt-3.5">
                 <span className="text-[9.5px] text-white/18 font-mono">9 Apr 2026</span>
-                <span className="inline-flex items-center gap-1 text-[9px] font-semibold text-[rgba(200,245,90,0.5)] tracking-[0.5px] uppercase">
+                <span className="inline-flex items-center gap-1 text-[9px] font-semibold text-[rgba(198,242,74,0.5)] tracking-[0.5px] uppercase">
                   <LockIcon /> Client-only
                 </span>
               </div>
@@ -897,13 +900,13 @@ export default async function VitrinaPage() {
       </section>
 
       {/* ── 09. GRANTS PREVIEW ──────────────────────────────────────────────── */}
-      <section id="grants" className="w-full bg-[#eeeee8]">
+      <section id="grants" className="w-full bg-[#f4f4ef]">
         <SectionBar label="Grants — funding fit" num="08" />
         <div className="max-w-[1100px] mx-auto px-12 py-24">
-          <h2 className="text-[clamp(2rem,4vw,3.2rem)] font-light text-[#0e0e0e] tracking-[-1.5px] leading-[1.05]">
+          <h2 className="text-[clamp(2rem,4vw,3.2rem)] font-light text-[#0a0a0a] tracking-[-1.5px] leading-[1.05]">
             Funding fit,
             <br />
-            mapped and <em className="font-black italic">monitored.</em>
+            mapped and <em className="italic font-[family-name:var(--font-hall-display)] font-normal">monitored.</em>
           </h2>
           <p className="text-[15px] text-[#6b6b6b] leading-[1.7] max-w-[520px] mt-4 font-normal">
             The House maintains a live view of grant opportunities across the portfolio — matching funders to projects continuously.
@@ -911,58 +914,58 @@ export default async function VitrinaPage() {
 
           <div className="grid grid-cols-3 gap-4 mt-[52px]">
             {/* Grant 1 */}
-            <div className="bg-white border-[1.5px] border-[#d8d8d0] rounded-2xl p-[22px]">
+            <div className="bg-white border-[1.5px] border-[#e4e4dd] rounded-2xl p-[22px]">
               <div className="flex items-center gap-2 mb-3.5">
                 <div>
                   <p className="text-[9.5px] font-bold text-[#6b6b6b] tracking-[0.5px] uppercase">Match</p>
-                  <p className="text-[20px] font-black text-[#0e0e0e] tracking-[-1px]">82%</p>
+                  <p className="text-[20px] font-black text-[#0a0a0a] tracking-[-1px]">82%</p>
                 </div>
-                <div className="flex-1 h-1 bg-[#d8d8d0] rounded-sm overflow-hidden">
-                  <div className="h-full bg-[#c8f55a] rounded-sm" style={{ width: "82%" }} />
+                <div className="flex-1 h-1 bg-[#e4e4dd] rounded-sm overflow-hidden">
+                  <div className="h-full bg-[#c6f24a] rounded-sm" style={{ width: "82%" }} />
                 </div>
               </div>
-              <p className="text-[14px] font-extrabold text-[#0e0e0e] tracking-[-0.3px] leading-[1.3] mb-1.5">Circular Economy Innovation Fund</p>
+              <p className="text-[14px] font-extrabold text-[#0a0a0a] tracking-[-0.3px] leading-[1.3] mb-1.5">Circular Economy Innovation Fund</p>
               <p className="text-[10.5px] text-[#6b6b6b] font-medium mb-3">European Investment Bank</p>
               <div className="flex flex-wrap gap-1.5">
                 {["Circular economy", "SME", "LATAM-eligible"].map((t) => (
-                  <span key={t} className="text-[9px] font-semibold text-[#6b6b6b] border border-[#d8d8d0] rounded-full px-2 py-0.5">{t}</span>
+                  <span key={t} className="text-[9px] font-semibold text-[#6b6b6b] border border-[#e4e4dd] rounded-full px-2 py-0.5">{t}</span>
                 ))}
               </div>
               <p className="text-[11px] font-bold text-black/20 font-mono mt-3.5 tracking-[0.5px] blur-sm select-none">€ ██,███ — €███,███</p>
             </div>
 
             {/* Grant 2 */}
-            <div className="bg-white border-[1.5px] border-[#d8d8d0] rounded-2xl p-[22px]">
+            <div className="bg-white border-[1.5px] border-[#e4e4dd] rounded-2xl p-[22px]">
               <div className="flex items-center gap-2 mb-3.5">
                 <div>
                   <p className="text-[9.5px] font-bold text-[#6b6b6b] tracking-[0.5px] uppercase">Match</p>
-                  <p className="text-[20px] font-black text-[#0e0e0e] tracking-[-1px]">74%</p>
+                  <p className="text-[20px] font-black text-[#0a0a0a] tracking-[-1px]">74%</p>
                 </div>
-                <div className="flex-1 h-1 bg-[#d8d8d0] rounded-sm overflow-hidden">
-                  <div className="h-full bg-[#c8f55a] rounded-sm" style={{ width: "74%" }} />
+                <div className="flex-1 h-1 bg-[#e4e4dd] rounded-sm overflow-hidden">
+                  <div className="h-full bg-[#c6f24a] rounded-sm" style={{ width: "74%" }} />
                 </div>
               </div>
-              <p className="text-[14px] font-extrabold text-[#0e0e0e] tracking-[-0.3px] leading-[1.3] mb-1.5">Fair4All Finance — Impact Lending</p>
+              <p className="text-[14px] font-extrabold text-[#0a0a0a] tracking-[-0.3px] leading-[1.3] mb-1.5">Fair4All Finance — Impact Lending</p>
               <p className="text-[10.5px] text-[#6b6b6b] font-medium mb-3">SUFI · Fair4All Finance</p>
               <div className="flex flex-wrap gap-1.5">
                 {["Impact", "Retail", "P1 — deadline Apr 30"].map((t) => (
-                  <span key={t} className="text-[9px] font-semibold text-[#6b6b6b] border border-[#d8d8d0] rounded-full px-2 py-0.5">{t}</span>
+                  <span key={t} className="text-[9px] font-semibold text-[#6b6b6b] border border-[#e4e4dd] rounded-full px-2 py-0.5">{t}</span>
                 ))}
               </div>
               <p className="text-[11px] font-bold text-black/20 font-mono mt-3.5 tracking-[0.5px] blur-sm select-none">$ ██,███ — $███,███</p>
             </div>
 
             {/* Grant 3 — Grants desk active */}
-            <div className="bg-[#f9f9f6] border-[1.5px] border-[#d8d8d0] rounded-2xl p-[22px]">
+            <div className="bg-[#fafaf7] border-[1.5px] border-[#e4e4dd] rounded-2xl p-[22px]">
               <div className="flex items-center gap-2.5 mb-4">
-                <div className="w-9 h-9 rounded-full bg-[#c8f55a] flex items-center justify-center shrink-0">
+                <div className="w-9 h-9 rounded-full bg-[#c6f24a] flex items-center justify-center shrink-0">
                   <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="#000" strokeWidth="2" strokeLinecap="round">
                     <circle cx="8" cy="8" r="6" />
                     <path d="M8 5v3l2 1.5" />
                   </svg>
                 </div>
                 <div>
-                  <p className="text-[11px] font-extrabold text-[#0e0e0e]">Grants desk active</p>
+                  <p className="text-[11px] font-extrabold text-[#0a0a0a]">Grants desk active</p>
                   <p className="text-[10px] text-[#6b6b6b]">11 funders mapped · 3 in pipeline</p>
                 </div>
               </div>
@@ -972,7 +975,7 @@ export default async function VitrinaPage() {
               <div className="mt-[18px]">
                 <a
                   href="#desks"
-                  className="inline-flex items-center gap-1.5 bg-[#c8f55a] text-black text-[11px] font-bold px-3.5 py-2 rounded-lg no-underline hover:opacity-90 transition-opacity"
+                  className="inline-flex items-center gap-1.5 bg-[#c6f24a] text-black text-[11px] font-bold px-3.5 py-2 rounded-lg no-underline hover:opacity-90 transition-opacity"
                 >
                   Explore Grants desk →
                 </a>
@@ -996,7 +999,7 @@ export default async function VitrinaPage() {
           <h2 className="text-[clamp(3rem,6vw,5.5rem)] font-light text-white tracking-[-3px] leading-none mb-8">
             Enough context.
             <br />
-            <em className="font-black italic text-[#c8f55a]">Time to talk.</em>
+            <em className="italic font-[family-name:var(--font-hall-display)] font-normal text-[#c6f24a]">Time to talk.</em>
           </h2>
           <p className="text-[15px] text-white/35 max-w-[420px] leading-[1.65] mb-11">
             If the work sounds familiar — or if you want to understand what activating the House could mean for your organisation — let&apos;s have a real conversation.
@@ -1004,7 +1007,7 @@ export default async function VitrinaPage() {
           <div className="flex items-center gap-3 flex-wrap">
             <a
               href="#"
-              className="inline-flex items-center gap-2 bg-[#c8f55a] text-black text-[13px] font-extrabold px-7 py-[15px] rounded-xl no-underline tracking-[-0.2px] hover:opacity-90 transition-opacity"
+              className="inline-flex items-center gap-2 bg-[#c6f24a] text-black text-[13px] font-extrabold px-7 py-[15px] rounded-xl no-underline tracking-[-0.2px] hover:opacity-90 transition-opacity"
             >
               Request a conversation
               <ArrowRight size={13} />
