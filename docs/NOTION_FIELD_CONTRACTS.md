@@ -1,6 +1,6 @@
 # Notion Field Contracts
 
-Last reviewed: 2026-04-14
+Last reviewed: 2026-04-24
 
 ---
 
@@ -53,6 +53,7 @@ Used by: `/hall`, `/workroom`, `/garage`, `/admin`, `/living-room`, all project-
 | `Share to Living Room` | Only for Living Room | `/living-room` milestones, `updateProjectLivingRoom()` | Checkbox gate — only projects with this checked appear in Living Room milestones | Project never appears in Living Room |
 | `Milestone Type` | Only for Living Room | `/living-room` | Select — type of milestone shown in community view | Milestone type blank in Living Room |
 | `Community Theme` | Only for Living Room | `/living-room` | Text shown as community theme in Living Room | Theme text blank |
+| `Drive Folder ID` | Only for Drive ingestor | Future Drive ingestor (Phase 9, `docs/NORMALIZATION_ARCHITECTURE.md`) | Rich text — the Google Drive folder ID the ingestor watches for this project. Empty means the project is not watched; ingestor reports it in `diagnostics.skipped_unconfigured_projects`. | Drive artifacts + `review` action_items never emitted for this project |
 
 ---
 
@@ -89,6 +90,7 @@ Used by: Hall Conversations section, Shared Materials section, project source co
 | `Source Date` | Recommended | Sort field; document list | Date sort for source queries and document display | Documents/sources appear in random order |
 | `Source URL` | Only for documents | `getDocumentsForProject()` filter | URL field. Documents without a URL are filtered out entirely (`.filter(d => d.url)`). | Document appears in DB but never shown in Hall |
 | `Processed Summary` | Recommended | Hall Conversations section | Rich text written by OS engine after meeting intake. Code comments note it may be empty for older sources. | Meeting entry shows in Conversations but without any summary text |
+| `Group Chat` | Only for WhatsApp | WhatsApp post-processor (Phase 8, `docs/NORMALIZATION_ARCHITECTURE.md` §11) | Checkbox. `true` = group chat (emit ConversationSignal only, no ActionSignals). `false`/unset = DM (full signal emission). | Group chats may emit noisy `reply` ActionSignals if left unset |
 
 ---
 
@@ -111,6 +113,8 @@ Used by: Hall team section, `/residents`, Living Room, relationship warmth queue
 | `Contact Warmth` | Recommended | Relationship queue in admin, portfolio-health-agent | Select: `"Hot"` \| `"Warm"` \| `"Cold"` \| `"Dormant"`. Used to filter cold/dormant contacts for the admin dashboard queue. | Relationship queue always empty; warmth-based alerts never fire |
 | `Last Contact Date` | Recommended | Relationship queue sort | Date — sort field for cold contacts list | Cold contacts appear in random order |
 | `Follow-up Status` | Recommended | `identify-quick-win` skill route | Select: `"Needed"`. Filtered by skill to surface hot contacts needing follow-up. | Quick-win skill never surfaces contact follow-ups |
+| `Relationship Tier` | Only for nurture | Contacts ingestor (`docs/NORMALIZATION_ARCHITECTURE.md` §7.4) | Select: `"VIP"` \| `"Active"` \| `"Occasional"` \| `"Dormant"`. Drives cadence_expected_days default (30 / 60 / 90 / 180). Distinct from `Contact Warmth` (observed state) — Tier is the **intended** cadence classification. | Nurture ActionSignals never fire for this contact; `relationship_signals.cadence_expected_days` stays null |
+| `Cadence Days Override` | Only for nurture | Contacts ingestor | Number. Overrides the tier default. Set this when a specific contact needs a bespoke cadence (e.g., a monthly VIP touchpoint instead of every 30d). | If set to an unexpected value, nurture alerts fire at the wrong cadence for that contact |
 
 ---
 
