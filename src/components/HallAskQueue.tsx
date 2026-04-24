@@ -44,36 +44,25 @@ export function HallAskQueue() {
   }, []);
 
   return (
-    <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-      <div className="flex items-center justify-between px-5 py-3 border-b border-[#EFEFEA]">
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] font-bold tracking-widest uppercase text-[#131218]/50">Waiting on others</span>
-          {items && items.length > 0 && (
-            <span className="text-[9px] font-bold bg-[#131218]/6 text-[#131218]/60 px-1.5 py-0.5 rounded-full">
-              {total}
-            </span>
-          )}
-        </div>
-        <span className="text-[9px] font-semibold text-[#131218]/30">top {items?.length ?? 0}</span>
-      </div>
-      {loading && <div className="px-5 py-4"><p className="text-[11px] text-[#131218]/30">Scanning inbox…</p></div>}
-      {error && !loading && <div className="px-5 py-4"><p className="text-[11px] text-red-600">{error}</p></div>}
+    <div>
+      {loading && <p className="text-[11px]" style={{ color: "var(--hall-muted-3)" }}>Scanning inbox…</p>}
+      {error && !loading && <p className="text-[11px]" style={{ color: "var(--hall-danger)" }}>{error}</p>}
       {!loading && !error && items && items.length === 0 && (
-        <div className="px-5 py-6 text-center">
-          <p className="text-[11px] text-[#131218]/35">Everyone has responded. No outstanding pings.</p>
-        </div>
+        <p className="text-[11px]" style={{ color: "var(--hall-muted-3)" }}>Everyone has responded. No outstanding pings.</p>
       )}
       {!loading && !error && items && items.length > 0 && (
-        <div className="divide-y divide-[#EFEFEA]">
+        <ul className="flex flex-col">
           {items.map(i => <AskRow key={i.threadId} item={i} />)}
-        </div>
+        </ul>
       )}
     </div>
   );
 }
 
 function AskRow({ item }: { item: Item }) {
-  const stale = item.daysWaiting >= 21 ? "text-red-600" : item.daysWaiting >= 10 ? "text-amber-700" : "text-[#131218]/55";
+  const ageColor = item.daysWaiting >= 21 ? "var(--hall-danger)"
+    : item.daysWaiting >= 10 ? "var(--hall-warn)"
+    : "var(--hall-muted-3)";
   const [nudging, setNudging] = useState(false);
   const [failed,  setFailed]  = useState(false);
 
@@ -112,33 +101,56 @@ function AskRow({ item }: { item: Item }) {
   }
 
   return (
-    <div className="flex items-start gap-3 px-5 py-2.5 hover:bg-[#EFEFEA]/40 transition-colors">
+    <li
+      className="group flex items-start gap-3 py-2.5"
+      style={{ borderTop: "1px solid var(--hall-line-soft)" }}
+    >
       <a
         href={item.gmailUrl}
         target="_blank"
         rel="noopener noreferrer"
         className="flex-1 min-w-0"
       >
-        <p className="text-[11px] font-bold text-[#131218] truncate">
+        <span
+          className="block text-[12px] font-semibold truncate"
+          style={{ color: "var(--hall-ink-0)" }}
+        >
           {item.subject}
-          {item.isVip && <span className="ml-2 text-[8px] font-bold px-1.5 py-0.5 rounded bg-[#B2FF59]/40 text-green-900">VIP</span>}
-        </p>
-        <p className="text-[9px] text-[#131218]/45 mt-0.5 truncate">
-          <span className="font-semibold">{item.toName}</span>
-          <span className="text-[#131218]/25"> · </span>
+          {item.isVip && (
+            <span
+              className="ml-2 text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded"
+              style={{
+                background: "var(--hall-lime-soft)",
+                color: "var(--hall-lime-ink)",
+                fontFamily: "var(--font-hall-mono)",
+              }}
+            >
+              VIP
+            </span>
+          )}
+        </span>
+        <span
+          className="block text-[10.5px] mt-0.5 truncate"
+          style={{ color: "var(--hall-muted-2)" }}
+        >
+          <span className="font-semibold" style={{ color: "var(--hall-ink-3)" }}>{item.toName}</span>
+          <span> · </span>
           {item.classes.length > 0
             ? item.classes.slice(0, 2).join(" · ")
             : "unclassified"}
-        </p>
+        </span>
       </a>
 
       <div className="flex items-center gap-2 shrink-0">
-        <span className={`text-[10px] font-bold ${stale}`}>
+        <span
+          className="font-semibold"
+          style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10, color: ageColor }}
+        >
           {item.daysWaiting}d
         </span>
 
         {failed && (
-          <span className="text-[9px] font-semibold text-red-600">Failed</span>
+          <span className="text-[9px] font-semibold" style={{ color: "var(--hall-danger)" }}>Failed</span>
         )}
 
         <button
@@ -147,11 +159,12 @@ function AskRow({ item }: { item: Item }) {
           disabled={nudging}
           title="Draft a follow-up with Haiku, opens in Gmail"
           aria-label="Nudge with Haiku draft"
-          className="h-6 flex items-center justify-center rounded-md px-2 text-[10px] font-bold tracking-wide uppercase bg-[#c8f55a] text-[#131218] hover:bg-[#b6e544] transition-colors disabled:opacity-50 leading-none whitespace-nowrap"
+          className="hall-btn-primary opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-50"
+          style={{ padding: "4px 10px", fontSize: 10.5 }}
         >
           {nudging ? "…" : "Nudge →"}
         </button>
       </div>
-    </div>
+    </li>
   );
 }

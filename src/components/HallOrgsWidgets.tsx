@@ -36,39 +36,42 @@ export async function HallOrgsColdRelations() {
   if (cold.length === 0) return null;
 
   return (
-    <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-      <div className="flex items-center justify-between px-5 py-3 border-b border-[#EFEFEA]">
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] font-bold tracking-widest uppercase text-[#131218]/50">Cold orgs</span>
-          <span className="text-[9px] font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">
-            {cold.length}
-          </span>
-        </div>
-        <Link href="/admin/hall/organizations" className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/40 hover:text-[#131218]/80">
-          All orgs →
-        </Link>
-      </div>
-      <div className="divide-y divide-[#EFEFEA]">
-        {cold.map(o => (
-          <Link
-            key={o.domain}
-            href={`/admin/hall/organizations/${encodeURIComponent(o.domain)}`}
-            className="flex items-center gap-3 px-5 py-2.5 hover:bg-[#EFEFEA]/40 transition-colors"
-          >
-            <div className="flex-1 min-w-0">
-              <p className="text-[11px] font-bold text-[#131218] truncate">{o.name}</p>
-              <p className="text-[9px] text-[#131218]/45 mt-0.5">
-                {o.relationship_classes.slice(0, 2).join(" · ")}
-                {" · "}{o.contact_count} contact{o.contact_count === 1 ? "" : "s"}
-              </p>
-            </div>
-            <span className={`text-[10px] font-bold shrink-0 ${daysAgo(o.last_interaction_at) >= 60 ? "text-red-600" : "text-amber-700"}`}>
-              {daysAgo(o.last_interaction_at)}d
-            </span>
-          </Link>
-        ))}
-      </div>
-    </div>
+    <ul className="flex flex-col">
+      {cold.map(o => {
+        const days = daysAgo(o.last_interaction_at);
+        const ageColor = days >= 60 ? "var(--hall-danger)" : "var(--hall-warn)";
+        return (
+          <li key={o.domain} style={{ borderTop: "1px solid var(--hall-line-soft)" }}>
+            <Link
+              href={`/admin/hall/organizations/${encodeURIComponent(o.domain)}`}
+              className="flex items-center gap-3 py-2.5"
+            >
+              <div className="flex-1 min-w-0">
+                <span
+                  className="block text-[12px] font-semibold truncate"
+                  style={{ color: "var(--hall-ink-0)" }}
+                >
+                  {o.name}
+                </span>
+                <span
+                  className="block text-[10.5px] mt-0.5"
+                  style={{ color: "var(--hall-muted-2)" }}
+                >
+                  {o.relationship_classes.slice(0, 2).join(" · ")}
+                  {" · "}{o.contact_count} contact{o.contact_count === 1 ? "" : "s"}
+                </span>
+              </div>
+              <span
+                className="font-semibold shrink-0"
+                style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10, color: ageColor }}
+              >
+                {days}d
+              </span>
+            </Link>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
@@ -95,49 +98,66 @@ export async function HallOrgsClassMix() {
   const row = MIX_CLASSES.map(c => ({ label: c, count: counts[c] ?? 0 }));
 
   return (
-    <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-      <div className="flex items-center justify-between px-5 py-3 border-b border-[#EFEFEA]">
-        <span className="text-[10px] font-bold tracking-widest uppercase text-[#131218]/50">Network mix</span>
-        <span className="text-[9px] font-semibold text-[#131218]/30">{total} orgs</span>
+    <div>
+      <div
+        className="flex items-center justify-between mb-2 text-[10px]"
+        style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+      >
+        <span>NETWORK MIX</span>
+        <span style={{ color: "var(--hall-ink-0)", fontWeight: 600 }}>{total} ORGS</span>
       </div>
-      <div className="px-5 py-4">
-        {total === 0 ? (
-          <div className="text-center">
-            <p className="text-[11px] text-[#131218]/35 mb-2">No organisations registered yet.</p>
-            <Link href="/admin/hall/organizations" className="text-[10px] font-bold tracking-wide uppercase text-[#131218] bg-[#c8f55a] hover:bg-[#b2ea3f] px-3 py-1.5 rounded-md transition-colors inline-block">
-              Add first organization →
-            </Link>
+      {total === 0 ? (
+        <div>
+          <p className="text-[11px] mb-2" style={{ color: "var(--hall-muted-3)" }}>
+            No organisations registered yet.
+          </p>
+          <Link
+            href="/admin/hall/organizations"
+            className="hall-btn-primary inline-flex"
+            style={{ padding: "6px 12px", fontSize: 11 }}
+          >
+            Add first organization →
+          </Link>
+        </div>
+      ) : (
+        <>
+          <div
+            className="flex w-full h-2 rounded-full overflow-hidden mb-3"
+            style={{ background: "var(--hall-paper-3)" }}
+          >
+            {row.filter(r => r.count > 0).map(r => (
+              <div
+                key={r.label}
+                className={`h-full ${MIX_COLOR[r.label as typeof MIX_CLASSES[number]]}`}
+                style={{ width: `${(r.count / total) * 100}%`, minWidth: "2px" }}
+                title={`${r.label}: ${r.count} (${((r.count / total) * 100).toFixed(0)}%)`}
+              />
+            ))}
           </div>
-        ) : (
-          <>
-            {/* L2 — Stacked bar taller + ring so it's clearly visible (K1 learnings) */}
-            <div className="flex w-full h-3 rounded-full overflow-hidden bg-[#E0E0D8] ring-1 ring-[#E0E0D8] mb-3">
-              {row.filter(r => r.count > 0).map(r => (
-                <div
-                  key={r.label}
-                  className={`h-full ${MIX_COLOR[r.label as typeof MIX_CLASSES[number]]}`}
-                  style={{ width: `${(r.count / total) * 100}%`, minWidth: "2px" }}
-                  title={`${r.label}: ${r.count} (${((r.count / total) * 100).toFixed(0)}%)`}
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+            {row.map(r => (
+              <Link
+                key={r.label}
+                href={`/admin/hall/organizations?class=${encodeURIComponent(r.label)}`}
+                className="flex items-center gap-2 text-[11px] group"
+                style={{ color: "var(--hall-ink-3)" }}
+              >
+                <span
+                  className={`${MIX_COLOR[r.label as typeof MIX_CLASSES[number]]}`}
+                  style={{ width: 8, height: 8, borderRadius: "50%" }}
                 />
-              ))}
-            </div>
-            {/* L1 — Legend entries are now links to filtered Organizations view */}
-            <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-              {row.map(r => (
-                <Link
-                  key={r.label}
-                  href={`/admin/hall/organizations?class=${encodeURIComponent(r.label)}`}
-                  className="flex items-center gap-2 text-[10px] text-[#131218]/70 hover:text-[#131218] transition-colors group"
+                <span className="font-semibold group-hover:underline decoration-dotted underline-offset-2">{r.label}</span>
+                <span
+                  className="ml-auto tabular-nums"
+                  style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--hall-muted-2)" }}
                 >
-                  <span className={`w-2 h-2 rounded-full ${MIX_COLOR[r.label as typeof MIX_CLASSES[number]]}`} />
-                  <span className="font-semibold group-hover:underline decoration-dotted underline-offset-2">{r.label}</span>
-                  <span className="ml-auto tabular-nums text-[#131218]/50">{r.count}</span>
-                </Link>
-              ))}
-            </div>
-          </>
-        )}
-      </div>
+                  {r.count}
+                </span>
+              </Link>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }

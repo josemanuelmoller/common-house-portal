@@ -128,52 +128,58 @@ export async function HallPortfolioPulse() {
   if (cold.length === 0) return null;
 
   return (
-    <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-      <div className="flex items-center justify-between px-5 py-3 border-b border-[#EFEFEA]">
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] font-bold tracking-widest uppercase text-[#131218]/50">Portfolio check-ins needed</span>
-          <span className="text-[9px] font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">{cold.length} cold</span>
-        </div>
-        <Link href="/admin/garage-view" className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/40 hover:text-[#131218]/80">
-          Garage →
-        </Link>
-      </div>
-      <div className="divide-y divide-[#EFEFEA]">
-        {cold.slice(0, 5).map(r => <PulseRow key={r.project.notion_id} entry={r} />)}
-      </div>
-    </div>
+    <ul className="flex flex-col">
+      {cold.slice(0, 5).map(r => <PulseRow key={r.project.notion_id} entry={r} />)}
+    </ul>
   );
 }
 
 function PulseRow({ entry }: { entry: PortfolioEntry }) {
   const { project: p, heat } = entry;
-  const dot = heat === "hot" ? "bg-[#B2FF59]" : heat === "warm" ? "bg-amber-400" : "bg-red-500";
+  const dotColor = heat === "hot" ? "var(--hall-ok)"
+    : heat === "warm" ? "var(--hall-warn)"
+    : "var(--hall-danger)";
   const dotLabel = heat === "cold" ? "check-in" : heat === "warm" ? "warm" : "hot";
-  const dotLabelColor = heat === "cold" ? "text-red-700" : heat === "warm" ? "text-amber-700" : "text-green-800";
 
   return (
-    <a
-      href={`https://www.notion.so/${p.notion_id.replace(/-/g, "")}`}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="flex items-center gap-3 px-5 py-2.5 hover:bg-[#EFEFEA]/40 transition-colors"
-    >
-      <span className={`w-2 h-2 rounded-full ${dot} shrink-0`} />
-      <div className="flex-1 min-w-0">
-        <p className="text-[11px] font-bold text-[#131218] truncate">{p.name}</p>
-        <p className="text-[9px] text-[#131218]/45 mt-0.5">
-          {p.current_stage ?? "—"}
-          {" · "}
-          {entry.events14d > 0
-            ? `${entry.events14d} event${entry.events14d === 1 ? "" : "s"} · last ${timeAgo(entry.lastEventAt)}`
-            : entry.lastEventAt
-              ? `last activity ${timeAgo(entry.lastEventAt)}`
-              : "no recent activity"}
-        </p>
-      </div>
-      <span className={`text-[9px] font-bold shrink-0 uppercase tracking-wide ${dotLabelColor}`}>
-        {dotLabel}
-      </span>
-    </a>
+    <li style={{ borderTop: "1px solid var(--hall-line-soft)" }}>
+      <a
+        href={`https://www.notion.so/${p.notion_id.replace(/-/g, "")}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex items-center gap-3 py-2.5"
+      >
+        <span
+          className="shrink-0"
+          style={{ width: 8, height: 8, borderRadius: "50%", background: dotColor }}
+        />
+        <div className="flex-1 min-w-0">
+          <span
+            className="block text-[12px] font-semibold truncate"
+            style={{ color: "var(--hall-ink-0)" }}
+          >
+            {p.name}
+          </span>
+          <span
+            className="block text-[10.5px] mt-0.5"
+            style={{ color: "var(--hall-muted-2)" }}
+          >
+            {p.current_stage ?? "—"}
+            {" · "}
+            {entry.events14d > 0
+              ? `${entry.events14d} event${entry.events14d === 1 ? "" : "s"} · last ${timeAgo(entry.lastEventAt)}`
+              : entry.lastEventAt
+                ? `last activity ${timeAgo(entry.lastEventAt)}`
+                : "no recent activity"}
+          </span>
+        </div>
+        <span
+          className="uppercase tracking-[0.08em] shrink-0 font-bold"
+          style={{ fontFamily: "var(--font-hall-mono)", fontSize: 9, color: dotColor }}
+        >
+          {dotLabel}
+        </span>
+      </a>
+    </li>
   );
 }

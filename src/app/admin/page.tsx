@@ -898,41 +898,53 @@ export default async function AdminPage() {
                 The K-v2 Today grid above shows compact peeks of Market +
                 Inbox; this Signals wrapper hosts the deeper panels and
                 the manual agent triggers Jose uses when feeds go stale. ── */}
-          <div data-hall-tab="signals" className="grid grid-cols-[1fr_340px] gap-6 items-start">
-            <div className="space-y-6 min-w-0">
-              <MarketSignalsPanel
-                text={latestMarketSignals?.text ?? null}
-                date={latestMarketSignals?.date ?? null}
-                generatedAt={latestMarketSignals?.generatedAt ?? null}
-                briefs={marketSignalBriefs}
-              />
-              <InboxTriage initialItems={inboxData.items} initialScanned={inboxData.total_scanned} />
-              <HallAskQueue />
-              <HallOppFreshnessRadar />
+          <div data-hall-tab="signals" className="hall-today-grid">
+            <div className="hall-today-col-left">
+              <HallSection title="Market " flourish="signals" meta={marketSignalBriefs.length > 0 ? `${marketSignalBriefs.length} NEW` : undefined}>
+                <MarketSignalsPanel
+                  text={latestMarketSignals?.text ?? null}
+                  date={latestMarketSignals?.date ?? null}
+                  generatedAt={latestMarketSignals?.generatedAt ?? null}
+                  briefs={marketSignalBriefs}
+                />
+              </HallSection>
+
+              <HallSection
+                title="Inbox · "
+                flourish="needs attention"
+                meta={`${inboxData.items.length} VISIBLE · ${inboxData.total_scanned} TOTAL`}
+              >
+                <InboxTriage initialItems={inboxData.items} initialScanned={inboxData.total_scanned} />
+              </HallSection>
+
+              <HallSection title="Waiting on " flourish="others">
+                <HallAskQueue />
+              </HallSection>
+
+              <HallSection title="Opps going " flourish="cold">
+                <HallOppFreshnessRadar />
+              </HallSection>
             </div>
 
-            <div className="flex flex-col gap-4">
-              <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-                <div className="px-5 py-3 border-b border-[#EFEFEA]">
-                  <p className="text-xs font-bold text-[#131218]">Manual triggers</p>
-                </div>
-                <div className="px-5 py-4">
-                  <HallManualTriggers />
-                </div>
-              </div>
+            <div className="hall-today-col-right">
+              <HallSection title="Manual " flourish="triggers">
+                <HallManualTriggers />
+              </HallSection>
+
               {dailyBriefing?.meetingPrep && (
-                <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-                  <div className="px-5 py-3 border-b border-[#EFEFEA]">
-                    <p className="text-xs font-bold text-[#131218]">Meeting prep</p>
-                  </div>
-                  <div className="px-5 py-4">
-                    <pre className="text-[11px] text-[#131218]/65 leading-[1.65] whitespace-pre-wrap font-sans">
-                      {dailyBriefing.meetingPrep.slice(0, 700)}
-                    </pre>
-                  </div>
-                </div>
+                <HallSection title="Meeting " flourish="prep">
+                  <pre
+                    className="text-[11px] leading-[1.65] whitespace-pre-wrap font-sans"
+                    style={{ color: "var(--hall-muted-2)" }}
+                  >
+                    {dailyBriefing.meetingPrep.slice(0, 700)}
+                  </pre>
+                </HallSection>
               )}
-              <HallPortfolioPulse />
+
+              <HallSection title="Portfolio " flourish="check-ins">
+                <HallPortfolioPulse />
+              </HallSection>
             </div>
           </div>
 

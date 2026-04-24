@@ -111,63 +111,67 @@ export async function HallOppFreshnessRadar() {
   if (opps.length === 0) return null;
 
   return (
-    <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-      <div className="flex items-center justify-between px-5 py-3 border-b border-[#EFEFEA]">
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] font-bold tracking-widest uppercase text-[#131218]/50">Opps going cold</span>
-          <span className="text-[9px] font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">{opps.length}</span>
-        </div>
-        <Link href="/admin/opportunities" className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/40 hover:text-[#131218]/80">
-          All opps →
-        </Link>
-      </div>
-      <div className="divide-y divide-[#EFEFEA]">
-        {opps.map(o => <OppRow key={o.id} opp={o} />)}
-      </div>
-    </div>
+    <ul className="flex flex-col">
+      {opps.map(o => <OppRow key={o.id} opp={o} />)}
+    </ul>
   );
 }
 
 function OppRow({ opp }: { opp: ColdOpp }) {
-  const staleColor = opp.daysStale >= 30 ? "text-red-600" : opp.daysStale >= 14 ? "text-amber-700" : "text-[#131218]/60";
+  const ageColor = opp.daysStale >= 30 ? "var(--hall-danger)"
+    : opp.daysStale >= 14 ? "var(--hall-warn)"
+    : "var(--hall-muted-3)";
   return (
-    <a
-      href={opp.reviewUrl ?? `https://www.notion.so/${opp.id.replace(/-/g, "")}`}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="flex items-start gap-3 px-5 py-2.5 hover:bg-[#EFEFEA]/40 transition-colors"
-    >
-      <div className="flex-1 min-w-0">
-        <p className="text-[11px] font-bold text-[#131218] truncate">{opp.title}</p>
-        <p className="text-[9px] text-[#131218]/45 mt-0.5 flex items-center gap-1.5 flex-wrap">
-          {opp.orgName && <span>{opp.orgName}</span>}
-          {opp.orgName && <span className="text-[#131218]/20">·</span>}
-          <span>{opp.status}</span>
-          {opp.priority && (
-            <>
-              <span className="text-[#131218]/20">·</span>
-              <span className={opp.priority.startsWith("P1") ? "text-red-600 font-bold" : ""}>
-                {opp.priority.split(" ")[0]}
-              </span>
-            </>
-          )}
-          {opp.followUp === "Needed" && (
-            <>
-              <span className="text-[#131218]/20">·</span>
-              <span className="text-amber-700 font-bold">follow-up needed</span>
-            </>
-          )}
-          {opp.value > 0 && (
-            <>
-              <span className="text-[#131218]/20">·</span>
-              <span className="font-semibold text-[#131218]/70">{formatValue(opp.value)}</span>
-            </>
-          )}
-        </p>
-      </div>
-      <span className={`text-[10px] font-bold shrink-0 ${staleColor}`}>
-        {opp.daysStale}d
-      </span>
-    </a>
+    <li style={{ borderTop: "1px solid var(--hall-line-soft)" }}>
+      <a
+        href={opp.reviewUrl ?? `https://www.notion.so/${opp.id.replace(/-/g, "")}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex items-start gap-3 py-2.5 transition-colors"
+      >
+        <div className="flex-1 min-w-0">
+          <span
+            className="block text-[12px] font-semibold truncate"
+            style={{ color: "var(--hall-ink-0)" }}
+          >
+            {opp.title}
+          </span>
+          <span
+            className="block text-[10.5px] mt-0.5 flex items-center gap-1.5 flex-wrap"
+            style={{ color: "var(--hall-muted-2)" }}
+          >
+            {opp.orgName && <span>{opp.orgName}</span>}
+            {opp.orgName && <span style={{ color: "var(--hall-muted-3)" }}>·</span>}
+            <span>{opp.status}</span>
+            {opp.priority && (
+              <>
+                <span style={{ color: "var(--hall-muted-3)" }}>·</span>
+                <span style={{ color: opp.priority.startsWith("P1") ? "var(--hall-danger)" : undefined, fontWeight: opp.priority.startsWith("P1") ? 700 : undefined }}>
+                  {opp.priority.split(" ")[0]}
+                </span>
+              </>
+            )}
+            {opp.followUp === "Needed" && (
+              <>
+                <span style={{ color: "var(--hall-muted-3)" }}>·</span>
+                <span style={{ color: "var(--hall-warn)", fontWeight: 700 }}>follow-up needed</span>
+              </>
+            )}
+            {opp.value > 0 && (
+              <>
+                <span style={{ color: "var(--hall-muted-3)" }}>·</span>
+                <span className="font-semibold" style={{ color: "var(--hall-ink-3)" }}>{formatValue(opp.value)}</span>
+              </>
+            )}
+          </span>
+        </div>
+        <span
+          className="font-semibold shrink-0"
+          style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10, color: ageColor }}
+        >
+          {opp.daysStale}d
+        </span>
+      </a>
+    </li>
   );
 }
