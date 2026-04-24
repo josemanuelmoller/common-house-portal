@@ -70,13 +70,13 @@ export async function getRecentInsightBriefBriefs(): Promise<MarketSignalBrief[]
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return (res.results as any[]).map(page => {
       const url = page.properties?.["Source Link"]?.url ?? null;
+      const themeName = select(prop(page, "Theme"));
       return {
         id:         page.id,
-        title:      text(prop(page, "Brief Title")) || text(prop(page, "Name")) || "Untitled",
+        title:      text(prop(page, "Title")) || "Untitled",
         sourceLink: typeof url === "string" && url.length > 0 ? url : null,
         notionUrl:  page.url ?? "",
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        theme:      (page.properties?.["Theme"]?.multi_select ?? []).map((r: any) => r.name),
+        theme:      themeName ? [themeName] : [],
       };
     });
   } catch {
