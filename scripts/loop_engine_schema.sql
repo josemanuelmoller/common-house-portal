@@ -64,6 +64,15 @@ CREATE TABLE IF NOT EXISTS loops (
   linked_entity_id   TEXT        NOT NULL,   -- Notion page ID of the source record
   linked_entity_name TEXT        NOT NULL,   -- Human-readable name for display
 
+  -- Source-of-origin enrichment. Populated at sync time so every surfaced
+  -- loop can name the project / org it relates to without extra lookups.
+  --   parent_project_id   — Notion page ID of the related project, or NULL
+  --   parent_project_name — display name of that project at sync time
+  --   org_name            — organization / account name (opportunities only)
+  parent_project_id   TEXT,
+  parent_project_name TEXT,
+  org_name            TEXT,
+
   notion_url         TEXT        NOT NULL DEFAULT '',
   review_url         TEXT,                   -- NULL or document/email URL for review loops
 
@@ -136,6 +145,9 @@ CREATE INDEX IF NOT EXISTS loops_dismissed_at_idx
 
 CREATE INDEX IF NOT EXISTS loops_linked_entity_idx
   ON loops(linked_entity_type, linked_entity_id);
+
+CREATE INDEX IF NOT EXISTS loops_parent_project_idx
+  ON loops(parent_project_id) WHERE parent_project_id IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS loop_signals_loop_id_idx
   ON loop_signals(loop_id);

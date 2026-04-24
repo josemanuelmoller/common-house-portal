@@ -606,6 +606,14 @@ export type CoSTask = {
   orgName: string;
   opportunityType: string;
 
+  // Origin context — populated when the underlying Loop row knows which
+  // project this task relates to. Consumed by the Focus of the Day card
+  // to show an explicit source chip so surfaced items never appear
+  // orphaned from their project. Nullable: not every loop has a
+  // resolvable parent project.
+  parentProjectId?: string | null;
+  parentProjectName?: string | null;
+
   // Action signals (internal)
   reviewUrl: string | null;
   entrySignal: "meeting_soon" | "proposal_pending" | "negotiation" | "manual" | "review_needed" | "inbound";
@@ -915,6 +923,9 @@ async function getProjectCoSTasks(): Promise<CoSTask[]> {
         opportunityStage: "Project",
         orgName:          "",
         opportunityType:  "Project",
+        // Project-type tasks ARE the project — origin chip points to self.
+        parentProjectId:   page.id,
+        parentProjectName: name,
         reviewUrl:        null,
         entrySignal:      "manual",
         signalReason,
@@ -958,6 +969,29 @@ async function getEvidenceOpenLoops(): Promise<CoSTask[]> {
       page_size: 20,
     });
 
+    // Resolve project page IDs → names via the Notion Projects DB so every
+    // surfaced evidence loop can name the project it relates to.
+    const projectNameById = new Map<string, string>();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const referencedProjectIds = new Set<string>();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const p of res.results as any[]) {
+      const rel = p.properties?.["Project"]?.relation as Array<{ id: string }> | undefined;
+      if (rel && rel.length > 0) referencedProjectIds.add(rel[0].id);
+    }
+    await Promise.all(
+      [...referencedProjectIds].map(async pid => {
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const page = await notion.pages.retrieve({ page_id: pid }) as any;
+          const name = text(prop(page, "Project Name")) || text(prop(page, "Name"));
+          if (name) projectNameById.set(pid, name);
+        } catch {
+          // Individual lookup failure — leave unresolved, chip renders type only.
+        }
+      }),
+    );
+
     const tasks: CoSTask[] = [];
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -982,6 +1016,10 @@ async function getEvidenceOpenLoops(): Promise<CoSTask[]> {
         ? excerpt.slice(0, 140)
         : title.slice(0, 140);
 
+      const projectRel = page.properties?.["Project"]?.relation as Array<{ id: string }> | undefined;
+      const parentProjectId = projectRel && projectRel.length > 0 ? projectRel[0].id : null;
+      const parentProjectName = parentProjectId ? projectNameById.get(parentProjectId) ?? null : null;
+
       tasks.push({
         id:               page.id,
         notionUrl,
@@ -995,6 +1033,8 @@ async function getEvidenceOpenLoops(): Promise<CoSTask[]> {
         opportunityStage: "Evidence",
         orgName:          "",
         opportunityType:  evidenceType,
+        parentProjectId,
+        parentProjectName,
         reviewUrl:        null,
         entrySignal:      "review_needed",
         signalReason:     `Validated ${evidenceType.toLowerCase()} — ${dateCaptured}`,

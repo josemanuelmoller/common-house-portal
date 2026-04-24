@@ -395,11 +395,57 @@ async function upsertLoop(
   }
 }
 
+// ─── Origin-context resolvers ────────────────────────────────────────────────
+// Every loop is enriched with "where does this belong?" context at sync time:
+//   parent_project_id / parent_project_name — the CH Project this relates to
+//   org_name                                 — the organization (opportunity loops)
+// Pre-loading these as maps keeps the per-loop path cheap and avoids N extra
+// Notion API calls inside the sync fan-out.
+
+async function loadProjectNameMap(): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  try {
+    const sb = getSupabaseServerClient();
+    const { data, error } = await sb
+      .from("projects")
+      .select("notion_id, name");
+    if (error || !data) return out;
+    for (const row of data as Array<{ notion_id: string | null; name: string | null }>) {
+      if (row.notion_id && row.name) out.set(row.notion_id, row.name);
+    }
+  } catch {
+    // Supabase unavailable — sync still runs; parent_project_name will be null.
+  }
+  return out;
+}
+
+async function loadOpportunityOrgMap(): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  try {
+    const sb = getSupabaseServerClient();
+    const { data, error } = await sb
+      .from("opportunities")
+      .select("notion_id, org_name");
+    if (error || !data) return out;
+    for (const row of data as Array<{ notion_id: string | null; org_name: string | null }>) {
+      if (row.notion_id && row.org_name && row.org_name.trim().length > 0) {
+        out.set(row.notion_id, row.org_name.trim());
+      }
+    }
+  } catch {
+    // Supabase unavailable — org_name stays null.
+  }
+  return out;
+}
+
 // ─── Source 1: Evidence ───────────────────────────────────────────────────────
 // Supabase-first since 2026-04-17: sync-evidence now runs at 7:30am,
 // 30 minutes before sync-loops at 8am. Notion fallback preserved.
 
-async function syncEvidenceLoops(stats: Stats): Promise<void> {
+async function syncEvidenceLoops(
+  stats: Stats,
+  projectNameById: Map<string, string>,
+): Promise<void> {
   const now = Date.now();
   const THIRTY_DAYS = 30 * 86400000;
 
@@ -409,6 +455,7 @@ async function syncEvidenceLoops(stats: Stats): Promise<void> {
     dateCaptured: string | null;
     title: string;
     excerpt: string | null;
+    projectId: string | null;   // parent project Notion page ID, if linked
   };
 
   let evidenceItems: EvidenceItem[] = [];
@@ -419,7 +466,7 @@ async function syncEvidenceLoops(stats: Stats): Promise<void> {
     const sb = getSupabaseServerClient();
     const { data, error } = await sb
       .from("evidence")
-      .select("notion_id, title, source_excerpt, date_captured")
+      .select("notion_id, title, source_excerpt, date_captured, project_notion_id")
       .eq("validation_status", "Validated")
       .eq("evidence_type", "Blocker")
       .order("date_captured", { ascending: false })
@@ -433,8 +480,31 @@ async function syncEvidenceLoops(stats: Stats): Promise<void> {
         dateCaptured: e.date_captured,
         title:        e.title ?? "Untitled evidence",
         excerpt:      e.source_excerpt ?? null,
+        projectId:    e.project_notion_id ?? null,
       }));
       usedSupabase = true;
+
+      // Gap-closer: when Supabase hasn't mirrored the Project relation yet,
+      // read it straight from Notion so the Focus card still names the
+      // project. Bounded to items missing projectId; skipped quickly if
+      // every item is already linked.
+      const missingProject = evidenceItems.filter(e => !e.projectId);
+      if (missingProject.length > 0) {
+        const resolved = await Promise.all(missingProject.map(async item => {
+          try {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const page = await notion.pages.retrieve({ page_id: item.id }) as any;
+            const rel = page.properties?.["Project"]?.relation as Array<{ id: string }> | undefined;
+            return { id: item.id, projectId: rel && rel.length > 0 ? rel[0].id : null };
+          } catch {
+            return { id: item.id, projectId: null };
+          }
+        }));
+        const pidMap = new Map(resolved.map(r => [r.id, r.projectId]));
+        evidenceItems = evidenceItems.map(e => e.projectId
+          ? e
+          : { ...e, projectId: pidMap.get(e.id) ?? null });
+      }
     }
   } catch {
     // Supabase unavailable — fall through to Notion
@@ -458,13 +528,20 @@ async function syncEvidenceLoops(stats: Stats): Promise<void> {
     });
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    evidenceItems = (res.results as any[]).map(page => ({
-      id:           page.id,
-      notion_url:   page.url ?? "",
-      dateCaptured: dt(page.properties["Date Captured"]),
-      title:        text(page.properties["Evidence Title"]) || "Untitled evidence",
-      excerpt:      text(page.properties["Source Excerpt"]) || null,
-    }));
+    evidenceItems = (res.results as any[]).map(page => {
+      // "Project" is a relation field on CH Evidence; take the first linked page
+      // if present. Notion API returns an array of { id } entries on relations.
+      const relation = page.properties?.["Project"]?.relation as Array<{ id: string }> | undefined;
+      const projectId = relation && relation.length > 0 ? relation[0].id : null;
+      return {
+        id:           page.id,
+        notion_url:   page.url ?? "",
+        dateCaptured: dt(page.properties["Date Captured"]),
+        title:        text(page.properties["Evidence Title"]) || "Untitled evidence",
+        excerpt:      text(page.properties["Source Excerpt"]) || null,
+        projectId,
+      };
+    });
   }
 
   // ── Process items ────────────────────────────────────────────────────────
@@ -494,6 +571,9 @@ async function syncEvidenceLoops(stats: Stats): Promise<void> {
       contentText: item.excerpt || item.title,
     });
 
+    const parentProjectId   = item.projectId ?? null;
+    const parentProjectName = parentProjectId ? projectNameById.get(parentProjectId) ?? null : null;
+
     await upsertLoop(
       {
         normalized_key:       normalizedKey,
@@ -506,6 +586,9 @@ async function syncEvidenceLoops(stats: Stats): Promise<void> {
         linked_entity_type:   "evidence",
         linked_entity_id:     item.id,
         linked_entity_name:   item.title,
+        parent_project_id:    parentProjectId,
+        parent_project_name:  parentProjectName,
+        org_name:             null,
         notion_url:           item.notion_url,
         review_url:           null,
         due_at:               null,
@@ -544,7 +627,10 @@ async function loadFollowedGrantIds(): Promise<Set<string>> {
 
 // ─── Source 2: Opportunities ──────────────────────────────────────────────────
 
-async function syncOpportunityLoops(stats: Stats): Promise<void> {
+async function syncOpportunityLoops(
+  stats: Stats,
+  orgNameById: Map<string, string>,
+): Promise<void> {
   const res = await notion.databases.query({
     database_id: DB.opportunities,
     filter: {
@@ -657,6 +743,12 @@ async function syncOpportunityLoops(stats: Stats): Promise<void> {
       contentText: isActionablePendingAction(effectivePending) ? effectivePending! : title,
     });
 
+    // Opportunities are not typically linked to CH Projects in the data model
+    // (the "Project" relation is not a standard field here). Origin context
+    // comes from the organization — pulled from the Supabase opportunities
+    // table where sync-opportunities has already resolved the org relation.
+    const orgName = orgNameById.get(page.id) ?? null;
+
     await upsertLoop(
       {
         normalized_key:       normalizedKey,
@@ -669,6 +761,9 @@ async function syncOpportunityLoops(stats: Stats): Promise<void> {
         linked_entity_type:   "opportunity",
         linked_entity_id:     page.id,
         linked_entity_name:   name,
+        parent_project_id:    null,
+        parent_project_name:  null,
+        org_name:             orgName,
         notion_url:           page.url ?? "",
         review_url:           reviewUrl && !reviewUrl.includes("mail.google.com") ? reviewUrl : null,
         due_at:               nextMeeting ? new Date(nextMeeting).toISOString() : null,
@@ -738,6 +833,10 @@ async function syncProjectLoops(stats: Stats): Promise<void> {
         linked_entity_type:   "project",
         linked_entity_id:     page.id,
         linked_entity_name:   name,
+        // Project loops ARE the project — origin context points back at itself.
+        parent_project_id:    page.id,
+        parent_project_name:  name,
+        org_name:             null,
         notion_url:           page.url ?? "",
         review_url:           null,
         due_at:               null,
@@ -820,9 +919,17 @@ async function _POST(req: NextRequest) {
   };
 
   try {
+    // Preload origin-context maps once — each sync function would otherwise
+    // trigger per-loop relation lookups. Both maps are cheap reads from
+    // Supabase and stay null-safe if Supabase is unavailable.
+    const [projectNameById, orgNameById] = await Promise.all([
+      loadProjectNameMap(),
+      loadOpportunityOrgMap(),
+    ]);
+
     // Run all three source syncs in sequence (Notion rate limits)
-    await syncEvidenceLoops(stats);
-    await syncOpportunityLoops(stats);
+    await syncEvidenceLoops(stats, projectNameById);
+    await syncOpportunityLoops(stats, orgNameById);
     await syncProjectLoops(stats);
 
     // Auto-resolve loops whose source is gone

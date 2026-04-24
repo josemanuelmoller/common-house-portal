@@ -122,12 +122,19 @@ const STAGE_COLORS: Record<string, string> = {
 
 type FocusLink = { label: string; url: string; style: "primary" | "secondary" };
 
+type FocusOrigin = {
+  kind: "Project" | "Evidence" | "Decision" | "Blocker" | "Opportunity" | "Organization";
+  label: string;           // display name (project / org / linked entity)
+  secondary?: string;      // optional parent project label for evidence/decision tasks
+};
+
 type FocusRecommendation = {
   action: string;
   timeEstimate: string;
   whyToday: string;
   links: FocusLink[];
   winReason: string;
+  origin: FocusOrigin | null;
 };
 
 function computeFocusRecommendation(
@@ -227,6 +234,7 @@ function computeFocusRecommendation(
           : "Marked urgent in your inbox.",
         links:  [{ label: "Open thread", url: urgentInbox.gmailUrl, style: "primary" }],
         winReason: "inbox fallback — no actionable CoS tasks",
+        origin: { kind: "Organization", label: urgentInbox.fromName },
       };
     }
     return null;
@@ -263,41 +271,73 @@ function computeFocusRecommendation(
       })()
     : null;
 
-  // Action sentence
+  // Action sentence — templates must gracefully omit org/partner clauses when
+  // the underlying source record doesn't carry one. An empty orgName is the
+  // common case for Evidence and Project loops (they have parent projects, not
+  // organizations), and the tasks-with-... template previously produced
+  // strings like "…with ." for those loops.
+  //
+  // Partner rule for the "with X" / "— X" clauses:
+  //   opportunity loop  → orgName (real counterpart)
+  //   project loop      → parent project name (the work is on the project itself)
+  //   evidence loop     → parent project name, if known; otherwise skip the clause
+  //
+  // Never fall back to opportunityName here — for evidence loops that IS the
+  // blocker text, and stitching it in produces tautologies like "resolving X with X".
+  const partner = (() => {
+    if (task.orgName && task.orgName.trim().length > 0) return task.orgName.trim();
+    if (task.taskSource === "project" && task.opportunityName) return task.opportunityName;
+    if (task.parentProjectName) return task.parentProjectName;
+    return null;
+  })();
+  const withClause = partner ? ` with ${partner}` : "";
+  const toClause   = partner ? ` to ${partner}`   : "";
+  const emDashClause = partner ? ` — ${partner} is waiting` : "";
+
   let action: string;
   const pendingSnippet = hasExplicitPending
     ? task.pendingAction!.trim().replace(/\.$/, "").slice(0, 80)
     : null;
 
   if (task.loopType === "blocker") {
-    action = `Spend ${timeEstimate} resolving ${pendingSnippet ?? `the ${task.opportunityName} blocker`} with ${task.orgName}.`;
+    const blockerSubject = pendingSnippet
+      ?? (task.taskSource === "evidence" ? task.opportunityName : `the ${task.opportunityName} blocker`);
+    action = `Spend ${timeEstimate} resolving ${blockerSubject}${withClause}.`;
   } else if (task.loopType === "decision") {
-    action = `Spend ${timeEstimate} making the call on ${pendingSnippet ?? task.taskTitle} — ${task.orgName} is waiting.`;
+    action = `Spend ${timeEstimate} making the call on ${pendingSnippet ?? task.taskTitle}${emDashClause}.`;
   } else if (task.loopType === "prep") {
     if (pendingSnippet) {
-      action = `Spend ${timeEstimate} on ${pendingSnippet}${meetingLabel ? ` before the ${task.orgName} meeting ${meetingLabel}` : ""}.`;
+      const meetingTail = meetingLabel
+        ? ` before the${partner ? ` ${partner}` : ""} meeting ${meetingLabel}`
+        : "";
+      action = `Spend ${timeEstimate} on ${pendingSnippet}${meetingTail}.`;
     } else {
-      action = `Spend ${timeEstimate} preparing for the ${task.orgName} meeting${meetingLabel ? ` ${meetingLabel}` : ""}.`;
+      const target = partner ? ` for the ${partner} meeting` : " for the upcoming meeting";
+      action = `Spend ${timeEstimate} preparing${target}${meetingLabel ? ` ${meetingLabel}` : ""}.`;
     }
   } else if (task.loopType === "review") {
     if (reviewIsDoc) {
       action = `Spend ${timeEstimate} reviewing the ${task.opportunityName} document${pendingSnippet ? ` — ${pendingSnippet}` : ""}.`;
+    } else if (partner) {
+      action = `Spend ${timeEstimate} clearing the ${partner} thread${pendingSnippet ? ` — ${pendingSnippet}` : ""}.`;
     } else {
-      action = `Spend ${timeEstimate} clearing the ${task.orgName} thread${pendingSnippet ? ` — ${pendingSnippet}` : ""}.`;
+      action = `Spend ${timeEstimate} clearing the ${task.opportunityName} thread${pendingSnippet ? ` — ${pendingSnippet}` : ""}.`;
     }
   } else if (task.loopType === "commitment") {
-    action = `Spend ${timeEstimate} delivering on your ${task.opportunityName} commitment to ${task.orgName}.`;
+    action = `Spend ${timeEstimate} delivering on your ${task.opportunityName} commitment${toClause}.`;
   } else if (task.loopType === "follow-up") {
     const reviewIsGmail = !!task.reviewUrl && task.reviewUrl.includes("mail.google.com");
     if (pendingSnippet) {
-      action = `Spend ${timeEstimate} on ${pendingSnippet} with ${task.orgName}.`;
-    } else if (reviewIsGmail) {
-      action = `Spend ${timeEstimate} replying to the ${task.orgName} thread — ${task.opportunityName}.`;
+      action = `Spend ${timeEstimate} on ${pendingSnippet}${withClause}.`;
+    } else if (reviewIsGmail && partner) {
+      action = `Spend ${timeEstimate} replying to the ${partner} thread — ${task.opportunityName}.`;
+    } else if (partner) {
+      action = `Spend ${timeEstimate} following up with ${partner} on ${task.opportunityName}.`;
     } else {
-      action = `Spend ${timeEstimate} following up with ${task.orgName} on ${task.opportunityName}.`;
+      action = `Spend ${timeEstimate} following up on ${task.opportunityName}.`;
     }
   } else {
-    action = `Spend ${timeEstimate} on ${pendingSnippet ?? task.taskTitle} with ${task.orgName}.`;
+    action = `Spend ${timeEstimate} on ${pendingSnippet ?? task.taskTitle}${withClause}.`;
   }
 
   // Check if there's a matching draft for this task
@@ -377,7 +417,42 @@ function computeFocusRecommendation(
   }
   links.push({ label: "Notion", url: task.notionUrl, style: "secondary" });
 
-  return { action, timeEstimate, whyToday, links, winReason };
+  // Origin — explicit source indicator so surfaced items never appear
+  // orphaned from the project they belong to. Computed per task-source so
+  // each kind of loop names what makes sense:
+  //   project loop     → the project itself
+  //   evidence loop    → "Evidence" (+ parent project name as secondary)
+  //   opportunity loop → organization when known, otherwise the opportunity
+  const origin: FocusOrigin | null = (() => {
+    if (task.taskSource === "project") {
+      const name = task.parentProjectName || task.opportunityName;
+      return name ? { kind: "Project", label: name } : null;
+    }
+    if (task.taskSource === "evidence") {
+      const kind: FocusOrigin["kind"] =
+        task.loopType === "blocker" ? "Blocker"
+        : task.loopType === "decision" ? "Decision"
+        : "Evidence";
+      return {
+        kind,
+        label: task.opportunityName,
+        secondary: task.parentProjectName ?? undefined,
+      };
+    }
+    // opportunity-sourced (or undefined taskSource)
+    if (task.orgName && task.orgName.trim().length > 0) {
+      return {
+        kind: "Organization",
+        label: task.orgName.trim(),
+        secondary: task.opportunityName,
+      };
+    }
+    return task.opportunityName
+      ? { kind: "Opportunity", label: task.opportunityName }
+      : null;
+  })();
+
+  return { action, timeEstimate, whyToday, links, winReason, origin };
 }
 
 // Section header — consistent across all Hall sections
@@ -608,6 +683,24 @@ export default async function AdminPage() {
                   <p className="text-[11px] text-white/45 mt-1.5 leading-snug">
                     {focusRec.whyToday}
                   </p>
+                  {focusRec.origin && (
+                    <div className="flex items-center gap-1.5 mt-3 flex-wrap">
+                      <span className="text-[9px] font-bold uppercase tracking-[1.5px] text-[#c8f55a]/70 bg-[#c8f55a]/10 border border-[#c8f55a]/20 px-2 py-0.5 rounded">
+                        {focusRec.origin.kind}
+                      </span>
+                      <span className="text-[11px] text-white/70 truncate max-w-[480px]" title={focusRec.origin.label}>
+                        {focusRec.origin.label}
+                      </span>
+                      {focusRec.origin.secondary && (
+                        <>
+                          <span className="text-[10px] text-white/25">·</span>
+                          <span className="text-[10px] text-white/40 truncate max-w-[240px]" title={focusRec.origin.secondary}>
+                            Project: {focusRec.origin.secondary}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <div className="flex flex-col items-end gap-1.5 shrink-0">
                   {focusRec.links.map(link => (

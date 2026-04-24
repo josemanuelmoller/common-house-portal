@@ -25,6 +25,10 @@ type CoSTask = {
   opportunityStage: string;
   orgName: string;
   opportunityType: string;
+  // Origin context — populated when the underlying Loop row knows which
+  // project this task relates to. Kept in sync with CoSTask in notion.ts.
+  parentProjectId?: string | null;
+  parentProjectName?: string | null;
   reviewUrl: string | null;
   entrySignal: "meeting_soon" | "proposal_pending" | "negotiation" | "manual" | "review_needed" | "inbound";
   signalReason: string;
@@ -123,6 +127,13 @@ export type Loop = {
   linked_entity_type: LinkedEntityType;
   linked_entity_id: string;
   linked_entity_name: string;
+  // Source-of-origin enrichment. Populated at sync time so every surfaced
+  // loop can name the project / org it relates to — prevents Focus copy
+  // like "resolving X with ." when org_name is empty. All three are nullable:
+  // not every loop has a clean parent project or associated org.
+  parent_project_id: string | null;
+  parent_project_name: string | null;
+  org_name: string | null;
   notion_url: string;
   review_url: string | null;
   due_at: string | null;       // ISO timestamp or null
@@ -614,7 +625,9 @@ export function mapLoopToCoSTask(loop: Loop): CoSTask {
     opportunityStage:    loop.linked_entity_type === "project" ? "Project"
                        : loop.linked_entity_type === "evidence" ? "Evidence"
                        : "Opportunity",
-    orgName:             "",
+    orgName:             loop.org_name ?? "",
+    parentProjectId:     loop.parent_project_id ?? null,
+    parentProjectName:   loop.parent_project_name ?? null,
     opportunityType:     loop.linked_entity_type === "evidence"
                            ? "Evidence"
                            : loop.linked_entity_type === "project"
