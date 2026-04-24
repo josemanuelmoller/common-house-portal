@@ -14,7 +14,7 @@ function renderMarkdown(md: string): React.ReactNode[] {
 
     if (line.startsWith("# ")) {
       nodes.push(
-        <h1 key={i} className="text-[15px] font-black text-[#131218] mt-4 mb-1 tracking-tight">
+        <h1 key={i} className="text-[15px] font-black text-[#0a0a0a] mt-4 mb-1 tracking-tight">
           {inlineFormat(line.slice(2))}
         </h1>
       );
@@ -23,7 +23,7 @@ function renderMarkdown(md: string): React.ReactNode[] {
 
     if (line.startsWith("## ")) {
       nodes.push(
-        <h2 key={i} className="text-[13px] font-bold text-[#131218] mt-4 mb-1 tracking-tight">
+        <h2 key={i} className="text-[13px] font-bold text-[#0a0a0a] mt-4 mb-1 tracking-tight">
           {inlineFormat(line.slice(3))}
         </h2>
       );
@@ -32,7 +32,7 @@ function renderMarkdown(md: string): React.ReactNode[] {
 
     if (line.startsWith("### ")) {
       nodes.push(
-        <h3 key={i} className="text-[12px] font-bold text-[#131218]/80 mt-3 mb-0.5">
+        <h3 key={i} className="text-[12px] font-bold text-[#0a0a0a]/80 mt-3 mb-0.5">
           {inlineFormat(line.slice(4))}
         </h3>
       );
@@ -45,7 +45,7 @@ function renderMarkdown(md: string): React.ReactNode[] {
       nodes.push(
         <ul key={`ul-${i}`} className="my-1.5 space-y-0.5 pl-4">
           {bullets.map((b, j) => (
-            <li key={j} className="text-[11.5px] text-[#131218]/75 leading-relaxed list-disc">{inlineFormat(b)}</li>
+            <li key={j} className="text-[11.5px] text-[#0a0a0a]/75 leading-relaxed list-disc">{inlineFormat(b)}</li>
           ))}
         </ul>
       );
@@ -60,8 +60,8 @@ function renderMarkdown(md: string): React.ReactNode[] {
       nodes.push(
         <ul key={`cb-${i}`} className="my-1.5 space-y-0.5 pl-2">
           {items.map((item, j) => (
-            <li key={j} className="flex items-start gap-2 text-[11.5px] text-[#131218]/75">
-              <span className={`mt-0.5 w-3.5 h-3.5 rounded border flex-shrink-0 flex items-center justify-center text-[8px] ${item.checked ? "bg-[#131218] border-[#131218] text-white" : "border-[#131218]/30"}`}>
+            <li key={j} className="flex items-start gap-2 text-[11.5px] text-[#0a0a0a]/75">
+              <span className={`mt-0.5 w-3.5 h-3.5 rounded border flex-shrink-0 flex items-center justify-center text-[8px] ${item.checked ? "bg-[#0a0a0a] border-[#0a0a0a] text-white" : "border-[#0a0a0a]/30"}`}>
                 {item.checked ? "✓" : ""}
               </span>
               <span className={item.checked ? "line-through opacity-50" : ""}>{inlineFormat(item.text)}</span>
@@ -73,10 +73,10 @@ function renderMarkdown(md: string): React.ReactNode[] {
     }
 
     if (line.trim() === "") { nodes.push(<div key={i} className="h-2" />); i++; continue; }
-    if (/^---+$/.test(line.trim())) { nodes.push(<hr key={i} className="my-3 border-[#E0E0D8]" />); i++; continue; }
+    if (/^---+$/.test(line.trim())) { nodes.push(<hr key={i} className="my-3 border-[#e4e4dd]" />); i++; continue; }
 
     nodes.push(
-      <p key={i} className="text-[11.5px] text-[#131218]/80 leading-relaxed">{inlineFormat(line)}</p>
+      <p key={i} className="text-[11.5px] text-[#0a0a0a]/80 leading-relaxed">{inlineFormat(line)}</p>
     );
     i++;
   }
@@ -93,9 +93,9 @@ function inlineFormat(text: string): React.ReactNode {
   while ((match = regex.exec(text)) !== null) {
     if (match.index > last) parts.push(text.slice(last, match.index));
     const raw = match[0];
-    if (raw.startsWith("**")) parts.push(<strong key={match.index} className="font-bold text-[#131218]">{raw.slice(2, -2)}</strong>);
+    if (raw.startsWith("**")) parts.push(<strong key={match.index} className="font-bold text-[#0a0a0a]">{raw.slice(2, -2)}</strong>);
     else if (raw.startsWith("*")) parts.push(<em key={match.index} className="italic">{raw.slice(1, -1)}</em>);
-    else if (raw.startsWith("`")) parts.push(<code key={match.index} className="bg-[#EFEFEA] px-1 py-0.5 rounded text-[10px] font-mono text-[#131218]">{raw.slice(1, -1)}</code>);
+    else if (raw.startsWith("`")) parts.push(<code key={match.index} className="bg-[#f4f4ef] px-1 py-0.5 rounded text-[10px] font-mono text-[#0a0a0a]">{raw.slice(1, -1)}</code>);
     last = match.index + raw.length;
   }
 
@@ -106,7 +106,7 @@ function inlineFormat(text: string): React.ReactNode {
 // ─── Status styles ─────────────────────────────────────────────────────────────
 
 const STATUS_PILL: Record<string, string> = {
-  "Draft":            "bg-[#EFEFEA] text-[#131218]/50 border border-[#E0E0D8]",
+  "Draft":            "bg-[#f4f4ef] text-[#0a0a0a]/50 border border-[#e4e4dd]",
   "Briefed":          "bg-purple-50 text-purple-700 border border-purple-200",
   "Signal":           "bg-sky-50 text-sky-700 border border-sky-200",
   "Topic Brief":      "bg-sky-50 text-sky-700 border border-sky-200",
@@ -114,12 +114,12 @@ const STATUS_PILL: Record<string, string> = {
   "Review":           "bg-amber-50 text-amber-700 border border-amber-200",
   "Approved":         "bg-blue-50 text-blue-700 border border-blue-200",
   "Ready to Publish": "bg-green-50 text-green-700 border border-green-200",
-  "Published":        "bg-[#B2FF59]/30 text-green-800 border border-[#B2FF59]",
+  "Published":        "bg-[#c6f24a]/30 text-green-800 border border-[#c6f24a]",
   "Archived":         "bg-gray-50 text-gray-400 border border-gray-200",
 };
 
 const STATUS_DOT: Record<string, string> = {
-  "Draft":            "bg-[#131218]/20",
+  "Draft":            "bg-[#0a0a0a]/20",
   "Briefed":          "bg-purple-400",
   "Signal":           "bg-sky-400",
   "Topic Brief":      "bg-sky-400",
@@ -127,7 +127,7 @@ const STATUS_DOT: Record<string, string> = {
   "Review":           "bg-amber-400",
   "Approved":         "bg-blue-500",
   "Ready to Publish": "bg-green-500",
-  "Published":        "bg-[#B2FF59]",
+  "Published":        "bg-[#c6f24a]",
   "Archived":         "bg-gray-300",
 };
 
@@ -265,7 +265,7 @@ export function ContentCard({ item, onArchive }: { item: ContentCardItem; onArch
       {/* Fullscreen overlay */}
       {fullscreen && hasSlides && (
         <div className="fixed inset-0 z-50 bg-black flex flex-col">
-          <div className="flex items-center justify-between px-4 py-2 bg-[#131218] border-b border-white/10 flex-shrink-0">
+          <div className="flex items-center justify-between px-4 py-2 bg-[#0a0a0a] border-b border-white/10 flex-shrink-0">
             <p className="text-[10px] font-bold text-white/40 truncate max-w-[50%]">{item.title}</p>
             <div className="flex items-center gap-2">
               <button onClick={handleDownloadPdf} className="text-[9px] font-bold px-2.5 py-1 rounded-md border border-white/20 text-white/50 hover:text-white hover:border-white/40 transition-all">PDF</button>
@@ -283,15 +283,15 @@ export function ContentCard({ item, onArchive }: { item: ContentCardItem; onArch
         </div>
       )}
 
-      <div className={`bg-white border rounded-[12px] overflow-hidden transition-all ${localStatus === "Archived" ? "opacity-50" : ""} border-[#E0E0D8]`}>
+      <div className={`bg-white border rounded-[12px] overflow-hidden transition-all ${localStatus === "Archived" ? "opacity-50" : ""} border-[#e4e4dd]`}>
         <button
           onClick={() => setExpanded(v => !v)}
           className="w-full text-left px-4 py-3.5 flex items-center gap-3 hover:bg-[#FAFAF8] transition-colors"
         >
           <span className={`w-2 h-2 rounded-full flex-shrink-0 ${dotClass}`} />
           <div className="flex-1 min-w-0">
-            <p className="text-[12.5px] font-bold text-[#131218] tracking-[-0.2px] truncate">{item.title}</p>
-            <p className="text-[10px] text-[#131218]/40 mt-0.5">
+            <p className="text-[12.5px] font-bold text-[#0a0a0a] tracking-[-0.2px] truncate">{item.title}</p>
+            <p className="text-[10px] text-[#0a0a0a]/40 mt-0.5">
               {item.contentType || "—"}
               {item.channel ? ` · ${item.channel}` : ""}
               {item.projectName ? ` · ${item.projectName}` : ""}
@@ -303,48 +303,48 @@ export function ContentCard({ item, onArchive }: { item: ContentCardItem; onArch
               {localStatus || "—"}
             </span>
             {hasContent && (
-              <span className="text-[9px] font-bold text-[#131218]/20 tracking-wide">{expanded ? "▲" : "▼"}</span>
+              <span className="text-[9px] font-bold text-[#0a0a0a]/20 tracking-wide">{expanded ? "▲" : "▼"}</span>
             )}
           </div>
         </button>
 
         {expanded && (
-          <div className="border-t border-[#EFEFEA]">
+          <div className="border-t border-[#f4f4ef]">
             {hasContent ? (
               <>
-                <div className="flex items-center justify-between px-4 py-2.5 bg-[#FAFAF8] border-b border-[#EFEFEA]">
-                  <p className="text-[9px] font-bold tracking-[1.5px] uppercase text-[#131218]/25">
+                <div className="flex items-center justify-between px-4 py-2.5 bg-[#FAFAF8] border-b border-[#f4f4ef]">
+                  <p className="text-[9px] font-bold tracking-[1.5px] uppercase text-[#0a0a0a]/25">
                     {hasSlides ? (isDocumentMode ? "Documento" : "Slides") : "Draft"}
                   </p>
                   <div className="flex items-center gap-2">
                     {hasSlides && (
                       <button onClick={e => { e.stopPropagation(); setFullscreen(true); }}
-                        className="text-[9px] font-bold px-2.5 py-1 rounded-md bg-[#131218] text-[#B2FF59] border border-[#131218] hover:bg-[#131218]/80 transition-all">
+                        className="text-[9px] font-bold px-2.5 py-1 rounded-md bg-[#0a0a0a] text-[#c6f24a] border border-[#0a0a0a] hover:bg-[#0a0a0a]/80 transition-all">
                         Expandir
                       </button>
                     )}
                     {!hasSlides && (
-                      <button onClick={handleCopy} className="text-[9px] font-bold px-2.5 py-1 rounded-md border border-[#E0E0D8] text-[#131218]/50 hover:text-[#131218] hover:border-[#131218]/30 transition-all">
+                      <button onClick={handleCopy} className="text-[9px] font-bold px-2.5 py-1 rounded-md border border-[#e4e4dd] text-[#0a0a0a]/50 hover:text-[#0a0a0a] hover:border-[#0a0a0a]/30 transition-all">
                         {copied ? "✓ Copiado" : "Copiar"}
                       </button>
                     )}
                     {hasSlides ? (
                       <>
-                        <button onClick={handleDownloadPdf} className="text-[9px] font-bold px-2.5 py-1 rounded-md border border-[#E0E0D8] text-[#131218]/50 hover:text-[#131218] hover:border-[#131218]/30 transition-all">PDF</button>
-                        <button onClick={handleDownloadPpt} disabled={pptLoading} className="text-[9px] font-bold px-2.5 py-1 rounded-md border border-[#E0E0D8] text-[#131218]/50 hover:text-[#131218] hover:border-[#131218]/30 transition-all disabled:opacity-40">
+                        <button onClick={handleDownloadPdf} className="text-[9px] font-bold px-2.5 py-1 rounded-md border border-[#e4e4dd] text-[#0a0a0a]/50 hover:text-[#0a0a0a] hover:border-[#0a0a0a]/30 transition-all">PDF</button>
+                        <button onClick={handleDownloadPpt} disabled={pptLoading} className="text-[9px] font-bold px-2.5 py-1 rounded-md border border-[#e4e4dd] text-[#0a0a0a]/50 hover:text-[#0a0a0a] hover:border-[#0a0a0a]/30 transition-all disabled:opacity-40">
                           {pptLoading ? "…" : "PPT"}
                         </button>
-                        <button onClick={handleDownloadJpg} disabled={jpgLoading} className="text-[9px] font-bold px-2.5 py-1 rounded-md border border-[#E0E0D8] text-[#131218]/50 hover:text-[#131218] hover:border-[#131218]/30 transition-all disabled:opacity-40">
+                        <button onClick={handleDownloadJpg} disabled={jpgLoading} className="text-[9px] font-bold px-2.5 py-1 rounded-md border border-[#e4e4dd] text-[#0a0a0a]/50 hover:text-[#0a0a0a] hover:border-[#0a0a0a]/30 transition-all disabled:opacity-40">
                           {jpgLoading ? "…" : "JPG"}
                         </button>
-                        <button onClick={handleDownloadHtml} className="text-[9px] font-bold px-2.5 py-1 rounded-md border border-[#E0E0D8] text-[#131218]/50 hover:text-[#131218] hover:border-[#131218]/30 transition-all">.html</button>
+                        <button onClick={handleDownloadHtml} className="text-[9px] font-bold px-2.5 py-1 rounded-md border border-[#e4e4dd] text-[#0a0a0a]/50 hover:text-[#0a0a0a] hover:border-[#0a0a0a]/30 transition-all">.html</button>
                       </>
                     ) : (
-                      <button onClick={handleDownloadTxt} className="text-[9px] font-bold px-2.5 py-1 rounded-md border border-[#E0E0D8] text-[#131218]/50 hover:text-[#131218] hover:border-[#131218]/30 transition-all">.txt</button>
+                      <button onClick={handleDownloadTxt} className="text-[9px] font-bold px-2.5 py-1 rounded-md border border-[#e4e4dd] text-[#0a0a0a]/50 hover:text-[#0a0a0a] hover:border-[#0a0a0a]/30 transition-all">.txt</button>
                     )}
                     {item.notionUrl && (
                       <a href={item.notionUrl} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
-                        className="text-[9px] font-bold px-2.5 py-1 rounded-md border border-[#E0E0D8] text-[#131218]/50 hover:text-[#131218] hover:border-[#131218]/30 transition-all">
+                        className="text-[9px] font-bold px-2.5 py-1 rounded-md border border-[#e4e4dd] text-[#0a0a0a]/50 hover:text-[#0a0a0a] hover:border-[#0a0a0a]/30 transition-all">
                         Notion ↗
                       </a>
                     )}
@@ -358,7 +358,7 @@ export function ContentCard({ item, onArchive }: { item: ContentCardItem; onArch
                 </div>
 
                 {hasSlides ? (
-                  <div className={`relative ${isDocumentMode ? "bg-[#EEEEE8]" : "bg-[#131218]"}`}>
+                  <div className={`relative ${isDocumentMode ? "bg-[#EEEEE8]" : "bg-[#0a0a0a]"}`}>
                     <iframe
                       ref={iframeRef}
                       srcDoc={item.slideHtml}
@@ -387,11 +387,11 @@ export function ContentCard({ item, onArchive }: { item: ContentCardItem; onArch
               </>
             ) : (
               <div className="px-4 py-6 text-center">
-                <p className="text-[11px] text-[#131218]/25">No hay draft generado aún.</p>
-                <p className="text-[10px] text-[#131218]/20 mt-1">El AI draft aparecerá aquí una vez generado (~30–60s).</p>
+                <p className="text-[11px] text-[#0a0a0a]/25">No hay draft generado aún.</p>
+                <p className="text-[10px] text-[#0a0a0a]/20 mt-1">El AI draft aparecerá aquí una vez generado (~30–60s).</p>
                 {item.notionUrl && (
                   <a href={item.notionUrl} target="_blank" rel="noopener noreferrer"
-                    className="inline-block mt-3 text-[10px] font-bold text-[#131218]/40 underline hover:text-[#131218]">
+                    className="inline-block mt-3 text-[10px] font-bold text-[#0a0a0a]/40 underline hover:text-[#0a0a0a]">
                     Ver en Notion →
                   </a>
                 )}
@@ -420,11 +420,11 @@ function getPhase(item: ContentCardItem): ItemPhase {
 }
 
 const PHASE_BADGE: Record<ItemPhase, { label: string; className: string }> = {
-  "no-content": { label: "Sin draft",    className: "bg-[#EFEFEA] text-[#131218]/35 border border-[#E0E0D8]" },
+  "no-content": { label: "Sin draft",    className: "bg-[#f4f4ef] text-[#0a0a0a]/35 border border-[#e4e4dd]" },
   "draft":      { label: "Borrador",     className: "bg-amber-50 text-amber-700 border border-amber-200" },
   "review":     { label: "En revisión",  className: "bg-blue-50 text-blue-700 border border-blue-200" },
-  "ready":      { label: "Listo",        className: "bg-[#B2FF59]/20 text-[#3a6600] border border-[#B2FF59]/50" },
-  "archived":   { label: "Archivado",    className: "bg-[#EFEFEA] text-[#131218]/25 border border-[#E0E0D8]" },
+  "ready":      { label: "Listo",        className: "bg-[#c6f24a]/20 text-[#3a6600] border border-[#c6f24a]/50" },
+  "archived":   { label: "Archivado",    className: "bg-[#f4f4ef] text-[#0a0a0a]/25 border border-[#e4e4dd]" },
 };
 
 export function DeskQueueSection({
@@ -445,9 +445,9 @@ export function DeskQueueSection({
 
       {/* Header */}
       <div className="flex items-center gap-3">
-        <p className="text-[9px] font-bold tracking-[1.5px] uppercase text-[#131218]/30">Producción</p>
-        <div className="flex-1 h-px bg-[#E0E0D8]" />
-        <p className="text-[9px] font-bold text-[#131218]/25">{active.length} items</p>
+        <p className="text-[9px] font-bold tracking-[1.5px] uppercase text-[#0a0a0a]/30">Producción</p>
+        <div className="flex-1 h-px bg-[#e4e4dd]" />
+        <p className="text-[9px] font-bold text-[#0a0a0a]/25">{active.length} items</p>
       </div>
 
       {/* Items — single column */}
@@ -471,10 +471,10 @@ export function DeskQueueSection({
 
               // No-content row (item exists but draft not generated yet)
               return (
-                <div key={item.id} className="bg-white border border-[#E0E0D8] rounded-[12px] px-4 py-3 flex items-center gap-3">
+                <div key={item.id} className="bg-white border border-[#e4e4dd] rounded-[12px] px-4 py-3 flex items-center gap-3">
                   <div className="flex-1 min-w-0">
-                    <p className="text-[12px] font-bold text-[#131218] truncate">{item.title}</p>
-                    <p className="text-[10px] text-[#131218]/35 mt-0.5">{item.contentType || "—"}</p>
+                    <p className="text-[12px] font-bold text-[#0a0a0a] truncate">{item.title}</p>
+                    <p className="text-[10px] text-[#0a0a0a]/35 mt-0.5">{item.contentType || "—"}</p>
                   </div>
                   <span className={`text-[8.5px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${badge.className}`}>
                     {badge.label}
@@ -487,15 +487,15 @@ export function DeskQueueSection({
           {active.length > DESK_MAX && (
             <button
               onClick={() => setShowAll(v => !v)}
-              className="text-[9px] font-bold text-[#131218]/30 hover:text-[#131218]/60 py-1 transition-colors text-left"
+              className="text-[9px] font-bold text-[#0a0a0a]/30 hover:text-[#0a0a0a]/60 py-1 transition-colors text-left"
             >
               {showAll ? "▲ Mostrar menos" : `▼ Expandir (${active.length - DESK_MAX} más)`}
             </button>
           )}
         </>
       ) : (
-        <div className="bg-white border border-dashed border-[#E0E0D8] rounded-[12px] px-4 py-6 text-center">
-          <p className="text-[11px] text-[#131218]/20">Los items generados aparecerán aquí.</p>
+        <div className="bg-white border border-dashed border-[#e4e4dd] rounded-[12px] px-4 py-6 text-center">
+          <p className="text-[11px] text-[#0a0a0a]/20">Los items generados aparecerán aquí.</p>
         </div>
       )}
 
@@ -504,19 +504,19 @@ export function DeskQueueSection({
         <div>
           <button
             onClick={() => setShowArchived(v => !v)}
-            className="text-[9px] font-bold text-[#131218]/25 hover:text-[#131218]/50 transition-colors"
+            className="text-[9px] font-bold text-[#0a0a0a]/25 hover:text-[#0a0a0a]/50 transition-colors"
           >
             {showArchived ? "▲ Ocultar archivados" : `▼ ${archived.length} archivado${archived.length > 1 ? "s" : ""}`}
           </button>
           {showArchived && (
             <div className="flex flex-col gap-2 mt-2">
               {archived.map(item => (
-                <div key={item.id} className="bg-[#FAFAF8] border border-[#E0E0D8] rounded-[12px] px-4 py-3 flex items-center gap-3 opacity-50">
+                <div key={item.id} className="bg-[#FAFAF8] border border-[#e4e4dd] rounded-[12px] px-4 py-3 flex items-center gap-3 opacity-50">
                   <div className="flex-1 min-w-0">
-                    <p className="text-[12px] font-bold text-[#131218] truncate">{item.title}</p>
-                    <p className="text-[10px] text-[#131218]/35 mt-0.5">{item.contentType || "—"}</p>
+                    <p className="text-[12px] font-bold text-[#0a0a0a] truncate">{item.title}</p>
+                    <p className="text-[10px] text-[#0a0a0a]/35 mt-0.5">{item.contentType || "—"}</p>
                   </div>
-                  <span className="text-[8.5px] font-bold px-2 py-0.5 rounded-full bg-[#EFEFEA] text-[#131218]/30 border border-[#E0E0D8]">
+                  <span className="text-[8.5px] font-bold px-2 py-0.5 rounded-full bg-[#f4f4ef] text-[#0a0a0a]/30 border border-[#e4e4dd]">
                     Archivado
                   </span>
                 </div>
@@ -564,14 +564,14 @@ export default function ContentList({ items }: { items: ContentCardItem[] }) {
             onClick={() => setDeskFilter(tab.id)}
             className={`text-[10px] font-bold px-3.5 py-1.5 rounded-full border transition-all ${
               deskFilter === tab.id
-                ? "bg-[#131218] text-white border-[#131218]"
-                : "border-[#E0E0D8] text-[#131218]/50 hover:border-[#131218]/30 hover:text-[#131218] bg-white"
+                ? "bg-[#0a0a0a] text-white border-[#0a0a0a]"
+                : "border-[#e4e4dd] text-[#0a0a0a]/50 hover:border-[#0a0a0a]/30 hover:text-[#0a0a0a] bg-white"
             }`}
           >
             {tab.label}
           </button>
         ))}
-        <span className="ml-auto text-[9px] font-bold text-[#131218]/25">{active.length} activos</span>
+        <span className="ml-auto text-[9px] font-bold text-[#0a0a0a]/25">{active.length} activos</span>
       </div>
 
       {/* Active items */}
@@ -586,9 +586,9 @@ export default function ContentList({ items }: { items: ContentCardItem[] }) {
           ))}
         </div>
       ) : (
-        <div className="bg-white border border-[#E0E0D8] rounded-2xl p-12 text-center">
-          <p className="text-sm font-bold text-[#131218]/25 mb-2">No hay documentos activos</p>
-          <p className="text-xs text-[#131218]/20">Las solicitudes del Design y Comms Desk aparecerán aquí con su draft generado.</p>
+        <div className="bg-white border border-[#e4e4dd] rounded-2xl p-12 text-center">
+          <p className="text-sm font-bold text-[#0a0a0a]/25 mb-2">No hay documentos activos</p>
+          <p className="text-xs text-[#0a0a0a]/20">Las solicitudes del Design y Comms Desk aparecerán aquí con su draft generado.</p>
         </div>
       )}
 
@@ -599,14 +599,14 @@ export default function ContentList({ items }: { items: ContentCardItem[] }) {
             onClick={() => setShowArchived(v => !v)}
             className="flex items-center gap-3 w-full group mb-3"
           >
-            <p className="text-[9px] font-bold tracking-[1.5px] uppercase text-[#131218]/25 group-hover:text-[#131218]/50 transition-colors">
+            <p className="text-[9px] font-bold tracking-[1.5px] uppercase text-[#0a0a0a]/25 group-hover:text-[#0a0a0a]/50 transition-colors">
               Archivados
             </p>
-            <div className="flex-1 h-px bg-[#E0E0D8]" />
+            <div className="flex-1 h-px bg-[#e4e4dd]" />
             <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-400">
               {archived.length}
             </span>
-            <span className="text-[9px] text-[#131218]/25 group-hover:text-[#131218]/50">
+            <span className="text-[9px] text-[#0a0a0a]/25 group-hover:text-[#0a0a0a]/50">
               {showArchived ? "▲" : "▼"}
             </span>
           </button>

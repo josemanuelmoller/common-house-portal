@@ -47,7 +47,7 @@ export function SynthesizeTopicsButton({
       <button
         onClick={run}
         disabled={running}
-        className="text-[10px] font-bold uppercase tracking-widest border border-[#131218]/20 text-[#131218]/70 hover:text-[#131218] hover:border-[#131218]/50 px-3 py-1.5 rounded-lg disabled:opacity-40"
+        className="text-[10px] font-bold uppercase tracking-widest border border-[#0a0a0a]/20 text-[#0a0a0a]/70 hover:text-[#0a0a0a] hover:border-[#0a0a0a]/50 px-3 py-1.5 rounded-lg disabled:opacity-40"
       >
         {running ? "Thinking…" : `✨ ${label}`}
       </button>

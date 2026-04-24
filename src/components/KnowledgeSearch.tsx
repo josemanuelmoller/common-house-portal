@@ -62,65 +62,65 @@ export function KnowledgeSearch({ items }: { items: SearchItem[] }) {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest bg-white border border-[#E0E0D8] hover:border-[#131218]/30 text-[#131218]/70 hover:text-[#131218] px-3 py-1.5 rounded-full transition-colors"
+        className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest bg-white border border-[#e4e4dd] hover:border-[#0a0a0a]/30 text-[#0a0a0a]/70 hover:text-[#0a0a0a] px-3 py-1.5 rounded-full transition-colors"
       >
-        <span className="text-[13px] text-[#131218]/40">⌕</span>
+        <span className="text-[13px] text-[#0a0a0a]/40">⌕</span>
         Search
-        <kbd className="text-[9px] font-mono font-bold bg-[#EFEFEA] text-[#131218]/60 px-1.5 py-0.5 rounded border border-[#E0E0D8]">/</kbd>
+        <kbd className="text-[9px] font-mono font-bold bg-[#f4f4ef] text-[#0a0a0a]/60 px-1.5 py-0.5 rounded border border-[#e4e4dd]">/</kbd>
       </button>
 
       {open && (
         <div
-          className="fixed inset-0 z-50 bg-[#131218]/40 backdrop-blur-sm flex items-start justify-center pt-24"
+          className="fixed inset-0 z-50 bg-[#0a0a0a]/40 backdrop-blur-sm flex items-start justify-center pt-24"
           onClick={() => setOpen(false)}
         >
           <div
-            className="w-full max-w-2xl bg-white rounded-[14px] border border-[#E0E0D8] shadow-2xl overflow-hidden"
+            className="w-full max-w-2xl bg-white rounded-[14px] border border-[#e4e4dd] shadow-2xl overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center gap-3 px-5 py-4 border-b border-[#EFEFEA]">
-              <span className="text-[#131218]/40 text-lg">⌕</span>
+            <div className="flex items-center gap-3 px-5 py-4 border-b border-[#f4f4ef]">
+              <span className="text-[#0a0a0a]/40 text-lg">⌕</span>
               <input
                 ref={inputRef}
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Buscar leaves, cases, contenido..."
-                className="flex-1 outline-none text-sm text-[#131218] placeholder:text-[#131218]/25"
+                className="flex-1 outline-none text-sm text-[#0a0a0a] placeholder:text-[#0a0a0a]/25"
               />
-              <kbd className="text-[9px] font-mono font-bold bg-[#EFEFEA] text-[#131218]/50 px-1.5 py-0.5 rounded border border-[#E0E0D8]">ESC</kbd>
+              <kbd className="text-[9px] font-mono font-bold bg-[#f4f4ef] text-[#0a0a0a]/50 px-1.5 py-0.5 rounded border border-[#e4e4dd]">ESC</kbd>
             </div>
 
             {results.length === 0 ? (
               <div className="px-5 py-10 text-center">
-                <p className="text-sm text-[#131218]/30">
+                <p className="text-sm text-[#0a0a0a]/30">
                   {query.trim() ? "Sin resultados" : "Escribe para buscar en el árbol + cases"}
                 </p>
-                <p className="text-[10px] text-[#131218]/20 mt-1">
+                <p className="text-[10px] text-[#0a0a0a]/20 mt-1">
                   {items.length} elementos indexados
                 </p>
               </div>
             ) : (
-              <div className="max-h-[60vh] overflow-y-auto divide-y divide-[#EFEFEA]">
+              <div className="max-h-[60vh] overflow-y-auto divide-y divide-[#f4f4ef]">
                 {results.map(r => (
                   <Link
                     key={r.kind === "case" ? `case-${r.case_code}` : r.path}
                     href={r.kind === "case"
                       ? `/admin/knowledge/cases/${encodeURIComponent(r.case_code!)}`
                       : `/admin/knowledge/${r.path}`}
-                    className="block px-5 py-3 hover:bg-[#EFEFEA]/40 transition-colors"
+                    className="block px-5 py-3 hover:bg-[#f4f4ef]/40 transition-colors"
                     onClick={() => setOpen(false)}
                   >
                     <div className="flex items-center gap-2">
                       <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-widest ${
-                        r.kind === "case" ? "bg-[#131218] text-[#B2FF59]" : "bg-[#EFEFEA] text-[#131218]/40"
+                        r.kind === "case" ? "bg-[#0a0a0a] text-[#c6f24a]" : "bg-[#f4f4ef] text-[#0a0a0a]/40"
                       }`}>
                         {r.kind === "case" ? "CASE" : "NODE"}
                       </span>
-                      <p className="text-[10px] font-bold font-mono text-[#131218]/30">{r.path}</p>
+                      <p className="text-[10px] font-bold font-mono text-[#0a0a0a]/30">{r.path}</p>
                     </div>
-                    <p className="text-sm font-semibold text-[#131218] mt-1">{r.title}</p>
-                    {r.summary && <p className="text-[11px] text-[#131218]/50 line-clamp-1 mt-0.5">{r.summary}</p>}
+                    <p className="text-sm font-semibold text-[#0a0a0a] mt-1">{r.title}</p>
+                    {r.summary && <p className="text-[11px] text-[#0a0a0a]/50 line-clamp-1 mt-0.5">{r.summary}</p>}
                   </Link>
                 ))}
               </div>

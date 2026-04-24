@@ -25,7 +25,7 @@ const LOOP_TYPE_LABEL: Record<string, string> = {
 
 const INTEREST_BADGE: Record<string, { label: string; cls: string }> = {
   watching:   { label: "Watching", cls: "bg-amber-50 text-amber-600 border border-amber-200" },
-  interested: { label: "Interested", cls: "bg-[#c8f55a]/20 text-[#131218] border border-[#c8f55a]/40" },
+  interested: { label: "Interested", cls: "bg-[#c6f24a]/20 text-[#0a0a0a] border border-[#c6f24a]/40" },
 };
 
 async function patchInterest(loopId: string, founderInterest: string | null) {
@@ -57,16 +57,16 @@ export function RadarSection({ initialLoops }: { initialLoops: RadarLoop[] }) {
 
   if (visible.length === 0) {
     return (
-      <div className="flex items-center gap-3 bg-white/50 border border-dashed border-[#E0E0D8] rounded-xl px-4 py-2">
-        <span className="w-1.5 h-1.5 rounded-full bg-[#131218]/15 shrink-0" />
-        <p className="text-[11px] text-[#131218]/40 flex-1 min-w-0">Radar clear — no passive discovery items.</p>
+      <div className="flex items-center gap-3 bg-white/50 border border-dashed border-[#e4e4dd] rounded-xl px-4 py-2">
+        <span className="w-1.5 h-1.5 rounded-full bg-[#0a0a0a]/15 shrink-0" />
+        <p className="text-[11px] text-[#0a0a0a]/40 flex-1 min-w-0">Radar clear — no passive discovery items.</p>
       </div>
     );
   }
 
   return (
-    <div className={`bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden ${isPending ? "opacity-70" : ""}`}>
-      <div className="divide-y divide-[#EFEFEA]">
+    <div className={`bg-white rounded-2xl border border-[#e4e4dd] overflow-hidden ${isPending ? "opacity-70" : ""}`}>
+      <div className="divide-y divide-[#f4f4ef]">
         {visible.map(loop => {
           const interest = optimistic[loop.id] !== undefined ? optimistic[loop.id] : loop.founder_interest;
           const badge = interest ? INTEREST_BADGE[interest] : null;
@@ -75,9 +75,9 @@ export function RadarSection({ initialLoops }: { initialLoops: RadarLoop[] }) {
           const movingToCoS = interest === "interested" && optimistic[loop.id] === "interested";
 
           return (
-            <div key={loop.id} className={`flex items-center gap-3 px-5 py-3.5 transition-colors ${movingToCoS ? "bg-[#c8f55a]/10" : ""}`}>
+            <div key={loop.id} className={`flex items-center gap-3 px-5 py-3.5 transition-colors ${movingToCoS ? "bg-[#c6f24a]/10" : ""}`}>
               {/* Type badge */}
-              <span className="text-[8px] font-bold uppercase tracking-widest text-[#131218]/30 bg-[#EFEFEA] px-2 py-0.5 rounded-full shrink-0">
+              <span className="text-[8px] font-bold uppercase tracking-widest text-[#0a0a0a]/30 bg-[#f4f4ef] px-2 py-0.5 rounded-full shrink-0">
                 {typeLabel}
               </span>
 
@@ -87,20 +87,20 @@ export function RadarSection({ initialLoops }: { initialLoops: RadarLoop[] }) {
                   href={loop.notion_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-[12px] font-medium text-[#131218] hover:underline truncate block"
+                  className="text-[12px] font-medium text-[#0a0a0a] hover:underline truncate block"
                 >
                   {loop.title}
                 </a>
-                <p className="text-[10px] text-[#131218]/35 truncate mt-0.5">{loop.linked_entity_name}</p>
+                <p className="text-[10px] text-[#0a0a0a]/35 truncate mt-0.5">{loop.linked_entity_name}</p>
                 {/* debug strip */}
-                <p className="text-[8px] font-mono text-[#131218]/20 mt-0.5 truncate">
+                <p className="text-[8px] font-mono text-[#0a0a0a]/20 mt-0.5 truncate">
                   radar · passive=yes · interest={interest ?? "none"} · variant={loop.normalized_key.split(":").pop()}
                 </p>
               </div>
 
               {/* Interest state badge */}
               {movingToCoS ? (
-                <span className="text-[8px] font-bold px-2 py-0.5 rounded-full shrink-0 bg-[#c8f55a] text-[#131218]">
+                <span className="text-[8px] font-bold px-2 py-0.5 rounded-full shrink-0 bg-[#c6f24a] text-[#0a0a0a]">
                   → CoS
                 </span>
               ) : badge ? (
@@ -114,7 +114,7 @@ export function RadarSection({ initialLoops }: { initialLoops: RadarLoop[] }) {
                 {interest !== "watching" && (
                   <button
                     onClick={() => handleAction(loop.id, "watching")}
-                    className="text-[9px] font-bold px-2.5 py-1 rounded-lg border border-[#E0E0D8] text-[#131218]/50 hover:bg-[#EFEFEA] transition-colors"
+                    className="text-[9px] font-bold px-2.5 py-1 rounded-lg border border-[#e4e4dd] text-[#0a0a0a]/50 hover:bg-[#f4f4ef] transition-colors"
                   >
                     Watch
                   </button>
@@ -122,14 +122,14 @@ export function RadarSection({ initialLoops }: { initialLoops: RadarLoop[] }) {
                 {interest !== "interested" && (
                   <button
                     onClick={() => handleAction(loop.id, "interested")}
-                    className="text-[9px] font-bold px-2.5 py-1 rounded-lg bg-[#c8f55a] text-[#131218] hover:bg-[#b8e54a] transition-colors"
+                    className="text-[9px] font-bold px-2.5 py-1 rounded-lg bg-[#c6f24a] text-[#0a0a0a] hover:bg-[#b8e54a] transition-colors"
                   >
                     Interested
                   </button>
                 )}
                 <button
                   onClick={() => handleAction(loop.id, "dropped")}
-                  className="text-[9px] font-bold px-2.5 py-1 rounded-lg border border-[#E0E0D8] text-[#131218]/30 hover:bg-red-50 hover:text-red-500 hover:border-red-200 transition-colors"
+                  className="text-[9px] font-bold px-2.5 py-1 rounded-lg border border-[#e4e4dd] text-[#0a0a0a]/30 hover:bg-red-50 hover:text-red-500 hover:border-red-200 transition-colors"
                 >
                   Drop
                 </button>

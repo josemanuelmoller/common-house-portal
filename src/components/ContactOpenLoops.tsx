@@ -55,17 +55,17 @@ export function ContactOpenLoops({
   // loops=null → never run.  loops=[] → ran but nothing found.
   if (loops == null) {
     return (
-      <div className="bg-white border border-[#E0E0D8] rounded-2xl px-5 py-4 flex items-center gap-3">
+      <div className="bg-white border border-[#e4e4dd] rounded-2xl px-5 py-4 flex items-center gap-3">
         <div className="flex-1">
-          <p className="text-[11px] text-[#131218]/60 leading-snug">
-            <strong className="text-[#131218]">Open loops</strong>{" "}
+          <p className="text-[11px] text-[#0a0a0a]/60 leading-snug">
+            <strong className="text-[#0a0a0a]">Open loops</strong>{" "}
             — promises you made or things you&apos;re waiting on, pulled from the last 6 weeks of transcripts, meetings and WhatsApp.
           </p>
         </div>
         <button
           onClick={() => run(false)}
           disabled={running}
-          className="text-[10px] font-bold uppercase tracking-widest border border-[#131218]/20 text-[#131218] hover:border-[#131218]/50 px-3 py-2 rounded-lg disabled:opacity-40 shrink-0"
+          className="text-[10px] font-bold uppercase tracking-widest border border-[#0a0a0a]/20 text-[#0a0a0a] hover:border-[#0a0a0a]/50 px-3 py-2 rounded-lg disabled:opacity-40 shrink-0"
         >
           {running ? "Scanning…" : "🔍 Scan"}
         </button>
@@ -78,31 +78,31 @@ export function ContactOpenLoops({
   const awaiting  = loops.filter(l => l.direction === "awaiting_from_them");
 
   return (
-    <div className="bg-white border border-[#E0E0D8] rounded-2xl px-5 py-4 space-y-3">
+    <div className="bg-white border border-[#e4e4dd] rounded-2xl px-5 py-4 space-y-3">
       <div className="flex items-center gap-3">
-        <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/45">
+        <p className="text-[9px] font-bold tracking-widest uppercase text-[#0a0a0a]/45">
           Open loops
-          {updatedAt && <span className="text-[#131218]/30"> · {timeAgoShort(updatedAt)}</span>}
+          {updatedAt && <span className="text-[#0a0a0a]/30"> · {timeAgoShort(updatedAt)}</span>}
         </p>
-        <div className="flex-1 h-px bg-[#EFEFEA]" />
+        <div className="flex-1 h-px bg-[#f4f4ef]" />
         <button
           onClick={() => run(true)}
           disabled={running}
-          className="text-[9px] font-bold uppercase tracking-widest text-[#131218]/40 hover:text-[#131218] underline decoration-dotted"
+          className="text-[9px] font-bold uppercase tracking-widest text-[#0a0a0a]/40 hover:text-[#0a0a0a] underline decoration-dotted"
         >
           {running ? "Refreshing…" : "Refresh"}
         </button>
       </div>
 
       {loops.length === 0 && (
-        <p className="text-[11.5px] text-[#131218]/40 italic">
+        <p className="text-[11.5px] text-[#0a0a0a]/40 italic">
           No open commitments detected. Recent conversations look clean.
         </p>
       )}
 
       {promised.length > 0 && (
         <div>
-          <p className="text-[9px] font-bold uppercase tracking-widest text-[#131218]/50 mb-1.5">
+          <p className="text-[9px] font-bold uppercase tracking-widest text-[#0a0a0a]/50 mb-1.5">
             You promised · {promised.length}
           </p>
           <ul className="space-y-1.5">
@@ -113,7 +113,7 @@ export function ContactOpenLoops({
 
       {awaiting.length > 0 && (
         <div>
-          <p className="text-[9px] font-bold uppercase tracking-widest text-[#131218]/50 mb-1.5">
+          <p className="text-[9px] font-bold uppercase tracking-widest text-[#0a0a0a]/50 mb-1.5">
             Awaiting from them · {awaiting.length}
           </p>
           <ul className="space-y-1.5">
@@ -130,7 +130,7 @@ export function ContactOpenLoops({
 function LoopRow({ loop, tone }: { loop: Loop; tone: "you" | "them" }) {
   const bg = tone === "you"
     ? "bg-amber-50  border-amber-200  text-amber-900"
-    : "bg-[#c8f55a]/20 border-[#c8f55a]/50 text-[#131218]";
+    : "bg-[#c6f24a]/20 border-[#c6f24a]/50 text-[#0a0a0a]";
   const glyph = loop.source === "whatsapp" ? "💬"
               : loop.source === "email"    ? "✉"
               : loop.source === "transcript" ? "🎙️"

@@ -105,17 +105,17 @@ export function NetworkGraph() {
   }, [data]);
 
   if (error) {
-    return <div className="bg-white border border-[#E0E0D8] rounded-2xl px-6 py-8">
+    return <div className="bg-white border border-[#e4e4dd] rounded-2xl px-6 py-8">
       <p className="text-[12px] text-red-600">Error loading network: {error}</p>
     </div>;
   }
   if (!data) {
-    return <div className="bg-white border border-[#E0E0D8] rounded-2xl px-6 py-8">
+    return <div className="bg-white border border-[#e4e4dd] rounded-2xl px-6 py-8">
       <p className="text-[12px] text-black/40">Computing network from calendar history…</p>
     </div>;
   }
   if (data.nodes.length === 0) {
-    return <div className="bg-white border border-[#E0E0D8] rounded-2xl px-6 py-8">
+    return <div className="bg-white border border-[#e4e4dd] rounded-2xl px-6 py-8">
       <p className="text-[12px] text-black/40">Not enough classified contacts with co-attendance yet. Tag more contacts in Control Room → Contacts.</p>
     </div>;
   }

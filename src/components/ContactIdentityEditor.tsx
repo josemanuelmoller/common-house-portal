@@ -91,7 +91,7 @@ export function ContactIdentityEditor({
     return (
       <button
         onClick={() => setOpen(true)}
-        className="text-[10px] font-bold uppercase tracking-widest border border-[#131218]/20 text-[#131218]/70 hover:text-[#131218] hover:border-[#131218]/50 px-3 py-1.5 rounded-lg"
+        className="text-[10px] font-bold uppercase tracking-widest border border-[#0a0a0a]/20 text-[#0a0a0a]/70 hover:text-[#0a0a0a] hover:border-[#0a0a0a]/50 px-3 py-1.5 rounded-lg"
       >
         ✎ Edit identity
       </button>
@@ -99,7 +99,7 @@ export function ContactIdentityEditor({
   }
 
   return (
-    <div className="w-full mt-3 bg-[#F7F7F3] border border-[#E0E0D8] rounded-2xl px-4 py-4 space-y-3">
+    <div className="w-full mt-3 bg-[#F7F7F3] border border-[#e4e4dd] rounded-2xl px-4 py-4 space-y-3">
       <div className="grid grid-cols-2 gap-2">
         <Input label="Full name"    value={values.full_name    ?? ""} onChange={v => setField("full_name",    v)} placeholder="Carlos Silva" />
         <Input label="Display name" value={values.display_name ?? ""} onChange={v => setField("display_name", v)} placeholder="(how it appears)" />
@@ -110,12 +110,12 @@ export function ContactIdentityEditor({
         <Input label="Country"      value={values.country      ?? ""} onChange={v => setField("country",      v)} placeholder="" />
       </div>
       <div>
-        <label className="text-[9px] font-bold uppercase tracking-widest text-[#131218]/45 mb-1 block">Notes</label>
+        <label className="text-[9px] font-bold uppercase tracking-widest text-[#0a0a0a]/45 mb-1 block">Notes</label>
         <textarea
           value={values.notes ?? ""}
           onChange={e => setField("notes", e.target.value)}
           rows={3}
-          className="w-full text-[12px] px-3 py-2 rounded-lg border border-[#E0E0D8] bg-white outline-none focus:border-[#131218]/30 resize-y"
+          className="w-full text-[12px] px-3 py-2 rounded-lg border border-[#e4e4dd] bg-white outline-none focus:border-[#0a0a0a]/30 resize-y"
         />
       </div>
       {err && (
@@ -125,18 +125,18 @@ export function ContactIdentityEditor({
         <button
           onClick={save}
           disabled={saving}
-          className="text-[10px] font-bold uppercase tracking-widest bg-[#131218] text-white px-4 py-2 rounded-lg hover:bg-[#131218]/80 disabled:opacity-40"
+          className="text-[10px] font-bold uppercase tracking-widest bg-[#0a0a0a] text-white px-4 py-2 rounded-lg hover:bg-[#0a0a0a]/80 disabled:opacity-40"
         >
           {saving ? "Saving…" : "✓ Save"}
         </button>
         <button
           onClick={() => { setOpen(false); setValues(initial); setErr(null); }}
           disabled={saving}
-          className="text-[10px] font-bold uppercase tracking-widest text-[#131218]/50 hover:text-[#131218] px-2"
+          className="text-[10px] font-bold uppercase tracking-widest text-[#0a0a0a]/50 hover:text-[#0a0a0a] px-2"
         >
           Cancel
         </button>
-        <span className="text-[10px] text-[#131218]/40 ml-auto">
+        <span className="text-[10px] text-[#0a0a0a]/40 ml-auto">
           Saved values are marked as manual — the agent will not overwrite them on future runs.
         </span>
       </div>
@@ -151,7 +151,7 @@ function Input({
 }) {
   return (
     <div>
-      <label className="text-[9px] font-bold uppercase tracking-widest text-[#131218]/45 mb-1 block">
+      <label className="text-[9px] font-bold uppercase tracking-widest text-[#0a0a0a]/45 mb-1 block">
         {label}
       </label>
       <input
@@ -159,7 +159,7 @@ function Input({
         value={value}
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full text-[12px] px-3 py-1.5 rounded-lg border border-[#E0E0D8] bg-white outline-none focus:border-[#131218]/30"
+        className="w-full text-[12px] px-3 py-1.5 rounded-lg border border-[#e4e4dd] bg-white outline-none focus:border-[#0a0a0a]/30"
       />
     </div>
   );

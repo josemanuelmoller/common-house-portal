@@ -22,17 +22,17 @@ const STATUS_OPTIONS: ArtifactStatus[] = [
 ];
 
 const STATUS_PILL_STYLES: Record<ArtifactStatus, string> = {
-  draft: "bg-[#EFEFEA] text-[#131218]",
+  draft: "bg-[#f4f4ef] text-[#0a0a0a]",
   in_review: "bg-[#FFF3C4] text-[#8B6F00]",
-  approved: "bg-[#B2FF59]/30 text-[#1F5200]",
-  sent: "bg-[#131218] text-[#B2FF59]",
-  archived: "bg-[#E0E0D8] text-[#6B6B60]",
+  approved: "bg-[#c6f24a]/30 text-[#1F5200]",
+  sent: "bg-[#0a0a0a] text-[#c6f24a]",
+  archived: "bg-[#e4e4dd] text-[#6B6B60]",
 };
 
 const TIER_PILL_STYLES = {
-  high: "bg-[#B2FF59] text-[#131218]",
-  mid: "bg-[#FFC773] text-[#131218]",
-  low: "bg-[#E0E0D8] text-[#6B6B60]",
+  high: "bg-[#c6f24a] text-[#0a0a0a]",
+  mid: "bg-[#FFC773] text-[#0a0a0a]",
+  low: "bg-[#e4e4dd] text-[#6B6B60]",
 } as const;
 
 export function ArtifactRow({ artifact }: { artifact: ObjectiveArtifactWithObjective }) {
@@ -105,7 +105,7 @@ export function ArtifactRow({ artifact }: { artifact: ObjectiveArtifactWithObjec
 
   return (
     <div>
-      <div className="grid grid-cols-[1.6fr_1.4fr_0.7fr_0.9fr_0.9fr_0.9fr_0.4fr] gap-4 px-5 py-4 items-center hover:bg-[#EFEFEA]/50 transition-colors">
+      <div className="grid grid-cols-[1.6fr_1.4fr_0.7fr_0.9fr_0.9fr_0.9fr_0.4fr] gap-4 px-5 py-4 items-center hover:bg-[#f4f4ef]/50 transition-colors">
         {/* Objective */}
         <div className="flex flex-col gap-1 min-w-0">
           <div className="flex items-center gap-2">
@@ -121,7 +121,7 @@ export function ArtifactRow({ artifact }: { artifact: ObjectiveArtifactWithObjec
             </span>
           </div>
           <span
-            className="text-[13px] font-semibold text-[#131218] truncate"
+            className="text-[13px] font-semibold text-[#0a0a0a] truncate"
             title={artifact.objective_title}
           >
             {artifact.objective_title}
@@ -134,11 +134,11 @@ export function ArtifactRow({ artifact }: { artifact: ObjectiveArtifactWithObjec
             <span className="text-[9px] font-bold text-[#6B6B60] uppercase tracking-wider">
               {artifactTypeLabel(artifact.artifact_type)}
             </span>
-            <span className="text-[9px] font-bold text-[#131218] bg-[#EFEFEA] px-1.5 py-0.5 rounded">
+            <span className="text-[9px] font-bold text-[#0a0a0a] bg-[#f4f4ef] px-1.5 py-0.5 rounded">
               {versionLabel}
             </span>
           </div>
-          <span className="text-[13px] text-[#131218] truncate" title={artifact.title}>
+          <span className="text-[13px] text-[#0a0a0a] truncate" title={artifact.title}>
             {artifact.title}
           </span>
           <div className="flex items-center gap-3 text-[10px]">
@@ -181,7 +181,7 @@ export function ArtifactRow({ artifact }: { artifact: ObjectiveArtifactWithObjec
               href={artifact.drive_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#131218] bg-[#B2FF59] hover:bg-[#a3ef50] px-3 py-1.5 rounded-md transition-colors"
+              className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#0a0a0a] bg-[#c6f24a] hover:bg-[#a3ef50] px-3 py-1.5 rounded-md transition-colors"
             >
               Open Drive →
             </a>
@@ -197,7 +197,7 @@ export function ArtifactRow({ artifact }: { artifact: ObjectiveArtifactWithObjec
               href={calendarEventUrl(artifact.calendar_event_id)}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#131218] border border-[#131218] hover:bg-[#131218] hover:text-white px-3 py-1.5 rounded-md transition-colors"
+              className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#0a0a0a] border border-[#0a0a0a] hover:bg-[#0a0a0a] hover:text-white px-3 py-1.5 rounded-md transition-colors"
             >
               Calendar ↗
             </a>
@@ -210,7 +210,7 @@ export function ArtifactRow({ artifact }: { artifact: ObjectiveArtifactWithObjec
         <div className="flex justify-end">
           <button
             onClick={toggleExpand}
-            className="text-[14px] font-bold text-[#6B6B60] hover:text-[#131218] w-8 h-8 flex items-center justify-center rounded-md hover:bg-[#EFEFEA] transition-colors"
+            className="text-[14px] font-bold text-[#6B6B60] hover:text-[#0a0a0a] w-8 h-8 flex items-center justify-center rounded-md hover:bg-[#f4f4ef] transition-colors"
             aria-label={expanded ? "Collapse" : "Expand"}
           >
             {expanded ? "▲" : "▼"}
@@ -219,7 +219,7 @@ export function ArtifactRow({ artifact }: { artifact: ObjectiveArtifactWithObjec
       </div>
 
       {expanded && (
-        <div className="bg-[#F7F7F3] border-t border-[#E0E0D8] px-6 py-5">
+        <div className="bg-[#F7F7F3] border-t border-[#e4e4dd] px-6 py-5">
           {loadingDetails && !details ? (
             <p className="text-[12px] text-[#6B6B60]">Loading questions…</p>
           ) : details ? (
@@ -394,7 +394,7 @@ function ArtifactDetails({
           ))}
           {grouped.answered.length > 0 && (
             <details className="mt-2">
-              <summary className="text-[10px] font-bold text-[#6B6B60] uppercase tracking-wider cursor-pointer hover:text-[#131218]">
+              <summary className="text-[10px] font-bold text-[#6B6B60] uppercase tracking-wider cursor-pointer hover:text-[#0a0a0a]">
                 {grouped.answered.length} answered — show
               </summary>
               <div className="flex flex-col gap-3 mt-3">
@@ -423,10 +423,10 @@ function ArtifactDetails({
           {versions.map((v) => (
             <div
               key={v.id}
-              className="bg-white border border-[#E0E0D8] rounded-lg p-3 flex flex-col gap-1"
+              className="bg-white border border-[#e4e4dd] rounded-lg p-3 flex flex-col gap-1"
             >
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-[#131218]">
+                <span className="text-[11px] font-bold text-[#0a0a0a]">
                   v{v.version_number}
                 </span>
                 <span className="text-[10px] text-[#6B6B60]">
@@ -446,7 +446,7 @@ function ArtifactDetails({
                     href={v.drive_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-[11px] font-semibold text-[#131218] hover:underline"
+                    className="text-[11px] font-semibold text-[#0a0a0a] hover:underline"
                   >
                     Drive →
                   </a>
@@ -454,7 +454,7 @@ function ArtifactDetails({
                 {v.content && (
                   <button
                     onClick={() => setPreviewVersion(v)}
-                    className="text-[11px] font-semibold text-[#131218] hover:underline"
+                    className="text-[11px] font-semibold text-[#0a0a0a] hover:underline"
                   >
                     Preview text
                   </button>
@@ -475,8 +475,8 @@ function ArtifactDetails({
         </div>
 
         {/* Regenerate block */}
-        <div className="mt-4 p-3 bg-[#131218] rounded-lg flex flex-col gap-2">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-[#B2FF59]">
+        <div className="mt-4 p-3 bg-[#0a0a0a] rounded-lg flex flex-col gap-2">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-[#c6f24a]">
             Regenerate v{latestVersionNumber + 1}
           </p>
           <p className="text-[10px] leading-relaxed text-white/70">
@@ -496,7 +496,7 @@ function ArtifactDetails({
             <p className="text-[10px] text-[#FF8A80] leading-relaxed">{regenError}</p>
           )}
           {regenProgress && (
-            <div className="text-[10px] text-[#B2FF59] leading-relaxed font-mono">
+            <div className="text-[10px] text-[#c6f24a] leading-relaxed font-mono">
               {regenProgress.stage === "connecting" && "◉ connecting to agent…"}
               {regenProgress.stage === "generating" && (
                 <>
@@ -521,7 +521,7 @@ function ArtifactDetails({
             <button
               onClick={() => regenerate(false)}
               disabled={regenPending || !canRegenerate}
-              className="text-[10px] font-bold text-[#131218] bg-[#B2FF59] hover:bg-[#a3ef50] disabled:opacity-30 disabled:cursor-not-allowed px-3 py-1.5 rounded-md"
+              className="text-[10px] font-bold text-[#0a0a0a] bg-[#c6f24a] hover:bg-[#a3ef50] disabled:opacity-30 disabled:cursor-not-allowed px-3 py-1.5 rounded-md"
             >
               {regenPending ? "Working…" : `Regenerate v${latestVersionNumber + 1}`}
             </button>
@@ -567,9 +567,9 @@ function VersionPreviewModal({
         className="bg-white rounded-2xl max-w-3xl w-full max-h-[85vh] overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#E0E0D8]">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[#e4e4dd]">
           <div>
-            <h4 className="text-[14px] font-bold text-[#131218]">
+            <h4 className="text-[14px] font-bold text-[#0a0a0a]">
               v{version.version_number} preview
             </h4>
             {version.summary_of_changes && (
@@ -580,21 +580,21 @@ function VersionPreviewModal({
           </div>
           <button
             onClick={onClose}
-            className="text-[16px] text-[#6B6B60] hover:text-[#131218] w-8 h-8 flex items-center justify-center rounded-md hover:bg-[#EFEFEA]"
+            className="text-[16px] text-[#6B6B60] hover:text-[#0a0a0a] w-8 h-8 flex items-center justify-center rounded-md hover:bg-[#f4f4ef]"
             aria-label="Close preview"
           >
             ✕
           </button>
         </div>
         <div className="overflow-auto px-8 py-7">
-          <article className="ch-artifact-prose max-w-none text-[#131218]">
+          <article className="ch-artifact-prose max-w-none text-[#0a0a0a]">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>
               {version.content ?? ""}
             </ReactMarkdown>
           </article>
         </div>
         {version.answers_used?.length > 0 && (
-          <div className="px-6 py-3 border-t border-[#E0E0D8] bg-[#F7F7F3]">
+          <div className="px-6 py-3 border-t border-[#e4e4dd] bg-[#F7F7F3]">
             <p className="text-[10px] font-bold text-[#6B6B60] uppercase tracking-wider">
               Based on {version.answers_used.length} answer
               {version.answers_used.length === 1 ? "" : "s"}
@@ -673,7 +673,7 @@ function QuestionCard({
   return (
     <div
       className={`bg-white border rounded-xl p-4 flex flex-col gap-2 ${
-        isAnswered ? "border-[#B2FF59]/50" : "border-[#E0E0D8]"
+        isAnswered ? "border-[#c6f24a]/50" : "border-[#e4e4dd]"
       }`}
     >
       <div className="flex items-start gap-2">
@@ -685,7 +685,7 @@ function QuestionCard({
           {isAnswered ? "●" : "◯"}
         </span>
         <div className="flex-1">
-          <p className="text-[13px] text-[#131218] font-semibold leading-snug">
+          <p className="text-[13px] text-[#0a0a0a] font-semibold leading-snug">
             {question.question}
           </p>
           {question.rationale && (
@@ -704,7 +704,7 @@ function QuestionCard({
         onChange={(e) => setAnswer(e.target.value)}
         placeholder="Tu respuesta…"
         rows={isAnswered ? 2 : 3}
-        className="text-[12px] text-[#131218] border border-[#E0E0D8] rounded-md p-2 focus:outline-none focus:border-[#131218] resize-vertical font-sans"
+        className="text-[12px] text-[#0a0a0a] border border-[#e4e4dd] rounded-md p-2 focus:outline-none focus:border-[#0a0a0a] resize-vertical font-sans"
       />
 
       <div className="flex items-center justify-between gap-2">
@@ -715,14 +715,14 @@ function QuestionCard({
               <button
                 onClick={reopen}
                 disabled={saving}
-                className="text-[10px] font-semibold text-[#6B6B60] hover:text-[#131218] px-3 py-1.5 rounded-md border border-[#E0E0D8]"
+                className="text-[10px] font-semibold text-[#6B6B60] hover:text-[#0a0a0a] px-3 py-1.5 rounded-md border border-[#e4e4dd]"
               >
                 Re-open
               </button>
               <button
                 onClick={save}
                 disabled={saving || answer.trim() === (question.answer ?? "")}
-                className="text-[10px] font-semibold text-[#131218] bg-[#B2FF59] hover:bg-[#a3ef50] disabled:opacity-50 px-3 py-1.5 rounded-md"
+                className="text-[10px] font-semibold text-[#0a0a0a] bg-[#c6f24a] hover:bg-[#a3ef50] disabled:opacity-50 px-3 py-1.5 rounded-md"
               >
                 {saving ? "Saving…" : "Update"}
               </button>
@@ -731,7 +731,7 @@ function QuestionCard({
             <button
               onClick={save}
               disabled={saving || answer.trim().length === 0}
-              className="text-[10px] font-semibold text-[#131218] bg-[#B2FF59] hover:bg-[#a3ef50] disabled:opacity-50 px-3 py-1.5 rounded-md"
+              className="text-[10px] font-semibold text-[#0a0a0a] bg-[#c6f24a] hover:bg-[#a3ef50] disabled:opacity-50 px-3 py-1.5 rounded-md"
             >
               {saving ? "Saving…" : "Save answer"}
             </button>

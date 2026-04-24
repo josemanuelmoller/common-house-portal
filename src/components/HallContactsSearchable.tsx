@@ -251,9 +251,9 @@ export function HallContactsSearchable({
   return (
     <div className="space-y-5">
       {/* Search + filter bar */}
-      <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
+      <div className="bg-white rounded-2xl border border-[#e4e4dd] overflow-hidden">
         <div className="px-4 py-3 flex items-center gap-3">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="text-[#131218]/40 shrink-0">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="text-[#0a0a0a]/40 shrink-0">
             <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" />
             <path d="M20 20l-3.5-3.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
           </svg>
@@ -263,31 +263,31 @@ export function HallContactsSearchable({
             value={query}
             onChange={e => setQuery(e.target.value)}
             placeholder="Search… or tier:founder area:marketing warmth:cold  ( / to focus)"
-            className="flex-1 text-[12px] text-[#131218] placeholder:text-[#131218]/35 bg-transparent outline-none"
+            className="flex-1 text-[12px] text-[#0a0a0a] placeholder:text-[#0a0a0a]/35 bg-transparent outline-none"
             autoComplete="off"
           />
           {anyFilterActive && (
             <button
               onClick={() => { setQuery(""); setTierFilter(""); setAreaFilter(""); setClassFilter(""); }}
-              className="text-[9px] font-bold uppercase tracking-widest text-[#131218]/40 hover:text-[#131218]"
+              className="text-[9px] font-bold uppercase tracking-widest text-[#0a0a0a]/40 hover:text-[#0a0a0a]"
             >
               Clear all
             </button>
           )}
-          <span className="text-[10px] text-[#131218]/40 tabular-nums">
+          <span className="text-[10px] text-[#0a0a0a]/40 tabular-nums">
             {filtered.length}/{contacts.length}
           </span>
-          <div className="flex items-center gap-0.5 ml-2 border border-[#E0E0D8] rounded-lg overflow-hidden">
+          <div className="flex items-center gap-0.5 ml-2 border border-[#e4e4dd] rounded-lg overflow-hidden">
             <button
               onClick={() => setDensity("card")}
-              className={`px-2 py-1 text-[9px] font-bold uppercase tracking-widest transition-colors ${density === "card" ? "bg-[#131218] text-white" : "text-[#131218]/40 hover:text-[#131218]"}`}
+              className={`px-2 py-1 text-[9px] font-bold uppercase tracking-widest transition-colors ${density === "card" ? "bg-[#0a0a0a] text-white" : "text-[#0a0a0a]/40 hover:text-[#0a0a0a]"}`}
               title="Card view"
             >
               Cards
             </button>
             <button
               onClick={() => setDensity("compact")}
-              className={`px-2 py-1 text-[9px] font-bold uppercase tracking-widest transition-colors ${density === "compact" ? "bg-[#131218] text-white" : "text-[#131218]/40 hover:text-[#131218]"}`}
+              className={`px-2 py-1 text-[9px] font-bold uppercase tracking-widest transition-colors ${density === "compact" ? "bg-[#0a0a0a] text-white" : "text-[#0a0a0a]/40 hover:text-[#0a0a0a]"}`}
               title="Compact list view"
             >
               List
@@ -295,8 +295,8 @@ export function HallContactsSearchable({
           </div>
         </div>
         {/* Preset pills */}
-        <div className="flex items-center gap-1.5 px-4 py-2 border-t border-[#EFEFEA] bg-[#FAFAF6] flex-wrap">
-          <span className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/40 mr-1">Presets</span>
+        <div className="flex items-center gap-1.5 px-4 py-2 border-t border-[#f4f4ef] bg-[#FAFAF6] flex-wrap">
+          <span className="text-[9px] font-bold tracking-widest uppercase text-[#0a0a0a]/40 mr-1">Presets</span>
           {PRESETS.map(p => {
             const active = query === p.query;
             return (
@@ -306,8 +306,8 @@ export function HallContactsSearchable({
                 title={p.hint}
                 className={`text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full transition-colors ${
                   active
-                    ? "bg-[#131218] text-white"
-                    : "bg-white border border-[#E0E0D8] text-[#131218]/60 hover:text-[#131218] hover:border-[#131218]/30"
+                    ? "bg-[#0a0a0a] text-white"
+                    : "bg-white border border-[#e4e4dd] text-[#0a0a0a]/60 hover:text-[#0a0a0a] hover:border-[#0a0a0a]/30"
                 }`}
               >
                 {p.label}
@@ -317,8 +317,8 @@ export function HallContactsSearchable({
         </div>
         {/* Filter dropdowns — only shown when we have values to filter by */}
         {(availableTiers.length > 0 || availableAreas.length > 0 || availableClasses.length > 0) && (
-          <div className="flex items-center gap-2 px-4 py-2 border-t border-[#EFEFEA] bg-[#FAFAF6]">
-            <span className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/40">Filter</span>
+          <div className="flex items-center gap-2 px-4 py-2 border-t border-[#f4f4ef] bg-[#FAFAF6]">
+            <span className="text-[9px] font-bold tracking-widest uppercase text-[#0a0a0a]/40">Filter</span>
             {availableClasses.length > 0 && (
               <FilterSelect
                 label="Class"
@@ -351,15 +351,15 @@ export function HallContactsSearchable({
       {waOnly.length > 0 && (
         <section>
           <div className="flex items-center gap-3 mb-3">
-            <h2 className="text-[11px] font-bold tracking-widest uppercase text-[#131218]/60">
+            <h2 className="text-[11px] font-bold tracking-widest uppercase text-[#0a0a0a]/60">
               WhatsApp-only — no email yet
             </h2>
-            <div className="flex-1 h-px bg-[#E0E0D8]" />
+            <div className="flex-1 h-px bg-[#e4e4dd]" />
             <span className="text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full">
               {waOnly.length}
             </span>
           </div>
-          <p className="text-[10.5px] text-[#131218]/50 mb-2 leading-snug">
+          <p className="text-[10.5px] text-[#0a0a0a]/50 mb-2 leading-snug">
             These were auto-created from WhatsApp clips. Tag them so they count
             for prep-brief and warmth scoring. Google Contacts sync is skipped
             until you add an email manually.
@@ -380,11 +380,11 @@ export function HallContactsSearchable({
       {withEmail.length > 0 && (
         <section>
           <div className="flex items-center gap-3 mb-3">
-            <h2 className="text-[11px] font-bold tracking-widest uppercase text-[#131218]/60">
+            <h2 className="text-[11px] font-bold tracking-widest uppercase text-[#0a0a0a]/60">
               {query ? "Matching contacts" : "All contacts"}
             </h2>
-            <div className="flex-1 h-px bg-[#E0E0D8]" />
-            <span className="text-[10px] text-[#131218]/40 tabular-nums">
+            <div className="flex-1 h-px bg-[#e4e4dd]" />
+            <span className="text-[10px] text-[#0a0a0a]/40 tabular-nums">
               {withEmail.length}
             </span>
           </div>
@@ -400,7 +400,7 @@ export function HallContactsSearchable({
               ))}
             </div>
           ) : (
-            <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden divide-y divide-[#EFEFEA]">
+            <div className="bg-white rounded-2xl border border-[#e4e4dd] overflow-hidden divide-y divide-[#f4f4ef]">
               {withEmail.map(c => (
                 <CompactRow
                   key={c.id}
@@ -414,8 +414,8 @@ export function HallContactsSearchable({
       )}
 
       {filtered.length === 0 && (
-        <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-10 text-center">
-          <p className="text-sm text-[#131218]/40">
+        <div className="bg-white rounded-2xl border border-[#e4e4dd] px-5 py-10 text-center">
+          <p className="text-sm text-[#0a0a0a]/40">
             {query ? `No contacts match "${query}".` : "No contacts observed yet."}
           </p>
         </div>
@@ -437,13 +437,13 @@ function FilterSelect({
   const active = !!value;
   return (
     <label className={`flex items-center gap-1.5 text-[10px] rounded-lg px-2 py-1 transition-colors ${
-      active ? "bg-[#131218] text-white" : "bg-white border border-[#E0E0D8] text-[#131218]/60 hover:text-[#131218]"
+      active ? "bg-[#0a0a0a] text-white" : "bg-white border border-[#e4e4dd] text-[#0a0a0a]/60 hover:text-[#0a0a0a]"
     }`}>
       <span className="font-bold uppercase tracking-widest text-[9px]">{label}</span>
       <select
         value={value}
         onChange={e => onChange(e.target.value)}
-        className={`bg-transparent outline-none text-[10.5px] ${active ? "text-white" : "text-[#131218]"}`}
+        className={`bg-transparent outline-none text-[10.5px] ${active ? "text-white" : "text-[#0a0a0a]"}`}
       >
         <option value="">all</option>
         {options.map(o => <option key={o} value={o}>{o}</option>)}
@@ -479,36 +479,36 @@ function WithEmailCard({
     <Link
       href={`/admin/hall/contacts/${encodeURIComponent(contact.email ?? contact.id)}`}
       prefetch={false}
-      className="group bg-white rounded-2xl border border-[#E0E0D8] hover:border-[#131218]/30 hover:shadow-sm transition-all px-5 py-4"
+      className="group bg-white rounded-2xl border border-[#e4e4dd] hover:border-[#0a0a0a]/30 hover:shadow-sm transition-all px-5 py-4"
     >
       <div className="flex items-start gap-4">
         <ContactAvatar photoUrl={contact.photo_url} display={display} size={40} />
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline justify-between gap-4">
             <div className="min-w-0">
-              <p className="text-[13px] font-semibold text-[#131218] truncate">{display}</p>
-              <p className="text-[10.5px] text-[#131218]/45 mt-0.5 truncate">
+              <p className="text-[13px] font-semibold text-[#0a0a0a] truncate">{display}</p>
+              <p className="text-[10.5px] text-[#0a0a0a]/45 mt-0.5 truncate">
                 {contact.job_title ? (
                   <>
-                    <span className="text-[#131218]/70">{contact.job_title}</span>
-                    <span className="text-[#131218]/30"> · {domain}</span>
+                    <span className="text-[#0a0a0a]/70">{contact.job_title}</span>
+                    <span className="text-[#0a0a0a]/30"> · {domain}</span>
                   </>
                 ) : domain}
               </p>
             </div>
-            <div className="flex items-center gap-3 text-[10px] text-[#131218]/50 shrink-0 tabular-nums">
+            <div className="flex items-center gap-3 text-[10px] text-[#0a0a0a]/50 shrink-0 tabular-nums">
               {contact.meeting_count  > 0 && <span title="Meetings">📅 {contact.meeting_count}</span>}
               {contact.email_thread_count > 0 && <span title="Email threads">✉ {contact.email_thread_count}</span>}
               {contact.transcript_count > 0 && <span title="Transcripts">🎙 {contact.transcript_count}</span>}
               {contact.wa_count > 0 && <span title="WhatsApp msgs" className="text-emerald-700">💬 {contact.wa_count}</span>}
             </div>
           </div>
-          <div className="relative mt-2.5 h-1.5 w-full bg-[#EFEFEA] rounded-full overflow-hidden">
+          <div className="relative mt-2.5 h-1.5 w-full bg-[#f4f4ef] rounded-full overflow-hidden">
             <div className={`h-full ${barColor}`} style={{ width: `${barPct}%` }} />
           </div>
           <div className="flex items-center gap-2 mt-2 flex-wrap">
             {classes.map(cls => (
-              <span key={cls} className="text-[9px] font-bold uppercase tracking-widest bg-[#EFEFEA] text-[#131218]/70 px-2 py-0.5 rounded-full">
+              <span key={cls} className="text-[9px] font-bold uppercase tracking-widest bg-[#f4f4ef] text-[#0a0a0a]/70 px-2 py-0.5 rounded-full">
                 {cls}
               </span>
             ))}
@@ -518,17 +518,17 @@ function WithEmailCard({
               </span>
             )}
             {contact.role_category && (
-              <span className="text-[9px] font-bold uppercase tracking-widest bg-[#131218] text-white px-2 py-0.5 rounded-full" title="Seniority tier">
+              <span className="text-[9px] font-bold uppercase tracking-widest bg-[#0a0a0a] text-white px-2 py-0.5 rounded-full" title="Seniority tier">
                 {contact.role_category}
               </span>
             )}
             {contact.function_area && (
-              <span className="text-[9px] font-bold uppercase tracking-widest bg-[#c8f55a]/50 text-[#131218] px-2 py-0.5 rounded-full" title="Function area">
+              <span className="text-[9px] font-bold uppercase tracking-widest bg-[#c6f24a]/50 text-[#0a0a0a] px-2 py-0.5 rounded-full" title="Function area">
                 {contact.function_area}
               </span>
             )}
             {contact.suggestion && (
-              <span className="text-[9px] font-bold uppercase tracking-widest bg-[#c8f55a]/30 text-[#131218]/80 px-2 py-0.5 rounded-full" title={`Inferred from ${contact.suggestion.domain}`}>
+              <span className="text-[9px] font-bold uppercase tracking-widest bg-[#c6f24a]/30 text-[#0a0a0a]/80 px-2 py-0.5 rounded-full" title={`Inferred from ${contact.suggestion.domain}`}>
                 Likely at {contact.suggestion.orgName ?? contact.suggestion.domain}
               </span>
             )}
@@ -555,28 +555,28 @@ function CompactRow({
     <Link
       href={`/admin/hall/contacts/${encodeURIComponent(contact.email ?? contact.id)}`}
       prefetch={false}
-      className="flex items-center gap-3 px-4 py-2 hover:bg-[#EFEFEA]/40 transition-colors"
+      className="flex items-center gap-3 px-4 py-2 hover:bg-[#f4f4ef]/40 transition-colors"
     >
       <span className={`w-2 h-2 rounded-full shrink-0 ${dotColor}`} title={`Warmth: ${tier}`} />
       <span className="flex-1 min-w-0 flex items-baseline gap-2">
-        <span className="text-[12.5px] font-semibold text-[#131218] truncate">{display}</span>
+        <span className="text-[12.5px] font-semibold text-[#0a0a0a] truncate">{display}</span>
         {contact.job_title && (
-          <span className="text-[10.5px] text-[#131218]/55 truncate">· {contact.job_title}</span>
+          <span className="text-[10.5px] text-[#0a0a0a]/55 truncate">· {contact.job_title}</span>
         )}
-        <span className="text-[10px] text-[#131218]/35 truncate">· {domain}</span>
+        <span className="text-[10px] text-[#0a0a0a]/35 truncate">· {domain}</span>
       </span>
       <div className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest shrink-0">
         {contact.role_category && (
-          <span className="bg-[#131218] text-white px-1.5 py-0.5 rounded">{contact.role_category}</span>
+          <span className="bg-[#0a0a0a] text-white px-1.5 py-0.5 rounded">{contact.role_category}</span>
         )}
         {contact.function_area && (
-          <span className="bg-[#c8f55a]/50 text-[#131218] px-1.5 py-0.5 rounded">{contact.function_area}</span>
+          <span className="bg-[#c6f24a]/50 text-[#0a0a0a] px-1.5 py-0.5 rounded">{contact.function_area}</span>
         )}
         {classes.slice(0, 2).map(cls => (
-          <span key={cls} className="bg-[#EFEFEA] text-[#131218]/70 px-1.5 py-0.5 rounded">{cls}</span>
+          <span key={cls} className="bg-[#f4f4ef] text-[#0a0a0a]/70 px-1.5 py-0.5 rounded">{cls}</span>
         ))}
       </div>
-      <div className="flex items-center gap-2 text-[10px] text-[#131218]/45 tabular-nums shrink-0">
+      <div className="flex items-center gap-2 text-[10px] text-[#0a0a0a]/45 tabular-nums shrink-0">
         {contact.meeting_count  > 0 && <span title="Meetings">📅 {contact.meeting_count}</span>}
         {contact.email_thread_count > 0 && <span title="Email threads">✉ {contact.email_thread_count}</span>}
         {contact.wa_count > 0 && <span title="WhatsApp" className="text-emerald-700">💬 {contact.wa_count}</span>}

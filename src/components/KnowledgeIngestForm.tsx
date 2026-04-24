@@ -114,23 +114,23 @@ export function KnowledgeIngestForm() {
   }
 
   return (
-    <div className="bg-white rounded-[14px] border border-[#E0E0D8] overflow-hidden">
-      <div className="h-1 bg-[#B2FF59]" />
-      <div className="px-6 py-4 border-b border-[#EFEFEA]">
-        <h2 className="text-sm font-bold text-[#131218] tracking-tight">Add external knowledge</h2>
-        <p className="text-xs text-[#131218]/40 mt-0.5 leading-relaxed max-w-[620px]">
+    <div className="bg-white rounded-[14px] border border-[#e4e4dd] overflow-hidden">
+      <div className="h-1 bg-[#c6f24a]" />
+      <div className="px-6 py-4 border-b border-[#f4f4ef]">
+        <h2 className="text-sm font-bold text-[#0a0a0a] tracking-tight">Add external knowledge</h2>
+        <p className="text-xs text-[#0a0a0a]/40 mt-0.5 leading-relaxed max-w-[620px]">
           Sube un PDF / Word, pega texto, o pega URL. El extractor saca insights atómicos, les asigna case code, y el curator los rutea al leaf correcto del árbol.
         </p>
       </div>
 
       {status === "done" && result ? (
         <div className="p-6 space-y-4">
-          <div className="rounded-[14px] border border-[#B2FF59] bg-[#B2FF59]/10 p-5">
-            <p className="text-[10px] font-bold text-[#131218] uppercase tracking-widest">✓ Ingested</p>
-            <p className="text-[22px] font-semibold text-[#131218] tracking-tight mt-1">
+          <div className="rounded-[14px] border border-[#c6f24a] bg-[#c6f24a]/10 p-5">
+            <p className="text-[10px] font-bold text-[#0a0a0a] uppercase tracking-widest">✓ Ingested</p>
+            <p className="text-[22px] font-semibold text-[#0a0a0a] tracking-tight mt-1">
               {result.insights_extracted} insights extracted
             </p>
-            <p className="text-[10px] font-mono font-bold text-[#131218]/70 mt-2">
+            <p className="text-[10px] font-mono font-bold text-[#0a0a0a]/70 mt-2">
               {result.case_code}
             </p>
             {result.curator_summary && (
@@ -143,12 +143,12 @@ export function KnowledgeIngestForm() {
             )}
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={reset} className="text-[11px] font-bold uppercase tracking-widest bg-[#131218] text-white px-3 py-2 rounded-full hover:bg-[#131218]/80 transition-colors">
+            <button onClick={reset} className="text-[11px] font-bold uppercase tracking-widest bg-[#0a0a0a] text-white px-3 py-2 rounded-full hover:bg-[#0a0a0a]/80 transition-colors">
               Add another
             </button>
             {result.case_code && (
               <a href={`/admin/knowledge/cases/${encodeURIComponent(result.case_code)}`}
-                 className="text-[11px] font-bold uppercase tracking-widest bg-white border border-[#E0E0D8] text-[#131218]/70 hover:text-[#131218] px-3 py-2 rounded-full transition-colors">
+                 className="text-[11px] font-bold uppercase tracking-widest bg-white border border-[#e4e4dd] text-[#0a0a0a]/70 hover:text-[#0a0a0a] px-3 py-2 rounded-full transition-colors">
                 → View case
               </a>
             )}
@@ -158,7 +158,7 @@ export function KnowledgeIngestForm() {
         <div className="p-6 space-y-5">
           {/* Source selector */}
           <div>
-            <p className="text-[10px] font-bold text-[#131218]/50 uppercase tracking-widest mb-2">Source</p>
+            <p className="text-[10px] font-bold text-[#0a0a0a]/50 uppercase tracking-widest mb-2">Source</p>
             <div className="flex gap-2">
               {(["file", "text", "url"] as const).map(m => (
                 <button
@@ -166,8 +166,8 @@ export function KnowledgeIngestForm() {
                   onClick={() => setMode(m)}
                   className={`text-[11px] font-bold uppercase tracking-widest px-3 py-2 rounded-full transition-colors ${
                     mode === m
-                      ? "bg-[#131218] text-white"
-                      : "bg-white border border-[#E0E0D8] text-[#131218]/60 hover:text-[#131218]"
+                      ? "bg-[#0a0a0a] text-white"
+                      : "bg-white border border-[#e4e4dd] text-[#0a0a0a]/60 hover:text-[#0a0a0a]"
                   }`}
                 >
                   {m === "file" ? "📄 File (PDF / Word)" : m === "text" ? "✎ Paste text" : "🔗 URL"}
@@ -183,10 +183,10 @@ export function KnowledgeIngestForm() {
                     type="file"
                     accept=".pdf,.docx,.doc,.txt,.md,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
                     onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-                    className="block w-full text-sm text-[#131218]/70 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-[#EFEFEA] file:text-[#131218] file:text-[11px] file:font-bold file:uppercase file:tracking-widest hover:file:bg-[#E0E0D8]"
+                    className="block w-full text-sm text-[#0a0a0a]/70 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-[#f4f4ef] file:text-[#0a0a0a] file:text-[11px] file:font-bold file:uppercase file:tracking-widest hover:file:bg-[#e4e4dd]"
                   />
                   {file && (
-                    <p className="text-[11px] text-[#131218]/50 mt-2">
+                    <p className="text-[11px] text-[#0a0a0a]/50 mt-2">
                       {file.name} · {(file.size / 1024).toFixed(1)} KB
                     </p>
                   )}
@@ -198,7 +198,7 @@ export function KnowledgeIngestForm() {
                   onChange={(e) => setText(e.target.value)}
                   rows={8}
                   placeholder="Pega el texto del documento o artículo aquí…"
-                  className="w-full text-[13px] text-[#131218] border border-[#E0E0D8] rounded-[14px] px-4 py-3 outline-none focus:border-[#131218]/40 placeholder:text-[#131218]/25 resize-y font-sans"
+                  className="w-full text-[13px] text-[#0a0a0a] border border-[#e4e4dd] rounded-[14px] px-4 py-3 outline-none focus:border-[#0a0a0a]/40 placeholder:text-[#0a0a0a]/25 resize-y font-sans"
                 />
               )}
               {mode === "url" && (
@@ -207,66 +207,66 @@ export function KnowledgeIngestForm() {
                   onChange={(e) => setUrl(e.target.value)}
                   type="url"
                   placeholder="https://..."
-                  className="w-full text-sm text-[#131218] border border-[#E0E0D8] rounded-full px-4 py-2 outline-none focus:border-[#131218]/40 placeholder:text-[#131218]/25"
+                  className="w-full text-sm text-[#0a0a0a] border border-[#e4e4dd] rounded-full px-4 py-2 outline-none focus:border-[#0a0a0a]/40 placeholder:text-[#0a0a0a]/25"
                 />
               )}
             </div>
           </div>
 
           {/* Case metadata */}
-          <div className="pt-3 border-t border-[#EFEFEA]">
-            <p className="text-[10px] font-bold text-[#131218]/50 uppercase tracking-widest mb-2">Case code</p>
+          <div className="pt-3 border-t border-[#f4f4ef]">
+            <p className="text-[10px] font-bold text-[#0a0a0a]/50 uppercase tracking-widest mb-2">Case code</p>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <div>
-                <label className="text-[9px] font-bold text-[#131218]/40 uppercase tracking-widest block mb-1">Type</label>
+                <label className="text-[9px] font-bold text-[#0a0a0a]/40 uppercase tracking-widest block mb-1">Type</label>
                 <select
                   value={caseType}
                   onChange={(e) => setCaseType(e.target.value)}
-                  className="w-full text-[12px] text-[#131218] border border-[#E0E0D8] rounded-full px-3 py-2 outline-none focus:border-[#131218]/40 bg-white"
+                  className="w-full text-[12px] text-[#0a0a0a] border border-[#e4e4dd] rounded-full px-3 py-2 outline-none focus:border-[#0a0a0a]/40 bg-white"
                 >
                   {CASE_TYPES.map(t => <option key={t.value} value={t.value}>{t.value} — {t.label}</option>)}
                 </select>
               </div>
               <div>
-                <label className="text-[9px] font-bold text-[#131218]/40 uppercase tracking-widest block mb-1">Identifier</label>
+                <label className="text-[9px] font-bold text-[#0a0a0a]/40 uppercase tracking-widest block mb-1">Identifier</label>
                 <input
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value.toUpperCase())}
                   placeholder={TYPE_EXAMPLE[caseType].split(" · ")[0]}
-                  className="w-full text-[12px] font-mono text-[#131218] border border-[#E0E0D8] rounded-full px-3 py-2 outline-none focus:border-[#131218]/40 placeholder:text-[#131218]/20 uppercase"
+                  className="w-full text-[12px] font-mono text-[#0a0a0a] border border-[#e4e4dd] rounded-full px-3 py-2 outline-none focus:border-[#0a0a0a]/40 placeholder:text-[#0a0a0a]/20 uppercase"
                 />
               </div>
               <div>
-                <label className="text-[9px] font-bold text-[#131218]/40 uppercase tracking-widest block mb-1">Scope</label>
+                <label className="text-[9px] font-bold text-[#0a0a0a]/40 uppercase tracking-widest block mb-1">Scope</label>
                 <input
                   value={scope}
                   onChange={(e) => setScope(e.target.value.toUpperCase())}
                   placeholder={TYPE_EXAMPLE[caseType].split(" · ")[1]}
-                  className="w-full text-[12px] font-mono text-[#131218] border border-[#E0E0D8] rounded-full px-3 py-2 outline-none focus:border-[#131218]/40 placeholder:text-[#131218]/20 uppercase"
+                  className="w-full text-[12px] font-mono text-[#0a0a0a] border border-[#e4e4dd] rounded-full px-3 py-2 outline-none focus:border-[#0a0a0a]/40 placeholder:text-[#0a0a0a]/20 uppercase"
                 />
               </div>
               <div>
-                <label className="text-[9px] font-bold text-[#131218]/40 uppercase tracking-widest block mb-1">Year</label>
+                <label className="text-[9px] font-bold text-[#0a0a0a]/40 uppercase tracking-widest block mb-1">Year</label>
                 <input
                   value={year}
                   onChange={(e) => setYear(e.target.value)}
                   inputMode="numeric"
                   placeholder={TYPE_EXAMPLE[caseType].split(" · ")[2]}
-                  className="w-full text-[12px] font-mono text-[#131218] border border-[#E0E0D8] rounded-full px-3 py-2 outline-none focus:border-[#131218]/40 placeholder:text-[#131218]/20"
+                  className="w-full text-[12px] font-mono text-[#0a0a0a] border border-[#e4e4dd] rounded-full px-3 py-2 outline-none focus:border-[#0a0a0a]/40 placeholder:text-[#0a0a0a]/20"
                 />
               </div>
             </div>
             <div className="mt-3">
-              <label className="text-[9px] font-bold text-[#131218]/40 uppercase tracking-widest block mb-1">Title (optional — shown in Cases list)</label>
+              <label className="text-[9px] font-bold text-[#0a0a0a]/40 uppercase tracking-widest block mb-1">Title (optional — shown in Cases list)</label>
               <input
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder='ej. "Algramo operational guide"'
-                className="w-full text-[12px] text-[#131218] border border-[#E0E0D8] rounded-full px-3 py-2 outline-none focus:border-[#131218]/40 placeholder:text-[#131218]/25"
+                className="w-full text-[12px] text-[#0a0a0a] border border-[#e4e4dd] rounded-full px-3 py-2 outline-none focus:border-[#0a0a0a]/40 placeholder:text-[#0a0a0a]/25"
               />
             </div>
-            <p className="text-[11px] font-mono text-[#131218]/30 mt-3">
-              Final code: <span className="text-[#131218]/70 font-semibold">{caseType}:{identifier || "?"}-{scope || "X"}-{year || "????"}</span>
+            <p className="text-[11px] font-mono text-[#0a0a0a]/30 mt-3">
+              Final code: <span className="text-[#0a0a0a]/70 font-semibold">{caseType}:{identifier || "?"}-{scope || "X"}-{year || "????"}</span>
             </p>
           </div>
 
@@ -274,7 +274,7 @@ export function KnowledgeIngestForm() {
             <button
               onClick={handleSubmit}
               disabled={!canSubmit}
-              className="inline-flex items-center gap-2 bg-[#B2FF59] text-[#131218] text-[11px] font-bold uppercase tracking-widest px-4 py-2.5 rounded-full hover:bg-[#9ee84a] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-2 bg-[#c6f24a] text-[#0a0a0a] text-[11px] font-bold uppercase tracking-widest px-4 py-2.5 rounded-full hover:bg-[#9ee84a] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {status === "processing" ? "Procesando…" : "✦ Process + classify"}
             </button>
@@ -291,8 +291,8 @@ export function KnowledgeIngestForm() {
 function Stat({ label, value }: { label: string; value: number }) {
   return (
     <div>
-      <p className="text-[22px] font-bold text-[#131218] tracking-tight">{value}</p>
-      <p className="text-[9px] font-bold text-[#131218]/30 uppercase tracking-widest mt-0.5">{label}</p>
+      <p className="text-[22px] font-bold text-[#0a0a0a] tracking-tight">{value}</p>
+      <p className="text-[9px] font-bold text-[#0a0a0a]/30 uppercase tracking-widest mt-0.5">{label}</p>
     </div>
   );
 }

@@ -91,7 +91,7 @@ const EVIDENCE_TYPE_COLORS: Record<string, string> = {
 };
 
 function evidenceTypeBadge(type: string) {
-  const cls = EVIDENCE_TYPE_COLORS[type] ?? "bg-[#EFEFEA] text-[#131218]/50 border-[#E0E0D8]";
+  const cls = EVIDENCE_TYPE_COLORS[type] ?? "bg-[#f4f4ef] text-[#0a0a0a]/50 border-[#e4e4dd]";
   return `text-[8.5px] font-bold px-2 py-0.5 rounded-full border ${cls}`;
 }
 
@@ -100,7 +100,7 @@ function validationDot(status: string) {
   if (status === "New")       return "bg-amber-400";
   if (status === "Rejected")  return "bg-red-400";
   if (status === "Reviewed")  return "bg-blue-400";
-  return "bg-[#131218]/15";
+  return "bg-[#0a0a0a]/15";
 }
 
 function fmtDate(d: string | null): string {
@@ -124,7 +124,7 @@ const PRIORITY_COLORS: Record<string, string> = {
   "P1 Critical": "text-red-600 bg-red-50 border-red-200",
   "High":        "text-orange-600 bg-orange-50 border-orange-200",
   "Medium":      "text-amber-600 bg-amber-50 border-amber-200",
-  "Low":         "text-[#131218]/40 bg-[#EFEFEA] border-[#E0E0D8]",
+  "Low":         "text-[#0a0a0a]/40 bg-[#f4f4ef] border-[#e4e4dd]",
 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -143,9 +143,9 @@ const CONFIDENCE_COLORS: Record<string, string> = {
 
 function EmptyState({ label }: { label: string }) {
   return (
-    <div className="bg-white border border-[#E0E0D8] rounded-2xl p-12 text-center">
-      <p className="text-sm font-bold text-[#131218]/25 mb-1">No {label} records yet</p>
-      <p className="text-xs text-[#131218]/20">Add entries in Notion to surface them here.</p>
+    <div className="bg-white border border-[#e4e4dd] rounded-2xl p-12 text-center">
+      <p className="text-sm font-bold text-[#0a0a0a]/25 mb-1">No {label} records yet</p>
+      <p className="text-xs text-[#0a0a0a]/20">Add entries in Notion to surface them here.</p>
     </div>
   );
 }
@@ -169,13 +169,13 @@ function PulseTab({ project, evidence, sources, decisions, meetings }: {
       <div className="col-span-2 space-y-5">
 
         {/* Recent evidence */}
-        <div className="bg-white border border-[#E0E0D8] rounded-2xl overflow-hidden">
-          <div className="px-5 py-4 border-b border-[#EFEFEA]">
-            <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30">Recent Evidence</p>
-            <p className="text-sm font-bold text-[#131218] mt-0.5">{evidence.length} items total</p>
+        <div className="bg-white border border-[#e4e4dd] rounded-2xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-[#f4f4ef]">
+            <p className="text-[9px] font-bold tracking-widest uppercase text-[#0a0a0a]/30">Recent Evidence</p>
+            <p className="text-sm font-bold text-[#0a0a0a] mt-0.5">{evidence.length} items total</p>
           </div>
           {recent.length > 0 ? (
-            <div className="divide-y divide-[#EFEFEA]">
+            <div className="divide-y divide-[#f4f4ef]">
               {recent.map(ev => (
                 <div key={ev.id} className="px-5 py-3.5 flex items-start gap-3">
                   <span className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ${validationDot(ev.validationStatus)}`} />
@@ -184,48 +184,48 @@ function PulseTab({ project, evidence, sources, decisions, meetings }: {
                       {ev.type && (
                         <span className={evidenceTypeBadge(ev.type)}>{ev.type}</span>
                       )}
-                      <span className="text-[8px] text-[#131218]/30 font-medium">{fmtDate(ev.dateCaptured)}</span>
+                      <span className="text-[8px] text-[#0a0a0a]/30 font-medium">{fmtDate(ev.dateCaptured)}</span>
                     </div>
-                    <p className="text-[12.5px] font-medium text-[#131218] leading-snug line-clamp-2">
+                    <p className="text-[12.5px] font-medium text-[#0a0a0a] leading-snug line-clamp-2">
                       {ev.title || ev.excerpt || "—"}
                     </p>
                     {ev.excerpt && ev.title && (
-                      <p className="text-[11px] text-[#131218]/40 mt-0.5 line-clamp-1">{ev.excerpt}</p>
+                      <p className="text-[11px] text-[#0a0a0a]/40 mt-0.5 line-clamp-1">{ev.excerpt}</p>
                     )}
                   </div>
-                  <span className="text-[9px] font-medium text-[#131218]/25 shrink-0 mt-0.5">{ev.validationStatus}</span>
+                  <span className="text-[9px] font-medium text-[#0a0a0a]/25 shrink-0 mt-0.5">{ev.validationStatus}</span>
                 </div>
               ))}
             </div>
           ) : (
             <div className="px-5 py-8 text-center">
-              <p className="text-xs text-[#131218]/25">No evidence captured yet</p>
+              <p className="text-xs text-[#0a0a0a]/25">No evidence captured yet</p>
             </div>
           )}
         </div>
 
         {/* Open decisions */}
-        <div className="bg-white border border-[#E0E0D8] rounded-2xl overflow-hidden">
-          <div className="px-5 py-4 border-b border-[#EFEFEA]">
-            <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30">Open Decisions</p>
-            <p className="text-sm font-bold text-[#131218] mt-0.5">
+        <div className="bg-white border border-[#e4e4dd] rounded-2xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-[#f4f4ef]">
+            <p className="text-[9px] font-bold tracking-widest uppercase text-[#0a0a0a]/30">Open Decisions</p>
+            <p className="text-sm font-bold text-[#0a0a0a] mt-0.5">
               {openDecs.length > 0 ? `${openDecs.length} open` : "No open decisions"}
             </p>
           </div>
           {openDecs.length > 0 ? (
-            <div className="divide-y divide-[#EFEFEA]">
+            <div className="divide-y divide-[#f4f4ef]">
               {openDecs.slice(0, 5).map(dec => (
                 <div key={dec.id} className="px-5 py-3.5 flex items-start gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap mb-1">
-                      <span className={`text-[8.5px] font-bold px-2 py-0.5 rounded-full border ${PRIORITY_COLORS[dec.priority] ?? "bg-[#EFEFEA] text-[#131218]/40 border-[#E0E0D8]"}`}>
+                      <span className={`text-[8.5px] font-bold px-2 py-0.5 rounded-full border ${PRIORITY_COLORS[dec.priority] ?? "bg-[#f4f4ef] text-[#0a0a0a]/40 border-[#e4e4dd]"}`}>
                         {dec.priority}
                       </span>
                       {dec.decisionType && (
-                        <span className="text-[8px] text-[#131218]/30 font-medium">{dec.decisionType}</span>
+                        <span className="text-[8px] text-[#0a0a0a]/30 font-medium">{dec.decisionType}</span>
                       )}
                     </div>
-                    <p className="text-[12.5px] font-medium text-[#131218] leading-snug line-clamp-2">{dec.title}</p>
+                    <p className="text-[12.5px] font-medium text-[#0a0a0a] leading-snug line-clamp-2">{dec.title}</p>
                     {dec.dueDate && (
                       <p className="text-[10px] text-amber-600 font-medium mt-0.5">Due {fmtDate(dec.dueDate)}</p>
                     )}
@@ -235,7 +235,7 @@ function PulseTab({ project, evidence, sources, decisions, meetings }: {
                       href={dec.notionUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-[#131218]/20 hover:text-[#131218]/60 transition-colors text-sm shrink-0"
+                      className="text-[#0a0a0a]/20 hover:text-[#0a0a0a]/60 transition-colors text-sm shrink-0"
                     >
                       →
                     </a>
@@ -245,7 +245,7 @@ function PulseTab({ project, evidence, sources, decisions, meetings }: {
             </div>
           ) : (
             <div className="px-5 py-8 text-center">
-              <p className="text-xs text-[#131218]/25">No open decisions</p>
+              <p className="text-xs text-[#0a0a0a]/25">No open decisions</p>
             </div>
           )}
         </div>
@@ -256,15 +256,15 @@ function PulseTab({ project, evidence, sources, decisions, meetings }: {
       <div className="space-y-5">
 
         {/* Status summary */}
-        <div className="bg-white border border-[#E0E0D8] rounded-2xl overflow-hidden">
-          <div className="px-5 py-4 border-b border-[#EFEFEA]">
-            <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30">Status Summary</p>
+        <div className="bg-white border border-[#e4e4dd] rounded-2xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-[#f4f4ef]">
+            <p className="text-[9px] font-bold tracking-widest uppercase text-[#0a0a0a]/30">Status Summary</p>
           </div>
           <div className="px-5 py-4">
             {project.statusSummary ? (
-              <p className="text-[12.5px] text-[#131218]/75 leading-relaxed">{project.statusSummary}</p>
+              <p className="text-[12.5px] text-[#0a0a0a]/75 leading-relaxed">{project.statusSummary}</p>
             ) : (
-              <p className="text-xs text-[#131218]/25 italic">No summary written yet</p>
+              <p className="text-xs text-[#0a0a0a]/25 italic">No summary written yet</p>
             )}
           </div>
         </div>
@@ -282,23 +282,23 @@ function PulseTab({ project, evidence, sources, decisions, meetings }: {
         )}
 
         {/* Sessions / meetings */}
-        <div className="bg-white border border-[#E0E0D8] rounded-2xl overflow-hidden">
-          <div className="px-5 py-4 border-b border-[#EFEFEA]">
-            <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30">Sessions</p>
-            <p className="text-sm font-bold text-[#131218] mt-0.5">{meetings.length} meeting{meetings.length !== 1 ? "s" : ""}</p>
+        <div className="bg-white border border-[#e4e4dd] rounded-2xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-[#f4f4ef]">
+            <p className="text-[9px] font-bold tracking-widest uppercase text-[#0a0a0a]/30">Sessions</p>
+            <p className="text-sm font-bold text-[#0a0a0a] mt-0.5">{meetings.length} meeting{meetings.length !== 1 ? "s" : ""}</p>
           </div>
           {meetings.length > 0 ? (
-            <div className="divide-y divide-[#EFEFEA]">
+            <div className="divide-y divide-[#f4f4ef]">
               {meetings.slice(0, 5).map(m => (
                 <div key={m.id} className="px-5 py-3">
                   <div className="flex items-start justify-between gap-2">
-                    <p className="text-[12px] font-medium text-[#131218] leading-snug line-clamp-2 flex-1">{m.title}</p>
+                    <p className="text-[12px] font-medium text-[#0a0a0a] leading-snug line-clamp-2 flex-1">{m.title}</p>
                     {m.url && (
                       <a
                         href={m.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-[#131218]/20 hover:text-[#131218]/60 transition-colors text-sm shrink-0"
+                        className="text-[#0a0a0a]/20 hover:text-[#0a0a0a]/60 transition-colors text-sm shrink-0"
                       >
                         →
                       </a>
@@ -306,15 +306,15 @@ function PulseTab({ project, evidence, sources, decisions, meetings }: {
                   </div>
                   <div className="flex items-center gap-2 mt-0.5">
                     {m.platform && (
-                      <span className="text-[9px] text-[#131218]/30 font-medium">{m.platform}</span>
+                      <span className="text-[9px] text-[#0a0a0a]/30 font-medium">{m.platform}</span>
                     )}
-                    {m.platform && m.date && <span className="text-[#131218]/15">·</span>}
+                    {m.platform && m.date && <span className="text-[#0a0a0a]/15">·</span>}
                     {m.date && (
-                      <span className="text-[9px] text-[#131218]/25">{fmtDate(m.date)}</span>
+                      <span className="text-[9px] text-[#0a0a0a]/25">{fmtDate(m.date)}</span>
                     )}
                   </div>
                   {m.processedSummary && (
-                    <p className="text-[10.5px] text-[#131218]/50 mt-1.5 leading-snug line-clamp-3 italic">
+                    <p className="text-[10.5px] text-[#0a0a0a]/50 mt-1.5 leading-snug line-clamp-3 italic">
                       {m.processedSummary}
                     </p>
                   )}
@@ -322,44 +322,44 @@ function PulseTab({ project, evidence, sources, decisions, meetings }: {
               ))}
               {meetings.length > 5 && (
                 <div className="px-5 py-2.5">
-                  <p className="text-[10px] text-[#131218]/30">+{meetings.length - 5} more sessions</p>
+                  <p className="text-[10px] text-[#0a0a0a]/30">+{meetings.length - 5} more sessions</p>
                 </div>
               )}
             </div>
           ) : (
             <div className="px-5 py-6 text-center">
-              <p className="text-xs text-[#131218]/25">No meetings linked</p>
+              <p className="text-xs text-[#0a0a0a]/25">No meetings linked</p>
             </div>
           )}
         </div>
 
         {/* Sources breakdown */}
-        <div className="bg-white border border-[#E0E0D8] rounded-2xl overflow-hidden">
-          <div className="px-5 py-4 border-b border-[#EFEFEA]">
-            <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30">Sources</p>
-            <p className="text-sm font-bold text-[#131218] mt-0.5">{sources.length} total</p>
+        <div className="bg-white border border-[#e4e4dd] rounded-2xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-[#f4f4ef]">
+            <p className="text-[9px] font-bold tracking-widest uppercase text-[#0a0a0a]/30">Sources</p>
+            <p className="text-sm font-bold text-[#0a0a0a] mt-0.5">{sources.length} total</p>
           </div>
           {sources.length > 0 ? (
-            <div className="divide-y divide-[#EFEFEA]">
+            <div className="divide-y divide-[#f4f4ef]">
               {sources.slice(0, 5).map(src => (
                 <div key={src.id} className="px-5 py-2.5">
-                  <p className="text-[12px] font-medium text-[#131218] truncate">{src.title}</p>
+                  <p className="text-[12px] font-medium text-[#0a0a0a] truncate">{src.title}</p>
                   <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-[9px] text-[#131218]/30 font-medium">{src.sourceType}</span>
-                    <span className="text-[#131218]/15">·</span>
-                    <span className="text-[9px] text-[#131218]/25">{fmtDate(src.dateIngested)}</span>
+                    <span className="text-[9px] text-[#0a0a0a]/30 font-medium">{src.sourceType}</span>
+                    <span className="text-[#0a0a0a]/15">·</span>
+                    <span className="text-[9px] text-[#0a0a0a]/25">{fmtDate(src.dateIngested)}</span>
                   </div>
                 </div>
               ))}
               {sources.length > 5 && (
                 <div className="px-5 py-2.5">
-                  <p className="text-[10px] text-[#131218]/30">+{sources.length - 5} more sources</p>
+                  <p className="text-[10px] text-[#0a0a0a]/30">+{sources.length - 5} more sources</p>
                 </div>
               )}
             </div>
           ) : (
             <div className="px-5 py-6 text-center">
-              <p className="text-xs text-[#131218]/25">No sources linked</p>
+              <p className="text-xs text-[#0a0a0a]/25">No sources linked</p>
             </div>
           )}
         </div>
@@ -375,12 +375,12 @@ function UploadCTA({ label, onUpload }: { label: string; onUpload: () => void })
   return (
     <button
       onClick={onUpload}
-      className="w-full flex items-center gap-3 border-2 border-dashed border-[#E0E0D8] rounded-2xl px-6 py-5 text-left hover:border-[#131218]/25 hover:bg-[#EFEFEA]/50 transition-all group"
+      className="w-full flex items-center gap-3 border-2 border-dashed border-[#e4e4dd] rounded-2xl px-6 py-5 text-left hover:border-[#0a0a0a]/25 hover:bg-[#f4f4ef]/50 transition-all group"
     >
-      <span className="text-[#131218]/20 text-xl group-hover:text-[#131218]/40 transition-colors">↑</span>
+      <span className="text-[#0a0a0a]/20 text-xl group-hover:text-[#0a0a0a]/40 transition-colors">↑</span>
       <div>
-        <p className="text-[11.5px] font-semibold text-[#131218]/40 group-hover:text-[#131218]/70 transition-colors">{label}</p>
-        <p className="text-[10px] text-[#131218]/25 mt-0.5">PDF · XLSX · PPTX · DOCX</p>
+        <p className="text-[11.5px] font-semibold text-[#0a0a0a]/40 group-hover:text-[#0a0a0a]/70 transition-colors">{label}</p>
+        <p className="text-[10px] text-[#0a0a0a]/25 mt-0.5">PDF · XLSX · PPTX · DOCX</p>
       </div>
     </button>
   );
@@ -389,13 +389,13 @@ function UploadCTA({ label, onUpload }: { label: string; onUpload: () => void })
 // ─── Stage badge colours ────────────────────────────────────────────────────────
 
 const OPP_STAGE_COLORS: Record<string, string> = {
-  "New":           "bg-[#EFEFEA] text-[#131218]/40 border-[#E0E0D8]",
+  "New":           "bg-[#f4f4ef] text-[#0a0a0a]/40 border-[#e4e4dd]",
   "Exploring":     "bg-blue-50 text-blue-600 border-blue-200",
   "Qualifying":    "bg-amber-50 text-amber-700 border-amber-200",
   "Active":        "bg-green-50 text-green-700 border-green-200",
   "Proposal Sent": "bg-purple-50 text-purple-700 border-purple-200",
   "Negotiation":   "bg-orange-50 text-orange-700 border-orange-200",
-  "Won":           "bg-[#c8f55a]/30 text-[#2d6a00] border-[#b2ff59]",
+  "Won":           "bg-[#c6f24a]/30 text-[#2d6a00] border-[#b2ff59]",
   "Lost":          "bg-red-50 text-red-500 border-red-200",
 };
 
@@ -416,9 +416,9 @@ function FinancialsTab({ orgData, financials, onUpload }: { orgData: StartupOrgD
             { label: "Investment Status", value: orgData.investmentStatus || "—" },
             { label: "Team Size",         value: orgData.teamSize         || "—" },
           ].map(s => (
-            <div key={s.label} className="bg-white border border-[#E0E0D8] rounded-2xl px-5 py-4">
-              <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30 mb-1">{s.label}</p>
-              <p className="text-[15px] font-bold text-[#131218] tracking-tight">{s.value}</p>
+            <div key={s.label} className="bg-white border border-[#e4e4dd] rounded-2xl px-5 py-4">
+              <p className="text-[9px] font-bold tracking-widest uppercase text-[#0a0a0a]/30 mb-1">{s.label}</p>
+              <p className="text-[15px] font-bold text-[#0a0a0a] tracking-tight">{s.value}</p>
             </div>
           ))}
         </div>
@@ -426,17 +426,17 @@ function FinancialsTab({ orgData, financials, onUpload }: { orgData: StartupOrgD
 
       {/* Latest snapshot headline */}
       {latest && (
-        <div className="bg-white border border-[#E0E0D8] rounded-2xl overflow-hidden">
-          <div className="px-5 py-4 border-b border-[#EFEFEA] flex items-center justify-between">
+        <div className="bg-white border border-[#e4e4dd] rounded-2xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-[#f4f4ef] flex items-center justify-between">
             <div>
-              <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30">Latest Snapshot</p>
-              <p className="text-sm font-bold text-[#131218] mt-0.5">{latest.name || fmtDate(latest.period)}</p>
+              <p className="text-[9px] font-bold tracking-widest uppercase text-[#0a0a0a]/30">Latest Snapshot</p>
+              <p className="text-sm font-bold text-[#0a0a0a] mt-0.5">{latest.name || fmtDate(latest.period)}</p>
             </div>
             {latest.period && (
-              <span className="text-[10px] font-medium text-[#131218]/40">{fmtDate(latest.period)}</span>
+              <span className="text-[10px] font-medium text-[#0a0a0a]/40">{fmtDate(latest.period)}</span>
             )}
           </div>
-          <div className="grid grid-cols-4 divide-x divide-[#EFEFEA]">
+          <div className="grid grid-cols-4 divide-x divide-[#f4f4ef]">
             {[
               { label: "Revenue",      value: fmtMoney(latest.revenue)     },
               { label: "Burn",         value: fmtMoney(latest.burn)        },
@@ -444,8 +444,8 @@ function FinancialsTab({ orgData, financials, onUpload }: { orgData: StartupOrgD
               { label: "Runway (mo)",  value: latest.runway !== null ? `${latest.runway}mo` : "—" },
             ].map(s => (
               <div key={s.label} className="px-5 py-4">
-                <p className="text-[8px] font-bold tracking-wider uppercase text-[#131218]/25 mb-0.5">{s.label}</p>
-                <p className="text-[15px] font-bold text-[#131218] tracking-tight">{s.value}</p>
+                <p className="text-[8px] font-bold tracking-wider uppercase text-[#0a0a0a]/25 mb-0.5">{s.label}</p>
+                <p className="text-[15px] font-bold text-[#0a0a0a] tracking-tight">{s.value}</p>
               </div>
             ))}
           </div>
@@ -454,29 +454,29 @@ function FinancialsTab({ orgData, financials, onUpload }: { orgData: StartupOrgD
 
       {/* All snapshots table */}
       {financials.length > 0 ? (
-        <div className="bg-white border border-[#E0E0D8] rounded-2xl overflow-hidden">
-          <div className="px-5 py-4 border-b border-[#EFEFEA]">
-            <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30">All Snapshots ({financials.length})</p>
+        <div className="bg-white border border-[#e4e4dd] rounded-2xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-[#f4f4ef]">
+            <p className="text-[9px] font-bold tracking-widest uppercase text-[#0a0a0a]/30">All Snapshots ({financials.length})</p>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-[11.5px]">
               <thead>
-                <tr className="border-b border-[#EFEFEA]">
+                <tr className="border-b border-[#f4f4ef]">
                   {["Period", "Revenue", "Cost", "Gross Margin", "Burn", "Cash", "Runway"].map(h => (
-                    <th key={h} className="text-left px-5 py-2.5 text-[8px] font-bold tracking-wider uppercase text-[#131218]/25">{h}</th>
+                    <th key={h} className="text-left px-5 py-2.5 text-[8px] font-bold tracking-wider uppercase text-[#0a0a0a]/25">{h}</th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#EFEFEA]">
+              <tbody className="divide-y divide-[#f4f4ef]">
                 {financials.map(snap => (
-                  <tr key={snap.id} className="hover:bg-[#EFEFEA]/40 transition-colors">
-                    <td className="px-5 py-3 font-medium text-[#131218]">{fmtDate(snap.period)}</td>
-                    <td className="px-5 py-3 text-[#131218]/70">{fmtMoney(snap.revenue)}</td>
-                    <td className="px-5 py-3 text-[#131218]/70">{fmtMoney(snap.cost)}</td>
-                    <td className="px-5 py-3 text-[#131218]/70">{fmtPct(snap.grossMargin)}</td>
-                    <td className="px-5 py-3 text-[#131218]/70">{fmtMoney(snap.burn)}</td>
-                    <td className="px-5 py-3 text-[#131218]/70">{fmtMoney(snap.cash)}</td>
-                    <td className="px-5 py-3 text-[#131218]/70">{snap.runway !== null ? `${snap.runway}mo` : "—"}</td>
+                  <tr key={snap.id} className="hover:bg-[#f4f4ef]/40 transition-colors">
+                    <td className="px-5 py-3 font-medium text-[#0a0a0a]">{fmtDate(snap.period)}</td>
+                    <td className="px-5 py-3 text-[#0a0a0a]/70">{fmtMoney(snap.revenue)}</td>
+                    <td className="px-5 py-3 text-[#0a0a0a]/70">{fmtMoney(snap.cost)}</td>
+                    <td className="px-5 py-3 text-[#0a0a0a]/70">{fmtPct(snap.grossMargin)}</td>
+                    <td className="px-5 py-3 text-[#0a0a0a]/70">{fmtMoney(snap.burn)}</td>
+                    <td className="px-5 py-3 text-[#0a0a0a]/70">{fmtMoney(snap.cash)}</td>
+                    <td className="px-5 py-3 text-[#0a0a0a]/70">{snap.runway !== null ? `${snap.runway}mo` : "—"}</td>
                   </tr>
                 ))}
               </tbody>
@@ -501,43 +501,43 @@ function ValuationTab({ valuations }: { valuations: ValuationRecord[] }) {
   return (
     <div className="space-y-4">
       {valuations.map(v => (
-        <div key={v.id} className="bg-white border border-[#E0E0D8] rounded-2xl overflow-hidden">
-          <div className="px-5 py-4 border-b border-[#EFEFEA] flex items-center justify-between">
+        <div key={v.id} className="bg-white border border-[#e4e4dd] rounded-2xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-[#f4f4ef] flex items-center justify-between">
             <div>
-              <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30 mb-0.5">{v.method}</p>
-              <p className="text-sm font-bold text-[#131218]">{v.name || "Unnamed valuation"}</p>
+              <p className="text-[9px] font-bold tracking-widest uppercase text-[#0a0a0a]/30 mb-0.5">{v.method}</p>
+              <p className="text-sm font-bold text-[#0a0a0a]">{v.name || "Unnamed valuation"}</p>
             </div>
             <div className="flex items-center gap-3">
               {v.status && (
-                <span className="text-[8.5px] font-bold px-2 py-0.5 rounded-full bg-[#EFEFEA] text-[#131218]/50 border border-[#E0E0D8]">
+                <span className="text-[8.5px] font-bold px-2 py-0.5 rounded-full bg-[#f4f4ef] text-[#0a0a0a]/50 border border-[#e4e4dd]">
                   {v.status}
                 </span>
               )}
               {v.confidence && (
-                <span className={`text-[10px] font-bold ${CONFIDENCE_COLORS[v.confidence] ?? "text-[#131218]/40"}`}>
+                <span className={`text-[10px] font-bold ${CONFIDENCE_COLORS[v.confidence] ?? "text-[#0a0a0a]/40"}`}>
                   {v.confidence} confidence
                 </span>
               )}
             </div>
           </div>
-          <div className="grid grid-cols-3 divide-x divide-[#EFEFEA]">
+          <div className="grid grid-cols-3 divide-x divide-[#f4f4ef]">
             <div className="px-5 py-4">
-              <p className="text-[8px] font-bold tracking-wider uppercase text-[#131218]/25 mb-1">Pre-money Min</p>
-              <p className="text-[17px] font-bold text-[#131218] tracking-tight">{fmtMoney(v.preMoneyMin)}</p>
+              <p className="text-[8px] font-bold tracking-wider uppercase text-[#0a0a0a]/25 mb-1">Pre-money Min</p>
+              <p className="text-[17px] font-bold text-[#0a0a0a] tracking-tight">{fmtMoney(v.preMoneyMin)}</p>
             </div>
             <div className="px-5 py-4">
-              <p className="text-[8px] font-bold tracking-wider uppercase text-[#131218]/25 mb-1">Pre-money Max</p>
-              <p className="text-[17px] font-bold text-[#131218] tracking-tight">{fmtMoney(v.preMoneyMax)}</p>
+              <p className="text-[8px] font-bold tracking-wider uppercase text-[#0a0a0a]/25 mb-1">Pre-money Max</p>
+              <p className="text-[17px] font-bold text-[#0a0a0a] tracking-tight">{fmtMoney(v.preMoneyMax)}</p>
             </div>
             <div className="px-5 py-4">
-              <p className="text-[8px] font-bold tracking-wider uppercase text-[#131218]/25 mb-1">Period</p>
-              <p className="text-[13px] font-bold text-[#131218]">{fmtDate(v.period)}</p>
+              <p className="text-[8px] font-bold tracking-wider uppercase text-[#0a0a0a]/25 mb-1">Period</p>
+              <p className="text-[13px] font-bold text-[#0a0a0a]">{fmtDate(v.period)}</p>
             </div>
           </div>
           {v.keyAssumptions && (
-            <div className="px-5 py-4 border-t border-[#EFEFEA]">
-              <p className="text-[8px] font-bold tracking-wider uppercase text-[#131218]/25 mb-1">Key Assumptions</p>
-              <p className="text-[12px] text-[#131218]/65 leading-relaxed">{v.keyAssumptions}</p>
+            <div className="px-5 py-4 border-t border-[#f4f4ef]">
+              <p className="text-[8px] font-bold tracking-wider uppercase text-[#0a0a0a]/25 mb-1">Key Assumptions</p>
+              <p className="text-[12px] text-[#0a0a0a]/65 leading-relaxed">{v.keyAssumptions}</p>
             </div>
           )}
         </div>
@@ -558,45 +558,45 @@ function CapTableTab({ capTable }: { capTable: CapTableEntry[] }) {
 
       {/* Summary */}
       <div className="grid grid-cols-3 gap-4">
-        <div className="bg-white border border-[#E0E0D8] rounded-2xl px-5 py-4">
-          <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30 mb-1">Shareholders</p>
-          <p className="text-3xl font-bold text-[#131218] tracking-tight">{capTable.length}</p>
+        <div className="bg-white border border-[#e4e4dd] rounded-2xl px-5 py-4">
+          <p className="text-[9px] font-bold tracking-widest uppercase text-[#0a0a0a]/30 mb-1">Shareholders</p>
+          <p className="text-3xl font-bold text-[#0a0a0a] tracking-tight">{capTable.length}</p>
         </div>
-        <div className="bg-white border border-[#E0E0D8] rounded-2xl px-5 py-4">
-          <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30 mb-1">Total Invested</p>
-          <p className="text-3xl font-bold text-[#131218] tracking-tight">{fmtMoney(totalInvested || null)}</p>
+        <div className="bg-white border border-[#e4e4dd] rounded-2xl px-5 py-4">
+          <p className="text-[9px] font-bold tracking-widest uppercase text-[#0a0a0a]/30 mb-1">Total Invested</p>
+          <p className="text-3xl font-bold text-[#0a0a0a] tracking-tight">{fmtMoney(totalInvested || null)}</p>
         </div>
-        <div className="bg-white border border-[#E0E0D8] rounded-2xl px-5 py-4">
-          <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30 mb-1">Share Classes</p>
-          <p className="text-3xl font-bold text-[#131218] tracking-tight">
+        <div className="bg-white border border-[#e4e4dd] rounded-2xl px-5 py-4">
+          <p className="text-[9px] font-bold tracking-widest uppercase text-[#0a0a0a]/30 mb-1">Share Classes</p>
+          <p className="text-3xl font-bold text-[#0a0a0a] tracking-tight">
             {[...new Set(capTable.map(e => e.shareClass).filter(Boolean))].length || "—"}
           </p>
         </div>
       </div>
 
       {/* Table */}
-      <div className="bg-white border border-[#E0E0D8] rounded-2xl overflow-hidden">
+      <div className="bg-white border border-[#e4e4dd] rounded-2xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-[11.5px]">
             <thead>
-              <tr className="border-b border-[#E0E0D8]">
+              <tr className="border-b border-[#e4e4dd]">
                 {["Shareholder", "Type", "Class", "Round", "Shares", "Ownership", "Diluted", "Invested", "Date"].map(h => (
-                  <th key={h} className="text-left px-4 py-3 text-[8px] font-bold tracking-wider uppercase text-[#131218]/25">{h}</th>
+                  <th key={h} className="text-left px-4 py-3 text-[8px] font-bold tracking-wider uppercase text-[#0a0a0a]/25">{h}</th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#EFEFEA]">
+            <tbody className="divide-y divide-[#f4f4ef]">
               {capTable.map(e => (
-                <tr key={e.id} className="hover:bg-[#EFEFEA]/40 transition-colors">
-                  <td className="px-4 py-3 font-semibold text-[#131218]">{e.shareholderName || e.name || "—"}</td>
-                  <td className="px-4 py-3 text-[#131218]/50">{e.shareholderType || "—"}</td>
-                  <td className="px-4 py-3 text-[#131218]/50">{e.shareClass || "—"}</td>
-                  <td className="px-4 py-3 text-[#131218]/50">{e.round || "—"}</td>
-                  <td className="px-4 py-3 text-[#131218]/70">{e.shares?.toLocaleString() ?? "—"}</td>
-                  <td className="px-4 py-3 font-medium text-[#131218]">{fmtPct(e.ownershipPct)}</td>
-                  <td className="px-4 py-3 text-[#131218]/60">{fmtPct(e.dilutedPct)}</td>
-                  <td className="px-4 py-3 font-medium text-[#131218]">{fmtMoney(e.investedAmount)}</td>
-                  <td className="px-4 py-3 text-[#131218]/40">{fmtDate(e.investmentDate)}</td>
+                <tr key={e.id} className="hover:bg-[#f4f4ef]/40 transition-colors">
+                  <td className="px-4 py-3 font-semibold text-[#0a0a0a]">{e.shareholderName || e.name || "—"}</td>
+                  <td className="px-4 py-3 text-[#0a0a0a]/50">{e.shareholderType || "—"}</td>
+                  <td className="px-4 py-3 text-[#0a0a0a]/50">{e.shareClass || "—"}</td>
+                  <td className="px-4 py-3 text-[#0a0a0a]/50">{e.round || "—"}</td>
+                  <td className="px-4 py-3 text-[#0a0a0a]/70">{e.shares?.toLocaleString() ?? "—"}</td>
+                  <td className="px-4 py-3 font-medium text-[#0a0a0a]">{fmtPct(e.ownershipPct)}</td>
+                  <td className="px-4 py-3 text-[#0a0a0a]/60">{fmtPct(e.dilutedPct)}</td>
+                  <td className="px-4 py-3 font-medium text-[#0a0a0a]">{fmtMoney(e.investedAmount)}</td>
+                  <td className="px-4 py-3 text-[#0a0a0a]/40">{fmtDate(e.investmentDate)}</td>
                 </tr>
               ))}
             </tbody>
@@ -664,12 +664,12 @@ function DataRoomTab({
 
       {/* Uploaded files panel */}
       {uploadedFiles.length > 0 && (
-        <div className="bg-white border border-[#E0E0D8] rounded-2xl overflow-hidden">
-          <div className="px-5 py-3.5 border-b border-[#EFEFEA] flex items-center justify-between">
-            <p className="text-[10px] font-bold tracking-widest uppercase text-[#131218]/40">Uploaded Files</p>
-            <span className="text-[9px] text-[#131218]/25">{uploadedFiles.length} stored</span>
+        <div className="bg-white border border-[#e4e4dd] rounded-2xl overflow-hidden">
+          <div className="px-5 py-3.5 border-b border-[#f4f4ef] flex items-center justify-between">
+            <p className="text-[10px] font-bold tracking-widest uppercase text-[#0a0a0a]/40">Uploaded Files</p>
+            <span className="text-[9px] text-[#0a0a0a]/25">{uploadedFiles.length} stored</span>
           </div>
-          <div className="divide-y divide-[#EFEFEA]">
+          <div className="divide-y divide-[#f4f4ef]">
             {uploadedFiles.map(item => {
               const storagePath = extractStoragePath(item.notes);
               const isDeleting  = deletingId === item.id;
@@ -694,13 +694,13 @@ function DataRoomTab({
                   {/* File row */}
                   <div className="px-5 py-3 flex items-center gap-3">
                     <div className="w-8 text-center shrink-0">
-                      <span className="text-[8px] font-bold text-[#131218]/25 uppercase">
+                      <span className="text-[8px] font-bold text-[#0a0a0a]/25 uppercase">
                         {item.documentType?.split(" ")[0]?.slice(0, 3) || "DOC"}
                       </span>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-[12.5px] font-medium text-[#131218] truncate">{item.name}</p>
-                      <p className="text-[9.5px] text-[#131218]/35 mt-0.5">{item.documentType} · {item.category}</p>
+                      <p className="text-[12.5px] font-medium text-[#0a0a0a] truncate">{item.name}</p>
+                      <p className="text-[9.5px] text-[#0a0a0a]/35 mt-0.5">{item.documentType} · {item.category}</p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       {/* Procesar button — PDF, Excel, CSV */}
@@ -710,12 +710,12 @@ function DataRoomTab({
                           disabled={anyBusy || isThisPreview}
                           className={`text-[10px] font-bold px-2.5 py-1 rounded-lg transition-all ${
                             isThisProcessing
-                              ? "bg-[#EFEFEA] text-[#131218]/40 cursor-wait"
+                              ? "bg-[#f4f4ef] text-[#0a0a0a]/40 cursor-wait"
                               : isThisPreview
-                              ? "bg-[#131218]/5 text-[#131218]/30 cursor-default"
+                              ? "bg-[#0a0a0a]/5 text-[#0a0a0a]/30 cursor-default"
                               : anyBusy
-                              ? "bg-[#EFEFEA] text-[#131218]/20 cursor-not-allowed"
-                              : "bg-[#c8f55a] text-[#131218] hover:bg-[#b8e84a]"
+                              ? "bg-[#f4f4ef] text-[#0a0a0a]/20 cursor-not-allowed"
+                              : "bg-[#c6f24a] text-[#0a0a0a] hover:bg-[#b8e84a]"
                           }`}
                         >
                           {isThisProcessing ? "Analizando…" : "Procesar"}
@@ -731,7 +731,7 @@ function DataRoomTab({
                         href={item.fileUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-[#EFEFEA] text-[#131218]/50 hover:bg-[#131218] hover:text-white transition-all"
+                        className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-[#f4f4ef] text-[#0a0a0a]/50 hover:bg-[#0a0a0a] hover:text-white transition-all"
                       >
                         ↓ Download
                       </a>
@@ -757,11 +757,11 @@ function DataRoomTab({
                     <div className={`mx-4 mb-4 rounded-xl border p-4 ${
                       isThisDone
                         ? "bg-green-50 border-green-200"
-                        : "bg-[#EFEFEA] border-[#E0E0D8]"
+                        : "bg-[#f4f4ef] border-[#e4e4dd]"
                     }`}>
                       {isThisPreview && ingestState.status === "preview" && (
                         <>
-                          <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/40 mb-3">
+                          <p className="text-[9px] font-bold tracking-widest uppercase text-[#0a0a0a]/40 mb-3">
                             Extracción AI — Vista previa
                           </p>
                           {/* Section breakdown grid */}
@@ -774,27 +774,27 @@ function DataRoomTab({
                               { label: "Knowledge",      count: ingestState.extraction.knowledge_assets?.length ?? 0 },
                               { label: "Decisions",      count: ingestState.extraction.decision_items?.length ?? 0 },
                             ] as { label: string; count: number }[]).map(s => (
-                              <div key={s.label} className={`rounded-lg px-2.5 py-1.5 ${s.count > 0 ? "bg-white border border-[#c8f55a]/40" : "bg-[#131218]/5 border border-transparent"}`}>
-                                <p className={`text-[8px] font-bold tracking-widest uppercase ${s.count > 0 ? "text-[#131218]/50" : "text-[#131218]/20"}`}>{s.label}</p>
-                                <p className={`text-[13px] font-bold ${s.count > 0 ? "text-[#131218]" : "text-[#131218]/20"}`}>{s.count > 0 ? s.count : "—"}</p>
+                              <div key={s.label} className={`rounded-lg px-2.5 py-1.5 ${s.count > 0 ? "bg-white border border-[#c6f24a]/40" : "bg-[#0a0a0a]/5 border border-transparent"}`}>
+                                <p className={`text-[8px] font-bold tracking-widest uppercase ${s.count > 0 ? "text-[#0a0a0a]/50" : "text-[#0a0a0a]/20"}`}>{s.label}</p>
+                                <p className={`text-[13px] font-bold ${s.count > 0 ? "text-[#0a0a0a]" : "text-[#0a0a0a]/20"}`}>{s.count > 0 ? s.count : "—"}</p>
                               </div>
                             ))}
                           </div>
                           {ingestState.extraction.draft_status_update && (
-                            <p className="text-[11px] text-[#131218]/50 italic mb-3 leading-relaxed border-l-2 border-[#131218]/15 pl-3">
+                            <p className="text-[11px] text-[#0a0a0a]/50 italic mb-3 leading-relaxed border-l-2 border-[#0a0a0a]/15 pl-3">
                               {ingestState.extraction.draft_status_update}
                             </p>
                           )}
                           <div className="flex items-center gap-2">
                             <button
                               onClick={() => onIngestConfirm(item.id, item.fileUrl!, actualFileName)}
-                              className="text-[10.5px] font-bold px-3 py-1.5 rounded-lg bg-[#c8f55a] text-[#131218] hover:bg-[#b8e84a] transition-all"
+                              className="text-[10.5px] font-bold px-3 py-1.5 rounded-lg bg-[#c6f24a] text-[#0a0a0a] hover:bg-[#b8e84a] transition-all"
                             >
                               Confirmar y ejecutar
                             </button>
                             <button
                               onClick={onIngestCancel}
-                              className="text-[10.5px] font-bold px-3 py-1.5 rounded-lg bg-white border border-[#E0E0D8] text-[#131218]/50 hover:text-[#131218] transition-all"
+                              className="text-[10.5px] font-bold px-3 py-1.5 rounded-lg bg-white border border-[#e4e4dd] text-[#0a0a0a]/50 hover:text-[#0a0a0a] transition-all"
                             >
                               Cancelar
                             </button>
@@ -802,7 +802,7 @@ function DataRoomTab({
                         </>
                       )}
                       {isThisExecuting && (
-                        <p className="text-[11px] font-medium text-[#131218]/60">
+                        <p className="text-[11px] font-medium text-[#0a0a0a]/60">
                           Escribiendo en Notion…
                         </p>
                       )}
@@ -846,28 +846,28 @@ function DataRoomTab({
       )}
 
       {/* Summary bar */}
-      <div className="bg-white border border-[#E0E0D8] rounded-2xl overflow-hidden">
-        <div className="grid grid-cols-4 divide-x divide-[#EFEFEA]">
+      <div className="bg-white border border-[#e4e4dd] rounded-2xl overflow-hidden">
+        <div className="grid grid-cols-4 divide-x divide-[#f4f4ef]">
           <div className="px-5 py-4">
-            <p className="text-[8px] font-bold tracking-wider uppercase text-[#131218]/25 mb-1">Readiness</p>
-            <p className="text-[17px] font-bold text-[#131218] tracking-tight">{readinessPct}%</p>
-            <div className="mt-2 h-1 bg-[#EFEFEA] rounded-full overflow-hidden">
+            <p className="text-[8px] font-bold tracking-wider uppercase text-[#0a0a0a]/25 mb-1">Readiness</p>
+            <p className="text-[17px] font-bold text-[#0a0a0a] tracking-tight">{readinessPct}%</p>
+            <div className="mt-2 h-1 bg-[#f4f4ef] rounded-full overflow-hidden">
               <div
-                className={`h-full rounded-full ${readinessPct >= 80 ? "bg-[#c8f55a]" : readinessPct >= 50 ? "bg-amber-400" : "bg-red-400"}`}
+                className={`h-full rounded-full ${readinessPct >= 80 ? "bg-[#c6f24a]" : readinessPct >= 50 ? "bg-amber-400" : "bg-red-400"}`}
                 style={{ width: `${readinessPct}%` }}
               />
             </div>
           </div>
           <div className="px-5 py-4">
-            <p className="text-[8px] font-bold tracking-wider uppercase text-[#131218]/25 mb-1">Complete</p>
+            <p className="text-[8px] font-bold tracking-wider uppercase text-[#0a0a0a]/25 mb-1">Complete</p>
             <p className="text-[17px] font-bold text-green-600 tracking-tight">{complete}</p>
           </div>
           <div className="px-5 py-4">
-            <p className="text-[8px] font-bold tracking-wider uppercase text-[#131218]/25 mb-1">Partial</p>
+            <p className="text-[8px] font-bold tracking-wider uppercase text-[#0a0a0a]/25 mb-1">Partial</p>
             <p className="text-[17px] font-bold text-amber-500 tracking-tight">{partial}</p>
           </div>
           <div className="px-5 py-4">
-            <p className="text-[8px] font-bold tracking-wider uppercase text-[#131218]/25 mb-1">Missing</p>
+            <p className="text-[8px] font-bold tracking-wider uppercase text-[#0a0a0a]/25 mb-1">Missing</p>
             <p className="text-[17px] font-bold text-red-500 tracking-tight">{missing}</p>
           </div>
         </div>
@@ -875,33 +875,33 @@ function DataRoomTab({
 
       {/* Grouped items */}
       {Object.entries(groups).map(([category, items]) => (
-        <div key={category} className="bg-white border border-[#E0E0D8] rounded-2xl overflow-hidden">
-          <div className="px-5 py-3.5 border-b border-[#EFEFEA] flex items-center justify-between">
-            <p className="text-[10px] font-bold tracking-widest uppercase text-[#131218]/40">{category}</p>
-            <span className="text-[9px] text-[#131218]/25">{items.length} items</span>
+        <div key={category} className="bg-white border border-[#e4e4dd] rounded-2xl overflow-hidden">
+          <div className="px-5 py-3.5 border-b border-[#f4f4ef] flex items-center justify-between">
+            <p className="text-[10px] font-bold tracking-widest uppercase text-[#0a0a0a]/40">{category}</p>
+            <span className="text-[9px] text-[#0a0a0a]/25">{items.length} items</span>
           </div>
-          <div className="divide-y divide-[#EFEFEA]">
+          <div className="divide-y divide-[#f4f4ef]">
             {items.map(item => (
               <div key={item.id} className="px-5 py-3 flex items-center gap-3">
-                <span className={`text-[8.5px] font-bold px-2 py-0.5 rounded-full border shrink-0 ${STATUS_COLORS[item.status] ?? "bg-[#EFEFEA] text-[#131218]/40 border-[#E0E0D8]"}`}>
+                <span className={`text-[8.5px] font-bold px-2 py-0.5 rounded-full border shrink-0 ${STATUS_COLORS[item.status] ?? "bg-[#f4f4ef] text-[#0a0a0a]/40 border-[#e4e4dd]"}`}>
                   {item.status || "—"}
                 </span>
                 <div className="flex-1 min-w-0">
-                  <p className="text-[12.5px] font-medium text-[#131218] truncate">{item.name}</p>
+                  <p className="text-[12.5px] font-medium text-[#0a0a0a] truncate">{item.name}</p>
                   {item.documentType && (
-                    <p className="text-[9.5px] text-[#131218]/35 mt-0.5">{item.documentType}</p>
+                    <p className="text-[9.5px] text-[#0a0a0a]/35 mt-0.5">{item.documentType}</p>
                   )}
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
                   {item.vcRelevance && (
-                    <span className="text-[8.5px] font-medium text-[#131218]/30">{item.vcRelevance}</span>
+                    <span className="text-[8.5px] font-medium text-[#0a0a0a]/30">{item.vcRelevance}</span>
                   )}
                   {item.fileUrl && (
                     <a
                       href={item.fileUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-[10px] font-bold text-[#131218]/25 hover:text-[#131218]/70 transition-colors"
+                      className="text-[10px] font-bold text-[#0a0a0a]/25 hover:text-[#0a0a0a]/70 transition-colors"
                     >
                       →
                     </a>
@@ -939,9 +939,9 @@ function FundingTab({
             { label: "Investment Status",  value: orgData.investmentStatus || "—" },
             { label: "MRR",                value: orgData.mrr              || "—" },
           ].map(s => (
-            <div key={s.label} className="bg-white border border-[#E0E0D8] rounded-2xl px-5 py-4">
-              <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30 mb-1">{s.label}</p>
-              <p className="text-xl font-bold text-[#131218] tracking-tight">{s.value}</p>
+            <div key={s.label} className="bg-white border border-[#e4e4dd] rounded-2xl px-5 py-4">
+              <p className="text-[9px] font-bold tracking-widest uppercase text-[#0a0a0a]/30 mb-1">{s.label}</p>
+              <p className="text-xl font-bold text-[#0a0a0a] tracking-tight">{s.value}</p>
             </div>
           ))}
         </div>
@@ -950,28 +950,28 @@ function FundingTab({
       <div className="grid grid-cols-2 gap-5">
 
         {/* Investor pipeline */}
-        <div className="bg-white border border-[#E0E0D8] rounded-2xl overflow-hidden">
-          <div className="px-5 py-4 border-b border-[#EFEFEA]">
-            <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30">Investor Pipeline</p>
-            <p className="text-sm font-bold text-[#131218] mt-0.5">
+        <div className="bg-white border border-[#e4e4dd] rounded-2xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-[#f4f4ef]">
+            <p className="text-[9px] font-bold tracking-widest uppercase text-[#0a0a0a]/30">Investor Pipeline</p>
+            <p className="text-sm font-bold text-[#0a0a0a] mt-0.5">
               {investorOpps.length > 0 ? `${investorOpps.length} active` : "No matches logged"}
             </p>
           </div>
           {investorOpps.length > 0 ? (
-            <div className="divide-y divide-[#EFEFEA]">
+            <div className="divide-y divide-[#f4f4ef]">
               {investorOpps.map(opp => (
                 <div key={opp.id} className="px-5 py-3.5 flex items-center gap-3">
                   <div className="flex-1 min-w-0">
-                    <p className="text-[12.5px] font-semibold text-[#131218] truncate">{opp.name}</p>
+                    <p className="text-[12.5px] font-semibold text-[#0a0a0a] truncate">{opp.name}</p>
                     {opp.orgName && (
-                      <p className="text-[9.5px] text-[#131218]/35 mt-0.5">{opp.orgName}</p>
+                      <p className="text-[9.5px] text-[#0a0a0a]/35 mt-0.5">{opp.orgName}</p>
                     )}
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     {opp.score !== null && (
                       <span className="text-[10px] font-bold text-[#2d6a00]">{opp.score}</span>
                     )}
-                    <span className={`text-[8.5px] font-bold px-2 py-0.5 rounded-full border ${OPP_STAGE_COLORS[opp.stage] ?? "bg-[#EFEFEA] text-[#131218]/40 border-[#E0E0D8]"}`}>
+                    <span className={`text-[8.5px] font-bold px-2 py-0.5 rounded-full border ${OPP_STAGE_COLORS[opp.stage] ?? "bg-[#f4f4ef] text-[#0a0a0a]/40 border-[#e4e4dd]"}`}>
                       {opp.stage}
                     </span>
                   </div>
@@ -980,35 +980,35 @@ function FundingTab({
             </div>
           ) : (
             <div className="px-5 py-8 text-center">
-              <p className="text-xs text-[#131218]/25">No investor matches logged yet</p>
-              <p className="text-[10px] text-[#131218]/20 mt-1">Add Investor Match opportunities in Notion with Portfolio scope</p>
+              <p className="text-xs text-[#0a0a0a]/25">No investor matches logged yet</p>
+              <p className="text-[10px] text-[#0a0a0a]/20 mt-1">Add Investor Match opportunities in Notion with Portfolio scope</p>
             </div>
           )}
         </div>
 
         {/* Grants as non-dilutive funding */}
-        <div className="bg-white border border-[#E0E0D8] rounded-2xl overflow-hidden">
-          <div className="px-5 py-4 border-b border-[#EFEFEA]">
-            <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30">Grant Pipeline — Non-dilutive</p>
-            <p className="text-sm font-bold text-[#131218] mt-0.5">
+        <div className="bg-white border border-[#e4e4dd] rounded-2xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-[#f4f4ef]">
+            <p className="text-[9px] font-bold tracking-widest uppercase text-[#0a0a0a]/30">Grant Pipeline — Non-dilutive</p>
+            <p className="text-sm font-bold text-[#0a0a0a] mt-0.5">
               {grantOpps.length > 0 ? `${grantOpps.length} opportunities` : "No grants tracked"}
             </p>
           </div>
           {grantOpps.length > 0 ? (
-            <div className="divide-y divide-[#EFEFEA]">
+            <div className="divide-y divide-[#f4f4ef]">
               {grantOpps.map(opp => (
                 <div key={opp.id} className="px-5 py-3.5 flex items-center gap-3">
                   <div className="flex-1 min-w-0">
-                    <p className="text-[12.5px] font-semibold text-[#131218] truncate">{opp.name}</p>
+                    <p className="text-[12.5px] font-semibold text-[#0a0a0a] truncate">{opp.name}</p>
                     {opp.orgName && (
-                      <p className="text-[9.5px] text-[#131218]/35 mt-0.5">{opp.orgName}</p>
+                      <p className="text-[9.5px] text-[#0a0a0a]/35 mt-0.5">{opp.orgName}</p>
                     )}
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     {opp.score !== null && (
                       <span className="text-[10px] font-bold text-green-700 bg-green-50 px-1.5 py-0.5 rounded-md">{opp.score}</span>
                     )}
-                    <span className={`text-[8.5px] font-bold px-2 py-0.5 rounded-full border ${OPP_STAGE_COLORS[opp.stage] ?? "bg-[#EFEFEA] text-[#131218]/40 border-[#E0E0D8]"}`}>
+                    <span className={`text-[8.5px] font-bold px-2 py-0.5 rounded-full border ${OPP_STAGE_COLORS[opp.stage] ?? "bg-[#f4f4ef] text-[#0a0a0a]/40 border-[#e4e4dd]"}`}>
                       {opp.stage}
                     </span>
                   </div>
@@ -1017,8 +1017,8 @@ function FundingTab({
             </div>
           ) : (
             <div className="px-5 py-8 text-center">
-              <p className="text-xs text-[#131218]/25">No grant opportunities tracked</p>
-              <p className="text-[10px] text-[#131218]/20 mt-1">Add Grant opportunities in Notion with Portfolio scope</p>
+              <p className="text-xs text-[#0a0a0a]/25">No grant opportunities tracked</p>
+              <p className="text-[10px] text-[#0a0a0a]/20 mt-1">Add Grant opportunities in Notion with Portfolio scope</p>
             </div>
           )}
         </div>
@@ -1048,26 +1048,26 @@ function CommercialTab({
       <div className="grid grid-cols-2 gap-5">
 
         {/* Traction signals */}
-        <div className="bg-white border border-[#E0E0D8] rounded-2xl overflow-hidden">
-          <div className="px-5 py-4 border-b border-[#EFEFEA]">
-            <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30">Traction Signals</p>
-            <p className="text-sm font-bold text-[#131218] mt-0.5">
+        <div className="bg-white border border-[#e4e4dd] rounded-2xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-[#f4f4ef]">
+            <p className="text-[9px] font-bold tracking-widest uppercase text-[#0a0a0a]/30">Traction Signals</p>
+            <p className="text-sm font-bold text-[#0a0a0a] mt-0.5">
               {traction.length > 0 ? `${traction.length} validated signals` : "No traction logged yet"}
             </p>
           </div>
           {traction.length > 0 ? (
-            <div className="divide-y divide-[#EFEFEA]">
+            <div className="divide-y divide-[#f4f4ef]">
               {traction.slice(0, 6).map(ev => (
                 <div key={ev.id} className="px-5 py-3.5 flex items-start gap-3">
                   <span className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ${ev.validationStatus === "Validated" ? "bg-green-400" : "bg-amber-400"}`} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap mb-0.5">
-                      <span className={`text-[8.5px] font-bold px-2 py-0.5 rounded-full border ${EVIDENCE_TYPE_COLORS[ev.type] ?? "bg-[#EFEFEA] text-[#131218]/50 border-[#E0E0D8]"}`}>
+                      <span className={`text-[8.5px] font-bold px-2 py-0.5 rounded-full border ${EVIDENCE_TYPE_COLORS[ev.type] ?? "bg-[#f4f4ef] text-[#0a0a0a]/50 border-[#e4e4dd]"}`}>
                         {ev.type}
                       </span>
-                      <span className="text-[8px] text-[#131218]/30">{fmtDate(ev.dateCaptured)}</span>
+                      <span className="text-[8px] text-[#0a0a0a]/30">{fmtDate(ev.dateCaptured)}</span>
                     </div>
-                    <p className="text-[12px] font-medium text-[#131218] leading-snug line-clamp-2">
+                    <p className="text-[12px] font-medium text-[#0a0a0a] leading-snug line-clamp-2">
                       {ev.title || ev.excerpt || "—"}
                     </p>
                   </div>
@@ -1076,30 +1076,30 @@ function CommercialTab({
             </div>
           ) : (
             <div className="px-5 py-8 text-center">
-              <p className="text-xs text-[#131218]/25">No traction evidence captured yet</p>
-              <p className="text-[10px] text-[#131218]/20 mt-1">Upload commercial documents to extract signals</p>
+              <p className="text-xs text-[#0a0a0a]/25">No traction evidence captured yet</p>
+              <p className="text-[10px] text-[#0a0a0a]/20 mt-1">Upload commercial documents to extract signals</p>
             </div>
           )}
         </div>
 
         {/* Commercial opportunities */}
         <div className="space-y-4">
-          <div className="bg-white border border-[#E0E0D8] rounded-2xl overflow-hidden">
-            <div className="px-5 py-4 border-b border-[#EFEFEA]">
-              <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30">Active Opportunities</p>
-              <p className="text-sm font-bold text-[#131218] mt-0.5">
+          <div className="bg-white border border-[#e4e4dd] rounded-2xl overflow-hidden">
+            <div className="px-5 py-4 border-b border-[#f4f4ef]">
+              <p className="text-[9px] font-bold tracking-widest uppercase text-[#0a0a0a]/30">Active Opportunities</p>
+              <p className="text-sm font-bold text-[#0a0a0a] mt-0.5">
                 {commercialOpps.length > 0 ? `${commercialOpps.length} tracked` : "No commercial opportunities"}
               </p>
             </div>
             {commercialOpps.length > 0 ? (
-              <div className="divide-y divide-[#EFEFEA]">
+              <div className="divide-y divide-[#f4f4ef]">
                 {commercialOpps.map(opp => (
                   <div key={opp.id} className="px-5 py-3.5 flex items-center gap-3">
                     <div className="flex-1 min-w-0">
-                      <p className="text-[12.5px] font-semibold text-[#131218] truncate">{opp.name}</p>
-                      <p className="text-[9.5px] text-[#131218]/35 mt-0.5">{opp.type} {opp.orgName ? `· ${opp.orgName}` : ""}</p>
+                      <p className="text-[12.5px] font-semibold text-[#0a0a0a] truncate">{opp.name}</p>
+                      <p className="text-[9.5px] text-[#0a0a0a]/35 mt-0.5">{opp.type} {opp.orgName ? `· ${opp.orgName}` : ""}</p>
                     </div>
-                    <span className={`text-[8.5px] font-bold px-2 py-0.5 rounded-full border shrink-0 ${OPP_STAGE_COLORS[opp.stage] ?? "bg-[#EFEFEA] text-[#131218]/40 border-[#E0E0D8]"}`}>
+                    <span className={`text-[8.5px] font-bold px-2 py-0.5 rounded-full border shrink-0 ${OPP_STAGE_COLORS[opp.stage] ?? "bg-[#f4f4ef] text-[#0a0a0a]/40 border-[#e4e4dd]"}`}>
                       {opp.stage}
                     </span>
                   </div>
@@ -1107,7 +1107,7 @@ function CommercialTab({
               </div>
             ) : (
               <div className="px-5 py-6 text-center">
-                <p className="text-xs text-[#131218]/25">No commercial opportunities logged</p>
+                <p className="text-xs text-[#0a0a0a]/25">No commercial opportunities logged</p>
               </div>
             )}
           </div>
@@ -1186,19 +1186,19 @@ function InvestorUpdateTab({ project }: { project: Project }) {
 
       {/* Left: config panel */}
       <div className="space-y-4">
-        <div className="bg-white border border-[#E0E0D8] rounded-2xl p-5 space-y-5">
-          <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30">Generate Investor Update</p>
+        <div className="bg-white border border-[#e4e4dd] rounded-2xl p-5 space-y-5">
+          <p className="text-[9px] font-bold tracking-widest uppercase text-[#0a0a0a]/30">Generate Investor Update</p>
 
           {/* Period */}
           <div>
-            <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30 mb-2">Period</p>
+            <p className="text-[9px] font-bold tracking-widest uppercase text-[#0a0a0a]/30 mb-2">Period</p>
             <div className="flex flex-wrap gap-1.5">
               {periods.map(p => (
                 <button key={p} onClick={() => setConfig(c => ({ ...c, period: p }))}
                   className={`text-[10px] font-semibold px-3 py-1.5 rounded-lg border transition-all ${
                     config.period === p
-                      ? "bg-[#131218] text-white border-[#131218]"
-                      : "bg-white text-[#131218]/50 border-[#E0E0D8] hover:border-[#131218]/30"
+                      ? "bg-[#0a0a0a] text-white border-[#0a0a0a]"
+                      : "bg-white text-[#0a0a0a]/50 border-[#e4e4dd] hover:border-[#0a0a0a]/30"
                   }`}>
                   {p}
                 </button>
@@ -1208,14 +1208,14 @@ function InvestorUpdateTab({ project }: { project: Project }) {
 
           {/* Tone */}
           <div>
-            <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30 mb-2">Tone</p>
+            <p className="text-[9px] font-bold tracking-widest uppercase text-[#0a0a0a]/30 mb-2">Tone</p>
             <div className="flex flex-wrap gap-1.5">
               {tones.map(t => (
                 <button key={t} onClick={() => setConfig(c => ({ ...c, tone: t }))}
                   className={`text-[10px] font-semibold px-3 py-1.5 rounded-lg border transition-all ${
                     config.tone === t
-                      ? "bg-[#131218] text-white border-[#131218]"
-                      : "bg-white text-[#131218]/50 border-[#E0E0D8] hover:border-[#131218]/30"
+                      ? "bg-[#0a0a0a] text-white border-[#0a0a0a]"
+                      : "bg-white text-[#0a0a0a]/50 border-[#e4e4dd] hover:border-[#0a0a0a]/30"
                   }`}>
                   {t}
                 </button>
@@ -1225,7 +1225,7 @@ function InvestorUpdateTab({ project }: { project: Project }) {
 
           {/* Include */}
           <div>
-            <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30 mb-2">Include</p>
+            <p className="text-[9px] font-bold tracking-widest uppercase text-[#0a0a0a]/30 mb-2">Include</p>
             <div className="space-y-2">
               {includeOptions.map(opt => (
                 <label key={opt.id} className="flex items-center gap-2.5 cursor-pointer">
@@ -1233,9 +1233,9 @@ function InvestorUpdateTab({ project }: { project: Project }) {
                     type="checkbox"
                     checked={config.include.includes(opt.id)}
                     onChange={() => toggleInclude(opt.id)}
-                    className="w-3.5 h-3.5 rounded accent-[#c8f55a]"
+                    className="w-3.5 h-3.5 rounded accent-[#c6f24a]"
                   />
-                  <span className="text-[11.5px] text-[#131218]/70">{opt.label}</span>
+                  <span className="text-[11.5px] text-[#0a0a0a]/70">{opt.label}</span>
                 </label>
               ))}
             </div>
@@ -1246,8 +1246,8 @@ function InvestorUpdateTab({ project }: { project: Project }) {
             disabled={state.status === "generating"}
             className={`w-full py-2.5 rounded-xl text-[11.5px] font-bold transition-all ${
               state.status === "generating"
-                ? "bg-[#EFEFEA] text-[#131218]/30 cursor-wait"
-                : "bg-[#c8f55a] text-[#131218] hover:bg-[#b8e84a]"
+                ? "bg-[#f4f4ef] text-[#0a0a0a]/30 cursor-wait"
+                : "bg-[#c6f24a] text-[#0a0a0a] hover:bg-[#b8e84a]"
             }`}
           >
             {state.status === "generating" ? "Generating…" : "⚡ Generate draft"}
@@ -1258,17 +1258,17 @@ function InvestorUpdateTab({ project }: { project: Project }) {
       {/* Right: preview */}
       <div>
         {state.status === "idle" && (
-          <div className="bg-white border border-[#E0E0D8] rounded-2xl p-12 text-center">
-            <p className="text-sm font-bold text-[#131218]/25 mb-1">Configure and generate</p>
-            <p className="text-xs text-[#131218]/20">
+          <div className="bg-white border border-[#e4e4dd] rounded-2xl p-12 text-center">
+            <p className="text-sm font-bold text-[#0a0a0a]/25 mb-1">Configure and generate</p>
+            <p className="text-xs text-[#0a0a0a]/20">
               Select period, tone and content — then click Generate draft to build the investor update from your OS data.
             </p>
           </div>
         )}
         {state.status === "generating" && (
-          <div className="bg-white border border-[#E0E0D8] rounded-2xl p-12 text-center">
-            <p className="text-sm font-bold text-[#131218]/30 animate-pulse">Building investor update…</p>
-            <p className="text-xs text-[#131218]/20 mt-2">Reading evidence, financials and milestones from Notion</p>
+          <div className="bg-white border border-[#e4e4dd] rounded-2xl p-12 text-center">
+            <p className="text-sm font-bold text-[#0a0a0a]/30 animate-pulse">Building investor update…</p>
+            <p className="text-xs text-[#0a0a0a]/20 mt-2">Reading evidence, financials and milestones from Notion</p>
           </div>
         )}
         {state.status === "error" && (
@@ -1279,9 +1279,9 @@ function InvestorUpdateTab({ project }: { project: Project }) {
           </div>
         )}
         {state.status === "done" && (
-          <div className="bg-white border-2 border-[#c8f55a] rounded-2xl overflow-hidden">
-            <div className="bg-[#c8f55a] px-5 py-3 flex items-center justify-between">
-              <span className="text-[10px] font-bold text-[#131218]">DRAFT GENERATED · {config.period}</span>
+          <div className="bg-white border-2 border-[#c6f24a] rounded-2xl overflow-hidden">
+            <div className="bg-[#c6f24a] px-5 py-3 flex items-center justify-between">
+              <span className="text-[10px] font-bold text-[#0a0a0a]">DRAFT GENERATED · {config.period}</span>
               <div className="flex gap-2">
                 <button
                   onClick={() => navigator.clipboard.writeText(state.draft)}
@@ -1291,14 +1291,14 @@ function InvestorUpdateTab({ project }: { project: Project }) {
                 </button>
                 <button
                   onClick={() => setState({ status: "idle" })}
-                  className="text-[9px] font-bold px-3 py-1 bg-[#131218] text-white rounded-md hover:bg-black transition-all"
+                  className="text-[9px] font-bold px-3 py-1 bg-[#0a0a0a] text-white rounded-md hover:bg-black transition-all"
                 >
                   Regenerate
                 </button>
               </div>
             </div>
             <div className="px-6 py-5">
-              <pre className="text-[12px] text-[#131218]/80 leading-relaxed whitespace-pre-wrap font-sans">
+              <pre className="text-[12px] text-[#0a0a0a]/80 leading-relaxed whitespace-pre-wrap font-sans">
                 {state.draft}
               </pre>
             </div>
@@ -1403,16 +1403,16 @@ function UploadModal({ projectId, projectName, orgId, onDone }: {
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={e => { if (e.target === e.currentTarget) onDone([]); }}>
-      <div className="bg-white rounded-2xl border border-[#E0E0D8] p-8 w-full max-w-lg">
+      <div className="bg-white rounded-2xl border border-[#e4e4dd] p-8 w-full max-w-lg">
 
         {/* Header */}
         <div className="flex items-start justify-between mb-5">
           <div>
-            <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30 mb-1">Garage · {projectName}</p>
-            <p className="text-lg font-bold text-[#131218]">Upload documents</p>
-            <p className="text-xs text-[#131218]/40 mt-1">Pitch deck, financial model, cap table, one-pager…</p>
+            <p className="text-[9px] font-bold tracking-widest uppercase text-[#0a0a0a]/30 mb-1">Garage · {projectName}</p>
+            <p className="text-lg font-bold text-[#0a0a0a]">Upload documents</p>
+            <p className="text-xs text-[#0a0a0a]/40 mt-1">Pitch deck, financial model, cap table, one-pager…</p>
           </div>
-          <button onClick={() => onDone([])} className="text-[#131218]/30 hover:text-[#131218] text-xl leading-none mt-1">×</button>
+          <button onClick={() => onDone([])} className="text-[#0a0a0a]/30 hover:text-[#0a0a0a] text-xl leading-none mt-1">×</button>
         </div>
 
         {/* Success state */}
@@ -1450,12 +1450,12 @@ function UploadModal({ projectId, projectName, orgId, onDone }: {
               onDragLeave={() => setDragging(false)}
               onDrop={e => { e.preventDefault(); setDragging(false); addFiles(e.dataTransfer.files); }}
               className={`border-2 border-dashed rounded-xl px-6 py-9 text-center cursor-pointer transition-colors ${
-                dragging ? "border-[#131218] bg-[#EFEFEA]" : "border-[#E0E0D8] hover:border-[#131218]/30"
+                dragging ? "border-[#0a0a0a] bg-[#f4f4ef]" : "border-[#e4e4dd] hover:border-[#0a0a0a]/30"
               }`}
               onClick={() => document.getElementById("garage-file-input")?.click()}
             >
-              <p className="text-sm font-semibold text-[#131218]/40">Drop files here or click to browse</p>
-              <p className="text-[10px] text-[#131218]/25 mt-1">PDF · PPTX · XLSX · DOCX — up to 200 MB each</p>
+              <p className="text-sm font-semibold text-[#0a0a0a]/40">Drop files here or click to browse</p>
+              <p className="text-[10px] text-[#0a0a0a]/25 mt-1">PDF · PPTX · XLSX · DOCX — up to 200 MB each</p>
               <input id="garage-file-input" type="file" multiple accept=".pdf,.pptx,.xlsx,.docx,.xls,.ppt"
                 className="hidden" onChange={e => addFiles(e.target.files)} />
             </div>
@@ -1464,11 +1464,11 @@ function UploadModal({ projectId, projectName, orgId, onDone }: {
             {files.length > 0 && (
               <div className="mt-3 space-y-1.5 max-h-40 overflow-y-auto">
                 {files.map(f => (
-                  <div key={f.name} className="flex items-center gap-2 bg-[#EFEFEA] rounded-lg px-3 py-2">
-                    <span className="text-[9px] font-bold text-[#131218]/30 uppercase w-8 shrink-0">{f.name.split(".").pop()}</span>
-                    <span className="text-[11px] text-[#131218] font-medium flex-1 truncate">{f.name}</span>
+                  <div key={f.name} className="flex items-center gap-2 bg-[#f4f4ef] rounded-lg px-3 py-2">
+                    <span className="text-[9px] font-bold text-[#0a0a0a]/30 uppercase w-8 shrink-0">{f.name.split(".").pop()}</span>
+                    <span className="text-[11px] text-[#0a0a0a] font-medium flex-1 truncate">{f.name}</span>
                     <button onClick={() => setFiles(prev => prev.filter(x => x.name !== f.name))}
-                      className="text-[#131218]/20 hover:text-[#131218]/60 text-base leading-none">×</button>
+                      className="text-[#0a0a0a]/20 hover:text-[#0a0a0a]/60 text-base leading-none">×</button>
                   </div>
                 ))}
               </div>
@@ -1479,8 +1479,8 @@ function UploadModal({ projectId, projectName, orgId, onDone }: {
               disabled={!files.length || status === "uploading"}
               className={`mt-4 w-full py-2.5 rounded-xl text-[11.5px] font-bold transition-all ${
                 files.length && status !== "uploading"
-                  ? "bg-[#c8f55a] text-[#131218] hover:bg-[#b8e84a]"
-                  : "bg-[#EFEFEA] text-[#131218]/30 cursor-not-allowed"
+                  ? "bg-[#c6f24a] text-[#0a0a0a] hover:bg-[#b8e84a]"
+                  : "bg-[#f4f4ef] text-[#0a0a0a]/30 cursor-not-allowed"
               }`}
             >
               {status === "uploading" ? "Uploading…" : `Upload ${files.length ? `${files.length} file${files.length > 1 ? "s" : ""}` : "files"}`}
@@ -1623,7 +1623,7 @@ export function GarageDetailClient({
       )}
 
       {/* Tab nav */}
-      <div className="bg-white border-b border-[#E0E0D8] px-12">
+      <div className="bg-white border-b border-[#e4e4dd] px-12">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-0">
             {TABS.map(t => (
@@ -1632,8 +1632,8 @@ export function GarageDetailClient({
                 onClick={() => setTab(t.id)}
                 className={`px-4 py-3.5 text-[11.5px] font-semibold border-b-2 transition-all ${
                   tab === t.id
-                    ? "border-[#131218] text-[#131218]"
-                    : "border-transparent text-[#131218]/38 hover:text-[#131218] hover:border-[#131218]/20"
+                    ? "border-[#0a0a0a] text-[#0a0a0a]"
+                    : "border-transparent text-[#0a0a0a]/38 hover:text-[#0a0a0a] hover:border-[#0a0a0a]/20"
                 }`}
               >
                 {t.label}
@@ -1642,7 +1642,7 @@ export function GarageDetailClient({
           </div>
           <button
             onClick={() => setShowUpload(true)}
-            className="flex items-center gap-1.5 text-[10.5px] font-bold text-[#131218]/40 hover:text-[#131218] hover:bg-[#EFEFEA] px-3 py-1.5 rounded-lg transition-all"
+            className="flex items-center gap-1.5 text-[10.5px] font-bold text-[#0a0a0a]/40 hover:text-[#0a0a0a] hover:bg-[#f4f4ef] px-3 py-1.5 rounded-lg transition-all"
           >
             ↑ Upload docs
           </button>

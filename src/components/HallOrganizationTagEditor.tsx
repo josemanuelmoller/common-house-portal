@@ -129,8 +129,8 @@ export function HallOrganizationTagEditor(props: Props) {
     <div className="flex items-center gap-1.5 flex-wrap justify-end">
       {TAG_OPTIONS.map(t => {
         const active = selected.includes(t.v);
-        const activeCls = t.kind === "vip" ? "bg-[#B2FF59] text-black" : "bg-[#131218] text-white";
-        const inactive  = "bg-[#131218]/6 text-[#131218]/55 hover:bg-[#131218]/12";
+        const activeCls = t.kind === "vip" ? "bg-[#c6f24a] text-black" : "bg-[#0a0a0a] text-white";
+        const inactive  = "bg-[#0a0a0a]/6 text-[#0a0a0a]/55 hover:bg-[#0a0a0a]/12";
         return (
           <button
             key={t.v}
@@ -161,7 +161,7 @@ export function HallOrganizationTagEditor(props: Props) {
     <div className="flex flex-col gap-1.5 items-end shrink-0">
       {classChips}
       <div className="flex items-center gap-2">
-        <label className="flex items-center gap-1 text-[9px] text-[#131218]/55 cursor-pointer select-none">
+        <label className="flex items-center gap-1 text-[9px] text-[#0a0a0a]/55 cursor-pointer select-none">
           <input type="checkbox" className="w-3 h-3" checked={cascade} onChange={e => setCascade(e.target.checked)} />
           cascade to {props.contactCount}
         </label>
@@ -170,7 +170,7 @@ export function HallOrganizationTagEditor(props: Props) {
             type="button"
             disabled={pending}
             onClick={syncToNotion}
-            className="text-[9px] font-bold px-2 py-1 rounded-full bg-[#131218]/6 text-[#131218]/70 hover:bg-[#131218]/16 transition-colors"
+            className="text-[9px] font-bold px-2 py-1 rounded-full bg-[#0a0a0a]/6 text-[#0a0a0a]/70 hover:bg-[#0a0a0a]/16 transition-colors"
           >
             Sync to Notion →
           </button>
@@ -178,7 +178,7 @@ export function HallOrganizationTagEditor(props: Props) {
         <button
           type="button"
           onClick={dismissOrUndismiss}
-          className="text-[9px] font-bold px-2 py-1 rounded-full text-[#131218]/40 hover:text-[#131218]/80 hover:bg-[#131218]/6 transition-colors"
+          className="text-[9px] font-bold px-2 py-1 rounded-full text-[#0a0a0a]/40 hover:text-[#0a0a0a]/80 hover:bg-[#0a0a0a]/6 transition-colors"
           title={props.dismissed ? "Restore org" : "Dismiss org"}
         >
           {props.dismissed ? "↺ restore" : "✕ dismiss"}

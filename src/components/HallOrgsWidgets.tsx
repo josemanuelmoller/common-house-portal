@@ -79,13 +79,13 @@ export async function HallOrgsColdRelations() {
 
 const MIX_CLASSES = ["Client", "Partner", "Portfolio", "Investor", "Funder", "Team", "VIP"] as const;
 const MIX_COLOR: Record<typeof MIX_CLASSES[number], string> = {
-  Client:    "bg-[#c8f55a]",
+  Client:    "bg-[#c6f24a]",
   Partner:   "bg-[#7dd3fc]",
   Portfolio: "bg-[#fbbf24]",
   Investor:  "bg-[#a78bfa]",
   Funder:    "bg-[#f472b6]",
-  Team:      "bg-[#131218]",
-  VIP:       "bg-[#B2FF59]",
+  Team:      "bg-[#0a0a0a]",
+  VIP:       "bg-[#c6f24a]",
 };
 
 export async function HallOrgsClassMix() {

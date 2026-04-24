@@ -38,7 +38,7 @@ export function ApproveProjectUpdateButton({
 
   if (state === "done") {
     return (
-      <span className="shrink-0 text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">
+      <span className="shrink-0 text-[10px] font-bold text-[#0a0a0a]/30 uppercase tracking-widest">
         {activeAction === "approve" ? "Approved ✓" : "Dismissed ✓"}
       </span>
     );
@@ -49,7 +49,7 @@ export function ApproveProjectUpdateButton({
       <button
         onClick={() => act("dismiss")}
         disabled={state === "loading"}
-        className="text-[10px] font-bold px-3 py-1.5 rounded-lg border border-[#131218]/15 text-[#131218]/40 hover:border-[#131218]/30 hover:text-[#131218]/70 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        className="text-[10px] font-bold px-3 py-1.5 rounded-lg border border-[#0a0a0a]/15 text-[#0a0a0a]/40 hover:border-[#0a0a0a]/30 hover:text-[#0a0a0a]/70 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
       >
         {state === "loading" && activeAction === "dismiss" ? "…" : "Dismiss"}
       </button>
@@ -57,7 +57,7 @@ export function ApproveProjectUpdateButton({
         <button
           onClick={() => act("approve")}
           disabled={state === "loading"}
-          className="text-[10px] font-bold px-3 py-1.5 rounded-lg bg-[#c8f55a] text-[#131218] hover:bg-[#b8e54a] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          className="text-[10px] font-bold px-3 py-1.5 rounded-lg bg-[#c6f24a] text-[#0a0a0a] hover:bg-[#b8e54a] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {state === "loading" && activeAction === "approve" ? "Approving…" : "Approve update"}
         </button>

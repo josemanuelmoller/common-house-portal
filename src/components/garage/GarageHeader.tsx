@@ -11,7 +11,7 @@ import type { GarageProject } from "@/types/garage";
  */
 export function GarageHeader({ project }: { project: GarageProject }) {
   return (
-    <div className="bg-[#131218] px-8 py-8 border-b border-white/8">
+    <div className="bg-[#0a0a0a] px-8 py-8 border-b border-white/8">
       <div className="max-w-4xl mx-auto flex items-start justify-between gap-6 flex-wrap">
         <div>
           <p className="text-[10px] font-bold text-white/25 uppercase tracking-widest mb-2">
@@ -21,7 +21,7 @@ export function GarageHeader({ project }: { project: GarageProject }) {
             {project.name}
           </h1>
           <div className="flex items-center gap-2 mt-3 flex-wrap">
-            <span className="text-[10px] font-bold text-[#131218] bg-[#B2FF59] px-2.5 py-1 rounded-full uppercase tracking-widest">
+            <span className="text-[10px] font-bold text-[#0a0a0a] bg-[#c6f24a] px-2.5 py-1 rounded-full uppercase tracking-widest">
               {project.stage}
             </span>
             {project.garageMode && (

@@ -86,12 +86,12 @@ function bestActivity(p: { lastUpdate: string | null; lastEvidenceDate?: string 
 // Q4 — "Hot" is a HEALTHY state (recent activity), so it should be green,
 // not red. Red is reserved for alarming signals (blockers, stale >30d).
 function warmthLabel(days: number | null): { label: string; dot: string; text: string } {
-  if (days === null) return { label: "Dormant", dot: "bg-[#131218]/15", text: "text-[#131218]/35" };
+  if (days === null) return { label: "Dormant", dot: "bg-[#0a0a0a]/15", text: "text-[#0a0a0a]/35" };
   if (days <= 3)  return { label: "Hot",     dot: "bg-emerald-500",  text: "text-emerald-700" };
-  if (days <= 10) return { label: "Warm",    dot: "bg-[#c8f55a]",    text: "text-[#131218]/70" };
+  if (days <= 10) return { label: "Warm",    dot: "bg-[#c6f24a]",    text: "text-[#0a0a0a]/70" };
   if (days <= 21) return { label: "Warm",    dot: "bg-amber-300",    text: "text-amber-600" };
   if (days <= 35) return { label: "Cold",    dot: "bg-blue-400",     text: "text-blue-500" };
-  return              { label: "Dormant", dot: "bg-[#131218]/15", text: "text-[#131218]/35" };
+  return              { label: "Dormant", dot: "bg-[#0a0a0a]/15", text: "text-[#0a0a0a]/35" };
 }
 
 function personWarmthBadge(warmth: string): { dot: string; text: string; bg: string } {
@@ -102,9 +102,9 @@ function personWarmthBadge(warmth: string): { dot: string; text: string; bg: str
 }
 
 function projectTypeBadge(primaryWorkspace: string): string {
-  if (primaryWorkspace === "garage")   return "bg-[#131218] text-[#B2FF59]";
-  if (primaryWorkspace === "workroom") return "bg-[#EFEFEA] text-[#131218]/60 border border-[#E0E0D8]";
-  return "bg-[#EFEFEA] text-[#131218]/30 border border-[#E0E0D8]";
+  if (primaryWorkspace === "garage")   return "bg-[#0a0a0a] text-[#c6f24a]";
+  if (primaryWorkspace === "workroom") return "bg-[#f4f4ef] text-[#0a0a0a]/60 border border-[#e4e4dd]";
+  return "bg-[#f4f4ef] text-[#0a0a0a]/30 border border-[#e4e4dd]";
 }
 
 function projectTypeLabel(primaryWorkspace: string): string {
@@ -116,8 +116,8 @@ function projectTypeLabel(primaryWorkspace: string): string {
 const STAGE_COLORS: Record<string, string> = {
   "Discovery":  "bg-blue-50 text-blue-600 border border-blue-200",
   "Validation": "bg-amber-50 text-amber-600 border border-amber-200",
-  "Execution":  "bg-[#131218] text-[#B2FF59]",
-  "Completion": "bg-[#B2FF59] text-[#131218]",
+  "Execution":  "bg-[#0a0a0a] text-[#c6f24a]",
+  "Completion": "bg-[#c6f24a] text-[#0a0a0a]",
   "On Hold":    "bg-gray-100 text-gray-400 border border-gray-200",
   "Paused":     "bg-gray-100 text-gray-400 border border-gray-200",
 };
@@ -439,10 +439,10 @@ function QuietRow({ label, note, action }: {
   action?: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center gap-3 bg-white/50 border border-dashed border-[#E0E0D8] rounded-xl px-4 py-2">
-      <span className="w-1.5 h-1.5 rounded-full bg-[#131218]/15 shrink-0" />
-      <span className="text-[10px] font-bold uppercase tracking-[2px] text-[#131218]/30">{label}</span>
-      <span className="text-[11px] text-[#131218]/45 flex-1 min-w-0 truncate">{note}</span>
+    <div className="flex items-center gap-3 bg-white/50 border border-dashed border-[#e4e4dd] rounded-xl px-4 py-2">
+      <span className="w-1.5 h-1.5 rounded-full bg-[#0a0a0a]/15 shrink-0" />
+      <span className="text-[10px] font-bold uppercase tracking-[2px] text-[#0a0a0a]/30">{label}</span>
+      <span className="text-[11px] text-[#0a0a0a]/45 flex-1 min-w-0 truncate">{note}</span>
       {action}
     </div>
   );
@@ -578,7 +578,7 @@ export default async function AdminPage() {
   const firstName = adminUser.firstName || adminUser.primaryEmailAddress?.emailAddress?.split("@")[0] || "Common House";
 
   return (
-    <div className="flex min-h-screen bg-[#EFEFEA]">
+    <div className="flex min-h-screen bg-[#f4f4ef]">
       <Sidebar adminNav />
 
       <main
@@ -759,11 +759,11 @@ export default async function AdminPage() {
 
             if (suggestions.length === 0) {
               return (
-                <div className="bg-white border border-[#E0E0D8] rounded-xl px-5 py-3 flex items-center justify-between gap-4">
+                <div className="bg-white border border-[#e4e4dd] rounded-xl px-5 py-3 flex items-center justify-between gap-4">
                   <div className="flex items-center gap-3 min-w-0">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#c8f55a] shrink-0" />
-                    <p className="text-[10px] font-bold uppercase tracking-[2.5px] text-[#131218]/35">Focus of the Day</p>
-                    <p className="text-[12px] text-[#131218]/50 truncate">Queue is clear — good moment for deep work.</p>
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#c6f24a] shrink-0" />
+                    <p className="text-[10px] font-bold uppercase tracking-[2.5px] text-[#0a0a0a]/35">Focus of the Day</p>
+                    <p className="text-[12px] text-[#0a0a0a]/50 truncate">Queue is clear — good moment for deep work.</p>
                   </div>
                   <TriggerBriefingButton />
                 </div>
@@ -787,30 +787,30 @@ export default async function AdminPage() {
                     : suggestions.length === 1 ? "Suggested move" : "Suggested moves";
 
             return (
-              <div className={`bg-white border rounded-xl overflow-hidden ${hasP1 ? "border-red-300 ring-1 ring-red-100" : "border-[#E0E0D8]"}`}>
-                <div className={`px-5 pt-3 pb-2 flex items-center justify-between gap-3 border-b ${hasP1 ? "border-red-100 bg-red-50/40" : "border-[#EFEFEA]"}`}>
+              <div className={`bg-white border rounded-xl overflow-hidden ${hasP1 ? "border-red-300 ring-1 ring-red-100" : "border-[#e4e4dd]"}`}>
+                <div className={`px-5 pt-3 pb-2 flex items-center justify-between gap-3 border-b ${hasP1 ? "border-red-100 bg-red-50/40" : "border-[#f4f4ef]"}`}>
                   <div className="flex items-center gap-2.5">
-                    <span className={`w-1.5 h-1.5 rounded-full ${hasP1 ? "bg-red-500 animate-pulse" : "bg-[#c8f55a]"}`} />
-                    <p className="text-[10px] font-bold uppercase tracking-[2.5px] text-[#131218]/35">Focus of the Day</p>
-                    <span className="text-[10px] text-[#131218]/35">·</span>
-                    <span className={`text-[10px] font-semibold ${hasP1 ? "text-red-700" : "text-[#131218]/55"}`}>{heroSubtitle}</span>
+                    <span className={`w-1.5 h-1.5 rounded-full ${hasP1 ? "bg-red-500 animate-pulse" : "bg-[#c6f24a]"}`} />
+                    <p className="text-[10px] font-bold uppercase tracking-[2.5px] text-[#0a0a0a]/35">Focus of the Day</p>
+                    <span className="text-[10px] text-[#0a0a0a]/35">·</span>
+                    <span className={`text-[10px] font-semibold ${hasP1 ? "text-red-700" : "text-[#0a0a0a]/55"}`}>{heroSubtitle}</span>
                   </div>
                   <TriggerBriefingButton />
                 </div>
-                <div className="divide-y divide-[#EFEFEA]">
+                <div className="divide-y divide-[#f4f4ef]">
                   {suggestions.map((s, i) => (
                     <a
                       key={i}
                       href={s.href}
                       target={s.href.startsWith("http") ? "_blank" : undefined}
                       rel={s.href.startsWith("http") ? "noopener noreferrer" : undefined}
-                      className="flex items-center gap-3 px-5 py-2.5 hover:bg-[#EFEFEA]/50 transition-colors"
+                      className="flex items-center gap-3 px-5 py-2.5 hover:bg-[#f4f4ef]/50 transition-colors"
                     >
-                      <span className="text-[9px] font-bold uppercase tracking-widest text-[#131218]/40 bg-[#EFEFEA] px-2 py-0.5 rounded-full shrink-0 w-[72px] text-center">
+                      <span className="text-[9px] font-bold uppercase tracking-widest text-[#0a0a0a]/40 bg-[#f4f4ef] px-2 py-0.5 rounded-full shrink-0 w-[72px] text-center">
                         {s.label}
                       </span>
-                      <p className="text-[12px] text-[#131218] flex-1 min-w-0 truncate">{s.action}</p>
-                      <span className="text-[#131218]/25 shrink-0 text-sm">→</span>
+                      <p className="text-[12px] text-[#0a0a0a] flex-1 min-w-0 truncate">{s.action}</p>
+                      <span className="text-[#0a0a0a]/25 shrink-0 text-sm">→</span>
                     </a>
                   ))}
                 </div>
@@ -990,10 +990,10 @@ export default async function AdminPage() {
 
                 if (allEmpty) {
                   return (
-                    <div className="bg-white rounded-xl border border-[#E0E0D8] px-5 py-2.5 flex items-center gap-3">
+                    <div className="bg-white rounded-xl border border-[#e4e4dd] px-5 py-2.5 flex items-center gap-3">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                      <span className="text-[11px] font-semibold text-[#131218]/70">System clear</span>
-                      <span className="text-[10px] text-[#131218]/40">— no candidates, no Chief-of-Staff work, no parked loops.</span>
+                      <span className="text-[11px] font-semibold text-[#0a0a0a]/70">System clear</span>
+                      <span className="text-[10px] text-[#0a0a0a]/40">— no candidates, no Chief-of-Staff work, no parked loops.</span>
                     </div>
                   );
                 }
@@ -1394,7 +1394,7 @@ export default async function AdminPage() {
                           {/* Stage */}
                           <div className="min-w-0">
                             {p.stage ? (
-                              <span className={`inline-block text-[9px] font-bold px-2 py-0.5 rounded-full truncate max-w-full ${STAGE_COLORS[p.stage] ?? "bg-[#EFEFEA] text-[#131218]/50"}`}>
+                              <span className={`inline-block text-[9px] font-bold px-2 py-0.5 rounded-full truncate max-w-full ${STAGE_COLORS[p.stage] ?? "bg-[#f4f4ef] text-[#0a0a0a]/50"}`}>
                                 {p.stage}
                               </span>
                             ) : <span className="text-xs" style={{ color: "var(--hall-muted-3)" }}>—</span>}
@@ -1479,7 +1479,7 @@ export default async function AdminPage() {
                                   </div>
                                 </div>
                                 <div>
-                                  {p.stage && <span className={`inline-block text-[9px] font-bold px-2 py-0.5 rounded-full ${STAGE_COLORS[p.stage] ?? "bg-[#EFEFEA] text-[#131218]/50"}`}>{p.stage}</span>}
+                                  {p.stage && <span className={`inline-block text-[9px] font-bold px-2 py-0.5 rounded-full ${STAGE_COLORS[p.stage] ?? "bg-[#f4f4ef] text-[#0a0a0a]/50"}`}>{p.stage}</span>}
                                 </div>
                                 <div className="text-[10px]" style={{ color: "var(--hall-muted-3)", fontFamily: "var(--font-hall-mono)" }}>DORMANT</div>
                                 <div className="text-right text-[10px]" style={{ color: "var(--hall-muted-3)", fontFamily: "var(--font-hall-mono)" }}>{days != null ? `${days}d silent` : "—"}</div>

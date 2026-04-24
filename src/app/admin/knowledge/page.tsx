@@ -434,7 +434,7 @@ export default async function KnowledgePage() {
   ];
 
   return (
-    <div className="flex min-h-screen bg-[#EFEFEA]">
+    <div className="flex min-h-screen bg-[#f4f4ef]">
       <Sidebar items={NAV} isAdmin />
 
       <main

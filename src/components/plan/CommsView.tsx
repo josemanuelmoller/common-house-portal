@@ -41,9 +41,9 @@ const TIER_LABEL: Record<string, string> = {
 };
 
 const TIER_COLOR: Record<string, string> = {
-  core:         "bg-[#131218] text-white",
-  building:     "bg-[#c8f55a] text-[#131218]",
-  experimental: "bg-[#EFEFEA] text-[#131218]/60",
+  core:         "bg-[#0a0a0a] text-white",
+  building:     "bg-[#c6f24a] text-[#0a0a0a]",
+  experimental: "bg-[#f4f4ef] text-[#0a0a0a]/60",
 };
 
 const STATUS_LABEL: Record<PitchStatus, string> = {
@@ -61,9 +61,9 @@ const STATUS_COLOR: Record<PitchStatus, string> = {
   approved:  "text-emerald-700 bg-emerald-50 border-emerald-200",
   drafting:  "text-blue-700 bg-blue-50 border-blue-200",
   drafted:   "text-emerald-700 bg-emerald-50 border-emerald-200",
-  published: "text-[#131218] bg-[#c8f55a]/30 border-[#c8f55a]",
-  skipped:   "text-[#131218]/40 bg-[#EFEFEA] border-[#E0E0D8]",
-  rejected:  "text-[#131218]/40 bg-[#EFEFEA] border-[#E0E0D8]",
+  published: "text-[#0a0a0a] bg-[#c6f24a]/30 border-[#c6f24a]",
+  skipped:   "text-[#0a0a0a]/40 bg-[#f4f4ef] border-[#e4e4dd]",
+  rejected:  "text-[#0a0a0a]/40 bg-[#f4f4ef] border-[#e4e4dd]",
 };
 
 // ─── Date helpers ─────────────────────────────────────────────────────────────
@@ -314,14 +314,14 @@ export default function CommsView({ pillars, audiences, channels, pitches, outco
     <div className="space-y-8">
 
       {/* ── Strategy header ──────────────────────────────────────────────── */}
-      <section className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-        <div className="px-6 py-4 border-b border-[#EFEFEA]">
-          <h2 className="text-[13px] font-bold text-[#131218]">Strategy · revised quarterly</h2>
+      <section className="bg-white rounded-2xl border border-[#e4e4dd] overflow-hidden">
+        <div className="px-6 py-4 border-b border-[#f4f4ef]">
+          <h2 className="text-[13px] font-bold text-[#0a0a0a]">Strategy · revised quarterly</h2>
         </div>
-        <div className="grid grid-cols-[1fr_1fr_1fr] gap-0 divide-x divide-[#EFEFEA]">
+        <div className="grid grid-cols-[1fr_1fr_1fr] gap-0 divide-x divide-[#f4f4ef]">
 
           <div className="px-6 py-4">
-            <p className="text-[9px] font-bold uppercase tracking-[2.5px] text-[#131218]/40 mb-3">
+            <p className="text-[9px] font-bold uppercase tracking-[2.5px] text-[#0a0a0a]/40 mb-3">
               Pilares · {pillars.length}
             </p>
             <ul className="space-y-2">
@@ -331,9 +331,9 @@ export default function CommsView({ pillars, audiences, channels, pitches, outco
                     {TIER_LABEL[p.tier]}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="text-[12px] font-semibold text-[#131218] leading-tight">{p.name}</p>
+                    <p className="text-[12px] font-semibold text-[#0a0a0a] leading-tight">{p.name}</p>
                     {p.description && (
-                      <p className="text-[10px] text-[#131218]/50 leading-snug mt-0.5">{p.description}</p>
+                      <p className="text-[10px] text-[#0a0a0a]/50 leading-snug mt-0.5">{p.description}</p>
                     )}
                   </div>
                 </li>
@@ -342,19 +342,19 @@ export default function CommsView({ pillars, audiences, channels, pitches, outco
           </div>
 
           <div className="px-6 py-4">
-            <p className="text-[9px] font-bold uppercase tracking-[2.5px] text-[#131218]/40 mb-3">
+            <p className="text-[9px] font-bold uppercase tracking-[2.5px] text-[#0a0a0a]/40 mb-3">
               Audiencias · {audiences.length}
             </p>
             <ul className="space-y-2">
               {audiences.map(a => (
                 <li key={a.id} className="flex items-start gap-2.5">
-                  <span className="text-[8.5px] font-bold text-[#131218]/40 shrink-0 w-4 text-right">
+                  <span className="text-[8.5px] font-bold text-[#0a0a0a]/40 shrink-0 w-4 text-right">
                     P{a.priority}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="text-[12px] font-semibold text-[#131218] leading-tight">{a.name}</p>
+                    <p className="text-[12px] font-semibold text-[#0a0a0a] leading-tight">{a.name}</p>
                     {a.description && (
-                      <p className="text-[10px] text-[#131218]/50 leading-snug mt-0.5">{a.description}</p>
+                      <p className="text-[10px] text-[#0a0a0a]/50 leading-snug mt-0.5">{a.description}</p>
                     )}
                   </div>
                 </li>
@@ -363,14 +363,14 @@ export default function CommsView({ pillars, audiences, channels, pitches, outco
           </div>
 
           <div className="px-6 py-4">
-            <p className="text-[9px] font-bold uppercase tracking-[2.5px] text-[#131218]/40 mb-3">
+            <p className="text-[9px] font-bold uppercase tracking-[2.5px] text-[#0a0a0a]/40 mb-3">
               Canales · {channels.length}
             </p>
             <ul className="space-y-2">
               {channels.map(c => (
                 <li key={c.id}>
-                  <p className="text-[12px] font-semibold text-[#131218] leading-tight">{c.name}</p>
-                  <p className="text-[10px] text-[#131218]/50 leading-snug">
+                  <p className="text-[12px] font-semibold text-[#0a0a0a] leading-tight">{c.name}</p>
+                  <p className="text-[10px] text-[#0a0a0a]/50 leading-snug">
                     {c.monthly_cadence}/mes · {Object.entries(c.format_mix).map(([k, v]) => `${v} ${k}`).join(" · ")}
                   </p>
                 </li>
@@ -383,17 +383,17 @@ export default function CommsView({ pillars, audiences, channels, pitches, outco
 
       {/* ── Generator controls ──────────────────────────────────────────── */}
       {staging === null && (
-        <section className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-3 flex items-center justify-between gap-4">
+        <section className="bg-white rounded-2xl border border-[#e4e4dd] px-5 py-3 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
-            <span className="text-[9px] font-bold uppercase tracking-[2.5px] text-[#131218]/40">Generator</span>
-            <p className="text-[11px] text-[#131218]/55">
+            <span className="text-[9px] font-bold uppercase tracking-[2.5px] text-[#0a0a0a]/40">Generator</span>
+            <p className="text-[11px] text-[#0a0a0a]/55">
               Corre automático el último viernes de mes. Dispará manual si ocurre algo digno de postear antes.
             </p>
           </div>
           <button
             onClick={runGenerate}
             disabled={generating !== null}
-            className="text-[10px] font-bold bg-[#131218] text-white rounded-lg px-3 py-1.5 hover:bg-[#2a2938] transition-colors disabled:opacity-50"
+            className="text-[10px] font-bold bg-[#0a0a0a] text-white rounded-lg px-3 py-1.5 hover:bg-[#2a2938] transition-colors disabled:opacity-50"
           >
             {generating === "generate" ? "Generating…" : "Generate batch"}
           </button>
@@ -408,13 +408,13 @@ export default function CommsView({ pillars, audiences, channels, pitches, outco
 
       {/* ── Staging area (dry_run batch awaiting Save / Regenerate / Discard) ── */}
       {staging !== null && (
-        <section className="bg-[#FAF8EE] border-2 border-dashed border-[#c8f55a] rounded-2xl overflow-hidden">
-          <div className="px-5 py-3 border-b border-dashed border-[#c8f55a]/50 flex items-center justify-between gap-4">
+        <section className="bg-[#FAF8EE] border-2 border-dashed border-[#c6f24a] rounded-2xl overflow-hidden">
+          <div className="px-5 py-3 border-b border-dashed border-[#c6f24a]/50 flex items-center justify-between gap-4">
             <div className="flex items-center gap-3 min-w-0">
-              <span className="text-[9px] font-bold uppercase tracking-[2.5px] text-[#131218] bg-[#c8f55a] px-2 py-0.5 rounded">
+              <span className="text-[9px] font-bold uppercase tracking-[2.5px] text-[#0a0a0a] bg-[#c6f24a] px-2 py-0.5 rounded">
                 Preview · sin guardar
               </span>
-              <p className="text-[11px] text-[#131218]/60">
+              <p className="text-[11px] text-[#0a0a0a]/60">
                 {staging.length - strikeIdx.size} de {staging.length} se guardarán · usa ✕ para excluir alguno
               </p>
             </div>
@@ -422,38 +422,38 @@ export default function CommsView({ pillars, audiences, channels, pitches, outco
               <button
                 onClick={runGenerate}
                 disabled={generating !== null}
-                className="text-[10px] font-bold text-[#131218]/60 hover:text-[#131218] border border-[#131218]/20 rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50"
+                className="text-[10px] font-bold text-[#0a0a0a]/60 hover:text-[#0a0a0a] border border-[#0a0a0a]/20 rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50"
               >
                 {generating === "generate" ? "…" : "Regenerate"}
               </button>
               <button
                 onClick={discardStaging}
                 disabled={generating !== null}
-                className="text-[10px] font-bold text-[#131218]/60 hover:text-red-600 border border-[#131218]/20 rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50"
+                className="text-[10px] font-bold text-[#0a0a0a]/60 hover:text-red-600 border border-[#0a0a0a]/20 rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50"
               >
                 Discard
               </button>
               <button
                 onClick={saveStaging}
                 disabled={generating !== null || staging.length - strikeIdx.size === 0}
-                className="text-[10px] font-bold bg-[#131218] text-white rounded-lg px-3 py-1.5 hover:bg-[#2a2938] transition-colors disabled:opacity-50"
+                className="text-[10px] font-bold bg-[#0a0a0a] text-white rounded-lg px-3 py-1.5 hover:bg-[#2a2938] transition-colors disabled:opacity-50"
               >
                 {generating === "save" ? "Saving…" : `Save ${staging.length - strikeIdx.size}`}
               </button>
             </div>
           </div>
 
-          <ul className="divide-y divide-[#c8f55a]/30">
+          <ul className="divide-y divide-[#c6f24a]/30">
             {staging.map((p, i) => {
               const struck = strikeIdx.has(i);
               return (
                 <li key={i} className={`px-5 py-3 flex items-start gap-4 ${struck ? "opacity-40" : ""}`}>
                   <div className="shrink-0 w-24">
-                    <p className={`text-[11px] font-bold text-[#131218] ${struck ? "line-through" : ""}`}>
+                    <p className={`text-[11px] font-bold text-[#0a0a0a] ${struck ? "line-through" : ""}`}>
                       {fmtDate(p.proposed_for_date)}
                     </p>
                     {p.channel_name && (
-                      <p className="text-[9px] text-[#131218]/40 mt-0.5">{p.channel_name}</p>
+                      <p className="text-[9px] text-[#0a0a0a]/40 mt-0.5">{p.channel_name}</p>
                     )}
                   </div>
                   <div className="shrink-0 flex flex-col gap-1">
@@ -463,18 +463,18 @@ export default function CommsView({ pillars, audiences, channels, pitches, outco
                       </span>
                     )}
                     {p.audience_name && (
-                      <span className="text-[9px] text-[#131218]/50 bg-white/60 px-1.5 py-0.5 rounded w-fit">
+                      <span className="text-[9px] text-[#0a0a0a]/50 bg-white/60 px-1.5 py-0.5 rounded w-fit">
                         → {p.audience_name}
                       </span>
                     )}
                   </div>
                   <div className={`flex-1 min-w-0 ${struck ? "line-through" : ""}`}>
                     {p.headline && (
-                      <p className="text-[12.5px] font-semibold text-[#131218] leading-snug">{p.headline}</p>
+                      <p className="text-[12.5px] font-semibold text-[#0a0a0a] leading-snug">{p.headline}</p>
                     )}
-                    <p className="text-[11px] text-[#131218]/65 leading-[1.55] mt-1">{p.angle}</p>
+                    <p className="text-[11px] text-[#0a0a0a]/65 leading-[1.55] mt-1">{p.angle}</p>
                     {p.trigger && (
-                      <p className="text-[9.5px] text-[#131218]/35 leading-snug mt-1.5">
+                      <p className="text-[9.5px] text-[#0a0a0a]/35 leading-snug mt-1.5">
                         <span className="font-bold uppercase tracking-wider">Trigger</span> · {p.trigger}
                       </p>
                     )}
@@ -483,8 +483,8 @@ export default function CommsView({ pillars, audiences, channels, pitches, outco
                     onClick={() => toggleStrike(i)}
                     className={`shrink-0 text-[12px] font-bold w-7 h-7 rounded-full flex items-center justify-center transition-colors ${
                       struck
-                        ? "bg-[#131218] text-white hover:bg-[#2a2938]"
-                        : "text-[#131218]/30 hover:text-red-600 hover:bg-red-50"
+                        ? "bg-[#0a0a0a] text-white hover:bg-[#2a2938]"
+                        : "text-[#0a0a0a]/30 hover:text-red-600 hover:bg-red-50"
                     }`}
                     title={struck ? "Re-incluir este pitch" : "Excluir este pitch del save"}
                   >
@@ -501,22 +501,22 @@ export default function CommsView({ pillars, audiences, channels, pitches, outco
       <section>
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3">
-            <h2 className="text-[13px] font-bold text-[#131218]">Próximos 30 días</h2>
+            <h2 className="text-[13px] font-bold text-[#0a0a0a]">Próximos 30 días</h2>
             {proposedCount > 0 && (
               <span className="text-[10px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
                 {proposedCount} por revisar
               </span>
             )}
           </div>
-          <p className="text-[10px] text-[#131218]/40">
+          <p className="text-[10px] text-[#0a0a0a]/40">
             Canal activo: {primaryChannel?.name ?? "—"}
           </p>
         </div>
 
         {pitches.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-[#E0E0D8] px-6 py-10 text-center">
-            <p className="text-[12px] font-semibold text-[#131218] mb-1">Sin pitches todavía</p>
-            <p className="text-[11px] text-[#131218]/50 leading-relaxed max-w-md mx-auto">
+          <div className="bg-white rounded-2xl border border-[#e4e4dd] px-6 py-10 text-center">
+            <p className="text-[12px] font-semibold text-[#0a0a0a] mb-1">Sin pitches todavía</p>
+            <p className="text-[11px] text-[#0a0a0a]/50 leading-relaxed max-w-md mx-auto">
               Usá <span className="font-bold">Generate now</span> arriba para crear un batch ya, o esperá al cron del último viernes de mes.
             </p>
           </div>
@@ -528,14 +528,14 @@ export default function CommsView({ pillars, audiences, channels, pitches, outco
               return (
                 <div key={wk}>
                   <div className="flex items-center justify-between mb-2 px-1">
-                    <p className="text-[10px] font-bold uppercase tracking-[2.5px] text-[#131218]/40">
+                    <p className="text-[10px] font-bold uppercase tracking-[2.5px] text-[#0a0a0a]/40">
                       {weekLabel(wk, thisMonday)} · {weekPitches.length} pitch{weekPitches.length === 1 ? "" : "es"}
                     </p>
                     {canBulkApprove && (
                       <button
                         disabled={actingId !== null}
                         onClick={() => handleAction(proposedInWeek.map(p => p.id), "approve")}
-                        className="text-[10px] font-bold bg-[#c8f55a] text-[#131218] rounded px-2.5 py-1 hover:bg-[#b8e54a] transition-colors disabled:opacity-50"
+                        className="text-[10px] font-bold bg-[#c6f24a] text-[#0a0a0a] rounded px-2.5 py-1 hover:bg-[#b8e54a] transition-colors disabled:opacity-50"
                       >
                         ✓ Aprobar {proposedInWeek.length} de esta semana
                       </button>
@@ -555,14 +555,14 @@ export default function CommsView({ pillars, audiences, channels, pitches, outco
                       const outcome      = outcomes[p.id];
 
                       return (
-                        <li key={p.id} className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
+                        <li key={p.id} className="bg-white rounded-2xl border border-[#e4e4dd] overflow-hidden">
                           <div className="px-5 py-4">
                             <div className="flex items-start gap-4">
 
                               <div className="shrink-0 w-24">
-                                <p className="text-[11px] font-bold text-[#131218]">{fmtDate(p.proposed_for_date)}</p>
+                                <p className="text-[11px] font-bold text-[#0a0a0a]">{fmtDate(p.proposed_for_date)}</p>
                                 {p.channel_name && (
-                                  <p className="text-[9px] text-[#131218]/40 mt-0.5">{p.channel_name}</p>
+                                  <p className="text-[9px] text-[#0a0a0a]/40 mt-0.5">{p.channel_name}</p>
                                 )}
                               </div>
 
@@ -573,7 +573,7 @@ export default function CommsView({ pillars, audiences, channels, pitches, outco
                                   </span>
                                 )}
                                 {p.audience_name && (
-                                  <span className="text-[9px] text-[#131218]/50 bg-[#EFEFEA] px-1.5 py-0.5 rounded w-fit">
+                                  <span className="text-[9px] text-[#0a0a0a]/50 bg-[#f4f4ef] px-1.5 py-0.5 rounded w-fit">
                                     → {p.audience_name}
                                   </span>
                                 )}
@@ -588,25 +588,25 @@ export default function CommsView({ pillars, audiences, channels, pitches, outco
                                       value={editHeadline}
                                       onChange={e => setEditHeadline(e.target.value)}
                                       placeholder="Headline (optional)"
-                                      className="w-full text-[12.5px] font-semibold text-[#131218] border border-[#131218]/20 rounded px-2 py-1 outline-none focus:border-[#131218]"
+                                      className="w-full text-[12.5px] font-semibold text-[#0a0a0a] border border-[#0a0a0a]/20 rounded px-2 py-1 outline-none focus:border-[#0a0a0a]"
                                     />
                                     <textarea
                                       value={editAngle}
                                       onChange={e => setEditAngle(e.target.value)}
-                                      className="w-full text-[11px] text-[#131218] leading-[1.55] border border-[#131218]/20 rounded px-2 py-1.5 outline-none focus:border-[#131218] min-h-[80px] resize-y"
+                                      className="w-full text-[11px] text-[#0a0a0a] leading-[1.55] border border-[#0a0a0a]/20 rounded px-2 py-1.5 outline-none focus:border-[#0a0a0a] min-h-[80px] resize-y"
                                     />
                                     <div className="flex items-center gap-3">
                                       <button
                                         disabled={isActing}
                                         onClick={() => saveEdit(p.id)}
-                                        className="text-[10px] font-bold text-[#131218] hover:text-emerald-700 transition-colors disabled:opacity-50"
+                                        className="text-[10px] font-bold text-[#0a0a0a] hover:text-emerald-700 transition-colors disabled:opacity-50"
                                       >
                                         {isActing ? "Saving…" : "Save edit"}
                                       </button>
                                       <button
                                         disabled={isActing}
                                         onClick={() => setEditingId(null)}
-                                        className="text-[10px] font-bold text-[#131218]/30 hover:text-[#131218] transition-colors disabled:opacity-50"
+                                        className="text-[10px] font-bold text-[#0a0a0a]/30 hover:text-[#0a0a0a] transition-colors disabled:opacity-50"
                                       >
                                         Cancel
                                       </button>
@@ -615,16 +615,16 @@ export default function CommsView({ pillars, audiences, channels, pitches, outco
                                 ) : (
                                   <>
                                     {displayHeadline && (
-                                      <p className="text-[12.5px] font-semibold text-[#131218] leading-snug">{displayHeadline}</p>
+                                      <p className="text-[12.5px] font-semibold text-[#0a0a0a] leading-snug">{displayHeadline}</p>
                                     )}
-                                    <p className="text-[11px] text-[#131218]/60 leading-[1.55] mt-1">{displayAngle}</p>
+                                    <p className="text-[11px] text-[#0a0a0a]/60 leading-[1.55] mt-1">{displayAngle}</p>
                                     {p.trigger && (
-                                      <p className="text-[9.5px] text-[#131218]/35 leading-snug mt-1.5">
+                                      <p className="text-[9.5px] text-[#0a0a0a]/35 leading-snug mt-1.5">
                                         <span className="font-bold uppercase tracking-wider">Trigger</span> · {p.trigger}
                                       </p>
                                     )}
                                     {(status === "drafted" || status === "published") && outcome && (
-                                      <p className="text-[9.5px] text-[#131218]/50 leading-snug mt-1.5">
+                                      <p className="text-[9.5px] text-[#0a0a0a]/50 leading-snug mt-1.5">
                                         <span className="font-bold uppercase tracking-wider">Outcome</span>
                                         {outcome.worth_repeating === true  && " · 👍 worth repeating"}
                                         {outcome.worth_repeating === false && " · 👎 skip next time"}
@@ -648,14 +648,14 @@ export default function CommsView({ pillars, audiences, channels, pitches, outco
                                       <button
                                         disabled={isActing}
                                         onClick={() => handleAction([p.id], "approve")}
-                                        className="text-[10px] font-bold bg-[#c8f55a] text-[#131218] rounded px-2 py-1 hover:bg-[#b8e54a] transition-colors disabled:opacity-50"
+                                        className="text-[10px] font-bold bg-[#c6f24a] text-[#0a0a0a] rounded px-2 py-1 hover:bg-[#b8e54a] transition-colors disabled:opacity-50"
                                       >
                                         Approve
                                       </button>
                                       <button
                                         disabled={isActing}
                                         onClick={() => startEdit(p)}
-                                        className="text-[10px] font-bold text-[#131218]/70 hover:text-[#131218] border border-[#E0E0D8] rounded px-2 py-1 transition-colors disabled:opacity-50"
+                                        className="text-[10px] font-bold text-[#0a0a0a]/70 hover:text-[#0a0a0a] border border-[#e4e4dd] rounded px-2 py-1 transition-colors disabled:opacity-50"
                                       >
                                         Edit
                                       </button>
@@ -664,14 +664,14 @@ export default function CommsView({ pillars, audiences, channels, pitches, outco
                                       <button
                                         disabled={isActing}
                                         onClick={() => handleAction([p.id], "skip")}
-                                        className="text-[10px] font-bold text-[#131218]/50 hover:text-[#131218] border border-[#E0E0D8] rounded px-2 py-1 transition-colors disabled:opacity-50"
+                                        className="text-[10px] font-bold text-[#0a0a0a]/50 hover:text-[#0a0a0a] border border-[#e4e4dd] rounded px-2 py-1 transition-colors disabled:opacity-50"
                                       >
                                         Skip
                                       </button>
                                       <button
                                         disabled={isActing}
                                         onClick={() => setRejectingId(p.id)}
-                                        className="text-[10px] font-bold text-red-500/70 hover:text-red-600 border border-[#E0E0D8] rounded px-2 py-1 transition-colors disabled:opacity-50"
+                                        className="text-[10px] font-bold text-red-500/70 hover:text-red-600 border border-[#e4e4dd] rounded px-2 py-1 transition-colors disabled:opacity-50"
                                       >
                                         Reject
                                       </button>
@@ -687,7 +687,7 @@ export default function CommsView({ pillars, audiences, channels, pitches, outco
                                       value={rejectReason}
                                       onChange={e => setRejectReason(e.target.value)}
                                       placeholder="Why?"
-                                      className="text-[10px] border border-[#E0E0D8] rounded px-2 py-1 outline-none focus:border-[#131218]"
+                                      className="text-[10px] border border-[#e4e4dd] rounded px-2 py-1 outline-none focus:border-[#0a0a0a]"
                                     />
                                     <div className="flex gap-1">
                                       <button
@@ -700,7 +700,7 @@ export default function CommsView({ pillars, audiences, channels, pitches, outco
                                       <button
                                         disabled={isActing}
                                         onClick={() => { setRejectingId(null); setRejectReason(""); }}
-                                        className="text-[10px] font-bold text-[#131218]/40 hover:text-[#131218] transition-colors"
+                                        className="text-[10px] font-bold text-[#0a0a0a]/40 hover:text-[#0a0a0a] transition-colors"
                                       >
                                         Cancel
                                       </button>
@@ -714,13 +714,13 @@ export default function CommsView({ pillars, audiences, channels, pitches, outco
                                       href={`https://www.notion.so/${p.draft_notion_id.replace(/-/g, "")}`}
                                       target="_blank"
                                       rel="noopener noreferrer"
-                                      className="text-[10px] font-bold text-[#131218] hover:text-[#131218]/70 transition-colors"
+                                      className="text-[10px] font-bold text-[#0a0a0a] hover:text-[#0a0a0a]/70 transition-colors"
                                     >
                                       Open in Notion ↗
                                     </a>
                                     <button
                                       onClick={() => openOutcome(p)}
-                                      className="text-[10px] font-bold text-[#131218]/60 hover:text-[#131218] border border-[#E0E0D8] rounded px-2 py-1 transition-colors"
+                                      className="text-[10px] font-bold text-[#0a0a0a]/60 hover:text-[#0a0a0a] border border-[#e4e4dd] rounded px-2 py-1 transition-colors"
                                     >
                                       {outcome ? "Edit outcome" : "Mark outcome"}
                                     </button>
@@ -730,14 +730,14 @@ export default function CommsView({ pillars, audiences, channels, pitches, outco
                                 {status === "published" && (
                                   <button
                                     onClick={() => openOutcome(p)}
-                                    className="text-[10px] font-bold text-[#131218]/60 hover:text-[#131218] border border-[#E0E0D8] rounded px-2 py-1 transition-colors mt-1"
+                                    className="text-[10px] font-bold text-[#0a0a0a]/60 hover:text-[#0a0a0a] border border-[#e4e4dd] rounded px-2 py-1 transition-colors mt-1"
                                   >
                                     {outcome ? "Edit outcome" : "Log outcome"}
                                   </button>
                                 )}
 
                                 {p.rejected_reason && status === "rejected" && (
-                                  <p className="text-[9px] text-[#131218]/40 italic leading-tight mt-1 max-w-[140px] text-right">
+                                  <p className="text-[9px] text-[#0a0a0a]/40 italic leading-tight mt-1 max-w-[140px] text-right">
                                     &ldquo;{p.rejected_reason}&rdquo;
                                   </p>
                                 )}
@@ -747,9 +747,9 @@ export default function CommsView({ pillars, audiences, channels, pitches, outco
 
                             {/* Outcome form — expands below the row when active */}
                             {isMarking && (
-                              <div className="mt-4 pt-4 border-t border-[#EFEFEA] space-y-3">
+                              <div className="mt-4 pt-4 border-t border-[#f4f4ef] space-y-3">
                                 <div className="flex items-center gap-3">
-                                  <p className="text-[10px] font-bold uppercase tracking-widest text-[#131218]/40">
+                                  <p className="text-[10px] font-bold uppercase tracking-widest text-[#0a0a0a]/40">
                                     Outcome
                                   </p>
                                   <div className="flex gap-1.5">
@@ -758,7 +758,7 @@ export default function CommsView({ pillars, audiences, channels, pitches, outco
                                       className={`text-[10px] font-bold px-2.5 py-1 rounded border transition-colors ${
                                         outcomeForm.worth_repeating === true
                                           ? "bg-emerald-500 text-white border-emerald-500"
-                                          : "text-[#131218]/60 border-[#E0E0D8] hover:text-[#131218]"
+                                          : "text-[#0a0a0a]/60 border-[#e4e4dd] hover:text-[#0a0a0a]"
                                       }`}
                                     >
                                       👍 Worth repeating
@@ -768,7 +768,7 @@ export default function CommsView({ pillars, audiences, channels, pitches, outco
                                       className={`text-[10px] font-bold px-2.5 py-1 rounded border transition-colors ${
                                         outcomeForm.worth_repeating === false
                                           ? "bg-red-500 text-white border-red-500"
-                                          : "text-[#131218]/60 border-[#E0E0D8] hover:text-[#131218]"
+                                          : "text-[#0a0a0a]/60 border-[#e4e4dd] hover:text-[#0a0a0a]"
                                       }`}
                                     >
                                       👎 Skip next time
@@ -777,30 +777,30 @@ export default function CommsView({ pillars, audiences, channels, pitches, outco
                                 </div>
                                 <div className="grid grid-cols-3 gap-3">
                                   <label className="flex flex-col gap-1">
-                                    <span className="text-[9px] font-bold uppercase tracking-wider text-[#131218]/40">Impressions</span>
-                                    <input type="number" value={outcomeForm.impressions} onChange={e => setOutcomeForm(f => ({ ...f, impressions: e.target.value }))} className="text-[11px] border border-[#E0E0D8] rounded px-2 py-1 outline-none focus:border-[#131218]" />
+                                    <span className="text-[9px] font-bold uppercase tracking-wider text-[#0a0a0a]/40">Impressions</span>
+                                    <input type="number" value={outcomeForm.impressions} onChange={e => setOutcomeForm(f => ({ ...f, impressions: e.target.value }))} className="text-[11px] border border-[#e4e4dd] rounded px-2 py-1 outline-none focus:border-[#0a0a0a]" />
                                   </label>
                                   <label className="flex flex-col gap-1">
-                                    <span className="text-[9px] font-bold uppercase tracking-wider text-[#131218]/40">Comments</span>
-                                    <input type="number" value={outcomeForm.comments} onChange={e => setOutcomeForm(f => ({ ...f, comments: e.target.value }))} className="text-[11px] border border-[#E0E0D8] rounded px-2 py-1 outline-none focus:border-[#131218]" />
+                                    <span className="text-[9px] font-bold uppercase tracking-wider text-[#0a0a0a]/40">Comments</span>
+                                    <input type="number" value={outcomeForm.comments} onChange={e => setOutcomeForm(f => ({ ...f, comments: e.target.value }))} className="text-[11px] border border-[#e4e4dd] rounded px-2 py-1 outline-none focus:border-[#0a0a0a]" />
                                   </label>
                                   <label className="flex flex-col gap-1">
-                                    <span className="text-[9px] font-bold uppercase tracking-wider text-[#131218]/40">DMs</span>
-                                    <input type="number" value={outcomeForm.dms} onChange={e => setOutcomeForm(f => ({ ...f, dms: e.target.value }))} className="text-[11px] border border-[#E0E0D8] rounded px-2 py-1 outline-none focus:border-[#131218]" />
+                                    <span className="text-[9px] font-bold uppercase tracking-wider text-[#0a0a0a]/40">DMs</span>
+                                    <input type="number" value={outcomeForm.dms} onChange={e => setOutcomeForm(f => ({ ...f, dms: e.target.value }))} className="text-[11px] border border-[#e4e4dd] rounded px-2 py-1 outline-none focus:border-[#0a0a0a]" />
                                   </label>
                                 </div>
                                 <textarea
                                   value={outcomeForm.notes}
                                   onChange={e => setOutcomeForm(f => ({ ...f, notes: e.target.value }))}
                                   placeholder="What happened? Lessons?"
-                                  className="w-full text-[11px] border border-[#E0E0D8] rounded px-2 py-1.5 outline-none focus:border-[#131218] min-h-[48px] resize-y"
+                                  className="w-full text-[11px] border border-[#e4e4dd] rounded px-2 py-1.5 outline-none focus:border-[#0a0a0a] min-h-[48px] resize-y"
                                 />
                                 <div className="flex items-center gap-3 justify-end">
                                   {status === "drafted" && (
                                     <button
                                       disabled={isActing}
                                       onClick={() => saveOutcome(p.id, true)}
-                                      className="text-[10px] font-bold bg-[#131218] text-white rounded px-3 py-1.5 hover:bg-[#2a2938] transition-colors disabled:opacity-50"
+                                      className="text-[10px] font-bold bg-[#0a0a0a] text-white rounded px-3 py-1.5 hover:bg-[#2a2938] transition-colors disabled:opacity-50"
                                     >
                                       Mark published + save
                                     </button>
@@ -808,14 +808,14 @@ export default function CommsView({ pillars, audiences, channels, pitches, outco
                                   <button
                                     disabled={isActing}
                                     onClick={() => saveOutcome(p.id, false)}
-                                    className="text-[10px] font-bold text-[#131218] border border-[#E0E0D8] rounded px-3 py-1.5 hover:bg-[#EFEFEA] transition-colors disabled:opacity-50"
+                                    className="text-[10px] font-bold text-[#0a0a0a] border border-[#e4e4dd] rounded px-3 py-1.5 hover:bg-[#f4f4ef] transition-colors disabled:opacity-50"
                                   >
                                     Save
                                   </button>
                                   <button
                                     disabled={isActing}
                                     onClick={() => setOutcomeId(null)}
-                                    className="text-[10px] font-bold text-[#131218]/40 hover:text-[#131218] transition-colors"
+                                    className="text-[10px] font-bold text-[#0a0a0a]/40 hover:text-[#0a0a0a] transition-colors"
                                   >
                                     Close
                                   </button>

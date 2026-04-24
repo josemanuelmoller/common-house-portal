@@ -119,7 +119,7 @@ function EntitySearch({ onSelect }: { onSelect: (id: string, name: string) => vo
       <p className="text-[10px] font-bold text-amber-700 uppercase tracking-widest">
         Este item no tiene registro vinculado
       </p>
-      <p className="text-[10px] text-[#131218]/45 leading-snug">
+      <p className="text-[10px] text-[#0a0a0a]/45 leading-snug">
         Busca el registro de Notion al que pertenece este item. Tu respuesta se guardará allí directamente.
       </p>
       <div className="relative">
@@ -128,32 +128,32 @@ function EntitySearch({ onSelect }: { onSelect: (id: string, name: string) => vo
           value={query}
           onChange={e => { setQuery(e.target.value); search(e.target.value) }}
           placeholder="Buscar organización, persona o proyecto…"
-          className="w-full text-[12px] text-[#131218] bg-white border border-[#d4d4cc] rounded-lg px-3 py-1.5 placeholder:text-[#131218]/30 focus:outline-none focus:border-amber-400"
+          className="w-full text-[12px] text-[#0a0a0a] bg-white border border-[#d4d4cc] rounded-lg px-3 py-1.5 placeholder:text-[#0a0a0a]/30 focus:outline-none focus:border-amber-400"
         />
         {searching && (
-          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-[#131218]/30">
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-[#0a0a0a]/30">
             Buscando…
           </span>
         )}
       </div>
       {results.length > 0 && (
-        <div className="flex flex-col gap-0.5 bg-white border border-[#E0E0D8] rounded-lg overflow-hidden">
+        <div className="flex flex-col gap-0.5 bg-white border border-[#e4e4dd] rounded-lg overflow-hidden">
           {results.map(r => (
             <button
               key={r.id}
               onClick={() => onSelect(r.id, r.name)}
-              className="flex items-center gap-2 px-3 py-2 text-left hover:bg-[#EFEFEA] transition-colors"
+              className="flex items-center gap-2 px-3 py-2 text-left hover:bg-[#f4f4ef] transition-colors"
             >
-              <span className="text-[9px] font-bold text-[#131218]/30 bg-[#EFEFEA] px-1.5 py-0.5 rounded-full uppercase tracking-widest shrink-0">
+              <span className="text-[9px] font-bold text-[#0a0a0a]/30 bg-[#f4f4ef] px-1.5 py-0.5 rounded-full uppercase tracking-widest shrink-0">
                 {r.dbType}
               </span>
-              <span className="text-[12px] text-[#131218] font-medium">{r.name}</span>
+              <span className="text-[12px] text-[#0a0a0a] font-medium">{r.name}</span>
             </button>
           ))}
         </div>
       )}
       {query.trim().length >= 2 && !searching && results.length === 0 && (
-        <p className="text-[10px] text-[#131218]/35 italic">
+        <p className="text-[10px] text-[#0a0a0a]/35 italic">
           Sin resultados para &ldquo;{query}&rdquo;
         </p>
       )}
@@ -192,17 +192,17 @@ function RelationSearch({
       <div className="flex flex-col gap-1.5">
         <div className="flex items-center gap-2 p-2.5 bg-green-50 border border-green-200 rounded-lg">
           <span className="text-[10px] text-green-600">✓</span>
-          <span className="text-[12px] font-semibold text-[#131218]">{preview.name}</span>
+          <span className="text-[12px] font-semibold text-[#0a0a0a]">{preview.name}</span>
           <a href={preview.url} target="_blank" rel="noopener noreferrer"
-            className="text-[10px] text-[#131218]/30 hover:text-[#131218]/60 ml-auto">
+            className="text-[10px] text-[#0a0a0a]/30 hover:text-[#0a0a0a]/60 ml-auto">
             ver →
           </a>
         </div>
-        <p className="text-[10px] text-[#131218]/35 leading-snug">
+        <p className="text-[10px] text-[#0a0a0a]/35 leading-snug">
           Se vinculará <span className="font-mono">{fieldName}</span> a este registro.
         </p>
         <button onClick={() => { setPreview(null); setQuery("") }}
-          className="self-start text-[10px] text-[#131218]/35 hover:text-[#131218]/60 transition-colors">
+          className="self-start text-[10px] text-[#0a0a0a]/35 hover:text-[#0a0a0a]/60 transition-colors">
           ← Buscar otro
         </button>
         {/* Trigger actual write via parent — call onConfirm with the found ID */}
@@ -223,18 +223,18 @@ function RelationSearch({
           onKeyDown={e => { if (e.key === "Enter") handleSearch() }}
           placeholder={placeholder}
           disabled={disabled}
-          className="flex-1 text-[12px] text-[#131218] bg-[#FAFAF8] border border-[#d4d4cc] rounded-lg px-3 py-1.5 placeholder:text-[#131218]/30 focus:outline-none focus:border-[#131218]/40 disabled:opacity-50"
+          className="flex-1 text-[12px] text-[#0a0a0a] bg-[#FAFAF8] border border-[#d4d4cc] rounded-lg px-3 py-1.5 placeholder:text-[#0a0a0a]/30 focus:outline-none focus:border-[#0a0a0a]/40 disabled:opacity-50"
         />
         <button
           onClick={handleSearch}
           disabled={disabled || !query.trim() || previewing}
-          className="text-[11px] font-medium text-[#131218]/55 border border-[#d4d4cc] rounded-lg px-3 py-1.5 hover:bg-[#EFEFEA] transition-colors disabled:opacity-40"
+          className="text-[11px] font-medium text-[#0a0a0a]/55 border border-[#d4d4cc] rounded-lg px-3 py-1.5 hover:bg-[#f4f4ef] transition-colors disabled:opacity-40"
         >
           {previewing ? "Buscando…" : "Buscar"}
         </button>
       </div>
       {previewError && <p className="text-[10px] text-red-500">{previewError}</p>}
-      <p className="text-[10px] text-[#131218]/35 leading-snug">
+      <p className="text-[10px] text-[#0a0a0a]/35 leading-snug">
         Escribe parte del nombre. El sistema buscará en Notion y te mostrará el registro antes de vincularlo.
       </p>
     </div>
@@ -262,16 +262,16 @@ function RerunHint({ sourceAgent }: { sourceAgent?: string }) {
   }
 
   return (
-    <div className="mt-2 p-2.5 bg-[#EFEFEA] rounded-lg flex flex-col gap-1">
-      <p className="text-[10px] font-bold text-[#131218]/40 uppercase tracking-widest">
+    <div className="mt-2 p-2.5 bg-[#f4f4ef] rounded-lg flex flex-col gap-1">
+      <p className="text-[10px] font-bold text-[#0a0a0a]/40 uppercase tracking-widest">
         Re-ejecutar agente
       </p>
-      <pre className="text-[11px] text-[#131218]/70 font-mono leading-relaxed whitespace-pre-wrap">
+      <pre className="text-[11px] text-[#0a0a0a]/70 font-mono leading-relaxed whitespace-pre-wrap">
         {command}
       </pre>
       <button
         onClick={copy}
-        className="self-start text-[10px] font-medium text-[#131218]/40 hover:text-[#131218]/70 transition-colors"
+        className="self-start text-[10px] font-medium text-[#0a0a0a]/40 hover:text-[#0a0a0a]/70 transition-colors"
       >
         {copied ? "Copiado ✓" : "Copiar comando"}
       </button>
@@ -319,7 +319,7 @@ export function DecisionActions({
   if (done) {
     return (
       <div className="mt-1">
-        <p className="text-[10px] text-[#131218]/35 italic">{done}</p>
+        <p className="text-[10px] text-[#0a0a0a]/35 italic">{done}</p>
         <RerunHint sourceAgent={sourceAgent} />
       </div>
     )
@@ -396,29 +396,29 @@ export function DecisionActions({
 
       {/* Entity creation proposal card */}
       {isEntityCreation && entityName && (
-        <div className="flex flex-col gap-2 p-3 bg-[#FAFAF8] border border-[#E0E0D8] rounded-lg">
-          <p className="text-[10px] font-bold text-[#131218]/40 uppercase tracking-widest">
+        <div className="flex flex-col gap-2 p-3 bg-[#FAFAF8] border border-[#e4e4dd] rounded-lg">
+          <p className="text-[10px] font-bold text-[#0a0a0a]/40 uppercase tracking-widest">
             Nueva organización detectada
           </p>
           <div className="flex flex-col gap-1">
-            <p className="text-[13px] font-semibold text-[#131218]">{entityName}</p>
+            <p className="text-[13px] font-semibold text-[#0a0a0a]">{entityName}</p>
             {entityDomain && (
-              <p className="text-[11px] text-[#131218]/45 font-mono">{entityDomain}</p>
+              <p className="text-[11px] text-[#0a0a0a]/45 font-mono">{entityDomain}</p>
             )}
             {entityCategory && (
-              <span className="self-start text-[9px] font-bold text-[#131218]/40 bg-[#EFEFEA] px-2 py-0.5 rounded-full uppercase tracking-widest">
+              <span className="self-start text-[9px] font-bold text-[#0a0a0a]/40 bg-[#f4f4ef] px-2 py-0.5 rounded-full uppercase tracking-widest">
                 {entityCategory}
               </span>
             )}
           </div>
           {(contactName || contactEmail) && (
-            <div className="pt-1.5 border-t border-[#E0E0D8] flex flex-col gap-0.5">
-              <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Contacto</p>
-              {contactName && <p className="text-[12px] text-[#131218]/70 font-medium">{contactName}</p>}
-              {contactEmail && <p className="text-[11px] text-[#131218]/40 font-mono">{contactEmail}</p>}
+            <div className="pt-1.5 border-t border-[#e4e4dd] flex flex-col gap-0.5">
+              <p className="text-[10px] font-bold text-[#0a0a0a]/30 uppercase tracking-widest">Contacto</p>
+              {contactName && <p className="text-[12px] text-[#0a0a0a]/70 font-medium">{contactName}</p>}
+              {contactEmail && <p className="text-[11px] text-[#0a0a0a]/40 font-mono">{contactEmail}</p>}
             </div>
           )}
-          <p className="text-[10px] text-[#131218]/35 leading-snug">
+          <p className="text-[10px] text-[#0a0a0a]/35 leading-snug">
             Al aprobar se creará la organización en CH Organizations [OS v2]{contactName ? " y el contacto en CH People [OS v2]" : ""}.
           </p>
         </div>
@@ -426,23 +426,23 @@ export function DecisionActions({
 
       {/* Person creation proposal card */}
       {entityAction === "create_person" && personName && (
-        <div className="flex flex-col gap-2 p-3 bg-[#FAFAF8] border border-[#E0E0D8] rounded-lg">
-          <p className="text-[10px] font-bold text-[#131218]/40 uppercase tracking-widest">
+        <div className="flex flex-col gap-2 p-3 bg-[#FAFAF8] border border-[#e4e4dd] rounded-lg">
+          <p className="text-[10px] font-bold text-[#0a0a0a]/40 uppercase tracking-widest">
             Nueva persona detectada
           </p>
           <div className="flex flex-col gap-1">
-            <p className="text-[13px] font-semibold text-[#131218]">{personName}</p>
+            <p className="text-[13px] font-semibold text-[#0a0a0a]">{personName}</p>
             {personEmail && (
-              <p className="text-[11px] text-[#131218]/45 font-mono">{personEmail}</p>
+              <p className="text-[11px] text-[#0a0a0a]/45 font-mono">{personEmail}</p>
             )}
           </div>
           {personOrgName && (
-            <div className="pt-1.5 border-t border-[#E0E0D8] flex flex-col gap-0.5">
-              <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Organización</p>
-              <p className="text-[12px] text-[#131218]/70 font-medium">{personOrgName}</p>
+            <div className="pt-1.5 border-t border-[#e4e4dd] flex flex-col gap-0.5">
+              <p className="text-[10px] font-bold text-[#0a0a0a]/30 uppercase tracking-widest">Organización</p>
+              <p className="text-[12px] text-[#0a0a0a]/70 font-medium">{personOrgName}</p>
             </div>
           )}
-          <p className="text-[10px] text-[#131218]/35 leading-snug">
+          <p className="text-[10px] text-[#0a0a0a]/35 leading-snug">
             Al aprobar se creará la persona en CH People [OS v2]{personOrgName ? ` vinculada a ${personOrgName}` : ""}.
           </p>
         </div>
@@ -464,7 +464,7 @@ export function DecisionActions({
         <div className="flex flex-col gap-2">
           {relatedFields.map(({ field, label }) => (
             <div key={field} className="flex flex-col gap-0.5">
-              <label className="text-[10px] font-bold text-[#131218]/50 uppercase tracking-widest">
+              <label className="text-[10px] font-bold text-[#0a0a0a]/50 uppercase tracking-widest">
                 {label}
               </label>
               <textarea
@@ -473,11 +473,11 @@ export function DecisionActions({
                 placeholder={`${label}…`}
                 rows={2}
                 disabled={loading !== null}
-                className="w-full text-[12px] text-[#131218] bg-[#FAFAF8] border border-[#d4d4cc] rounded-lg px-3 py-2 resize-y placeholder:text-[#131218]/30 focus:outline-none focus:border-[#131218]/40 disabled:opacity-50 leading-relaxed"
+                className="w-full text-[12px] text-[#0a0a0a] bg-[#FAFAF8] border border-[#d4d4cc] rounded-lg px-3 py-2 resize-y placeholder:text-[#0a0a0a]/30 focus:outline-none focus:border-[#0a0a0a]/40 disabled:opacity-50 leading-relaxed"
               />
             </div>
           ))}
-          <p className="text-[10px] text-[#131218]/35 leading-snug">
+          <p className="text-[10px] text-[#0a0a0a]/35 leading-snug">
             {effectiveEntityId
               ? "Se escribirá en el registro de Notion. El agente lo usará en su próxima ejecución."
               : "Se guardará como respuesta en este item."}
@@ -494,9 +494,9 @@ export function DecisionActions({
             placeholder={cfg.placeholder}
             rows={3}
             disabled={loading !== null}
-            className="w-full text-[12px] text-[#131218] bg-[#FAFAF8] border border-[#d4d4cc] rounded-lg px-3 py-2 resize-y placeholder:text-[#131218]/30 focus:outline-none focus:border-[#131218]/40 disabled:opacity-50 leading-relaxed"
+            className="w-full text-[12px] text-[#0a0a0a] bg-[#FAFAF8] border border-[#d4d4cc] rounded-lg px-3 py-2 resize-y placeholder:text-[#0a0a0a]/30 focus:outline-none focus:border-[#0a0a0a]/40 disabled:opacity-50 leading-relaxed"
           />
-          <p className="text-[10px] text-[#131218]/35 leading-snug">
+          <p className="text-[10px] text-[#0a0a0a]/35 leading-snug">
             {effectiveEntityId
               ? <>Se escribirá en <span className="font-mono">{relatedField ?? "Notes"}</span> del registro. El agente lo usará en su próxima ejecución.</>
               : "Se guardará como respuesta en este item. El agente lo leerá en su próxima ejecución."}
@@ -507,10 +507,10 @@ export function DecisionActions({
       {/* Optional entity linker — only for legacy items (no relatedEntityId) */}
       {needsInput && !isRelation && !relatedEntityId && (
         <details className="group">
-          <summary className="cursor-pointer text-[10px] text-[#131218]/30 hover:text-[#131218]/60 transition-colors list-none flex items-center gap-1 select-none">
+          <summary className="cursor-pointer text-[10px] text-[#0a0a0a]/30 hover:text-[#0a0a0a]/60 transition-colors list-none flex items-center gap-1 select-none">
             <span className="group-open:rotate-90 inline-block transition-transform">›</span>
             {selectedEntityId
-              ? <span className="text-[#131218]/50">Guardar también en registro de Notion</span>
+              ? <span className="text-[#0a0a0a]/50">Guardar también en registro de Notion</span>
               : "Vincular a un registro de Notion (opcional)"}
           </summary>
           <div className="mt-1.5 flex flex-col gap-1.5">
@@ -522,11 +522,11 @@ export function DecisionActions({
               <div className="flex items-center gap-2">
                 <div className="flex items-center gap-1.5 px-2.5 py-1 bg-green-50 border border-green-200 rounded-lg">
                   <span className="text-[10px] text-green-600">✓</span>
-                  <span className="text-[11px] font-medium text-[#131218]">{selectedEntityName}</span>
+                  <span className="text-[11px] font-medium text-[#0a0a0a]">{selectedEntityName}</span>
                 </div>
                 <button
                   onClick={() => { setSelectedEntityId(null); setSelectedEntityName(null) }}
-                  className="text-[10px] text-[#131218]/30 hover:text-[#131218]/60 transition-colors"
+                  className="text-[10px] text-[#0a0a0a]/30 hover:text-[#0a0a0a]/60 transition-colors"
                 >
                   Cambiar
                 </button>
@@ -540,26 +540,26 @@ export function DecisionActions({
       <div className="flex items-center gap-2 flex-wrap">
         {requiresExecute && !executeApproved && (
           <button onClick={() => handle("approve")} disabled={loading !== null}
-            className="text-[11px] font-bold bg-[#B2FF59] text-[#131218] border-none rounded-md px-3 py-1 cursor-pointer disabled:opacity-50 hover:bg-[#9ee84a] transition-colors">
+            className="text-[11px] font-bold bg-[#c6f24a] text-[#0a0a0a] border-none rounded-md px-3 py-1 cursor-pointer disabled:opacity-50 hover:bg-[#9ee84a] transition-colors">
             {loading === "approve" ? "Aprobando…" : "Aprobar ejecución"}
           </button>
         )}
         <button
           onClick={() => handle("resolve")}
           disabled={loading !== null || !canResolve}
-          className="text-[11px] text-[#131218]/55 border border-[#d4d4cc] rounded-md px-3 py-1 cursor-pointer disabled:opacity-40 hover:bg-[#EFEFEA] transition-colors"
+          className="text-[11px] text-[#0a0a0a]/55 border border-[#d4d4cc] rounded-md px-3 py-1 cursor-pointer disabled:opacity-40 hover:bg-[#f4f4ef] transition-colors"
         >
           {loading === "resolve"
             ? (isRelation ? "Vinculando…" : "Guardando…")
             : cfg.resolveLabel}
         </button>
         <button onClick={() => handle("dismiss")} disabled={loading !== null}
-          className="text-[11px] text-[#131218]/38 border border-transparent rounded-md px-3 py-1 cursor-pointer disabled:opacity-50 hover:text-[#131218]/60 transition-colors">
+          className="text-[11px] text-[#0a0a0a]/38 border border-transparent rounded-md px-3 py-1 cursor-pointer disabled:opacity-50 hover:text-[#0a0a0a]/60 transition-colors">
           {loading === "dismiss" ? "…" : cfg.dismissLabel}
         </button>
         {notionUrl && (
           <a href={notionUrl} target="_blank" rel="noopener noreferrer"
-            className="text-[10px] text-[#131218]/25 hover:text-[#131218]/50 transition-colors ml-auto">
+            className="text-[10px] text-[#0a0a0a]/25 hover:text-[#0a0a0a]/50 transition-colors ml-auto">
             Notion →
           </a>
         )}

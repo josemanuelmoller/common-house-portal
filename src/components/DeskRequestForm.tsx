@@ -65,7 +65,7 @@ function CommsVoiceSelector({
 
   return (
     <div>
-      <p className="text-[9px] font-bold tracking-[1.5px] uppercase text-[#131218]/30 mb-2">Voz</p>
+      <p className="text-[9px] font-bold tracking-[1.5px] uppercase text-[#0a0a0a]/30 mb-2">Voz</p>
       <div className="flex gap-2 mb-3">
         {MODES.map(mode => (
           <button
@@ -73,14 +73,14 @@ function CommsVoiceSelector({
             onClick={() => selectMode(mode.id)}
             className={`flex-1 text-center py-2.5 px-2 rounded-xl border transition-all ${
               activeMode === mode.id
-                ? "bg-[#131218] text-white border-[#131218]"
-                : "border-[#E0E0D8] text-[#131218]/50 hover:border-[#131218]/30 hover:text-[#131218] bg-white"
+                ? "bg-[#0a0a0a] text-white border-[#0a0a0a]"
+                : "border-[#e4e4dd] text-[#0a0a0a]/50 hover:border-[#0a0a0a]/30 hover:text-[#0a0a0a] bg-white"
             }`}
           >
-            <p className={`text-[11px] font-bold ${activeMode === mode.id ? "text-white" : "text-[#131218]"}`}>
+            <p className={`text-[11px] font-bold ${activeMode === mode.id ? "text-white" : "text-[#0a0a0a]"}`}>
               {mode.label}
             </p>
-            <p className={`text-[9px] font-medium mt-0.5 ${activeMode === mode.id ? "text-white/50" : "text-[#131218]/30"}`}>
+            <p className={`text-[9px] font-medium mt-0.5 ${activeMode === mode.id ? "text-white/50" : "text-[#0a0a0a]/30"}`}>
               {mode.sublabel}
             </p>
           </button>
@@ -95,8 +95,8 @@ function CommsVoiceSelector({
               onClick={() => onChange(p.id)}
               className={`text-[10px] font-semibold px-3 py-1.5 rounded-full border transition-all ${
                 selectedProfileId === p.id
-                  ? "bg-[#131218] text-white border-[#131218]"
-                  : "border-[#E0E0D8] text-[#131218]/50 hover:border-[#131218]/40"
+                  ? "bg-[#0a0a0a] text-white border-[#0a0a0a]"
+                  : "border-[#e4e4dd] text-[#0a0a0a]/50 hover:border-[#0a0a0a]/40"
               }`}
             >
               {p.name.replace(" Brand", "").replace(" Voice", "")}
@@ -106,8 +106,8 @@ function CommsVoiceSelector({
       )}
 
       {activeProfile?.toneSummary && (
-        <div className="bg-[#FAFAF8] border border-[#E0E0D8] rounded-lg px-3 py-2">
-          <p className="text-[9px] text-[#131218]/40 leading-relaxed">
+        <div className="bg-[#FAFAF8] border border-[#e4e4dd] rounded-lg px-3 py-2">
+          <p className="text-[9px] text-[#0a0a0a]/40 leading-relaxed">
             {activeProfile.toneSummary.slice(0, 120)}{activeProfile.toneSummary.length > 120 ? "…" : ""}
           </p>
         </div>
@@ -207,14 +207,14 @@ export default function DeskRequestForm({
   }
 
   return (
-    <div className="bg-white border border-[#E0E0D8] rounded-[14px] overflow-hidden flex">
+    <div className="bg-white border border-[#e4e4dd] rounded-[14px] overflow-hidden flex">
 
       {/* ── LEFT PANEL: selectors ── */}
-      <div className="w-[260px] flex-shrink-0 border-r border-[#E0E0D8] flex flex-col">
+      <div className="w-[260px] flex-shrink-0 border-r border-[#e4e4dd] flex flex-col">
         {/* Header */}
-        <div className="px-5 py-3.5 border-b border-[#E0E0D8]">
-          <p className="text-[8px] font-bold tracking-[2px] uppercase text-[#131218]/30 mb-0.5">Nueva solicitud</p>
-          <p className="text-sm font-bold text-[#131218]">{deskLabel}</p>
+        <div className="px-5 py-3.5 border-b border-[#e4e4dd]">
+          <p className="text-[8px] font-bold tracking-[2px] uppercase text-[#0a0a0a]/30 mb-0.5">Nueva solicitud</p>
+          <p className="text-sm font-bold text-[#0a0a0a]">{deskLabel}</p>
         </div>
 
         <div className="px-4 py-4 flex flex-col gap-4 overflow-y-auto">
@@ -223,7 +223,7 @@ export default function DeskRequestForm({
           {deskType === "comms" ? (
             <>
               <div>
-                <p className="text-[9px] font-bold tracking-[1.5px] uppercase text-[#131218]/30 mb-2">Canal</p>
+                <p className="text-[9px] font-bold tracking-[1.5px] uppercase text-[#0a0a0a]/30 mb-2">Canal</p>
                 <div className="flex gap-1.5">
                   {CANALES.map((canal) => (
                     <button
@@ -231,11 +231,11 @@ export default function DeskRequestForm({
                       onClick={() => handleCanalChange(canal)}
                       className={`flex-1 text-center py-2 px-1 rounded-xl border transition-all ${
                         selectedCanal === canal
-                          ? "bg-[#131218] text-white border-[#131218]"
-                          : "border-[#E0E0D8] text-[#131218]/50 hover:border-[#131218]/30 hover:text-[#131218] bg-white"
+                          ? "bg-[#0a0a0a] text-white border-[#0a0a0a]"
+                          : "border-[#e4e4dd] text-[#0a0a0a]/50 hover:border-[#0a0a0a]/30 hover:text-[#0a0a0a] bg-white"
                       }`}
                     >
-                      <p className={`text-[10px] font-bold ${selectedCanal === canal ? "text-white" : "text-[#131218]"}`}>
+                      <p className={`text-[10px] font-bold ${selectedCanal === canal ? "text-white" : "text-[#0a0a0a]"}`}>
                         {canal}
                       </p>
                     </button>
@@ -244,7 +244,7 @@ export default function DeskRequestForm({
               </div>
 
               <div>
-                <p className="text-[9px] font-bold tracking-[1.5px] uppercase text-[#131218]/30 mb-2">Formato</p>
+                <p className="text-[9px] font-bold tracking-[1.5px] uppercase text-[#0a0a0a]/30 mb-2">Formato</p>
                 <div className="flex flex-wrap gap-1.5">
                   {(CANAL_FORMAT_MAP[selectedCanal] ?? []).map((fmt) => (
                     <button
@@ -252,8 +252,8 @@ export default function DeskRequestForm({
                       onClick={() => setSelectedFormato(fmt)}
                       className={`text-[10px] font-semibold px-3 py-1.5 rounded-full border transition-all ${
                         selectedFormato === fmt
-                          ? "bg-[#131218] text-white border-[#131218]"
-                          : "border-[#E0E0D8] text-[#131218]/50 hover:border-[#131218]/40 hover:text-[#131218]"
+                          ? "bg-[#0a0a0a] text-white border-[#0a0a0a]"
+                          : "border-[#e4e4dd] text-[#0a0a0a]/50 hover:border-[#0a0a0a]/40 hover:text-[#0a0a0a]"
                       }`}
                     >
                       {fmt}
@@ -271,7 +271,7 @@ export default function DeskRequestForm({
             /* Design: Tipo + output mode + audience + project */
             <>
               <div>
-                <p className="text-[9px] font-bold tracking-[1.5px] uppercase text-[#131218]/30 mb-2">Tipo</p>
+                <p className="text-[9px] font-bold tracking-[1.5px] uppercase text-[#0a0a0a]/30 mb-2">Tipo</p>
                 <div className="flex flex-wrap gap-1.5">
                   {contentTypes.map((t) => (
                     <button
@@ -279,8 +279,8 @@ export default function DeskRequestForm({
                       onClick={() => setSelectedType(t)}
                       className={`text-[10px] font-semibold px-3 py-1.5 rounded-full border transition-all ${
                         selectedType === t
-                          ? "bg-[#131218] text-white border-[#131218]"
-                          : "border-[#E0E0D8] text-[#131218]/50 hover:border-[#131218]/40 hover:text-[#131218]"
+                          ? "bg-[#0a0a0a] text-white border-[#0a0a0a]"
+                          : "border-[#e4e4dd] text-[#0a0a0a]/50 hover:border-[#0a0a0a]/40 hover:text-[#0a0a0a]"
                       }`}
                     >
                       {t}
@@ -292,19 +292,19 @@ export default function DeskRequestForm({
               {/* Formato de salida — visual types only, except One-pager */}
               {isVisual && selectedType !== "One-pager" && (
                 <div>
-                  <p className="text-[9px] font-bold tracking-[1.5px] uppercase text-[#131218]/30 mb-2">Formato de salida</p>
+                  <p className="text-[9px] font-bold tracking-[1.5px] uppercase text-[#0a0a0a]/30 mb-2">Formato de salida</p>
                   <div className="grid grid-cols-2 gap-2">
                     {(["slides", "document"] as const).map((mode) => {
                       const active = outputMode === mode;
                       return (
                         <button key={mode} onClick={() => setOutputMode(mode)}
                           className={`text-left px-3 py-2.5 rounded-xl border transition-all ${
-                            active ? "bg-[#131218] border-[#131218] text-white" : "border-[#E0E0D8] text-[#131218]/50 hover:border-[#131218]/30 hover:text-[#131218] bg-white"
+                            active ? "bg-[#0a0a0a] border-[#0a0a0a] text-white" : "border-[#e4e4dd] text-[#0a0a0a]/50 hover:border-[#0a0a0a]/30 hover:text-[#0a0a0a] bg-white"
                           }`}
                         >
-                          <p className={`text-[13px] mb-0.5 ${active ? "text-[#c8f55a]" : "text-[#131218]/30"}`}>{mode === "slides" ? "◳" : "▤"}</p>
-                          <p className={`text-[11px] font-bold leading-tight ${active ? "text-white" : "text-[#131218]"}`}>{mode === "slides" ? "Presentación" : "Documento"}</p>
-                          <p className={`text-[9px] mt-0.5 leading-snug ${active ? "text-white/50" : "text-[#131218]/30"}`}>{mode === "slides" ? "Carrusel · pantalla" : "Página única · PDF"}</p>
+                          <p className={`text-[13px] mb-0.5 ${active ? "text-[#c6f24a]" : "text-[#0a0a0a]/30"}`}>{mode === "slides" ? "◳" : "▤"}</p>
+                          <p className={`text-[11px] font-bold leading-tight ${active ? "text-white" : "text-[#0a0a0a]"}`}>{mode === "slides" ? "Presentación" : "Documento"}</p>
+                          <p className={`text-[9px] mt-0.5 leading-snug ${active ? "text-white/50" : "text-[#0a0a0a]/30"}`}>{mode === "slides" ? "Carrusel · pantalla" : "Página única · PDF"}</p>
                         </button>
                       );
                     })}
@@ -314,7 +314,7 @@ export default function DeskRequestForm({
 
               {/* Audiencia */}
               <div>
-                <p className="text-[9px] font-bold tracking-[1.5px] uppercase text-[#131218]/30 mb-2">Audiencia</p>
+                <p className="text-[9px] font-bold tracking-[1.5px] uppercase text-[#0a0a0a]/30 mb-2">Audiencia</p>
                 <div className="flex flex-wrap gap-1.5">
                   {[
                     { id: "Inversor",        sub: "Pitch · data-forward" },
@@ -324,11 +324,11 @@ export default function DeskRequestForm({
                   ].map(({ id, sub }) => (
                     <button key={id} onClick={() => setAudience(id)}
                       className={`text-left px-3 py-2 rounded-xl border transition-all ${
-                        audience === id ? "bg-[#131218] border-[#131218] text-white" : "border-[#E0E0D8] text-[#131218]/50 hover:border-[#131218]/30 hover:text-[#131218] bg-white"
+                        audience === id ? "bg-[#0a0a0a] border-[#0a0a0a] text-white" : "border-[#e4e4dd] text-[#0a0a0a]/50 hover:border-[#0a0a0a]/30 hover:text-[#0a0a0a] bg-white"
                       }`}
                     >
-                      <p className={`text-[10px] font-bold ${audience === id ? "text-white" : "text-[#131218]"}`}>{id}</p>
-                      <p className={`text-[9px] ${audience === id ? "text-white/50" : "text-[#131218]/30"}`}>{sub}</p>
+                      <p className={`text-[10px] font-bold ${audience === id ? "text-white" : "text-[#0a0a0a]"}`}>{id}</p>
+                      <p className={`text-[9px] ${audience === id ? "text-white/50" : "text-[#0a0a0a]/30"}`}>{sub}</p>
                     </button>
                   ))}
                 </div>
@@ -336,20 +336,20 @@ export default function DeskRequestForm({
 
               {/* Proyecto — optional */}
               <div>
-                <p className="text-[9px] font-bold tracking-[1.5px] uppercase text-[#131218]/30 mb-2">
+                <p className="text-[9px] font-bold tracking-[1.5px] uppercase text-[#0a0a0a]/30 mb-2">
                   {channelOrProjectLabel}
-                  <span className="ml-1.5 text-[8px] font-bold text-[#131218]/20 normal-case tracking-normal">opcional</span>
+                  <span className="ml-1.5 text-[8px] font-bold text-[#0a0a0a]/20 normal-case tracking-normal">opcional</span>
                 </p>
                 <div className="relative">
                   <select value={selectedOption} onChange={(e) => setSelectedOption(e.target.value)}
-                    className="w-full border border-[#E0E0D8] rounded-lg px-3 py-2.5 text-xs font-semibold text-[#131218] bg-[#EFEFEA] outline-none focus:border-[#131218]/40 appearance-none cursor-pointer"
+                    className="w-full border border-[#e4e4dd] rounded-lg px-3 py-2.5 text-xs font-semibold text-[#0a0a0a] bg-[#f4f4ef] outline-none focus:border-[#0a0a0a]/40 appearance-none cursor-pointer"
                   >
                     <option value="">Common House (default)</option>
                     {channelOrProjectOptions.map((opt) => (
                       <option key={opt} value={opt}>{opt}</option>
                     ))}
                   </select>
-                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#131218]/30 text-[10px]">▾</span>
+                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#0a0a0a]/30 text-[10px]">▾</span>
                 </div>
               </div>
             </>
@@ -360,16 +360,16 @@ export default function DeskRequestForm({
 
       {/* ── RIGHT PANEL: textarea + submit ── */}
       <div className="w-[280px] flex-shrink-0 flex flex-col">
-        <div className="px-5 py-3.5 border-b border-[#E0E0D8]">
-          <p className="text-[8px] font-bold tracking-[2px] uppercase text-[#131218]/30 mb-0.5">{textareaLabel}</p>
-          <p className="text-[11px] text-[#131218]/40">Qué, para quién, en qué tono</p>
+        <div className="px-5 py-3.5 border-b border-[#e4e4dd]">
+          <p className="text-[8px] font-bold tracking-[2px] uppercase text-[#0a0a0a]/30 mb-0.5">{textareaLabel}</p>
+          <p className="text-[11px] text-[#0a0a0a]/40">Qué, para quién, en qué tono</p>
         </div>
 
         <div className="px-4 py-4 flex flex-col gap-3 flex-1">
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            className="flex-1 min-h-[140px] border border-[#E0E0D8] rounded-lg px-3 py-2.5 text-xs text-[#131218] bg-[#EFEFEA] resize-none outline-none focus:border-[#131218]/40 placeholder-[#131218]/20"
+            className="flex-1 min-h-[140px] border border-[#e4e4dd] rounded-lg px-3 py-2.5 text-xs text-[#0a0a0a] bg-[#f4f4ef] resize-none outline-none focus:border-[#0a0a0a]/40 placeholder-[#0a0a0a]/20"
             placeholder={textareaPlaceholder}
           />
 
@@ -378,14 +378,14 @@ export default function DeskRequestForm({
             disabled={status === "loading" || status === "generating" || !description.trim()}
             className={`w-full text-xs font-bold py-2.5 rounded-xl transition-all ${
               status === "success"
-                ? "bg-[#B2FF59] text-[#131218]"
+                ? "bg-[#c6f24a] text-[#0a0a0a]"
                 : status === "error"
                 ? "bg-red-100 text-red-700"
                 : status === "loading" || status === "generating"
-                ? "bg-[#131218]/40 text-white cursor-not-allowed"
+                ? "bg-[#0a0a0a]/40 text-white cursor-not-allowed"
                 : deskType === "comms"
-                ? "bg-[#131218] text-white hover:bg-[#131218]/80"
-                : "bg-[#B2FF59] text-[#131218] hover:opacity-85"
+                ? "bg-[#0a0a0a] text-white hover:bg-[#0a0a0a]/80"
+                : "bg-[#c6f24a] text-[#0a0a0a] hover:opacity-85"
             }`}
           >
             {status === "success"

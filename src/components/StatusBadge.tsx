@@ -5,41 +5,41 @@
 
 const styles: Record<string, string> = {
   // Validation status
-  Validated:   "bg-[#B2FF59] text-[#131218]",
-  New:         "bg-[#131218]/8 text-[#131218]/60 border border-[#131218]/10",
-  Reviewed:    "bg-[#131218] text-white",
+  Validated:   "bg-[#c6f24a] text-[#0a0a0a]",
+  New:         "bg-[#0a0a0a]/8 text-[#0a0a0a]/60 border border-[#0a0a0a]/10",
+  Reviewed:    "bg-[#0a0a0a] text-white",
   Rejected:    "bg-red-600 text-white",
 
   // Project status
-  Active:      "bg-[#B2FF59] text-[#131218]",
-  Paused:      "bg-[#131218]/10 text-[#131218]/60",
-  Completed:   "bg-[#131218] text-white",
-  Archived:    "bg-[#131218]/8 text-[#131218]/40",
+  Active:      "bg-[#c6f24a] text-[#0a0a0a]",
+  Paused:      "bg-[#0a0a0a]/10 text-[#0a0a0a]/60",
+  Completed:   "bg-[#0a0a0a] text-white",
+  Archived:    "bg-[#0a0a0a]/8 text-[#0a0a0a]/40",
 
   // Evidence types — black pill style (like "POWERED BY" tags in brand)
   Blocker:     "bg-red-600 text-white",
-  Dependency:  "bg-[#131218] text-white",
-  Decision:    "bg-[#131218] text-white",
-  Requirement: "bg-[#131218] text-white",
-  Outcome:     "bg-[#B2FF59] text-[#131218]",
+  Dependency:  "bg-[#0a0a0a] text-white",
+  Decision:    "bg-[#0a0a0a] text-white",
+  Requirement: "bg-[#0a0a0a] text-white",
+  Outcome:     "bg-[#c6f24a] text-[#0a0a0a]",
   Risk:        "bg-amber-500 text-white",
-  "Process Step": "bg-[#131218]/10 text-[#131218]/70",
+  "Process Step": "bg-[#0a0a0a]/10 text-[#0a0a0a]/70",
 
   // Confidence
-  High:        "bg-[#B2FF59] text-[#131218]",
-  Medium:      "bg-[#131218]/10 text-[#131218]/70",
+  High:        "bg-[#c6f24a] text-[#0a0a0a]",
+  Medium:      "bg-[#0a0a0a]/10 text-[#0a0a0a]/70",
   Low:         "bg-red-100 text-red-700",
 
   // Stages
-  "Stakeholder Alignment": "border border-[#131218]/20 text-[#131218]/70 bg-transparent",
-  "Pilot Planning":        "border border-[#131218]/20 text-[#131218]/70 bg-transparent",
-  "Research":              "border border-[#131218]/20 text-[#131218]/70 bg-transparent",
-  "Execution":             "border border-[#B2FF59] text-[#131218] bg-[#B2FF59]/20",
-  "Launch":                "border border-[#B2FF59] text-[#131218] bg-[#B2FF59]/20",
+  "Stakeholder Alignment": "border border-[#0a0a0a]/20 text-[#0a0a0a]/70 bg-transparent",
+  "Pilot Planning":        "border border-[#0a0a0a]/20 text-[#0a0a0a]/70 bg-transparent",
+  "Research":              "border border-[#0a0a0a]/20 text-[#0a0a0a]/70 bg-transparent",
+  "Execution":             "border border-[#c6f24a] text-[#0a0a0a] bg-[#c6f24a]/20",
+  "Launch":                "border border-[#c6f24a] text-[#0a0a0a] bg-[#c6f24a]/20",
 };
 
 export function StatusBadge({ value }: { value: string }) {
-  const style = styles[value] ?? "border border-[#131218]/15 text-[#131218]/60 bg-transparent";
+  const style = styles[value] ?? "border border-[#0a0a0a]/15 text-[#0a0a0a]/60 bg-transparent";
   return (
     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold tracking-wide ${style}`}>
       {value || "—"}

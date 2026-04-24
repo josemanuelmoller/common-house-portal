@@ -10,7 +10,7 @@ type PlanTab = "objectives" | "comms" | "artifacts";
 export function PlanNav({ active }: { active: PlanTab }) {
   const tabStyle = (key: PlanTab) =>
     active === key
-      ? "text-[12px] font-bold text-white border-b-2 border-[#B2FF59] px-3 pb-2 pt-1"
+      ? "text-[12px] font-bold text-white border-b-2 border-[#c6f24a] px-3 pb-2 pt-1"
       : "text-[12px] font-semibold text-white/50 hover:text-white/80 border-b-2 border-transparent px-3 pb-2 pt-1 transition-colors";
 
   return (

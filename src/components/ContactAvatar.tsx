@@ -38,7 +38,7 @@ export function ContactAvatar({
         loading="lazy"
         referrerPolicy="no-referrer"
         onError={() => setFailed(true)}
-        className={`${ring} object-cover bg-[#131218] flex-shrink-0`}
+        className={`${ring} object-cover bg-[#0a0a0a] flex-shrink-0`}
         style={{ width: size, height: size }}
       />
     );
@@ -46,7 +46,7 @@ export function ContactAvatar({
 
   return (
     <div
-      className={`${ring} bg-[#131218] text-white flex items-center justify-center font-bold flex-shrink-0`}
+      className={`${ring} bg-[#0a0a0a] text-white flex items-center justify-center font-bold flex-shrink-0`}
       style={{ width: size, height: size, fontSize: Math.round(size * 0.38) }}
     >
       {initial}

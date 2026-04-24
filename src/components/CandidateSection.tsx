@@ -30,7 +30,7 @@ function OriginBadges({ origins }: { origins: ("meeting" | "email" | "doc")[] })
       {origins.map(o => (
         <span
           key={o}
-          className="text-[8px] font-semibold px-1.5 py-0.5 rounded-full bg-[#EFEFEA] text-[#131218]/50 border border-[#E0E0D8]"
+          className="text-[8px] font-semibold px-1.5 py-0.5 rounded-full bg-[#f4f4ef] text-[#0a0a0a]/50 border border-[#e4e4dd]"
         >
           {ORIGIN_LABEL[o] ?? o}
         </span>
@@ -44,7 +44,7 @@ function typeColor(type: string): string {
   if (type === "Investment")  return "bg-purple-50 text-purple-600 border-purple-200";
   if (type === "Consulting")  return "bg-blue-50 text-blue-600 border-blue-200";
   if (type === "Partnership") return "bg-amber-50 text-amber-600 border-amber-200";
-  return "bg-[#EFEFEA] text-[#131218]/40 border-[#E0E0D8]";
+  return "bg-[#f4f4ef] text-[#0a0a0a]/40 border-[#e4e4dd]";
 }
 
 interface Props {
@@ -119,7 +119,7 @@ export function CandidateSection({ candidates }: Props) {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           {scanResult !== null && (
-            <span className="text-[9px] text-[#131218]/35 font-medium">
+            <span className="text-[9px] text-[#0a0a0a]/35 font-medium">
               {scanResult.created > 0 || scanResult.enriched > 0
                 ? [
                     scanResult.created  > 0 && `${scanResult.created} new`,
@@ -141,11 +141,11 @@ export function CandidateSection({ candidates }: Props) {
         <button
           onClick={handleScan}
           disabled={scanning}
-          className="text-[9px] font-bold text-[#131218]/30 hover:text-[#131218] transition-colors uppercase tracking-widest disabled:opacity-40 flex items-center gap-1.5"
+          className="text-[9px] font-bold text-[#0a0a0a]/30 hover:text-[#0a0a0a] transition-colors uppercase tracking-widest disabled:opacity-40 flex items-center gap-1.5"
         >
           {scanning ? (
             <>
-              <span className="w-1.5 h-1.5 rounded-full bg-[#131218]/30 animate-pulse" />
+              <span className="w-1.5 h-1.5 rounded-full bg-[#0a0a0a]/30 animate-pulse" />
               Scanning…
             </>
           ) : "Scan inbox →"}
@@ -154,10 +154,10 @@ export function CandidateSection({ candidates }: Props) {
 
       {/* Empty state — compact */}
       {visible.length === 0 && !scanning && (
-        <div className="flex items-center gap-3 bg-white/50 border border-dashed border-[#E0E0D8] rounded-xl px-4 py-2">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#131218]/15 shrink-0" />
-          <p className="text-[11px] text-[#131218]/40 flex-1 min-w-0 truncate">
-            No unreviewed candidates — use <span className="font-semibold text-[#131218]/55">Scan inbox</span> above or the &ldquo;+&rdquo; button on inbox rows.
+        <div className="flex items-center gap-3 bg-white/50 border border-dashed border-[#e4e4dd] rounded-xl px-4 py-2">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#0a0a0a]/15 shrink-0" />
+          <p className="text-[11px] text-[#0a0a0a]/40 flex-1 min-w-0 truncate">
+            No unreviewed candidates — use <span className="font-semibold text-[#0a0a0a]/55">Scan inbox</span> above or the &ldquo;+&rdquo; button on inbox rows.
           </p>
         </div>
       )}
@@ -187,12 +187,12 @@ export function CandidateSection({ candidates }: Props) {
               </div>
 
               {/* Name */}
-              <p className="text-[12.5px] font-semibold text-[#131218] leading-snug">{c.name}</p>
+              <p className="text-[12.5px] font-semibold text-[#0a0a0a] leading-snug">{c.name}</p>
               {c.orgName && (
-                <p className="text-[10.5px] text-[#131218]/40 mt-0.5">{c.orgName}</p>
+                <p className="text-[10.5px] text-[#0a0a0a]/40 mt-0.5">{c.orgName}</p>
               )}
               {c.signalRef && c.signalRef !== c.orgName && (
-                <p className="text-[9.5px] text-[#131218]/30 mt-0.5 truncate max-w-[360px]" title={c.signalRef}>
+                <p className="text-[9.5px] text-[#0a0a0a]/30 mt-0.5 truncate max-w-[360px]" title={c.signalRef}>
                   {c.signalRef}
                 </p>
               )}
@@ -202,7 +202,7 @@ export function CandidateSection({ candidates }: Props) {
 
               {/* Signal context */}
               {c.signalContext && (
-                <p className="text-[10px] text-[#131218]/45 mt-1 leading-snug italic">
+                <p className="text-[10px] text-[#0a0a0a]/45 mt-1 leading-snug italic">
                   {c.signalContext.slice(0, 200)}
                 </p>
               )}
@@ -224,14 +224,14 @@ export function CandidateSection({ candidates }: Props) {
                 <button
                   onClick={() => handleAction(c.id, "promote")}
                   disabled={isActing}
-                  className="text-[9px] font-bold text-white bg-[#131218] hover:bg-[#131218]/80 px-2.5 py-1.5 rounded-lg transition-colors disabled:opacity-40"
+                  className="text-[9px] font-bold text-white bg-[#0a0a0a] hover:bg-[#0a0a0a]/80 px-2.5 py-1.5 rounded-lg transition-colors disabled:opacity-40"
                 >
                   {isActing ? "…" : "✓ Create Opportunity"}
                 </button>
                 <button
                   onClick={() => handleAction(c.id, "ignore")}
                   disabled={isActing}
-                  className="text-[9px] font-bold text-[#131218]/40 hover:text-[#131218] bg-[#EFEFEA] hover:bg-[#E0E0D8] px-2.5 py-1.5 rounded-lg transition-colors disabled:opacity-40"
+                  className="text-[9px] font-bold text-[#0a0a0a]/40 hover:text-[#0a0a0a] bg-[#f4f4ef] hover:bg-[#e4e4dd] px-2.5 py-1.5 rounded-lg transition-colors disabled:opacity-40"
                 >
                   Ignore
                 </button>
@@ -239,7 +239,7 @@ export function CandidateSection({ candidates }: Props) {
                   href={c.notionUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-[9px] font-bold text-[#131218]/25 hover:text-[#131218]/60 transition-colors ml-auto"
+                  className="text-[9px] font-bold text-[#0a0a0a]/25 hover:text-[#0a0a0a]/60 transition-colors ml-auto"
                 >
                   Notion →
                 </a>

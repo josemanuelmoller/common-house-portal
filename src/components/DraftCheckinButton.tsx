@@ -59,7 +59,7 @@ export function DraftCheckinButton({
     <button
       onClick={handleDraft}
       disabled={state === "loading"}
-      className="text-[9px] font-bold text-[#131218]/25 hover:text-[#131218] transition-colors disabled:opacity-50"
+      className="text-[9px] font-bold text-[#0a0a0a]/25 hover:text-[#0a0a0a] transition-colors disabled:opacity-50"
     >
       {state === "loading" ? "…" : "Draft →"}
     </button>

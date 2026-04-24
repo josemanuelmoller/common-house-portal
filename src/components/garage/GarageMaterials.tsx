@@ -14,24 +14,24 @@ export function GarageMaterials({ materials }: { materials: GarageMaterial[] }) 
   if (materials.length === 0) return null;
 
   return (
-    <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-      <div className="h-1 bg-[#EFEFEA]" />
-      <div className="px-6 py-5 border-b border-[#EFEFEA]">
-        <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">
+    <div className="bg-white rounded-2xl border border-[#e4e4dd] overflow-hidden">
+      <div className="h-1 bg-[#f4f4ef]" />
+      <div className="px-6 py-5 border-b border-[#f4f4ef]">
+        <p className="text-[10px] font-bold text-[#0a0a0a]/30 uppercase tracking-widest">
           Materials
         </p>
-        <p className="text-sm text-[#131218]/40 mt-1.5 leading-relaxed">
+        <p className="text-sm text-[#0a0a0a]/40 mt-1.5 leading-relaxed">
           Decks, models, and documents for this engagement.
         </p>
       </div>
-      <div className="divide-y divide-[#EFEFEA]">
+      <div className="divide-y divide-[#f4f4ef]">
         {materials.map((m) => (
           <div key={m.id} className="px-6 py-4 flex items-center justify-between gap-4">
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-[#131218] leading-snug truncate">
+              <p className="text-sm font-semibold text-[#0a0a0a] leading-snug truncate">
                 {m.title}
               </p>
-              <p className="text-[10px] text-[#131218]/25 font-medium uppercase tracking-widest mt-0.5">
+              <p className="text-[10px] text-[#0a0a0a]/25 font-medium uppercase tracking-widest mt-0.5">
                 {m.platform}
                 {m.addedDate && ` · ${m.addedDate}`}
               </p>
@@ -40,7 +40,7 @@ export function GarageMaterials({ materials }: { materials: GarageMaterial[] }) 
               href={m.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-[10px] font-bold text-[#131218]/40 hover:text-[#131218] uppercase tracking-widest transition-colors shrink-0"
+              className="text-[10px] font-bold text-[#0a0a0a]/40 hover:text-[#0a0a0a] uppercase tracking-widest transition-colors shrink-0"
             >
               Open ↗
             </a>

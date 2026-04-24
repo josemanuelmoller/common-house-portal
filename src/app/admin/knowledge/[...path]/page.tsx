@@ -26,27 +26,27 @@ function renderInline(text: string): string {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;");
   // Bold + italic + code (order matters)
-  out = out.replace(/`([^`]+)`/g, '<code class="text-[11px] bg-[#EFEFEA] px-1 py-0.5 rounded">$1</code>');
-  out = out.replace(/\*\*([^*]+)\*\*/g, '<strong class="font-semibold text-[#131218]">$1</strong>');
+  out = out.replace(/`([^`]+)`/g, '<code class="text-[11px] bg-[#f4f4ef] px-1 py-0.5 rounded">$1</code>');
+  out = out.replace(/\*\*([^*]+)\*\*/g, '<strong class="font-semibold text-[#0a0a0a]">$1</strong>');
   out = out.replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '<em class="italic">$1</em>');
   // Markdown links [text](url)
-  out = out.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-[#131218] underline decoration-[#B2FF59] decoration-2 underline-offset-2 hover:text-[#B2FF59]">$1</a>');
+  out = out.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-[#0a0a0a] underline decoration-[#c6f24a] decoration-2 underline-offset-2 hover:text-[#c6f24a]">$1</a>');
   // Case code chips: [AUTOMERCADO-CR-2026] → small pill linking to case page
   out = out.replace(/\[([A-Z0-9]+-[A-Z]{2,3}-\d{4})\]/g,
-    '<a href="/admin/knowledge/cases/$1" class="inline-block text-[10px] font-mono font-semibold text-[#131218]/70 bg-[#F7F7F2] px-1.5 py-0.5 rounded border border-[#EFEFEA] hover:bg-[#131218] hover:text-[#B2FF59] hover:border-[#131218] transition-colors align-middle no-underline">$1</a>');
+    '<a href="/admin/knowledge/cases/$1" class="inline-block text-[10px] font-mono font-semibold text-[#0a0a0a]/70 bg-[#F7F7F2] px-1.5 py-0.5 rounded border border-[#f4f4ef] hover:bg-[#0a0a0a] hover:text-[#c6f24a] hover:border-[#0a0a0a] transition-colors align-middle no-underline">$1</a>');
   // Cross-references to other leaves: `path/like/this` → link. The code regex
   // above has already transformed unrelated backtick content into <code>, so
   // we operate on remaining inline backticks that look like a knowledge path.
   // Matches patterns like reuse/packaging/refill/at-home inside existing code blocks.
   out = out.replace(
     /<code class="[^"]+">((?:reuse|organics|new-materials)\/[a-z0-9-]+(?:\/[a-z0-9-]+)*)<\/code>/g,
-    '<a href="/admin/knowledge/$1" class="inline-block text-[11px] font-mono font-semibold text-[#131218]/70 bg-[#EFEFEA] px-1.5 py-0.5 rounded border border-[#E0E0D8] hover:bg-[#131218] hover:text-[#B2FF59] hover:border-[#131218] transition-colors no-underline">→ $1</a>',
+    '<a href="/admin/knowledge/$1" class="inline-block text-[11px] font-mono font-semibold text-[#0a0a0a]/70 bg-[#f4f4ef] px-1.5 py-0.5 rounded border border-[#e4e4dd] hover:bg-[#0a0a0a] hover:text-[#c6f24a] hover:border-[#0a0a0a] transition-colors no-underline">→ $1</a>',
   );
   return out;
 }
 
 function renderMarkdown(md: string): string {
-  if (!md.trim()) return '<p class="text-sm text-[#131218]/30 italic">(sin contenido todavía)</p>';
+  if (!md.trim()) return '<p class="text-sm text-[#0a0a0a]/30 italic">(sin contenido todavía)</p>';
   const lines = md.split(/\r?\n/);
   const out: string[] = [];
   let inList = false;
@@ -54,19 +54,19 @@ function renderMarkdown(md: string): string {
     if (/^##\s+/.test(line)) {
       if (inList) { out.push("</ul>"); inList = false; }
       const h = line.replace(/^##\s+/, "");
-      out.push(`<h2 class="text-[11px] font-bold text-[#131218]/40 uppercase tracking-widest mt-6 mb-2">${renderInline(h)}</h2>`);
+      out.push(`<h2 class="text-[11px] font-bold text-[#0a0a0a]/40 uppercase tracking-widest mt-6 mb-2">${renderInline(h)}</h2>`);
       continue;
     }
     if (/^###\s+/.test(line)) {
       if (inList) { out.push("</ul>"); inList = false; }
       const h = line.replace(/^###\s+/, "");
-      out.push(`<h3 class="text-sm font-semibold text-[#131218] mt-4 mb-1.5">${renderInline(h)}</h3>`);
+      out.push(`<h3 class="text-sm font-semibold text-[#0a0a0a] mt-4 mb-1.5">${renderInline(h)}</h3>`);
       continue;
     }
     if (/^-\s+/.test(line)) {
       if (!inList) { out.push('<ul class="space-y-1.5 my-2">'); inList = true; }
       const li = line.replace(/^-\s+/, "");
-      out.push(`<li class="text-[13px] text-[#131218]/80 leading-relaxed pl-4 relative before:content-['•'] before:absolute before:left-0 before:text-[#131218]/30">${renderInline(li)}</li>`);
+      out.push(`<li class="text-[13px] text-[#0a0a0a]/80 leading-relaxed pl-4 relative before:content-['•'] before:absolute before:left-0 before:text-[#0a0a0a]/30">${renderInline(li)}</li>`);
       continue;
     }
     if (line.trim() === "") {
@@ -74,7 +74,7 @@ function renderMarkdown(md: string): string {
       continue;
     }
     if (inList) { out.push("</ul>"); inList = false; }
-    out.push(`<p class="text-[13px] text-[#131218]/80 leading-relaxed my-2">${renderInline(line)}</p>`);
+    out.push(`<p class="text-[13px] text-[#0a0a0a]/80 leading-relaxed my-2">${renderInline(line)}</p>`);
   }
   if (inList) out.push("</ul>");
   return out.join("");
@@ -244,7 +244,7 @@ export default async function KnowledgeDetailPage({
   const currentSourceCount = (node.body_md.match(/^[ \t]*-\s+/gm) ?? []).length;
 
   return (
-    <div className="flex min-h-screen bg-[#EFEFEA]">
+    <div className="flex min-h-screen bg-[#f4f4ef]">
       <Sidebar items={NAV} isAdmin />
 
       <main

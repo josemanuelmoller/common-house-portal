@@ -17,34 +17,34 @@ export function GarageDecisions({ decisions }: { decisions: GarageDecision[] }) 
   if (decisions.length === 0) return null;
 
   return (
-    <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-      <div className="h-1 bg-[#EFEFEA]" />
-      <div className="px-6 py-5 border-b border-[#EFEFEA]">
+    <div className="bg-white rounded-2xl border border-[#e4e4dd] overflow-hidden">
+      <div className="h-1 bg-[#f4f4ef]" />
+      <div className="px-6 py-5 border-b border-[#f4f4ef]">
         <div className="flex items-center justify-between">
-          <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">
+          <p className="text-[10px] font-bold text-[#0a0a0a]/30 uppercase tracking-widest">
             Decisions Locked
           </p>
-          <span className="text-[10px] font-bold text-[#131218]/30 bg-[#EFEFEA] border border-[#E0E0D8] px-2 py-0.5 rounded-full">
+          <span className="text-[10px] font-bold text-[#0a0a0a]/30 bg-[#f4f4ef] border border-[#e4e4dd] px-2 py-0.5 rounded-full">
             {decisions.length}
           </span>
         </div>
-        <p className="text-sm text-[#131218]/40 mt-1.5 leading-relaxed">
+        <p className="text-sm text-[#0a0a0a]/40 mt-1.5 leading-relaxed">
           What the team has agreed on — recorded and confirmed.
         </p>
       </div>
-      <div className="divide-y divide-[#EFEFEA]">
+      <div className="divide-y divide-[#f4f4ef]">
         {decisions.map((d) => (
           <div key={d.id} className="px-6 py-4">
             <div className="flex items-start justify-between gap-4">
-              <p className="text-sm font-semibold text-[#131218] leading-snug">
+              <p className="text-sm font-semibold text-[#0a0a0a] leading-snug">
                 {d.title}
               </p>
-              <p className="text-[10px] text-[#131218]/25 font-medium uppercase tracking-widest shrink-0 pt-0.5">
+              <p className="text-[10px] text-[#0a0a0a]/25 font-medium uppercase tracking-widest shrink-0 pt-0.5">
                 {d.date}
               </p>
             </div>
             {d.context && (
-              <p className="text-sm text-[#131218]/50 mt-2 leading-relaxed">
+              <p className="text-sm text-[#0a0a0a]/50 mt-2 leading-relaxed">
                 {d.context}
               </p>
             )}

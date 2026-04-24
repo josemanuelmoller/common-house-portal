@@ -24,12 +24,12 @@ interface WorkspaceActivationProps {
  */
 export function WorkspaceActivation({ project, lastSession }: WorkspaceActivationProps) {
   return (
-    <div className="bg-[#131218] rounded-2xl overflow-hidden">
-      <div className="h-1 bg-[#B2FF59]" />
+    <div className="bg-[#0a0a0a] rounded-2xl overflow-hidden">
+      <div className="h-1 bg-[#c6f24a]" />
       <div className="px-6 py-6">
         <div className="flex items-start justify-between gap-6 flex-wrap">
           <div className="flex-1 min-w-0">
-            <p className="text-[10px] font-bold text-[#B2FF59]/60 uppercase tracking-widest mb-3">
+            <p className="text-[10px] font-bold text-[#c6f24a]/60 uppercase tracking-widest mb-3">
               Execution is live
             </p>
             <h3 className="text-base font-bold text-white tracking-tight">
@@ -43,7 +43,7 @@ export function WorkspaceActivation({ project, lastSession }: WorkspaceActivatio
           </div>
           <Link
             href="/workroom"
-            className="shrink-0 self-center inline-flex items-center gap-2 bg-[#B2FF59] text-[#131218] text-[11px] font-bold px-4 py-2.5 rounded-xl hover:bg-white transition-colors uppercase tracking-widest whitespace-nowrap"
+            className="shrink-0 self-center inline-flex items-center gap-2 bg-[#c6f24a] text-[#0a0a0a] text-[11px] font-bold px-4 py-2.5 rounded-xl hover:bg-white transition-colors uppercase tracking-widest whitespace-nowrap"
           >
             Open The Workroom →
           </Link>

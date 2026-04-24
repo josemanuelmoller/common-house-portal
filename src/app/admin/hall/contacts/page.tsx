@@ -344,7 +344,7 @@ export default async function HallContactsPage({ searchParams }: PageProps) {
   const vip      = classified.filter(c => (c.relationship_classes ?? []).some(x => VIP.has(x)));
 
   return (
-    <div className="flex min-h-screen bg-[#EFEFEA]">
+    <div className="flex min-h-screen bg-[#f4f4ef]">
       <Sidebar adminNav />
 
       <main

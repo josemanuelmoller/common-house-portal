@@ -80,13 +80,13 @@ export function ProjectsMap({ projects }: Props) {
   });
 
   return (
-    <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-      <div className="h-1 bg-[#131218]" />
-      <div className="px-6 py-4 border-b border-[#EFEFEA]">
-        <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Portfolio Map</p>
-        <p className="text-sm font-bold text-[#131218] tracking-tight mt-0.5">Active Projects by Location</p>
+    <div className="bg-white rounded-2xl border border-[#e4e4dd] overflow-hidden">
+      <div className="h-1 bg-[#0a0a0a]" />
+      <div className="px-6 py-4 border-b border-[#f4f4ef]">
+        <p className="text-[10px] font-bold text-[#0a0a0a]/30 uppercase tracking-widest">Portfolio Map</p>
+        <p className="text-sm font-bold text-[#0a0a0a] tracking-tight mt-0.5">Active Projects by Location</p>
       </div>
-      <div className="bg-[#EFEFEA]/50 px-2 py-2" style={{ height: 320 }}>
+      <div className="bg-[#f4f4ef]/50 px-2 py-2" style={{ height: 320 }}>
         <ComposableMap
           projection="geoMercator"
           projectionConfig={{ scale: 120, center: [0, 20] }}
@@ -133,7 +133,7 @@ export function ProjectsMap({ projects }: Props) {
       </div>
       {markers.length === 0 && (
         <div className="px-6 py-4 text-center">
-          <p className="text-xs text-[#131218]/30">No geography tags on projects</p>
+          <p className="text-xs text-[#0a0a0a]/30">No geography tags on projects</p>
         </div>
       )}
     </div>

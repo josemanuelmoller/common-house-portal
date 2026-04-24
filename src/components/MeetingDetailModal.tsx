@@ -22,7 +22,7 @@ type Props = {
 function platformColor(platform: string) {
   if (platform === "Fireflies") return "bg-purple-100 text-purple-700";
   if (platform === "Gmail")     return "bg-red-100 text-red-700";
-  return "bg-[#EFEFEA] text-[#131218]/50";
+  return "bg-[#f4f4ef] text-[#0a0a0a]/50";
 }
 
 function formatDate(d: string | null) {
@@ -54,7 +54,7 @@ export function MeetingDetailModal({ meetingId, children }: Props) {
       {/* Backdrop */}
       {open && (
         <div
-          className="fixed inset-0 z-40 bg-[#131218]/40 backdrop-blur-sm"
+          className="fixed inset-0 z-40 bg-[#0a0a0a]/40 backdrop-blur-sm"
           onClick={() => setOpen(false)}
         />
       )}
@@ -67,17 +67,17 @@ export function MeetingDetailModal({ meetingId, children }: Props) {
         style={{ width: "min(520px, 95vw)" }}
       >
         {/* Panel header */}
-        <div className="h-1 bg-[#131218] shrink-0" />
-        <div className="px-6 py-5 border-b border-[#EFEFEA] flex items-start justify-between shrink-0">
+        <div className="h-1 bg-[#0a0a0a] shrink-0" />
+        <div className="px-6 py-5 border-b border-[#f4f4ef] flex items-start justify-between shrink-0">
           <div>
-            <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest mb-1">Meeting Detail</p>
-            <p className="text-lg font-bold text-[#131218] leading-tight">
+            <p className="text-[10px] font-bold text-[#0a0a0a]/30 uppercase tracking-widest mb-1">Meeting Detail</p>
+            <p className="text-lg font-bold text-[#0a0a0a] leading-tight">
               {loading ? "Cargando..." : detail?.title ?? "—"}
             </p>
           </div>
           <button
             onClick={() => setOpen(false)}
-            className="text-[#131218]/30 hover:text-[#131218] transition-colors text-xl leading-none mt-0.5 shrink-0 ml-4"
+            className="text-[#0a0a0a]/30 hover:text-[#0a0a0a] transition-colors text-xl leading-none mt-0.5 shrink-0 ml-4"
           >
             ✕
           </button>
@@ -87,7 +87,7 @@ export function MeetingDetailModal({ meetingId, children }: Props) {
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
           {loading && (
             <div className="flex items-center justify-center py-12">
-              <div className="w-6 h-6 border-2 border-[#131218]/20 border-t-[#131218] rounded-full animate-spin" />
+              <div className="w-6 h-6 border-2 border-[#0a0a0a]/20 border-t-[#0a0a0a] rounded-full animate-spin" />
             </div>
           )}
 
@@ -98,7 +98,7 @@ export function MeetingDetailModal({ meetingId, children }: Props) {
                 <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-widest ${platformColor(detail.platform)}`}>
                   {detail.platform || "Meeting"}
                 </span>
-                <span className="text-sm text-[#131218]/50 font-medium">
+                <span className="text-sm text-[#0a0a0a]/50 font-medium">
                   {formatDate(detail.date)}
                 </span>
               </div>
@@ -106,7 +106,7 @@ export function MeetingDetailModal({ meetingId, children }: Props) {
               {/* Attendees */}
               {detail.attendees.length > 0 && (
                 <div>
-                  <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest mb-2">Asistentes</p>
+                  <p className="text-[10px] font-bold text-[#0a0a0a]/30 uppercase tracking-widest mb-2">Asistentes</p>
                   <div className="flex flex-wrap gap-2">
                     {detail.attendees.map((a, i) => {
                       const words = a.trim().split(/\s+/);
@@ -114,11 +114,11 @@ export function MeetingDetailModal({ meetingId, children }: Props) {
                         ? (words[0][0] + words[words.length - 1][0]).toUpperCase()
                         : a.slice(0, 2).toUpperCase();
                       return (
-                        <div key={i} className="flex items-center gap-2 bg-[#EFEFEA] rounded-xl px-3 py-1.5">
-                          <div className="w-6 h-6 rounded-lg bg-[#131218] flex items-center justify-center text-[9px] font-bold text-[#B2FF59] shrink-0">
+                        <div key={i} className="flex items-center gap-2 bg-[#f4f4ef] rounded-xl px-3 py-1.5">
+                          <div className="w-6 h-6 rounded-lg bg-[#0a0a0a] flex items-center justify-center text-[9px] font-bold text-[#c6f24a] shrink-0">
                             {initials}
                           </div>
-                          <span className="text-xs font-semibold text-[#131218]">{a}</span>
+                          <span className="text-xs font-semibold text-[#0a0a0a]">{a}</span>
                         </div>
                       );
                     })}
@@ -129,27 +129,27 @@ export function MeetingDetailModal({ meetingId, children }: Props) {
               {/* Content sections */}
               {detail.sections.length > 0 ? (
                 <div>
-                  <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest mb-3">Resumen</p>
+                  <p className="text-[10px] font-bold text-[#0a0a0a]/30 uppercase tracking-widest mb-3">Resumen</p>
                   <div className="space-y-2">
                     {detail.sections.map((s, i) => {
                       if (s.type === "heading") return (
-                        <p key={i} className="text-sm font-bold text-[#131218] mt-4 first:mt-0">{s.text}</p>
+                        <p key={i} className="text-sm font-bold text-[#0a0a0a] mt-4 first:mt-0">{s.text}</p>
                       );
                       if (s.type === "bullet") return (
                         <div key={i} className="flex gap-2">
-                          <span className="text-[#B2FF59] bg-[#131218] rounded-full w-1.5 h-1.5 mt-1.5 shrink-0" />
-                          <p className="text-sm text-[#131218]/70 leading-relaxed">{s.text}</p>
+                          <span className="text-[#c6f24a] bg-[#0a0a0a] rounded-full w-1.5 h-1.5 mt-1.5 shrink-0" />
+                          <p className="text-sm text-[#0a0a0a]/70 leading-relaxed">{s.text}</p>
                         </div>
                       );
                       return (
-                        <p key={i} className="text-sm text-[#131218]/70 leading-relaxed">{s.text}</p>
+                        <p key={i} className="text-sm text-[#0a0a0a]/70 leading-relaxed">{s.text}</p>
                       );
                     })}
                   </div>
                 </div>
               ) : (
-                <div className="bg-[#EFEFEA]/50 rounded-xl px-4 py-6 text-center">
-                  <p className="text-sm text-[#131218]/30">Sin contenido procesado en Notion</p>
+                <div className="bg-[#f4f4ef]/50 rounded-xl px-4 py-6 text-center">
+                  <p className="text-sm text-[#0a0a0a]/30">Sin contenido procesado en Notion</p>
                 </div>
               )}
 
@@ -159,7 +159,7 @@ export function MeetingDetailModal({ meetingId, children }: Props) {
                   href={detail.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-2 w-full bg-[#131218] text-[#B2FF59] text-[10px] font-bold px-4 py-3 rounded-xl uppercase tracking-widest hover:bg-[#131218]/80 transition-colors"
+                  className="flex items-center justify-center gap-2 w-full bg-[#0a0a0a] text-[#c6f24a] text-[10px] font-bold px-4 py-3 rounded-xl uppercase tracking-widest hover:bg-[#0a0a0a]/80 transition-colors"
                 >
                   Ver fuente completa →
                 </a>

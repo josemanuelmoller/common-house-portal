@@ -47,11 +47,11 @@ const TASK_TYPE_LABEL: Record<string, string> = {
 };
 
 const TASK_TYPE_CLASS: Record<string, string> = {
-  deep_work: "bg-[#131218] text-[#c8f55a]",
+  deep_work: "bg-[#0a0a0a] text-[#c6f24a]",
   follow_up: "bg-amber-50 text-amber-700 border border-amber-200",
   prep:      "bg-blue-50 text-blue-700 border border-blue-200",
   decision:  "bg-red-50 text-red-600 border border-red-200",
-  admin:     "bg-[#EFEFEA] text-[#131218]/60 border border-[#E0E0D8]",
+  admin:     "bg-[#f4f4ef] text-[#0a0a0a]/60 border border-[#e4e4dd]",
 };
 
 export function SuggestedTimeBlocks() {

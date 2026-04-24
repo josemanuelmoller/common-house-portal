@@ -63,8 +63,8 @@ function PersonCard({ person, variant }: { person: PersonRecord; variant: CardVa
             isEir
               ? "bg-white/10 border border-white/15 text-white"
               : variant === "cofounder"
-              ? "bg-[#c8f55a] text-black"
-              : "bg-[#c8f55a] text-black"
+              ? "bg-[#c6f24a] text-black"
+              : "bg-[#c6f24a] text-black"
           }`}
         >
           {ini}
@@ -221,7 +221,7 @@ export default function ResidentsClient({
             onClick={() => setActiveFilter(label)}
             className={`text-[10px] font-bold px-3.5 py-[7px] rounded-full border transition-all cursor-pointer ${
               activeFilter === label
-                ? "border-[rgba(200,245,90,0.5)] text-[#B2FF59] bg-[rgba(200,245,90,0.08)]"
+                ? "border-[rgba(200,245,90,0.5)] text-[#c6f24a] bg-[rgba(200,245,90,0.08)]"
                 : "border-white/12 text-white/40 hover:text-white/70 hover:border-white/25"
             }`}
           >
@@ -295,7 +295,7 @@ export default function ResidentsClient({
               count={`${DIGITAL_RESIDENTS.length} agents · always on`}
             />
             <div className="bg-white border-[1.5px] border-dashed border-[#d8d8d0] rounded-2xl px-6 py-5 mb-5 flex items-center gap-3.5">
-              <div className="w-2 h-2 rounded-full bg-[#c8f55a] shrink-0" />
+              <div className="w-2 h-2 rounded-full bg-[#c6f24a] shrink-0" />
               <p className="text-[12px] text-[#555] leading-[1.6]">
                 Digital residents operate continuously — capturing, classifying, auditing, and maintaining the OS while humans focus on strategy and output. They&apos;re listed here without gimmick: these are functional agents, each with a specific scope.
               </p>

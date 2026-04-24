@@ -16,14 +16,14 @@ export function ActivityBar({ activity }: Props) {
 
   return (
     <div>
-      <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest mb-2">
+      <p className="text-[10px] font-bold text-[#0a0a0a]/30 uppercase tracking-widest mb-2">
         Actividad registrada
       </p>
       <div className="flex flex-wrap gap-2">
         {pills.map(pill => (
           <span
             key={pill.label}
-            className="inline-flex items-center gap-1.5 bg-[#131218] text-white text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-full"
+            className="inline-flex items-center gap-1.5 bg-[#0a0a0a] text-white text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-full"
           >
             <span>{pill.icon}</span>
             <span>{pill.count}</span>

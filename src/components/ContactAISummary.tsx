@@ -42,17 +42,17 @@ export function ContactAISummary({
 
   if (!summary) {
     return (
-      <div className="bg-[#F7F7F3] border border-[#E0E0D8] rounded-2xl px-5 py-4 flex items-center gap-3">
+      <div className="bg-[#F7F7F3] border border-[#e4e4dd] rounded-2xl px-5 py-4 flex items-center gap-3">
         <div className="flex-1">
-          <p className="text-[11px] text-[#131218]/60 leading-snug">
-            <strong className="text-[#131218]">Operating brief</strong>{" "}
+          <p className="text-[11px] text-[#0a0a0a]/60 leading-snug">
+            <strong className="text-[#0a0a0a]">Operating brief</strong>{" "}
             — a 1-paragraph synthesis of who this person is and what&apos;s in play with them, written by Claude from everything we have on file.
           </p>
         </div>
         <button
           onClick={() => run(false)}
           disabled={running}
-          className="text-[10px] font-bold uppercase tracking-widest bg-[#131218] text-white px-4 py-2 rounded-lg hover:bg-[#131218]/80 disabled:opacity-40 shrink-0"
+          className="text-[10px] font-bold uppercase tracking-widest bg-[#0a0a0a] text-white px-4 py-2 rounded-lg hover:bg-[#0a0a0a]/80 disabled:opacity-40 shrink-0"
         >
           {running ? "Thinking…" : "✨ Generate"}
         </button>
@@ -62,19 +62,19 @@ export function ContactAISummary({
   }
 
   return (
-    <div className="bg-[#F7F7F3] border border-[#E0E0D8] rounded-2xl px-5 py-4">
+    <div className="bg-[#F7F7F3] border border-[#e4e4dd] rounded-2xl px-5 py-4">
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
-          <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/45 mb-1.5">
+          <p className="text-[9px] font-bold tracking-widest uppercase text-[#0a0a0a]/45 mb-1.5">
             Operating brief
-            {updatedAt && <span className="text-[#131218]/30"> · {timeAgoShort(updatedAt)}</span>}
+            {updatedAt && <span className="text-[#0a0a0a]/30"> · {timeAgoShort(updatedAt)}</span>}
           </p>
-          <p className="text-[13px] text-[#131218] leading-relaxed">{summary}</p>
+          <p className="text-[13px] text-[#0a0a0a] leading-relaxed">{summary}</p>
         </div>
         <button
           onClick={() => run(true)}
           disabled={running}
-          className="text-[9px] font-bold uppercase tracking-widest text-[#131218]/40 hover:text-[#131218] underline decoration-dotted shrink-0 mt-1"
+          className="text-[9px] font-bold uppercase tracking-widest text-[#0a0a0a]/40 hover:text-[#0a0a0a] underline decoration-dotted shrink-0 mt-1"
         >
           {running ? "Refreshing…" : "Refresh"}
         </button>

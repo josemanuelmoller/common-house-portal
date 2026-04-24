@@ -213,7 +213,7 @@ export function WaOnlyContactRow({
   })();
 
   return (
-    <div className={`bg-white rounded-2xl border border-[#E0E0D8] transition-all ${expanded ? "ring-1 ring-[#131218]/10" : ""} ${pending ? "opacity-50" : ""}`}>
+    <div className={`bg-white rounded-2xl border border-[#e4e4dd] transition-all ${expanded ? "ring-1 ring-[#0a0a0a]/10" : ""} ${pending ? "opacity-50" : ""}`}>
       <button
         onClick={() => expanded ? setExpanded(false) : openAndLoad()}
         className="w-full px-5 py-3.5 text-left"
@@ -221,17 +221,17 @@ export function WaOnlyContactRow({
         <div className="flex items-center gap-3">
           <ContactAvatar photoUrl={contact.photo_url} display={display} size={36} />
           <div className="flex-1 min-w-0">
-            <p className="text-[12.5px] font-semibold text-[#131218] truncate">{display}</p>
-            <p className="text-[10px] text-[#131218]/45 mt-0.5">
+            <p className="text-[12.5px] font-semibold text-[#0a0a0a] truncate">{display}</p>
+            <p className="text-[10px] text-[#0a0a0a]/45 mt-0.5">
               <span className="inline-block bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 rounded-full text-[8px] font-bold uppercase tracking-widest mr-2">
                 WA
               </span>
               {contact.wa_count} messages ·{" "}
               {classes.length > 0
-                ? <span className="text-[#131218]/70">{classes.join(", ")}</span>
+                ? <span className="text-[#0a0a0a]/70">{classes.join(", ")}</span>
                 : <span className="text-amber-700">untagged</span>}
               {contact.auto_suggested && (
-                <span className="ml-2 text-[#131218]/35">· {contact.auto_suggested}</span>
+                <span className="ml-2 text-[#0a0a0a]/35">· {contact.auto_suggested}</span>
               )}
             </p>
           </div>
@@ -240,7 +240,7 @@ export function WaOnlyContactRow({
       </button>
 
       {expanded && (
-        <div className="border-t border-[#EFEFEA] px-5 py-4 space-y-5">
+        <div className="border-t border-[#f4f4ef] px-5 py-4 space-y-5">
           {error && (
             <p className="text-[11px] text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
               {error}
@@ -249,12 +249,12 @@ export function WaOnlyContactRow({
 
           {/* ─── Is this…? ─── */}
           <section>
-            <h3 className="text-[10px] font-bold tracking-widest uppercase text-[#131218]/60 mb-2">
+            <h3 className="text-[10px] font-bold tracking-widest uppercase text-[#0a0a0a]/60 mb-2">
               🤝 Is this the same person as…?
             </h3>
-            {loading && <p className="text-[11px] text-[#131218]/40">Checking possible matches…</p>}
+            {loading && <p className="text-[11px] text-[#0a0a0a]/40">Checking possible matches…</p>}
             {!loading && loaded && suggestions.length === 0 && (
-              <p className="text-[11px] text-[#131218]/40">
+              <p className="text-[11px] text-[#0a0a0a]/40">
                 No structural matches. Try the manual search below, or just tag them as a new person.
               </p>
             )}
@@ -262,10 +262,10 @@ export function WaOnlyContactRow({
               <ul className="space-y-1.5">
                 {suggestions.map(s => (
                   <li key={s.person_id}
-                      className="flex items-center gap-3 px-3 py-2 rounded-lg bg-[#F7F7F3] border border-[#EFEFEA]">
+                      className="flex items-center gap-3 px-3 py-2 rounded-lg bg-[#F7F7F3] border border-[#f4f4ef]">
                     <div className="flex-1 min-w-0">
-                      <p className="text-[12px] font-semibold text-[#131218] truncate">{s.full_name}</p>
-                      <p className="text-[10px] text-[#131218]/45 truncate">
+                      <p className="text-[12px] font-semibold text-[#0a0a0a] truncate">{s.full_name}</p>
+                      <p className="text-[10px] text-[#0a0a0a]/45 truncate">
                         {s.email} · {pctBadge(s.confidence)} via {s.reason}
                         {s.meeting_count > 0 && ` · 📅 ${s.meeting_count}`}
                         {s.wa_count > 0 && ` · 💬 ${s.wa_count}`}
@@ -274,7 +274,7 @@ export function WaOnlyContactRow({
                     <button
                       onClick={() => doMerge(s.person_id, s.full_name)}
                       disabled={loading}
-                      className="text-[10px] font-bold uppercase tracking-widest bg-[#131218] text-white px-3 py-1.5 rounded-lg hover:bg-[#131218]/80 disabled:opacity-40"
+                      className="text-[10px] font-bold uppercase tracking-widest bg-[#0a0a0a] text-white px-3 py-1.5 rounded-lg hover:bg-[#0a0a0a]/80 disabled:opacity-40"
                     >
                       ✓ Merge
                     </button>
@@ -286,7 +286,7 @@ export function WaOnlyContactRow({
 
           {/* ─── Search manually ─── */}
           <section>
-            <h3 className="text-[10px] font-bold tracking-widest uppercase text-[#131218]/60 mb-2">
+            <h3 className="text-[10px] font-bold tracking-widest uppercase text-[#0a0a0a]/60 mb-2">
               🔍 Not them? Search manually
             </h3>
             <input
@@ -294,7 +294,7 @@ export function WaOnlyContactRow({
               value={manualQuery}
               onChange={e => setManualQuery(e.target.value)}
               placeholder="Type a name or email to find the match…"
-              className="w-full text-[12px] px-3 py-2 rounded-lg border border-[#E0E0D8] bg-white outline-none focus:border-[#131218]/30"
+              className="w-full text-[12px] px-3 py-2 rounded-lg border border-[#e4e4dd] bg-white outline-none focus:border-[#0a0a0a]/30"
             />
             {manualHits.length > 0 && (
               <ul className="mt-2 space-y-1">
@@ -302,13 +302,13 @@ export function WaOnlyContactRow({
                   <li key={c.id}
                       className="flex items-center gap-3 px-3 py-1.5 rounded-lg hover:bg-[#F7F7F3]">
                     <div className="flex-1 min-w-0">
-                      <p className="text-[11.5px] font-semibold text-[#131218] truncate">{displayFor(c)}</p>
-                      <p className="text-[10px] text-[#131218]/45 truncate">{c.email}</p>
+                      <p className="text-[11.5px] font-semibold text-[#0a0a0a] truncate">{displayFor(c)}</p>
+                      <p className="text-[10px] text-[#0a0a0a]/45 truncate">{c.email}</p>
                     </div>
                     <button
                       onClick={() => doMerge(c.id, displayFor(c))}
                       disabled={loading}
-                      className="text-[10px] font-bold uppercase tracking-widest text-[#131218]/70 hover:text-[#131218] border border-[#131218]/20 hover:border-[#131218]/50 px-2.5 py-1 rounded-lg disabled:opacity-40"
+                      className="text-[10px] font-bold uppercase tracking-widest text-[#0a0a0a]/70 hover:text-[#0a0a0a] border border-[#0a0a0a]/20 hover:border-[#0a0a0a]/50 px-2.5 py-1 rounded-lg disabled:opacity-40"
                     >
                       Merge
                     </button>
@@ -320,7 +320,7 @@ export function WaOnlyContactRow({
 
           {/* ─── Or tag as new ─── */}
           <section>
-            <h3 className="text-[10px] font-bold tracking-widest uppercase text-[#131218]/60 mb-2">
+            <h3 className="text-[10px] font-bold tracking-widest uppercase text-[#0a0a0a]/60 mb-2">
               🏷️ Or they&apos;re someone new — tag them
             </h3>
             <div className="flex flex-wrap gap-1.5">
@@ -332,10 +332,10 @@ export function WaOnlyContactRow({
                     onClick={() => toggleClass(c.v)}
                     className={`text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full border transition-colors ${
                       active
-                        ? c.kind === "vip"      ? "bg-[#c8f55a]/40 border-[#131218]/30 text-[#131218]"
+                        ? c.kind === "vip"      ? "bg-[#c6f24a]/40 border-[#0a0a0a]/30 text-[#0a0a0a]"
                         : c.kind === "personal" ? "bg-amber-50    border-amber-200     text-amber-700"
-                        :                         "bg-[#EFEFEA]    border-[#131218]/20  text-[#131218]"
-                        : "bg-white border-[#E0E0D8] text-[#131218]/50 hover:border-[#131218]/30"
+                        :                         "bg-[#f4f4ef]    border-[#0a0a0a]/20  text-[#0a0a0a]"
+                        : "bg-white border-[#e4e4dd] text-[#0a0a0a]/50 hover:border-[#0a0a0a]/30"
                     }`}
                   >
                     {c.label}
@@ -343,7 +343,7 @@ export function WaOnlyContactRow({
                 );
               })}
             </div>
-            <p className="text-[10px] text-[#131218]/35 mt-2 leading-snug">
+            <p className="text-[10px] text-[#0a0a0a]/35 mt-2 leading-snug">
               Tagging a WA-only contact is fine — Google Contacts sync is skipped until you add an email.
             </p>
           </section>
@@ -352,7 +352,7 @@ export function WaOnlyContactRow({
           <section>
             <button
               onClick={() => setProfileOpen(v => !v)}
-              className="text-[10px] font-bold tracking-widest uppercase text-[#131218]/60 hover:text-[#131218] flex items-center gap-2"
+              className="text-[10px] font-bold tracking-widest uppercase text-[#0a0a0a]/60 hover:text-[#0a0a0a] flex items-center gap-2"
             >
               ✨ Make them a full contact
               <span className={`text-[8px] opacity-40 transition-transform ${profileOpen ? "rotate-180" : ""}`}>▾</span>
@@ -366,13 +366,13 @@ export function WaOnlyContactRow({
                 <Input label="Phone"        value={profile.phone}        onChange={v => setProfile(p => ({ ...p, phone: v }))}        placeholder="+56 9 …" />
                 <Input label="Display name" value={profile.display_name} onChange={v => setProfile(p => ({ ...p, display_name: v }))} placeholder="(how it appears)" />
                 <div className="col-span-2">
-                  <label className="text-[9px] font-bold uppercase tracking-widest text-[#131218]/45 mb-1 block">Notes</label>
+                  <label className="text-[9px] font-bold uppercase tracking-widest text-[#0a0a0a]/45 mb-1 block">Notes</label>
                   <textarea
                     value={profile.notes}
                     onChange={e => setProfile(p => ({ ...p, notes: e.target.value }))}
                     placeholder="Context, how you met, shared projects, etc."
                     rows={3}
-                    className="w-full text-[12px] px-3 py-2 rounded-lg border border-[#E0E0D8] bg-white outline-none focus:border-[#131218]/30 resize-y"
+                    className="w-full text-[12px] px-3 py-2 rounded-lg border border-[#e4e4dd] bg-white outline-none focus:border-[#0a0a0a]/30 resize-y"
                   />
                 </div>
                 {profileConflict && (
@@ -392,14 +392,14 @@ export function WaOnlyContactRow({
                   <button
                     onClick={saveProfile}
                     disabled={profileSaving}
-                    className="text-[10px] font-bold uppercase tracking-widest bg-[#131218] text-white px-4 py-2 rounded-lg hover:bg-[#131218]/80 disabled:opacity-40"
+                    className="text-[10px] font-bold uppercase tracking-widest bg-[#0a0a0a] text-white px-4 py-2 rounded-lg hover:bg-[#0a0a0a]/80 disabled:opacity-40"
                   >
                     {profileSaving ? "Saving…" : "✓ Create contact"}
                   </button>
                   <button
                     onClick={() => setProfileOpen(false)}
                     disabled={profileSaving}
-                    className="text-[10px] font-bold uppercase tracking-widest text-[#131218]/50 hover:text-[#131218] px-2"
+                    className="text-[10px] font-bold uppercase tracking-widest text-[#0a0a0a]/50 hover:text-[#0a0a0a] px-2"
                   >
                     Cancel
                   </button>
@@ -424,7 +424,7 @@ function Input({
 }) {
   return (
     <div>
-      <label className="text-[9px] font-bold uppercase tracking-widest text-[#131218]/45 mb-1 block">
+      <label className="text-[9px] font-bold uppercase tracking-widest text-[#0a0a0a]/45 mb-1 block">
         {label}
       </label>
       <input
@@ -432,7 +432,7 @@ function Input({
         value={value}
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full text-[12px] px-3 py-1.5 rounded-lg border border-[#E0E0D8] bg-white outline-none focus:border-[#131218]/30"
+        className="w-full text-[12px] px-3 py-1.5 rounded-lg border border-[#e4e4dd] bg-white outline-none focus:border-[#0a0a0a]/30"
       />
     </div>
   );

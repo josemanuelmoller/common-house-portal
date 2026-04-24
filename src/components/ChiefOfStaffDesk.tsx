@@ -29,13 +29,13 @@ function urgencyBar(urgency: CoSTask["urgency"]): string {
 function urgencyDot(urgency: CoSTask["urgency"]): string {
   if (urgency === "critical") return "bg-red-500";
   if (urgency === "high")     return "bg-amber-400";
-  return "bg-[#131218]/20";
+  return "bg-[#0a0a0a]/20";
 }
 
 function urgencyTaskColor(urgency: CoSTask["urgency"]): string {
   if (urgency === "critical") return "text-red-700";
   if (urgency === "high")     return "text-amber-700";
-  return "text-[#131218]/80";
+  return "text-[#0a0a0a]/80";
 }
 
 function loopBadge(loopType: CoSTask["loopType"]): { label: string; cls: string } {
@@ -46,7 +46,7 @@ function loopBadge(loopType: CoSTask["loopType"]): { label: string; cls: string 
     case "prep":       return { label: "Prep needed", cls: "bg-blue-50 text-blue-600 border-blue-200" };
     case "review":     return { label: "Review",      cls: "bg-sky-50 text-sky-600 border-sky-200" };
     case "follow-up":  return { label: "Follow-up",   cls: "bg-green-50 text-green-700 border-green-200" };
-    default:           return { label: "Action",      cls: "bg-[#EFEFEA] text-[#131218]/50 border-[#E0E0D8]" };
+    default:           return { label: "Action",      cls: "bg-[#f4f4ef] text-[#0a0a0a]/50 border-[#e4e4dd]" };
   }
 }
 
@@ -68,14 +68,14 @@ function signalBadge(signal: CoSTask["entrySignal"]): { label: string; cls: stri
     case "negotiation":      return { label: "Negotiation",    cls: "bg-purple-50 text-purple-600 border-purple-200" };
     case "proposal_pending": return { label: "Proposal sent",  cls: "bg-amber-50 text-amber-600 border-amber-200" };
     case "inbound":          return { label: "Inbound",        cls: "bg-green-50 text-green-700 border-green-200" };
-    default:                 return { label: "Follow-up",      cls: "bg-[#EFEFEA] text-[#131218]/50 border-[#E0E0D8]" };
+    default:                 return { label: "Follow-up",      cls: "bg-[#f4f4ef] text-[#0a0a0a]/50 border-[#e4e4dd]" };
   }
 }
 
 function statusBadge(status: CoSTask["taskStatus"]): { label: string; cls: string } | null {
   switch (status) {
     case "in-progress": return { label: "In progress", cls: "bg-blue-50 text-blue-600 border-blue-200" };
-    case "waiting":     return { label: "Waiting",     cls: "bg-[#EFEFEA] text-[#131218]/40 border-[#E0E0D8]" };
+    case "waiting":     return { label: "Waiting",     cls: "bg-[#f4f4ef] text-[#0a0a0a]/40 border-[#e4e4dd]" };
     // "todo" for a row that was previously reopened — Loop Engine surfaces it
     // as actionable again, but we still want the lineage context visible.
     default:            return null;
@@ -94,13 +94,13 @@ function dueDateLabel(isoDate: string | null): string | null {
 }
 
 function dueDateColor(isoDate: string | null): string {
-  if (!isoDate) return "text-[#131218]/30";
+  if (!isoDate) return "text-[#0a0a0a]/30";
   const days = Math.floor((new Date(isoDate).getTime() - Date.now()) / 86400000);
   if (days < 0)   return "text-red-600 font-bold";
   if (days === 0) return "text-red-500 font-bold";
   if (days === 1) return "text-amber-600 font-semibold";
   if (days <= 3)  return "text-amber-500 font-semibold";
-  return "text-[#131218]/50";
+  return "text-[#0a0a0a]/50";
 }
 
 // ─── Single Task Card ─────────────────────────────────────────────────────────
@@ -123,7 +123,7 @@ function TaskCard({
   const hint         = interventionHint(task.interventionMoment);
 
   return (
-    <div className={`divide-y divide-[#EFEFEA] ${urgencyBar(task.urgency)}`}>
+    <div className={`divide-y divide-[#f4f4ef] ${urgencyBar(task.urgency)}`}>
 
       {/* ── Main row ──────────────────────────────────────────────────────── */}
       <div className="px-5 py-4">
@@ -148,12 +148,12 @@ function TaskCard({
                 </span>
               )}
               {hint && (
-                <span className="text-[8px] font-medium text-[#131218]/30 uppercase tracking-widest">
+                <span className="text-[8px] font-medium text-[#0a0a0a]/30 uppercase tracking-widest">
                   · {hint}
                 </span>
               )}
               {task.opportunityType && task.opportunityType !== "Project" && (
-                <span className="text-[8px] font-bold text-[#131218]/20 uppercase tracking-widest">
+                <span className="text-[8px] font-bold text-[#0a0a0a]/20 uppercase tracking-widest">
                   · {task.opportunityType}
                 </span>
               )}
@@ -165,14 +165,14 @@ function TaskCard({
             </p>
 
             {/* Signal reason (why this is a task) */}
-            <p className="text-[10px] text-[#131218]/35 font-medium mb-1.5">
+            <p className="text-[10px] text-[#0a0a0a]/35 font-medium mb-1.5">
               {task.signalReason}
             </p>
 
             {/* Due date / meeting date */}
             {dueDateStr && (
               <div className="flex items-center gap-1.5 mb-1.5">
-                <span className="text-[10px] text-[#131218]/25">📅</span>
+                <span className="text-[10px] text-[#0a0a0a]/25">📅</span>
                 <span className={`text-[10.5px] ${dueDateCls}`}>{dueDateStr}</span>
               </div>
             )}
@@ -180,7 +180,7 @@ function TaskCard({
             {/* Review link */}
             {task.reviewUrl && (
               <div className="flex items-center gap-1.5 mb-1.5">
-                <span className="text-[10px] text-[#131218]/25">📄</span>
+                <span className="text-[10px] text-[#0a0a0a]/25">📄</span>
                 <a
                   href={task.reviewUrl}
                   target="_blank"
@@ -193,13 +193,13 @@ function TaskCard({
             )}
 
             {/* Source context — SECONDARY */}
-            <p className="text-[9.5px] text-[#131218]/30 font-medium mt-0.5">
+            <p className="text-[9.5px] text-[#0a0a0a]/30 font-medium mt-0.5">
               {task.taskSource === "project" ? "Project" : "Opportunity"}:{" "}
-              <span className="font-semibold text-[#131218]/50">{task.opportunityName}</span>
+              <span className="font-semibold text-[#0a0a0a]/50">{task.opportunityName}</span>
               {task.orgName && task.orgName !== task.opportunityName && (
-                <span className="text-[#131218]/30"> · {task.orgName}</span>
+                <span className="text-[#0a0a0a]/30"> · {task.orgName}</span>
               )}
-              <span className="text-[#131218]/25"> · {task.opportunityStage || "—"}</span>
+              <span className="text-[#0a0a0a]/25"> · {task.opportunityStage || "—"}</span>
             </p>
 
           </div>
@@ -207,7 +207,7 @@ function TaskCard({
           {/* Expand toggle */}
           <button
             onClick={() => setExpanded(x => !x)}
-            className="text-[#131218]/20 hover:text-[#131218]/50 transition-colors text-xs shrink-0 mt-0.5"
+            className="text-[#0a0a0a]/20 hover:text-[#0a0a0a]/50 transition-colors text-xs shrink-0 mt-0.5"
             aria-label={expanded ? "Collapse" : "Expand"}
           >
             {expanded ? "▲" : "▼"}
@@ -222,7 +222,7 @@ function TaskCard({
               href={task.reviewUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-[10px] font-bold text-white bg-[#131218] hover:bg-[#131218]/80 px-3 py-1.5 rounded-lg transition-colors"
+              className="text-[10px] font-bold text-white bg-[#0a0a0a] hover:bg-[#0a0a0a]/80 px-3 py-1.5 rounded-lg transition-colors"
             >
               Open doc →
             </a>
@@ -231,7 +231,7 @@ function TaskCard({
               href={task.notionUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-[10px] font-bold text-white bg-[#131218] hover:bg-[#131218]/80 px-3 py-1.5 rounded-lg transition-colors"
+              className="text-[10px] font-bold text-white bg-[#0a0a0a] hover:bg-[#0a0a0a]/80 px-3 py-1.5 rounded-lg transition-colors"
             >
               Open in Notion →
             </a>
@@ -243,7 +243,7 @@ function TaskCard({
               href={task.calendarBlockUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-[10px] font-bold text-[#131218]/60 bg-[#EFEFEA] hover:bg-[#E0E0D8] px-3 py-1.5 rounded-lg transition-colors"
+              className="text-[10px] font-bold text-[#0a0a0a]/60 bg-[#f4f4ef] hover:bg-[#e4e4dd] px-3 py-1.5 rounded-lg transition-colors"
             >
               📅 Block 1h
             </a>
@@ -264,7 +264,7 @@ function TaskCard({
               <button
                 onClick={() => onStatusChange(task.id, "Waiting")}
                 disabled={isUpdating}
-                className="text-[9px] font-bold text-[#131218]/40 bg-[#EFEFEA] hover:bg-[#E0E0D8] px-2 py-1 rounded-full transition-colors disabled:opacity-40"
+                className="text-[9px] font-bold text-[#0a0a0a]/40 bg-[#f4f4ef] hover:bg-[#e4e4dd] px-2 py-1 rounded-full transition-colors disabled:opacity-40"
               >
                 Waiting
               </button>
@@ -284,11 +284,11 @@ function TaskCard({
       {expanded && (
         <div className="px-5 py-3 bg-[#FAFAF8]">
           <div className="ml-5 space-y-2">
-            <p className="text-[9px] font-bold uppercase tracking-widest text-[#131218]/25">Task context</p>
+            <p className="text-[9px] font-bold uppercase tracking-widest text-[#0a0a0a]/25">Task context</p>
             <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[10.5px]">
-              <div><span className="text-[#131218]/35">Stage</span> <span className="font-semibold text-[#131218]/70">{task.opportunityStage || "—"}</span></div>
-              <div><span className="text-[#131218]/35">Type</span> <span className="font-semibold text-[#131218]/70">{task.opportunityType || "—"}</span></div>
-              <div><span className="text-[#131218]/35">Task status</span> <span className="font-semibold text-[#131218]/70">{task.taskStatus}</span></div>
+              <div><span className="text-[#0a0a0a]/35">Stage</span> <span className="font-semibold text-[#0a0a0a]/70">{task.opportunityStage || "—"}</span></div>
+              <div><span className="text-[#0a0a0a]/35">Type</span> <span className="font-semibold text-[#0a0a0a]/70">{task.opportunityType || "—"}</span></div>
+              <div><span className="text-[#0a0a0a]/35">Task status</span> <span className="font-semibold text-[#0a0a0a]/70">{task.taskStatus}</span></div>
             </div>
 
             {/* Drop task */}
@@ -296,7 +296,7 @@ function TaskCard({
               <button
                 onClick={() => onStatusChange(task.id, "Dropped")}
                 disabled={isUpdating}
-                className="text-[9px] font-bold text-[#131218]/25 hover:text-[#131218]/50 transition-colors"
+                className="text-[9px] font-bold text-[#0a0a0a]/25 hover:text-[#0a0a0a]/50 transition-colors"
               >
                 Drop task →
               </button>
@@ -304,15 +304,15 @@ function TaskCard({
                 href={task.notionUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-[9px] font-bold text-[#131218]/25 hover:text-[#131218]/50 transition-colors ml-auto"
+                className="text-[9px] font-bold text-[#0a0a0a]/25 hover:text-[#0a0a0a]/50 transition-colors ml-auto"
               >
                 Notion →
               </a>
             </div>
 
             {/* ── Debug strip (admin observability) ──────────────────────── */}
-            <div className="mt-2 pt-2 border-t border-dashed border-[#131218]/8">
-              <p className="text-[8px] font-mono text-[#131218]/25 leading-relaxed">
+            <div className="mt-2 pt-2 border-t border-dashed border-[#0a0a0a]/8">
+              <p className="text-[8px] font-mono text-[#0a0a0a]/25 leading-relaxed">
                 <span className="font-bold uppercase tracking-widest">debug</span>
                 {" · "}status={task.loopStatus ?? task.taskStatus}
                 {" · "}passive={task.isPassiveDiscovery ? "yes" : "no"}
@@ -428,9 +428,9 @@ export function ChiefOfStaffDesk({ tasks }: { tasks: CoSTask[] }) {
 
   if (visible.length === 0) {
     return (
-      <div className="flex items-center gap-3 bg-white/50 border border-dashed border-[#E0E0D8] rounded-xl px-4 py-2">
-        <span className="w-1.5 h-1.5 rounded-full bg-[#c8f55a] shrink-0" />
-        <p className="text-[11px] text-[#131218]/45 flex-1 min-w-0">
+      <div className="flex items-center gap-3 bg-white/50 border border-dashed border-[#e4e4dd] rounded-xl px-4 py-2">
+        <span className="w-1.5 h-1.5 rounded-full bg-[#c6f24a] shrink-0" />
+        <p className="text-[11px] text-[#0a0a0a]/45 flex-1 min-w-0">
           Desk is clear — tasks surface when work has a review link, meeting, or explicit action.
         </p>
       </div>

@@ -11,7 +11,7 @@ interface HallHeroProps {
 
 export function HallHero({ project, cta }: HallHeroProps) {
   return (
-    <div className="bg-[#131218] px-14 py-12">
+    <div className="bg-[#0a0a0a] px-14 py-12">
       <div className="max-w-4xl">
         {/* Eyebrow */}
         <p className="text-[11px] font-bold text-white/30 uppercase tracking-[2.5px] mb-5">
@@ -24,7 +24,7 @@ export function HallHero({ project, cta }: HallHeroProps) {
             <h1 className="text-[3rem] font-[900] text-white tracking-[-2px] leading-none">
               {project.name}
             </h1>
-            <span className="inline-block bg-[#B2FF59] text-[#131218] text-[11px] font-bold uppercase tracking-[1.5px] rounded-full px-3 py-1 mt-3.5">
+            <span className="inline-block bg-[#c6f24a] text-[#0a0a0a] text-[11px] font-bold uppercase tracking-[1.5px] rounded-full px-3 py-1 mt-3.5">
               {project.stage}
             </span>
             {project.statusLine && (
@@ -57,7 +57,7 @@ export function HallHero({ project, cta }: HallHeroProps) {
         {cta && (
           <a
             href={cta.href}
-            className="inline-flex items-center gap-2 mt-6 bg-[#B2FF59] text-[#131218] text-[12px] font-bold px-4 py-2.5 rounded-full uppercase tracking-[1.5px] hover:bg-white transition-colors"
+            className="inline-flex items-center gap-2 mt-6 bg-[#c6f24a] text-[#0a0a0a] text-[12px] font-bold px-4 py-2.5 rounded-full uppercase tracking-[1.5px] hover:bg-white transition-colors"
           >
             {cta.label}
             <span aria-hidden="true">→</span>

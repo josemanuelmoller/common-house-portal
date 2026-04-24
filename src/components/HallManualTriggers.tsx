@@ -119,16 +119,16 @@ export function HallManualTriggers() {
 
   return (
     <div className="flex items-center gap-2 flex-wrap">
-      <span className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/35 mr-1">
+      <span className="text-[9px] font-bold tracking-widest uppercase text-[#0a0a0a]/35 mr-1">
         Refresh
       </span>
       {TRIGGERS.map(t => {
         const s = state[t.id];
         const cls =
-          s.status === "running" ? "bg-[#131218]/8 text-[#131218]/60 cursor-wait"
-          : s.status === "done"  ? "bg-[#B2FF59]/30 text-green-900 border border-[#B2FF59]/60"
+          s.status === "running" ? "bg-[#0a0a0a]/8 text-[#0a0a0a]/60 cursor-wait"
+          : s.status === "done"  ? "bg-[#c6f24a]/30 text-green-900 border border-[#c6f24a]/60"
           : s.status === "error" ? "bg-red-50 text-red-700 border border-red-200"
-          :                        "bg-[#131218] text-white hover:bg-[#131218]/85";
+          :                        "bg-[#0a0a0a] text-white hover:bg-[#0a0a0a]/85";
         const subtitle =
           s.status === "running" ? "syncing…"
           : (s.status === "done" || s.status === "error") && s.summary ? s.summary

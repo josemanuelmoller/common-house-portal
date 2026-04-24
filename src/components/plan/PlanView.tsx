@@ -100,16 +100,16 @@ function describeMetric(type: ObjectiveMetricType, params: Record<string, unknow
 }
 
 const TIER_PILL: Record<ObjectiveTier, string> = {
-  high: "bg-[#B2FF59] text-[#131218] border-[#B2FF59]",
-  mid: "bg-[#131218] text-white border-[#131218]",
-  low: "bg-[#EFEFEA] text-[#131218]/60 border-[#E0E0D8]",
+  high: "bg-[#c6f24a] text-[#0a0a0a] border-[#c6f24a]",
+  mid: "bg-[#0a0a0a] text-white border-[#0a0a0a]",
+  low: "bg-[#f4f4ef] text-[#0a0a0a]/60 border-[#e4e4dd]",
 };
 
 const STATUS_PILL: Record<string, string> = {
   achieved: "bg-green-100 text-green-700 border-green-200",
   slipped: "bg-amber-50 text-amber-700 border-amber-200",
-  dropped: "bg-[#EFEFEA] text-[#131218]/40 border-[#E0E0D8]",
-  active: "bg-[#131218] text-white border-[#131218]",
+  dropped: "bg-[#f4f4ef] text-[#0a0a0a]/40 border-[#e4e4dd]",
+  active: "bg-[#0a0a0a] text-white border-[#0a0a0a]",
 };
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
@@ -150,29 +150,29 @@ function ObjectiveCard({ obj, onClick }: { obj: StrategicObjective; onClick: () 
     <button
       onClick={onClick}
       aria-label={`Ver detalle: ${obj.title}`}
-      className={`text-left w-full border rounded-2xl p-4 transition-all hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-[#B2FF59]/60 ${
+      className={`text-left w-full border rounded-2xl p-4 transition-all hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-[#c6f24a]/60 ${
         isAchieved
           ? "bg-[#F3FAEA] border-[#D6EDB0] hover:border-[#9DD46A]"
           : obj.status === "slipped"
-          ? "bg-white border-l-[3px] border-l-amber-400 border-[#E0E0D8] hover:border-[#131218]/40"
-          : "bg-white border-[#E0E0D8] hover:border-[#131218]/40"
+          ? "bg-white border-l-[3px] border-l-amber-400 border-[#e4e4dd] hover:border-[#0a0a0a]/40"
+          : "bg-white border-[#e4e4dd] hover:border-[#0a0a0a]/40"
       }`}
     >
       <div className="flex items-start justify-between gap-2 mb-2">
-        <div className="text-[13px] font-bold text-[#131218] leading-snug tracking-[-0.2px] flex-1">
+        <div className="text-[13px] font-bold text-[#0a0a0a] leading-snug tracking-[-0.2px] flex-1">
           {obj.title}
         </div>
         <TierPill tier={obj.tier} />
       </div>
 
       <div className="flex gap-1.5 items-center flex-wrap mb-2">
-        <span className="text-[8.5px] font-bold uppercase tracking-[1.2px] px-2 py-0.5 rounded-full border bg-[#131218] text-white border-[#131218]">
+        <span className="text-[8.5px] font-bold uppercase tracking-[1.2px] px-2 py-0.5 rounded-full border bg-[#0a0a0a] text-white border-[#0a0a0a]">
           {typeLabel(obj.objective_type)}
         </span>
         {obj.status !== "active" ? (
           <StatusPill status={obj.status} />
         ) : (
-          <span className="text-[8.5px] font-bold uppercase tracking-[1.2px] px-2 py-0.5 rounded-full border bg-transparent text-[#131218]/50 border-[#E0E0D8]">
+          <span className="text-[8.5px] font-bold uppercase tracking-[1.2px] px-2 py-0.5 rounded-full border bg-transparent text-[#0a0a0a]/50 border-[#e4e4dd]">
             {obj.metric_type.replace(/_/g, " ")}
           </span>
         )}
@@ -180,15 +180,15 @@ function ObjectiveCard({ obj, onClick }: { obj: StrategicObjective; onClick: () 
 
       {progress != null && (
         <>
-          <div className="h-1 bg-[#EFEFEA] rounded overflow-hidden mt-1">
+          <div className="h-1 bg-[#f4f4ef] rounded overflow-hidden mt-1">
             <div
               className={`h-full rounded ${
-                progress >= 66 ? "bg-[#B2FF59]" : progress >= 33 ? "bg-[#131218]" : "bg-amber-400"
+                progress >= 66 ? "bg-[#c6f24a]" : progress >= 33 ? "bg-[#0a0a0a]" : "bg-amber-400"
               }`}
               style={{ width: `${progress}%` }}
             />
           </div>
-          <div className="text-[10px] font-semibold text-[#131218]/50 mt-1.5 flex justify-between">
+          <div className="text-[10px] font-semibold text-[#0a0a0a]/50 mt-1.5 flex justify-between">
             <span>
               {fmtNum(obj.current_value ?? 0)} / {fmtNum(obj.target_value)} {obj.target_unit ?? ""}
             </span>
@@ -198,10 +198,10 @@ function ObjectiveCard({ obj, onClick }: { obj: StrategicObjective; onClick: () 
       )}
 
       {(obj.achieved_at || obj.notes) && (
-        <div className="text-[9.5px] text-[#131218]/50 mt-2 pt-2 border-t border-[#E0E0D8]">
+        <div className="text-[9.5px] text-[#0a0a0a]/50 mt-2 pt-2 border-t border-[#e4e4dd]">
           {obj.achieved_at && (
             <>
-              Closed: <span className="text-[#131218] font-semibold">{obj.achieved_at.slice(0, 10)}</span>
+              Closed: <span className="text-[#0a0a0a] font-semibold">{obj.achieved_at.slice(0, 10)}</span>
             </>
           )}
           {obj.notes && <div className="line-clamp-2">{obj.notes}</div>}
@@ -223,23 +223,23 @@ function RevenueStrip({ summaries, currentQuarter }: { summaries: QuarterRevenue
           <div
             key={s.quarter ?? "annual"}
             className={`bg-white border rounded-2xl px-4 py-3.5 flex flex-col min-h-[128px] ${
-              isCurrent ? "border-[#131218] border-2" : "border-[#E0E0D8]"
+              isCurrent ? "border-[#0a0a0a] border-2" : "border-[#e4e4dd]"
             }`}
           >
-            <div className="text-[8px] font-bold tracking-[2px] uppercase text-[#131218]/50 mb-2">
+            <div className="text-[8px] font-bold tracking-[2px] uppercase text-[#0a0a0a]/50 mb-2">
               Q{s.quarter} 2026{isCurrent ? " — en curso" : ""}
             </div>
-            <div className="text-[1.55rem] font-black tracking-[-0.8px] leading-none text-[#131218]">
+            <div className="text-[1.55rem] font-black tracking-[-0.8px] leading-none text-[#0a0a0a]">
               {fmtCurrency(paid || target)}
             </div>
-            <div className="text-[10px] font-medium text-[#131218]/50 mt-1">
+            <div className="text-[10px] font-medium text-[#0a0a0a]/50 mt-1">
               de {fmtCurrency(target)}
               {paid > 0 ? ` · ${progress}%` : " · target"}
             </div>
-            <div className="h-1 bg-[#EFEFEA] rounded mt-auto overflow-hidden">
+            <div className="h-1 bg-[#f4f4ef] rounded mt-auto overflow-hidden">
               <div
                 className={`h-full rounded ${
-                  isCurrent ? "bg-[#B2FF59]" : progress > 0 ? "bg-[#131218]" : "bg-[#EFEFEA]"
+                  isCurrent ? "bg-[#c6f24a]" : progress > 0 ? "bg-[#0a0a0a]" : "bg-[#f4f4ef]"
                 }`}
                 style={{ width: `${Math.max(progress, 2)}%` }}
               />
@@ -261,18 +261,18 @@ function AnnualAdjustedCell({ summaries }: { summaries: QuarterRevenueSummary[] 
   const diff = origTotal - adjTotal;
 
   return (
-    <div className="bg-white border border-[#E0E0D8] rounded-2xl px-4 py-3.5 flex flex-col min-h-[128px]">
-      <div className="text-[8px] font-bold tracking-[2px] uppercase text-[#131218]/50 mb-2">
+    <div className="bg-white border border-[#e4e4dd] rounded-2xl px-4 py-3.5 flex flex-col min-h-[128px]">
+      <div className="text-[8px] font-bold tracking-[2px] uppercase text-[#0a0a0a]/50 mb-2">
         Anual 2026
       </div>
-      <div className="text-[1.55rem] font-black tracking-[-0.8px] leading-none text-[#131218]">
+      <div className="text-[1.55rem] font-black tracking-[-0.8px] leading-none text-[#0a0a0a]">
         {fmtCurrency(adjTotal)}
       </div>
-      <div className="text-[10px] font-medium text-[#131218]/50 mt-1">
+      <div className="text-[10px] font-medium text-[#0a0a0a]/50 mt-1">
         {diff > 0 ? `original ${fmtCurrency(origTotal)}` : `target · cerrado ${fmtCurrency(paidTotal)}`}
       </div>
-      <div className="h-1 bg-[#EFEFEA] rounded mt-auto overflow-hidden">
-        <div className="h-full rounded bg-[#131218]" style={{ width: `${pct(paidTotal, adjTotal)}%` }} />
+      <div className="h-1 bg-[#f4f4ef] rounded mt-auto overflow-hidden">
+        <div className="h-full rounded bg-[#0a0a0a]" style={{ width: `${pct(paidTotal, adjTotal)}%` }} />
       </div>
     </div>
   );
@@ -323,7 +323,7 @@ export default function PlanView({ objectives2026, objectives2027, revenue2026, 
   return (
     <div>
       {/* Tabs */}
-      <div className="flex items-center justify-between border-b border-[#E0E0D8] mb-6">
+      <div className="flex items-center justify-between border-b border-[#e4e4dd] mb-6">
         <div className="flex gap-0">
           <Tab label="Annual 2026" active={tab === "annual-2026"} onClick={() => setTab("annual-2026")} />
           {[1, 2, 3, 4].map((q) => {
@@ -350,11 +350,11 @@ export default function PlanView({ objectives2026, objectives2027, revenue2026, 
         <div className="flex items-center gap-3">
           <button
             onClick={() => setCreating(true)}
-            className="text-[11px] font-bold px-3 py-1.5 rounded-md bg-[#B2FF59] text-[#131218] hover:bg-[#B2FF59]/80 transition-colors"
+            className="text-[11px] font-bold px-3 py-1.5 rounded-md bg-[#c6f24a] text-[#0a0a0a] hover:bg-[#c6f24a]/80 transition-colors"
           >
             + Nuevo objetivo
           </button>
-          <div className="text-[10px] text-[#131218]/40 font-medium">Última sync: hace {Math.floor(Math.random() * 5) + 1} min</div>
+          <div className="text-[10px] text-[#0a0a0a]/40 font-medium">Última sync: hace {Math.floor(Math.random() * 5) + 1} min</div>
         </div>
       </div>
 
@@ -363,7 +363,7 @@ export default function PlanView({ objectives2026, objectives2027, revenue2026, 
 
       {/* Helper bar */}
       {tab !== "annual-2026" && totalCount > 0 && (
-        <div className="bg-[#131218] text-white rounded-xl px-4 py-2.5 text-[11px] mb-5 flex justify-between items-center">
+        <div className="bg-[#0a0a0a] text-white rounded-xl px-4 py-2.5 text-[11px] mb-5 flex justify-between items-center">
           <span>
             {highOnly ? (
               <>Mostrando <strong>{highCount} objetivos Tier HIGH</strong> · filtro activo</>
@@ -372,7 +372,7 @@ export default function PlanView({ objectives2026, objectives2027, revenue2026, 
                 Este periodo tiene <strong>{totalCount} objetivos</strong>.
                 {highCount > 0 && (
                   <>
-                    {" "}El sistema marca <em className="not-italic text-[#B2FF59] font-bold">{highCount} como Tier HIGH</em> — los demás son apoyo.
+                    {" "}El sistema marca <em className="not-italic text-[#c6f24a] font-bold">{highCount} como Tier HIGH</em> — los demás son apoyo.
                   </>
                 )}
               </>
@@ -383,8 +383,8 @@ export default function PlanView({ objectives2026, objectives2027, revenue2026, 
               onClick={() => setHighOnly((v) => !v)}
               className={`text-[10px] font-bold px-3 py-1.5 rounded-md transition-colors ${
                 highOnly
-                  ? "bg-white text-[#131218] hover:bg-white/80"
-                  : "bg-[#B2FF59] text-[#131218] hover:bg-[#B2FF59]/80"
+                  ? "bg-white text-[#0a0a0a] hover:bg-white/80"
+                  : "bg-[#c6f24a] text-[#0a0a0a] hover:bg-[#c6f24a]/80"
               }`}
             >
               {highOnly ? "Ver todo" : "Ver solo HIGH"}
@@ -401,11 +401,11 @@ export default function PlanView({ objectives2026, objectives2027, revenue2026, 
           return (
             <section key={area} className="mb-8">
               <div className="flex items-baseline gap-4 mt-10 mb-4">
-                <h2 className="text-[18px] font-extrabold tracking-[-0.4px] text-[#131218]">
+                <h2 className="text-[18px] font-extrabold tracking-[-0.4px] text-[#0a0a0a]">
                   {areaLabel(area)}
                 </h2>
-                <div className="flex-1 h-px bg-[#E0E0D8] -translate-y-1" />
-                <span className="text-[11px] font-bold text-[#131218]/50 bg-[#EFEFEA] px-2.5 py-1 rounded-lg">
+                <div className="flex-1 h-px bg-[#e4e4dd] -translate-y-1" />
+                <span className="text-[11px] font-bold text-[#0a0a0a]/50 bg-[#f4f4ef] px-2.5 py-1 rounded-lg">
                   {items.length}
                 </span>
               </div>
@@ -422,7 +422,7 @@ export default function PlanView({ objectives2026, objectives2027, revenue2026, 
       )}
 
       {tabObjectives.length === 0 && tab !== "annual-2026" && (
-        <div className="text-center text-[#131218]/40 py-12">
+        <div className="text-center text-[#0a0a0a]/40 py-12">
           {highOnly
             ? "No hay objetivos Tier HIGH en este periodo."
             : "No hay objetivos cargados para este periodo."}
@@ -489,9 +489,9 @@ function ObjectiveDrawer({ obj, onClose, onSaved }: DrawerProps) {
       <aside
         role="dialog"
         aria-label={`Objetivo: ${obj.title}`}
-        className="fixed top-0 right-0 h-screen w-full max-w-[480px] bg-white border-l border-[#E0E0D8] z-50 overflow-y-auto shadow-xl"
+        className="fixed top-0 right-0 h-screen w-full max-w-[480px] bg-white border-l border-[#e4e4dd] z-50 overflow-y-auto shadow-xl"
       >
-        <header className="bg-[#131218] text-white px-7 py-6">
+        <header className="bg-[#0a0a0a] text-white px-7 py-6">
           <div className="flex items-center justify-between">
             <p className="text-[8px] font-bold tracking-[2.5px] uppercase text-white/40">
               Objetivo · {obj.year}{obj.quarter ? ` · Q${obj.quarter}` : " · Anual"}
@@ -550,15 +550,15 @@ function ViewObjectiveBody({ obj, progress }: { obj: StrategicObjective; progres
 
           {(obj.target_value != null || obj.current_value != null) && (
             <div>
-              <p className="text-[8.5px] font-bold tracking-[1.8px] uppercase text-[#131218]/50 mb-1.5">
+              <p className="text-[8.5px] font-bold tracking-[1.8px] uppercase text-[#0a0a0a]/50 mb-1.5">
                 Target / Actual
               </p>
-              <div className="text-[13px] font-bold text-[#131218]">
+              <div className="text-[13px] font-bold text-[#0a0a0a]">
                 {fmtNum(obj.current_value ?? 0)} / {fmtNum(obj.target_value)} {obj.target_unit ?? ""}
-                {progress != null && <span className="text-[#131218]/50 font-medium ml-2">({progress}%)</span>}
+                {progress != null && <span className="text-[#0a0a0a]/50 font-medium ml-2">({progress}%)</span>}
               </div>
               {obj.original_target != null && obj.original_target !== obj.target_value && (
-                <div className="text-[10px] text-[#131218]/50 mt-1">
+                <div className="text-[10px] text-[#0a0a0a]/50 mt-1">
                   Original: {fmtNum(obj.original_target)} {obj.target_unit ?? ""}
                 </div>
               )}
@@ -569,18 +569,18 @@ function ViewObjectiveBody({ obj, progress }: { obj: StrategicObjective; progres
             label="Cómo se mide"
             value={
               <>
-                <div className="inline-block text-[10px] font-bold px-2 py-1 rounded-md bg-[#B2FF59]/25 text-[#131218] border border-[#B2FF59]">
+                <div className="inline-block text-[10px] font-bold px-2 py-1 rounded-md bg-[#c6f24a]/25 text-[#0a0a0a] border border-[#c6f24a]">
                   {metricLabel(obj.metric_type)}
                 </div>
-                <p className="mt-2 text-[11.5px] text-[#131218]/70 leading-relaxed">
+                <p className="mt-2 text-[11.5px] text-[#0a0a0a]/70 leading-relaxed">
                   {describeMetric(obj.metric_type, obj.metric_params)}
                 </p>
                 {obj.metric_type !== "manual" && Object.keys(obj.metric_params).length > 0 && (
                   <details className="mt-2">
-                    <summary className="text-[9.5px] text-[#131218]/40 cursor-pointer hover:text-[#131218]/70 select-none">
+                    <summary className="text-[9.5px] text-[#0a0a0a]/40 cursor-pointer hover:text-[#0a0a0a]/70 select-none">
                       Ver parámetros técnicos
                     </summary>
-                    <pre className="mt-1.5 text-[10px] bg-[#EFEFEA] p-2 rounded overflow-auto font-mono text-[#131218]/60">
+                    <pre className="mt-1.5 text-[10px] bg-[#f4f4ef] p-2 rounded overflow-auto font-mono text-[#0a0a0a]/60">
                       {JSON.stringify(obj.metric_params, null, 2)}
                     </pre>
                   </details>
@@ -614,29 +614,29 @@ function ViewObjectiveBody({ obj, progress }: { obj: StrategicObjective; progres
             obj.linked_projects.length > 0 ||
             obj.linked_people.length > 0) && (
             <div>
-              <p className="text-[8.5px] font-bold tracking-[1.8px] uppercase text-[#131218]/50 mb-1.5">
+              <p className="text-[8.5px] font-bold tracking-[1.8px] uppercase text-[#0a0a0a]/50 mb-1.5">
                 Linked
               </p>
               {obj.linked_opportunities.length > 0 && (
                 <div className="mb-1.5">
-                  <span className="text-[10px] text-[#131218]/60">Opportunities: </span>
-                  <span className="text-[11px] font-semibold text-[#131218]">
+                  <span className="text-[10px] text-[#0a0a0a]/60">Opportunities: </span>
+                  <span className="text-[11px] font-semibold text-[#0a0a0a]">
                     {obj.linked_opportunities.length}
                   </span>
                 </div>
               )}
               {obj.linked_projects.length > 0 && (
                 <div className="mb-1.5">
-                  <span className="text-[10px] text-[#131218]/60">Projects: </span>
-                  <span className="text-[11px] font-semibold text-[#131218]">
+                  <span className="text-[10px] text-[#0a0a0a]/60">Projects: </span>
+                  <span className="text-[11px] font-semibold text-[#0a0a0a]">
                     {obj.linked_projects.length}
                   </span>
                 </div>
               )}
               {obj.linked_people.length > 0 && (
                 <div>
-                  <span className="text-[10px] text-[#131218]/60">People: </span>
-                  <span className="text-[11px] font-semibold text-[#131218]">
+                  <span className="text-[10px] text-[#0a0a0a]/60">People: </span>
+                  <span className="text-[11px] font-semibold text-[#0a0a0a]">
                     {obj.linked_people.length}
                   </span>
                 </div>
@@ -646,7 +646,7 @@ function ViewObjectiveBody({ obj, progress }: { obj: StrategicObjective; progres
 
           <DrawerField label="Notas" value={obj.notes} />
 
-          <div className="pt-4 mt-4 border-t border-[#E0E0D8] grid grid-cols-2 gap-4 text-[10px] text-[#131218]/50">
+          <div className="pt-4 mt-4 border-t border-[#e4e4dd] grid grid-cols-2 gap-4 text-[10px] text-[#0a0a0a]/50">
             <div>
               <span className="font-bold uppercase tracking-[1.5px] text-[7.5px] block mb-0.5">Creado</span>
               {new Date(obj.created_at).toLocaleDateString("es-ES")}
@@ -751,7 +751,7 @@ function EditObjectiveForm({
         <input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          className="w-full text-[13px] px-3 py-2 border border-[#E0E0D8] rounded-md focus:outline-none focus:border-[#131218]"
+          className="w-full text-[13px] px-3 py-2 border border-[#e4e4dd] rounded-md focus:outline-none focus:border-[#0a0a0a]"
         />
       </FormField>
 
@@ -760,7 +760,7 @@ function EditObjectiveForm({
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           rows={3}
-          className="w-full text-[12px] px-3 py-2 border border-[#E0E0D8] rounded-md focus:outline-none focus:border-[#131218] resize-y"
+          className="w-full text-[12px] px-3 py-2 border border-[#e4e4dd] rounded-md focus:outline-none focus:border-[#0a0a0a] resize-y"
         />
       </FormField>
 
@@ -769,7 +769,7 @@ function EditObjectiveForm({
           <select
             value={tier}
             onChange={(e) => setTier(e.target.value as ObjectiveTier)}
-            className="w-full text-[12px] px-3 py-2 border border-[#E0E0D8] rounded-md bg-white focus:outline-none focus:border-[#131218]"
+            className="w-full text-[12px] px-3 py-2 border border-[#e4e4dd] rounded-md bg-white focus:outline-none focus:border-[#0a0a0a]"
           >
             {TIERS_LIST.map((t) => (
               <option key={t} value={t}>
@@ -782,7 +782,7 @@ function EditObjectiveForm({
           <select
             value={status}
             onChange={(e) => setStatus(e.target.value as ObjectiveStatus)}
-            className="w-full text-[12px] px-3 py-2 border border-[#E0E0D8] rounded-md bg-white focus:outline-none focus:border-[#131218]"
+            className="w-full text-[12px] px-3 py-2 border border-[#e4e4dd] rounded-md bg-white focus:outline-none focus:border-[#0a0a0a]"
           >
             {STATUSES.map((s) => (
               <option key={s} value={s}>
@@ -798,7 +798,7 @@ function EditObjectiveForm({
           <select
             value={area}
             onChange={(e) => setArea(e.target.value as ObjectiveArea)}
-            className="w-full text-[12px] px-3 py-2 border border-[#E0E0D8] rounded-md bg-white focus:outline-none focus:border-[#131218]"
+            className="w-full text-[12px] px-3 py-2 border border-[#e4e4dd] rounded-md bg-white focus:outline-none focus:border-[#0a0a0a]"
           >
             {AREAS.map((a) => (
               <option key={a} value={a}>
@@ -811,7 +811,7 @@ function EditObjectiveForm({
           <select
             value={objectiveType}
             onChange={(e) => setObjectiveType(e.target.value as ObjectiveType)}
-            className="w-full text-[12px] px-3 py-2 border border-[#E0E0D8] rounded-md bg-white focus:outline-none focus:border-[#131218]"
+            className="w-full text-[12px] px-3 py-2 border border-[#e4e4dd] rounded-md bg-white focus:outline-none focus:border-[#0a0a0a]"
           >
             {TYPES.map((t) => (
               <option key={t} value={t}>
@@ -826,7 +826,7 @@ function EditObjectiveForm({
         <select
           value={quarter ?? ""}
           onChange={(e) => setQuarter(e.target.value === "" ? null : Number(e.target.value))}
-          className="w-full text-[12px] px-3 py-2 border border-[#E0E0D8] rounded-md bg-white focus:outline-none focus:border-[#131218]"
+          className="w-full text-[12px] px-3 py-2 border border-[#e4e4dd] rounded-md bg-white focus:outline-none focus:border-[#0a0a0a]"
         >
           <option value="">Anual</option>
           {[1, 2, 3, 4].map((q) => (
@@ -844,7 +844,7 @@ function EditObjectiveForm({
             onChange={(e) => setTargetValue(e.target.value)}
             type="number"
             step="any"
-            className="w-full text-[12px] px-3 py-2 border border-[#E0E0D8] rounded-md focus:outline-none focus:border-[#131218]"
+            className="w-full text-[12px] px-3 py-2 border border-[#e4e4dd] rounded-md focus:outline-none focus:border-[#0a0a0a]"
           />
         </FormField>
         <FormField label="Unit">
@@ -852,7 +852,7 @@ function EditObjectiveForm({
             value={targetUnit}
             onChange={(e) => setTargetUnit(e.target.value)}
             placeholder="USD, orgs, events..."
-            className="w-full text-[12px] px-3 py-2 border border-[#E0E0D8] rounded-md focus:outline-none focus:border-[#131218]"
+            className="w-full text-[12px] px-3 py-2 border border-[#e4e4dd] rounded-md focus:outline-none focus:border-[#0a0a0a]"
           />
         </FormField>
       </div>
@@ -861,7 +861,7 @@ function EditObjectiveForm({
         <select
           value={metricType}
           onChange={(e) => setMetricType(e.target.value as ObjectiveMetricType)}
-          className="w-full text-[12px] px-3 py-2 border border-[#E0E0D8] rounded-md bg-white focus:outline-none focus:border-[#131218]"
+          className="w-full text-[12px] px-3 py-2 border border-[#e4e4dd] rounded-md bg-white focus:outline-none focus:border-[#0a0a0a]"
         >
           {METRICS.map((m) => (
             <option key={m} value={m}>
@@ -877,7 +877,7 @@ function EditObjectiveForm({
             value={metricParamsText}
             onChange={(e) => setMetricParamsText(e.target.value)}
             rows={4}
-            className="w-full text-[11px] font-mono px-3 py-2 border border-[#E0E0D8] rounded-md focus:outline-none focus:border-[#131218] resize-y bg-[#FAFAF6]"
+            className="w-full text-[11px] font-mono px-3 py-2 border border-[#e4e4dd] rounded-md focus:outline-none focus:border-[#0a0a0a] resize-y bg-[#FAFAF6]"
           />
         </FormField>
       )}
@@ -887,7 +887,7 @@ function EditObjectiveForm({
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           rows={2}
-          className="w-full text-[12px] px-3 py-2 border border-[#E0E0D8] rounded-md focus:outline-none focus:border-[#131218] resize-y"
+          className="w-full text-[12px] px-3 py-2 border border-[#e4e4dd] rounded-md focus:outline-none focus:border-[#0a0a0a] resize-y"
         />
       </FormField>
 
@@ -897,7 +897,7 @@ function EditObjectiveForm({
         </div>
       )}
 
-      <div className="flex items-center justify-between pt-4 border-t border-[#E0E0D8]">
+      <div className="flex items-center justify-between pt-4 border-t border-[#e4e4dd]">
         {confirmDelete ? (
           <div className="flex items-center gap-2">
             <span className="text-[10.5px] text-red-700">¿Archivar?</span>
@@ -910,7 +910,7 @@ function EditObjectiveForm({
             </button>
             <button
               onClick={() => setConfirmDelete(false)}
-              className="text-[10.5px] px-2.5 py-1 rounded border border-[#E0E0D8] hover:border-[#131218]"
+              className="text-[10.5px] px-2.5 py-1 rounded border border-[#e4e4dd] hover:border-[#0a0a0a]"
             >
               No
             </button>
@@ -928,14 +928,14 @@ function EditObjectiveForm({
           <button
             onClick={onCancel}
             disabled={saving}
-            className="text-[11px] font-semibold px-3 py-1.5 rounded border border-[#E0E0D8] hover:border-[#131218]"
+            className="text-[11px] font-semibold px-3 py-1.5 rounded border border-[#e4e4dd] hover:border-[#0a0a0a]"
           >
             Cancelar
           </button>
           <button
             onClick={onSave}
             disabled={saving}
-            className="text-[11px] font-bold px-4 py-1.5 rounded bg-[#B2FF59] text-[#131218] hover:bg-[#B2FF59]/80 disabled:opacity-50"
+            className="text-[11px] font-bold px-4 py-1.5 rounded bg-[#c6f24a] text-[#0a0a0a] hover:bg-[#c6f24a]/80 disabled:opacity-50"
           >
             {saving ? "Guardando..." : "Guardar"}
           </button>
@@ -948,7 +948,7 @@ function EditObjectiveForm({
 function FormField({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div>
-      <label className="text-[8.5px] font-bold tracking-[1.8px] uppercase text-[#131218]/50 mb-1.5 block">
+      <label className="text-[8.5px] font-bold tracking-[1.8px] uppercase text-[#0a0a0a]/50 mb-1.5 block">
         {label}
       </label>
       {children}
@@ -1024,7 +1024,7 @@ function CreateObjectiveModal({
         aria-label="Nuevo objetivo"
         className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-[540px] max-h-[90vh] overflow-y-auto bg-white rounded-2xl shadow-xl z-50"
       >
-        <header className="bg-[#131218] text-white px-6 py-5 rounded-t-2xl">
+        <header className="bg-[#0a0a0a] text-white px-6 py-5 rounded-t-2xl">
           <div className="flex items-center justify-between">
             <p className="text-[8px] font-bold tracking-[2.5px] uppercase text-white/40">
               Nuevo
@@ -1038,7 +1038,7 @@ function CreateObjectiveModal({
             </button>
           </div>
           <h2 className="text-[1.25rem] font-light tracking-[-0.5px] mt-1">
-            Crear <em className="font-black not-italic italic text-[#B2FF59]">objetivo</em>
+            Crear <em className="font-black not-italic italic text-[#c6f24a]">objetivo</em>
           </h2>
         </header>
         <div className="px-6 py-5 space-y-4">
@@ -1048,7 +1048,7 @@ function CreateObjectiveModal({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Ej: Un cliente grande en Francia"
-              className="w-full text-[13px] px-3 py-2 border border-[#E0E0D8] rounded-md focus:outline-none focus:border-[#131218]"
+              className="w-full text-[13px] px-3 py-2 border border-[#e4e4dd] rounded-md focus:outline-none focus:border-[#0a0a0a]"
             />
           </FormField>
 
@@ -1058,14 +1058,14 @@ function CreateObjectiveModal({
                 value={year}
                 onChange={(e) => setYear(Number(e.target.value))}
                 type="number"
-                className="w-full text-[12px] px-3 py-2 border border-[#E0E0D8] rounded-md focus:outline-none focus:border-[#131218]"
+                className="w-full text-[12px] px-3 py-2 border border-[#e4e4dd] rounded-md focus:outline-none focus:border-[#0a0a0a]"
               />
             </FormField>
             <FormField label="Quarter">
               <select
                 value={quarter ?? ""}
                 onChange={(e) => setQuarter(e.target.value === "" ? null : Number(e.target.value))}
-                className="w-full text-[12px] px-3 py-2 border border-[#E0E0D8] rounded-md bg-white focus:outline-none focus:border-[#131218]"
+                className="w-full text-[12px] px-3 py-2 border border-[#e4e4dd] rounded-md bg-white focus:outline-none focus:border-[#0a0a0a]"
               >
                 <option value="">Anual</option>
                 {[1, 2, 3, 4].map((q) => (
@@ -1079,7 +1079,7 @@ function CreateObjectiveModal({
               <select
                 value={tier}
                 onChange={(e) => setTier(e.target.value as ObjectiveTier)}
-                className="w-full text-[12px] px-3 py-2 border border-[#E0E0D8] rounded-md bg-white focus:outline-none focus:border-[#131218]"
+                className="w-full text-[12px] px-3 py-2 border border-[#e4e4dd] rounded-md bg-white focus:outline-none focus:border-[#0a0a0a]"
               >
                 {TIERS_LIST.map((t) => (
                   <option key={t} value={t}>
@@ -1095,7 +1095,7 @@ function CreateObjectiveModal({
               <select
                 value={area}
                 onChange={(e) => setArea(e.target.value as ObjectiveArea)}
-                className="w-full text-[12px] px-3 py-2 border border-[#E0E0D8] rounded-md bg-white focus:outline-none focus:border-[#131218]"
+                className="w-full text-[12px] px-3 py-2 border border-[#e4e4dd] rounded-md bg-white focus:outline-none focus:border-[#0a0a0a]"
               >
                 {AREAS.map((a) => (
                   <option key={a} value={a}>
@@ -1108,7 +1108,7 @@ function CreateObjectiveModal({
               <select
                 value={objectiveType}
                 onChange={(e) => setObjectiveType(e.target.value as ObjectiveType)}
-                className="w-full text-[12px] px-3 py-2 border border-[#E0E0D8] rounded-md bg-white focus:outline-none focus:border-[#131218]"
+                className="w-full text-[12px] px-3 py-2 border border-[#e4e4dd] rounded-md bg-white focus:outline-none focus:border-[#0a0a0a]"
               >
                 {TYPES.map((t) => (
                   <option key={t} value={t}>
@@ -1127,7 +1127,7 @@ function CreateObjectiveModal({
                 type="number"
                 step="any"
                 placeholder="500000, 3, ..."
-                className="w-full text-[12px] px-3 py-2 border border-[#E0E0D8] rounded-md focus:outline-none focus:border-[#131218]"
+                className="w-full text-[12px] px-3 py-2 border border-[#e4e4dd] rounded-md focus:outline-none focus:border-[#0a0a0a]"
               />
             </FormField>
             <FormField label="Unit">
@@ -1135,7 +1135,7 @@ function CreateObjectiveModal({
                 value={targetUnit}
                 onChange={(e) => setTargetUnit(e.target.value)}
                 placeholder="USD, orgs, ..."
-                className="w-full text-[12px] px-3 py-2 border border-[#E0E0D8] rounded-md focus:outline-none focus:border-[#131218]"
+                className="w-full text-[12px] px-3 py-2 border border-[#e4e4dd] rounded-md focus:outline-none focus:border-[#0a0a0a]"
               />
             </FormField>
           </div>
@@ -1144,7 +1144,7 @@ function CreateObjectiveModal({
             <select
               value={metricType}
               onChange={(e) => setMetricType(e.target.value as ObjectiveMetricType)}
-              className="w-full text-[12px] px-3 py-2 border border-[#E0E0D8] rounded-md bg-white focus:outline-none focus:border-[#131218]"
+              className="w-full text-[12px] px-3 py-2 border border-[#e4e4dd] rounded-md bg-white focus:outline-none focus:border-[#0a0a0a]"
             >
               {METRICS.map((m) => (
                 <option key={m} value={m}>
@@ -1164,14 +1164,14 @@ function CreateObjectiveModal({
             <button
               onClick={onClose}
               disabled={saving}
-              className="text-[11px] font-semibold px-3 py-1.5 rounded border border-[#E0E0D8] hover:border-[#131218]"
+              className="text-[11px] font-semibold px-3 py-1.5 rounded border border-[#e4e4dd] hover:border-[#0a0a0a]"
             >
               Cancelar
             </button>
             <button
               onClick={onCreate}
               disabled={saving || !title.trim()}
-              className="text-[11px] font-bold px-4 py-1.5 rounded bg-[#B2FF59] text-[#131218] hover:bg-[#B2FF59]/80 disabled:opacity-50"
+              className="text-[11px] font-bold px-4 py-1.5 rounded bg-[#c6f24a] text-[#0a0a0a] hover:bg-[#c6f24a]/80 disabled:opacity-50"
             >
               {saving ? "Creando..." : "Crear"}
             </button>
@@ -1186,10 +1186,10 @@ function DrawerField({ label, value }: { label: string; value: ReactNode }) {
   if (value == null || value === "") return null;
   return (
     <div>
-      <p className="text-[8.5px] font-bold tracking-[1.8px] uppercase text-[#131218]/50 mb-1.5">
+      <p className="text-[8.5px] font-bold tracking-[1.8px] uppercase text-[#0a0a0a]/50 mb-1.5">
         {label}
       </p>
-      <div className="text-[12px] text-[#131218] leading-relaxed">{value}</div>
+      <div className="text-[12px] text-[#0a0a0a] leading-relaxed">{value}</div>
     </div>
   );
 }
@@ -1210,13 +1210,13 @@ function Tab({
       onClick={onClick}
       className={`px-4 py-3 text-[11px] font-bold tracking-[0.8px] border-b-2 transition-colors ${
         active
-          ? "text-[#131218] border-[#B2FF59]"
-          : "text-[#131218]/50 border-transparent hover:text-[#131218]"
+          ? "text-[#0a0a0a] border-[#c6f24a]"
+          : "text-[#0a0a0a]/50 border-transparent hover:text-[#0a0a0a]"
       }`}
     >
       {label}
       {sublabel && (
-        <span className="ml-1.5 font-medium text-[#131218]/40 text-[9px] tracking-normal">{sublabel}</span>
+        <span className="ml-1.5 font-medium text-[#0a0a0a]/40 text-[9px] tracking-normal">{sublabel}</span>
       )}
     </button>
   );
@@ -1232,19 +1232,19 @@ function AnnualRollupView({ objectives }: { objectives: StrategicObjective[] }) 
         const achieved = items.filter((o) => o.status === "achieved").length;
         const progress = items.length > 0 ? Math.round((achieved / items.length) * 100) : 0;
         return (
-          <div key={area} className="bg-white border border-[#E0E0D8] rounded-2xl p-5">
-            <div className="text-[16px] font-extrabold tracking-[-0.3px] text-[#131218] pb-3 border-b border-[#E0E0D8] mb-4">
+          <div key={area} className="bg-white border border-[#e4e4dd] rounded-2xl p-5">
+            <div className="text-[16px] font-extrabold tracking-[-0.3px] text-[#0a0a0a] pb-3 border-b border-[#e4e4dd] mb-4">
               {areaLabel(area)}
             </div>
             <div className="flex justify-between items-center mb-3">
-              <span className="text-[12px] font-semibold text-[#131218]">Objetivos del año</span>
+              <span className="text-[12px] font-semibold text-[#0a0a0a]">Objetivos del año</span>
               <div className="flex items-center gap-3">
-                <div className="w-32 h-1 bg-[#EFEFEA] rounded overflow-hidden">
-                  <div className="h-full bg-[#B2FF59] rounded" style={{ width: `${progress}%` }} />
+                <div className="w-32 h-1 bg-[#f4f4ef] rounded overflow-hidden">
+                  <div className="h-full bg-[#c6f24a] rounded" style={{ width: `${progress}%` }} />
                 </div>
-                <span className="text-[13px] font-extrabold tracking-[-0.3px] text-[#131218]">
+                <span className="text-[13px] font-extrabold tracking-[-0.3px] text-[#0a0a0a]">
                   {achieved}
-                  <span className="text-[#131218]/50 font-medium"> / {items.length}</span>
+                  <span className="text-[#0a0a0a]/50 font-medium"> / {items.length}</span>
                 </span>
               </div>
             </div>
@@ -1255,7 +1255,7 @@ function AnnualRollupView({ objectives }: { objectives: StrategicObjective[] }) 
                   className={`text-[9px] font-semibold px-2 py-0.5 rounded ${
                     o.status === "achieved"
                       ? "bg-green-100 text-green-700"
-                      : "bg-[#EFEFEA] text-[#131218]/60"
+                      : "bg-[#f4f4ef] text-[#0a0a0a]/60"
                   }`}
                   title={o.title}
                 >

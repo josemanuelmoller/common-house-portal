@@ -62,8 +62,8 @@ export function GrantFollowButton({ opportunityId, initialFollowed, size = "sm" 
   const nextLabel = followed ? "Unfollow" : "Follow";
   const base = size === "md" ? "text-[11px] px-3 py-1.5" : "text-[10px] px-2 py-1";
   const cls = followed
-    ? `${base} font-bold rounded-full bg-[#B2FF59]/25 text-green-900 hover:bg-[#B2FF59]/40 border border-[#B2FF59]/60 transition-colors`
-    : `${base} font-bold rounded-full bg-[#131218] text-white hover:bg-[#131218]/80 transition-colors`;
+    ? `${base} font-bold rounded-full bg-[#c6f24a]/25 text-green-900 hover:bg-[#c6f24a]/40 border border-[#c6f24a]/60 transition-colors`
+    : `${base} font-bold rounded-full bg-[#0a0a0a] text-white hover:bg-[#0a0a0a]/80 transition-colors`;
 
   return (
     <div className="flex items-center gap-2">

@@ -18,10 +18,10 @@ const SECTION_PATTERNS: { regex: RegExp; label: string; type: Section["type"] }[
 ];
 
 const typeStyles = {
-  positive: { bar: "bg-[#B2FF59]",  label: "text-[#131218]/50", bg: "bg-white" },
+  positive: { bar: "bg-[#c6f24a]",  label: "text-[#0a0a0a]/50", bg: "bg-white" },
   warning:  { bar: "bg-amber-400",  label: "text-amber-600",    bg: "bg-amber-50/30" },
-  neutral:  { bar: "bg-[#131218]/20", label: "text-[#131218]/40", bg: "bg-white" },
-  clear:    { bar: "bg-[#B2FF59]",  label: "text-[#131218]/40", bg: "bg-[#EFEFEA]/50" },
+  neutral:  { bar: "bg-[#0a0a0a]/20", label: "text-[#0a0a0a]/40", bg: "bg-white" },
+  clear:    { bar: "bg-[#c6f24a]",  label: "text-[#0a0a0a]/40", bg: "bg-[#f4f4ef]/50" },
 };
 
 function parseDraftUpdate(raw: string): { period: string; intro: string; sections: Section[] } {
@@ -81,21 +81,21 @@ export function DraftUpdateCard({ text }: { text: string }) {
       <div className="h-1 bg-amber-400" />
 
       {/* Header */}
-      <div className="px-6 pt-5 pb-4 border-b border-[#EFEFEA]">
+      <div className="px-6 pt-5 pb-4 border-b border-[#f4f4ef]">
         <p className="text-[10px] font-bold text-amber-500 uppercase tracking-widest mb-1">
           Draft Update — Pending Review
         </p>
         {period && (
-          <p className="text-base font-bold text-[#131218] tracking-tight">{period}</p>
+          <p className="text-base font-bold text-[#0a0a0a] tracking-tight">{period}</p>
         )}
         {intro && (
-          <p className="text-sm text-[#131218]/50 mt-1 leading-relaxed">{intro}</p>
+          <p className="text-sm text-[#0a0a0a]/50 mt-1 leading-relaxed">{intro}</p>
         )}
       </div>
 
       {/* Sections */}
       {sections.length > 0 && (
-        <div className="divide-y divide-[#EFEFEA]">
+        <div className="divide-y divide-[#f4f4ef]">
           {sections.map((s, i) => {
             const style = typeStyles[s.type];
             return (
@@ -105,7 +105,7 @@ export function DraftUpdateCard({ text }: { text: string }) {
                   <p className={`text-[10px] font-bold uppercase tracking-widest mb-1.5 ${style.label}`}>
                     {s.label}
                   </p>
-                  <p className="text-sm text-[#131218]/65 leading-relaxed">{s.content}</p>
+                  <p className="text-sm text-[#0a0a0a]/65 leading-relaxed">{s.content}</p>
                 </div>
               </div>
             );

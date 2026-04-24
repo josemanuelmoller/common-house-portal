@@ -43,11 +43,11 @@ export function ScanNewsButton({ personId }: { personId: string }) {
       <button
         onClick={run}
         disabled={running}
-        className="text-[10px] font-bold uppercase tracking-widest border border-[#131218]/20 text-[#131218]/70 hover:text-[#131218] hover:border-[#131218]/50 px-3 py-1.5 rounded-lg disabled:opacity-40"
+        className="text-[10px] font-bold uppercase tracking-widest border border-[#0a0a0a]/20 text-[#0a0a0a]/70 hover:text-[#0a0a0a] hover:border-[#0a0a0a]/50 px-3 py-1.5 rounded-lg disabled:opacity-40"
       >
         {running ? "Scanning…" : "📰 Scan news"}
       </button>
-      {msg && <span className="text-[10px] text-[#131218]/60">{msg}</span>}
+      {msg && <span className="text-[10px] text-[#0a0a0a]/60">{msg}</span>}
       {err && <span className="text-[10px] text-red-600">{err}</span>}
     </div>
   );

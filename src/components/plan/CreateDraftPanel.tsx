@@ -5,9 +5,9 @@ import { useRouter } from "next/navigation";
 import type { EligibleObjectiveForV1 } from "@/lib/plan";
 
 const TIER_PILL: Record<string, string> = {
-  high: "bg-[#B2FF59] text-[#131218]",
-  mid: "bg-[#FFC773] text-[#131218]",
-  low: "bg-[#E0E0D8] text-[#6B6B60]",
+  high: "bg-[#c6f24a] text-[#0a0a0a]",
+  mid: "bg-[#FFC773] text-[#0a0a0a]",
+  low: "bg-[#e4e4dd] text-[#6B6B60]",
 };
 
 export function CreateDraftPanel({
@@ -119,10 +119,10 @@ export function CreateDraftPanel({
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-[#E0E0D8] p-5 mb-5">
+    <div className="bg-white rounded-2xl border border-[#e4e4dd] p-5 mb-5">
       <div className="flex items-start justify-between gap-6">
         <div className="flex-1 min-w-0">
-          <h2 className="text-[14px] font-bold text-[#131218] mb-1">
+          <h2 className="text-[14px] font-bold text-[#0a0a0a] mb-1">
             Create new draft
           </h2>
           <p className="text-[11px] text-[#6B6B60] leading-relaxed">
@@ -142,7 +142,7 @@ export function CreateDraftPanel({
           value={selected}
           onChange={(e) => setSelected(e.target.value)}
           disabled={pending}
-          className="flex-1 text-[12px] border border-[#E0E0D8] rounded-md px-3 py-2 bg-white focus:outline-none focus:border-[#131218] disabled:opacity-50"
+          className="flex-1 text-[12px] border border-[#e4e4dd] rounded-md px-3 py-2 bg-white focus:outline-none focus:border-[#0a0a0a] disabled:opacity-50"
         >
           <option value="">— Seleccionar objetivo —</option>
           {objectives.map((o) => {
@@ -160,7 +160,7 @@ export function CreateDraftPanel({
         <button
           onClick={generate}
           disabled={!eligible}
-          className="text-[11px] font-bold text-[#131218] bg-[#B2FF59] hover:bg-[#a3ef50] disabled:opacity-30 disabled:cursor-not-allowed px-4 py-2 rounded-md whitespace-nowrap"
+          className="text-[11px] font-bold text-[#0a0a0a] bg-[#c6f24a] hover:bg-[#a3ef50] disabled:opacity-30 disabled:cursor-not-allowed px-4 py-2 rounded-md whitespace-nowrap"
           title={
             chosen && !chosen.has_description
               ? "Este objetivo no tiene description — agrégasela antes de generar v1"
@@ -192,7 +192,7 @@ export function CreateDraftPanel({
       )}
 
       {progress && (
-        <div className="mt-3 text-[10px] font-mono text-[#1F5200] bg-[#B2FF59]/20 rounded-md px-3 py-2">
+        <div className="mt-3 text-[10px] font-mono text-[#1F5200] bg-[#c6f24a]/20 rounded-md px-3 py-2">
           {progress.stage === "connecting" && "◉ connecting to agent…"}
           {progress.stage === "generating" && (
             <>

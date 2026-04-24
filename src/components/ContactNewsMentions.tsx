@@ -48,7 +48,7 @@ function relevanceClass(r: number | null): string {
   const v = r ?? 0;
   if (v >= 0.8) return "text-emerald-700 bg-emerald-50 border-emerald-200";
   if (v >= 0.5) return "text-amber-700  bg-amber-50  border-amber-200";
-  return "text-[#131218]/50 bg-[#EFEFEA] border-[#E0E0D8]";
+  return "text-[#0a0a0a]/50 bg-[#f4f4ef] border-[#e4e4dd]";
 }
 
 /**
@@ -87,12 +87,12 @@ export async function ContactNewsMentions({
 
   if (mentions.length === 0) {
     return (
-      <div className="bg-white border border-[#E0E0D8] rounded-2xl px-5 py-4">
-        <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/45 mb-2">
+      <div className="bg-white border border-[#e4e4dd] rounded-2xl px-5 py-4">
+        <p className="text-[9px] font-bold tracking-widest uppercase text-[#0a0a0a]/45 mb-2">
           Recent mentions
-          {lastScanAt && <span className="text-[#131218]/30"> · last scanned {timeAgoShort(lastScanAt)}</span>}
+          {lastScanAt && <span className="text-[#0a0a0a]/30"> · last scanned {timeAgoShort(lastScanAt)}</span>}
         </p>
-        <p className="text-[11.5px] text-[#131218]/45 leading-snug">
+        <p className="text-[11.5px] text-[#0a0a0a]/45 leading-snug">
           {lastScanAt
             ? "No recent news, LinkedIn posts, or podcast appearances detected. Next scan runs biweekly."
             : "Not scanned yet. The biweekly news monitor runs on VIPs Monday mornings."}
@@ -102,16 +102,16 @@ export async function ContactNewsMentions({
   }
 
   return (
-    <div className="bg-white border border-[#E0E0D8] rounded-2xl overflow-hidden">
+    <div className="bg-white border border-[#e4e4dd] rounded-2xl overflow-hidden">
       <div className="flex items-center gap-3 px-5 pt-4 pb-2">
-        <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/45">
+        <p className="text-[9px] font-bold tracking-widest uppercase text-[#0a0a0a]/45">
           Recent mentions
-          {lastScanAt && <span className="text-[#131218]/30"> · scanned {timeAgoShort(lastScanAt)}</span>}
+          {lastScanAt && <span className="text-[#0a0a0a]/30"> · scanned {timeAgoShort(lastScanAt)}</span>}
         </p>
-        <div className="flex-1 h-px bg-[#EFEFEA]" />
-        <span className="text-[10px] text-[#131218]/40 tabular-nums">{mentions.length}</span>
+        <div className="flex-1 h-px bg-[#f4f4ef]" />
+        <span className="text-[10px] text-[#0a0a0a]/40 tabular-nums">{mentions.length}</span>
       </div>
-      <ul className="divide-y divide-[#EFEFEA]">
+      <ul className="divide-y divide-[#f4f4ef]">
         {mentions.slice(0, 8).map(m => (
           <li key={m.id} className="px-5 py-3">
             <a
@@ -122,11 +122,11 @@ export async function ContactNewsMentions({
             >
               <div className="flex items-baseline gap-2 flex-wrap">
                 <span className="text-[11px]">{kindGlyph(m.kind)}</span>
-                <span className="text-[9px] font-bold uppercase tracking-widest text-[#131218]/45">
+                <span className="text-[9px] font-bold uppercase tracking-widest text-[#0a0a0a]/45">
                   {kindLabel(m.kind)}
                 </span>
-                {m.source && <span className="text-[9px] text-[#131218]/40">· {m.source}</span>}
-                <span className="text-[9px] text-[#131218]/40">
+                {m.source && <span className="text-[9px] text-[#0a0a0a]/40">· {m.source}</span>}
+                <span className="text-[9px] text-[#0a0a0a]/40">
                   · {m.published_at ? timeAgoShort(m.published_at) : `detected ${timeAgoShort(m.detected_at)}`}
                 </span>
                 {m.relevance != null && (
@@ -135,16 +135,16 @@ export async function ContactNewsMentions({
                   </span>
                 )}
               </div>
-              <p className="text-[12.5px] font-semibold text-[#131218] mt-1 group-hover:underline underline-offset-2 decoration-[#131218]/30">
+              <p className="text-[12.5px] font-semibold text-[#0a0a0a] mt-1 group-hover:underline underline-offset-2 decoration-[#0a0a0a]/30">
                 {m.title ?? m.url}
               </p>
               {m.snippet && (
-                <p className="text-[11px] text-[#131218]/60 mt-1 leading-snug line-clamp-2">
+                <p className="text-[11px] text-[#0a0a0a]/60 mt-1 leading-snug line-clamp-2">
                   {m.snippet}
                 </p>
               )}
               {m.why_relevant && (
-                <p className="text-[10px] text-[#131218]/45 italic mt-1">→ {m.why_relevant}</p>
+                <p className="text-[10px] text-[#0a0a0a]/45 italic mt-1">→ {m.why_relevant}</p>
               )}
             </a>
           </li>

@@ -77,12 +77,12 @@ export function LibraryIngestPanel() {
     (mode === "paste" ? text.trim().length > 0 : file !== null);
 
   return (
-    <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
+    <div className="bg-white rounded-2xl border border-[#e4e4dd] overflow-hidden">
       {/* Header */}
-      <div className="px-6 py-4 border-b border-[#E0E0D8] flex items-center justify-between">
+      <div className="px-6 py-4 border-b border-[#e4e4dd] flex items-center justify-between">
         <div>
-          <p className="text-[8px] font-bold tracking-[2px] uppercase text-[#131218]/30 mb-0.5">Library Ingest</p>
-          <p className="text-sm font-bold text-[#131218]">Añadir conocimiento</p>
+          <p className="text-[8px] font-bold tracking-[2px] uppercase text-[#0a0a0a]/30 mb-0.5">Library Ingest</p>
+          <p className="text-sm font-bold text-[#0a0a0a]">Añadir conocimiento</p>
         </div>
         <div className="flex gap-1.5">
           {(["paste", "upload"] as const).map(m => (
@@ -91,8 +91,8 @@ export function LibraryIngestPanel() {
               onClick={() => { setMode(m); setFile(null); setText(""); setStatus("idle"); setResult(null); }}
               className={`text-[10px] font-bold px-3 py-1.5 rounded-lg border transition-all ${
                 mode === m
-                  ? "bg-[#131218] text-white border-[#131218]"
-                  : "border-[#E0E0D8] text-[#131218]/40 hover:text-[#131218] hover:border-[#131218]/30"
+                  ? "bg-[#0a0a0a] text-white border-[#0a0a0a]"
+                  : "border-[#e4e4dd] text-[#0a0a0a]/40 hover:text-[#0a0a0a] hover:border-[#0a0a0a]/30"
               }`}
             >
               {m === "paste" ? "Pegar texto" : "Subir archivo"}
@@ -109,12 +109,12 @@ export function LibraryIngestPanel() {
             value={text}
             onChange={e => setText(e.target.value)}
             placeholder="Pega aquí un artículo, reporte, extracto, regulación, análisis... Claude lo clasificará y creará el Knowledge Asset."
-            className="w-full h-36 border border-[#E0E0D8] rounded-xl px-4 py-3 text-sm text-[#131218] bg-[#FAFAF8] resize-none outline-none focus:border-[#131218]/30 placeholder-[#131218]/20 leading-relaxed"
+            className="w-full h-36 border border-[#e4e4dd] rounded-xl px-4 py-3 text-sm text-[#0a0a0a] bg-[#FAFAF8] resize-none outline-none focus:border-[#0a0a0a]/30 placeholder-[#0a0a0a]/20 leading-relaxed"
           />
         ) : (
           <div
             onClick={() => fileRef.current?.click()}
-            className="border-2 border-dashed border-[#E0E0D8] rounded-xl px-6 py-8 text-center cursor-pointer hover:border-[#131218]/30 hover:bg-[#FAFAF8] transition-all"
+            className="border-2 border-dashed border-[#e4e4dd] rounded-xl px-6 py-8 text-center cursor-pointer hover:border-[#0a0a0a]/30 hover:bg-[#FAFAF8] transition-all"
           >
             <input
               ref={fileRef}
@@ -125,22 +125,22 @@ export function LibraryIngestPanel() {
             />
             {file ? (
               <div>
-                <p className="text-sm font-bold text-[#131218]">{file.name}</p>
-                <p className="text-[10px] text-[#131218]/35 mt-1">
+                <p className="text-sm font-bold text-[#0a0a0a]">{file.name}</p>
+                <p className="text-[10px] text-[#0a0a0a]/35 mt-1">
                   {(file.size / 1024).toFixed(0)} KB · {file.type || "unknown type"}
                 </p>
                 <button
                   onClick={e => { e.stopPropagation(); setFile(null); }}
-                  className="mt-2 text-[9px] font-bold text-[#131218]/30 hover:text-red-500 transition-colors"
+                  className="mt-2 text-[9px] font-bold text-[#0a0a0a]/30 hover:text-red-500 transition-colors"
                 >
                   Quitar
                 </button>
               </div>
             ) : (
               <>
-                <p className="text-2xl mb-2 text-[#131218]/20">↑</p>
-                <p className="text-sm font-semibold text-[#131218]/50">Subir archivo</p>
-                <p className="text-[10px] text-[#131218]/25 mt-1">PDF, TXT, MD, DOCX, CSV · máx 50 MB</p>
+                <p className="text-2xl mb-2 text-[#0a0a0a]/20">↑</p>
+                <p className="text-sm font-semibold text-[#0a0a0a]/50">Subir archivo</p>
+                <p className="text-[10px] text-[#0a0a0a]/25 mt-1">PDF, TXT, MD, DOCX, CSV · máx 50 MB</p>
               </>
             )}
           </div>
@@ -151,7 +151,7 @@ export function LibraryIngestPanel() {
           value={source}
           onChange={e => setSource(e.target.value)}
           placeholder="Fuente / URL / referencia (opcional)"
-          className="w-full border border-[#E0E0D8] rounded-lg px-4 py-2.5 text-xs text-[#131218] bg-[#FAFAF8] outline-none focus:border-[#131218]/30 placeholder-[#131218]/20"
+          className="w-full border border-[#e4e4dd] rounded-lg px-4 py-2.5 text-xs text-[#0a0a0a] bg-[#FAFAF8] outline-none focus:border-[#0a0a0a]/30 placeholder-[#0a0a0a]/20"
         />
 
         {/* Submit */}
@@ -160,14 +160,14 @@ export function LibraryIngestPanel() {
           disabled={!canSubmit}
           className={`w-full text-xs font-bold py-3 rounded-xl transition-all ${
             status === "processing"
-              ? "bg-[#131218]/40 text-white cursor-not-allowed"
+              ? "bg-[#0a0a0a]/40 text-white cursor-not-allowed"
               : status === "done"
-              ? "bg-[#B2FF59] text-[#131218]"
+              ? "bg-[#c6f24a] text-[#0a0a0a]"
               : status === "error"
               ? "bg-red-100 text-red-700"
               : canSubmit
-              ? "bg-[#131218] text-white hover:bg-[#131218]/80"
-              : "bg-[#E0E0D8] text-[#131218]/30 cursor-not-allowed"
+              ? "bg-[#0a0a0a] text-white hover:bg-[#0a0a0a]/80"
+              : "bg-[#e4e4dd] text-[#0a0a0a]/30 cursor-not-allowed"
           }`}
         >
           {status === "processing"
@@ -181,44 +181,44 @@ export function LibraryIngestPanel() {
 
         {/* Result card */}
         {status === "done" && result && (
-          <div className="bg-[#FAFAF8] border border-[#E0E0D8] rounded-xl px-4 py-4">
+          <div className="bg-[#FAFAF8] border border-[#e4e4dd] rounded-xl px-4 py-4">
             <div className="flex items-start justify-between gap-3 mb-2">
-              <p className="text-[11px] font-bold text-[#131218] leading-snug flex-1">{result.title}</p>
-              <span className="text-[9px] font-bold bg-[#EFEFEA] text-[#131218]/50 px-2 py-0.5 rounded-full shrink-0">
+              <p className="text-[11px] font-bold text-[#0a0a0a] leading-snug flex-1">{result.title}</p>
+              <span className="text-[9px] font-bold bg-[#f4f4ef] text-[#0a0a0a]/50 px-2 py-0.5 rounded-full shrink-0">
                 {result.assetType}
               </span>
             </div>
-            <p className="text-[10px] text-[#131218]/50 leading-relaxed mb-2">{result.summary}</p>
+            <p className="text-[10px] text-[#0a0a0a]/50 leading-relaxed mb-2">{result.summary}</p>
             <div className="flex flex-wrap gap-1 mb-3">
               {result.tags.map(t => (
-                <span key={t} className="text-[8px] font-semibold bg-[#131218]/5 text-[#131218]/40 px-2 py-0.5 rounded-full">
+                <span key={t} className="text-[8px] font-semibold bg-[#0a0a0a]/5 text-[#0a0a0a]/40 px-2 py-0.5 rounded-full">
                   {t}
                 </span>
               ))}
             </div>
 
             {/* File link + actions */}
-            <div className="flex items-center justify-between pt-2.5 border-t border-[#E0E0D8]">
+            <div className="flex items-center justify-between pt-2.5 border-t border-[#e4e4dd]">
               <div className="flex items-center gap-3">
                 {result.sourceFileUrl ? (
                   <a
                     href={result.sourceFileUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-[9px] font-bold text-[#131218]/50 hover:text-[#131218] transition-colors flex items-center gap-1"
+                    className="text-[9px] font-bold text-[#0a0a0a]/50 hover:text-[#0a0a0a] transition-colors flex items-center gap-1"
                   >
                     ↓ Descargar archivo original
                   </a>
                 ) : (
-                  <p className="text-[8px] text-[#131218]/20">Texto procesado · sin archivo adjunto</p>
+                  <p className="text-[8px] text-[#0a0a0a]/20">Texto procesado · sin archivo adjunto</p>
                 )}
               </div>
               <div className="flex items-center gap-2">
-                <p className="text-[8px] text-[#131218]/20">Draft en Notion · revisar antes de publicar</p>
+                <p className="text-[8px] text-[#0a0a0a]/20">Draft en Notion · revisar antes de publicar</p>
                 <button
                   onClick={handleDelete}
                   disabled={deleting}
-                  className="text-[9px] font-bold text-[#131218]/25 hover:text-red-500 transition-colors"
+                  className="text-[9px] font-bold text-[#0a0a0a]/25 hover:text-red-500 transition-colors"
                 >
                   {deleting ? "..." : "Descartar"}
                 </button>

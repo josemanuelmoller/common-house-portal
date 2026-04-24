@@ -17,30 +17,30 @@ export function GarageSessions({ sessions }: { sessions: GarageSession[] }) {
   if (sessions.length === 0) return null;
 
   return (
-    <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-      <div className="h-1 bg-[#EFEFEA]" />
-      <div className="px-6 py-5 border-b border-[#EFEFEA]">
+    <div className="bg-white rounded-2xl border border-[#e4e4dd] overflow-hidden">
+      <div className="h-1 bg-[#f4f4ef]" />
+      <div className="px-6 py-5 border-b border-[#f4f4ef]">
         <div className="flex items-center justify-between">
-          <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">
+          <p className="text-[10px] font-bold text-[#0a0a0a]/30 uppercase tracking-widest">
             Working Sessions
           </p>
-          <span className="text-[10px] font-bold text-[#131218]/30 bg-[#EFEFEA] border border-[#E0E0D8] px-2 py-0.5 rounded-full">
+          <span className="text-[10px] font-bold text-[#0a0a0a]/30 bg-[#f4f4ef] border border-[#e4e4dd] px-2 py-0.5 rounded-full">
             {sessions.length}
           </span>
         </div>
       </div>
-      <div className="divide-y divide-[#EFEFEA]">
+      <div className="divide-y divide-[#f4f4ef]">
         {sessions.map((s) => (
           <div key={s.id} className="px-6 py-5">
             <div className="flex items-start justify-between gap-4 mb-2">
-              <p className="text-sm font-semibold text-[#131218] leading-snug">
+              <p className="text-sm font-semibold text-[#0a0a0a] leading-snug">
                 {s.title}
               </p>
-              <p className="text-[10px] text-[#131218]/30 font-medium uppercase tracking-widest shrink-0 pt-0.5">
+              <p className="text-[10px] text-[#0a0a0a]/30 font-medium uppercase tracking-widest shrink-0 pt-0.5">
                 {s.date}
               </p>
             </div>
-            <p className="text-sm text-[#131218]/55 leading-relaxed">
+            <p className="text-sm text-[#0a0a0a]/55 leading-relaxed">
               {s.summary}
             </p>
           </div>

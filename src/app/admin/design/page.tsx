@@ -47,7 +47,7 @@ export default async function DesignPage() {
     .sort();
 
   return (
-    <div className="flex min-h-screen bg-[#EFEFEA]">
+    <div className="flex min-h-screen bg-[#f4f4ef]">
       <Sidebar adminNav />
       <main
         className="flex-1 ml-[228px]"

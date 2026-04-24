@@ -1,23 +1,23 @@
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
 @import "tailwindcss";
 
 :root {
-  --ch-cream:  #EFEFEA;
-  --ch-dark:   #131218;
-  --ch-green:  #B2FF59;
+  /* Legacy brand tokens — kept for ch-artifact-prose only. */
+  --ch-cream:  #f4f4ef;
+  --ch-dark:   #0a0a0a;
+  --ch-green:  #c6f24a;
   --ch-white:  #FFFFFF;
 }
 
 @theme inline {
-  --color-background: var(--ch-cream);
-  --color-foreground: var(--ch-dark);
-  --font-sans: 'Space Grotesk', sans-serif;
+  --color-background: var(--hall-paper-0);
+  --color-foreground: var(--hall-ink-0);
+  --font-sans: var(--font-hall-sans);
 }
 
 body {
-  background: var(--ch-cream);
-  color: var(--ch-dark);
-  font-family: 'Space Grotesk', sans-serif;
+  background: var(--hall-paper-0);
+  color: var(--hall-ink-0);
+  font-family: var(--font-hall-sans), "Inter Tight", sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 

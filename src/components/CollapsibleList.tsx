@@ -37,7 +37,7 @@ export function CollapsibleList({
         <button
           type="button"
           onClick={() => setExpanded(v => !v)}
-          className="w-full px-5 py-3 text-[10px] font-bold tracking-widest uppercase text-[#131218]/40 hover:text-[#131218]/80 hover:bg-[#EFEFEA]/40 border-t border-[#EFEFEA] transition-colors"
+          className="w-full px-5 py-3 text-[10px] font-bold tracking-widest uppercase text-[#0a0a0a]/40 hover:text-[#0a0a0a]/80 hover:bg-[#f4f4ef]/40 border-t border-[#f4f4ef] transition-colors"
         >
           {expanded ? collapseLabel : `Show ${hidden} ${moreLabel}`}
         </button>

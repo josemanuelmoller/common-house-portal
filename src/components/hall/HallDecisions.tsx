@@ -5,8 +5,8 @@ const STATUS_STYLES: Record<
   { bar: string; badge: string; label: string }
 > = {
   confirmed: {
-    bar: "bg-[#B2FF59]",
-    badge: "bg-[#B2FF59] text-[#131218]",
+    bar: "bg-[#c6f24a]",
+    badge: "bg-[#c6f24a] text-[#0a0a0a]",
     label: "Agreed",
   },
   pending: {
@@ -15,8 +15,8 @@ const STATUS_STYLES: Record<
     label: "In discussion",
   },
   revisited: {
-    bar: "bg-[#EFEFEA]",
-    badge: "bg-[#EFEFEA] text-[#131218]/50",
+    bar: "bg-[#f4f4ef]",
+    badge: "bg-[#f4f4ef] text-[#0a0a0a]/50",
     label: "Revisited",
   },
 };
@@ -24,15 +24,15 @@ const STATUS_STYLES: Record<
 export function HallDecisions({ decisions }: { decisions: HallDecision[] }) {
   if (decisions.length === 0) {
     return (
-      <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-        <div className="h-1 bg-[#B2FF59]" />
-        <div className="px-6 py-5 border-b border-[#EFEFEA]">
-          <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">
+      <div className="bg-white rounded-2xl border border-[#e4e4dd] overflow-hidden">
+        <div className="h-1 bg-[#c6f24a]" />
+        <div className="px-6 py-5 border-b border-[#f4f4ef]">
+          <p className="text-[10px] font-bold text-[#0a0a0a]/30 uppercase tracking-widest">
             Decisions
           </p>
         </div>
         <div className="px-6 py-10 text-center">
-          <p className="text-sm text-[#131218]/40 leading-relaxed">
+          <p className="text-sm text-[#0a0a0a]/40 leading-relaxed">
             Agreements reached together will appear here as the work moves forward.
           </p>
         </div>
@@ -41,14 +41,14 @@ export function HallDecisions({ decisions }: { decisions: HallDecision[] }) {
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-      <div className="h-1 bg-[#B2FF59]" />
-      <div className="px-6 py-5 border-b border-[#EFEFEA]">
-        <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">
+    <div className="bg-white rounded-2xl border border-[#e4e4dd] overflow-hidden">
+      <div className="h-1 bg-[#c6f24a]" />
+      <div className="px-6 py-5 border-b border-[#f4f4ef]">
+        <p className="text-[10px] font-bold text-[#0a0a0a]/30 uppercase tracking-widest">
           What we&apos;ve agreed
         </p>
       </div>
-      <div className="divide-y divide-[#EFEFEA]">
+      <div className="divide-y divide-[#f4f4ef]">
         {decisions.map((dec) => {
           const s = STATUS_STYLES[dec.status];
           return (
@@ -59,11 +59,11 @@ export function HallDecisions({ decisions }: { decisions: HallDecision[] }) {
                 ✓
               </span>
               <div className="flex-1">
-                <p className="text-sm font-semibold text-[#131218] leading-snug">
+                <p className="text-sm font-semibold text-[#0a0a0a] leading-snug">
                   {dec.title}
                 </p>
                 {dec.context && (
-                  <p className="text-xs text-[#131218]/50 mt-1.5 leading-relaxed">
+                  <p className="text-xs text-[#0a0a0a]/50 mt-1.5 leading-relaxed">
                     {dec.context}
                   </p>
                 )}
@@ -73,7 +73,7 @@ export function HallDecisions({ decisions }: { decisions: HallDecision[] }) {
                   >
                     {s.label}
                   </span>
-                  <span className="text-[10px] font-bold text-[#131218]/25 uppercase tracking-widest">
+                  <span className="text-[10px] font-bold text-[#0a0a0a]/25 uppercase tracking-widest">
                     {dec.date}
                   </span>
                 </div>

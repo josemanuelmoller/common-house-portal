@@ -14,18 +14,18 @@ export function ExecutiveSnapshot({ project }: { project: WorkroomProject }) {
   if (!project.draftUpdate) return null;
 
   return (
-    <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-      <div className="h-1 bg-[#131218]" />
-      <div className="px-6 py-4 border-b border-[#EFEFEA]">
-        <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">
+    <div className="bg-white rounded-2xl border border-[#e4e4dd] overflow-hidden">
+      <div className="h-1 bg-[#0a0a0a]" />
+      <div className="px-6 py-4 border-b border-[#f4f4ef]">
+        <p className="text-[10px] font-bold text-[#0a0a0a]/30 uppercase tracking-widest">
           Latest status
         </p>
-        <p className="text-[10px] text-[#131218]/20 mt-0.5">
+        <p className="text-[10px] text-[#0a0a0a]/20 mt-0.5">
           Common House system — most recent assessment
         </p>
       </div>
       <div className="px-6 py-5">
-        <p className="text-sm text-[#131218]/70 leading-relaxed">{project.draftUpdate}</p>
+        <p className="text-sm text-[#0a0a0a]/70 leading-relaxed">{project.draftUpdate}</p>
       </div>
     </div>
   );

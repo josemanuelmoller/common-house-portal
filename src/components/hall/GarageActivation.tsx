@@ -25,8 +25,8 @@ interface GarageActivationProps {
  */
 export function GarageActivation({ project: _project, lastSession }: GarageActivationProps) {
   return (
-    <div className="bg-[#131218] rounded-2xl overflow-hidden">
-      <div className="h-1 bg-[#B2FF59]" />
+    <div className="bg-[#0a0a0a] rounded-2xl overflow-hidden">
+      <div className="h-1 bg-[#c6f24a]" />
       <div className="px-6 py-6">
         <p className="text-[10px] font-bold text-white/25 uppercase tracking-widest mb-3">
           The Garage is live
@@ -42,7 +42,7 @@ export function GarageActivation({ project: _project, lastSession }: GarageActiv
         <div className="mt-5">
           <a
             href="/garage"
-            className="inline-flex items-center gap-2 bg-[#B2FF59] text-[#131218] text-xs font-bold px-4 py-2.5 rounded-full uppercase tracking-widest hover:bg-[#c5ff7a] transition-colors"
+            className="inline-flex items-center gap-2 bg-[#c6f24a] text-[#0a0a0a] text-xs font-bold px-4 py-2.5 rounded-full uppercase tracking-widest hover:bg-[#c5ff7a] transition-colors"
           >
             Open The Garage →
           </a>

@@ -18,16 +18,16 @@ export function GarageSnapshot({ project }: { project: GarageProject }) {
   if (!signal) return null;
 
   return (
-    <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-      <div className="h-1 bg-[#131218]" />
+    <div className="bg-white rounded-2xl border border-[#e4e4dd] overflow-hidden">
+      <div className="h-1 bg-[#0a0a0a]" />
       <div className="px-6 py-5">
-        <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest mb-3">
+        <p className="text-[10px] font-bold text-[#0a0a0a]/30 uppercase tracking-widest mb-3">
           Where the build is right now
         </p>
-        <p className="text-sm text-[#131218]/70 leading-relaxed">
+        <p className="text-sm text-[#0a0a0a]/70 leading-relaxed">
           {signal}
         </p>
-        <p className="text-[10px] text-[#131218]/20 font-medium mt-3">
+        <p className="text-[10px] text-[#0a0a0a]/20 font-medium mt-3">
           Common House OS · most recent assessment
         </p>
       </div>

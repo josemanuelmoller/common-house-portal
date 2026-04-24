@@ -36,7 +36,7 @@ export function SynthesizeLeafButton({ path, hasPlaybook }: { path: string; hasP
       <button
         onClick={handleClick}
         disabled={status === "running"}
-        className="inline-flex items-center gap-2 bg-[#B2FF59] text-[#131218] text-[11px] font-bold uppercase tracking-widest px-3 py-2 rounded-full hover:bg-[#9ee84a] transition-colors disabled:opacity-60"
+        className="inline-flex items-center gap-2 bg-[#c6f24a] text-[#0a0a0a] text-[11px] font-bold uppercase tracking-widest px-3 py-2 rounded-full hover:bg-[#9ee84a] transition-colors disabled:opacity-60"
       >
         {status === "running" ? "Sintetizando…"
           : hasPlaybook ? "⟳ Regenerar playbook"

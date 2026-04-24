@@ -59,7 +59,7 @@ export function DraftFollowupButton({
     <button
       onClick={handleDraft}
       disabled={state === "loading"}
-      className="text-[10px] font-bold text-[#131218]/30 hover:text-[#131218] transition-colors shrink-0 border border-[#E0E0D8] rounded-lg px-2.5 py-1.5 disabled:opacity-50"
+      className="text-[10px] font-bold text-[#0a0a0a]/30 hover:text-[#0a0a0a] transition-colors shrink-0 border border-[#e4e4dd] rounded-lg px-2.5 py-1.5 disabled:opacity-50"
     >
       {state === "loading" ? "Drafting…" : "Draft email →"}
     </button>

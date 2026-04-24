@@ -174,7 +174,7 @@ const TAG_COLOR: Record<string, string> = {
   "Sector Trend": "bg-amber-50 text-amber-700 border-amber-200",
   "Competitor":   "bg-red-50 text-red-700 border-red-200",
   "Ecosystem":    "bg-sky-50 text-sky-700 border-sky-200",
-  "Portfolio":    "bg-[#c8f55a]/25 text-[#131218]/80 border-[#c8f55a]",
+  "Portfolio":    "bg-[#c6f24a]/25 text-[#0a0a0a]/80 border-[#c6f24a]",
 };
 
 type Signal = { tag: string | null; headline: string; relevance: string | null };
@@ -227,7 +227,7 @@ function SignalList({ raw }: { raw: string }) {
   // Plain fallback: if nothing parsed with a tag, render as readable paragraph(s)
   if (!structured) {
     return (
-      <div className="text-[11px] text-[#131218]/65 leading-[1.65] whitespace-pre-wrap">
+      <div className="text-[11px] text-[#0a0a0a]/65 leading-[1.65] whitespace-pre-wrap">
         {raw}
       </div>
     );
@@ -246,14 +246,14 @@ function SignalList({ raw }: { raw: string }) {
       {signals.map((s, i) => {
         const color = s.tag && TAG_COLOR[s.tag]
           ? TAG_COLOR[s.tag]
-          : "bg-[#EFEFEA] text-[#131218]/55 border-[#E0E0D8]";
+          : "bg-[#f4f4ef] text-[#0a0a0a]/55 border-[#e4e4dd]";
         const isOpen = expanded.has(i);
         const hasRelevance = !!s.relevance;
         return (
           <li key={i} className="flex gap-3">
             <span
               className={`shrink-0 w-[96px] text-[8.5px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full border text-center ${
-                s.tag ? color : "bg-[#EFEFEA] text-[#131218]/30 border-[#E0E0D8]"
+                s.tag ? color : "bg-[#f4f4ef] text-[#0a0a0a]/30 border-[#e4e4dd]"
               } self-start mt-0.5`}
             >
               {s.tag ?? "—"}
@@ -265,17 +265,17 @@ function SignalList({ raw }: { raw: string }) {
                 className={`text-left w-full ${hasRelevance ? "cursor-pointer" : "cursor-default"} group`}
                 disabled={!hasRelevance}
               >
-                <p className="text-[11.5px] font-semibold text-[#131218] leading-snug group-hover:text-[#131218]/70 transition-colors">
+                <p className="text-[11.5px] font-semibold text-[#0a0a0a] leading-snug group-hover:text-[#0a0a0a]/70 transition-colors">
                   {s.headline}
                   {hasRelevance && (
-                    <span className="ml-1 text-[9px] font-normal text-[#131218]/30">
+                    <span className="ml-1 text-[9px] font-normal text-[#0a0a0a]/30">
                       {isOpen ? "▾" : "▸"}
                     </span>
                   )}
                 </p>
               </button>
               {hasRelevance && isOpen && (
-                <p className="text-[10px] text-[#131218]/55 leading-snug mt-1">
+                <p className="text-[10px] text-[#0a0a0a]/55 leading-snug mt-1">
                   {s.relevance}
                 </p>
               )}

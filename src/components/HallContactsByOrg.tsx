@@ -64,9 +64,9 @@ export function HallContactsByOrg({ orgs }: Props) {
   return (
     <section>
       <div className="flex items-center gap-3 mb-3">
-        <h2 className="text-[11px] font-bold tracking-widest uppercase text-[#131218]/60">By organization</h2>
-        <div className="flex-1 h-px bg-[#E0E0D8]" />
-        <span className="text-[10px] font-semibold text-[#131218]/30">{orgs.length} orgs</span>
+        <h2 className="text-[11px] font-bold tracking-widest uppercase text-[#0a0a0a]/60">By organization</h2>
+        <div className="flex-1 h-px bg-[#e4e4dd]" />
+        <span className="text-[10px] font-semibold text-[#0a0a0a]/30">{orgs.length} orgs</span>
       </div>
 
       <div className="mb-3">
@@ -75,15 +75,15 @@ export function HallContactsByOrg({ orgs }: Props) {
           placeholder="Filter domain…"
           value={query}
           onChange={e => setQuery(e.target.value)}
-          className="w-full max-w-xs text-[11px] px-3 py-1.5 rounded-full bg-white border border-[#E0E0D8] focus:outline-none focus:border-[#131218]/30"
+          className="w-full max-w-xs text-[11px] px-3 py-1.5 rounded-full bg-white border border-[#e4e4dd] focus:outline-none focus:border-[#0a0a0a]/30"
         />
       </div>
 
       <div className="space-y-2">
         {filtered.map(org => <OrgRow key={org.domain} org={org} />)}
         {filtered.length === 0 && (
-          <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-6 text-center">
-            <p className="text-[11px] text-[#131218]/30">No domains match.</p>
+          <div className="bg-white rounded-2xl border border-[#e4e4dd] px-5 py-6 text-center">
+            <p className="text-[11px] text-[#0a0a0a]/30">No domains match.</p>
           </div>
         )}
       </div>
@@ -220,22 +220,22 @@ function OrgRow({ org }: { org: Org }) {
   }
 
   return (
-    <div className={`bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden ${org.vip_count > 0 ? "ring-1 ring-[#B2FF59]/50" : ""}`}>
+    <div className={`bg-white rounded-2xl border border-[#e4e4dd] overflow-hidden ${org.vip_count > 0 ? "ring-1 ring-[#c6f24a]/50" : ""}`}>
       <button
         type="button"
         onClick={() => setOpen(v => !v)}
-        className="w-full flex items-center gap-4 px-5 py-3 hover:bg-[#EFEFEA]/40 transition-colors text-left"
+        className="w-full flex items-center gap-4 px-5 py-3 hover:bg-[#f4f4ef]/40 transition-colors text-left"
       >
-        <span className="text-[10px] text-[#131218]/30">{open ? "▾" : "▸"}</span>
+        <span className="text-[10px] text-[#0a0a0a]/30">{open ? "▾" : "▸"}</span>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <p className="text-[13px] font-bold text-[#131218] truncate">
+            <p className="text-[13px] font-bold text-[#0a0a0a] truncate">
               {org.org_registered ? (org.org_name || org.domain) : org.domain}
             </p>
             {org.org_registered && org.org_name && org.org_name !== org.domain && (
-              <span className="text-[10px] text-[#131218]/35">{org.domain}</span>
+              <span className="text-[10px] text-[#0a0a0a]/35">{org.domain}</span>
             )}
-            {org.is_personal_domain && <span className="text-[9px] font-semibold text-[#131218]/30">(personal provider)</span>}
+            {org.is_personal_domain && <span className="text-[9px] font-semibold text-[#0a0a0a]/30">(personal provider)</span>}
             {!org.org_registered && !org.is_personal_domain && (
               <span className="text-[8px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">PROPOSED</span>
             )}
@@ -243,14 +243,14 @@ function OrgRow({ org }: { org: Org }) {
               <span
                 key={c}
                 className={`text-[8px] font-bold px-1.5 py-0.5 rounded ${
-                  c === "VIP" ? "bg-[#B2FF59]/40 text-green-900" : "bg-[#131218] text-white"
+                  c === "VIP" ? "bg-[#c6f24a]/40 text-green-900" : "bg-[#0a0a0a] text-white"
                 }`}
               >
                 {c.toUpperCase()}
               </span>
             ))}
           </div>
-          <p className="text-[10px] text-[#131218]/50 mt-0.5">
+          <p className="text-[10px] text-[#0a0a0a]/50 mt-0.5">
             <strong>{org.contact_count}</strong> contact{org.contact_count === 1 ? "" : "s"}
             {" · "}{touches} total touches
             {org.vip_count > 0 && <> · <strong className="text-green-700">{org.vip_count} VIP</strong></>}
@@ -267,12 +267,12 @@ function OrgRow({ org }: { org: Org }) {
       </button>
 
       {open && (
-        <div className="border-t border-[#EFEFEA]">
+        <div className="border-t border-[#f4f4ef]">
           {/* Organisation-level editor — tag the org itself + optional cascade */}
           {!org.is_personal_domain && (
-            <div className="px-5 py-3 bg-[#131218]/5 border-b border-[#EFEFEA] space-y-2">
+            <div className="px-5 py-3 bg-[#0a0a0a]/5 border-b border-[#f4f4ef] space-y-2">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-[9px] font-bold uppercase tracking-widest text-[#131218]/40">
+                <span className="text-[9px] font-bold uppercase tracking-widest text-[#0a0a0a]/40">
                   Organisation · @{org.domain}
                 </span>
                 <input
@@ -281,7 +281,7 @@ function OrgRow({ org }: { org: Org }) {
                   placeholder={org.domain.split(".")[0]}
                   onChange={e => setOrgName(e.target.value)}
                   onBlur={renameOrg}
-                  className="text-[11px] font-semibold px-2 py-0.5 rounded bg-white border border-[#E0E0D8] focus:outline-none focus:border-[#131218]/40 min-w-[160px]"
+                  className="text-[11px] font-semibold px-2 py-0.5 rounded bg-white border border-[#e4e4dd] focus:outline-none focus:border-[#0a0a0a]/40 min-w-[160px]"
                 />
                 {org.org_registered && (
                   org.org_notion_id ? (
@@ -291,7 +291,7 @@ function OrgRow({ org }: { org: Org }) {
                       type="button"
                       disabled={pending}
                       onClick={syncToNotion}
-                      className="ml-auto text-[9px] font-bold px-2 py-1 rounded-full bg-[#131218] text-white hover:bg-[#131218]/85 transition-colors"
+                      className="ml-auto text-[9px] font-bold px-2 py-1 rounded-full bg-[#0a0a0a] text-white hover:bg-[#0a0a0a]/85 transition-colors"
                       title="Create or link this org in CH Organizations [OS v2]"
                     >
                       Sync to Notion →
@@ -302,8 +302,8 @@ function OrgRow({ org }: { org: Org }) {
               <div className="flex items-center gap-1.5 flex-wrap">
                 {TAG_OPTIONS.map(t => {
                   const active = org.org_classes.includes(t.v);
-                  const activeCls = t.kind === "vip" ? "bg-[#B2FF59] text-black" : "bg-[#131218] text-white";
-                  const inactiveCls = "bg-[#131218]/6 text-[#131218]/55 hover:bg-[#131218]/16";
+                  const activeCls = t.kind === "vip" ? "bg-[#c6f24a] text-black" : "bg-[#0a0a0a] text-white";
+                  const inactiveCls = "bg-[#0a0a0a]/6 text-[#0a0a0a]/55 hover:bg-[#0a0a0a]/16";
                   return (
                     <button
                       key={t.v}
@@ -317,7 +317,7 @@ function OrgRow({ org }: { org: Org }) {
                     </button>
                   );
                 })}
-                <label className="ml-2 flex items-center gap-1 text-[9px] text-[#131218]/60 cursor-pointer select-none">
+                <label className="ml-2 flex items-center gap-1 text-[9px] text-[#0a0a0a]/60 cursor-pointer select-none">
                   <input
                     type="checkbox"
                     className="w-3 h-3"
@@ -333,8 +333,8 @@ function OrgRow({ org }: { org: Org }) {
           )}
 
           {/* Bulk-tag bar for contacts (independent of org class) */}
-          <div className="px-5 py-3 flex items-center gap-2 flex-wrap bg-[#EFEFEA]/30">
-            <span className="text-[9px] font-bold uppercase tracking-widest text-[#131218]/40">Contacts only:</span>
+          <div className="px-5 py-3 flex items-center gap-2 flex-wrap bg-[#f4f4ef]/30">
+            <span className="text-[9px] font-bold uppercase tracking-widest text-[#0a0a0a]/40">Contacts only:</span>
             {TAG_OPTIONS.map(t => (
               <button
                 key={t.v}
@@ -343,8 +343,8 @@ function OrgRow({ org }: { org: Org }) {
                 onClick={() => bulkTag(t.v)}
                 className={`text-[9px] font-bold px-2 py-1 rounded-full transition-colors ${
                   t.kind === "vip"
-                    ? "bg-[#B2FF59]/70 text-black hover:bg-[#B2FF59]"
-                    : "bg-[#131218]/8 text-[#131218]/70 hover:bg-[#131218]/16"
+                    ? "bg-[#c6f24a]/70 text-black hover:bg-[#c6f24a]"
+                    : "bg-[#0a0a0a]/8 text-[#0a0a0a]/70 hover:bg-[#0a0a0a]/16"
                 } ${pending ? "opacity-50 cursor-wait" : ""}`}
                 title={`Apply ${t.v} to every contact @${org.domain} (keeps existing classes) — does NOT touch the organisation tag`}
               >
@@ -354,7 +354,7 @@ function OrgRow({ org }: { org: Org }) {
           </div>
 
           {/* Contacts inside this org */}
-          <div className="divide-y divide-[#EFEFEA]">
+          <div className="divide-y divide-[#f4f4ef]">
             {org.contacts.map(c => (
               <HallContactRow key={c.email} {...c} />
             ))}

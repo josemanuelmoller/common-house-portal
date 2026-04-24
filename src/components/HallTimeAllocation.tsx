@@ -14,17 +14,17 @@ import { getSelfEmails } from "@/lib/hall-self";
  */
 
 const BUCKETS = [
-  { key: "Client",       label: "Client",       color: "bg-[#c8f55a]", target: 20 },
+  { key: "Client",       label: "Client",       color: "bg-[#c6f24a]", target: 20 },
   { key: "Investor",     label: "Investor",     color: "bg-[#a78bfa]", target: 10 },
   { key: "Funder",       label: "Funder",       color: "bg-[#f472b6]", target: 5  },
   { key: "Portfolio",    label: "Portfolio",    color: "bg-[#fbbf24]", target: 20 },
   { key: "Partner",      label: "Partner",      color: "bg-[#7dd3fc]", target: 15 },
-  { key: "VIP",          label: "VIP",          color: "bg-[#B2FF59]", target: 0  },
-  { key: "Team",         label: "Team",         color: "bg-[#131218]", target: 10 },
+  { key: "VIP",          label: "VIP",          color: "bg-[#c6f24a]", target: 0  },
+  { key: "Team",         label: "Team",         color: "bg-[#0a0a0a]", target: 10 },
   { key: "Vendor",       label: "Vendor",       color: "bg-[#9ca3af]", target: 0  },
   { key: "External",     label: "External",     color: "bg-[#cbd5e1]", target: 0  },
   { key: "Personal",     label: "Personal",     color: "bg-amber-300", target: 0  },
-  { key: "Unclassified", label: "Unclassified", color: "bg-[#E0E0D8]", target: 0  },
+  { key: "Unclassified", label: "Unclassified", color: "bg-[#e4e4dd]", target: 0  },
 ] as const;
 
 const PRIORITY_ORDER: readonly string[] = ["Client", "Investor", "Funder", "Portfolio", "Partner", "VIP", "Team", "Vendor", "External"];

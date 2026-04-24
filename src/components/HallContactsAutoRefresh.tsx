@@ -59,8 +59,8 @@ export function HallContactsAutoRefresh() {
 
   const base = "text-[10px] font-bold tracking-wide px-2.5 py-1 rounded-full";
   const cls =
-    status === "syncing" ? `${base} bg-[#131218]/6 text-[#131218]/60`
-    : status === "done"  ? `${base} bg-[#B2FF59]/30 text-green-900`
+    status === "syncing" ? `${base} bg-[#0a0a0a]/6 text-[#0a0a0a]/60`
+    : status === "done"  ? `${base} bg-[#c6f24a]/30 text-green-900`
     :                      `${base} bg-red-100 text-red-700`;
 
   return (

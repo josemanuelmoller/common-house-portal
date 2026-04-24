@@ -44,19 +44,19 @@ function ModuleHeader({
 }) {
   return (
     <div className="flex items-center gap-3 mb-4">
-      <span className="text-[8.5px] font-bold tracking-[2px] uppercase text-[#131218]/28 whitespace-nowrap">
+      <span className="text-[8.5px] font-bold tracking-[2px] uppercase text-[#0a0a0a]/28 whitespace-nowrap">
         {label}
       </span>
       <div className="flex-1 h-px bg-[#D8D8D0]" />
       {count !== undefined && (
-        <span className="text-[8.5px] font-bold text-[#131218]/18 whitespace-nowrap">
+        <span className="text-[8.5px] font-bold text-[#0a0a0a]/18 whitespace-nowrap">
           {count} {count === 1 ? "item" : "items"}
         </span>
       )}
       {ctaLabel && ctaHref && (
         <a
           href={ctaHref}
-          className="text-[9.5px] font-bold text-[#131218]/30 hover:text-[#131218] transition-colors whitespace-nowrap"
+          className="text-[9.5px] font-bold text-[#0a0a0a]/30 hover:text-[#0a0a0a] transition-colors whitespace-nowrap"
         >
           {ctaLabel}
         </a>
@@ -84,18 +84,18 @@ function VisBadge({ vis }: { vis: string }) {
 function MemberRow({ p }: { p: LivingRoomPerson }) {
   return (
     <div className="flex items-center gap-3 py-3 border-b border-[#D8D8D0] last:border-b-0">
-      <div className="w-9 h-9 rounded-full bg-[#131218] text-[#B2FF59] text-[11px] font-extrabold flex items-center justify-center shrink-0">
+      <div className="w-9 h-9 rounded-full bg-[#0a0a0a] text-[#c6f24a] text-[11px] font-extrabold flex items-center justify-center shrink-0">
         {initials(p.name)}
       </div>
       <div className="flex-1 min-w-0">
-        <div className="text-[12.5px] font-bold text-[#131218] tracking-tight leading-tight">
+        <div className="text-[12.5px] font-bold text-[#0a0a0a] tracking-tight leading-tight">
           {p.name}
         </div>
         {p.jobTitle && (
           <div className="text-[10px] text-[#6b6b6b] mt-0.5">{p.jobTitle}</div>
         )}
         {p.location && (
-          <div className="text-[9.5px] text-[#131218]/30 font-semibold mt-0.5">
+          <div className="text-[9.5px] text-[#0a0a0a]/30 font-semibold mt-0.5">
             {p.location}
           </div>
         )}
@@ -105,7 +105,7 @@ function MemberRow({ p }: { p: LivingRoomPerson }) {
           {p.roles.slice(0, 2).map((r) => (
             <span
               key={r}
-              className="text-[8.5px] font-semibold px-2 py-0.5 rounded-full border border-[#D8D8D0] text-[#6b6b6b] bg-[#EFEFEA]"
+              className="text-[8.5px] font-semibold px-2 py-0.5 rounded-full border border-[#D8D8D0] text-[#6b6b6b] bg-[#f4f4ef]"
             >
               {r}
             </span>
@@ -129,14 +129,14 @@ function ExpertisePanel({ people }: { people: LivingRoomPerson[] }) {
   const entries = Object.entries(roleCounts).sort((a, b) => b[1] - a[1]).slice(0, 8);
 
   return (
-    <div className="bg-[#131218] rounded-2xl p-6 flex flex-col gap-4">
+    <div className="bg-[#0a0a0a] rounded-2xl p-6 flex flex-col gap-4">
       <div className="text-[9px] font-bold tracking-[2px] uppercase text-white/25">
         Expertise in the Room
       </div>
       <div className="flex flex-col gap-3">
         {entries.map(([role, count]) => (
           <div key={role} className="flex items-center gap-2">
-            <div className="w-1.5 h-1.5 rounded-full bg-[#B2FF59] shrink-0" />
+            <div className="w-1.5 h-1.5 rounded-full bg-[#c6f24a] shrink-0" />
             <span className="text-[12.5px] font-bold text-white tracking-tight flex-1">{role}</span>
             <span className="text-[9.5px] font-bold text-white/30">{count}</span>
           </div>
@@ -150,7 +150,7 @@ function MembersSection({ people }: { people: LivingRoomPerson[] }) {
   if (!people.length)
     return (
       <div className="bg-white rounded-2xl border border-[#D8D8D0] px-6 py-8 text-center">
-        <p className="text-sm text-[#131218]/30 font-medium">No members flagged as community-visible yet.</p>
+        <p className="text-sm text-[#0a0a0a]/30 font-medium">No members flagged as community-visible yet.</p>
       </div>
     );
 
@@ -159,10 +159,10 @@ function MembersSection({ people }: { people: LivingRoomPerson[] }) {
       <div className="bg-white rounded-2xl border border-[#D8D8D0] overflow-hidden">
         <div className="px-5 py-3.5 border-b border-[#D8D8D0] flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-lg bg-[#131218] flex items-center justify-center text-[11px]">
-              <span className="text-[#B2FF59]">◉</span>
+            <div className="w-6 h-6 rounded-lg bg-[#0a0a0a] flex items-center justify-center text-[11px]">
+              <span className="text-[#c6f24a]">◉</span>
             </div>
-            <span className="text-[12px] font-extrabold text-[#131218] tracking-tight">
+            <span className="text-[12px] font-extrabold text-[#0a0a0a] tracking-tight">
               People in the House
             </span>
           </div>
@@ -182,14 +182,14 @@ function MembersSection({ people }: { people: LivingRoomPerson[] }) {
 // ─── Module C: Milestones ────────────────────────────────────────────────────
 
 const MS_DOT_COLOR: Record<string, string> = {
-  "First Revenue":   "bg-[#B2FF59]",
+  "First Revenue":   "bg-[#c6f24a]",
   "Key Partnership": "bg-blue-400",
   "Product Launch":  "bg-amber-400",
   "Funding Closed":  "bg-purple-400",
   "Team Expansion":  "bg-teal-400",
   "Market Entry":    "bg-orange-400",
-  "Pilot Complete":  "bg-[#B2FF59]",
-  "Pilot":           "bg-[#B2FF59]",
+  "Pilot Complete":  "bg-[#c6f24a]",
+  "Pilot":           "bg-[#c6f24a]",
   "Grant win":       "bg-amber-400",
   "Speaking":        "bg-teal-400",
   "Publication":     "bg-blue-400",
@@ -212,11 +212,11 @@ function MilestoneRow({ m, isLast }: { m: LivingRoomMilestone; isLast: boolean }
       </div>
       <div className="flex-1 min-w-0">
         {m.milestoneType && (
-          <div className="text-[8px] font-bold tracking-[1.5px] uppercase text-[#131218]/25 mb-1">
+          <div className="text-[8px] font-bold tracking-[1.5px] uppercase text-[#0a0a0a]/25 mb-1">
             {m.milestoneType}
           </div>
         )}
-        <div className="text-[13px] font-bold text-[#131218] tracking-tight leading-snug mb-1">
+        <div className="text-[13px] font-bold text-[#0a0a0a] tracking-tight leading-snug mb-1">
           {m.communityTheme ?? m.name}
         </div>
         {m.stage && (
@@ -224,12 +224,12 @@ function MilestoneRow({ m, isLast }: { m: LivingRoomMilestone; isLast: boolean }
         )}
         <div className="flex items-center gap-2 flex-wrap">
           {m.geography.length > 0 && (
-            <span className="text-[8.5px] font-bold text-[#131218]/22 uppercase tracking-widest">
+            <span className="text-[8.5px] font-bold text-[#0a0a0a]/22 uppercase tracking-widest">
               {m.geography.join(", ")}
             </span>
           )}
           {dateStr && (
-            <span className="text-[9px] text-[#131218]/25 font-semibold ml-auto">
+            <span className="text-[9px] text-[#0a0a0a]/25 font-semibold ml-auto">
               {dateStr}
             </span>
           )}
@@ -243,14 +243,14 @@ function MilestonesSection({ milestones }: { milestones: LivingRoomMilestone[] }
   if (!milestones.length)
     return (
       <div className="bg-white rounded-2xl border border-[#D8D8D0] px-6 py-8 text-center">
-        <p className="text-sm text-[#131218]/30 font-medium">No milestones shared to the Living Room yet.</p>
+        <p className="text-sm text-[#0a0a0a]/30 font-medium">No milestones shared to the Living Room yet.</p>
       </div>
     );
   return (
     <div className="bg-white rounded-2xl border border-[#D8D8D0] overflow-hidden">
       <div className="px-5 py-3.5 border-b border-[#D8D8D0] flex items-center gap-2">
-        <div className="w-6 h-6 rounded-lg bg-[#B2FF59] flex items-center justify-center text-[11px]">◈</div>
-        <span className="text-[12px] font-extrabold text-[#131218] tracking-tight">Recent highlights</span>
+        <div className="w-6 h-6 rounded-lg bg-[#c6f24a] flex items-center justify-center text-[11px]">◈</div>
+        <span className="text-[12px] font-extrabold text-[#0a0a0a] tracking-tight">Recent highlights</span>
       </div>
       <div className="px-5">
         {milestones.map((m, i) => (
@@ -267,7 +267,7 @@ function ThemeCard({ t }: { t: LivingRoomTheme }) {
   return (
     <div className="bg-white border border-[#D8D8D0] rounded-xl p-4 flex flex-col gap-2.5 hover:border-[#aaa] transition-colors">
       <div className="flex items-start justify-between gap-2">
-        <div className="text-[13px] font-extrabold text-[#131218] tracking-tight leading-snug">
+        <div className="text-[13px] font-extrabold text-[#0a0a0a] tracking-tight leading-snug">
           {t.name}
         </div>
         {t.category && <VisBadge vis="public-safe" />}
@@ -295,7 +295,7 @@ function ThemesSection({ themes }: { themes: LivingRoomTheme[] }) {
   if (!themes.length)
     return (
       <div className="bg-white rounded-2xl border border-[#D8D8D0] px-6 py-8 text-center">
-        <p className="text-sm text-[#131218]/30 font-medium">No themes currently active in the Living Room.</p>
+        <p className="text-sm text-[#0a0a0a]/30 font-medium">No themes currently active in the Living Room.</p>
       </div>
     );
   return (
@@ -312,7 +312,7 @@ function ThemesSection({ themes }: { themes: LivingRoomTheme[] }) {
 function SignalRow({ b }: { b: InsightBrief }) {
   return (
     <div className="flex items-start gap-3.5 py-3.5 border-b border-[#D8D8D0] last:border-b-0">
-      <div className="w-8 h-8 rounded-lg bg-[#EFEFEA] border border-[#D8D8D0] flex items-center justify-center text-sm shrink-0">
+      <div className="w-8 h-8 rounded-lg bg-[#f4f4ef] border border-[#D8D8D0] flex items-center justify-center text-sm shrink-0">
         ◎
       </div>
       <div className="flex-1 min-w-0">
@@ -321,14 +321,14 @@ function SignalRow({ b }: { b: InsightBrief }) {
             {b.theme.slice(0, 2).map((t) => (
               <span
                 key={t}
-                className="text-[8.5px] font-bold text-[#131218]/35 bg-[#EFEFEA] px-1.5 py-0.5 rounded-full uppercase tracking-widest"
+                className="text-[8.5px] font-bold text-[#0a0a0a]/35 bg-[#f4f4ef] px-1.5 py-0.5 rounded-full uppercase tracking-widest"
               >
                 {t}
               </span>
             ))}
           </div>
         )}
-        <div className="text-[12px] font-bold text-[#131218] tracking-tight leading-snug mb-1">
+        <div className="text-[12px] font-bold text-[#0a0a0a] tracking-tight leading-snug mb-1">
           {b.title}
         </div>
         {b.relevance.length > 0 && (
@@ -343,7 +343,7 @@ function SignalRow({ b }: { b: InsightBrief }) {
             <VisBadge vis="public-safe" />
           )}
           {b.lastEdited && (
-            <span className="text-[9px] text-[#131218]/25 font-semibold ml-auto">
+            <span className="text-[9px] text-[#0a0a0a]/25 font-semibold ml-auto">
               {formatDate(b.lastEdited)}
             </span>
           )}
@@ -358,14 +358,14 @@ function SignalsSection({ briefs }: { briefs: InsightBrief[] }) {
   if (!visible.length)
     return (
       <div className="bg-white rounded-2xl border border-[#D8D8D0] px-6 py-8 text-center">
-        <p className="text-sm text-[#131218]/30 font-medium">No community signals available yet.</p>
+        <p className="text-sm text-[#0a0a0a]/30 font-medium">No community signals available yet.</p>
       </div>
     );
   return (
     <div className="bg-white rounded-2xl border border-[#D8D8D0] overflow-hidden">
       <div className="px-5 py-3.5 border-b border-[#D8D8D0] flex items-center gap-2">
-        <div className="w-6 h-6 rounded-lg bg-[#EFEFEA] border border-[#D8D8D0] flex items-center justify-center text-[11px]">📡</div>
-        <span className="text-[12px] font-extrabold text-[#131218] tracking-tight">Community signals</span>
+        <div className="w-6 h-6 rounded-lg bg-[#f4f4ef] border border-[#D8D8D0] flex items-center justify-center text-[11px]">📡</div>
+        <span className="text-[12px] font-extrabold text-[#0a0a0a] tracking-tight">Community signals</span>
       </div>
       <div className="px-5">
         {visible.map((b) => (
@@ -394,7 +394,7 @@ function GeographySection({ projects }: { projects: { geography: string[] }[] })
           key={geo}
           className="bg-white border border-[#D8D8D0] rounded-xl p-4 flex flex-col gap-2"
         >
-          <div className="text-[12px] font-extrabold text-[#131218] tracking-tight">{geo}</div>
+          <div className="text-[12px] font-extrabold text-[#0a0a0a] tracking-tight">{geo}</div>
           <div className="text-[9px] font-bold text-[#6b6b6b]">
             {count} {count === 1 ? "project" : "projects"}
           </div>
@@ -447,7 +447,7 @@ export default function LivingRoomClient({
             onClick={() => setActiveTab(i)}
             className={`px-3.5 py-1.5 text-[10.5px] font-semibold border rounded-lg transition-all cursor-pointer ${
               i === activeTab
-                ? "text-[#B2FF59] border-[rgba(200,245,90,0.4)] bg-[rgba(200,245,90,0.06)]"
+                ? "text-[#c6f24a] border-[rgba(200,245,90,0.4)] bg-[rgba(200,245,90,0.06)]"
                 : "text-white/28 border-white/10 hover:text-white/65 hover:border-white/20"
             }`}
           >
@@ -476,10 +476,10 @@ export default function LivingRoomClient({
             { label: "Community signals", value: visibleSignals.length, sub: "Curated · this week" },
           ].map((s) => (
             <div key={s.label} className="bg-white border border-[#D8D8D0] rounded-xl p-4">
-              <div className="text-[8px] font-bold tracking-[2px] uppercase text-[#131218]/25 mb-1.5">
+              <div className="text-[8px] font-bold tracking-[2px] uppercase text-[#0a0a0a]/25 mb-1.5">
                 {s.label}
               </div>
-              <div className={`text-[1.6rem] font-black tracking-tight leading-none ${s.lime ? "text-[#3a8c00]" : "text-[#131218]"}`}>
+              <div className={`text-[1.6rem] font-black tracking-tight leading-none ${s.lime ? "text-[#3a8c00]" : "text-[#0a0a0a]"}`}>
                 {s.value}
               </div>
               <div className="text-[10px] text-[#6b6b6b] mt-1.5">{s.sub}</div>
@@ -489,7 +489,7 @@ export default function LivingRoomClient({
 
         {/* Visibility legend — always visible */}
         <div className="flex items-center gap-4 bg-white border border-[#D8D8D0] rounded-xl px-4 py-2.5">
-          <span className="text-[8px] font-bold tracking-[2px] uppercase text-[#131218]/22 shrink-0">
+          <span className="text-[8px] font-bold tracking-[2px] uppercase text-[#0a0a0a]/22 shrink-0">
             Visibility
           </span>
           <div className="w-px h-3.5 bg-[#D8D8D0] shrink-0" />

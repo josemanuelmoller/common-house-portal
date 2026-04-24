@@ -46,14 +46,14 @@ export function ProposalActions({ changelogId, action }: Props) {
       <button
         onClick={handleAccept}
         disabled={pending}
-        className="text-[10px] font-bold bg-[#B2FF59] text-[#131218] px-2.5 py-1 rounded-full uppercase tracking-widest hover:bg-[#9ee84a] transition-colors disabled:opacity-50"
+        className="text-[10px] font-bold bg-[#c6f24a] text-[#0a0a0a] px-2.5 py-1 rounded-full uppercase tracking-widest hover:bg-[#9ee84a] transition-colors disabled:opacity-50"
       >
         {pending ? "…" : action === "SPLIT" ? "✓ Accept & create" : "✓ Accept change"}
       </button>
       <button
         onClick={handleReject}
         disabled={pending}
-        className="text-[10px] font-bold bg-[#EFEFEA] text-[#131218]/60 px-2.5 py-1 rounded-full uppercase tracking-widest hover:bg-[#E0E0D8] transition-colors disabled:opacity-50"
+        className="text-[10px] font-bold bg-[#f4f4ef] text-[#0a0a0a]/60 px-2.5 py-1 rounded-full uppercase tracking-widest hover:bg-[#e4e4dd] transition-colors disabled:opacity-50"
       >
         {pending ? "…" : "✕ Reject"}
       </button>

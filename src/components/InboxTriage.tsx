@@ -27,13 +27,13 @@ export type InboxItem = {
 const LABEL_STYLE: Record<string, string> = {
   "Urgent":      "bg-red-50 text-red-600 border border-red-200",
   "Needs Reply": "bg-amber-50 text-amber-600 border border-amber-200",
-  "FYI":         "bg-[#EFEFEA] text-[#131218]/40 border border-[#E0E0D8]",
+  "FYI":         "bg-[#f4f4ef] text-[#0a0a0a]/40 border border-[#e4e4dd]",
 };
 
 const LABEL_DOT: Record<string, string> = {
   "Urgent":      "bg-red-500",
   "Needs Reply": "bg-amber-400",
-  "FYI":         "bg-[#131218]/20",
+  "FYI":         "bg-[#0a0a0a]/20",
 };
 
 const MAX_VISIBLE_ROWS = 5;
@@ -147,8 +147,8 @@ export function InboxTriage({ initialItems, initialScanned = 0 }: Props) {
   if (loading) {
     return (
       <div className="flex items-center gap-2 py-3">
-        <span className="w-1.5 h-1.5 rounded-full bg-[#131218]/20 animate-pulse" />
-        <span className="text-[11px] text-[#131218]/30">Refreshing inbox…</span>
+        <span className="w-1.5 h-1.5 rounded-full bg-[#0a0a0a]/20 animate-pulse" />
+        <span className="text-[11px] text-[#0a0a0a]/30">Refreshing inbox…</span>
       </div>
     );
   }
@@ -156,10 +156,10 @@ export function InboxTriage({ initialItems, initialScanned = 0 }: Props) {
   if (error) {
     return (
       <div className="flex items-center justify-between py-2">
-        <p className="text-[11px] text-[#131218]/30">{error}</p>
+        <p className="text-[11px] text-[#0a0a0a]/30">{error}</p>
         <button
           onClick={refresh}
-          className="text-[9px] font-bold text-[#131218]/25 hover:text-[#131218] transition-colors uppercase tracking-widest"
+          className="text-[9px] font-bold text-[#0a0a0a]/25 hover:text-[#0a0a0a] transition-colors uppercase tracking-widest"
         >
           Retry
         </button>
@@ -326,16 +326,16 @@ export function InboxTriage({ initialItems, initialScanned = 0 }: Props) {
       </ul>
 
       <div className="flex items-center justify-between pt-1.5 px-1">
-        <p className="text-[9px] text-[#131218]/25">
+        <p className="text-[9px] text-[#0a0a0a]/25">
           {visible.length} flagged
           {overflow && (
-            <span className="text-[#131218]/55"> — {visible.length - MAX_VISIBLE_ROWS} more below (scroll)</span>
+            <span className="text-[#0a0a0a]/55"> — {visible.length - MAX_VISIBLE_ROWS} more below (scroll)</span>
           )}
-          <span className="text-[#131218]/15"> · {scanned} scanned</span>
+          <span className="text-[#0a0a0a]/15"> · {scanned} scanned</span>
         </p>
         <button
           onClick={refresh}
-          className="text-[9px] font-bold text-[#131218]/25 hover:text-[#131218] transition-colors uppercase tracking-widest"
+          className="text-[9px] font-bold text-[#0a0a0a]/25 hover:text-[#0a0a0a] transition-colors uppercase tracking-widest"
         >
           Refresh
         </button>

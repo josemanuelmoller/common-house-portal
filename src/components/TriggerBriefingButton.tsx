@@ -28,7 +28,7 @@ export function TriggerBriefingButton() {
     <button
       onClick={trigger}
       disabled={state === "loading" || state === "done"}
-      className="shrink-0 text-[11px] font-bold px-3 py-1.5 rounded-lg bg-[#c8f55a] text-[#131218] hover:bg-[#b8e54a] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+      className="shrink-0 text-[11px] font-bold px-3 py-1.5 rounded-lg bg-[#c6f24a] text-[#0a0a0a] hover:bg-[#b8e54a] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
     >
       {state === "loading" ? "Generating…"
         : state === "done"    ? "Done — actualizando…"

@@ -8,7 +8,7 @@ type Props = {
 function platformBadge(platform: string): string {
   if (platform === "Fireflies") return "bg-purple-100 text-purple-700";
   if (platform === "Gmail")     return "bg-red-100 text-red-700";
-  return "bg-[#EFEFEA] text-[#131218]/40";
+  return "bg-[#f4f4ef] text-[#0a0a0a]/40";
 }
 
 function formatDate(dateStr: string | null): string {
@@ -26,23 +26,23 @@ export function MeetingsSection({ meetings }: Props) {
   const visible = meetings.slice(0, 3);
 
   return (
-    <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-      <div className="h-1 bg-[#131218]" />
-      <div className="px-6 py-4 border-b border-[#EFEFEA]">
-        <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Últimas Reuniones</p>
-        <p className="text-[10px] text-[#131218]/20 mt-0.5">Clic en cualquier reunión para ver detalle</p>
+    <div className="bg-white rounded-2xl border border-[#e4e4dd] overflow-hidden">
+      <div className="h-1 bg-[#0a0a0a]" />
+      <div className="px-6 py-4 border-b border-[#f4f4ef]">
+        <p className="text-[10px] font-bold text-[#0a0a0a]/30 uppercase tracking-widest">Últimas Reuniones</p>
+        <p className="text-[10px] text-[#0a0a0a]/20 mt-0.5">Clic en cualquier reunión para ver detalle</p>
       </div>
-      <div className="divide-y divide-[#EFEFEA]">
+      <div className="divide-y divide-[#f4f4ef]">
         {visible.map(meeting => (
           <MeetingDetailModal key={meeting.id} meetingId={meeting.id}>
-            <div className="flex items-center gap-4 px-6 py-4 hover:bg-[#EFEFEA]/40 transition-colors group cursor-pointer">
+            <div className="flex items-center gap-4 px-6 py-4 hover:bg-[#f4f4ef]/40 transition-colors group cursor-pointer">
               {/* Date */}
-              <p className="text-xs text-[#131218]/40 shrink-0 w-24">
+              <p className="text-xs text-[#0a0a0a]/40 shrink-0 w-24">
                 {formatDate(meeting.date)}
               </p>
 
               {/* Title */}
-              <p className="text-sm font-semibold text-[#131218] flex-1 min-w-0 truncate group-hover:underline underline-offset-2">
+              <p className="text-sm font-semibold text-[#0a0a0a] flex-1 min-w-0 truncate group-hover:underline underline-offset-2">
                 {meeting.title}
               </p>
 
@@ -54,7 +54,7 @@ export function MeetingsSection({ meetings }: Props) {
               )}
 
               {/* Chevron */}
-              <span className="text-[#131218]/20 group-hover:text-[#131218]/50 transition-colors shrink-0 text-sm">
+              <span className="text-[#0a0a0a]/20 group-hover:text-[#0a0a0a]/50 transition-colors shrink-0 text-sm">
                 →
               </span>
             </div>

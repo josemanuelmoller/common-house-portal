@@ -157,7 +157,7 @@ export function Sidebar({ items, projectName, isAdmin, adminNav }: Props) {
                   href={entry.href}
                   className={`flex items-center gap-[9px] px-[18px] py-[7px] text-[11.5px] font-semibold border-l-2 transition-all ${
                     active
-                      ? "border-[#B2FF59] bg-[rgba(178,255,89,0.14)] text-[#0e0e0e]"
+                      ? "border-[#c6f24a] bg-[rgba(178,255,89,0.14)] text-[#0e0e0e]"
                       : "border-transparent text-[#0e0e0e]/42 hover:text-[#0e0e0e] hover:bg-[rgba(0,0,0,0.03)]"
                   }`}
                 >
@@ -222,7 +222,7 @@ export function Sidebar({ items, projectName, isAdmin, adminNav }: Props) {
                           href={item.href}
                           className={`flex items-center gap-2 pl-[34px] pr-[18px] py-1.5 text-[11px] font-medium border-l-2 transition-all ${
                             active
-                              ? "border-[#B2FF59] bg-[rgba(178,255,89,0.12)] text-[#0e0e0e] font-semibold"
+                              ? "border-[#c6f24a] bg-[rgba(178,255,89,0.12)] text-[#0e0e0e] font-semibold"
                               : "border-transparent text-[#0e0e0e]/38 hover:text-[#0e0e0e] hover:bg-[rgba(0,0,0,0.025)]"
                           }`}
                         >
@@ -251,8 +251,8 @@ export function Sidebar({ items, projectName, isAdmin, adminNav }: Props) {
                 <div key={item.href}>
                   {showSection && (
                     <div className="pt-4 pb-1.5 px-3">
-                      <div className="h-px bg-[#E0E0D8] mb-3" />
-                      <p className="text-[10px] font-bold text-[#131218]/25 uppercase tracking-widest">
+                      <div className="h-px bg-[#e4e4dd] mb-3" />
+                      <p className="text-[10px] font-bold text-[#0a0a0a]/25 uppercase tracking-widest">
                         {item.section}
                       </p>
                     </div>
@@ -261,8 +261,8 @@ export function Sidebar({ items, projectName, isAdmin, adminNav }: Props) {
                     href={item.href}
                     className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
                       active
-                        ? "bg-[#131218] text-white"
-                        : "text-[#131218]/50 hover:text-[#131218] hover:bg-[#131218]/5"
+                        ? "bg-[#0a0a0a] text-white"
+                        : "text-[#0a0a0a]/50 hover:text-[#0a0a0a] hover:bg-[#0a0a0a]/5"
                     }`}
                   >
                     <span className="text-base">{item.icon}</span>

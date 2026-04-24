@@ -28,8 +28,8 @@ export function HallContactsCollapsibleList({
 
   if (rows.length === 0) {
     return (
-      <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-8 text-center">
-        <p className="text-sm text-[#131218]/25">{emptyText}</p>
+      <div className="bg-white rounded-2xl border border-[#e4e4dd] px-5 py-8 text-center">
+        <p className="text-sm text-[#0a0a0a]/25">{emptyText}</p>
       </div>
     );
   }
@@ -38,15 +38,15 @@ export function HallContactsCollapsibleList({
   const hiddenCount = rows.length - visibleRows.length;
 
   return (
-    <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-      <div className="divide-y divide-[#EFEFEA]">
+    <div className="bg-white rounded-2xl border border-[#e4e4dd] overflow-hidden">
+      <div className="divide-y divide-[#f4f4ef]">
         {visibleRows.map(r => <HallContactRow key={r.email} {...r} />)}
       </div>
       {hiddenCount > 0 && (
         <button
           type="button"
           onClick={() => setExpanded(true)}
-          className="w-full px-5 py-3 text-[10px] font-bold tracking-widest uppercase text-[#131218]/40 hover:text-[#131218]/80 hover:bg-[#EFEFEA]/40 border-t border-[#EFEFEA] transition-colors"
+          className="w-full px-5 py-3 text-[10px] font-bold tracking-widest uppercase text-[#0a0a0a]/40 hover:text-[#0a0a0a]/80 hover:bg-[#f4f4ef]/40 border-t border-[#f4f4ef] transition-colors"
         >
           Show all ({rows.length})  →
         </button>
@@ -55,7 +55,7 @@ export function HallContactsCollapsibleList({
         <button
           type="button"
           onClick={() => setExpanded(false)}
-          className="w-full px-5 py-3 text-[10px] font-bold tracking-widest uppercase text-[#131218]/40 hover:text-[#131218]/80 hover:bg-[#EFEFEA]/40 border-t border-[#EFEFEA] transition-colors"
+          className="w-full px-5 py-3 text-[10px] font-bold tracking-widest uppercase text-[#0a0a0a]/40 hover:text-[#0a0a0a]/80 hover:bg-[#f4f4ef]/40 border-t border-[#f4f4ef] transition-colors"
         >
           Show fewer
         </button>

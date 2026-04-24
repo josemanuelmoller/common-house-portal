@@ -168,10 +168,10 @@ async function loadAttention(): Promise<{ counts: AttentionCounts; rows: Attenti
 function kindStyle(kind: AttentionRow["kind"]): { dot: string; label: string } {
   switch (kind) {
     case "untagged":        return { dot: "bg-amber-400",   label: "Untagged"       };
-    case "linkedin_review": return { dot: "bg-[#c8f55a]",   label: "LinkedIn review" };
+    case "linkedin_review": return { dot: "bg-[#c6f24a]",   label: "LinkedIn review" };
     case "orphans":         return { dot: "bg-emerald-500", label: "Orphan match"    };
     case "cold_vip":        return { dot: "bg-blue-400",    label: "Cold VIP"        };
-    case "no_linkedin":     return { dot: "bg-[#131218]/40", label: "No LinkedIn"    };
+    case "no_linkedin":     return { dot: "bg-[#0a0a0a]/40", label: "No LinkedIn"    };
   }
 }
 
@@ -181,11 +181,11 @@ export async function NeedsAttentionSection() {
 
   return (
     <div className="space-y-5">
-      <div className="bg-[#131218] text-white rounded-2xl px-5 py-4">
+      <div className="bg-[#0a0a0a] text-white rounded-2xl px-5 py-4">
         <p className="text-[10px] font-bold tracking-widest uppercase text-white/40 mb-2">Attention inbox</p>
         <div className="flex items-center gap-6 text-[12px]">
           <Bucket count={counts.untagged}         label="Untagged"         colour="text-amber-300"   />
-          <Bucket count={counts.linkedin_review}  label="LinkedIn review"  colour="text-[#c8f55a]"   />
+          <Bucket count={counts.linkedin_review}  label="LinkedIn review"  colour="text-[#c6f24a]"   />
           <Bucket count={counts.orphans}          label="Orphan matches"   colour="text-emerald-300" />
           <Bucket count={counts.cold_vips}        label="Cold VIPs"        colour="text-blue-300"    />
           <Bucket count={counts.no_linkedin}      label="No LinkedIn"      colour="text-white/50"    />
@@ -197,11 +197,11 @@ export async function NeedsAttentionSection() {
       </div>
 
       {rows.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-10 text-center">
-          <p className="text-[13px] text-[#131218]/50">🎉 Inbox zero. Nothing needs your attention right now.</p>
+        <div className="bg-white rounded-2xl border border-[#e4e4dd] px-5 py-10 text-center">
+          <p className="text-[13px] text-[#0a0a0a]/50">🎉 Inbox zero. Nothing needs your attention right now.</p>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden divide-y divide-[#EFEFEA]">
+        <div className="bg-white rounded-2xl border border-[#e4e4dd] overflow-hidden divide-y divide-[#f4f4ef]">
           {rows.map((r, i) => {
             const s = kindStyle(r.kind);
             return (
@@ -209,17 +209,17 @@ export async function NeedsAttentionSection() {
                 key={`${r.kind}:${i}`}
                 href={r.href}
                 prefetch={false}
-                className="flex items-center gap-4 px-5 py-3 hover:bg-[#EFEFEA]/40 transition-colors"
+                className="flex items-center gap-4 px-5 py-3 hover:bg-[#f4f4ef]/40 transition-colors"
               >
                 <span className={`w-2 h-2 rounded-full shrink-0 ${s.dot}`} />
                 <div className="flex-1 min-w-0">
-                  <p className="text-[12.5px] font-semibold text-[#131218] truncate">{r.label}</p>
-                  <p className="text-[10.5px] text-[#131218]/50 mt-0.5 truncate">
+                  <p className="text-[12.5px] font-semibold text-[#0a0a0a] truncate">{r.label}</p>
+                  <p className="text-[10.5px] text-[#0a0a0a]/50 mt-0.5 truncate">
                     <span className="uppercase tracking-wide font-bold">{s.label}</span>
                     {" · "}{r.sub}
                   </p>
                 </div>
-                <span className="text-[10px] font-bold uppercase tracking-widest text-[#131218]/30 shrink-0">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-[#0a0a0a]/30 shrink-0">
                   Open →
                 </span>
               </Link>

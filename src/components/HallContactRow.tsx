@@ -136,20 +136,20 @@ export function HallContactRow(props: Props) {
   // Visual priority when a contact carries mixed classes (e.g. Family + CH Team):
   // VIP tint wins because "high-stakes contact" is more actionable for Jose
   // than "personal". The chips themselves show the full set unambiguously.
-  const bg = hasVip      ? "bg-[#B2FF59]/10"
+  const bg = hasVip      ? "bg-[#c6f24a]/10"
            : hasPersonal ? "bg-[#FFF4E6]/40"
            : "";
 
   const isDismissed = !!props.dismissed_at;
 
   return (
-    <div className={`group relative flex items-start gap-4 px-5 py-3.5 hover:bg-[#EFEFEA]/40 transition-colors ${bg} ${isDismissed ? "opacity-60" : ""}`}>
+    <div className={`group relative flex items-start gap-4 px-5 py-3.5 hover:bg-[#f4f4ef]/40 transition-colors ${bg} ${isDismissed ? "opacity-60" : ""}`}>
       {/* X — dismiss (or ↺ undo when already dismissed). Shown on hover only
           so the row stays clean. Top-right corner. */}
       <button
         type="button"
         onClick={isDismissed ? undismiss : dismiss}
-        className="absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center text-[11px] leading-none text-[#131218]/30 hover:text-[#131218] hover:bg-[#131218]/8 opacity-0 group-hover:opacity-100 transition-all"
+        className="absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center text-[11px] leading-none text-[#0a0a0a]/30 hover:text-[#0a0a0a] hover:bg-[#0a0a0a]/8 opacity-0 group-hover:opacity-100 transition-all"
         title={isDismissed ? "Restore — bring back to Untagged" : "Dismiss — hide without classifying"}
         aria-label={isDismissed ? "Undismiss contact" : "Dismiss contact"}
       >
@@ -160,7 +160,7 @@ export function HallContactRow(props: Props) {
         <div className="flex items-center gap-1.5 flex-wrap">
           <Link
             href={`/admin/hall/contacts/${encodeURIComponent(props.email)}`}
-            className="text-[12px] font-bold text-[#131218] truncate hover:underline decoration-[#131218]/30 underline-offset-2"
+            className="text-[12px] font-bold text-[#0a0a0a] truncate hover:underline decoration-[#0a0a0a]/30 underline-offset-2"
             title={`Open ${props.display_name || props.email} detail`}
           >
             {props.display_name || (props.email ?? "").split("@")[0] || "(no name)"}
@@ -172,8 +172,8 @@ export function HallContactRow(props: Props) {
                 key={cls}
                 className={`text-[8px] font-bold px-1.5 py-0.5 rounded ${
                   kind === "personal" ? "bg-amber-100 text-amber-800"
-                  : kind === "vip"    ? "bg-[#B2FF59]/40 text-green-900"
-                  : "bg-[#131218]/6 text-[#131218]/60"
+                  : kind === "vip"    ? "bg-[#c6f24a]/40 text-green-900"
+                  : "bg-[#0a0a0a]/6 text-[#0a0a0a]/60"
                 }`}
               >
                 {cls.toUpperCase()}
@@ -181,24 +181,24 @@ export function HallContactRow(props: Props) {
             );
           })}
         </div>
-        <p className="text-[10px] text-[#131218]/50 truncate mt-0.5">{props.email}</p>
-        <p className="text-[10px] text-[#131218]/35 mt-1">
+        <p className="text-[10px] text-[#0a0a0a]/50 truncate mt-0.5">{props.email}</p>
+        <p className="text-[10px] text-[#0a0a0a]/35 mt-1">
           <strong>{props.meeting_count}</strong> meeting{props.meeting_count === 1 ? "" : "s"}
           {" · last seen "}{timeAgo(props.last_seen_at)}
           {props.last_meeting_title && ` · "${props.last_meeting_title.slice(0, 60)}${props.last_meeting_title.length > 60 ? "…" : ""}"`}
         </p>
         <div className="flex items-center gap-2 mt-1">
           {props.google_resource_name?.startsWith("otherContacts/") ? (
-            <span className="text-[9px] font-semibold text-[#131218]/50">
+            <span className="text-[9px] font-semibold text-[#0a0a0a]/50">
               Auto-saved by Google — will be promoted when you tag
             </span>
           ) : props.google_resource_name ? (
-            <span className="text-[9px] font-semibold text-[#131218]/50">
+            <span className="text-[9px] font-semibold text-[#0a0a0a]/50">
               ✓ in Google Contacts
-              {props.google_last_write_at && <span className="text-[#131218]/30"> · synced {timeAgo(props.google_last_write_at)}</span>}
+              {props.google_last_write_at && <span className="text-[#0a0a0a]/30"> · synced {timeAgo(props.google_last_write_at)}</span>}
             </span>
           ) : props.google_source === "not_found" ? (
-            <span className="text-[9px] font-semibold text-[#131218]/50">
+            <span className="text-[9px] font-semibold text-[#0a0a0a]/50">
               Not saved in Google yet — will be created when you tag
             </span>
           ) : null}
@@ -231,9 +231,9 @@ export function HallContactRow(props: Props) {
           const active = selected.includes(c.v);
           const base = "text-[9px] font-bold px-2 py-1 rounded-full transition-colors";
           const activeCls = c.kind === "personal" ? "bg-amber-500 text-white"
-                          : c.kind === "vip"     ? "bg-[#B2FF59] text-black"
-                          : "bg-[#131218] text-white";
-          const inactiveCls = "bg-[#131218]/6 text-[#131218]/55 hover:bg-[#131218]/12";
+                          : c.kind === "vip"     ? "bg-[#c6f24a] text-black"
+                          : "bg-[#0a0a0a] text-white";
+          const inactiveCls = "bg-[#0a0a0a]/6 text-[#0a0a0a]/55 hover:bg-[#0a0a0a]/12";
           return (
             <button
               key={c.v}

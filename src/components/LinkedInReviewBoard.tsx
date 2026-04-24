@@ -104,10 +104,10 @@ export function LinkedInReviewBoard({
   return (
     <div className="space-y-5">
       {/* Run-agent controls */}
-      <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-4 flex items-center gap-4">
+      <div className="bg-white rounded-2xl border border-[#e4e4dd] px-5 py-4 flex items-center gap-4">
         <div className="flex-1">
-          <p className="text-[12.5px] font-semibold text-[#131218]">Run enrichment now</p>
-          <p className="text-[10.5px] text-[#131218]/50 mt-0.5">
+          <p className="text-[12.5px] font-semibold text-[#0a0a0a]">Run enrichment now</p>
+          <p className="text-[10.5px] text-[#0a0a0a]/50 mt-0.5">
             Scans contacts without a LinkedIn URL, searches Google Custom Search, and asks Haiku to confirm.
             Cooldown: 6 months between attempts per contact (LinkedIn profiles rarely change).
           </p>
@@ -115,41 +115,41 @@ export function LinkedInReviewBoard({
         <button
           onClick={() => runAgent(10)}
           disabled={running || pending}
-          className="text-[10px] font-bold uppercase tracking-widest border border-[#131218]/20 text-[#131218] hover:border-[#131218]/50 px-3 py-2 rounded-lg disabled:opacity-40"
+          className="text-[10px] font-bold uppercase tracking-widest border border-[#0a0a0a]/20 text-[#0a0a0a] hover:border-[#0a0a0a]/50 px-3 py-2 rounded-lg disabled:opacity-40"
         >
           Run 10
         </button>
         <button
           onClick={() => runAgent(25)}
           disabled={running || pending}
-          className="text-[10px] font-bold uppercase tracking-widest bg-[#131218] text-white px-4 py-2 rounded-lg hover:bg-[#131218]/80 disabled:opacity-40"
+          className="text-[10px] font-bold uppercase tracking-widest bg-[#0a0a0a] text-white px-4 py-2 rounded-lg hover:bg-[#0a0a0a]/80 disabled:opacity-40"
         >
           {running ? "Running…" : "Run 25"}
         </button>
       </div>
 
       {coverage && coverage.total > 0 && (
-        <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-4">
+        <div className="bg-white rounded-2xl border border-[#e4e4dd] px-5 py-4">
           <div className="flex items-baseline justify-between gap-4 mb-2">
-            <p className="text-[10px] font-bold tracking-widest uppercase text-[#131218]/45">Coverage</p>
-            <p className="text-[11px] text-[#131218]/60 tabular-nums">
-              <strong className="text-[#131218]">{coverage.filled}</strong>
-              <span className="text-[#131218]/40"> / {coverage.total} contacts</span>
-              <span className="text-[#131218]/40 ml-2">· </span>
-              <strong className="text-[#131218]">{Math.round((coverage.filled / coverage.total) * 100)}%</strong>
+            <p className="text-[10px] font-bold tracking-widest uppercase text-[#0a0a0a]/45">Coverage</p>
+            <p className="text-[11px] text-[#0a0a0a]/60 tabular-nums">
+              <strong className="text-[#0a0a0a]">{coverage.filled}</strong>
+              <span className="text-[#0a0a0a]/40"> / {coverage.total} contacts</span>
+              <span className="text-[#0a0a0a]/40 ml-2">· </span>
+              <strong className="text-[#0a0a0a]">{Math.round((coverage.filled / coverage.total) * 100)}%</strong>
             </p>
           </div>
-          <div className="h-2 w-full bg-[#EFEFEA] rounded-full overflow-hidden flex">
+          <div className="h-2 w-full bg-[#f4f4ef] rounded-full overflow-hidden flex">
             {coverage.auto > 0 && (
               <div
-                className="h-full bg-[#c8f55a]"
+                className="h-full bg-[#c6f24a]"
                 style={{ width: `${(coverage.auto / coverage.total) * 100}%` }}
                 title={`${coverage.auto} auto-applied`}
               />
             )}
             {coverage.manual > 0 && (
               <div
-                className="h-full bg-[#131218]"
+                className="h-full bg-[#0a0a0a]"
                 style={{ width: `${(coverage.manual / coverage.total) * 100}%` }}
                 title={`${coverage.manual} manual`}
               />
@@ -162,17 +162,17 @@ export function LinkedInReviewBoard({
               />
             )}
           </div>
-          <div className="flex items-center gap-4 mt-2 text-[10px] text-[#131218]/55">
+          <div className="flex items-center gap-4 mt-2 text-[10px] text-[#0a0a0a]/55">
             <span className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-[#c8f55a]" /> Auto · <strong>{coverage.auto}</strong>
+              <span className="w-2 h-2 rounded-full bg-[#c6f24a]" /> Auto · <strong>{coverage.auto}</strong>
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-[#131218]" /> Manual · <strong>{coverage.manual}</strong>
+              <span className="w-2 h-2 rounded-full bg-[#0a0a0a]" /> Manual · <strong>{coverage.manual}</strong>
             </span>
             <span className="flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-amber-400" /> Needs review · <strong>{coverage.needs_review}</strong>
             </span>
-            <span className="ml-auto text-[#131218]/40">
+            <span className="ml-auto text-[#0a0a0a]/40">
               {coverage.attempted - coverage.filled} tried but no match ·{" "}
               {coverage.total - coverage.attempted} not yet attempted
             </span>
@@ -187,11 +187,11 @@ export function LinkedInReviewBoard({
       )}
 
       {lastRun && (
-        <div className="bg-[#131218] text-white rounded-2xl px-5 py-4">
+        <div className="bg-[#0a0a0a] text-white rounded-2xl px-5 py-4">
           <p className="text-[10px] font-bold tracking-widest uppercase text-white/40 mb-2">Last run</p>
           <div className="flex items-center gap-6 text-[12px]">
             <span>Processed <strong>{lastRun.processed}</strong></span>
-            <span className="text-[#c8f55a]">Auto-applied <strong>{lastRun.auto_applied}</strong></span>
+            <span className="text-[#c6f24a]">Auto-applied <strong>{lastRun.auto_applied}</strong></span>
             <span className="text-amber-300">Review <strong>{lastRun.queued_review}</strong></span>
             <span className="text-white/50">No match <strong>{lastRun.no_match}</strong></span>
             {lastRun.errors > 0 && <span className="text-red-400">Errors <strong>{lastRun.errors}</strong></span>}
@@ -202,14 +202,14 @@ export function LinkedInReviewBoard({
       {/* Review queue */}
       <section>
         <div className="flex items-center gap-3 mb-3">
-          <h2 className="text-[11px] font-bold tracking-widest uppercase text-[#131218]/60">Needs review</h2>
-          <div className="flex-1 h-px bg-[#E0E0D8]" />
-          <span className="text-[10px] text-[#131218]/40 tabular-nums">{rows.length}</span>
+          <h2 className="text-[11px] font-bold tracking-widest uppercase text-[#0a0a0a]/60">Needs review</h2>
+          <div className="flex-1 h-px bg-[#e4e4dd]" />
+          <span className="text-[10px] text-[#0a0a0a]/40 tabular-nums">{rows.length}</span>
         </div>
 
         {rows.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-10 text-center">
-            <p className="text-[12px] text-[#131218]/40">
+          <div className="bg-white rounded-2xl border border-[#e4e4dd] px-5 py-10 text-center">
+            <p className="text-[12px] text-[#0a0a0a]/40">
               Nothing to review. Run the agent above to look up LinkedIn profiles for your queued contacts.
             </p>
           </div>
@@ -224,16 +224,16 @@ export function LinkedInReviewBoard({
       {noMatch.length > 0 && (
         <section>
           <div className="flex items-center gap-3 mb-3">
-            <h2 className="text-[11px] font-bold tracking-widest uppercase text-[#131218]/60">
+            <h2 className="text-[11px] font-bold tracking-widest uppercase text-[#0a0a0a]/60">
               No match found — complete manually
             </h2>
-            <div className="flex-1 h-px bg-[#E0E0D8]" />
-            <span className="text-[10px] text-[#131218]/40 tabular-nums">{noMatch.length}</span>
+            <div className="flex-1 h-px bg-[#e4e4dd]" />
+            <span className="text-[10px] text-[#0a0a0a]/40 tabular-nums">{noMatch.length}</span>
           </div>
-          <p className="text-[10.5px] text-[#131218]/50 mb-3 leading-snug">
+          <p className="text-[10.5px] text-[#0a0a0a]/50 mb-3 leading-snug">
             The agent searched but couldn&apos;t confidently match these contacts to a LinkedIn profile — usually because the name is too generic, missing a surname, or the person has a weak public footprint. Click a row to open their profile, then use <em>Edit identity</em> to paste the LinkedIn URL yourself (it gets marked as manual — the agent won&apos;t overwrite it).
           </p>
-          <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden divide-y divide-[#EFEFEA]">
+          <div className="bg-white rounded-2xl border border-[#e4e4dd] overflow-hidden divide-y divide-[#f4f4ef]">
             <CollapsibleList
               initialVisible={5}
               moreLabel={noMatch.length - 5 === 1 ? "more contact" : "more contacts"}
@@ -247,23 +247,23 @@ export function LinkedInReviewBoard({
                     key={c.id}
                     href={`/admin/hall/contacts/${encodeURIComponent(c.email ?? c.id)}`}
                     prefetch={false}
-                    className="flex items-center gap-4 px-5 py-3 hover:bg-[#EFEFEA]/40 transition-colors"
+                    className="flex items-center gap-4 px-5 py-3 hover:bg-[#f4f4ef]/40 transition-colors"
                   >
-                    <div className="w-8 h-8 rounded-full bg-[#131218] text-white flex items-center justify-center font-bold text-[11px] shrink-0">
+                    <div className="w-8 h-8 rounded-full bg-[#0a0a0a] text-white flex items-center justify-center font-bold text-[11px] shrink-0">
                       {display.slice(0, 1).toUpperCase()}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-[12.5px] font-semibold text-[#131218] truncate">{display}</p>
-                      <p className="text-[10.5px] text-[#131218]/45 mt-0.5 truncate">
+                      <p className="text-[12.5px] font-semibold text-[#0a0a0a] truncate">{display}</p>
+                      <p className="text-[10.5px] text-[#0a0a0a]/45 mt-0.5 truncate">
                         {c.email}
                         {classes.length > 0 && <span className="ml-2">· {classes.join(", ")}</span>}
                         {(c.meeting_count ?? 0) > 0 && <span className="ml-2">· 📅 {c.meeting_count}</span>}
                       </p>
                     </div>
-                    <span className="text-[10px] text-[#131218]/30 shrink-0">
+                    <span className="text-[10px] text-[#0a0a0a]/30 shrink-0">
                       {attempt ? `tried ${timeAgoShort(attempt)}` : "—"}
                     </span>
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-[#131218]/40">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-[#0a0a0a]/40">
                       Open →
                     </span>
                   </Link>
@@ -336,21 +336,21 @@ function ReviewRow({ row }: { row: Row }) {
   }
 
   return (
-    <div className={`bg-white rounded-2xl border border-[#E0E0D8] px-5 py-4 ${pending ? "opacity-50" : ""}`}>
+    <div className={`bg-white rounded-2xl border border-[#e4e4dd] px-5 py-4 ${pending ? "opacity-50" : ""}`}>
       <div className="flex items-start gap-4">
-        <div className="w-10 h-10 rounded-full bg-[#131218] text-white flex items-center justify-center flex-shrink-0 font-bold text-sm">
+        <div className="w-10 h-10 rounded-full bg-[#0a0a0a] text-white flex items-center justify-center flex-shrink-0 font-bold text-sm">
           {display.slice(0, 1).toUpperCase()}
         </div>
 
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline gap-3 flex-wrap">
-            <p className="text-[13px] font-semibold text-[#131218]">{display}</p>
-            <p className="text-[10.5px] text-[#131218]/45">{row.email}</p>
+            <p className="text-[13px] font-semibold text-[#0a0a0a]">{display}</p>
+            <p className="text-[10.5px] text-[#0a0a0a]/45">{row.email}</p>
             <span className={`text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full border ${confTier}`}>
               {Math.round(conf * 100)}% match
             </span>
             {classes.map(cls => (
-              <span key={cls} className="text-[9px] font-bold uppercase tracking-widest bg-[#EFEFEA] text-[#131218]/60 px-2 py-0.5 rounded-full">
+              <span key={cls} className="text-[9px] font-bold uppercase tracking-widest bg-[#f4f4ef] text-[#0a0a0a]/60 px-2 py-0.5 rounded-full">
                 {cls}
               </span>
             ))}
@@ -361,7 +361,7 @@ function ReviewRow({ row }: { row: Row }) {
               href={row.linkedin}
               target="_blank"
               rel="noopener noreferrer"
-              className="mt-1.5 inline-block text-[11.5px] text-[#131218] underline decoration-[#131218]/30 underline-offset-2 hover:decoration-[#131218]/70 break-all"
+              className="mt-1.5 inline-block text-[11.5px] text-[#0a0a0a] underline decoration-[#0a0a0a]/30 underline-offset-2 hover:decoration-[#0a0a0a]/70 break-all"
             >
               {row.linkedin}
             </a>
@@ -372,24 +372,24 @@ function ReviewRow({ row }: { row: Row }) {
             {!editingRole ? (
               <div className="flex items-center gap-2 flex-wrap text-[11px]">
                 {jobTitle ? (
-                  <span className="text-[#131218]">{jobTitle}</span>
+                  <span className="text-[#0a0a0a]">{jobTitle}</span>
                 ) : (
-                  <span className="text-[#131218]/30 italic">no title extracted</span>
+                  <span className="text-[#0a0a0a]/30 italic">no title extracted</span>
                 )}
                 {roleCategory && (
-                  <span className="text-[9px] font-bold uppercase tracking-widest bg-[#EFEFEA] text-[#131218]/70 px-2 py-0.5 rounded-full">
+                  <span className="text-[9px] font-bold uppercase tracking-widest bg-[#f4f4ef] text-[#0a0a0a]/70 px-2 py-0.5 rounded-full">
                     {roleCategory}
                   </span>
                 )}
                 {functionArea && (
-                  <span className="text-[9px] font-bold uppercase tracking-widest bg-[#c8f55a]/30 text-[#131218]/80 px-2 py-0.5 rounded-full">
+                  <span className="text-[9px] font-bold uppercase tracking-widest bg-[#c6f24a]/30 text-[#0a0a0a]/80 px-2 py-0.5 rounded-full">
                     {functionArea}
                   </span>
                 )}
                 <button
                   onClick={() => setEditingRole(true)}
                   disabled={pending}
-                  className="text-[9px] font-bold uppercase tracking-widest text-[#131218]/40 hover:text-[#131218] underline decoration-dotted"
+                  className="text-[9px] font-bold uppercase tracking-widest text-[#0a0a0a]/40 hover:text-[#0a0a0a] underline decoration-dotted"
                 >
                   edit
                 </button>
@@ -401,12 +401,12 @@ function ReviewRow({ row }: { row: Row }) {
                   value={jobTitle}
                   onChange={e => setJobTitle(e.target.value)}
                   placeholder="Job title"
-                  className="text-[11px] px-2 py-1 rounded-lg border border-[#E0E0D8] bg-white outline-none focus:border-[#131218]/30"
+                  className="text-[11px] px-2 py-1 rounded-lg border border-[#e4e4dd] bg-white outline-none focus:border-[#0a0a0a]/30"
                 />
                 <select
                   value={roleCategory}
                   onChange={e => setRoleCategory(e.target.value)}
-                  className="text-[11px] px-2 py-1 rounded-lg border border-[#E0E0D8] bg-white outline-none focus:border-[#131218]/30"
+                  className="text-[11px] px-2 py-1 rounded-lg border border-[#e4e4dd] bg-white outline-none focus:border-[#0a0a0a]/30"
                 >
                   <option value="">— tier —</option>
                   {ROLE_CATEGORIES.map(v => <option key={v} value={v}>{v}</option>)}
@@ -414,14 +414,14 @@ function ReviewRow({ row }: { row: Row }) {
                 <select
                   value={functionArea}
                   onChange={e => setFunctionArea(e.target.value)}
-                  className="text-[11px] px-2 py-1 rounded-lg border border-[#E0E0D8] bg-white outline-none focus:border-[#131218]/30"
+                  className="text-[11px] px-2 py-1 rounded-lg border border-[#e4e4dd] bg-white outline-none focus:border-[#0a0a0a]/30"
                 >
                   <option value="">— area —</option>
                   {FUNCTION_AREAS.map(v => <option key={v} value={v}>{v}</option>)}
                 </select>
                 <button
                   onClick={() => setEditingRole(false)}
-                  className="col-span-3 text-[9px] font-bold uppercase tracking-widest text-[#131218]/50 hover:text-[#131218] underline decoration-dotted justify-self-start"
+                  className="col-span-3 text-[9px] font-bold uppercase tracking-widest text-[#0a0a0a]/50 hover:text-[#0a0a0a] underline decoration-dotted justify-self-start"
                 >
                   done editing
                 </button>
@@ -442,18 +442,18 @@ function ReviewRow({ row }: { row: Row }) {
                 value={overrideUrl}
                 onChange={e => setOverrideUrl(e.target.value)}
                 placeholder="https://www.linkedin.com/in/…"
-                className="flex-1 text-[12px] px-3 py-1.5 rounded-lg border border-[#E0E0D8] bg-white outline-none focus:border-[#131218]/30"
+                className="flex-1 text-[12px] px-3 py-1.5 rounded-lg border border-[#e4e4dd] bg-white outline-none focus:border-[#0a0a0a]/30"
               />
               <button
                 onClick={() => { act("override", overrideUrl); setOverriding(false); setOverrideUrl(""); }}
                 disabled={!overrideUrl || pending}
-                className="text-[10px] font-bold uppercase tracking-widest bg-[#131218] text-white px-3 py-1.5 rounded-lg disabled:opacity-40"
+                className="text-[10px] font-bold uppercase tracking-widest bg-[#0a0a0a] text-white px-3 py-1.5 rounded-lg disabled:opacity-40"
               >
                 Save
               </button>
               <button
                 onClick={() => { setOverriding(false); setOverrideUrl(""); }}
-                className="text-[10px] font-bold uppercase tracking-widest text-[#131218]/50 hover:text-[#131218] px-2"
+                className="text-[10px] font-bold uppercase tracking-widest text-[#0a0a0a]/50 hover:text-[#0a0a0a] px-2"
               >
                 Cancel
               </button>
@@ -466,14 +466,14 @@ function ReviewRow({ row }: { row: Row }) {
             <button
               onClick={() => act("approve")}
               disabled={pending}
-              className="text-[10px] font-bold uppercase tracking-widest bg-[#131218] text-white px-3 py-1.5 rounded-lg hover:bg-[#131218]/80 disabled:opacity-40"
+              className="text-[10px] font-bold uppercase tracking-widest bg-[#0a0a0a] text-white px-3 py-1.5 rounded-lg hover:bg-[#0a0a0a]/80 disabled:opacity-40"
             >
               ✓ Approve
             </button>
             <button
               onClick={() => setOverriding(true)}
               disabled={pending}
-              className="text-[10px] font-bold uppercase tracking-widest border border-[#131218]/20 text-[#131218] hover:border-[#131218]/50 px-3 py-1.5 rounded-lg disabled:opacity-40"
+              className="text-[10px] font-bold uppercase tracking-widest border border-[#0a0a0a]/20 text-[#0a0a0a] hover:border-[#0a0a0a]/50 px-3 py-1.5 rounded-lg disabled:opacity-40"
             >
               ✎ Override
             </button>
