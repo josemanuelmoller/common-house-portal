@@ -657,39 +657,84 @@ export default function LivingRoomAdminPage() {
                     />
                   </div>
 
-                  <div className="bg-white rounded-2xl border border-[#D8D8D0] overflow-hidden">
-                    <div className="px-5 py-4 border-b border-[#D8D8D0] flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-lg bg-blue-100 flex items-center justify-center text-[11px]">◎</div>
-                      <span className="text-[12px] font-extrabold text-[#131218] tracking-tight">Signal Curator</span>
+                  <section>
+                    <div
+                      className="flex items-baseline justify-between gap-3 pb-2 mb-3.5"
+                      style={{ borderBottom: "1px solid var(--hall-ink-0)" }}
+                    >
+                      <h2
+                        className="text-[19px] font-bold leading-none"
+                        style={{ letterSpacing: "-0.02em", color: "var(--hall-ink-0)" }}
+                      >
+                        Signal{" "}
+                        <em
+                          style={{
+                            fontFamily: "var(--font-hall-display)",
+                            fontStyle: "italic",
+                            fontWeight: 400,
+                            color: "var(--hall-ink-0)",
+                          }}
+                        >
+                          curator
+                        </em>
+                      </h2>
                     </div>
 
                     {signals.length === 0 ? (
                       <div className="px-6 py-10 text-center">
-                        <p className="text-sm text-[#131218]/30">No insight briefs found.</p>
+                        <p className="text-sm" style={{ color: "var(--hall-muted-3)" }}>No insight briefs found.</p>
                       </div>
                     ) : (
-                      <div className="px-5 divide-y divide-[#EFEFEA]">
+                      <div>
                         {/* Header */}
-                        <div className="grid gap-3.5 py-2.5 items-center" style={{ gridTemplateColumns: "2.2fr 1fr 80px 80px" }}>
+                        <div
+                          className="grid gap-3.5 py-2.5 items-center"
+                          style={{ gridTemplateColumns: "2.2fr 1fr 80px 80px", borderBottom: "1px solid var(--hall-line)" }}
+                        >
                           {["Brief", "Theme", "Community", "Status"].map(l => (
-                            <span key={l} className="text-[8px] font-bold tracking-[1.8px] uppercase text-[#131218]/22">{l}</span>
+                            <span
+                              key={l}
+                              style={{
+                                fontFamily: "var(--font-hall-mono)",
+                                fontSize: 10,
+                                letterSpacing: "0.08em",
+                                textTransform: "uppercase",
+                                color: "var(--hall-muted-2)",
+                              }}
+                            >
+                              {l}
+                            </span>
                           ))}
                         </div>
                         {signals.map(s => (
                           <div
                             key={s.id}
                             className="grid gap-3.5 py-3 items-center"
-                            style={{ gridTemplateColumns: "2.2fr 1fr 80px 80px" }}
+                            style={{ gridTemplateColumns: "2.2fr 1fr 80px 80px", borderTop: "1px solid var(--hall-line-soft)" }}
                           >
                             <div>
-                              <div className="text-[13px] font-bold text-[#131218] tracking-tight">{s.title}</div>
+                              <div className="text-[13px] font-bold tracking-tight" style={{ color: "var(--hall-ink-0)" }}>{s.title}</div>
                               <div className="flex items-center gap-1.5 mt-0.5">
-                                <span className="text-[10px] text-[#6b6b6b]">{s.status}</span>
+                                <span style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--hall-muted-2)" }}>
+                                  {s.status}
+                                </span>
                               </div>
                             </div>
                             <div className="flex flex-wrap gap-1">
                               {s.theme.slice(0, 2).map(t => (
-                                <span key={t} className="text-[8.5px] font-bold text-[#131218]/35 bg-[#EFEFEA] px-1.5 py-0.5 rounded-full uppercase tracking-widest">
+                                <span
+                                  key={t}
+                                  className="px-1.5 py-0.5 rounded-full"
+                                  style={{
+                                    fontFamily: "var(--font-hall-mono)",
+                                    fontSize: 9.5,
+                                    fontWeight: 700,
+                                    color: "var(--hall-muted-3)",
+                                    background: "var(--hall-fill-soft)",
+                                    letterSpacing: "0.06em",
+                                    textTransform: "uppercase",
+                                  }}
+                                >
                                   {t}
                                 </span>
                               ))}
@@ -700,14 +745,21 @@ export default function LivingRoomAdminPage() {
                                 onChange={() => markSignalRelevant(s.id, !s.communityRelevant)}
                               />
                             </div>
-                            <span className={`text-[10px] font-bold ${s.communityRelevant ? "text-blue-600" : "text-[#131218]/20"}`}>
+                            <span
+                              style={{
+                                fontFamily: "var(--font-hall-mono)",
+                                fontSize: 10,
+                                fontWeight: 700,
+                                color: s.communityRelevant ? "var(--hall-info)" : "var(--hall-muted-3)",
+                              }}
+                            >
                               {s.communityRelevant ? "On" : "Off"}
                             </span>
                           </div>
                         ))}
                       </div>
                     )}
-                  </div>
+                  </section>
                 </div>
               )}
 
@@ -740,51 +792,91 @@ export default function LivingRoomAdminPage() {
                     />
                   </div>
 
-                  <div className="bg-white rounded-2xl border border-[#D8D8D0] overflow-hidden">
-                    <div className="px-5 py-4 border-b border-[#D8D8D0] flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-lg bg-amber-100 flex items-center justify-center text-[11px]">◦</div>
-                      <span className="text-[12px] font-extrabold text-[#131218] tracking-tight">Theme Curator</span>
+                  <section>
+                    <div
+                      className="flex items-baseline justify-between gap-3 pb-2 mb-3.5"
+                      style={{ borderBottom: "1px solid var(--hall-ink-0)" }}
+                    >
+                      <h2
+                        className="text-[19px] font-bold leading-none"
+                        style={{ letterSpacing: "-0.02em", color: "var(--hall-ink-0)" }}
+                      >
+                        Theme{" "}
+                        <em
+                          style={{
+                            fontFamily: "var(--font-hall-display)",
+                            fontStyle: "italic",
+                            fontWeight: 400,
+                            color: "var(--hall-ink-0)",
+                          }}
+                        >
+                          curator
+                        </em>
+                      </h2>
                     </div>
 
                     {themes.length === 0 ? (
                       <div className="px-6 py-10 text-center">
-                        <p className="text-sm text-[#131218]/30">No knowledge assets found.</p>
+                        <p className="text-sm" style={{ color: "var(--hall-muted-3)" }}>No knowledge assets found.</p>
                       </div>
                     ) : (
-                      <div className="px-5 divide-y divide-[#EFEFEA]">
+                      <div>
                         {/* Header */}
-                        <div className="grid gap-3.5 py-2.5 items-center" style={{ gridTemplateColumns: "2fr 1fr 72px 80px" }}>
+                        <div
+                          className="grid gap-3.5 py-2.5 items-center"
+                          style={{ gridTemplateColumns: "2fr 1fr 72px 80px", borderBottom: "1px solid var(--hall-line)" }}
+                        >
                           {["Theme", "Category", "Active", "Status"].map(l => (
-                            <span key={l} className="text-[8px] font-bold tracking-[1.8px] uppercase text-[#131218]/22">{l}</span>
+                            <span
+                              key={l}
+                              style={{
+                                fontFamily: "var(--font-hall-mono)",
+                                fontSize: 10,
+                                letterSpacing: "0.08em",
+                                textTransform: "uppercase",
+                                color: "var(--hall-muted-2)",
+                              }}
+                            >
+                              {l}
+                            </span>
                           ))}
                         </div>
                         {themes.map(t => (
                           <div
                             key={t.id}
                             className="grid gap-3.5 py-3 items-center"
-                            style={{ gridTemplateColumns: "2fr 1fr 72px 80px" }}
+                            style={{ gridTemplateColumns: "2fr 1fr 72px 80px", borderTop: "1px solid var(--hall-line-soft)" }}
                           >
                             <div>
-                              <div className="text-[13px] font-bold text-[#131218] tracking-tight">{t.name}</div>
+                              <div className="text-[13px] font-bold tracking-tight" style={{ color: "var(--hall-ink-0)" }}>{t.name}</div>
                               {t.assetType && (
-                                <div className="text-[10px] text-[#6b6b6b] mt-0.5">{t.assetType}</div>
+                                <div className="mt-0.5" style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--hall-muted-2)" }}>
+                                  {t.assetType}
+                                </div>
                               )}
                             </div>
-                            <div className="text-[10.5px] text-[#555]">{t.category || "—"}</div>
+                            <div style={{ fontSize: 10.5, color: "var(--hall-ink-3)" }}>{t.category || "—"}</div>
                             <div className="flex items-center">
                               <Toggle
                                 checked={!!t.active}
                                 onChange={() => markThemeActive(t.id, !t.active)}
                               />
                             </div>
-                            <span className={`text-[10px] font-bold ${t.active ? "text-amber-600" : "text-[#131218]/20"}`}>
+                            <span
+                              style={{
+                                fontFamily: "var(--font-hall-mono)",
+                                fontSize: 10,
+                                fontWeight: 700,
+                                color: t.active ? "var(--hall-warn)" : "var(--hall-muted-3)",
+                              }}
+                            >
                               {t.active ? "Active" : "Off"}
                             </span>
                           </div>
                         ))}
                       </div>
                     )}
-                  </div>
+                  </section>
                 </div>
               )}
 
@@ -795,16 +887,31 @@ export default function LivingRoomAdminPage() {
         {/* ── Fixed save bar ── */}
         {dirtyCount > 0 && (
           <div className="fixed bottom-7 left-1/2 -translate-x-1/2 z-50">
-            <div className="bg-[#131218] text-white rounded-xl px-6 py-3.5 flex items-center gap-4 border border-white/10 whitespace-nowrap">
-              <span className="text-[12px] font-semibold text-white/60">
-                <span className="text-[#B2FF59] font-extrabold">{dirtyCount}</span>{" "}
+            <div
+              className="px-6 py-3.5 flex items-center gap-4 whitespace-nowrap"
+              style={{
+                background: "var(--hall-ink-0)",
+                color: "var(--hall-paper-0)",
+                border: "1px solid var(--hall-ink-0)",
+              }}
+            >
+              <span className="text-[12px] font-semibold" style={{ color: "var(--hall-muted-3)" }}>
+                <b style={{ color: "var(--hall-paper-0)" }}>{dirtyCount}</b>{" "}
                 unsaved change{dirtyCount !== 1 ? "s" : ""}
               </span>
-              {error && <span className="text-xs font-bold text-red-400">{error}</span>}
+              {error && <span className="text-xs font-bold" style={{ color: "var(--hall-danger)" }}>{error}</span>}
               <button
                 onClick={saveAll}
                 disabled={saving}
-                className="bg-[#B2FF59] text-black text-xs font-bold px-4 py-2 rounded-lg hover:bg-[#c8f55a] transition-colors disabled:opacity-50"
+                className="disabled:opacity-50"
+                style={{
+                  background: "var(--hall-paper-0)",
+                  color: "var(--hall-ink-0)",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  padding: "6px 14px",
+                  borderRadius: 3,
+                }}
               >
                 {saving ? "Saving…" : "Save to Notion →"}
               </button>
@@ -814,7 +921,14 @@ export default function LivingRoomAdminPage() {
 
         {saved && (
           <div className="fixed bottom-7 left-1/2 -translate-x-1/2 z-50">
-            <div className="bg-[#B2FF59] text-black rounded-xl px-6 py-3.5 text-xs font-extrabold shadow-2xl">
+            <div
+              className="px-6 py-3.5 text-xs font-extrabold"
+              style={{
+                background: "var(--hall-ok-soft)",
+                color: "var(--hall-ok)",
+                border: "1px solid var(--hall-ok)",
+              }}
+            >
               ✓ All changes saved to Notion
             </div>
           </div>
