@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>The Hall — Propuesta de rediseño</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="styles/hall-system.css">
+<link rel="stylesheet" href="styles/variant-a.css">
+<link rel="stylesheet" href="styles/variant-b.css">
+<link rel="stylesheet" href="styles/variant-c.css">
+<link rel="stylesheet" href="styles/variant-d.css">
+<link rel="stylesheet" href="styles/variant-e.css">
+<link rel="stylesheet" href="styles/variant-f.css">
+<link rel="stylesheet" href="styles/variant-g.css">
+<link rel="stylesheet" href="styles/variant-k.css">
+<link rel="stylesheet" href="styles/variant-l.css">
+<link rel="stylesheet" href="styles/variant-m.css">
+<link rel="stylesheet" href="styles/variant-k2.css">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400;1,500;1,600&family=EB+Garamond:ital,wght@0,400;0,500;1,400;1,500&display=swap" rel="stylesheet">
+
+<style>
+  html, body { height: 100%; }
+  body { overflow: hidden; }
+
+  /* Tweaks panel */
+  .tw-panel {
+    position: fixed; right: 20px; bottom: 20px;
+    z-index: 50;
+    background: #0a0a0a; color: #fff;
+    border-radius: 14px;
+    padding: 16px 18px;
+    min-width: 240px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.4);
+    font-family: "Inter Tight", sans-serif;
+    font-size: 12px;
+    display: none;
+  }
+  .tw-panel.open { display: block; }
+  .tw-panel h4 {
+    font-family: "Instrument Serif", serif; font-style: italic;
+    font-size: 20px; font-weight: 400; margin-bottom: 4px;
+  }
+  .tw-panel .sub {
+    font-size: 10px; color: rgba(255,255,255,0.5);
+    letter-spacing: 0.1em; text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+  .tw-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 0; border-top: 1px solid rgba(255,255,255,0.08); }
+  .tw-row:first-of-type { border-top: none; }
+  .tw-row label { color: rgba(255,255,255,0.75); font-size: 11.5px; }
+  .tw-switch {
+    width: 30px; height: 16px; border-radius: 20px;
+    background: rgba(255,255,255,0.15); position: relative; cursor: pointer;
+    transition: background 0.2s;
+  }
+  .tw-switch::after {
+    content: ""; position: absolute; top: 2px; left: 2px;
+    width: 12px; height: 12px; border-radius: 50%;
+    background: #fff; transition: left 0.2s;
+  }
+  .tw-switch.on { background: #c6f24a; }
+  .tw-switch.on::after { left: 16px; background: #0a0a0a; }
+</style>
+</head>
+<body>
+
+<div id="root"></div>
+
+<div class="tw-panel" id="twPanel">
+  <h4>Tweaks</h4>
+  <div class="sub">Módulos visibles en Hall</div>
+  <div id="twRows"></div>
+</div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="components/Sidebar.jsx"></script>
+<script type="text/babel" src="components/VariantA.jsx"></script>
+<script type="text/babel" src="components/VariantB.jsx"></script>
+<script type="text/babel" src="components/VariantC.jsx"></script>
+<script type="text/babel" src="components/VariantD.jsx"></script>
+<script type="text/babel" src="components/VariantE.jsx"></script>
+<script type="text/babel" src="components/VariantF.jsx"></script>
+<script type="text/babel" src="components/VariantG.jsx"></script>
+<script type="text/babel" src="components/VariantK.jsx"></script>
+<script type="text/babel" src="components/VariantL.jsx"></script>
+<script type="text/babel" src="components/VariantM.jsx"></script>
+<script type="text/babel" src="components/VariantK2.jsx"></script>
+
+<script type="text/babel" data-presets="react">
+const TWEAKS = /*EDITMODE-BEGIN*/{
+  "showInbox": true,
+  "showAgents": true,
+  "showSignals": true,
+  "showCommitments": true,
+  "showPortfolio": true,
+  "showAlloc": true
+}/*EDITMODE-END*/;
+
+// Apply tweak visibility through CSS
+function applyTweaks(t) {
+  const css = `
+    ${!t.showInbox ? '.vA-inbox, .vB-inline, .vB-sep, .vB-more, .vC-mod.k-inbox{display:none!important}' : ''}
+    ${!t.showAgents ? '.vA-agents, .vB-rail-agent, .vC-mod.k-agent{display:none!important}' : ''}
+    ${!t.showSignals ? '.vA-signals, .vC-mod.k-signals{display:none!important}' : ''}
+    ${!t.showCommitments ? '.vA-commit, .vA-commit-tabs, .vC-mod.k-commit{display:none!important}' : ''}
+    ${!t.showPortfolio ? '.vC-mod.k-portfolio{display:none!important}' : ''}
+    ${!t.showAlloc ? '.vC-mod.k-alloc{display:none!important}' : ''}
+  `;
+  let s = document.getElementById('tweak-css');
+  if (!s) { s = document.createElement('style'); s.id = 'tweak-css'; document.head.appendChild(s); }
+  s.textContent = css;
+}
+applyTweaks(TWEAKS);
+
+// Edit mode protocol
+let state = {...TWEAKS};
+window.addEventListener('message', (e) => {
+  if (!e.data || !e.data.type) return;
+  if (e.data.type === '__activate_edit_mode') showTweaks();
+  if (e.data.type === '__deactivate_edit_mode') hideTweaks();
+});
+function showTweaks() {
+  const panel = document.getElementById('twPanel');
+  const rows = document.getElementById('twRows');
+  rows.innerHTML = '';
+  const labels = {
+    showInbox: 'Inbox',
+    showAgents: 'Agentes IA',
+    showSignals: 'Señales de mercado',
+    showCommitments: 'Compromisos',
+    showPortfolio: 'Portfolio check-ins',
+    showAlloc: 'Time allocation'
+  };
+  Object.keys(labels).forEach(k => {
+    const row = document.createElement('div');
+    row.className = 'tw-row';
+    row.innerHTML = `<label>${labels[k]}</label><div class="tw-switch ${state[k]?'on':''}" data-k="${k}"></div>`;
+    rows.appendChild(row);
+  });
+  rows.querySelectorAll('.tw-switch').forEach(sw => {
+    sw.onclick = () => {
+      const k = sw.dataset.k;
+      state[k] = !state[k];
+      sw.classList.toggle('on', state[k]);
+      applyTweaks(state);
+      window.parent.postMessage({type:'__edit_mode_set_keys', edits:{[k]: state[k]}}, '*');
+    };
+  });
+  panel.classList.add('open');
+}
+function hideTweaks() { document.getElementById('twPanel').classList.remove('open'); }
+window.parent.postMessage({type:'__edit_mode_available'}, '*');
+
+// ---------- Design canvas with 3 variants ----------
+function App() {
+  return (
+    <DesignCanvas title="The Hall · Propuesta de rediseño" subtitle="3 enfoques de jerarquía · evolución de identidad Common House · Abril 2026">
+      <DCSection id="pick" title="Recomendación · Variant K v2 (8 ajustes de UX aplicados)" subtitle="Elegida: 2-col narrativa + contexto. Cambios: focus con más peso y countdown live, right col reordenada por proximidad temporal, suggested blocks clickables con CTA en hover, header de una línea con tabs contadas, deadline movido al right, commitments split I owe / Owed, inbox 5+más, lime reservado solo para focus y now.">
+        <DCArtboard id="vk2" label="Variant K v2 — recomendada" width={1440} height={2400}>
+          <VariantK2 />
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="intro" title="Diagnóstico y sistema" subtitle="Lectura del audit y decisiones de sistema antes de maquetar">
+        <DCArtboard id="brief" label="Brief & sistema visual" width={820} height={1280}>
+          <Brief />
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="archbox" title="Focus of the day = sección (no header) · estética agent architecture" subtitle="Te gusta la nueva estética (negros sólidos, mono, chips, iconos circulares, el estilo de la gráfica de agent architecture) pero quieres que Focus of the day sea una sección más, no el hero. Estos 3 caminos repiten la estructura probada de A/B/C (2-col · feed · modular) con esa nueva vibra.">
+        <DCArtboard id="vk" label="Camino 1 · 2-column (estructura A) — focus como primera caja del flujo principal" width={1440} height={2400}>
+          <VariantK />
+        </DCArtboard>
+        <DCArtboard id="vl" label="Camino 2 · Priority feed (estructura B) — focus es el item #1 del feed, con chips" width={1440} height={2200}>
+          <VariantL />
+        </DCArtboard>
+        <DCArtboard id="vm" label="Camino 3 · Command modules (estructura C) — focus es un módulo destacado en el grid" width={1440} height={2200}>
+          <VariantM />
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="white" title="Caminos anteriores · blancos minimalistas" subtitle="Desde la E hacia territorio Star Wars/Tesla.">
+        <DCArtboard id="vf" label="HUD militar — Star Wars" width={1320} height={2400}>
+          <VariantF />
+        </DCArtboard>
+        <DCArtboard id="vg" label="Showroom — Tesla" width={1320} height={2600}>
+          <VariantG />
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="paths" title="Dos caminos desde la C" subtitle="Mantienen el banner superior como estructura. Exploran dos extremos de personalidad visual, con tipografías nuevas.">
+        <DCArtboard id="vd" label="Camino 1 · Editorial — Playfair + EB Garamond, calmado, mucho aire" width={1320} height={2100}>
+          <VariantD />
+        </DCArtboard>
+        <DCArtboard id="ve" label="Camino 2 · Terminal — JetBrains Mono, denso, tablero de operaciones" width={1320} height={2200}>
+          <VariantE />
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="variants" title="Iteraciones previas" subtitle="Para referencia">
+        <DCArtboard id="va" label="A · Foco del día" width={1280} height={1720}>
+          <VariantA />
+        </DCArtboard>
+        <DCArtboard id="vb" label="B · Inbox priorizado por IA" width={1280} height={1720}>
+          <VariantB />
+        </DCArtboard>
+        <DCArtboard id="vc" label="C · Command center modular" width={1280} height={1920}>
+          <VariantC />
+        </DCArtboard>
+      </DCSection>
+    </DesignCanvas>
+  );
+}
+
+function Brief() {
+  return (
+    <div style={{padding:"48px 56px", fontFamily:"Inter Tight, sans-serif", background:"#fafaf7", minHeight:"100%", color:"#141414"}}>
+      <div style={{fontSize:10, letterSpacing:"0.22em", textTransform:"uppercase", color:"#8a8a82", marginBottom:10, fontWeight:600}}>
+        Common House · Rediseño The Hall
+      </div>
+      <h1 style={{fontFamily:"Instrument Serif, serif", fontStyle:"italic", fontSize:58, lineHeight:1.08, fontWeight:400, letterSpacing:"-0.02em", marginBottom:28, paddingBottom:4}}>
+        Del scroll infinito al <span style={{color:"#4d6b0b"}}>foco del día</span>.
+      </h1>
+      <p style={{fontSize:15, lineHeight:1.6, color:"#2a2a2a", maxWidth:"62ch", marginBottom:36}}>
+        The Hall funciona como panel operativo diario, pero el audit identifica seis problemas de jerarquía: scroll sin fin, tabs invisibles, scroll doble del inbox, código técnico filtrado en primer plano, zonas sin separación y ausencia de un único foco. Estas tres maquetas atacan todo eso manteniendo la identidad (negro + lima + italic).
+      </p>
+
+      <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:20, marginBottom:36}}>
+        <div style={{background:"#fff", border:"1px solid #e4e4dd", borderRadius:14, padding:22}}>
+          <div style={{fontSize:10, letterSpacing:"0.18em", textTransform:"uppercase", color:"#d93636", fontWeight:700, marginBottom:10}}>Qué se va</div>
+          <ul style={{listStyle:"none", display:"flex", flexDirection:"column", gap:7, fontSize:13, color:"#2a2a2a"}}>
+            <li>— Scroll infinito con 15+ módulos sin jerarquía</li>
+            <li>— Tabs planos sin estado activo</li>
+            <li>— Scroll doble en el inbox</li>
+            <li>— Autopilot log técnico en primer plano</li>
+            <li>— Mix de inglés/español sin regla</li>
+            <li>— Empty states sin acción</li>
+          </ul>
+        </div>
+        <div style={{background:"#0a0a0a", color:"#fff", borderRadius:14, padding:22}}>
+          <div style={{fontSize:10, letterSpacing:"0.18em", textTransform:"uppercase", color:"#c6f24a", fontWeight:700, marginBottom:10}}>Qué se queda y se sistematiza</div>
+          <ul style={{listStyle:"none", display:"flex", flexDirection:"column", gap:7, fontSize:13, color:"rgba(255,255,255,0.8)"}}>
+            <li>— Paleta: negro + verde lima + beige papel</li>
+            <li>— Tipografía italic en headlines (ahora Instrument Serif)</li>
+            <li>— Patrón "Palabra + palabra en lima"</li>
+            <li>— Chips sólidos negros / lima / soft por semántica</li>
+            <li>— Cards con border 1px y radio 14px</li>
+            <li>— Sidebar con 3 grupos claros (Ops / Red / Sistema)</li>
+          </ul>
+        </div>
+      </div>
+
+      {/* Color + type specimen */}
+      <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:20, marginBottom:36}}>
+        <div>
+          <div style={{fontSize:10, letterSpacing:"0.18em", textTransform:"uppercase", color:"#8a8a82", marginBottom:10, fontWeight:600}}>Tokens de color</div>
+          <div style={{display:"grid", gridTemplateColumns:"repeat(6,1fr)", gap:6}}>
+            <Sw c="#0a0a0a" n="ink" v="950" dark />
+            <Sw c="#2a2a2a" n="ink" v="800" dark />
+            <Sw c="#8a8a82" n="muted" v="500" />
+            <Sw c="#fafaf7" n="paper" v="50" />
+            <Sw c="#c6f24a" n="lime" v="400" />
+            <Sw c="#4d6b0b" n="lime ink" v="800" dark />
+            <Sw c="#d93636" n="danger" v="" dark />
+            <Sw c="#d98a00" n="warn" v="" dark />
+            <Sw c="#2f9e44" n="ok" v="" dark />
+            <Sw c="#2458d6" n="info" v="" dark />
+            <Sw c="#e4e4dd" n="line" v="" />
+            <Sw c="#ececE5" n="paper" v="300" />
+          </div>
+        </div>
+        <div>
+          <div style={{fontSize:10, letterSpacing:"0.18em", textTransform:"uppercase", color:"#8a8a82", marginBottom:10, fontWeight:600}}>Tipografía</div>
+          <div style={{background:"#fff", border:"1px solid #e4e4dd", borderRadius:14, padding:"18px 22px"}}>
+            <div style={{fontFamily:"Instrument Serif", fontStyle:"italic", fontSize:40, lineHeight:1, fontWeight:400}}>
+              The <span style={{color:"#4d6b0b"}}>Hall</span>
+            </div>
+            <div style={{fontSize:10, color:"#8a8a82", letterSpacing:"0.14em", marginTop:4}}>DISPLAY · Instrument Serif italic</div>
+            <div style={{height:1, background:"#e4e4dd", margin:"14px 0"}} />
+            <div style={{fontFamily:"Inter Tight", fontSize:18, fontWeight:500, letterSpacing:"-0.01em"}}>
+              Body voice, neutral y compacta.
+            </div>
+            <div style={{fontSize:10, color:"#8a8a82", letterSpacing:"0.14em", marginTop:4}}>SANS · Inter Tight 400–700</div>
+            <div style={{height:1, background:"#e4e4dd", margin:"14px 0"}} />
+            <div style={{fontFamily:"JetBrains Mono", fontSize:12, letterSpacing:"0.02em"}}>14:09 · 70 runs · 42%</div>
+            <div style={{fontSize:10, color:"#8a8a82", letterSpacing:"0.14em", marginTop:4}}>MONO · JetBrains para datos</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Variant compass */}
+      <div style={{fontSize:10, letterSpacing:"0.18em", textTransform:"uppercase", color:"#8a8a82", marginBottom:14, fontWeight:600}}>
+        Las tres variantes, en una frase
+      </div>
+      <div style={{display:"grid", gridTemplateColumns:"repeat(3, 1fr)", gap:14}}>
+        <VCard letter="A" title="Foco del día" desc="2 columnas fijas (60/40) evolucionando el Hall actual. Hero con el único focus block del día. Identidad casi igual, jerarquía arreglada." />
+        <VCard letter="B" title="Inbox priorizado" desc="Feed único rankeado por IA con score explícito. Reemplaza el tablero por una lista de decisiones. Right rail con playbook y señales." />
+        <VCard letter="C" title="Command center" desc="Grid de módulos reordenables con hero editorial grande. Más atrevido visualmente — sienta el precedente de cómo se verían las otras vistas del portal." />
+      </div>
+    </div>
+  );
+}
+
+function Sw({c, n, v, dark}) {
+  return (
+    <div style={{background:c, borderRadius:8, padding:"14px 10px", color: dark ? "#fff" : "#141414", border: c === "#fafaf7" || c === "#e4e4dd" || c === "#ececE5" ? "1px solid #d4d4cb" : "none", height:76, display:"flex", flexDirection:"column", justifyContent:"flex-end"}}>
+      <div style={{fontSize:10, fontWeight:600, textTransform:"uppercase", letterSpacing:"0.04em", opacity:0.9}}>{n}</div>
+      <div style={{fontSize:9, opacity:0.6, fontFamily:"JetBrains Mono"}}>{c}{v ? " · " + v : ""}</div>
+    </div>
+  );
+}
+
+function VCard({letter, title, desc}) {
+  return (
+    <div style={{background:"#fff", border:"1px solid #e4e4dd", borderRadius:14, padding:20}}>
+      <div style={{fontFamily:"Instrument Serif", fontStyle:"italic", fontSize:46, lineHeight:0.9, color:"#c6f24a", WebkitTextStroke:"1px #0a0a0a", marginBottom:8}}>{letter}</div>
+      <div style={{fontSize:14, fontWeight:600, marginBottom:6}}>{title}</div>
+      <p style={{fontSize:12, lineHeight:1.55, color:"#2a2a2a"}}>{desc}</p>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

@@ -1,0 +1,141 @@
+/* Variant M — C-structure (modular grid) with agent-architecture aesthetic.
+   Focus of the day = one module, not the header. */
+
+.vM-main { background: #fff; min-height: 100%; color: #111; font-family: "Inter Tight", sans-serif; font-size: 13px; }
+
+.vM-top { padding: 18px 36px 16px; border-bottom: 1px solid #0a0a0a; display: flex; justify-content: space-between; align-items: center; gap: 24px; }
+.vM-top-l { display: flex; align-items: baseline; gap: 20px; }
+.vM-top-eyebrow { font-family: "JetBrains Mono", monospace; font-size: 10px; color: #6b6b6b; letter-spacing: 0.08em; }
+.vM-top-eyebrow b { color: #0a0a0a; }
+.vM-h1 { font-family: "Inter Tight", sans-serif; font-weight: 700; font-size: 20px; letter-spacing: -0.02em; }
+.vM-h1 em { font-family: "Instrument Serif", serif; font-style: italic; font-weight: 400; color: #4d6b0b; }
+.vM-top-r { display: flex; gap: 12px; align-items: center; font-family: "JetBrains Mono", monospace; font-size: 10.5px; color: #6b6b6b; }
+.vM-top-r button { background: #0a0a0a; color: #fff; border: none; border-radius: 3px; padding: 5px 12px; font-size: 11px; font-weight: 600; cursor: pointer; font-family: inherit; }
+
+/* Module grid */
+.vM-grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  grid-auto-rows: min-content;
+  gap: 0;
+}
+.vM-mod {
+  border-right: 1px solid #e8e8e8;
+  border-bottom: 1px solid #e8e8e8;
+  padding: 20px 22px;
+  position: relative;
+  background: #fff;
+}
+.vM-mod.span-4 { grid-column: span 4; }
+.vM-mod.span-5 { grid-column: span 5; }
+.vM-mod.span-6 { grid-column: span 6; }
+.vM-mod.span-7 { grid-column: span 7; }
+.vM-mod.span-8 { grid-column: span 8; }
+.vM-mod.span-12 { grid-column: span 12; }
+.vM-mod.span-3 { grid-column: span 3; }
+
+.vM-mod.focus { background: #fbfde8; grid-column: span 8; }
+.vM-mod.focus .vM-mod-head h3 em { color: #4d6b0b; }
+
+.vM-mod-head {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin-bottom: 14px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #0a0a0a;
+}
+.vM-mod-head h3 {
+  font-family: "Inter Tight", sans-serif;
+  font-weight: 700; font-size: 15px; letter-spacing: -0.01em;
+}
+.vM-mod-head h3 em {
+  font-family: "Instrument Serif", serif;
+  font-style: italic; font-weight: 400; color: #4d6b0b;
+}
+.vM-mod-head .meta {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 9.5px; letter-spacing: 0.08em; color: #6b6b6b;
+}
+
+.vM-chips { display: flex; gap: 6px; margin-bottom: 8px; }
+.vM-chip-dark { background: #0a0a0a; color: #fff; padding: 3px 10px; border-radius: 100px; font-size: 9.5px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; }
+.vM-chip-out { background: #fff; color: #0a0a0a; padding: 2px 9px; border-radius: 100px; font-size: 9.5px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; border: 1px solid #0a0a0a; display: inline-flex; align-items: center; gap: 6px; }
+.vM-chip-out .live-dot { width: 6px; height: 6px; border-radius: 50%; background: #2f9e44; }
+
+/* Focus content */
+.vM-focus-inner { display: grid; grid-template-columns: 60px 1fr; gap: 18px; align-items: start; }
+.vM-focus-ico { width: 60px; height: 60px; border-radius: 50%; background: #0a0a0a; color: #c6f24a; display: grid; place-items: center; }
+.vM-focus-body b { display: block; font-size: 18px; font-weight: 700; letter-spacing: -0.015em; color: #0a0a0a; margin-bottom: 6px; }
+.vM-focus-body em { font-style: normal; font-size: 12.5px; line-height: 1.55; color: #2a2a2a; display: block; margin-bottom: 10px; }
+.vM-focus-body .mono { font-family: "JetBrains Mono", monospace; font-size: 10px; color: #6b6b6b; letter-spacing: 0.02em; }
+.vM-focus-actions { display: flex; gap: 8px; margin-top: 14px; }
+.vM-focus-actions .p { background: #0a0a0a; color: #fff; border: none; border-radius: 3px; padding: 6px 14px; font-size: 11.5px; font-weight: 600; cursor: pointer; font-family: inherit; }
+.vM-focus-actions .o { background: #fff; color: #0a0a0a; border: 1px solid #0a0a0a; border-radius: 3px; padding: 5px 12px; font-size: 11.5px; font-weight: 600; cursor: pointer; font-family: inherit; }
+.vM-focus-actions .g { background: transparent; color: #6b6b6b; border: none; padding: 5px 0; font-size: 11.5px; cursor: pointer; font-family: inherit; margin-left: auto; }
+
+/* Day at a glance */
+.vM-glance { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.vM-glance div { text-align: left; }
+.vM-glance div b { font-family: "Inter Tight", sans-serif; font-weight: 700; font-size: 24px; letter-spacing: -0.02em; display: block; line-height: 1; color: #0a0a0a; }
+.vM-glance div span { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: #6b6b6b; font-weight: 700; display: block; margin-top: 5px; }
+
+/* Generic list */
+.vM-list { display: flex; flex-direction: column; }
+.vM-list li { list-style: none; display: grid; grid-template-columns: 28px 1fr auto; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid #f0f0ea; }
+.vM-list li:first-child { border-top: none; }
+.vM-list .ico { width: 28px; height: 28px; border-radius: 50%; background: #f2f2ee; border: 1px solid #e4e4dd; display: grid; place-items: center; }
+.vM-list b { display: block; font-size: 12px; font-weight: 600; color: #0a0a0a; }
+.vM-list em { font-style: normal; font-size: 10.5px; color: #6b6b6b; display: block; line-height: 1.4; }
+.vM-list .mono { font-family: "JetBrains Mono", monospace; font-size: 9.5px; color: #9a9a9a; text-align: right; }
+.vM-list .mono.err { color: #d93636; }
+.vM-list .mono.warn { color: #d98a00; }
+.vM-list .mono.ok { color: #2f9e44; }
+
+/* Portfolio */
+.vM-port { display: grid; gap: 6px; }
+.vM-port-row { display: grid; grid-template-columns: 1fr 60px 60px 50px; gap: 10px; align-items: center; padding: 7px 0; border-top: 1px solid #f0f0ea; font-size: 11.5px; }
+.vM-port-row:first-child { border-top: none; }
+.vM-port-row b { font-weight: 600; color: #0a0a0a; }
+.vM-port-row em { font-style: normal; font-size: 10px; color: #6b6b6b; display: block; }
+.vM-port-row .stage { font-family: "JetBrains Mono", monospace; font-size: 9.5px; letter-spacing: 0.06em; color: #6b6b6b; text-transform: uppercase; }
+.vM-port-row .n { font-family: "JetBrains Mono", monospace; font-size: 11px; color: #0a0a0a; text-align: right; }
+.vM-port-row .st { font-family: "JetBrains Mono", monospace; font-size: 9.5px; letter-spacing: 0.06em; text-align: right; }
+.vM-port-row.blocked .st { color: #d93636; }
+.vM-port-row.moving .st { color: #2f9e44; }
+.vM-port-row.flat .st { color: #6b6b6b; }
+
+/* Alloc bars */
+.vM-alc-row { display: grid; grid-template-columns: 70px 1fr 50px; gap: 10px; align-items: center; padding: 6px 0; border-top: 1px solid #f0f0ea; }
+.vM-alc-row:first-child { border-top: none; }
+.vM-alc-row b { font-size: 11.5px; font-weight: 600; color: #0a0a0a; }
+.vM-alc-row .track { height: 5px; background: #f0f0ea; position: relative; border-radius: 2px; }
+.vM-alc-row .track span { position: absolute; left: 0; top: 0; bottom: 0; background: #0a0a0a; border-radius: 2px; }
+.vM-alc-row .track .mk { position: absolute; top: -3px; bottom: -3px; width: 1.5px; background: #d98a00; }
+.vM-alc-row .v { font-family: "JetBrains Mono", monospace; font-size: 10.5px; color: #0a0a0a; font-weight: 700; text-align: right; }
+
+/* Signals */
+.vM-sig { display: flex; flex-direction: column; }
+.vM-sig li { list-style: none; padding: 10px 0; border-top: 1px solid #f0f0ea; }
+.vM-sig li:first-child { border-top: none; }
+.vM-sig .tag { font-family: "JetBrains Mono", monospace; font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: #6b6b6b; background: #f2f2ee; padding: 2px 6px; border-radius: 2px; margin-right: 8px; }
+.vM-sig p { font-size: 11.5px; line-height: 1.5; color: #2a2a2a; margin-top: 6px; }
+.vM-sig .age { font-family: "JetBrains Mono", monospace; font-size: 9.5px; color: #9a9a9a; }
+
+/* Meeting */
+.vM-meet h4 { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; margin-bottom: 2px; }
+.vM-meet .sub { font-family: "JetBrains Mono", monospace; font-size: 10px; color: #6b6b6b; margin-bottom: 12px; }
+.vM-meet .lbl { font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: #9a9a9a; font-weight: 700; margin: 10px 0 4px; }
+.vM-meet .at { display: flex; flex-wrap: wrap; gap: 5px; }
+.vM-meet .at span { font-size: 10.5px; background: #f2f2ee; padding: 2px 8px; border-radius: 100px; color: #2a2a2a; }
+.vM-meet ul { list-style: none; display: flex; flex-direction: column; gap: 5px; }
+.vM-meet ul li { font-size: 11px; line-height: 1.5; padding-left: 14px; position: relative; color: #2a2a2a; }
+.vM-meet ul li::before { content: "→"; position: absolute; left: 0; color: #4d6b0b; font-family: "JetBrains Mono", monospace; }
+
+/* Schedule blocks (dispatch-like) */
+.vM-sch { display: flex; flex-direction: column; }
+.vM-sch-row { display: grid; grid-template-columns: 80px 1fr auto; gap: 12px; padding: 10px 0; border-top: 1px solid #f0f0ea; align-items: start; }
+.vM-sch-row:first-child { border-top: none; }
+.vM-sch-time { font-family: "JetBrains Mono", monospace; font-size: 10.5px; color: #6b6b6b; }
+.vM-sch-time b { display: block; color: #0a0a0a; font-weight: 700; }
+.vM-sch-body b { display: block; font-size: 12.5px; color: #0a0a0a; }
+.vM-sch-body em { font-style: normal; font-size: 10.5px; color: #6b6b6b; display: block; line-height: 1.4; }
+.vM-sch-row button { background: #fff; color: #0a0a0a; border: 1px solid #0a0a0a; border-radius: 3px; padding: 3px 9px; font-size: 10.5px; font-weight: 600; cursor: pointer; font-family: inherit; }
