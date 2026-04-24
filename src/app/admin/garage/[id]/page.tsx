@@ -25,11 +25,11 @@ function daysSince(dateStr: string | null): number {
 }
 
 function warmthLabel(days: number): { label: string; dot: string; text: string } {
-  if (days <= 3)  return { label: "Hot",     dot: "bg-red-500",      text: "text-red-600"        };
-  if (days <= 10) return { label: "Warm",    dot: "bg-amber-400",    text: "text-amber-600"      };
-  if (days <= 21) return { label: "Active",  dot: "bg-amber-300",    text: "text-amber-500"      };
-  if (days <= 35) return { label: "Cold",    dot: "bg-blue-400",     text: "text-blue-500"       };
-  return               { label: "Dormant", dot: "bg-[#131218]/15", text: "text-[#131218]/35"   };
+  if (days <= 3)  return { label: "Hot",     dot: "var(--hall-danger)",  text: "var(--hall-danger)"  };
+  if (days <= 10) return { label: "Warm",    dot: "var(--hall-warn)",    text: "var(--hall-warn)"    };
+  if (days <= 21) return { label: "Active",  dot: "var(--hall-warn)",    text: "var(--hall-warn)"    };
+  if (days <= 35) return { label: "Cold",    dot: "var(--hall-info)",    text: "var(--hall-info)"    };
+  return               { label: "Dormant", dot: "var(--hall-muted-3)", text: "var(--hall-muted-3)" };
 }
 
 // Split a name so the last word is wrapped in <em> (e.g. "Fair Cycle" → "Fair <em>Cycle</em>")
@@ -78,60 +78,99 @@ export default async function GarageDetailPage({ params }: { params: Promise<{ i
   const { prefix, em } = splitName(project.name);
 
   return (
-    <div className="flex min-h-screen bg-[#EFEFEA]">
+    <div className="flex min-h-screen" style={{ background: "var(--hall-paper-0)" }}>
       <Sidebar adminNav />
 
-      <main className="flex-1 ml-[228px]">
+      <main
+        className="flex-1 ml-[228px]"
+        style={{ fontFamily: "var(--font-hall-sans)", background: "var(--hall-paper-0)" }}
+      >
 
-        {/* ── Dark header ─────────────────────────────────────────────────── */}
-        <header className="bg-[#131218] px-12 pt-10 pb-11">
-
-          {/* Eyebrow + back link */}
-          <div className="flex items-center justify-between mb-4">
-            <p className="text-[8px] font-bold tracking-[2.5px] uppercase text-white/20">
-              Portfolio · Garage · {project.name}
-            </p>
-            <Link
-              href="/admin/garage-view"
-              className="text-[10px] font-bold text-white/25 hover:text-white/60 transition-colors"
+        {/* K-v2 thin header */}
+        <header
+          className="flex items-center justify-between gap-6 px-9 py-3.5"
+          style={{ borderBottom: "1px solid var(--hall-ink-0)" }}
+        >
+          <div className="flex items-baseline gap-4 min-w-0">
+            <span
+              className="text-[10px] tracking-[0.08em] whitespace-nowrap"
+              style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
             >
-              ← Back to Garage
-            </Link>
-          </div>
-
-          {/* Title */}
-          <h1 className="text-[2.6rem] font-light text-white tracking-[-1.5px] leading-none mb-3">
-            {prefix}<em className="font-black italic text-[#c8f55a] not-italic"
-              style={{ fontStyle: "italic" }}>{em}</em>
-          </h1>
-
-          {/* Subtitle row */}
-          <div className="flex items-center gap-4 flex-wrap">
-            {project.stage && (
-              <span className="text-[11px] font-semibold text-white/50">{project.stage}</span>
-            )}
-            {project.geography.length > 0 && (
-              <>
-                <span className="text-white/15">·</span>
-                <span className="text-[11px] text-white/35">{project.geography.slice(0, 2).join(", ")}</span>
-              </>
-            )}
-            <span className="text-white/15">·</span>
-            <span className={`flex items-center gap-1.5 text-[11px] font-semibold ${warmth.text}`}>
-              <span className={`w-1.5 h-1.5 rounded-full ${warmth.dot}`} />
-              {warmth.label}
+              PORTFOLIO · GARAGE ·{" "}
+              <b style={{ color: "var(--hall-ink-0)" }}>{project.name}</b>
             </span>
-            {project.engagementStage && (
-              <>
-                <span className="text-white/15">·</span>
-                <span className="text-[11px] text-white/35">{project.engagementStage}</span>
-              </>
-            )}
+            <h1
+              className="text-[16px] font-medium tracking-[-0.01em]"
+              style={{ color: "var(--hall-ink-0)" }}
+            >
+              {prefix}
+              <em
+                style={{
+                  fontFamily: "var(--font-hall-display)",
+                  fontStyle: "italic",
+                  fontWeight: 400,
+                  color: "var(--hall-ink-0)",
+                }}
+              >
+                {em}
+              </em>
+            </h1>
           </div>
+          <Link
+            href="/admin/garage-view"
+            className="hall-btn-ghost"
+            style={{ fontSize: 11 }}
+          >
+            ← Back to Garage
+          </Link>
         </header>
 
+        {/* Subtitle row */}
+        <div
+          className="flex items-center gap-4 flex-wrap px-9 py-3"
+          style={{ borderBottom: "1px solid var(--hall-line-soft)" }}
+        >
+          {project.stage && (
+            <span style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10.5, color: "var(--hall-muted-2)" }}>
+              {project.stage}
+            </span>
+          )}
+          {project.geography.length > 0 && (
+            <>
+              <span style={{ color: "var(--hall-muted-3)" }}>·</span>
+              <span style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10.5, color: "var(--hall-muted-2)" }}>
+                {project.geography.slice(0, 2).join(", ")}
+              </span>
+            </>
+          )}
+          <span style={{ color: "var(--hall-muted-3)" }}>·</span>
+          <span
+            className="flex items-center gap-1.5"
+            style={{
+              fontFamily: "var(--font-hall-mono)",
+              fontSize: 10.5,
+              fontWeight: 700,
+              color: warmth.text,
+            }}
+          >
+            <span className="w-1.5 h-1.5 rounded-full" style={{ background: warmth.dot }} />
+            {warmth.label}
+          </span>
+          {project.engagementStage && (
+            <>
+              <span style={{ color: "var(--hall-muted-3)" }}>·</span>
+              <span style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10.5, color: "var(--hall-muted-2)" }}>
+                {project.engagementStage}
+              </span>
+            </>
+          )}
+        </div>
+
         {/* ── Stats bar ────────────────────────────────────────────────────── */}
-        <div className="bg-white border-b border-[#E0E0D8] px-12 py-4">
+        <div
+          className="px-9 py-4"
+          style={{ borderBottom: "1px solid var(--hall-line-soft)", background: "var(--hall-paper-0)" }}
+        >
           <div className="grid grid-cols-6 gap-4">
             {[
               { label: "Stage",       value: project.stage    || "—"                                    },
@@ -144,8 +183,21 @@ export default async function GarageDetailPage({ params }: { params: Promise<{ i
                   : "—"                                                                                 },
             ].map(stat => (
               <div key={stat.label}>
-                <p className="text-[8px] font-bold tracking-widest uppercase text-[#131218]/25 mb-0.5">{stat.label}</p>
-                <p className="text-[15px] font-bold text-[#131218] tracking-tight">{stat.value}</p>
+                <p
+                  className="mb-0.5"
+                  style={{
+                    fontFamily: "var(--font-hall-mono)",
+                    fontSize: 10,
+                    letterSpacing: "0.08em",
+                    textTransform: "uppercase",
+                    color: "var(--hall-muted-2)",
+                  }}
+                >
+                  {stat.label}
+                </p>
+                <p className="text-[15px] font-bold tracking-tight" style={{ color: "var(--hall-ink-0)" }}>
+                  {stat.value}
+                </p>
               </div>
             ))}
           </div>

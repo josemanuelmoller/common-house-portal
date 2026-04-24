@@ -56,20 +56,6 @@ const PRIORITY_SHORT: Record<string, string> = {
   "P1 — Act Now": "P1", "P2 — This Quarter": "P2", "P3 — Backlog": "P3", "P4 — Watch": "P4",
 };
 
-const STATUS_COLOR: Record<string, string> = {
-  "Qualifying": "bg-[#B2FF59]/20 text-green-800",
-  "Active":     "bg-[#B2FF59]/20 text-green-800",
-  "New":        "bg-[#131218]/6 text-[#131218]/50",
-  "Stalled":    "bg-amber-100 text-amber-700",
-};
-
-const PRIORITY_COLOR: Record<string, string> = {
-  "P1": "bg-red-100 text-red-700",
-  "P2": "bg-amber-100 text-amber-700",
-  "P3": "bg-[#131218]/6 text-[#131218]/40",
-  "P4": "bg-[#131218]/6 text-[#131218]/30",
-};
-
 // ─── Data fetching ────────────────────────────────────────────────────────────
 
 async function getGrantOpportunities(): Promise<GrantOpportunity[]> {
@@ -149,6 +135,20 @@ async function getGrantOpportunities(): Promise<GrantOpportunity[]> {
   });
 }
 
+// ─── Pill helpers ──────────────────────────────────────────────────────────────
+
+function statusStyle(status: string): { bg: string; color: string } {
+  if (status === "Qualifying" || status === "Active") return { bg: "var(--hall-ok-soft)", color: "var(--hall-ok)" };
+  if (status === "Stalled")                           return { bg: "var(--hall-warn-soft)", color: "var(--hall-warn)" };
+  return { bg: "var(--hall-fill-soft)", color: "var(--hall-muted-2)" };
+}
+
+function priorityStyle(p: string): { bg: string; color: string } {
+  if (p === "P1") return { bg: "var(--hall-danger-soft)", color: "var(--hall-danger)" };
+  if (p === "P2") return { bg: "var(--hall-warn-soft)", color: "var(--hall-warn)" };
+  return { bg: "var(--hall-fill-soft)", color: "var(--hall-muted-3)" };
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default async function GrantsPage() {
@@ -167,51 +167,59 @@ export default async function GrantsPage() {
   );
   const withDeadlines  = grantDecisions.filter(d => d.dueDate);
 
+  const eyebrowDate = new Date()
+    .toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })
+    .toUpperCase();
+
   return (
-    <div className="flex min-h-screen bg-[#EFEFEA]">
+    <div className="flex min-h-screen" style={{ background: "var(--hall-paper-0)" }}>
       <Sidebar adminNav />
 
-      <main className="flex-1 ml-[228px]">
+      <main
+        className="flex-1 ml-[228px]"
+        style={{ fontFamily: "var(--font-hall-sans)", background: "var(--hall-paper-0)" }}
+      >
 
-        {/* Dark header */}
-        <header className="bg-[#131218] px-12 pt-10 pb-11">
-          <p className="text-[8px] font-bold tracking-[2.5px] uppercase text-white/20 mb-3">
-            Commercial · Funding
-          </p>
-          <div className="flex items-end justify-between">
-            <div>
-              <h1 className="text-[2.6rem] font-light text-white tracking-[-1.5px] leading-none">
-                Grants <em className="font-black italic text-[#c8f55a]">Desk</em>
-              </h1>
-              <p className="text-sm text-white/40 mt-3">
-                Grant pipeline — funder, program, startup fit and application status.
-              </p>
-            </div>
-            <div className="flex items-center gap-4 pb-1">
-              <div className="text-right">
-                <p className="text-[2rem] font-black text-white tracking-tight leading-none">{grants.length}</p>
-                <p className="text-[9px] font-bold tracking-[1.5px] uppercase text-white/30 mt-0.5">Active</p>
-              </div>
-              {urgentGrants.length > 0 && (
-                <>
-                  <div className="w-px h-10 bg-white/10" />
-                  <div className="text-right">
-                    <p className="text-[2rem] font-black text-red-400 tracking-tight leading-none">{urgentGrants.length}</p>
-                    <p className="text-[9px] font-bold tracking-[1.5px] uppercase text-white/30 mt-0.5">P1 urgent</p>
-                  </div>
-                </>
-              )}
-            </div>
+        {/* K-v2 collapsed header */}
+        <header
+          className="flex items-center justify-between gap-6 px-9 py-3.5"
+          style={{ borderBottom: "1px solid var(--hall-ink-0)" }}
+        >
+          <div className="flex items-baseline gap-4 min-w-0">
+            <span
+              className="text-[10px] tracking-[0.08em] whitespace-nowrap"
+              style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+            >
+              GRANTS · <b style={{ color: "var(--hall-ink-0)" }}>{eyebrowDate}</b>
+            </span>
+            <h1
+              className="text-[16px] font-medium tracking-[-0.01em] truncate"
+              style={{ color: "var(--hall-ink-0)" }}
+            >
+              Grants <em className="hall-flourish">Desk</em>
+            </h1>
+          </div>
+          <div
+            className="flex items-center gap-4"
+            style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--hall-muted-2)", letterSpacing: "0.06em" }}
+          >
+            <span>{grants.length} ACTIVE</span>
+            {urgentGrants.length > 0 && (
+              <span style={{color: "var(--hall-danger)"}}>{urgentGrants.length} P1</span>
+            )}
           </div>
         </header>
 
-        <div className="px-12 py-9 max-w-6xl space-y-6">
+        <div className="px-9 py-6 max-w-6xl space-y-7">
 
           {/* P1 banner */}
           {(p1Decisions.length > 0 || withDeadlines.length > 0) && (
-            <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-xl px-5 py-3.5">
-              <span className="w-2 h-2 rounded-full bg-red-500 shrink-0 animate-pulse" />
-              <p className="text-sm text-[#131218] flex-1 min-w-0">
+            <div
+              className="flex items-center gap-3 px-5 py-3.5"
+              style={{ border: "1px solid var(--hall-danger)", background: "var(--hall-danger-soft)", borderRadius: 3 }}
+            >
+              <span className="w-2 h-2 rounded-full shrink-0 animate-pulse" style={{background: "var(--hall-danger)"}} />
+              <p className="text-sm flex-1 min-w-0" style={{color: "var(--hall-ink-0)"}}>
                 {p1Decisions.length > 0 && (
                   <><strong>{p1Decisions.length} urgent decision{p1Decisions.length !== 1 ? "s" : ""}</strong>{" — "}{p1Decisions[0].title}</>
                 )}
@@ -221,7 +229,11 @@ export default async function GrantsPage() {
                   {" — "}{withDeadlines[0].title}{withDeadlines[0].dueDate ? ` closes ${new Date(withDeadlines[0].dueDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}` : ""}</>
                 )}
               </p>
-              <Link href="/admin/decisions" className="text-[11px] font-bold text-red-600 shrink-0 hover:text-red-800 transition-colors whitespace-nowrap">
+              <Link
+                href="/admin/decisions"
+                className="text-[11px] font-bold shrink-0 whitespace-nowrap"
+                style={{color: "var(--hall-danger)"}}
+              >
                 Review →
               </Link>
             </div>
@@ -229,41 +241,36 @@ export default async function GrantsPage() {
 
           {/* Stats row */}
           <div className="grid grid-cols-4 gap-4">
-            <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-4">
-              <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30 mb-2">Grant pipeline</p>
-              <p className="text-3xl font-bold text-[#131218] tracking-tight">{grants.length}</p>
-              <p className="text-[11px] text-[#131218]/40 font-medium mt-1.5">Active opportunities</p>
-            </div>
-            <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-4">
-              <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30 mb-2">Following</p>
-              {followedGrants.length > 0
-                ? <p className="text-3xl font-bold text-green-600 tracking-tight">{followedGrants.length}</p>
-                : <p className="text-3xl font-bold text-[#131218]/15 tracking-tight">0</p>
-              }
-              <p className="text-[11px] text-[#131218]/40 font-medium mt-1.5">In Hall / Suggested Blocks</p>
-            </div>
-            <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-4">
-              <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30 mb-2">P1 — Act Now</p>
-              {urgentGrants.length > 0
-                ? <p className="text-3xl font-bold text-red-500 tracking-tight">{urgentGrants.length}</p>
-                : <p className="text-3xl font-bold text-[#131218]/15 tracking-tight">0</p>
-              }
-              <p className="text-[11px] text-[#131218]/40 font-medium mt-1.5">Require immediate action</p>
-            </div>
-            <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-4">
-              <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30 mb-2">Open decisions</p>
-              {grantDecisions.length > 0
-                ? <p className="text-3xl font-bold text-amber-500 tracking-tight">{grantDecisions.length}</p>
-                : <p className="text-3xl font-bold text-[#131218]/15 tracking-tight">0</p>
-              }
-              <p className="text-[11px] text-[#131218]/40 font-medium mt-1.5">Approvals / inputs pending</p>
-            </div>
+            {[
+              { label: "Grant pipeline", value: grants.length, sub: "Active opportunities", color: "var(--hall-ink-0)" },
+              { label: "Following", value: followedGrants.length, sub: "In Hall / Suggested Blocks", color: followedGrants.length > 0 ? "var(--hall-ok)" : "var(--hall-muted-3)" },
+              { label: "P1 — Act Now", value: urgentGrants.length, sub: "Require immediate action", color: urgentGrants.length > 0 ? "var(--hall-danger)" : "var(--hall-muted-3)" },
+              { label: "Open decisions", value: grantDecisions.length, sub: "Approvals / inputs pending", color: grantDecisions.length > 0 ? "var(--hall-warn)" : "var(--hall-muted-3)" },
+            ].map(s => (
+              <div
+                key={s.label}
+                className="px-5 py-4"
+                style={{ border: "1px solid var(--hall-line-soft)", borderRadius: 3, background: "var(--hall-paper-0)" }}
+              >
+                <p
+                  className="text-[9px] font-bold tracking-widest uppercase mb-2"
+                  style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-3)" }}
+                >
+                  {s.label}
+                </p>
+                <p className="text-3xl font-bold tracking-tight tabular-nums" style={{color: s.color}}>{s.value}</p>
+                <p className="text-[11px] font-medium mt-1.5" style={{color: "var(--hall-muted-2)"}}>{s.sub}</p>
+              </div>
+            ))}
           </div>
 
           {/* Activation model notice */}
-          <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-3.5">
-            <p className="text-[11px] text-[#131218]/60 leading-snug">
-              <strong className="text-[#131218]">Grants are passive by default.</strong>{" "}
+          <div
+            className="px-5 py-3.5"
+            style={{ border: "1px solid var(--hall-line-soft)", borderRadius: 3, background: "var(--hall-paper-1)" }}
+          >
+            <p className="text-[11px] leading-snug" style={{color: "var(--hall-ink-3)"}}>
+              <strong style={{color: "var(--hall-ink-0)"}}>Grants are passive by default.</strong>{" "}
               System-discovered grants stay here until you <em>Follow</em> one. Only followed grants enter the Hall,
               Suggested Time Blocks and Chief-of-Staff. Unfollow or Dismiss to suppress re-surfacing.
             </p>
@@ -273,139 +280,211 @@ export default async function GrantsPage() {
           <div className="grid grid-cols-[1fr_320px] gap-6 items-start">
 
             {/* Grant opportunity pipeline table */}
-            <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-              <div className="flex items-center justify-between px-5 py-3.5 border-b border-[#EFEFEA]">
-                <div className="flex items-center gap-2">
-                  <div className="w-5 h-5 rounded-md bg-[#B2FF59] flex items-center justify-center">
-                    <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="#000" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                    </svg>
-                  </div>
-                  <span className="text-[11px] font-bold text-[#131218]/60 tracking-wide">Grant pipeline</span>
-                </div>
+            <section>
+              <div
+                className="flex items-baseline justify-between gap-3 pb-2 mb-3.5"
+                style={{borderBottom: "1px solid var(--hall-ink-0)"}}
+              >
+                <h2
+                  className="text-[19px] font-bold leading-none"
+                  style={{letterSpacing: "-0.02em", color: "var(--hall-ink-0)"}}
+                >
+                  Grant <em className="hall-flourish">pipeline</em>
+                </h2>
                 <a
                   href="https://www.notion.so/687caa98594a41b595c9960c141be0c0"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-[9px] font-bold text-[#131218]/30 hover:text-[#131218]/60 transition-colors uppercase tracking-widest"
+                  style={{
+                    fontFamily: "var(--font-hall-mono)",
+                    fontSize: 10,
+                    color: "var(--hall-muted-2)",
+                    letterSpacing: "0.06em",
+                  }}
                 >
-                  Open in Notion →
+                  OPEN IN NOTION →
                 </a>
               </div>
 
               {grants.length === 0 ? (
-                <div className="px-5 py-10 text-center">
-                  <p className="text-sm text-[#131218]/25">No active grant opportunities.</p>
+                <div
+                  className="px-5 py-10 text-center"
+                  style={{ border: "1px solid var(--hall-line-soft)", borderRadius: 3 }}
+                >
+                  <p className="text-sm" style={{color: "var(--hall-muted-3)"}}>No active grant opportunities.</p>
                 </div>
               ) : (
                 <table className="w-full text-left">
                   <thead>
-                    <tr className="border-b border-[#EFEFEA]">
+                    <tr style={{ borderBottom: "1px solid var(--hall-line-soft)", background: "var(--hall-paper-1)" }}>
                       {["Funder / Program", "Status", "Priority", "For", "Activation"].map(h => (
-                        <th key={h} className="px-4 py-2.5 text-[8.5px] font-bold tracking-widest uppercase text-[#131218]/25 first:pl-5 last:pr-5">
+                        <th
+                          key={h}
+                          className="px-4 py-2.5 text-[8.5px] font-bold tracking-widest uppercase first:pl-5 last:pr-5"
+                          style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-3)" }}
+                        >
                           {h}
                         </th>
                       ))}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[#EFEFEA]">
-                    {[...grants].sort((a, b) => Number(b.isFollowed) - Number(a.isFollowed)).map(g => (
-                      <tr key={g.id} className={`hover:bg-[#EFEFEA]/40 transition-colors group ${g.isFollowed ? "bg-[#B2FF59]/5" : ""}`}>
-                        <td className="pl-5 pr-4 py-3.5">
-                          <div className="flex items-center gap-2">
-                            <p className="text-[12px] font-bold text-[#131218] leading-tight">{g.funder || g.program}</p>
-                            {g.isFollowed && (
-                              <span className="inline-flex items-center gap-1 text-[8px] font-bold px-1.5 py-0.5 rounded bg-[#B2FF59]/30 text-green-900" title="Explicitly followed by Jose">
-                                <span className="w-1 h-1 rounded-full bg-green-600" />
-                                FOLLOWING
-                              </span>
+                  <tbody>
+                    {[...grants].sort((a, b) => Number(b.isFollowed) - Number(a.isFollowed)).map(g => {
+                      const sStyle = statusStyle(g.status);
+                      const pStyle = priorityStyle(g.priority);
+                      return (
+                        <tr
+                          key={g.id}
+                          className="group"
+                          style={{ borderTop: "1px solid var(--hall-line-soft)" }}
+                        >
+                          <td className="pl-5 pr-4 py-3.5">
+                            <div className="flex items-center gap-2">
+                              <p className="text-[12px] font-bold leading-tight" style={{color: "var(--hall-ink-0)"}}>{g.funder || g.program}</p>
+                              {g.isFollowed && (
+                                <span
+                                  className="inline-flex items-center gap-1 text-[8px] font-bold px-1.5 py-0.5 rounded"
+                                  style={{
+                                    fontFamily: "var(--font-hall-mono)",
+                                    background: "var(--hall-ok-soft)",
+                                    color: "var(--hall-ok)",
+                                    letterSpacing: "0.06em",
+                                  }}
+                                  title="Explicitly followed by Jose"
+                                >
+                                  <span className="w-1 h-1 rounded-full" style={{background: "var(--hall-ok)"}} />
+                                  FOLLOWING
+                                </span>
+                              )}
+                            </div>
+                            {g.program && g.program !== g.funder && (
+                              <p className="text-[10px] mt-0.5 font-medium" style={{color: "var(--hall-muted-3)"}}>{g.program}</p>
                             )}
-                          </div>
-                          {g.program && g.program !== g.funder && (
-                            <p className="text-[10px] text-[#131218]/40 mt-0.5 font-medium">{g.program}</p>
-                          )}
-                          {!g.isFollowed && g.unfollowReason && (
-                            <p className="text-[9px] text-[#131218]/30 mt-0.5 italic" title="Dismiss reason">
-                              Dismissed: {g.unfollowReason}
-                            </p>
-                          )}
-                        </td>
-                        <td className="px-4 py-3.5">
-                          <span className={`inline-flex text-[9px] font-bold px-2 py-0.5 rounded-full ${STATUS_COLOR[g.status] ?? "bg-[#131218]/6 text-[#131218]/40"}`}>
-                            {g.statusLabel}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3.5">
-                          {g.priority ? (
-                            <span className={`inline-flex text-[9px] font-bold px-2 py-0.5 rounded-full ${PRIORITY_COLOR[g.priority] ?? "bg-[#131218]/6 text-[#131218]/40"}`}>
-                              {g.priority}
+                            {!g.isFollowed && g.unfollowReason && (
+                              <p className="text-[9px] mt-0.5 italic" style={{color: "var(--hall-muted-3)"}} title="Dismiss reason">
+                                Dismissed: {g.unfollowReason}
+                              </p>
+                            )}
+                          </td>
+                          <td className="px-4 py-3.5">
+                            <span
+                              className="inline-flex text-[9px] font-bold px-2 py-0.5 rounded-full"
+                              style={{
+                                fontFamily: "var(--font-hall-mono)",
+                                background: sStyle.bg,
+                                color: sStyle.color,
+                              }}
+                            >
+                              {g.statusLabel}
                             </span>
-                          ) : (
-                            <span className="text-[10px] text-[#131218]/20">—</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3.5">
-                          <span className="text-[10px] font-semibold text-[#131218]/50">
-                            {g.startup || "—"}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3.5 pr-5">
-                          <GrantFollowButton opportunityId={g.id} initialFollowed={g.isFollowed} />
-                        </td>
-                      </tr>
-                    ))}
+                          </td>
+                          <td className="px-4 py-3.5">
+                            {g.priority ? (
+                              <span
+                                className="inline-flex text-[9px] font-bold px-2 py-0.5 rounded-full"
+                                style={{
+                                  fontFamily: "var(--font-hall-mono)",
+                                  background: pStyle.bg,
+                                  color: pStyle.color,
+                                }}
+                              >
+                                {g.priority}
+                              </span>
+                            ) : (
+                              <span className="text-[10px]" style={{color: "var(--hall-muted-3)"}}>—</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3.5">
+                            <span className="text-[10px] font-semibold" style={{color: "var(--hall-muted-2)"}}>
+                              {g.startup || "—"}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3.5 pr-5">
+                            <GrantFollowButton opportunityId={g.id} initialFollowed={g.isFollowed} />
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               )}
-            </div>
+            </section>
 
             {/* Grant decisions */}
-            <div>
-              <div className="flex items-center gap-3 mb-3">
-                <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30">Open decisions</p>
-                <div className="flex-1 h-px bg-[#E0E0D8]" />
+            <section>
+              <div
+                className="flex items-baseline justify-between gap-3 pb-2 mb-3.5"
+                style={{borderBottom: "1px solid var(--hall-ink-0)"}}
+              >
+                <h2
+                  className="text-[19px] font-bold leading-none"
+                  style={{letterSpacing: "-0.02em", color: "var(--hall-ink-0)"}}
+                >
+                  Open <em className="hall-flourish">decisions</em>
+                </h2>
                 {grantDecisions.length > 0 && (
-                  <span className="text-[9px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">{grantDecisions.length}</span>
+                  <span
+                    style={{fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--hall-warn)", letterSpacing: "0.06em"}}
+                  >
+                    {grantDecisions.length} OPEN
+                  </span>
                 )}
               </div>
 
-              <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-                <div className="divide-y divide-[#EFEFEA]">
-                  {grantDecisions.slice(0, 8).map(d => (
-                    <Link key={d.id} href="/admin/decisions" className="flex items-start gap-3 px-4 py-3 hover:bg-[#EFEFEA]/40 transition-colors">
-                      <div className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 mt-0.5 ${
-                        d.priority === "P1" || d.priority === "P1 Critical" || d.priority === "Urgent"
-                          ? "bg-red-100" : "bg-[#EFEFEA]"
-                      }`}>
-                        <span className={`text-[8px] font-bold ${
-                          d.priority === "P1" || d.priority === "P1 Critical" || d.priority === "Urgent"
-                            ? "text-red-600" : "text-[#131218]/30"
-                        }`}>
-                          {d.priority?.startsWith("P1") || d.priority === "Urgent" ? "P1" : "·"}
-                        </span>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[11px] font-semibold text-[#131218] leading-snug line-clamp-2">{d.title}</p>
-                        <p className="text-[9px] text-[#131218]/35 mt-0.5">
-                          {d.decisionType || "Decision"}
-                          {d.dueDate && ` · Closes ${new Date(d.dueDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`}
-                        </p>
-                      </div>
-                    </Link>
-                  ))}
-                  {grantDecisions.length === 0 && (
-                    <div className="px-4 py-6 text-center">
-                      <p className="text-[11px] text-[#131218]/25 font-medium">No open grant decisions</p>
-                    </div>
-                  )}
-                </div>
-                <div className="px-4 py-2.5 border-t border-[#EFEFEA]">
-                  <Link href="/admin/decisions" className="text-[9px] font-bold text-[#131218]/30 hover:text-[#131218]/60 transition-colors uppercase tracking-widest">
-                    All decisions →
-                  </Link>
-                </div>
+              <ul className="flex flex-col">
+                {grantDecisions.slice(0, 8).map((d, idx) => {
+                  const isUrgent = d.priority === "P1" || d.priority === "P1 Critical" || d.priority === "Urgent";
+                  return (
+                    <li
+                      key={d.id}
+                      style={idx === 0 ? undefined : {borderTop: "1px solid var(--hall-line-soft)"}}
+                    >
+                      <Link href="/admin/decisions" className="flex items-start gap-3 py-3 transition-colors">
+                        <div
+                          className="w-5 h-5 rounded flex items-center justify-center shrink-0 mt-0.5"
+                          style={{
+                            background: isUrgent ? "var(--hall-danger-soft)" : "var(--hall-fill-soft)",
+                          }}
+                        >
+                          <span
+                            className="text-[8px] font-bold"
+                            style={{
+                              fontFamily: "var(--font-hall-mono)",
+                              color: isUrgent ? "var(--hall-danger)" : "var(--hall-muted-3)",
+                            }}
+                          >
+                            {d.priority?.startsWith("P1") || d.priority === "Urgent" ? "P1" : "·"}
+                          </span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[11px] font-semibold leading-snug line-clamp-2" style={{color: "var(--hall-ink-0)"}}>{d.title}</p>
+                          <p
+                            className="text-[9px] mt-0.5"
+                            style={{fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-3)", letterSpacing: "0.06em"}}
+                          >
+                            {d.decisionType || "Decision"}
+                            {d.dueDate && ` · Closes ${new Date(d.dueDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`}
+                          </p>
+                        </div>
+                      </Link>
+                    </li>
+                  );
+                })}
+                {grantDecisions.length === 0 && (
+                  <li className="py-6 text-center">
+                    <p className="text-[11px] font-medium" style={{color: "var(--hall-muted-3)"}}>No open grant decisions</p>
+                  </li>
+                )}
+              </ul>
+              <div className="pt-3 mt-2" style={{borderTop: "1px solid var(--hall-line-soft)"}}>
+                <Link
+                  href="/admin/decisions"
+                  style={{fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--hall-muted-2)", letterSpacing: "0.06em"}}
+                >
+                  ALL DECISIONS →
+                </Link>
               </div>
-            </div>
+            </section>
 
           </div>
         </div>

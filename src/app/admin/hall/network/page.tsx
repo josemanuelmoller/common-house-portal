@@ -8,27 +8,49 @@ export default async function NetworkPage() {
   await requireAdmin();
 
   return (
-    <div className="flex min-h-screen bg-white">
+    <div className="flex min-h-screen" style={{ background: "var(--hall-paper-0)" }}>
       <Sidebar adminNav />
-      <main className="flex-1 ml-[228px]">
-        <header className="px-12 pt-10 pb-6 border-b-2 border-black">
-          <div className="flex items-end justify-between">
-            <div>
-              <p className="text-[9px] font-bold tracking-[2px] uppercase text-black/60 mb-2">Hall · Network</p>
-              <h1 className="text-[2.4rem] font-light text-black tracking-[-1px] leading-none">
-                Relationship <em className="font-black italic">Map</em>
-              </h1>
-            </div>
-            <span className="inline-block bg-[#c8f55a] text-black text-[9px] font-bold tracking-[1.8px] uppercase rounded-full px-2.5 py-1">
-              Co-attendance · 180d
+      <main
+        className="flex-1 ml-60 overflow-auto"
+        style={{ fontFamily: "var(--font-hall-sans)" }}
+      >
+        <header
+          className="flex items-center justify-between gap-6 px-9 py-3.5"
+          style={{ borderBottom: "1px solid var(--hall-ink-0)" }}
+        >
+          <div className="flex items-baseline gap-4 min-w-0">
+            <span
+              className="text-[10px] tracking-[0.08em] whitespace-nowrap uppercase"
+              style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+            >
+              HALL · <b style={{ color: "var(--hall-ink-0)" }}>NETWORK</b>
             </span>
+            <h1
+              className="text-[16px] font-medium tracking-[-0.01em]"
+              style={{ color: "var(--hall-ink-0)" }}
+            >
+              Relationship{" "}
+              <em style={{ fontFamily: "var(--font-hall-display)", fontStyle: "italic", fontWeight: 400 }}>
+                map
+              </em>
+              .
+            </h1>
           </div>
-          <p className="text-[13px] text-[#444] mt-4 max-w-2xl leading-relaxed">
-            Contacts grouped by relationship class. Edges connect people who shared ≥ 2 meetings in the last 180 days. Hover any bubble to isolate its immediate network.
-          </p>
+          <span
+            className="text-[10px] font-bold tracking-[0.14em] uppercase whitespace-nowrap"
+            style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+          >
+            CO-ATTENDANCE · 180D
+          </span>
         </header>
 
-        <div className="px-6 py-8">
+        <div className="px-9 py-6">
+          <p
+            className="text-[11.5px] mb-5 max-w-2xl leading-relaxed"
+            style={{ color: "var(--hall-muted-2)" }}
+          >
+            Contacts grouped by relationship class. Edges connect people who shared ≥ 2 meetings in the last 180 days. Hover any bubble to isolate its immediate network.
+          </p>
           <NetworkGraph />
         </div>
       </main>

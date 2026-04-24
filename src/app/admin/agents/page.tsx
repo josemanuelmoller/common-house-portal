@@ -1,6 +1,6 @@
 import { requireAdmin } from "@/lib/require-admin";
 import { Sidebar } from "@/components/Sidebar";
-import { ADMIN_NAV } from "@/lib/admin-nav";
+import { HallSection } from "@/components/HallSection";
 
 // ── Static agent registry ────────────────────────────────────────────────────
 interface AgentDef {
@@ -148,43 +148,86 @@ type LiveStatus = "success" | "warning" | "error" | "skipped" | "none";
 
 function StatusDot({ status }: { status: LiveStatus }) {
   if (status === "success")
-    return <span className="w-2 h-2 rounded-full bg-[#c8f55a] flex-shrink-0" title="Success" />;
+    return <span className="w-2 h-2 rounded-full flex-shrink-0" title="Success" style={{ background: "var(--hall-ok)" }} />;
   if (status === "warning")
-    return <span className="w-2 h-2 rounded-full bg-[#FFE066] flex-shrink-0" title="Warning" />;
+    return <span className="w-2 h-2 rounded-full flex-shrink-0" title="Warning" style={{ background: "var(--hall-warn)" }} />;
   if (status === "error")
-    return <span className="w-2 h-2 rounded-full bg-[#FF6060] flex-shrink-0" title="Error" />;
+    return <span className="w-2 h-2 rounded-full flex-shrink-0" title="Error" style={{ background: "var(--hall-danger)" }} />;
   // skipped or none
-  return <span className="w-2 h-2 rounded-full bg-[#CCCCCC] flex-shrink-0" title="Sin datos" />;
+  return <span className="w-2 h-2 rounded-full flex-shrink-0" title="Sin datos" style={{ background: "var(--hall-muted-3)" }} />;
 }
 
 function StatusLabel({ status }: { status: LiveStatus }) {
   if (status === "success")
     return (
-      <span className="text-[10px] font-bold text-[#3a6600] bg-[#B2FF59]/20 px-2 py-0.5 rounded-full whitespace-nowrap">
+      <span
+        className="px-2 py-0.5 rounded-full whitespace-nowrap"
+        style={{
+          fontFamily: "var(--font-hall-mono)",
+          fontSize: 10,
+          fontWeight: 700,
+          color: "var(--hall-ok)",
+          background: "var(--hall-ok-soft)",
+        }}
+      >
         OK
       </span>
     );
   if (status === "warning")
     return (
-      <span className="text-[10px] font-bold text-[#7a5800] bg-[#FFE066]/20 px-2 py-0.5 rounded-full whitespace-nowrap">
+      <span
+        className="px-2 py-0.5 rounded-full whitespace-nowrap"
+        style={{
+          fontFamily: "var(--font-hall-mono)",
+          fontSize: 10,
+          fontWeight: 700,
+          color: "var(--hall-warn)",
+          background: "var(--hall-warn-soft)",
+        }}
+      >
         Warning
       </span>
     );
   if (status === "error")
     return (
-      <span className="text-[10px] font-bold text-[#7a0000] bg-[#FF6060]/20 px-2 py-0.5 rounded-full whitespace-nowrap">
+      <span
+        className="px-2 py-0.5 rounded-full whitespace-nowrap"
+        style={{
+          fontFamily: "var(--font-hall-mono)",
+          fontSize: 10,
+          fontWeight: 700,
+          color: "var(--hall-danger)",
+          background: "var(--hall-danger-soft)",
+        }}
+      >
         Error
       </span>
     );
   if (status === "skipped")
     return (
-      <span className="text-[10px] font-bold text-[#131218]/40 bg-[#CCCCCC]/20 px-2 py-0.5 rounded-full whitespace-nowrap">
+      <span
+        className="px-2 py-0.5 rounded-full whitespace-nowrap"
+        style={{
+          fontFamily: "var(--font-hall-mono)",
+          fontSize: 10,
+          fontWeight: 700,
+          color: "var(--hall-muted-3)",
+          background: "var(--hall-fill-soft)",
+        }}
+      >
         Skipped
       </span>
     );
   // none — no label
   return (
-    <span className="text-[10px] font-bold text-[#131218]/30 px-2 py-0.5 rounded-full whitespace-nowrap">
+    <span
+      className="px-2 py-0.5 whitespace-nowrap"
+      style={{
+        fontFamily: "var(--font-hall-mono)",
+        fontSize: 10,
+        color: "var(--hall-muted-3)",
+      }}
+    >
       —
     </span>
   );
@@ -210,212 +253,332 @@ export default async function AgentsPage() {
       ).ran_at
     : null;
 
+  const todayLabel = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+
   return (
-    <div className="flex min-h-screen bg-[#EFEFEA]">
+    <div className="flex min-h-screen" style={{ background: "var(--hall-paper-0)" }}>
       <Sidebar adminNav />
 
-      <main className="flex-1 ml-60 flex flex-col">
-        {/* Page header */}
-        <div className="bg-[#131218] px-10 py-10">
-          <p className="text-[8px] font-bold uppercase tracking-[2.5px] text-white/20 mb-3">
-            CONTROL ROOM · OS v2
-          </p>
-          <div className="flex items-end justify-between">
-            <div>
-              <h1 className="text-[2.6rem] font-[300] text-white leading-[1] tracking-[-1.5px]">
-                Agent <em className="font-[900] italic text-[#c8f55a]">Registry</em>
-              </h1>
-              <p className="text-[12.5px] text-white/40 mt-3 max-w-[520px] leading-[1.65]">
-                OS v2 agents — schedules, live run status, and telemetry.
-              </p>
-            </div>
-            <div className="flex items-center gap-3 pb-1">
-              {errorCount > 0 && (
-                <span className="inline-flex items-center gap-1.5 bg-[#3a0000] border border-[rgba(255,80,80,0.3)] rounded-full px-2.5 py-1 text-[9px] font-bold text-[#ff8080] uppercase tracking-[0.5px]">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#ff6060]" />
-                  {errorCount} error{errorCount > 1 ? "s" : ""}
-                </span>
-              )}
-              {warnCount > 0 && (
-                <span className="inline-flex items-center gap-1.5 bg-[#3a2000] border border-[rgba(255,200,80,0.3)] rounded-full px-2.5 py-1 text-[9px] font-bold text-[#FFE066] uppercase tracking-[0.5px]">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#FFE066]" />
-                  {warnCount} warning{warnCount > 1 ? "s" : ""}
-                </span>
-              )}
-              {errorCount === 0 && warnCount === 0 && hasTelemetry && (
-                <span className="inline-flex items-center gap-1.5 bg-[#c8f55a]/10 border border-[#c8f55a]/20 rounded-full px-2.5 py-1 text-[9px] font-bold text-[#c8f55a] uppercase tracking-[0.5px]">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#c8f55a]" />
-                  {successCount} ok
-                </span>
-              )}
-              {!hasTelemetry && (
-                <span className="inline-flex items-center gap-1.5 bg-white/5 border border-white/10 rounded-full px-2.5 py-1 text-[9px] font-bold text-white/30 uppercase tracking-[0.5px]">
-                  Sin telemetría
-                </span>
-              )}
-            </div>
+      <main
+        className="flex-1 ml-60 flex flex-col"
+        style={{ fontFamily: "var(--font-hall-sans)", background: "var(--hall-paper-0)" }}
+      >
+        {/* Page header — thin one-line */}
+        <header
+          className="flex items-center justify-between gap-6 px-9 py-3.5"
+          style={{ borderBottom: "1px solid var(--hall-ink-0)" }}
+        >
+          <div className="flex items-baseline gap-4 min-w-0">
+            <span
+              className="text-[10px] tracking-[0.08em] whitespace-nowrap"
+              style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+            >
+              CONTROL ROOM · OS v2 ·{" "}
+              <b style={{ color: "var(--hall-ink-0)" }}>{todayLabel}</b>
+            </span>
+            <h1
+              className="text-[16px] font-medium tracking-[-0.01em]"
+              style={{ color: "var(--hall-ink-0)" }}
+            >
+              Agent Registry
+            </h1>
           </div>
-        </div>
+          <div className="flex items-center gap-2">
+            {errorCount > 0 && (
+              <span
+                className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1"
+                style={{
+                  fontFamily: "var(--font-hall-mono)",
+                  fontSize: 10,
+                  fontWeight: 700,
+                  color: "var(--hall-danger)",
+                  background: "var(--hall-danger-soft)",
+                }}
+              >
+                <span className="w-1.5 h-1.5 rounded-full" style={{ background: "var(--hall-danger)" }} />
+                {errorCount} error{errorCount > 1 ? "s" : ""}
+              </span>
+            )}
+            {warnCount > 0 && (
+              <span
+                className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1"
+                style={{
+                  fontFamily: "var(--font-hall-mono)",
+                  fontSize: 10,
+                  fontWeight: 700,
+                  color: "var(--hall-warn)",
+                  background: "var(--hall-warn-soft)",
+                }}
+              >
+                <span className="w-1.5 h-1.5 rounded-full" style={{ background: "var(--hall-warn)" }} />
+                {warnCount} warning{warnCount > 1 ? "s" : ""}
+              </span>
+            )}
+            {errorCount === 0 && warnCount === 0 && hasTelemetry && (
+              <span
+                className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1"
+                style={{
+                  fontFamily: "var(--font-hall-mono)",
+                  fontSize: 10,
+                  fontWeight: 700,
+                  color: "var(--hall-ok)",
+                  background: "var(--hall-ok-soft)",
+                }}
+              >
+                <span className="w-1.5 h-1.5 rounded-full" style={{ background: "var(--hall-ok)" }} />
+                {successCount} ok
+              </span>
+            )}
+            {!hasTelemetry && (
+              <span
+                className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1"
+                style={{
+                  fontFamily: "var(--font-hall-mono)",
+                  fontSize: 10,
+                  fontWeight: 700,
+                  color: "var(--hall-muted-3)",
+                  background: "var(--hall-fill-soft)",
+                }}
+              >
+                Sin telemetría
+              </span>
+            )}
+          </div>
+        </header>
 
         {/* Content */}
-        <div className="flex-1 px-10 py-8">
+        <div className="flex-1 px-9 py-7">
           <div className="max-w-4xl">
 
             {/* Architecture diagram */}
-            <div className="bg-white border border-[#E0E0D8] rounded-2xl overflow-hidden mb-6">
-              <div className="px-5 py-3.5 border-b border-[#E0E0D8] flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-md bg-[#131218] flex items-center justify-center">
-                    <svg viewBox="0 0 14 14" width="11" height="11" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round">
-                      <rect x="2" y="2" width="4" height="4" rx="1"/>
-                      <rect x="8" y="2" width="4" height="4" rx="1"/>
-                      <rect x="2" y="8" width="4" height="4" rx="1"/>
-                      <rect x="8" y="8" width="4" height="4" rx="1"/>
-                    </svg>
-                  </div>
-                  <span className="text-[11px] font-[800] text-[#131218] tracking-tight">
-                    Architecture map
-                  </span>
-                </div>
+            <section
+              className="mb-7"
+              style={{ fontFamily: "var(--font-hall-sans)" }}
+            >
+              <div
+                className="flex items-baseline justify-between gap-3 pb-2 mb-3.5"
+                style={{ borderBottom: "1px solid var(--hall-ink-0)" }}
+              >
+                <h2
+                  className="text-[19px] font-bold leading-none"
+                  style={{ letterSpacing: "-0.02em", color: "var(--hall-ink-0)" }}
+                >
+                  Architecture{" "}
+                  <em
+                    style={{
+                      fontFamily: "var(--font-hall-display)",
+                      fontStyle: "italic",
+                      fontWeight: 400,
+                      color: "var(--hall-ink-0)",
+                    }}
+                  >
+                    map
+                  </em>
+                </h2>
                 <a
                   href="/portal/diagrama-agentes.html"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-[9px] font-bold uppercase tracking-[1.5px] text-[#131218]/30 hover:text-[#131218]/60 transition-colors"
+                  className="hall-btn-ghost"
+                  style={{ fontSize: 11 }}
                 >
                   Open full ↗
                 </a>
               </div>
-              <iframe
-                src="/portal/diagrama-agentes.html"
-                className="w-full border-none"
-                style={{ height: 780 }}
-                title="Agent Architecture"
-              />
-            </div>
+              <div style={{ border: "1px solid var(--hall-line)" }}>
+                <iframe
+                  src="/portal/diagrama-agentes.html"
+                  className="w-full border-none"
+                  style={{ height: 780 }}
+                  title="Agent Architecture"
+                />
+              </div>
+            </section>
 
             {/* Summary metrics */}
-            <div className="grid grid-cols-3 gap-3 mb-6">
-              <div className="bg-white border border-[#E0E0D8] rounded-xl p-4">
-                <p className="text-[8.5px] font-bold uppercase tracking-[1.8px] text-[#131218]/20 mb-1.5">
+            <div className="grid grid-cols-3 gap-3 mb-7">
+              <div className="p-4" style={{ border: "1px solid var(--hall-line)" }}>
+                <p
+                  className="mb-1.5"
+                  style={{
+                    fontFamily: "var(--font-hall-mono)",
+                    fontSize: 10,
+                    letterSpacing: "0.08em",
+                    textTransform: "uppercase",
+                    color: "var(--hall-muted-2)",
+                  }}
+                >
                   Total agents
                 </p>
-                <p className="text-[1.8rem] font-[900] text-[#131218] leading-none tracking-tight">
+                <p
+                  className="text-[1.8rem] font-[900] leading-none tracking-tight"
+                  style={{ color: "var(--hall-ink-0)" }}
+                >
                   {AGENTS.length}
                 </p>
-                <p className="text-[9.5px] text-[#6b6b6b] mt-1">in OS v2</p>
+                <p style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--hall-muted-2)", marginTop: 6 }}>
+                  in OS v2
+                </p>
               </div>
-              <div className="bg-white border border-[#E0E0D8] rounded-xl p-4">
-                <p className="text-[8.5px] font-bold uppercase tracking-[1.8px] text-[#131218]/20 mb-1.5">
+              <div className="p-4" style={{ border: "1px solid var(--hall-line)" }}>
+                <p
+                  className="mb-1.5"
+                  style={{
+                    fontFamily: "var(--font-hall-mono)",
+                    fontSize: 10,
+                    letterSpacing: "0.08em",
+                    textTransform: "uppercase",
+                    color: "var(--hall-muted-2)",
+                  }}
+                >
                   Running daily
                 </p>
-                <p className="text-[1.8rem] font-[900] text-[#3a6600] leading-none tracking-tight">
+                <p
+                  className="text-[1.8rem] font-[900] leading-none tracking-tight"
+                  style={{ color: "var(--hall-ok)" }}
+                >
                   {AGENTS.filter((a) => a.schedule.startsWith("Daily")).length}
                 </p>
-                <p className="text-[9.5px] text-[#6b6b6b] mt-1">scheduled agents</p>
+                <p style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--hall-muted-2)", marginTop: 6 }}>
+                  scheduled agents
+                </p>
               </div>
-              <div className="bg-white border border-[#E0E0D8] rounded-xl p-4">
-                <p className="text-[8.5px] font-bold uppercase tracking-[1.8px] text-[#131218]/20 mb-1.5">
+              <div className="p-4" style={{ border: "1px solid var(--hall-line)" }}>
+                <p
+                  className="mb-1.5"
+                  style={{
+                    fontFamily: "var(--font-hall-mono)",
+                    fontSize: 10,
+                    letterSpacing: "0.08em",
+                    textTransform: "uppercase",
+                    color: "var(--hall-muted-2)",
+                  }}
+                >
                   Last run
                 </p>
-                <p className="text-[1.8rem] font-[900] text-[#131218] leading-none tracking-tight">
+                <p
+                  className="text-[1.8rem] font-[900] leading-none tracking-tight"
+                  style={{ color: "var(--hall-ink-0)" }}
+                >
                   {latestRanAt ? relativeTime(latestRanAt) : "—"}
                 </p>
-                <p className="text-[9.5px] text-[#6b6b6b] mt-1">
+                <p style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--hall-muted-2)", marginTop: 6 }}>
                   {latestRanAt ? "último agente activo" : "sin ejecuciones"}
                 </p>
               </div>
             </div>
 
             {/* Agent table */}
-            <div className="bg-white border border-[#E0E0D8] rounded-2xl overflow-hidden">
-              {/* Card header */}
-              <div className="px-5 py-3.5 border-b border-[#E0E0D8] flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-md bg-[#131218] flex items-center justify-center">
-                    <svg viewBox="0 0 14 14" width="11" height="11" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round">
-                      <circle cx="7" cy="5" r="3"/>
-                      <path d="M1 12a6 6 0 0 1 12 0"/>
-                    </svg>
-                  </div>
-                  <span className="text-[11px] font-[800] text-[#131218] tracking-tight">
-                    Agent Registry
-                  </span>
+            <HallSection
+              title="Agent"
+              flourish="registry"
+              meta={`${AGENTS.length} AGENTS · ${hasTelemetry ? "LIVE DATA" : "SIN TELEMETRÍA"}`}
+            >
+              <div>
+                {/* Column headers */}
+                <div
+                  className="grid grid-cols-[32px_1fr_2fr_120px_110px_80px] gap-3 items-center px-1 py-2"
+                  style={{ borderBottom: "1px solid var(--hall-line)" }}
+                >
+                  <div />
+                  {["Agent", "Function", "Schedule", "Last run", "Status"].map((h) => (
+                    <p
+                      key={h}
+                      style={{
+                        fontFamily: "var(--font-hall-mono)",
+                        fontSize: 10,
+                        letterSpacing: "0.08em",
+                        textTransform: "uppercase",
+                        color: "var(--hall-muted-2)",
+                      }}
+                    >
+                      {h}
+                    </p>
+                  ))}
                 </div>
-                <span className="text-[8px] font-bold uppercase tracking-[1.5px] text-[#131218]/30">
-                  {AGENTS.length} agents · {hasTelemetry ? "Live data" : "Sin telemetría"}
-                </span>
+
+                {/* Agent rows */}
+                <ul className="flex flex-col">
+                  {AGENTS.map((agent) => {
+                    const run = runMap.get(agent.name);
+                    const liveStatus: LiveStatus = run ? run.status : "none";
+                    const lastRun = run
+                      ? relativeTime(run.ran_at)
+                      : "Sin ejecuciones registradas";
+
+                    return (
+                      <li
+                        key={agent.id}
+                        className="grid grid-cols-[32px_1fr_2fr_120px_110px_80px] gap-3 items-center px-1 py-3"
+                        style={{ borderTop: "1px solid var(--hall-line-soft)" }}
+                      >
+                        {/* Status dot */}
+                        <div className="flex items-center justify-center">
+                          <StatusDot status={liveStatus} />
+                        </div>
+
+                        {/* Name */}
+                        <p
+                          className="truncate"
+                          style={{
+                            fontFamily: "var(--font-hall-mono)",
+                            fontSize: 11,
+                            fontWeight: 700,
+                            color: "var(--hall-ink-0)",
+                          }}
+                        >
+                          {agent.name}
+                        </p>
+
+                        {/* Function */}
+                        <p
+                          className="leading-snug"
+                          style={{ fontSize: 10.5, color: "var(--hall-muted-2)" }}
+                        >
+                          {agent.fn}
+                        </p>
+
+                        {/* Schedule */}
+                        <p
+                          style={{
+                            fontFamily: "var(--font-hall-mono)",
+                            fontSize: 10,
+                            color: "var(--hall-muted-2)",
+                          }}
+                        >
+                          {agent.schedule}
+                        </p>
+
+                        {/* Last run */}
+                        <p
+                          className="truncate"
+                          style={{
+                            fontFamily: "var(--font-hall-mono)",
+                            fontSize: 10,
+                            color: "var(--hall-muted-3)",
+                          }}
+                        >
+                          {lastRun}
+                        </p>
+
+                        {/* Status pill */}
+                        <StatusLabel status={liveStatus} />
+                      </li>
+                    );
+                  })}
+                </ul>
               </div>
-
-              {/* Column headers */}
-              <div className="grid grid-cols-[32px_1fr_2fr_120px_110px_80px] gap-3 items-center px-5 py-2.5 border-b border-[#E0E0D8] bg-[#F7F7F5]">
-                <div />
-                <p className="text-[8px] font-bold uppercase tracking-[1.5px] text-[#131218]/30">
-                  Agent
-                </p>
-                <p className="text-[8px] font-bold uppercase tracking-[1.5px] text-[#131218]/30">
-                  Function
-                </p>
-                <p className="text-[8px] font-bold uppercase tracking-[1.5px] text-[#131218]/30">
-                  Schedule
-                </p>
-                <p className="text-[8px] font-bold uppercase tracking-[1.5px] text-[#131218]/30">
-                  Last run
-                </p>
-                <p className="text-[8px] font-bold uppercase tracking-[1.5px] text-[#131218]/30">
-                  Status
-                </p>
-              </div>
-
-              {/* Agent rows */}
-              {AGENTS.map((agent, i) => {
-                const run = runMap.get(agent.name);
-                const liveStatus: LiveStatus = run ? run.status : "none";
-                const lastRun = run
-                  ? relativeTime(run.ran_at)
-                  : "Sin ejecuciones registradas";
-
-                return (
-                  <div
-                    key={agent.id}
-                    className={`grid grid-cols-[32px_1fr_2fr_120px_110px_80px] gap-3 items-center px-5 py-3 ${
-                      i < AGENTS.length - 1 ? "border-b border-[#E0E0D8]" : ""
-                    } group hover:bg-[#F7F7F5] transition-colors`}
-                  >
-                    {/* Status dot */}
-                    <div className="flex items-center justify-center">
-                      <StatusDot status={liveStatus} />
-                    </div>
-
-                    {/* Name */}
-                    <p className="text-[11px] font-[700] text-[#131218] font-mono truncate">
-                      {agent.name}
-                    </p>
-
-                    {/* Function */}
-                    <p className="text-[10.5px] text-[#6b6b6b] leading-snug">
-                      {agent.fn}
-                    </p>
-
-                    {/* Schedule */}
-                    <p className="text-[9.5px] text-[#6b6b6b] font-mono">
-                      {agent.schedule}
-                    </p>
-
-                    {/* Last run */}
-                    <p className="text-[9.5px] text-[#131218]/30 font-mono truncate">
-                      {lastRun}
-                    </p>
-
-                    {/* Status pill */}
-                    <StatusLabel status={liveStatus} />
-                  </div>
-                );
-              })}
-            </div>
+            </HallSection>
 
             {/* Footer note */}
-            <p className="text-[9px] text-[#131218]/25 mt-4 font-medium">
+            <p
+              className="mt-4"
+              style={{
+                fontFamily: "var(--font-hall-mono)",
+                fontSize: 10,
+                color: "var(--hall-muted-3)",
+              }}
+            >
               Agent schedules reflect OS v2 spec · Sprint 28 · Last updated 2026-04-13.
               {hasTelemetry
                 ? ` Telemetría activa — ${runData.length} agente${runData.length !== 1 ? "s" : ""} con datos.`

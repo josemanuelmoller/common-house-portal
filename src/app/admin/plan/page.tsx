@@ -24,41 +24,74 @@ export default async function PlanPage() {
   const { quarter } = currentQuarter();
 
   return (
-    <div className="flex min-h-screen bg-[#EFEFEA]">
+    <div className="flex min-h-screen" style={{ background: "var(--hall-paper-0)" }}>
       <Sidebar adminNav />
 
-      <main className="flex-1 ml-[228px] overflow-auto">
-        <header className="bg-[#131218] text-white px-12 pt-10 pb-0">
-          <p className="text-[8px] font-bold tracking-[2.5px] uppercase text-white/40 mb-3.5">
-            Control Room · Strategic Plan
-          </p>
-          <div className="flex items-end justify-between gap-6">
-            <div>
-              <h1 className="text-[2.6rem] font-light tracking-[-1.5px] leading-none">
-                The <em className="font-black not-italic text-[#B2FF59] italic">Plan</em>
-              </h1>
-              <p className="text-[12px] text-white/60 mt-2.5 max-w-2xl leading-relaxed">
-                Plan estratégico 2026 → Q1 2027. El sistema usa estos objetivos para filtrar señales
-                y priorizar el weekly synthesis. Editá un objetivo, cambiá su tier, y toda la capa
-                de agentes recalibra en la próxima corrida.
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <button
-                disabled
-                className="text-[11px] font-semibold px-4 py-2 rounded-md border border-white/20 text-white/60 cursor-not-allowed"
-                title="Próximo sprint"
+      <main
+        className="flex-1 ml-[228px] overflow-auto"
+        style={{ fontFamily: "var(--font-hall-sans)", background: "var(--hall-paper-0)" }}
+      >
+        {/* K-v2 collapsed header */}
+        <header
+          className="flex items-center justify-between gap-6 px-9 py-3.5"
+          style={{ borderBottom: "1px solid var(--hall-ink-0)" }}
+        >
+          <div className="flex items-baseline gap-4 min-w-0">
+            <span
+              className="text-[10px] tracking-[0.08em] whitespace-nowrap uppercase"
+              style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+            >
+              PLAN · <b style={{ color: "var(--hall-ink-0)" }}>Q{quarter ?? 2} 2026</b>
+            </span>
+            <h1
+              className="text-[16px] font-medium tracking-[-0.01em]"
+              style={{ color: "var(--hall-ink-0)" }}
+            >
+              The{" "}
+              <em
+                style={{
+                  fontFamily: "var(--font-hall-display)",
+                  fontStyle: "italic",
+                  fontWeight: 400,
+                }}
               >
-                ▲ Quarter Close
-              </button>
-            </div>
+                Plan
+              </em>
+              .
+            </h1>
           </div>
-          <div className="mt-8 border-b border-white/10">
-            <PlanNav active="objectives" />
-          </div>
+          <button
+            disabled
+            className="text-[11px] px-3 py-1.5 cursor-not-allowed"
+            style={{
+              fontFamily: "var(--font-hall-mono)",
+              color: "var(--hall-muted-3)",
+              border: "1px solid var(--hall-line-strong)",
+              borderRadius: 3,
+              background: "var(--hall-paper-0)",
+            }}
+            title="Próximo sprint"
+          >
+            ▲ QUARTER CLOSE
+          </button>
         </header>
 
-        <div className="px-12 py-7">
+        <div
+          className="px-9 pt-3"
+          style={{ borderBottom: "1px solid var(--hall-line-soft)" }}
+        >
+          <PlanNav active="objectives" />
+        </div>
+
+        <div className="px-9 py-6">
+          <p
+            className="text-[12px] leading-relaxed max-w-2xl mb-6"
+            style={{ color: "var(--hall-muted-2)" }}
+          >
+            Plan estratégico 2026 → Q1 2027. El sistema usa estos objetivos para filtrar señales
+            y priorizar el weekly synthesis. Editá un objetivo, cambiá su tier, y toda la capa
+            de agentes recalibra en la próxima corrida.
+          </p>
           <PlanView
             objectives2026={objectives2026}
             objectives2027={objectives2027}

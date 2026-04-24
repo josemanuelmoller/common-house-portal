@@ -40,55 +40,82 @@ function rowToDisplay(r: OpportunityRowFull): OppDisplayItem {
 
 // ── Score badge ───────────────────────────────────────────────────────────────
 
-function ScoreBadge({ score, status }: { score: number | null; status: string }) {
+function ScoreBadge({ score }: { score: number | null; status: string }) {
   if (score === null) {
     return (
-      <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-[#EFEFEA] text-[#131218]/30 whitespace-nowrap">
+      <span
+        className="text-[9px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
+        style={{
+          fontFamily: "var(--font-hall-mono)",
+          background: "var(--hall-fill-soft)",
+          color: "var(--hall-muted-3)",
+        }}
+      >
         Not scored
       </span>
     );
   }
   if (score >= 70) {
     return (
-      <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-[#B2FF59]/25 text-green-800 whitespace-nowrap tabular-nums">
+      <span
+        className="text-[9px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap tabular-nums"
+        style={{
+          fontFamily: "var(--font-hall-mono)",
+          background: "var(--hall-ok-soft)",
+          color: "var(--hall-ok)",
+        }}
+      >
         {score} · Qualified
       </span>
     );
   }
   if (score >= 50) {
     return (
-      <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 whitespace-nowrap tabular-nums">
+      <span
+        className="text-[9px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap tabular-nums"
+        style={{
+          fontFamily: "var(--font-hall-mono)",
+          background: "var(--hall-warn-soft)",
+          color: "var(--hall-warn)",
+        }}
+      >
         {score} · Review
       </span>
     );
   }
   return (
-    <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-red-50 text-red-600 whitespace-nowrap tabular-nums">
+    <span
+      className="text-[9px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap tabular-nums"
+      style={{
+        fontFamily: "var(--font-hall-mono)",
+        background: "var(--hall-danger-soft)",
+        color: "var(--hall-danger)",
+      }}
+    >
       {score} · Below
     </span>
   );
 }
 
 function StagePill({ stage }: { stage: string }) {
-  const colours: Record<string, string> = {
-    "New":           "bg-slate-100 text-slate-600",
-    "Qualifying":    "bg-blue-50 text-blue-700",
-    "Exploring":     "bg-blue-50 text-blue-700",
-    "Active":        "bg-[#B2FF59]/20 text-green-800",
-    "Proposal Sent": "bg-amber-50 text-amber-700",
-    "Negotiation":   "bg-orange-50 text-orange-700",
-  };
   return (
-    <span className={`text-[8.5px] font-bold px-1.5 py-0.5 rounded ${colours[stage] ?? "bg-[#EFEFEA] text-[#131218]/40"}`}>
+    <span
+      className="text-[8.5px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider"
+      style={{
+        fontFamily: "var(--font-hall-mono)",
+        background: "var(--hall-fill-soft)",
+        color: "var(--hall-ink-3)",
+      }}
+    >
       {stage || "—"}
     </span>
   );
 }
 
 function FollowUpDot({ status }: { status: string }) {
-  if (status === "Needed")  return <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" title="Follow-up needed" />;
-  if (status === "Sent")    return <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" title="Follow-up sent" />;
-  if (status === "Waiting") return <span className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" title="Waiting for reply" />;
+  if (status === "Needed")  return <span className="w-1.5 h-1.5 rounded-full shrink-0" title="Follow-up needed" style={{background: "var(--hall-danger)"}} />;
+  if (status === "Sent")    return <span className="w-1.5 h-1.5 rounded-full shrink-0" title="Follow-up sent" style={{background: "var(--hall-warn)"}} />;
+  if (status === "Waiting") return <span className="w-1.5 h-1.5 rounded-full shrink-0" title="Waiting for reply" style={{background: "var(--hall-info)"}} />;
   return null;
 }
 
@@ -97,41 +124,53 @@ function FollowUpDot({ status }: { status: string }) {
 function OppList({ items, emptyMsg }: { items: OppDisplayItem[]; emptyMsg: string }) {
   if (items.length === 0) {
     return (
-      <div className="bg-white rounded-2xl border border-[#E0E0D8] px-6 py-10 text-center">
-        <p className="text-sm text-[#131218]/25">{emptyMsg}</p>
+      <div
+        className="px-6 py-10 text-center"
+        style={{ border: "1px solid var(--hall-line-soft)", borderRadius: 3 }}
+      >
+        <p className="text-sm" style={{color: "var(--hall-muted-3)"}}>{emptyMsg}</p>
       </div>
     );
   }
   return (
-    <div className="flex flex-col gap-2">
-      {items.map(opp => (
-        <Link
+    <ul className="flex flex-col">
+      {items.map((opp, idx) => (
+        <li
           key={opp.id}
-          href={opp.notionUrl || "#"}
-          target={opp.notionUrl ? "_blank" : undefined}
-          rel="noopener noreferrer"
-          className="group bg-white rounded-xl border border-[#E0E0D8] px-4 py-3 hover:border-[#131218]/20 hover:-translate-y-0.5 transition-all duration-150 flex items-center gap-3"
+          style={idx === 0 ? undefined : { borderTop: "1px solid var(--hall-line-soft)" }}
         >
-          <FollowUpDot status={opp.followUpStatus} />
-          <div className="flex-1 min-w-0">
-            <p className="text-[12.5px] font-bold text-[#131218] truncate leading-tight">{opp.name}</p>
-            <div className="flex items-center gap-2 mt-1 flex-wrap">
-              {opp.orgName && (
-                <span className="text-[9px] text-[#131218]/40 font-medium">{opp.orgName}</span>
-              )}
-              {opp.type && (
-                <span className="text-[8.5px] font-bold text-[#131218]/25 uppercase tracking-wide">{opp.type}</span>
-              )}
+          <Link
+            href={opp.notionUrl || "#"}
+            target={opp.notionUrl ? "_blank" : undefined}
+            rel="noopener noreferrer"
+            className="group flex items-center gap-3 py-3 transition-colors"
+          >
+            <FollowUpDot status={opp.followUpStatus} />
+            <div className="flex-1 min-w-0">
+              <p className="text-[12.5px] font-bold truncate leading-tight" style={{color: "var(--hall-ink-0)"}}>{opp.name}</p>
+              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                {opp.orgName && (
+                  <span className="text-[9px] font-medium" style={{color: "var(--hall-muted-3)"}}>{opp.orgName}</span>
+                )}
+                {opp.type && (
+                  <span
+                    className="text-[8.5px] font-bold uppercase tracking-wider"
+                    style={{fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-3)"}}
+                  >
+                    {opp.type}
+                  </span>
+                )}
+              </div>
             </div>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <StagePill stage={opp.stage} />
-            <ScoreBadge score={opp.score} status={opp.qualificationStatus} />
-          </div>
-          <span className="text-[#131218]/15 group-hover:text-[#131218]/40 transition-colors text-sm">↗</span>
-        </Link>
+            <div className="flex items-center gap-2 shrink-0">
+              <StagePill stage={opp.stage} />
+              <ScoreBadge score={opp.score} status={opp.qualificationStatus} />
+            </div>
+            <span className="transition-colors text-sm" style={{color: "var(--hall-muted-3)"}}>↗</span>
+          </Link>
+        </li>
       ))}
-    </div>
+    </ul>
   );
 }
 
@@ -151,110 +190,145 @@ export default async function OpportunitiesPage() {
   const needsReview    = all.filter(o => (o.score ?? -1) >= 50 && (o.score ?? 0) < 70).length;
   const followUpNeeded = all.filter(o => o.followUpStatus === "Needed").length;
 
+  const eyebrowDate = new Date()
+    .toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })
+    .toUpperCase();
+
   return (
-    <div className="flex min-h-screen bg-[#EFEFEA]">
+    <div className="flex min-h-screen" style={{ background: "var(--hall-paper-0)" }}>
       <Sidebar adminNav />
 
-      <main className="flex-1 ml-[228px]">
+      <main
+        className="flex-1 ml-[228px]"
+        style={{ fontFamily: "var(--font-hall-sans)", background: "var(--hall-paper-0)" }}
+      >
 
-        {/* Dark header */}
-        <header className="bg-[#131218] px-12 pt-10 pb-11">
-          <p className="text-[8px] font-bold tracking-[2.5px] uppercase text-white/20 mb-3">
-            Commercial · Pipeline
-          </p>
-          <div className="flex items-end justify-between">
-            <div>
-              <h1 className="text-[2.6rem] font-light text-white tracking-[-1.5px] leading-none">
-                Opportunities <em className="font-black italic text-[#c8f55a]">pipeline.</em>
-              </h1>
-              <p className="text-sm text-white/40 mt-3">
-                Active opportunities scored ≥ 50. Split by CH and Portfolio scope.
-              </p>
-            </div>
-            <div className="flex items-center gap-4 pb-1">
-              <div className="text-right">
-                <p className="text-[2rem] font-black text-[#c8f55a] tracking-tight leading-none">{qualified}</p>
-                <p className="text-[9px] font-bold tracking-[1.5px] uppercase text-white/30 mt-0.5">Qualified</p>
-              </div>
-              <div className="w-px h-10 bg-white/10" />
-              <div className="text-right">
-                <p className={`text-[2rem] font-black tracking-tight leading-none ${needsReview > 0 ? "text-amber-400" : "text-white/20"}`}>
-                  {needsReview}
-                </p>
-                <p className="text-[9px] font-bold tracking-[1.5px] uppercase text-white/30 mt-0.5">Needs review</p>
-              </div>
-              <div className="w-px h-10 bg-white/10" />
-              <div className="text-right">
-                <p className={`text-[2rem] font-black tracking-tight leading-none ${followUpNeeded > 0 ? "text-red-400" : "text-white/20"}`}>
-                  {followUpNeeded}
-                </p>
-                <p className="text-[9px] font-bold tracking-[1.5px] uppercase text-white/30 mt-0.5">Follow-up due</p>
-              </div>
-            </div>
+        {/* K-v2 collapsed header */}
+        <header
+          className="flex items-center justify-between gap-6 px-9 py-3.5"
+          style={{ borderBottom: "1px solid var(--hall-ink-0)" }}
+        >
+          <div className="flex items-baseline gap-4 min-w-0">
+            <span
+              className="text-[10px] tracking-[0.08em] whitespace-nowrap"
+              style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+            >
+              OPPORTUNITIES · <b style={{ color: "var(--hall-ink-0)" }}>{eyebrowDate}</b>
+            </span>
+            <h1
+              className="text-[16px] font-medium tracking-[-0.01em] truncate"
+              style={{ color: "var(--hall-ink-0)" }}
+            >
+              Opportunities <em className="hall-flourish">pipeline</em>
+            </h1>
+          </div>
+          <div
+            className="flex items-center gap-4"
+            style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--hall-muted-2)", letterSpacing: "0.06em" }}
+          >
+            <span>{qualified} QUAL</span>
+            <span style={{color: needsReview > 0 ? "var(--hall-warn)" : "var(--hall-muted-3)"}}>{needsReview} REVIEW</span>
+            <span style={{color: followUpNeeded > 0 ? "var(--hall-danger)" : "var(--hall-muted-3)"}}>{followUpNeeded} FOLLOW-UP</span>
           </div>
         </header>
 
-        <div className="px-12 py-9 max-w-6xl space-y-8">
+        <div className="px-9 py-6 max-w-6xl space-y-7">
 
           {/* Error state */}
           {error && (
-            <div className="bg-red-50 border border-red-200 rounded-xl px-5 py-4">
-              <p className="text-[10px] font-bold text-red-700 uppercase tracking-wider mb-1">Supabase error</p>
-              <p className="text-[10.5px] text-red-600 font-mono">{error}</p>
+            <div
+              className="px-5 py-4"
+              style={{ border: "1px solid var(--hall-danger)", background: "var(--hall-danger-soft)", borderRadius: 3 }}
+            >
+              <p
+                className="text-[10px] font-bold uppercase tracking-wider mb-1"
+                style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-danger)" }}
+              >
+                Supabase error
+              </p>
+              <p className="text-[10.5px]" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-danger)" }}>{error}</p>
             </div>
           )}
 
           {/* Score legend */}
-          <div className="flex items-center gap-4 text-[9px] font-bold text-[#131218]/30 uppercase tracking-widest">
+          <div
+            className="flex items-center gap-4 text-[9px] font-bold uppercase tracking-widest"
+            style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-3)" }}
+          >
             <span className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-[#B2FF59]" /> ≥ 70 Qualified
+              <span className="w-2 h-2 rounded-full" style={{background: "var(--hall-ok)"}} /> ≥ 70 Qualified
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-amber-400" /> 50–69 Needs review
+              <span className="w-2 h-2 rounded-full" style={{background: "var(--hall-warn)"}} /> 50–69 Needs review
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-red-400" /> Follow-up needed
+              <span className="w-1.5 h-1.5 rounded-full" style={{background: "var(--hall-danger)"}} /> Follow-up needed
             </span>
-            <div className="flex-1 h-px bg-[#E0E0D8]" />
-            <Link href="/admin/decisions" className="hover:text-[#131218]/60 transition-colors">
+            <div className="flex-1 h-px" style={{background: "var(--hall-line-soft)"}} />
+            <Link href="/admin/decisions" className="hall-btn-ghost" style={{padding: 0}}>
               Open decisions →
             </Link>
           </div>
 
           {/* Two-column: CH | Portfolio */}
-          <div className="grid grid-cols-2 gap-6 items-start">
+          <div className="grid grid-cols-2 gap-7 items-start">
 
             {/* CH column */}
-            <div>
-              <div className="flex items-center gap-3 mb-3">
-                <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30">Common House</p>
-                <div className="flex-1 h-px bg-[#E0E0D8]" />
-                <span className="text-[9px] font-bold text-[#131218]/25">{chSorted.length}</span>
+            <section>
+              <div
+                className="flex items-baseline justify-between gap-3 pb-2 mb-3.5"
+                style={{borderBottom: "1px solid var(--hall-ink-0)"}}
+              >
+                <h2
+                  className="text-[19px] font-bold leading-none"
+                  style={{letterSpacing: "-0.02em", color: "var(--hall-ink-0)"}}
+                >
+                  Common House <em className="hall-flourish">opps</em>
+                </h2>
+                <span
+                  style={{fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--hall-muted-2)", letterSpacing: "0.06em"}}
+                >
+                  {chSorted.length} ACTIVE
+                </span>
               </div>
               <OppList
                 items={chSorted}
                 emptyMsg="No active CH opportunities. Legacy and archived records excluded."
               />
-            </div>
+            </section>
 
             {/* Portfolio column */}
-            <div>
-              <div className="flex items-center gap-3 mb-3">
-                <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30">Portfolio</p>
-                <div className="flex-1 h-px bg-[#E0E0D8]" />
-                <span className="text-[9px] font-bold text-[#131218]/25">{portfolioSorted.length}</span>
+            <section>
+              <div
+                className="flex items-baseline justify-between gap-3 pb-2 mb-3.5"
+                style={{borderBottom: "1px solid var(--hall-ink-0)"}}
+              >
+                <h2
+                  className="text-[19px] font-bold leading-none"
+                  style={{letterSpacing: "-0.02em", color: "var(--hall-ink-0)"}}
+                >
+                  Portfolio <em className="hall-flourish">opps</em>
+                </h2>
+                <span
+                  style={{fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--hall-muted-2)", letterSpacing: "0.06em"}}
+                >
+                  {portfolioSorted.length} ACTIVE
+                </span>
               </div>
               <OppList
                 items={portfolioSorted}
                 emptyMsg="No active portfolio opportunities. Use Deal Flow or Grant Desk to identify new ones."
               />
-            </div>
+            </section>
 
           </div>
 
           {/* Footer meta */}
-          <p className="text-[8.5px] text-[#131218]/20 font-medium text-right">
-            {all.length} rows · Supabase · legacy + archived excluded
+          <p
+            className="text-[8.5px] font-medium text-right"
+            style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-3)", letterSpacing: "0.06em" }}
+          >
+            {all.length} ROWS · SUPABASE · LEGACY + ARCHIVED EXCLUDED
           </p>
 
         </div>

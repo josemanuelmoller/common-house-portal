@@ -9,22 +9,22 @@ function daysSince(dateStr: string | null): number {
 }
 
 function warmthLabel(days: number): { label: string; dot: string; text: string } {
-  if (days <= 3)  return { label: "Hot",     dot: "bg-red-500",        text: "text-red-600" };
-  if (days <= 10) return { label: "Warm",    dot: "bg-amber-400",      text: "text-amber-600" };
-  if (days <= 21) return { label: "Active",  dot: "bg-amber-300",      text: "text-amber-500" };
-  if (days <= 35) return { label: "Cold",    dot: "bg-blue-400",       text: "text-blue-500" };
-  return              { label: "Dormant", dot: "bg-[#131218]/15",   text: "text-[#131218]/35" };
+  if (days <= 3)  return { label: "Hot",     dot: "var(--hall-danger)", text: "var(--hall-danger)" };
+  if (days <= 10) return { label: "Warm",    dot: "var(--hall-warn)",   text: "var(--hall-warn)" };
+  if (days <= 21) return { label: "Active",  dot: "var(--hall-warn)",   text: "var(--hall-warn)" };
+  if (days <= 35) return { label: "Cold",    dot: "var(--hall-info)",   text: "var(--hall-info)" };
+  return              { label: "Dormant", dot: "var(--hall-muted-3)", text: "var(--hall-muted-3)" };
 }
 
-const STAGE_COLORS: Record<string, string> = {
-  "Pre-seed":   "bg-purple-50 text-purple-700 border border-purple-200",
-  "Seed":       "bg-blue-50 text-blue-600 border border-blue-200",
-  "Series A":   "bg-[#131218] text-[#B2FF59]",
-  "Series B":   "bg-[#131218] text-[#B2FF59]",
-  "Discovery":  "bg-[#EFEFEA] text-[#131218]/50 border border-[#E0E0D8]",
-  "Validation": "bg-amber-50 text-amber-600 border border-amber-200",
-  "Execution":  "bg-green-50 text-green-700 border border-green-200",
-  "On Hold":    "bg-gray-100 text-gray-400 border border-gray-200",
+const STAGE_STYLES: Record<string, { bg: string; color: string; border?: string }> = {
+  "Pre-seed":   { bg: "var(--hall-fill-soft)", color: "var(--hall-ink-0)" },
+  "Seed":       { bg: "var(--hall-info-soft)", color: "var(--hall-info)" },
+  "Series A":   { bg: "var(--hall-ink-0)",     color: "var(--hall-paper-0)" },
+  "Series B":   { bg: "var(--hall-ink-0)",     color: "var(--hall-paper-0)" },
+  "Discovery":  { bg: "var(--hall-fill-soft)", color: "var(--hall-muted-2)" },
+  "Validation": { bg: "var(--hall-warn-soft)", color: "var(--hall-warn)" },
+  "Execution":  { bg: "var(--hall-ok-soft)",   color: "var(--hall-ok)" },
+  "On Hold":    { bg: "var(--hall-fill-soft)", color: "var(--hall-muted-3)" },
 };
 
 export default async function GarageViewPage() {
@@ -38,51 +38,77 @@ export default async function GarageViewPage() {
   const totalEvidence  = projects.reduce((sum, p) => sum + p.evidenceCount, 0);
   const totalValidated = projects.reduce((sum, p) => sum + p.validatedCount, 0);
 
+  const todayLabel = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+
   return (
-    <div className="flex min-h-screen bg-[#EFEFEA]">
+    <div className="flex min-h-screen" style={{ background: "var(--hall-paper-0)" }}>
       <Sidebar adminNav />
 
-      <main className="flex-1 ml-[228px]">
+      <main
+        className="flex-1 ml-[228px]"
+        style={{ fontFamily: "var(--font-hall-sans)", background: "var(--hall-paper-0)" }}
+      >
 
-        {/* Dark header */}
-        <header className="bg-[#131218] px-12 pt-10 pb-11">
-          <p className="text-[8px] font-bold tracking-[2.5px] uppercase text-white/20 mb-3">
-            Portfolio · Startups
-          </p>
-          <div className="flex items-end justify-between">
-            <div>
-              <h1 className="text-[2.6rem] font-light text-white tracking-[-1.5px] leading-none">
-                The <em className="font-black italic text-[#c8f55a]">Garage</em>
-              </h1>
-              <p className="text-sm text-white/40 mt-3">
-                Portfolio startups. Evidence, investor readiness, and growth signals — company by company.
-              </p>
-            </div>
-            <div className="flex items-center gap-4 pb-1">
-              <div className="text-right">
-                <p className="text-[2rem] font-black text-white tracking-tight leading-none">{projects.length}</p>
-                <p className="text-[9px] font-bold tracking-[1.5px] uppercase text-white/30 mt-0.5">Startups</p>
-              </div>
-              <div className="w-px h-10 bg-white/10" />
-              <div className="text-right">
-                <p className="text-[2rem] font-black text-[#B2FF59] tracking-tight leading-none">{totalValidated}</p>
-                <p className="text-[9px] font-bold tracking-[1.5px] uppercase text-white/30 mt-0.5">Validated</p>
-              </div>
-            </div>
+        {/* K-v2 thin header */}
+        <header
+          className="flex items-center justify-between gap-6 px-9 py-3.5"
+          style={{ borderBottom: "1px solid var(--hall-ink-0)" }}
+        >
+          <div className="flex items-baseline gap-4 min-w-0">
+            <span
+              className="text-[10px] tracking-[0.08em] whitespace-nowrap"
+              style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+            >
+              PORTFOLIO · STARTUPS ·{" "}
+              <b style={{ color: "var(--hall-ink-0)" }}>{todayLabel}</b>
+            </span>
+            <h1
+              className="text-[16px] font-medium tracking-[-0.01em]"
+              style={{ color: "var(--hall-ink-0)" }}
+            >
+              The Garage
+            </h1>
+          </div>
+          <div
+            className="flex items-center gap-4"
+            style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10.5, color: "var(--hall-muted-2)" }}
+          >
+            <span>
+              <b style={{ color: "var(--hall-ink-0)" }}>{projects.length}</b> STARTUPS
+            </span>
+            <span style={{ color: "var(--hall-muted-3)" }}>·</span>
+            <span>
+              <b style={{ color: "var(--hall-ok)" }}>{totalValidated}</b> VALIDATED
+            </span>
           </div>
         </header>
 
-        <div className="px-12 py-9 max-w-7xl space-y-6">
+        <div className="px-9 py-7 max-w-7xl space-y-6">
 
           {/* P1 banner */}
           {withBlockers.length > 0 && (
-            <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-xl px-5 py-3.5">
-              <span className="w-2 h-2 rounded-full bg-red-500 shrink-0 animate-pulse" />
-              <p className="text-sm text-[#131218] flex-1 min-w-0">
+            <div
+              className="flex items-center gap-3 px-5 py-3.5"
+              style={{
+                background: "var(--hall-danger-soft)",
+                border: "1px solid var(--hall-danger)",
+              }}
+            >
+              <span className="w-2 h-2 rounded-full shrink-0 animate-pulse" style={{ background: "var(--hall-danger)" }} />
+              <p className="text-sm flex-1 min-w-0" style={{ color: "var(--hall-ink-0)" }}>
                 <strong>{withBlockers.length} blocker{withBlockers.length !== 1 ? "s" : ""}</strong>
                 {" — "}{withBlockers.slice(0, 2).map(p => p.name).join(", ")}
               </p>
-              <Link href="/admin/decisions" className="text-[11px] font-bold text-red-600 shrink-0 hover:text-red-800 transition-colors whitespace-nowrap">
+              <Link
+                href="/admin/decisions"
+                className="shrink-0 whitespace-nowrap"
+                style={{
+                  fontFamily: "var(--font-hall-mono)",
+                  fontSize: 10.5,
+                  fontWeight: 700,
+                  color: "var(--hall-danger)",
+                }}
+              >
                 View decisions →
               </Link>
             </div>
@@ -90,33 +116,77 @@ export default async function GarageViewPage() {
 
           {/* Stats row */}
           <div className="grid grid-cols-4 gap-4">
-            <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-4">
-              <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30 mb-2">Portfolio</p>
-              <p className="text-3xl font-bold text-[#131218] tracking-tight">{projects.length}</p>
-              <p className="text-[11px] text-[#131218]/40 font-medium mt-1.5">Active startups</p>
+            <div className="px-5 py-4" style={{ border: "1px solid var(--hall-line)" }}>
+              <p
+                className="mb-2"
+                style={{
+                  fontFamily: "var(--font-hall-mono)",
+                  fontSize: 10,
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                  color: "var(--hall-muted-2)",
+                }}
+              >
+                Portfolio
+              </p>
+              <p className="text-3xl font-bold tracking-tight" style={{ color: "var(--hall-ink-0)" }}>{projects.length}</p>
+              <p style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--hall-muted-2)", marginTop: 6 }}>Active startups</p>
             </div>
-            <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-4">
-              <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30 mb-2">Total evidence</p>
-              <p className="text-3xl font-bold text-[#131218] tracking-tight">{totalEvidence}</p>
-              <p className="text-[11px] text-[#131218]/40 font-medium mt-1.5">{totalValidated} validated</p>
+            <div className="px-5 py-4" style={{ border: "1px solid var(--hall-line)" }}>
+              <p
+                className="mb-2"
+                style={{
+                  fontFamily: "var(--font-hall-mono)",
+                  fontSize: 10,
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                  color: "var(--hall-muted-2)",
+                }}
+              >
+                Total evidence
+              </p>
+              <p className="text-3xl font-bold tracking-tight" style={{ color: "var(--hall-ink-0)" }}>{totalEvidence}</p>
+              <p style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--hall-muted-2)", marginTop: 6 }}>{totalValidated} validated</p>
             </div>
-            <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-4">
-              <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30 mb-2">Blockers</p>
+            <div className="px-5 py-4" style={{ border: "1px solid var(--hall-line)" }}>
+              <p
+                className="mb-2"
+                style={{
+                  fontFamily: "var(--font-hall-mono)",
+                  fontSize: 10,
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                  color: "var(--hall-muted-2)",
+                }}
+              >
+                Blockers
+              </p>
               {withBlockers.length > 0
-                ? <p className="text-3xl font-bold text-red-500 tracking-tight">{withBlockers.length}</p>
-                : <p className="text-3xl font-bold text-[#131218]/15 tracking-tight">0</p>
+                ? <p className="text-3xl font-bold tracking-tight" style={{ color: "var(--hall-danger)" }}>{withBlockers.length}</p>
+                : <p className="text-3xl font-bold tracking-tight" style={{ color: "var(--hall-muted-3)" }}>0</p>
               }
-              <p className="text-[11px] text-[#131218]/40 font-medium mt-1.5">
+              <p style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--hall-muted-2)", marginTop: 6 }}>
                 {withBlockers.length > 0 ? "Need attention" : "Portfolio clear"}
               </p>
             </div>
-            <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-4">
-              <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30 mb-2">Pending updates</p>
+            <div className="px-5 py-4" style={{ border: "1px solid var(--hall-line)" }}>
+              <p
+                className="mb-2"
+                style={{
+                  fontFamily: "var(--font-hall-mono)",
+                  fontSize: 10,
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                  color: "var(--hall-muted-2)",
+                }}
+              >
+                Pending updates
+              </p>
               {needsUpdate.length > 0
-                ? <p className="text-3xl font-bold text-amber-500 tracking-tight">{needsUpdate.length}</p>
-                : <p className="text-3xl font-bold text-[#131218]/15 tracking-tight">0</p>
+                ? <p className="text-3xl font-bold tracking-tight" style={{ color: "var(--hall-warn)" }}>{needsUpdate.length}</p>
+                : <p className="text-3xl font-bold tracking-tight" style={{ color: "var(--hall-muted-3)" }}>0</p>
               }
-              <p className="text-[11px] text-[#131218]/40 font-medium mt-1.5">Status updates due</p>
+              <p style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--hall-muted-2)", marginTop: 6 }}>Status updates due</p>
             </div>
           </div>
 
@@ -127,43 +197,77 @@ export default async function GarageViewPage() {
                 const activityDate = [p.lastUpdate, p.lastEvidenceDate, p.lastMeetingDate].filter(Boolean).sort().pop() ?? null;
                 const days    = daysSince(activityDate);
                 const warmth  = warmthLabel(days);
+                const stageStyle = p.stage ? STAGE_STYLES[p.stage] : undefined;
+
+                const accentBar = p.blockerCount > 0
+                  ? "var(--hall-danger)"
+                  : p.updateNeeded
+                  ? "var(--hall-warn)"
+                  : "var(--hall-ok)";
 
                 return (
                   <Link
                     key={p.id}
                     href={`/admin/garage/${p.id}`}
-                    className="group bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden hover:border-[#131218]/25 hover:-translate-y-0.5 transition-all duration-200"
+                    className="group transition-all duration-200 hover:-translate-y-0.5"
+                    style={{ border: "1px solid var(--hall-line)", background: "var(--hall-paper-0)" }}
                   >
                     {/* Top accent bar */}
-                    {p.blockerCount > 0 && <div className="h-1 bg-red-400" />}
-                    {!p.blockerCount && p.updateNeeded && <div className="h-1 bg-amber-400" />}
-                    {!p.blockerCount && !p.updateNeeded && <div className="h-1 bg-[#B2FF59]" />}
+                    <div style={{ height: 4, background: accentBar }} />
 
                     <div className="px-5 py-4">
                       <div className="flex items-start justify-between gap-3 mb-3">
                         <div className="min-w-0 flex-1">
-                          <p className="text-[13px] font-bold text-[#131218] tracking-tight leading-snug truncate">{p.name}</p>
+                          <p className="text-[13px] font-bold tracking-tight leading-snug truncate" style={{ color: "var(--hall-ink-0)" }}>{p.name}</p>
                           {p.geography.length > 0 && (
-                            <p className="text-[10px] text-[#131218]/40 mt-0.5 truncate">
+                            <p className="text-[10px] mt-0.5 truncate" style={{ color: "var(--hall-muted-2)" }}>
                               {p.geography.slice(0, 2).join(" · ")}
                             </p>
                           )}
                         </div>
                         <div className="flex items-center gap-1.5 shrink-0">
-                          <span className={`w-1.5 h-1.5 rounded-full ${warmth.dot}`} />
-                          <span className={`text-[9.5px] font-bold ${warmth.text}`}>{warmth.label}</span>
+                          <span className="w-1.5 h-1.5 rounded-full" style={{ background: warmth.dot }} />
+                          <span
+                            style={{
+                              fontFamily: "var(--font-hall-mono)",
+                              fontSize: 10,
+                              fontWeight: 700,
+                              color: warmth.text,
+                            }}
+                          >
+                            {warmth.label}
+                          </span>
                         </div>
                       </div>
 
                       {/* Badges */}
                       <div className="flex flex-wrap gap-1.5 mb-4">
                         {p.stage && (
-                          <span className={`text-[8.5px] font-bold px-2 py-0.5 rounded-full ${STAGE_COLORS[p.stage] ?? "bg-[#EFEFEA] text-[#131218]/50 border border-[#E0E0D8]"}`}>
+                          <span
+                            className="px-2 py-0.5 rounded-full"
+                            style={{
+                              fontFamily: "var(--font-hall-mono)",
+                              fontSize: 9.5,
+                              fontWeight: 700,
+                              background: stageStyle?.bg ?? "var(--hall-fill-soft)",
+                              color: stageStyle?.color ?? "var(--hall-muted-2)",
+                            }}
+                          >
                             {p.stage}
                           </span>
                         )}
                         {p.themes.slice(0, 2).map(t => (
-                          <span key={t} className="text-[8.5px] font-bold px-2 py-0.5 rounded-full bg-[#EFEFEA] text-[#131218]/40 border border-[#E0E0D8]">
+                          <span
+                            key={t}
+                            className="px-2 py-0.5 rounded-full"
+                            style={{
+                              fontFamily: "var(--font-hall-mono)",
+                              fontSize: 9.5,
+                              fontWeight: 700,
+                              background: "var(--hall-fill-soft)",
+                              color: "var(--hall-muted-3)",
+                            }}
+                          >
                             {t}
                           </span>
                         ))}
@@ -171,40 +275,86 @@ export default async function GarageViewPage() {
 
                       {/* Status snapshot */}
                       {p.statusSummary ? (
-                        <p className="text-[11px] text-[#131218]/55 leading-relaxed mb-4 line-clamp-2">
+                        <p className="text-[11px] leading-relaxed mb-4 line-clamp-2" style={{ color: "var(--hall-muted-2)" }}>
                           {p.statusSummary}
                         </p>
                       ) : (
-                        <p className="text-[11px] text-[#131218]/20 italic mb-4">No status logged yet.</p>
+                        <p className="text-[11px] italic mb-4" style={{ color: "var(--hall-muted-3)" }}>No status logged yet.</p>
                       )}
 
                       {/* Current focus + next milestone */}
                       <div className="grid grid-cols-2 gap-3 mb-4">
-                        <div className="bg-[#EFEFEA] rounded-xl px-3 py-2.5">
-                          <p className="text-[7.5px] font-bold tracking-wider uppercase text-[#131218]/30 mb-1">Current focus</p>
-                          <p className="text-[11px] font-medium text-[#131218] leading-snug line-clamp-2">
-                            {p.hallCurrentFocus || <span className="text-[#131218]/25 italic">—</span>}
+                        <div className="px-3 py-2.5" style={{ background: "var(--hall-fill-soft)" }}>
+                          <p
+                            className="mb-1"
+                            style={{
+                              fontFamily: "var(--font-hall-mono)",
+                              fontSize: 9,
+                              letterSpacing: "0.08em",
+                              textTransform: "uppercase",
+                              color: "var(--hall-muted-2)",
+                            }}
+                          >
+                            Current focus
+                          </p>
+                          <p className="text-[11px] font-medium leading-snug line-clamp-2" style={{ color: "var(--hall-ink-0)" }}>
+                            {p.hallCurrentFocus || <span style={{ color: "var(--hall-muted-3)", fontStyle: "italic" }}>—</span>}
                           </p>
                         </div>
-                        <div className="bg-[#EFEFEA] rounded-xl px-3 py-2.5">
-                          <p className="text-[7.5px] font-bold tracking-wider uppercase text-[#131218]/30 mb-1">Next milestone</p>
-                          <p className="text-[11px] font-medium text-[#131218] leading-snug line-clamp-2">
-                            {p.hallNextMilestone || <span className="text-[#131218]/25 italic">—</span>}
+                        <div className="px-3 py-2.5" style={{ background: "var(--hall-fill-soft)" }}>
+                          <p
+                            className="mb-1"
+                            style={{
+                              fontFamily: "var(--font-hall-mono)",
+                              fontSize: 9,
+                              letterSpacing: "0.08em",
+                              textTransform: "uppercase",
+                              color: "var(--hall-muted-2)",
+                            }}
+                          >
+                            Next milestone
+                          </p>
+                          <p className="text-[11px] font-medium leading-snug line-clamp-2" style={{ color: "var(--hall-ink-0)" }}>
+                            {p.hallNextMilestone || <span style={{ color: "var(--hall-muted-3)", fontStyle: "italic" }}>—</span>}
                           </p>
                         </div>
                       </div>
 
                       {/* Footer */}
-                      <div className="flex items-center justify-between pt-3 border-t border-[#EFEFEA]">
+                      <div className="flex items-center justify-between pt-3" style={{ borderTop: "1px solid var(--hall-line-soft)" }}>
                         <div className="flex items-center gap-3">
                           {p.blockerCount > 0 && (
-                            <span className="text-[9px] font-bold text-red-500">↯ {p.blockerCount} blocker{p.blockerCount !== 1 ? "s" : ""}</span>
+                            <span
+                              style={{
+                                fontFamily: "var(--font-hall-mono)",
+                                fontSize: 10,
+                                fontWeight: 700,
+                                color: "var(--hall-danger)",
+                              }}
+                            >
+                              ↯ {p.blockerCount} blocker{p.blockerCount !== 1 ? "s" : ""}
+                            </span>
                           )}
                           {p.updateNeeded && (
-                            <span className="text-[9px] font-bold text-amber-500">! Update needed</span>
+                            <span
+                              style={{
+                                fontFamily: "var(--font-hall-mono)",
+                                fontSize: 10,
+                                fontWeight: 700,
+                                color: "var(--hall-warn)",
+                              }}
+                            >
+                              ! Update needed
+                            </span>
                           )}
                           {!p.blockerCount && !p.updateNeeded && (
-                            <span className="text-[9px] font-medium text-[#131218]/25">
+                            <span
+                              style={{
+                                fontFamily: "var(--font-hall-mono)",
+                                fontSize: 10,
+                                color: "var(--hall-muted-3)",
+                              }}
+                            >
                               {p.lastUpdate
                                 ? `Updated ${new Date(p.lastUpdate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`
                                 : "No update logged"
@@ -212,7 +362,12 @@ export default async function GarageViewPage() {
                             </span>
                           )}
                         </div>
-                        <span className="text-[#131218]/20 group-hover:text-[#131218]/60 transition-colors text-sm">→</span>
+                        <span
+                          className="text-sm transition-colors"
+                          style={{ color: "var(--hall-muted-3)" }}
+                        >
+                          →
+                        </span>
                       </div>
                     </div>
                   </Link>
@@ -220,9 +375,12 @@ export default async function GarageViewPage() {
               })}
             </div>
           ) : (
-            <div className="bg-white rounded-2xl border border-[#E0E0D8] p-12 text-center">
-              <p className="text-sm font-bold text-[#131218]/25 mb-2">No garage projects found</p>
-              <p className="text-xs text-[#131218]/20">
+            <div
+              className="p-12 text-center"
+              style={{ border: "1px solid var(--hall-line)" }}
+            >
+              <p className="text-sm font-bold mb-2" style={{ color: "var(--hall-muted-3)" }}>No garage projects found</p>
+              <p className="text-xs" style={{ color: "var(--hall-muted-3)" }}>
                 Assign a project&apos;s <strong>Primary Workspace</strong> to <strong>garage</strong> in Notion to see it here.
               </p>
             </div>

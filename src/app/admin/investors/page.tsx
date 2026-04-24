@@ -9,11 +9,11 @@ function daysSince(dateStr: string | null): number {
 }
 
 function warmthLabel(days: number): { label: string; dot: string; text: string } {
-  if (days <= 3)  return { label: "Hot",     dot: "bg-red-500",        text: "text-red-600" };
-  if (days <= 14) return { label: "Warm",    dot: "bg-amber-400",      text: "text-amber-600" };
-  if (days <= 30) return { label: "Active",  dot: "bg-amber-300",      text: "text-amber-500" };
-  if (days <= 60) return { label: "Cold",    dot: "bg-blue-400",       text: "text-blue-500" };
-  return              { label: "Dormant", dot: "bg-[#131218]/15",   text: "text-[#131218]/35" };
+  if (days <= 3)  return { label: "Hot",     dot: "var(--hall-danger)", text: "var(--hall-danger)" };
+  if (days <= 14) return { label: "Warm",    dot: "var(--hall-warn)",   text: "var(--hall-warn)" };
+  if (days <= 30) return { label: "Active",  dot: "var(--hall-warn)",   text: "var(--hall-warn)" };
+  if (days <= 60) return { label: "Cold",    dot: "var(--hall-info)",   text: "var(--hall-info)" };
+  return              { label: "Dormant", dot: "var(--hall-muted-3)", text: "var(--hall-muted-3)" };
 }
 
 const INVESTOR_ROLES = ["Investor", "Angel", "VC", "LP", "Fund", "Funder", "Backer", "Grant Funder", "Grant Maker", "Impact Investor"];
@@ -53,53 +53,76 @@ export default async function InvestorsPage() {
     d.priority === "P1" || d.priority === "P1 Critical" || d.priority === "Urgent"
   );
 
+  const eyebrowDate = new Date()
+    .toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })
+    .toUpperCase();
+
   return (
-    <div className="flex min-h-screen bg-[#EFEFEA]">
+    <div className="flex min-h-screen" style={{ background: "var(--hall-paper-0)" }}>
       <Sidebar adminNav />
 
-      <main className="flex-1 ml-[228px]">
+      <main
+        className="flex-1 ml-[228px]"
+        style={{ fontFamily: "var(--font-hall-sans)", background: "var(--hall-paper-0)" }}
+      >
 
-        {/* Dark header */}
-        <header className="bg-[#131218] px-12 pt-10 pb-11">
-          <p className="text-[8px] font-bold tracking-[2.5px] uppercase text-white/20 mb-3">
-            Commercial · Investor relations
-          </p>
-          <div className="flex items-end justify-between">
-            <div>
-              <h1 className="text-[2.6rem] font-light text-white tracking-[-1.5px] leading-none">
-                Investor <em className="font-black italic text-[#c8f55a]">Match</em>
-              </h1>
-              <p className="text-sm text-white/40 mt-3">
-                Active investors, funders y angels en la red CH — matched a portfolio startups.
-              </p>
-            </div>
-            <div className="flex items-center gap-4 pb-1">
-              <div className="text-right">
-                <p className="text-[2rem] font-black text-white tracking-tight leading-none">{investors.length}</p>
-                <p className="text-[9px] font-bold tracking-[1.5px] uppercase text-white/30 mt-0.5">Investors</p>
-              </div>
-              <div className="w-px h-10 bg-white/10" />
-              <div className="text-right">
-                <p className="text-[2rem] font-black text-[#B2FF59] tracking-tight leading-none">{garageProjects.length}</p>
-                <p className="text-[9px] font-bold tracking-[1.5px] uppercase text-white/30 mt-0.5">Startups</p>
-              </div>
-            </div>
+        {/* K-v2 collapsed header */}
+        <header
+          className="flex items-center justify-between gap-6 px-9 py-3.5"
+          style={{ borderBottom: "1px solid var(--hall-ink-0)" }}
+        >
+          <div className="flex items-baseline gap-4 min-w-0">
+            <span
+              className="text-[10px] tracking-[0.08em] whitespace-nowrap"
+              style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+            >
+              INVESTORS · <b style={{ color: "var(--hall-ink-0)" }}>{eyebrowDate}</b>
+            </span>
+            <h1
+              className="text-[16px] font-medium tracking-[-0.01em] truncate"
+              style={{ color: "var(--hall-ink-0)" }}
+            >
+              Investor <em className="hall-flourish">Match</em>
+            </h1>
+          </div>
+          <div
+            className="flex items-center gap-4"
+            style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--hall-muted-2)", letterSpacing: "0.06em" }}
+          >
+            <span>{investors.length} INVESTORS</span>
+            <span>{garageProjects.length} STARTUPS</span>
           </div>
         </header>
 
-        <div className="px-12 py-9 max-w-7xl space-y-6">
+        <div className="px-9 py-6 max-w-7xl space-y-7">
 
           {/* Stats row */}
           <div className="grid grid-cols-2 gap-4">
-            <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-4">
-              <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30 mb-2">Investors</p>
-              <p className="text-3xl font-bold text-[#131218] tracking-tight">{investors.length}</p>
-              <p className="text-[11px] text-[#131218]/40 font-medium mt-1.5">In CH People network</p>
+            <div
+              className="px-5 py-4"
+              style={{ border: "1px solid var(--hall-line-soft)", borderRadius: 3 }}
+            >
+              <p
+                className="text-[9px] font-bold tracking-widest uppercase mb-2"
+                style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-3)" }}
+              >
+                Investors
+              </p>
+              <p className="text-3xl font-bold tracking-tight tabular-nums" style={{color: "var(--hall-ink-0)"}}>{investors.length}</p>
+              <p className="text-[11px] font-medium mt-1.5" style={{color: "var(--hall-muted-2)"}}>In CH People network</p>
             </div>
-            <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-4">
-              <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30 mb-2">Portfolio startups</p>
-              <p className="text-3xl font-bold text-[#B2FF59] bg-[#131218] w-fit px-3 py-0.5 rounded-xl tracking-tight">{garageProjects.length}</p>
-              <p className="text-[11px] text-[#131218]/40 font-medium mt-1.5">Raising or investor-ready</p>
+            <div
+              className="px-5 py-4"
+              style={{ border: "1px solid var(--hall-line-soft)", borderRadius: 3 }}
+            >
+              <p
+                className="text-[9px] font-bold tracking-widest uppercase mb-2"
+                style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-3)" }}
+              >
+                Portfolio startups
+              </p>
+              <p className="text-3xl font-bold tracking-tight tabular-nums" style={{color: "var(--hall-ink-0)"}}>{garageProjects.length}</p>
+              <p className="text-[11px] font-medium mt-1.5" style={{color: "var(--hall-muted-2)"}}>Raising or investor-ready</p>
             </div>
           </div>
 
@@ -107,44 +130,75 @@ export default async function InvestorsPage() {
           <div className="grid grid-cols-[1fr_320px] gap-6 items-start">
 
             {/* Investors table */}
-            <div>
-              <div className="flex items-center gap-3 mb-3">
-                <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30">All investors</p>
-                <div className="flex-1 h-px bg-[#E0E0D8]" />
-                <p className="text-[9px] font-bold text-[#131218]/25">{investors.length}</p>
+            <section>
+              <div
+                className="flex items-baseline justify-between gap-3 pb-2 mb-3.5"
+                style={{borderBottom: "1px solid var(--hall-ink-0)"}}
+              >
+                <h2
+                  className="text-[19px] font-bold leading-none"
+                  style={{letterSpacing: "-0.02em", color: "var(--hall-ink-0)"}}
+                >
+                  All <em className="hall-flourish">investors</em>
+                </h2>
+                <span
+                  style={{fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--hall-muted-2)", letterSpacing: "0.06em"}}
+                >
+                  {investors.length} IN NETWORK
+                </span>
               </div>
 
               {investors.length > 0 ? (
-                <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-                  <div className="grid grid-cols-[2fr_1fr_1fr_100px] px-5 py-2.5 border-b border-[#EFEFEA]">
+                <div style={{ border: "1px solid var(--hall-line-soft)", borderRadius: 3, overflow: "hidden" }}>
+                  <div
+                    className="grid grid-cols-[2fr_1fr_1fr_100px] px-5 py-2.5"
+                    style={{
+                      borderBottom: "1px solid var(--hall-line-soft)",
+                      background: "var(--hall-paper-1)",
+                    }}
+                  >
                     {["Name", "Role", "Location", "Type"].map(h => (
-                      <p key={h} className="text-[9px] font-bold text-[#131218]/25 uppercase tracking-widest">{h}</p>
+                      <p
+                        key={h}
+                        className="text-[9px] font-bold uppercase tracking-widest"
+                        style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-3)" }}
+                      >
+                        {h}
+                      </p>
                     ))}
                   </div>
 
-                  <div className="divide-y divide-[#EFEFEA]">
-                    {investors.map(p => {
+                  <div>
+                    {investors.map((p, idx) => {
                       const investorRole = p.roles.find(r => INVESTOR_ROLES.some(ir => r.toLowerCase().includes(ir.toLowerCase())));
                       return (
-                        <div key={p.id} className="grid grid-cols-[2fr_1fr_1fr_100px] px-5 py-3 items-center hover:bg-[#EFEFEA]/50 transition-colors">
+                        <div
+                          key={p.id}
+                          className="grid grid-cols-[2fr_1fr_1fr_100px] px-5 py-3 items-center transition-colors"
+                          style={idx === 0 ? undefined : { borderTop: "1px solid var(--hall-line-soft)" }}
+                        >
                           <div className="min-w-0">
-                            <p className="text-[12px] font-semibold text-[#131218] truncate">{p.name}</p>
+                            <p className="text-[12px] font-semibold truncate" style={{color: "var(--hall-ink-0)"}}>{p.name}</p>
                             {p.jobTitle && (
-                              <p className="text-[9.5px] text-[#131218]/40 truncate mt-0.5">{p.jobTitle}</p>
+                              <p className="text-[9.5px] truncate mt-0.5" style={{color: "var(--hall-muted-3)"}}>{p.jobTitle}</p>
                             )}
                           </div>
-                          <p className="text-[10px] text-[#131218]/50 font-medium truncate">
+                          <p className="text-[10px] font-medium truncate" style={{color: "var(--hall-muted-2)"}}>
                             {investorRole || "—"}
                           </p>
-                          <p className="text-[10px] text-[#131218]/40 truncate">
+                          <p className="text-[10px] truncate" style={{color: "var(--hall-muted-3)"}}>
                             {p.location || "—"}
                           </p>
                           <div>
-                            <span className={`inline-block text-[8px] font-bold px-2 py-0.5 rounded-full ${
-                              p.classification === "Internal"
-                                ? "bg-[#131218] text-[#B2FF59]"
-                                : "bg-[#EFEFEA] text-[#131218]/50 border border-[#E0E0D8]"
-                            }`}>
+                            <span
+                              className="inline-block text-[8px] font-bold px-2 py-0.5 rounded-full"
+                              style={{
+                                fontFamily: "var(--font-hall-mono)",
+                                letterSpacing: "0.06em",
+                                background: p.classification === "Internal" ? "var(--hall-ink-0)" : "var(--hall-fill-soft)",
+                                color: p.classification === "Internal" ? "var(--hall-paper-0)" : "var(--hall-muted-2)",
+                              }}
+                            >
                               {p.classification || "—"}
                             </span>
                           </div>
@@ -153,128 +207,188 @@ export default async function InvestorsPage() {
                     })}
                   </div>
 
-                  <div className="px-5 py-2.5 border-t border-[#EFEFEA]">
-                    <p className="text-[9px] font-bold text-[#131218]/25 uppercase tracking-widest">
+                  <div
+                    className="px-5 py-2.5"
+                    style={{ borderTop: "1px solid var(--hall-line-soft)" }}
+                  >
+                    <p
+                      className="text-[9px] font-bold uppercase tracking-widest"
+                      style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-3)" }}
+                    >
                       {investors.length} investor{investors.length !== 1 ? "s" : ""} in network
                     </p>
                   </div>
                 </div>
               ) : (
-                <div className="bg-white rounded-2xl border border-[#E0E0D8] p-10 text-center">
-                  <p className="text-sm text-[#131218]/25">
+                <div
+                  className="p-10 text-center"
+                  style={{ border: "1px solid var(--hall-line-soft)", borderRadius: 3 }}
+                >
+                  <p className="text-sm" style={{color: "var(--hall-muted-3)"}}>
                     No investors found. Add &ldquo;Investor&rdquo; to someone&apos;s Relationship Roles in CH People to see them here.
                   </p>
                 </div>
               )}
-            </div>
+            </section>
 
             {/* Portfolio startups sidebar */}
-            <div>
-              <div className="flex items-center gap-3 mb-3">
-                <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30">Portfolio</p>
-                <div className="flex-1 h-px bg-[#E0E0D8]" />
-                <p className="text-[9px] font-bold text-[#131218]/25">{garageProjects.length}</p>
+            <section>
+              <div
+                className="flex items-baseline justify-between gap-3 pb-2 mb-3.5"
+                style={{borderBottom: "1px solid var(--hall-ink-0)"}}
+              >
+                <h2
+                  className="text-[19px] font-bold leading-none"
+                  style={{letterSpacing: "-0.02em", color: "var(--hall-ink-0)"}}
+                >
+                  Portfolio
+                </h2>
+                <span
+                  style={{fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--hall-muted-2)", letterSpacing: "0.06em"}}
+                >
+                  {garageProjects.length} STARTUPS
+                </span>
               </div>
 
-              <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-                <div className="divide-y divide-[#EFEFEA]">
-                  {garageProjects.map(p => {
-                    const days   = daysSince(p.lastUpdate);
-                    const warmth = warmthLabel(days);
-                    return (
+              <ul className="flex flex-col">
+                {garageProjects.map((p, idx) => {
+                  const days   = daysSince(p.lastUpdate);
+                  const warmth = warmthLabel(days);
+                  return (
+                    <li
+                      key={p.id}
+                      style={idx === 0 ? undefined : { borderTop: "1px solid var(--hall-line-soft)" }}
+                    >
                       <Link
-                        key={p.id}
                         href={`/admin/projects/${p.id}`}
-                        className="flex items-center gap-3 px-4 py-3 hover:bg-[#EFEFEA]/40 transition-colors group"
+                        className="flex items-center gap-3 py-3 transition-colors group"
                       >
                         <div className="flex-1 min-w-0">
-                          <p className="text-[11.5px] font-bold text-[#131218] truncate">{p.name}</p>
+                          <p className="text-[11.5px] font-bold truncate" style={{color: "var(--hall-ink-0)"}}>{p.name}</p>
                           <div className="flex items-center gap-1.5 mt-0.5">
-                            <span className={`w-1.5 h-1.5 rounded-full ${warmth.dot}`} />
-                            <span className={`text-[9px] font-semibold ${warmth.text}`}>{warmth.label}</span>
+                            <span className="w-1.5 h-1.5 rounded-full" style={{background: warmth.dot}} />
+                            <span className="text-[9px] font-semibold" style={{color: warmth.text}}>{warmth.label}</span>
                             {p.stage && (
-                              <span className="text-[9px] text-[#131218]/30">· {p.stage}</span>
+                              <span className="text-[9px]" style={{color: "var(--hall-muted-3)"}}>· {p.stage}</span>
                             )}
                           </div>
                         </div>
                         <div className="text-right shrink-0">
-                          <p className="text-[10px] font-bold text-[#131218]/40">{p.validatedCount} val.</p>
+                          <p
+                            className="text-[10px] font-bold tabular-nums"
+                            style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+                          >
+                            {p.validatedCount} val.
+                          </p>
                           {p.blockerCount > 0 && (
-                            <p className="text-[8px] font-bold text-red-500">↯</p>
+                            <p className="text-[8px] font-bold" style={{color: "var(--hall-danger)"}}>↯</p>
                           )}
                         </div>
-                        <span className="text-[#131218]/20 group-hover:text-[#131218]/60 transition-colors text-sm">→</span>
+                        <span className="transition-colors text-sm" style={{color: "var(--hall-muted-3)"}}>→</span>
                       </Link>
-                    );
-                  })}
-                  {garageProjects.length === 0 && (
-                    <div className="px-4 py-6 text-center">
-                      <p className="text-[11px] text-[#131218]/25 font-medium">No garage projects</p>
-                    </div>
-                  )}
-                </div>
-                <div className="px-4 py-2.5 border-t border-[#EFEFEA]">
-                  <Link href="/admin/garage-view" className="text-[9px] font-bold text-[#131218]/30 hover:text-[#131218]/60 transition-colors uppercase tracking-widest">
-                    Open Garage →
-                  </Link>
-                </div>
+                    </li>
+                  );
+                })}
+                {garageProjects.length === 0 && (
+                  <li className="py-6 text-center">
+                    <p className="text-[11px] font-medium" style={{color: "var(--hall-muted-3)"}}>No garage projects</p>
+                  </li>
+                )}
+              </ul>
+              <div className="pt-3 mt-2" style={{borderTop: "1px solid var(--hall-line-soft)"}}>
+                <Link
+                  href="/admin/garage-view"
+                  style={{fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--hall-muted-2)", letterSpacing: "0.06em"}}
+                >
+                  OPEN GARAGE →
+                </Link>
               </div>
 
-
-            </div>
+            </section>
 
           </div>
 
           {/* Investor decisions section */}
-          <div>
-            <div className="flex items-center gap-3 mb-3">
-              <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30">Investor decisions</p>
-              <div className="flex-1 h-px bg-[#E0E0D8]" />
+          <section>
+            <div
+              className="flex items-baseline justify-between gap-3 pb-2 mb-3.5"
+              style={{borderBottom: "1px solid var(--hall-ink-0)"}}
+            >
+              <h2
+                className="text-[19px] font-bold leading-none"
+                style={{letterSpacing: "-0.02em", color: "var(--hall-ink-0)"}}
+              >
+                Investor <em className="hall-flourish">decisions</em>
+              </h2>
               {investorDecisions.length > 0 && (
-                <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${urgentInvestorDecisions.length > 0 ? "bg-red-100 text-red-600" : "bg-amber-100 text-amber-700"}`}>
-                  {investorDecisions.length}
+                <span
+                  style={{
+                    fontFamily: "var(--font-hall-mono)",
+                    fontSize: 10,
+                    color: urgentInvestorDecisions.length > 0 ? "var(--hall-danger)" : "var(--hall-warn)",
+                    letterSpacing: "0.06em",
+                  }}
+                >
+                  {investorDecisions.length} OPEN
                 </span>
               )}
             </div>
 
-            <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-              <div className="divide-y divide-[#EFEFEA]">
-                {investorDecisions.slice(0, 6).map(d => (
-                  <Link key={d.id} href="/admin/decisions" className="flex items-start gap-3 px-5 py-3 hover:bg-[#EFEFEA]/40 transition-colors">
-                    <div className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 mt-0.5 ${
-                      d.priority === "P1" || d.priority === "P1 Critical" || d.priority === "Urgent"
-                        ? "bg-red-100" : "bg-[#EFEFEA]"
-                    }`}>
-                      <span className={`text-[8px] font-bold ${
-                        d.priority === "P1" || d.priority === "P1 Critical" || d.priority === "Urgent"
-                          ? "text-red-600" : "text-[#131218]/30"
-                      }`}>
-                        {d.priority?.startsWith("P1") || d.priority === "Urgent" ? "P1" : "·"}
-                      </span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[11px] font-semibold text-[#131218] leading-snug line-clamp-2">{d.title}</p>
-                      <p className="text-[9px] text-[#131218]/35 mt-0.5">
-                        {d.decisionType || "Decision"}
-                        {d.dueDate && ` · Due ${new Date(d.dueDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`}
-                      </p>
-                    </div>
-                  </Link>
-                ))}
-                {investorDecisions.length === 0 && (
-                  <div className="px-5 py-6 text-center">
-                    <p className="text-[11px] text-[#131218]/25 font-medium">No open investor decisions</p>
-                    <p className="text-[9px] text-[#131218]/20 mt-1">Decisions mentioning investors, raises, or cap table appear here</p>
-                  </div>
-                )}
-              </div>
-              <div className="px-5 py-2.5 border-t border-[#EFEFEA]">
-                <Link href="/admin/decisions" className="text-[9px] font-bold text-[#131218]/30 hover:text-[#131218]/60 transition-colors uppercase tracking-widest">
-                  All decisions →
-                </Link>
-              </div>
+            <ul className="flex flex-col">
+              {investorDecisions.slice(0, 6).map((d, idx) => {
+                const isUrgent = d.priority === "P1" || d.priority === "P1 Critical" || d.priority === "Urgent";
+                return (
+                  <li
+                    key={d.id}
+                    style={idx === 0 ? undefined : { borderTop: "1px solid var(--hall-line-soft)" }}
+                  >
+                    <Link href="/admin/decisions" className="flex items-start gap-3 py-3 transition-colors">
+                      <div
+                        className="w-5 h-5 rounded flex items-center justify-center shrink-0 mt-0.5"
+                        style={{
+                          background: isUrgent ? "var(--hall-danger-soft)" : "var(--hall-fill-soft)",
+                        }}
+                      >
+                        <span
+                          className="text-[8px] font-bold"
+                          style={{
+                            fontFamily: "var(--font-hall-mono)",
+                            color: isUrgent ? "var(--hall-danger)" : "var(--hall-muted-3)",
+                          }}
+                        >
+                          {d.priority?.startsWith("P1") || d.priority === "Urgent" ? "P1" : "·"}
+                        </span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[11px] font-semibold leading-snug line-clamp-2" style={{color: "var(--hall-ink-0)"}}>{d.title}</p>
+                        <p
+                          className="text-[9px] mt-0.5"
+                          style={{fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-3)", letterSpacing: "0.06em"}}
+                        >
+                          {d.decisionType || "Decision"}
+                          {d.dueDate && ` · Due ${new Date(d.dueDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`}
+                        </p>
+                      </div>
+                    </Link>
+                  </li>
+                );
+              })}
+              {investorDecisions.length === 0 && (
+                <li className="py-6 text-center">
+                  <p className="text-[11px] font-medium" style={{color: "var(--hall-muted-3)"}}>No open investor decisions</p>
+                  <p className="text-[9px] mt-1" style={{color: "var(--hall-muted-3)"}}>Decisions mentioning investors, raises, or cap table appear here</p>
+                </li>
+              )}
+            </ul>
+            <div className="pt-3 mt-2" style={{borderTop: "1px solid var(--hall-line-soft)"}}>
+              <Link
+                href="/admin/decisions"
+                style={{fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--hall-muted-2)", letterSpacing: "0.06em"}}
+              >
+                ALL DECISIONS →
+              </Link>
             </div>
-          </div>
+          </section>
 
         </div>
       </main>
