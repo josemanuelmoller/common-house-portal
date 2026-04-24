@@ -73,12 +73,12 @@ function labelForSource(source: string): string {
 }
 
 function warmthFromLastSeen(iso: string | null): { label: string; tone: string } {
-  if (!iso) return { label: "Cold", tone: "text-[#131218]/40" };
+  if (!iso) return { label: "Cold", tone: "var(--hall-muted-3)" };
   const days = (Date.now() - new Date(iso).getTime()) / 86400_000;
-  if (days < 7)   return { label: "🔥 Hot",  tone: "text-emerald-700" };
-  if (days < 30)  return { label: "Warm",   tone: "text-amber-700"  };
-  if (days < 90)  return { label: "Cooling", tone: "text-[#131218]/50" };
-  return { label: "Cold", tone: "text-[#131218]/40" };
+  if (days < 7)   return { label: "Hot",     tone: "var(--hall-ok)" };
+  if (days < 30)  return { label: "Warm",    tone: "var(--hall-warn)" };
+  if (days < 90)  return { label: "Cooling", tone: "var(--hall-muted-2)" };
+  return { label: "Cold", tone: "var(--hall-muted-3)" };
 }
 
 // ─── page ─────────────────────────────────────────────────────────────────────

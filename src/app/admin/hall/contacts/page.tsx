@@ -580,8 +580,8 @@ type EnrichedContact = ContactRow & {
 function BrowseView({ contacts }: { contacts: EnrichedContact[] }) {
   if (contacts.length === 0) {
     return (
-      <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-10 text-center">
-        <p className="text-sm text-[#131218]/40">No contacts observed yet.</p>
+      <div className="px-5 py-10 text-center">
+        <p className="text-sm" style={{ color: "var(--hall-muted-3)" }}>No contacts observed yet.</p>
       </div>
     );
   }
@@ -593,10 +593,13 @@ function BrowseView({ contacts }: { contacts: EnrichedContact[] }) {
 
   return (
     <div className="space-y-4">
-      <p className="text-[10px] font-bold tracking-widest uppercase text-[#131218]/40">
+      <p
+        className="text-[10px] tracking-[0.08em] uppercase"
+        style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+      >
         Ranked by relationship intensity · {contacts.length} people
       </p>
-      <div className="grid gap-3">
+      <ul className="flex flex-col">
         {contacts.map(c => (
           <ContactCard
             key={c.email}
@@ -605,7 +608,7 @@ function BrowseView({ contacts }: { contacts: EnrichedContact[] }) {
             tier={c.intensity >= hotCutoff ? "hot" : c.intensity >= warmCutoff ? "warm" : "cool"}
           />
         ))}
-      </div>
+      </ul>
     </div>
   );
 }
@@ -620,82 +623,116 @@ function ContactCard({
   tier: "hot" | "warm" | "cool";
 }) {
   const barPct = Math.max(4, Math.round((contact.intensity / maxIntensity) * 100));
-  const barColor = tier === "hot" ? "bg-[#22c55e]" : tier === "warm" ? "bg-[#f59e0b]" : "bg-[#9ca3af]";
+  const barColor = tier === "hot" ? "var(--hall-ok)" : tier === "warm" ? "var(--hall-warn)" : "var(--hall-muted-3)";
   const display = contact.display_name || (contact.email ?? "").split("@")[0] || "(no name)";
   const domain  = (contact.email ?? "").split("@")[1] ?? "";
   const initial = display.slice(0, 1).toUpperCase();
   const classes = contact.relationship_classes ?? [];
 
   return (
-    <Link
-      href={`/admin/hall/contacts/${encodeURIComponent(contact.email ?? contact.id)}`}
-      prefetch={false}
-      className="group bg-white rounded-2xl border border-[#E0E0D8] hover:border-[#131218]/30 hover:shadow-sm transition-all px-5 py-4"
-    >
-      <div className="flex items-start gap-4">
-        <div className="w-10 h-10 rounded-full bg-[#131218] text-white flex items-center justify-center flex-shrink-0 font-bold text-sm">
-          {initial}
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-baseline justify-between gap-4">
-            <div className="min-w-0">
-              <p className="text-[13px] font-bold text-[#131218] truncate group-hover:underline decoration-[#131218]/30 underline-offset-2">
-                {display}
-              </p>
-              <p className="text-[10px] text-[#131218]/45 truncate">
-                {domain || contact.email}
-              </p>
-            </div>
-            <div className="flex items-center gap-3 text-[10px] text-[#131218]/55 font-medium flex-shrink-0">
-              {contact.meeting_count > 0 && (
-                <span title={contact.meeting_count > contact.transcript_count ? `${contact.meeting_count} invited · ${contact.transcript_count} confirmed in Fireflies` : `${contact.meeting_count} meetings`}>
-                  📅 {contact.meeting_count > contact.transcript_count
-                    ? `${contact.meeting_count}/${contact.transcript_count}`
-                    : contact.meeting_count}
-                </span>
-              )}
-              {contact.email_thread_count > 0 && <span>📧 {contact.email_thread_count}</span>}
-              {contact.transcript_count   > 0 && <span>🎙️ {contact.transcript_count}</span>}
-              {contact.wa_count           > 0 && <span>💬 {contact.wa_count}</span>}
-            </div>
+    <li style={{ borderTop: "1px solid var(--hall-line-soft)" }}>
+      <Link
+        href={`/admin/hall/contacts/${encodeURIComponent(contact.email ?? contact.id)}`}
+        prefetch={false}
+        className="group block transition-colors hover:bg-[var(--hall-fill-soft)] px-1 py-3"
+      >
+        <div className="flex items-start gap-4">
+          <div
+            className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-sm"
+            style={{ background: "var(--hall-ink-0)", color: "var(--hall-paper-0)" }}
+          >
+            {initial}
           </div>
-
-          {/* Intensity bar */}
-          <div className="mt-3 flex items-center gap-3">
-            <div className="flex-1 h-1 rounded-full bg-[#EFEFEA] overflow-hidden">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-baseline justify-between gap-4">
+              <div className="min-w-0">
+                <p
+                  className="text-[13px] font-semibold truncate group-hover:underline underline-offset-2"
+                  style={{ color: "var(--hall-ink-0)" }}
+                >
+                  {display}
+                </p>
+                <p
+                  className="text-[10px] truncate"
+                  style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-3)" }}
+                >
+                  {domain || contact.email}
+                </p>
+              </div>
               <div
-                className={`h-full ${barColor} transition-all`}
-                style={{ width: `${barPct}%` }}
-              />
+                className="flex items-center gap-3 text-[10px] flex-shrink-0"
+                style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+              >
+                {contact.meeting_count > 0 && (
+                  <span title={contact.meeting_count > contact.transcript_count ? `${contact.meeting_count} invited · ${contact.transcript_count} confirmed in Fireflies` : `${contact.meeting_count} meetings`}>
+                    {contact.meeting_count > contact.transcript_count
+                      ? `${contact.meeting_count}/${contact.transcript_count}`
+                      : contact.meeting_count} mtg
+                  </span>
+                )}
+                {contact.email_thread_count > 0 && <span>{contact.email_thread_count} mail</span>}
+                {contact.transcript_count   > 0 && <span>{contact.transcript_count} tx</span>}
+                {contact.wa_count           > 0 && <span>{contact.wa_count} wa</span>}
+              </div>
             </div>
-            <span className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30">
-              {Math.round(contact.intensity)}
-            </span>
-          </div>
 
-          {/* Classes + org suggestion */}
-          {(classes.length > 0 || contact.suggestion) && (
-            <div className="mt-2 flex flex-wrap gap-1 items-center">
-              {classes.map(cls => (
-                <span
-                  key={cls}
-                  className="text-[8px] font-bold tracking-wide uppercase px-1.5 py-0.5 rounded bg-[#131218]/5 text-[#131218]/55"
-                >
-                  {cls}
-                </span>
-              ))}
-              {contact.suggestion && (
-                <span
-                  title={`${contact.suggestion.matches}/${contact.suggestion.totalEvidence} transcripts match ${contact.suggestion.domain}`}
-                  className="text-[8px] font-bold tracking-wide uppercase px-1.5 py-0.5 rounded bg-[#c8f55a]/25 text-[#131218]/75 border border-[#c8f55a]/60"
-                >
-                  🔗 likely at {contact.suggestion.orgName ?? contact.suggestion.domain}
-                </span>
-              )}
+            {/* Intensity bar */}
+            <div className="mt-3 flex items-center gap-3">
+              <div
+                className="flex-1 h-1 overflow-hidden"
+                style={{ background: "var(--hall-line-soft)" }}
+              >
+                <div
+                  className="h-full transition-all"
+                  style={{ width: `${barPct}%`, background: barColor }}
+                />
+              </div>
+              <span
+                className="text-[9px] tracking-[0.08em] uppercase"
+                style={{ fontFamily: "var(--font-hall-mono)", fontWeight: 700, color: "var(--hall-muted-3)" }}
+              >
+                {Math.round(contact.intensity)}
+              </span>
             </div>
-          )}
+
+            {/* Classes + org suggestion */}
+            {(classes.length > 0 || contact.suggestion) && (
+              <div className="mt-2 flex flex-wrap gap-1 items-center">
+                {classes.map(cls => (
+                  <span
+                    key={cls}
+                    className="text-[9px] px-1.5 py-0.5 uppercase"
+                    style={{
+                      fontFamily: "var(--font-hall-mono)",
+                      fontWeight: 700,
+                      letterSpacing: "0.08em",
+                      background: "var(--hall-fill-soft)",
+                      color: "var(--hall-muted-2)",
+                    }}
+                  >
+                    {cls}
+                  </span>
+                ))}
+                {contact.suggestion && (
+                  <span
+                    title={`${contact.suggestion.matches}/${contact.suggestion.totalEvidence} transcripts match ${contact.suggestion.domain}`}
+                    className="text-[9px] px-1.5 py-0.5 uppercase"
+                    style={{
+                      fontFamily: "var(--font-hall-mono)",
+                      fontWeight: 700,
+                      letterSpacing: "0.08em",
+                      border: "1px solid var(--hall-ink-0)",
+                      color: "var(--hall-ink-0)",
+                    }}
+                  >
+                    likely at {contact.suggestion.orgName ?? contact.suggestion.domain}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
         </div>
-      </div>
-    </Link>
+      </Link>
+    </li>
   );
 }
