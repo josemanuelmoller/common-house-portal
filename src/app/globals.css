@@ -181,3 +181,64 @@ body {
 .ch-artifact-prose table tbody tr:hover {
   background: #F7F7F3;
 }
+
+/* ─── Hall (K-v2) design system ─────────────────────────────────────────────
+   Scoped to the Hall surface (admin home). Other pages keep --ch-* + Space
+   Grotesk. These tokens come from design_handoff/styles/variant-k2.css and
+   styles/hall-system.css — copied verbatim to keep the handoff as source of
+   truth. Fonts are loaded via next/font in src/app/layout.tsx and exposed
+   as --font-hall-{sans,display,mono} CSS variables. */
+:root {
+  /* Ink */
+  --hall-ink-0:   #0a0a0a;
+  --hall-ink-1:   #141414;
+  --hall-ink-2:   #1f1f1f;
+  --hall-ink-3:   #2a2a2a;
+
+  /* Paper */
+  --hall-paper-0: #ffffff;
+  --hall-paper-1: #fafaf7;
+  --hall-paper-2: #f4f4ef;
+  --hall-paper-3: #ececE5;
+
+  /* Lines + muted */
+  --hall-line:        #e8e8e8;
+  --hall-line-soft:   #f0f0ea;
+  --hall-line-strong: #d4d4cb;
+  --hall-fill-soft:   #f2f2ee;
+  --hall-muted:       #8a8a82;
+  --hall-muted-2:     #6b6b6b;
+  --hall-muted-3:     #9a9a9a;
+
+  /* Brand — RESERVED. Lime appears ONLY on Focus block + live "now" indicators. */
+  --hall-lime:       #c6f24a;
+  --hall-lime-soft:  #e7f9a8;
+  --hall-lime-paper: #fbfde8;
+  --hall-lime-ink:   #4d6b0b;
+
+  /* Semantic */
+  --hall-danger:      #d93636;
+  --hall-danger-soft: #ffe8e4;
+  --hall-warn:        #d98a00;
+  --hall-warn-paper:  #fff9ec;
+  --hall-warn-soft:   #fff2d6;
+  --hall-ok:          #2f9e44;
+  --hall-ok-soft:     #e4f6e3;
+  --hall-info:        #2458d6;
+  --hall-info-soft:   #e3ecff;
+}
+
+/* Italic display accent — used inside h2 ("Suggested *blocks*"). */
+.hall-flourish {
+  font-family: var(--font-hall-display, "Instrument Serif", Georgia, serif);
+  font-style: italic;
+  font-weight: 400;
+  color: inherit; /* never lime — lime is reserved */
+}
+
+/* Pulse for LIVE chip dot + countdown dots (1.6s ease-in-out, 0.4 ↔ 1). */
+@keyframes hall-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.4; }
+}
+.hall-pulse { animation: hall-pulse 1.6s ease-in-out infinite; }
