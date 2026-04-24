@@ -38,13 +38,12 @@ type Row = {
   staleReason: string | null;
 };
 
-// Expected cadence in hours per routine; null = one-off / manual
 function expectedCadenceHours(entry: RoutineCatalogEntry): number {
   const s = entry.schedule.toLowerCase();
-  if (s.includes("mon & thu")) return 96;          // bi-weekly Mon/Thu
-  if (s.includes("wed") && !s.includes("mon-fri")) return 7 * 24; // weekly Wed
-  if (s.includes("tue-sat")) return 36;            // daily-ish
-  if (s.includes("mon-fri")) return 36;            // daily weekday
+  if (s.includes("mon & thu")) return 96;
+  if (s.includes("wed") && !s.includes("mon-fri")) return 7 * 24;
+  if (s.includes("tue-sat")) return 36;
+  if (s.includes("mon-fri")) return 36;
   return 7 * 24;
 }
 
@@ -102,16 +101,16 @@ function formatDuration(ms: number | null): string {
   return `${(ms / 60_000).toFixed(1)}m`;
 }
 
-function statusColor(status: "success" | "error" | "never"): string {
-  if (status === "success") return "bg-[#B2FF59] text-[#131218]";
-  if (status === "error")   return "bg-red-500 text-white";
-  return "bg-[#EFEFEA] text-[#131218]/50 border border-[#E0E0D8]";
+function statusStyle(status: "success" | "error" | "never"): { bg: string; color: string } {
+  if (status === "success") return { bg: "var(--hall-ok-soft)",     color: "var(--hall-ok)" };
+  if (status === "error")   return { bg: "var(--hall-danger-soft)", color: "var(--hall-danger)" };
+  return                    { bg: "var(--hall-fill-soft)",          color: "var(--hall-muted-2)" };
 }
 
-function freshnessBadge(f: Row["freshness"]): { label: string; cls: string } {
-  if (f === "fresh") return { label: "fresh",  cls: "bg-green-50 text-green-700 border border-green-200" };
-  if (f === "stale") return { label: "stale",  cls: "bg-amber-50 text-amber-700 border border-amber-200" };
-  return             { label: "never",  cls: "bg-[#EFEFEA] text-[#131218]/50 border border-[#E0E0D8]" };
+function freshnessStyle(f: Row["freshness"]): { bg: string; color: string; label: string } {
+  if (f === "fresh") return { bg: "var(--hall-ok-soft)",     color: "var(--hall-ok)",     label: "fresh" };
+  if (f === "stale") return { bg: "var(--hall-warn-soft)",   color: "var(--hall-warn)",   label: "stale" };
+  return             { bg: "var(--hall-fill-soft)",          color: "var(--hall-muted-2)", label: "never" };
 }
 
 export default async function RoutinesPage() {
@@ -124,7 +123,6 @@ export default async function RoutinesPage() {
     return { name, catalog, run, freshness, staleReason };
   });
 
-  // Sort: errors first, then stale, then fresh. Within each group, by priority.
   const order = { error: 0, stale: 1, never: 2, fresh: 3 } as const;
   rows.sort((a, b) => {
     const ka = a.run?.status === "error" ? 0 : order[a.freshness];
@@ -141,134 +139,253 @@ export default async function RoutinesPage() {
     never: rows.filter((r) => r.freshness === "never").length,
   };
 
+  const eyebrowDate = new Date()
+    .toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })
+    .toUpperCase();
+
   return (
-    <div className="flex min-h-screen bg-[#EFEFEA] text-[#131218]">
+    <div className="flex min-h-screen" style={{ background: "var(--hall-paper-0)" }}>
       <Sidebar adminNav />
 
-      <main className="flex-1 p-8 overflow-x-auto">
-        <header className="mb-6">
-          <div className="flex items-baseline justify-between flex-wrap gap-2">
-            <h1 className="text-2xl font-bold tracking-tight">Routine Runs</h1>
-            <p className="text-xs text-[#131218]/50">
-              fetched {new Date().toLocaleString("en-GB")}
-            </p>
+      <main
+        className="flex-1 overflow-x-auto"
+        style={{ fontFamily: "var(--font-hall-sans)", background: "var(--hall-paper-0)" }}
+      >
+
+        {/* K-v2 collapsed header */}
+        <header
+          className="flex items-center justify-between gap-6 px-9 py-3.5"
+          style={{ borderBottom: "1px solid var(--hall-ink-0)" }}
+        >
+          <div className="flex items-baseline gap-4 min-w-0">
+            <span
+              className="text-[10px] tracking-[0.08em] whitespace-nowrap"
+              style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+            >
+              ROUTINES · <b style={{ color: "var(--hall-ink-0)" }}>{eyebrowDate}</b>
+            </span>
+            <h1
+              className="text-[16px] font-medium tracking-[-0.01em] truncate"
+              style={{ color: "var(--hall-ink-0)" }}
+            >
+              Routine <em className="hall-flourish">runs</em>
+            </h1>
           </div>
-          <p className="text-sm text-[#131218]/60 mt-1">
-            Health of scheduled / cron routines. Joined from{" "}
-            <code className="text-[11px] bg-[#131218]/6 px-1 rounded">public.routine_runs</code>{" "}
-            + static catalog in{" "}
-            <code className="text-[11px] bg-[#131218]/6 px-1 rounded">src/lib/routine-log.ts</code>.
-          </p>
+          <span
+            style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--hall-muted-3)", letterSpacing: "0.06em" }}
+          >
+            FETCHED {new Date().toLocaleString("en-GB")}
+          </span>
         </header>
 
-        <section className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6 max-w-3xl">
-          <StatPill label="Total"    value={counts.total}   />
-          <StatPill label="Fresh"    value={counts.fresh}   tone="good" />
-          <StatPill label="Failing"  value={counts.failing} tone={counts.failing > 0 ? "bad" : "neutral"} />
-          <StatPill label="Stale"    value={counts.stale}   tone={counts.stale > 0 ? "warn" : "neutral"} />
-          <StatPill label="No data"  value={counts.never}   tone={counts.never > 0 ? "warn" : "neutral"} />
-        </section>
+        <div className="px-9 py-6 space-y-7">
 
-        <div className="bg-white border border-[#E0E0D8] rounded-[14px] overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-[#131218] text-white text-[11px] uppercase tracking-wider">
-              <tr>
-                <th className="text-left px-4 py-3 font-semibold">Routine</th>
-                <th className="text-left px-4 py-3 font-semibold">Schedule</th>
-                <th className="text-left px-4 py-3 font-semibold">Last run</th>
-                <th className="text-left px-4 py-3 font-semibold">Status</th>
-                <th className="text-right px-4 py-3 font-semibold">Dur</th>
-                <th className="text-right px-4 py-3 font-semibold">R / W</th>
-                <th className="text-left px-4 py-3 font-semibold">Fresh</th>
-                <th className="text-left px-4 py-3 font-semibold">Output surface</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => {
-                const runStatus: "success" | "error" | "never" =
-                  !r.run ? "never" : r.run.status;
-                const fresh = freshnessBadge(r.freshness);
-                return (
-                  <tr
-                    key={r.name}
-                    className="border-t border-[#E0E0D8] hover:bg-[#EFEFEA]/40"
-                  >
-                    <td className="px-4 py-3">
-                      <div className="font-semibold">{r.name}</div>
-                      <div className="text-[11px] text-[#131218]/50 mt-0.5">
-                        {r.catalog.reads} → {r.catalog.writes}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-[#131218]/70 text-xs">
-                      {r.catalog.schedule}
-                    </td>
-                    <td className="px-4 py-3 text-xs">
-                      {r.run ? (
-                        <>
-                          <div>{relTime(r.run.started_at)}</div>
-                          <div className="text-[10px] text-[#131218]/40">
-                            {new Date(r.run.started_at).toISOString().slice(0, 16).replace("T", " ")}
-                          </div>
-                        </>
-                      ) : (
-                        <span className="text-[#131218]/40">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold ${statusColor(runStatus)}`}
-                      >
-                        {runStatus === "never" ? "no data" : runStatus}
-                      </span>
-                      {r.run?.error_message && (
-                        <div className="text-[10px] text-red-600 mt-1 max-w-[260px] truncate" title={r.run.error_message}>
-                          {r.run.error_message}
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-right text-xs tabular-nums text-[#131218]/70">
-                      {formatDuration(r.run?.duration_ms ?? null)}
-                    </td>
-                    <td className="px-4 py-3 text-right text-xs tabular-nums text-[#131218]/70">
-                      {r.run?.records_read ?? "—"} / {r.run?.records_written ?? "—"}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold ${fresh.cls}`}>
-                        {fresh.label}
-                      </span>
-                      {r.staleReason && (
-                        <div className="text-[10px] text-[#131218]/50 mt-0.5">{r.staleReason}</div>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-xs">
-                      <div className={r.catalog.visible_in_product ? "text-[#131218]/70" : "text-amber-600"}>
-                        {r.catalog.output_surface}
-                      </div>
-                      {!r.catalog.visible_in_product && (
-                        <div className="text-[10px] text-amber-600 mt-0.5">
-                          no UI consumer
-                        </div>
-                      )}
-                    </td>
+          <p className="text-sm max-w-3xl" style={{color: "var(--hall-muted-2)"}}>
+            Health of scheduled / cron routines. Joined from{" "}
+            <code
+              className="text-[11px] px-1"
+              style={{ fontFamily: "var(--font-hall-mono)", background: "var(--hall-fill-soft)", borderRadius: 3 }}
+            >
+              public.routine_runs
+            </code>{" "}
+            + static catalog in{" "}
+            <code
+              className="text-[11px] px-1"
+              style={{ fontFamily: "var(--font-hall-mono)", background: "var(--hall-fill-soft)", borderRadius: 3 }}
+            >
+              src/lib/routine-log.ts
+            </code>.
+          </p>
+
+          <section className="grid grid-cols-2 sm:grid-cols-5 gap-3 max-w-3xl">
+            <StatPill label="Total"    value={counts.total}   />
+            <StatPill label="Fresh"    value={counts.fresh}   tone="good" />
+            <StatPill label="Failing"  value={counts.failing} tone={counts.failing > 0 ? "bad" : "neutral"} />
+            <StatPill label="Stale"    value={counts.stale}   tone={counts.stale > 0 ? "warn" : "neutral"} />
+            <StatPill label="No data"  value={counts.never}   tone={counts.never > 0 ? "warn" : "neutral"} />
+          </section>
+
+          <section>
+            <div
+              className="flex items-baseline justify-between gap-3 pb-2 mb-3.5"
+              style={{borderBottom: "1px solid var(--hall-ink-0)"}}
+            >
+              <h2
+                className="text-[19px] font-bold leading-none"
+                style={{letterSpacing: "-0.02em", color: "var(--hall-ink-0)"}}
+              >
+                All <em className="hall-flourish">routines</em>
+              </h2>
+              <span
+                style={{fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--hall-muted-2)", letterSpacing: "0.06em"}}
+              >
+                {rows.length} ROUTINES
+              </span>
+            </div>
+
+            <div style={{ border: "1px solid var(--hall-line-soft)", borderRadius: 3, overflow: "hidden" }}>
+              <table className="w-full text-sm">
+                <thead
+                  className="text-[11px] uppercase tracking-wider"
+                  style={{
+                    background: "var(--hall-ink-0)",
+                    color: "var(--hall-paper-0)",
+                    fontFamily: "var(--font-hall-mono)",
+                  }}
+                >
+                  <tr>
+                    <th className="text-left px-4 py-3 font-semibold">Routine</th>
+                    <th className="text-left px-4 py-3 font-semibold">Schedule</th>
+                    <th className="text-left px-4 py-3 font-semibold">Last run</th>
+                    <th className="text-left px-4 py-3 font-semibold">Status</th>
+                    <th className="text-right px-4 py-3 font-semibold">Dur</th>
+                    <th className="text-right px-4 py-3 font-semibold">R / W</th>
+                    <th className="text-left px-4 py-3 font-semibold">Fresh</th>
+                    <th className="text-left px-4 py-3 font-semibold">Output surface</th>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                </thead>
+                <tbody>
+                  {rows.map((r) => {
+                    const runStatus: "success" | "error" | "never" =
+                      !r.run ? "never" : r.run.status;
+                    const sStyle = statusStyle(runStatus);
+                    const fresh = freshnessStyle(r.freshness);
+                    return (
+                      <tr
+                        key={r.name}
+                        style={{ borderTop: "1px solid var(--hall-line-soft)" }}
+                      >
+                        <td className="px-4 py-3">
+                          <div className="font-semibold" style={{color: "var(--hall-ink-0)"}}>{r.name}</div>
+                          <div
+                            className="text-[11px] mt-0.5"
+                            style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+                          >
+                            {r.catalog.reads} → {r.catalog.writes}
+                          </div>
+                        </td>
+                        <td
+                          className="px-4 py-3 text-xs"
+                          style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-ink-3)" }}
+                        >
+                          {r.catalog.schedule}
+                        </td>
+                        <td className="px-4 py-3 text-xs">
+                          {r.run ? (
+                            <>
+                              <div style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-ink-3)" }}>{relTime(r.run.started_at)}</div>
+                              <div className="text-[10px]" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-3)" }}>
+                                {new Date(r.run.started_at).toISOString().slice(0, 16).replace("T", " ")}
+                              </div>
+                            </>
+                          ) : (
+                            <span style={{color: "var(--hall-muted-3)"}}>—</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span
+                            className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold"
+                            style={{
+                              fontFamily: "var(--font-hall-mono)",
+                              letterSpacing: "0.06em",
+                              background: sStyle.bg,
+                              color: sStyle.color,
+                            }}
+                          >
+                            {runStatus === "never" ? "no data" : runStatus}
+                          </span>
+                          {r.run?.error_message && (
+                            <div
+                              className="text-[10px] mt-1 max-w-[260px] truncate"
+                              style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-danger)" }}
+                              title={r.run.error_message}
+                            >
+                              {r.run.error_message}
+                            </div>
+                          )}
+                        </td>
+                        <td
+                          className="px-4 py-3 text-right text-xs tabular-nums"
+                          style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-ink-3)" }}
+                        >
+                          {formatDuration(r.run?.duration_ms ?? null)}
+                        </td>
+                        <td
+                          className="px-4 py-3 text-right text-xs tabular-nums"
+                          style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-ink-3)" }}
+                        >
+                          {r.run?.records_read ?? "—"} / {r.run?.records_written ?? "—"}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span
+                            className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold"
+                            style={{
+                              fontFamily: "var(--font-hall-mono)",
+                              letterSpacing: "0.06em",
+                              background: fresh.bg,
+                              color: fresh.color,
+                            }}
+                          >
+                            {fresh.label}
+                          </span>
+                          {r.staleReason && (
+                            <div
+                              className="text-[10px] mt-0.5"
+                              style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+                            >
+                              {r.staleReason}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-xs">
+                          <div style={{color: r.catalog.visible_in_product ? "var(--hall-ink-3)" : "var(--hall-warn)"}}>
+                            {r.catalog.output_surface}
+                          </div>
+                          {!r.catalog.visible_in_product && (
+                            <div
+                              className="text-[10px] mt-0.5"
+                              style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-warn)" }}
+                            >
+                              no UI consumer
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
 
-        <p className="text-[11px] text-[#131218]/40 mt-4 max-w-3xl">
-          A routine must be wrapped with <code>withRoutineLog()</code> in{" "}
-          <code>src/lib/routine-log.ts</code> to show dynamic run data here.
-          Routines declared in the catalog but not yet wrapped render as{" "}
-          <em>no data</em>. Expected cadence is inferred from the schedule
-          string; stale = no run within 1.5× the schedule window.
-        </p>
+            <p className="text-[11px] mt-4 max-w-3xl" style={{color: "var(--hall-muted-3)"}}>
+              A routine must be wrapped with{" "}
+              <code
+                className="text-[11px] px-1"
+                style={{ fontFamily: "var(--font-hall-mono)", background: "var(--hall-fill-soft)", borderRadius: 3 }}
+              >
+                withRoutineLog()
+              </code>{" "}
+              in{" "}
+              <code
+                className="text-[11px] px-1"
+                style={{ fontFamily: "var(--font-hall-mono)", background: "var(--hall-fill-soft)", borderRadius: 3 }}
+              >
+                src/lib/routine-log.ts
+              </code>{" "}
+              to show dynamic run data here. Routines declared in the catalog but not yet wrapped render as{" "}
+              <em>no data</em>. Expected cadence is inferred from the schedule string; stale = no run within 1.5× the schedule window.
+            </p>
+          </section>
 
-        <div className="mt-6">
-          <Link href="/admin" className="text-xs text-[#131218]/60 underline hover:text-[#131218]">
-            ← back to admin
-          </Link>
+          <div>
+            <Link
+              href="/admin"
+              className="hall-btn-ghost"
+              style={{padding: 0}}
+            >
+              ← back to admin
+            </Link>
+          </div>
         </div>
       </main>
     </div>
@@ -278,14 +395,22 @@ export default async function RoutinesPage() {
 function StatPill({
   label, value, tone = "neutral",
 }: { label: string; value: number; tone?: "good" | "bad" | "warn" | "neutral" }) {
-  const toneCls =
-    tone === "good" ? "bg-[#B2FF59]/20 text-green-800 border-green-200" :
-    tone === "bad"  ? "bg-red-50 text-red-700 border-red-200" :
-    tone === "warn" ? "bg-amber-50 text-amber-700 border-amber-200" :
-                      "bg-white text-[#131218]/70 border-[#E0E0D8]";
+  const { bg, fg, border } =
+    tone === "good" ? { bg: "var(--hall-ok-soft)",     fg: "var(--hall-ok)",     border: "var(--hall-ok-soft)" } :
+    tone === "bad"  ? { bg: "var(--hall-danger-soft)", fg: "var(--hall-danger)", border: "var(--hall-danger-soft)" } :
+    tone === "warn" ? { bg: "var(--hall-warn-soft)",   fg: "var(--hall-warn)",   border: "var(--hall-warn-soft)" } :
+                      { bg: "var(--hall-paper-0)",     fg: "var(--hall-ink-3)",  border: "var(--hall-line-soft)" };
   return (
-    <div className={`rounded-[10px] border px-3 py-2 ${toneCls}`}>
-      <div className="text-[10px] uppercase tracking-wider opacity-70">{label}</div>
+    <div
+      className="px-3 py-2"
+      style={{ border: `1px solid ${border}`, background: bg, color: fg, borderRadius: 3 }}
+    >
+      <div
+        className="text-[10px] uppercase tracking-wider"
+        style={{ fontFamily: "var(--font-hall-mono)", opacity: 0.7 }}
+      >
+        {label}
+      </div>
       <div className="text-xl font-bold tabular-nums">{value}</div>
     </div>
   );

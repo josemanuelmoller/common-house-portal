@@ -1,5 +1,6 @@
 import { requireAdmin } from "@/lib/require-admin";
 import { Sidebar } from "@/components/Sidebar";
+import { HallSection } from "@/components/HallSection";
 import { getContentPipeline, getStyleProfiles, getAllProjects } from "@/lib/notion";
 import DeskRequestForm from "@/components/DeskRequestForm";
 import { DeskQueueSection } from "@/components/ContentCard";
@@ -48,35 +49,55 @@ export default async function DesignPage() {
   return (
     <div className="flex min-h-screen bg-[#EFEFEA]">
       <Sidebar adminNav />
-      <main className="flex-1 ml-[228px]">
+      <main
+        className="flex-1 ml-[228px]"
+        style={{ fontFamily: "var(--font-hall-sans)", background: "var(--hall-paper-0)" }}
+      >
 
-        <header className="bg-[#131218] px-12 pt-10 pb-11">
-          <p className="text-[8px] font-bold tracking-[2.5px] uppercase text-white/20 mb-3">Desks · Producción visual</p>
-          <h1 className="text-[2.6rem] font-light text-white tracking-[-1.5px] leading-none">
-            Design <em className="font-black italic text-[#c8f55a]">Desk</em>
-          </h1>
-          <p className="text-sm text-white/40 mt-3 leading-relaxed">
-            Solicitudes, producción y entrega de piezas visuales — decks, one-pagers, propuestas, informes.
-          </p>
+        <header
+          className="flex items-center justify-between gap-6 px-9 py-3.5"
+          style={{ borderBottom: "1px solid var(--hall-ink-0)" }}
+        >
+          <div className="flex items-baseline gap-4 min-w-0">
+            <span
+              className="text-[10px] tracking-[0.08em] whitespace-nowrap uppercase"
+              style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+            >
+              DESIGN · <b style={{ color: "var(--hall-ink-0)" }}>DESK</b>
+            </span>
+            <h1
+              className="text-[16px] font-medium tracking-[-0.01em] truncate"
+              style={{ color: "var(--hall-ink-0)" }}
+            >
+              Design{" "}
+              <em style={{ fontFamily: "var(--font-hall-display)", fontStyle: "italic", fontWeight: 400 }}>
+                desk
+              </em>.
+            </h1>
+          </div>
         </header>
 
-        <div className="px-8 py-8 flex gap-8 items-start">
+        <div className="px-9 py-6 flex gap-8 items-start">
 
           {/* Form panel — sticky */}
           <div className="flex-shrink-0 sticky top-6">
-            <DeskRequestForm
-              deskType="design"
-              deskLabel="Design Desk"
-              contentTypes={DESIGN_TYPES}
-              channelOrProjectOptions={projectNames.length > 0 ? projectNames : ["CH Institucional", "Auto Mercado", "Fair Cycle", "LATAM NGO"]}
-              channelOrProjectLabel="Proyecto"
-              styleProfiles={designStyleProfiles}
-            />
+            <HallSection title="New " flourish="request">
+              <DeskRequestForm
+                deskType="design"
+                deskLabel="Design Desk"
+                contentTypes={DESIGN_TYPES}
+                channelOrProjectOptions={projectNames.length > 0 ? projectNames : ["CH Institucional", "Auto Mercado", "Fair Cycle", "LATAM NGO"]}
+                channelOrProjectLabel="Proyecto"
+                styleProfiles={designStyleProfiles}
+              />
+            </HallSection>
           </div>
 
           {/* Production list — fills remaining space */}
           <div className="flex-1 min-w-0">
-            <DeskQueueSection items={deskItems} />
+            <HallSection title="Desk " flourish="queue" meta={`${deskItems.length} ITEM${deskItems.length !== 1 ? "S" : ""}`}>
+              <DeskQueueSection items={deskItems} />
+            </HallSection>
           </div>
 
         </div>
