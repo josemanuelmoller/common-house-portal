@@ -9,7 +9,36 @@ export type MarketSignalBrief = {
   sourceLink: string | null;
   notionUrl: string;
   theme: string[];
+  sourceType?: string | null;
 };
+
+// Short, readable label for Source Type (defaults to the raw string).
+function sourceTypeShort(t: string | null | undefined): string | null {
+  if (!t) return null;
+  const map: Record<string, string> = {
+    "Policy Doc": "POL",
+    "Sector Report": "REP",
+    "Report": "REP",
+    "Article": "ART",
+    "Playbook": "PLAY",
+    "Guide": "GUIDE",
+    "Deck": "DECK",
+    "PDF": "PDF",
+  };
+  return map[t] ?? t.slice(0, 4).toUpperCase();
+}
+
+// Extract a compact domain hint from a URL — used as fallback label when a
+// brief has no human Title. Strips www. and returns at most the registrable
+// domain + path hint (e.g. "gov.uk/epr").
+function domainHint(urlStr: string): string | null {
+  try {
+    const u = new URL(urlStr);
+    return u.hostname.replace(/^www\./, "");
+  } catch {
+    return null;
+  }
+}
 
 interface Props {
   text: string | null;
@@ -126,41 +155,73 @@ export function MarketSignalsPanel({ text, date, generatedAt, briefs = [] }: Pro
         )}
       </div>
 
-      {briefs.length > 0 && (
-        <div className="mt-3 pt-3" style={{ borderTop: "1px solid var(--hall-line-soft)" }}>
-          <p
-            className="text-[8.5px] font-bold uppercase tracking-widest mb-2"
-            style={{ color: "var(--hall-muted-3)", fontFamily: "var(--font-hall-mono)" }}
-          >
-            Sources · {briefs.length}
-          </p>
-          <ul className="flex flex-wrap gap-1.5">
-            {briefs.slice(0, 12).map(b => {
-              const href = b.sourceLink ?? b.notionUrl;
-              const isOriginal = !!b.sourceLink;
-              return (
-                <li key={b.id}>
-                  <a
-                    href={href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    title={isOriginal ? "Open original source" : "Open in Notion"}
-                    className="inline-flex items-center gap-1 text-[9.5px] font-semibold transition-colors px-2 py-0.5 rounded-full max-w-[220px]"
-                    style={{
-                      color: "var(--hall-muted-2)",
-                      background: "var(--hall-paper-0)",
-                      border: "1px solid var(--hall-line)",
-                    }}
-                  >
-                    <span className="truncate">{b.title}</span>
-                    <span className="text-[8px] opacity-60 shrink-0">{isOriginal ? "↗" : "N↗"}</span>
-                  </a>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      )}
+      {(() => {
+        // Drop chips with no useful label: Untitled AND no source URL →
+        // dead weight, doesn't even give the user a place to land.
+        const usable = briefs.filter(b => b.title !== "Untitled" || !!b.sourceLink);
+        if (usable.length === 0) return null;
+        return (
+          <div className="mt-3 pt-3" style={{ borderTop: "1px solid var(--hall-line-soft)" }}>
+            <p
+              className="text-[8.5px] font-bold uppercase tracking-widest mb-2"
+              style={{ color: "var(--hall-muted-3)", fontFamily: "var(--font-hall-mono)" }}
+            >
+              Sources · {usable.length}
+            </p>
+            <ul className="flex flex-wrap gap-1.5">
+              {usable.slice(0, 12).map(b => {
+                const href = b.sourceLink ?? b.notionUrl;
+                const isOriginal = !!b.sourceLink;
+                // Label precedence: real title → domain (if external) → "Notion brief"
+                const label =
+                  b.title !== "Untitled"
+                    ? b.title
+                    : (b.sourceLink && domainHint(b.sourceLink)) || "Notion brief";
+                const typeTag = sourceTypeShort(b.sourceType);
+                return (
+                  <li key={b.id}>
+                    <a
+                      href={href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title={
+                        (b.title !== "Untitled" ? b.title : "Untitled brief") +
+                        (isOriginal ? " · opens original source" : " · opens in Notion")
+                      }
+                      className="inline-flex items-center gap-1.5 text-[9.5px] font-semibold transition-colors px-2 py-0.5 rounded-full max-w-[240px]"
+                      style={{
+                        color: "var(--hall-muted-2)",
+                        background: "var(--hall-paper-0)",
+                        border: "1px solid var(--hall-line)",
+                      }}
+                    >
+                      {typeTag && (
+                        <span
+                          className="text-[8px] font-bold shrink-0 px-1 rounded"
+                          style={{
+                            color: "var(--hall-muted-3)",
+                            background: "var(--hall-fill-soft)",
+                            letterSpacing: "0.04em",
+                          }}
+                        >
+                          {typeTag}
+                        </span>
+                      )}
+                      <span className="truncate">{label}</span>
+                      <span
+                        className="text-[8px] opacity-60 shrink-0"
+                        aria-label={isOriginal ? "external" : "notion"}
+                      >
+                        {isOriginal ? "↗" : "↗N"}
+                      </span>
+                    </a>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        );
+      })()}
     </div>
   );
 }

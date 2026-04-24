@@ -53,6 +53,7 @@ export type MarketSignalBrief = {
   sourceLink: string | null;   // URL to the original news / report
   notionUrl: string;           // fallback — opens the brief in Notion
   theme: string[];
+  sourceType: string | null;   // "Report" | "Policy Doc" | "Article" | …
 };
 
 export async function getRecentInsightBriefBriefs(): Promise<MarketSignalBrief[]> {
@@ -77,6 +78,7 @@ export async function getRecentInsightBriefBriefs(): Promise<MarketSignalBrief[]
         sourceLink: typeof url === "string" && url.length > 0 ? url : null,
         notionUrl:  page.url ?? "",
         theme:      themeName ? [themeName] : [],
+        sourceType: select(prop(page, "Source Type")) || null,
       };
     });
   } catch {
