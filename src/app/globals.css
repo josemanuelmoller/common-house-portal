@@ -348,3 +348,49 @@ body {
     height: 56px;
   }
 }
+
+/* Today-tab 2-col grid — 1.55fr/1fr from 1024px up, stacks below. */
+.hall-today-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 28px;
+  align-items: start;
+}
+.hall-today-col-left,
+.hall-today-col-right {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+@media (min-width: 1024px) {
+  .hall-today-grid {
+    grid-template-columns: 1.55fr 1fr;
+    gap: 0;
+  }
+  .hall-today-col-left {
+    padding: 0 28px 0 0;
+    border-right: 1px solid var(--hall-line);
+  }
+  .hall-today-col-right {
+    padding: 0 0 0 28px;
+  }
+}
+
+/* K-v2 Deadline card — amber border + paper. */
+.hall-deadline-card {
+  padding: 12px 14px;
+  border: 1px solid var(--hall-warn);
+  background: var(--hall-warn-paper);
+  border-radius: 3px;
+  display: grid;
+  grid-template-columns: 20px 1fr;
+  gap: 10px;
+  align-items: start;
+}
+.hall-deadline-card .hall-deadline-when {
+  font-family: var(--font-hall-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--hall-warn);
+  margin-top: 4px;
+}

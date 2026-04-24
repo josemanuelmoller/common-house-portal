@@ -36,6 +36,7 @@ import { HallCommitmentLedger } from "@/components/HallCommitmentLedger";
 import { HallNextMeeting } from "@/components/HallNextMeeting";
 import { HallAutopilotLog } from "@/components/HallAutopilotLog";
 import { HallTabs } from "@/components/HallTabs";
+import { HallSection } from "@/components/HallSection";
 import OpportunityExplorer from "@/components/OpportunityExplorer";
 import {
   getProjectsOverview,
@@ -596,7 +597,15 @@ export default async function AdminPage() {
             signals: marketSignalBriefs.length > 0,
           }}
         >
-        <div className="px-8 py-6 space-y-6 max-w-6xl mx-auto">
+        <div className="px-9 py-6 space-y-7" style={{ background: "var(--hall-paper-0)" }}>
+
+          {/* ─── K-v2 primary layout (TODAY tab) ───────────────────────────
+              Narrative left: Focus hero → Suggested blocks → Inbox → Commitments.
+              Context right:  Next meeting → Deadline → Allocation → Signals → Agents.
+              Lime is reserved for the Focus hero and live "now" indicators. */}
+          <div className="hall-today-grid" data-hall-tab="today">
+
+            <div className="hall-today-col-left">
 
           {/* ── 1. Focus of the Day — K-v2 lime hero ────────────────────── */}
           {focusRec ? (
@@ -784,22 +793,92 @@ export default async function AdminPage() {
             );
           })()}
 
-          {/* ── 2. P1 Banner — show ONLY imminent deadlines (P1 decisions are already in Focus of the Day hero).
-                Prevents rojo overload (Q3): same information shown twice turns red into wallpaper. ── */}
-          {imminentDeadlines.length > 0 && p1Decisions.length === 0 && (
-            <div className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-xl px-5 py-3">
-              <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
-              <p className="text-[13px] text-[#131218] flex-1 min-w-0">
-                <strong>{imminentDeadlines.length} deadline{imminentDeadlines.length !== 1 ? "s" : ""} this week</strong>
-                {imminentDeadlines.slice(0, 1).map(d => (
-                  <span key={d.id}>{" · "}{d.title}{d.dueDate ? ` — closes ${new Date(d.dueDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}` : ""}</span>
-                ))}
-              </p>
-              <Link href="/admin/decisions" className="text-[11px] font-bold text-amber-700 shrink-0 hover:text-amber-900 transition-colors whitespace-nowrap">
-                View →
-              </Link>
-            </div>
-          )}
+          {/* ── Suggested blocks — K-v2 left col ─────────────────────────── */}
+          <HallSection title="Suggested" flourish="blocks">
+            <SuggestedTimeBlocks />
+          </HallSection>
+
+          {/* ── Inbox · needs attention — K-v2 left col ──────────────────── */}
+          <HallSection
+            title="Inbox · "
+            flourish="needs attention"
+            meta={`${inboxData.items.length} VISIBLE · ${inboxData.total_scanned} TOTAL`}
+          >
+            <InboxTriage initialItems={inboxData.items} initialScanned={inboxData.total_scanned} />
+          </HallSection>
+
+          {/* ── Commitments — K-v2 left col ──────────────────────────────── */}
+          <HallSection title="Commitments">
+            <HallCommitmentLedger />
+          </HallSection>
+
+            </div>{/* /hall-today-col-left */}
+
+            <div className="hall-today-col-right">
+
+              {/* ── Next meeting — K-v2 right col ────────────────────────── */}
+              <HallSection title="Next " flourish="meeting">
+                <HallNextMeeting />
+              </HallSection>
+
+              {/* ── This week — Deadline card (replaces old P1 Banner) ────
+                  Shows imminent deadlines in the K-v2 amber-card style.
+                  Suppressed when a P1 decision is already in Focus (avoid
+                  redundancy — same info twice turns red into wallpaper). */}
+              {imminentDeadlines.length > 0 && p1Decisions.length === 0 && (
+                <HallSection
+                  title="This "
+                  flourish="week"
+                  meta={`${imminentDeadlines.length} DEADLINE${imminentDeadlines.length > 1 ? "S" : ""}`}
+                >
+                  {imminentDeadlines.slice(0, 1).map((d) => (
+                    <Link key={d.id} href="/admin/decisions" className="hall-deadline-card hover:opacity-90 transition-opacity">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--hall-warn)" strokeWidth="1.8" style={{ marginTop: 2 }}>
+                        <circle cx="12" cy="12" r="10" />
+                        <path d="M12 6v6l4 2" />
+                      </svg>
+                      <div>
+                        <b style={{ fontSize: 12.5, color: "var(--hall-ink-0)", display: "block", marginBottom: 2 }}>{d.title}</b>
+                        <span style={{ fontSize: 11, color: "var(--hall-muted-2)", display: "block", lineHeight: 1.4 }}>
+                          {d.decisionType}
+                        </span>
+                        {d.dueDate && (
+                          <div className="hall-deadline-when">
+                            CLOSES {new Date(d.dueDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" }).toUpperCase()}
+                          </div>
+                        )}
+                      </div>
+                    </Link>
+                  ))}
+                </HallSection>
+              )}
+
+              {/* ── Time allocation ──────────────────────────────────────── */}
+              <HallSection title="Time " flourish="allocation">
+                <HallTimeAllocation />
+              </HallSection>
+
+              {/* ── Market signals (compact peek) ────────────────────────── */}
+              <HallSection
+                title="Market "
+                flourish="signals"
+                meta={marketSignalBriefs.length > 0 ? `${marketSignalBriefs.length} NEW` : undefined}
+              >
+                <MarketSignalsPanel
+                  text={latestMarketSignals?.text ?? null}
+                  date={latestMarketSignals?.date ?? null}
+                  generatedAt={latestMarketSignals?.generatedAt ?? null}
+                  briefs={marketSignalBriefs}
+                />
+              </HallSection>
+
+              {/* ── Agents (system / ambient, last) ──────────────────────── */}
+              <HallSection title="Agents" meta="24H · SYSTEM">
+                <HallAutopilotLog />
+              </HallSection>
+
+            </div>{/* /hall-today-col-right */}
+          </div>{/* /hall-today-grid */}
 
           {/* ── 3. Stats row — B6: hero tile wider, 2 satellites narrower. B7: expand abbreviations. ── */}
           <div className="grid grid-cols-[1.6fr_1fr_1fr] gap-3 items-stretch">
@@ -895,28 +974,32 @@ export default async function AdminPage() {
             </div>
           )}
 
-          {/* ── 4b. Suggested Time Blocks — TODAY ─────────────────────────── */}
-          <div data-hall-tab="today">
-            <div className="flex items-center gap-3 mb-3">
-              <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Suggested time blocks</p>
-              <div className="flex-1 h-px bg-[#E0E0D8]" />
-              <HallManualTriggers />
-            </div>
-            <SuggestedTimeBlocks />
-          </div>
-
-          {/* ── 4c. Inbox + Meeting prep right column — lives in TODAY + SIGNALS ─── */}
-          <div data-hall-tab="today signals" className="grid grid-cols-[1fr_340px] gap-6 items-start">
+          {/* ── Signals tab — full market feed + ops + manual triggers.
+                The K-v2 Today grid above shows compact peeks of Market +
+                Inbox; this Signals wrapper hosts the deeper panels and
+                the manual agent triggers Jose uses when feeds go stale. ── */}
+          <div data-hall-tab="signals" className="grid grid-cols-[1fr_340px] gap-6 items-start">
             <div className="space-y-6 min-w-0">
-              {/* Inbox Triage */}
-              <div>
-                <SectionHeader label="Inbox — needs attention" />
-                <InboxTriage initialItems={inboxData.items} initialScanned={inboxData.total_scanned} />
-              </div>
+              <MarketSignalsPanel
+                text={latestMarketSignals?.text ?? null}
+                date={latestMarketSignals?.date ?? null}
+                generatedAt={latestMarketSignals?.generatedAt ?? null}
+                briefs={marketSignalBriefs}
+              />
+              <InboxTriage initialItems={inboxData.items} initialScanned={inboxData.total_scanned} />
+              <HallAskQueue />
+              <HallOppFreshnessRadar />
             </div>
 
-            {/* Side column — briefing context parallel to Ready/Inbox */}
             <div className="flex flex-col gap-4">
+              <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
+                <div className="px-5 py-3 border-b border-[#EFEFEA]">
+                  <p className="text-xs font-bold text-[#131218]">Manual triggers</p>
+                </div>
+                <div className="px-5 py-4">
+                  <HallManualTriggers />
+                </div>
+              </div>
               {dailyBriefing?.meetingPrep && (
                 <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
                   <div className="px-5 py-3 border-b border-[#EFEFEA]">
@@ -929,29 +1012,7 @@ export default async function AdminPage() {
                   </div>
                 </div>
               )}
-
-              <MarketSignalsPanel
-                text={latestMarketSignals?.text ?? null}
-                date={latestMarketSignals?.date ?? null}
-                generatedAt={latestMarketSignals?.generatedAt ?? null}
-                briefs={marketSignalBriefs}
-              />
-
-              <HallNextMeeting />
-              <HallAutopilotLog />
-              <HallCommitmentLedger />
               <HallPortfolioPulse />
-              <HallOppFreshnessRadar />
-              <HallAskQueue />
-              <HallTimeAllocation />
-              <HallOrgsColdRelations />
-              <HallOrgsClassMix />
-
-              {!dailyBriefing?.meetingPrep && !latestMarketSignals && (
-                <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-4">
-                  <p className="text-[11px] text-[#131218]/30">No briefing context yet today.</p>
-                </div>
-              )}
             </div>
           </div>
 
@@ -1460,23 +1521,8 @@ export default async function AdminPage() {
             </div>
           )}
 
-          {/* ── SIGNALS tab — focused feed of market + inbox + pipeline ─────── */}
-          <div data-hall-tab="signals" className="space-y-6">
-            <div className="flex items-center gap-3">
-              <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Market & pipeline signals</p>
-              <div className="flex-1 h-px bg-[#E0E0D8]" />
-            </div>
-            <MarketSignalsPanel
-              text={latestMarketSignals?.text ?? null}
-              date={latestMarketSignals?.date ?? null}
-              generatedAt={latestMarketSignals?.generatedAt ?? null}
-              briefs={marketSignalBriefs}
-            />
-            <InboxTriage initialItems={inboxData.items} initialScanned={inboxData.total_scanned} />
-            <HallAskQueue />
-            <HallOppFreshnessRadar />
-            <HallPortfolioPulse />
-          </div>
+          {/* Old dedicated Signals wrapper removed in Phase 2b — its content
+              now lives in the repurposed signals grid higher up. */}
 
           {/* ── RELATIONSHIPS tab — network, classes, time allocation ────── */}
           <div data-hall-tab="relationships" className="space-y-6">
