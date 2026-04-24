@@ -63,31 +63,34 @@ export function HallCommitmentLedgerRows({
   const isHidden = (id: string) => !showDismissed && dismissed.has(id);
 
   const markDone = (id: string) => {
-    // Optimistic UI — apply locally first, then sync to server (G3 full write-back).
+    // Optimistic UI — apply locally first, then sync to server (Phase 5:
+    // action_items layer, not hall_commitment_dismissals). `id` is the
+    // action_items UUID set by HallCommitmentLedger (server component).
     const next = new Set(dismissed);
     next.add(id);
     setDismissed(next);
     writeDismissed(next);
     setRecentlyDismissed(id);
     setTimeout(() => setRecentlyDismissed(prev => prev === id ? null : prev), 5000);
-    // Fire-and-forget server sync.
-    fetch(`/api/hall/commitments/${encodeURIComponent(id)}`, {
-      method: "PATCH",
+    // Fire-and-forget server sync. Resolves via the normalization layer.
+    fetch(`/api/action-items/${encodeURIComponent(id)}/resolve`, {
+      method: "POST",
       credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reason: "manual_done" }),
     }).catch(() => { /* localStorage is authoritative fallback */ });
   };
 
   const undo = (id: string) => {
+    // Local-only undo for v1. Server-side "re-open a resolved row" isn't
+    // supported yet — it would need a POST /reopen route. LocalStorage
+    // overlay re-shows the row for the current session; after refresh it
+    // will stay dismissed (action_items.status='resolved' in DB).
     const next = new Set(dismissed);
     next.delete(id);
     setDismissed(next);
     writeDismissed(next);
     setRecentlyDismissed(null);
-    // Server undo — DELETE reverses the dismissal.
-    fetch(`/api/hall/commitments/${encodeURIComponent(id)}`, {
-      method: "DELETE",
-      credentials: "include",
-    }).catch(() => { /* local state is visible anyway */ });
   };
 
   const visibleJose   = joseCommits.filter(c => !isHidden(c.id));

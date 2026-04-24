@@ -121,6 +121,81 @@ export async function getInboxActions(limit = DEFAULT_INBOX_LIMIT): Promise<Inbo
   });
 }
 
+/**
+ * Items for the Hall Commitments surface (I OWE / OWED TO ME).
+ *
+ * Query from architecture doc §12: intents that represent explicit
+ * commitments (deliver, chase, follow_up, close_loop) with ball_in_court=jose
+ * and status=open. Gmail replies (intent=reply) are NOT commitments — they
+ * belong to the Inbox surface.
+ *
+ * Owner partitioning:
+ *   owner='jose'   = intent ∈ {deliver, follow_up, close_loop}
+ *                    (Jose committed to do it)
+ *   owner='others' = intent='chase'
+ *                    (someone else committed to Jose; he chases)
+ */
+export type CommitmentActionView = {
+  actionItemId: string;
+  title: string;
+  snippet: string;
+  daysAgo: number;
+  owner: "jose" | "others";
+  sourceType: string;
+  sourceUrl: string;
+  intent: string;
+  priorityScore: number;
+};
+
+export async function getCommitmentActions(limit = 60): Promise<CommitmentActionView[]> {
+  const sb = getSupabaseServerClient();
+  const { data, error } = await sb
+    .from("action_items")
+    .select(
+      "id, source_type, source_url, subject, counterparty, next_action, " +
+      "intent, priority_score, last_motion_at"
+    )
+    .in("intent", ["deliver", "chase", "follow_up", "close_loop"])
+    .eq("ball_in_court", "jose")
+    .eq("status", "open")
+    .order("priority_score", { ascending: false })
+    .order("last_motion_at", { ascending: false })
+    .limit(limit);
+  if (error) {
+    console.error("[getCommitmentActions] supabase error:", error.message);
+    return [];
+  }
+
+  const rows = (data ?? []) as unknown as Array<{
+    id: string;
+    source_type: string;
+    source_url: string | null;
+    subject: string;
+    counterparty: string | null;
+    next_action: string | null;
+    intent: string;
+    priority_score: number;
+    last_motion_at: string;
+  }>;
+
+  const now = Date.now();
+  return rows.map(r => {
+    const daysAgo = Math.max(0, Math.floor((now - new Date(r.last_motion_at).getTime()) / 86_400_000));
+    const owner: "jose" | "others" = r.intent === "chase" ? "others" : "jose";
+    return {
+      actionItemId: r.id,
+      title:        r.next_action ?? r.subject,
+      snippet:      r.counterparty ? `${r.counterparty} · ${r.subject}` : r.subject,
+      daysAgo,
+      owner,
+      sourceType:   r.source_type,
+      sourceUrl:    r.source_url ?? "",
+      intent:       r.intent,
+      priorityScore: r.priority_score,
+    };
+  });
+}
+
 /** Count of open gmail actions (for the "X TOTAL" meta label). */
 export async function countOpenGmailActions(): Promise<number> {
   const sb = getSupabaseServerClient();

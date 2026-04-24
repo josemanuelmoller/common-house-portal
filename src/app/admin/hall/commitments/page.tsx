@@ -1,82 +1,24 @@
 import Link from "next/link";
 import { Sidebar } from "@/components/Sidebar";
 import { requireAdmin } from "@/lib/require-admin";
-import { getSupabaseServerClient } from "@/lib/supabase-server";
-import { getSelfEmails } from "@/lib/hall-self";
+import { getCommitmentActions, type CommitmentActionView } from "@/lib/action-items";
 
 export const dynamic = "force-dynamic";
 
-const ACTION_VERBS = [
-  "must", "needs to", "need to", "will", "should", "is tasked",
-  "is responsible", "pending", "required", "owes", "to send", "to finalize",
-  "to complete", "to follow up", "to coordinate",
-];
-
-type Commitment = {
-  id:         string;
-  title:      string;
-  statement:  string;
-  daysAgo:    number;
-  owner:      "jose" | "others";
-  projectId:  string | null;
-  evidenceType: string;
-  dateCaptured: string;
-};
-
-async function load(): Promise<Commitment[]> {
-  const sb = getSupabaseServerClient();
-  const selfSet = await getSelfEmails();
-  const since = new Date(Date.now() - 90 * 86400_000).toISOString().slice(0, 10);
-
-  const [evRes, dismRes] = await Promise.all([
-    sb.from("evidence")
-      .select("notion_id, title, evidence_statement, evidence_type, project_notion_id, date_captured")
-      .in("evidence_type", ["Dependency", "Process Step", "Requirement"])
-      .eq("validation_status", "Validated")
-      .gte("date_captured", since)
-      .order("date_captured", { ascending: false })
-      .limit(300),
-    sb.from("hall_commitment_dismissals").select("notion_id"),
-  ]);
-
-  const dismissed = new Set(((dismRes.data ?? []) as { notion_id: string }[]).map(r => r.notion_id));
-
-  const rows = (evRes.data ?? []) as {
-    notion_id: string; title: string; evidence_statement: string | null;
-    evidence_type: string; project_notion_id: string | null; date_captured: string | null;
-  }[];
-
-  const out: Commitment[] = [];
-  const now = Date.now();
-  for (const r of rows) {
-    if (dismissed.has(r.notion_id)) continue;  // G3 — hide server-dismissed
-    const stmt = (r.evidence_statement ?? r.title).trim();
-    if (!stmt) continue;
-    const lower = stmt.toLowerCase();
-    if (!ACTION_VERBS.some(v => lower.includes(v))) continue;
-
-    let owner: "jose" | "others" = "others";
-    if (lower.includes("jose manuel") || /\bjose\b/i.test(stmt)) owner = "jose";
-    for (const se of selfSet) if (lower.includes(se)) owner = "jose";
-
-    const daysAgo = r.date_captured ? Math.floor((now - new Date(r.date_captured).getTime()) / 86400_000) : 0;
-    out.push({
-      id:           r.notion_id,
-      title:        r.title,
-      statement:    stmt,
-      daysAgo,
-      owner,
-      projectId:    r.project_notion_id,
-      evidenceType: r.evidence_type,
-      dateCaptured: r.date_captured ?? "",
-    });
-  }
-  return out;
-}
+type Commitment = CommitmentActionView & { statement: string; evidenceType: string };
 
 export default async function CommitmentsPage() {
   await requireAdmin();
-  const all = await load();
+  const rawActions = await getCommitmentActions(200);
+  const all: Commitment[] = rawActions.map(a => ({
+    ...a,
+    // Detail page shows both the imperative next-action (title) AND a longer
+    // context string. title came from next_action; use snippet (which carries
+    // counterparty · subject) as statement for the expanded text.
+    statement:    a.snippet,
+    // Map intent to a badge label users recognize.
+    evidenceType: a.intent === "chase" ? "Chase" : a.intent === "deliver" ? "Commit" : a.intent,
+  }));
   const jose   = all.filter(c => c.owner === "jose");
   const others = all.filter(c => c.owner === "others");
   const stale  = all.filter(c => c.daysAgo >= 14);
@@ -128,7 +70,7 @@ export default async function CommitmentsPage() {
         <div className="px-9 py-7 max-w-5xl space-y-7">
           <p className="text-[11px] leading-snug" style={{ color: "var(--hall-muted-2)" }}>
             <strong style={{ color: "var(--hall-ink-0)" }}>Ledger rules.</strong>{" "}
-            A commitment is Dependency / Process Step / Requirement evidence with an action verb in the statement. Owner = Jose if the statement mentions his name or email; otherwise it lives under &quot;Owed to you&quot;. Action items parsed from validated evidence in CH Evidence [OS v2], last 90 days. Heuristic-based — click into any record to refine, dismiss, or close.
+            Commitments come from the normalized <code>action_items</code> layer (Gmail + Fireflies ingestors). An item is classified at ingest time: if Jose is the actor it goes to &quot;You committed&quot;; if a named counterparty owes Jose something, it goes to &quot;Owed to you&quot;. Descriptive evidence without a clear actor is dropped at ingest — no substring heuristic on this surface. Click any row to open the underlying source.
           </p>
 
           <Section title="You committed" flourish="to act" items={jose} kind="jose" empty="Nothing on your side — clean slate." />
@@ -180,7 +122,7 @@ function Section({ title, flourish, items, kind, empty }: { title: string; flour
         </div>
       ) : (
         <ul className="flex flex-col">
-          {items.map(c => <Row key={c.id} c={c} kind={kind} />)}
+          {items.map(c => <Row key={c.actionItemId} c={c} kind={kind} />)}
         </ul>
       )}
     </section>
@@ -193,11 +135,15 @@ function Row({ c, kind }: { c: Commitment; kind: "jose" | "others" }) {
     c.daysAgo >= 10 ? "var(--hall-warn)" :
     "var(--hall-muted-2)";
   const accent = kind === "jose" ? "var(--hall-danger)" : "var(--hall-muted-3)";
+  // Link target: source_url from the action_items row (Gmail link, Fireflies
+  // transcript URL, Notion evidence page, etc.). Falls back to '#' so the
+  // row is still clickable when no source_url exists.
+  const href = c.sourceUrl || "#";
   return (
     <li style={{ borderTop: "1px solid var(--hall-line-soft)" }}>
       <Link
-        href={`https://www.notion.so/${c.id.replace(/-/g, "")}`}
-        target="_blank"
+        href={href}
+        target={href === "#" ? undefined : "_blank"}
         className="flex items-start gap-3 py-3 transition-colors hover:bg-[var(--hall-fill-soft)]"
         style={{ borderLeft: `3px solid ${accent}`, paddingLeft: 12, paddingRight: 4 }}
       >
@@ -220,6 +166,17 @@ function Row({ c, kind }: { c: Commitment; kind: "jose" | "others" }) {
               }}
             >
               {c.evidenceType}
+            </span>
+            <span
+              className="text-[9px] uppercase tracking-wide shrink-0"
+              style={{
+                fontFamily: "var(--font-hall-mono)",
+                color: "var(--hall-muted-3)",
+                letterSpacing: "0.08em",
+              }}
+              title="Source substrate"
+            >
+              · {c.sourceType}
             </span>
           </div>
           <p
