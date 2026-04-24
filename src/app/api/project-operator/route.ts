@@ -4,7 +4,9 @@
  * Inspects active projects for new validated evidence and writes a Draft Status Update
  * to CH Projects [OS v2] where material change is detected.
  *
- * - Only touches projects in Active / Executing / Validation / Discovery stages
+ * - Filters by Project Status ∈ {Active, Paused} per agent spec
+ *   (.claude/agents/project-operator.md). Stage is a human-owned field —
+ *   we do not filter by it and never write it.
  * - Only writes if ≥2 new validated evidence items exist since last status update
  * - Writes directly to "Status Summary" — no manual approval step
  * - Clears "Draft Status Update" and sets "Project Update Needed? = false"
@@ -25,7 +27,7 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const PROJECTS_DB = "49d59b18095f46588960f2e717832c5f";
 const EVIDENCE_DB = "fa28124978d043039d8932ac9964ccf5";
 
-const ACTIVE_STAGES = new Set(["Discovery", "Validation", "Execution", "Active"]);
+const ACTIVE_STATUSES = ["Active", "Paused"] as const;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -49,13 +51,13 @@ interface EvidenceRow {
 // ─── Fetch active projects ────────────────────────────────────────────────────
 
 async function fetchActiveProjects(): Promise<ProjectRow[]> {
-  const stageFilters = [...ACTIVE_STAGES].map(s => ({
-    property: "Current Stage", select: { equals: s },
+  const statusFilters = ACTIVE_STATUSES.map(s => ({
+    property: "Project Status", select: { equals: s },
   }));
 
   const res = await notion.databases.query({
     database_id: PROJECTS_DB,
-    filter: { or: stageFilters },
+    filter: { or: statusFilters },
     page_size: 50,
   });
 
