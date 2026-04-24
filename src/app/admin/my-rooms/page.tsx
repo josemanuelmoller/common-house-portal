@@ -133,67 +133,148 @@ export default async function MyRoomsPage() {
 
           {/* My Projects — only shown when ownership is configured */}
           {ownershipReady && myProjects.length > 0 && (
-            <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-              <div className="h-1 bg-[#B2FF59]" />
-              <div className="px-6 py-4 border-b border-[#EFEFEA] flex items-center justify-between">
-                <div>
-                  <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">My Projects</p>
-                  <p className="text-sm font-bold text-[#131218] tracking-tight mt-0.5">Projects you lead</p>
-                </div>
-                <span className="text-[10px] text-[#131218]/25 font-bold uppercase tracking-widest">
-                  {myProjects.length} project{myProjects.length !== 1 ? "s" : ""}
+            <section className="mb-7">
+              <div
+                className="flex items-baseline justify-between gap-3 pb-2 mb-3.5"
+                style={{ borderBottom: "1px solid var(--hall-ink-0)" }}
+              >
+                <h2
+                  className="text-[19px] font-bold leading-none"
+                  style={{ letterSpacing: "-0.02em", color: "var(--hall-ink-0)" }}
+                >
+                  My{" "}
+                  <em
+                    style={{
+                      fontFamily: "var(--font-hall-display)",
+                      fontStyle: "italic",
+                      fontWeight: 400,
+                      color: "var(--hall-ink-0)",
+                    }}
+                  >
+                    projects
+                  </em>
+                </h2>
+                <span
+                  style={{
+                    fontFamily: "var(--font-hall-mono)",
+                    fontSize: 10,
+                    color: "var(--hall-muted-2)",
+                    letterSpacing: "0.06em",
+                  }}
+                >
+                  {myProjects.length} PROJECT{myProjects.length !== 1 ? "S" : ""}
                 </span>
               </div>
-              <div className="divide-y divide-[#EFEFEA]">
+              <ul className="flex flex-col">
                 {myProjects.map(p => (
-                  <Link
-                    key={p.id}
-                    href={`/admin/projects/${p.id}`}
-                    className="flex items-center gap-4 px-6 py-3.5 hover:bg-[#EFEFEA]/50 transition-colors group"
-                  >
-                    <ProjectAvatar name={p.name} size="sm" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-[#131218] truncate">{p.name}</p>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        {p.blockerCount > 0 && (
-                          <span className="text-[9px] font-bold text-red-500 uppercase tracking-widest">
-                            {p.blockerCount} blocker{p.blockerCount !== 1 ? "s" : ""}
-                          </span>
-                        )}
-                        {p.updateNeeded && p.blockerCount === 0 && (
-                          <span className="text-[9px] font-bold text-amber-500 uppercase tracking-widest">Update needed</span>
-                        )}
-                        {!p.blockerCount && !p.updateNeeded && p.lastUpdate && (
-                          <span className="text-[9px] text-[#131218]/25 font-medium">
-                            {new Date(p.lastUpdate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
-                          </span>
-                        )}
+                  <li key={p.id} style={{ borderTop: "1px solid var(--hall-line-soft)" }}>
+                    <Link
+                      href={`/admin/projects/${p.id}`}
+                      className="flex items-center gap-4 px-1 py-3 transition-colors group"
+                    >
+                      <ProjectAvatar name={p.name} size="sm" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold truncate" style={{ color: "var(--hall-ink-0)" }}>{p.name}</p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          {p.blockerCount > 0 && (
+                            <span
+                              style={{
+                                fontFamily: "var(--font-hall-mono)",
+                                fontSize: 10,
+                                fontWeight: 700,
+                                color: "var(--hall-danger)",
+                                letterSpacing: "0.08em",
+                                textTransform: "uppercase",
+                              }}
+                            >
+                              {p.blockerCount} blocker{p.blockerCount !== 1 ? "s" : ""}
+                            </span>
+                          )}
+                          {p.updateNeeded && p.blockerCount === 0 && (
+                            <span
+                              style={{
+                                fontFamily: "var(--font-hall-mono)",
+                                fontSize: 10,
+                                fontWeight: 700,
+                                color: "var(--hall-warn)",
+                                letterSpacing: "0.08em",
+                                textTransform: "uppercase",
+                              }}
+                            >
+                              Update needed
+                            </span>
+                          )}
+                          {!p.blockerCount && !p.updateNeeded && p.lastUpdate && (
+                            <span style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--hall-muted-3)" }}>
+                              {new Date(p.lastUpdate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                            </span>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                    <StatusBadge value={p.stage} />
-                    <span className="text-[#131218]/20 group-hover:text-[#131218]/60 transition-colors text-sm">→</span>
-                  </Link>
+                      <StatusBadge value={p.stage} />
+                      <span
+                        className="text-sm transition-colors"
+                        style={{ color: "var(--hall-muted-3)" }}
+                      >
+                        →
+                      </span>
+                    </Link>
+                  </li>
                 ))}
-              </div>
-            </div>
+              </ul>
+            </section>
           )}
 
           {/* Your Queue */}
-          <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-            <div className={`h-1 ${queueCount > 0 ? "bg-amber-400" : "bg-[#B2FF59]"}`} />
-            <div className="px-6 py-4 border-b border-[#EFEFEA] flex items-center justify-between">
-              <div>
-                <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Your Queue</p>
-                <p className="text-sm font-bold text-[#131218] tracking-tight mt-0.5">
-                  {ownershipReady ? "Action items in your projects" : "Action items across all projects"}
-                </p>
-              </div>
+          <section className="mb-7">
+            <div
+              className="flex items-baseline justify-between gap-3 pb-2 mb-3.5"
+              style={{ borderBottom: "1px solid var(--hall-ink-0)" }}
+            >
+              <h2
+                className="text-[19px] font-bold leading-none"
+                style={{ letterSpacing: "-0.02em", color: "var(--hall-ink-0)" }}
+              >
+                Your{" "}
+                <em
+                  style={{
+                    fontFamily: "var(--font-hall-display)",
+                    fontStyle: "italic",
+                    fontWeight: 400,
+                    color: "var(--hall-ink-0)",
+                  }}
+                >
+                  queue
+                </em>
+              </h2>
               {queueCount > 0 ? (
-                <span className="text-[10px] font-bold bg-amber-100 text-amber-700 px-2.5 py-1 rounded-full uppercase tracking-widest">
+                <span
+                  className="px-2.5 py-1 rounded-full"
+                  style={{
+                    fontFamily: "var(--font-hall-mono)",
+                    fontSize: 10,
+                    fontWeight: 700,
+                    color: "var(--hall-warn)",
+                    background: "var(--hall-warn-soft)",
+                    letterSpacing: "0.06em",
+                    textTransform: "uppercase",
+                  }}
+                >
                   {queueCount} item{queueCount !== 1 ? "s" : ""}
                 </span>
               ) : (
-                <span className="text-[10px] font-bold bg-[#B2FF59] text-[#131218] px-2.5 py-1 rounded-full uppercase tracking-widest">
+                <span
+                  className="px-2.5 py-1 rounded-full"
+                  style={{
+                    fontFamily: "var(--font-hall-mono)",
+                    fontSize: 10,
+                    fontWeight: 700,
+                    color: "var(--hall-ok)",
+                    background: "var(--hall-ok-soft)",
+                    letterSpacing: "0.06em",
+                    textTransform: "uppercase",
+                  }}
+                >
                   Clear
                 </span>
               )}
@@ -201,49 +282,72 @@ export default async function MyRoomsPage() {
 
             {queueCount === 0 ? (
               <div className="px-6 py-8 text-center">
-                <p className="text-sm text-[#131218]/30 font-medium">All projects are healthy. Nothing urgent in your queue.</p>
+                <p className="text-sm" style={{ color: "var(--hall-muted-3)" }}>
+                  All projects are healthy. Nothing urgent in your queue.
+                </p>
               </div>
             ) : (
-              <div className="divide-y divide-[#EFEFEA]">
-
+              <ul className="flex flex-col">
                 {/* Blocked */}
                 {withBlockers.map(p => (
-                  <Link
-                    key={`b-${p.id}`}
-                    href={`/admin/projects/${p.id}`}
-                    className="flex items-center gap-4 px-6 py-3.5 hover:bg-[#EFEFEA]/50 transition-colors group"
-                  >
-                    <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-[#131218] truncate">{p.name}</p>
-                      <p className="text-[10px] text-red-500 font-bold uppercase tracking-widest mt-0.5">
-                        {p.blockerCount} blocker{p.blockerCount > 1 ? "s" : ""} — unblock this
-                      </p>
-                    </div>
-                    <StatusBadge value={p.stage} />
-                    <span className="text-[#131218]/20 group-hover:text-[#131218]/60 transition-colors text-sm">→</span>
-                  </Link>
+                  <li key={`b-${p.id}`} style={{ borderTop: "1px solid var(--hall-line-soft)" }}>
+                    <Link
+                      href={`/admin/projects/${p.id}`}
+                      className="flex items-center gap-4 px-1 py-3 transition-colors group"
+                    >
+                      <span className="w-2 h-2 rounded-full shrink-0" style={{ background: "var(--hall-danger)" }} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold truncate" style={{ color: "var(--hall-ink-0)" }}>{p.name}</p>
+                        <p
+                          className="mt-0.5"
+                          style={{
+                            fontFamily: "var(--font-hall-mono)",
+                            fontSize: 10,
+                            fontWeight: 700,
+                            color: "var(--hall-danger)",
+                            letterSpacing: "0.08em",
+                            textTransform: "uppercase",
+                          }}
+                        >
+                          {p.blockerCount} blocker{p.blockerCount > 1 ? "s" : ""} — unblock this
+                        </p>
+                      </div>
+                      <StatusBadge value={p.stage} />
+                      <span className="text-sm" style={{ color: "var(--hall-muted-3)" }}>→</span>
+                    </Link>
+                  </li>
                 ))}
 
                 {/* Needs update */}
                 {needsUpdate.map(p => {
                   const days = daysSince(bestActivity(p));
                   return (
-                    <Link
-                      key={`u-${p.id}`}
-                      href={`/admin/projects/${p.id}`}
-                      className="flex items-center gap-4 px-6 py-3.5 hover:bg-[#EFEFEA]/50 transition-colors group"
-                    >
-                      <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-[#131218] truncate">{p.name}</p>
-                        <p className="text-[10px] text-amber-500 font-bold uppercase tracking-widest mt-0.5">
-                          Status update needed · {days !== null ? `${days}d ago` : "no activity recorded"}
-                        </p>
-                      </div>
-                      <StatusBadge value={p.stage} />
-                      <span className="text-[#131218]/20 group-hover:text-[#131218]/60 transition-colors text-sm">→</span>
-                    </Link>
+                    <li key={`u-${p.id}`} style={{ borderTop: "1px solid var(--hall-line-soft)" }}>
+                      <Link
+                        href={`/admin/projects/${p.id}`}
+                        className="flex items-center gap-4 px-1 py-3 transition-colors group"
+                      >
+                        <span className="w-2 h-2 rounded-full shrink-0" style={{ background: "var(--hall-warn)" }} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold truncate" style={{ color: "var(--hall-ink-0)" }}>{p.name}</p>
+                          <p
+                            className="mt-0.5"
+                            style={{
+                              fontFamily: "var(--font-hall-mono)",
+                              fontSize: 10,
+                              fontWeight: 700,
+                              color: "var(--hall-warn)",
+                              letterSpacing: "0.08em",
+                              textTransform: "uppercase",
+                            }}
+                          >
+                            Status update needed · {days !== null ? `${days}d ago` : "no activity recorded"}
+                          </p>
+                        </div>
+                        <StatusBadge value={p.stage} />
+                        <span className="text-sm" style={{ color: "var(--hall-muted-3)" }}>→</span>
+                      </Link>
+                    </li>
                   );
                 })}
 
@@ -251,112 +355,172 @@ export default async function MyRoomsPage() {
                 {staleProjects.map(p => {
                   const days = daysSince(bestActivity(p));
                   return (
-                    <Link
-                      key={`s-${p.id}`}
-                      href={`/admin/projects/${p.id}`}
-                      className="flex items-center gap-4 px-6 py-3.5 hover:bg-[#EFEFEA]/50 transition-colors group"
-                    >
-                      <span className="w-2 h-2 rounded-full bg-[#131218]/20 shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-[#131218] truncate">{p.name}</p>
-                        <p className="text-[10px] text-[#131218]/35 font-bold uppercase tracking-widest mt-0.5">
-                          No activity · {days !== null ? `${days}d ago` : "unknown"}
-                        </p>
-                      </div>
-                      <StatusBadge value={p.stage} />
-                      <span className="text-[#131218]/20 group-hover:text-[#131218]/60 transition-colors text-sm">→</span>
-                    </Link>
+                    <li key={`s-${p.id}`} style={{ borderTop: "1px solid var(--hall-line-soft)" }}>
+                      <Link
+                        href={`/admin/projects/${p.id}`}
+                        className="flex items-center gap-4 px-1 py-3 transition-colors group"
+                      >
+                        <span className="w-2 h-2 rounded-full shrink-0" style={{ background: "var(--hall-muted-3)" }} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold truncate" style={{ color: "var(--hall-ink-0)" }}>{p.name}</p>
+                          <p
+                            className="mt-0.5"
+                            style={{
+                              fontFamily: "var(--font-hall-mono)",
+                              fontSize: 10,
+                              fontWeight: 700,
+                              color: "var(--hall-muted-3)",
+                              letterSpacing: "0.08em",
+                              textTransform: "uppercase",
+                            }}
+                          >
+                            No activity · {days !== null ? `${days}d ago` : "unknown"}
+                          </p>
+                        </div>
+                        <StatusBadge value={p.stage} />
+                        <span className="text-sm" style={{ color: "var(--hall-muted-3)" }}>→</span>
+                      </Link>
+                    </li>
                   );
                 })}
-
-              </div>
+              </ul>
             )}
-          </div>
+          </section>
 
           {/* What's Moving — recent sources from last 14 days */}
-          {recentSources.length > 0 && (
-            <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-              <div className="h-1 bg-[#131218]" />
-              <div className="px-6 py-4 border-b border-[#EFEFEA]">
-                <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">What&apos;s Moving</p>
-                <p className="text-sm font-bold text-[#131218] tracking-tight mt-0.5">Source activity — last 14 days</p>
-              </div>
-              <div className="divide-y divide-[#EFEFEA]">
+          <section className="mb-7">
+            <div
+              className="flex items-baseline justify-between gap-3 pb-2 mb-3.5"
+              style={{ borderBottom: "1px solid var(--hall-ink-0)" }}
+            >
+              <h2
+                className="text-[19px] font-bold leading-none"
+                style={{ letterSpacing: "-0.02em", color: "var(--hall-ink-0)" }}
+              >
+                What&apos;s{" "}
+                <em
+                  style={{
+                    fontFamily: "var(--font-hall-display)",
+                    fontStyle: "italic",
+                    fontWeight: 400,
+                    color: "var(--hall-ink-0)",
+                  }}
+                >
+                  moving
+                </em>
+              </h2>
+              <span
+                style={{
+                  fontFamily: "var(--font-hall-mono)",
+                  fontSize: 10,
+                  color: "var(--hall-muted-2)",
+                  letterSpacing: "0.06em",
+                }}
+              >
+                SOURCE ACTIVITY · LAST 14 DAYS
+              </span>
+            </div>
+
+            {recentSources.length > 0 ? (
+              <ul className="flex flex-col">
                 {recentSources.map(s => (
-                  <div key={s.id} className="flex items-center gap-3 px-6 py-3">
-                    <span className="text-[11px] text-[#131218]/25 shrink-0 w-4">{sourceIcon(s.sourceType)}</span>
+                  <li
+                    key={s.id}
+                    className="flex items-center gap-3 px-1 py-3"
+                    style={{ borderTop: "1px solid var(--hall-line-soft)" }}
+                  >
+                    <span className="shrink-0 w-4" style={{ fontSize: 11, color: "var(--hall-muted-3)" }}>
+                      {sourceIcon(s.sourceType)}
+                    </span>
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-semibold text-[#131218] truncate">{s.title}</p>
-                      <p className="text-[10px] text-[#131218]/35 font-medium truncate mt-0.5">{s.projectName}</p>
+                      <p className="text-xs font-semibold truncate" style={{ color: "var(--hall-ink-0)" }}>{s.title}</p>
+                      <p
+                        className="truncate mt-0.5"
+                        style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--hall-muted-3)" }}
+                      >
+                        {s.projectName}
+                      </p>
                     </div>
                     {s.dateIngested && (
                       <div className="text-right shrink-0">
-                        <p className="text-[10px] text-[#131218]/30 font-medium">
+                        <p style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--hall-muted-2)" }}>
                           {new Date(s.dateIngested).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
                         </p>
-                        <p className="text-[9px] text-[#131218]/20 font-medium">
+                        <p style={{ fontFamily: "var(--font-hall-mono)", fontSize: 9, color: "var(--hall-muted-3)" }}>
                           {daysSince(s.dateIngested)}d ago
                         </p>
                       </div>
                     )}
-                  </div>
+                  </li>
                 ))}
-              </div>
-            </div>
-          )}
-
-          {recentSources.length === 0 && (
-            <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-              <div className="h-1 bg-[#131218]" />
-              <div className="px-6 py-4 border-b border-[#EFEFEA]">
-                <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">What&apos;s Moving</p>
-                <p className="text-sm font-bold text-[#131218] tracking-tight mt-0.5">Source activity — last 14 days</p>
-              </div>
+              </ul>
+            ) : (
               <div className="px-6 py-8 text-center">
-                <p className="text-sm text-[#131218]/25 font-medium">No new sources in the last 14 days.</p>
+                <p className="text-sm" style={{ color: "var(--hall-muted-3)" }}>No new sources in the last 14 days.</p>
               </div>
-            </div>
-          )}
+            )}
+          </section>
 
           {/* Other Rooms — the rest of the portfolio (not mine) */}
           {otherProjects.length > 0 && (
-            <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-              <div className="h-1 bg-[#EFEFEA]" />
-              <div className="px-6 py-4 border-b border-[#EFEFEA] flex items-center justify-between">
-                <div>
-                  <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">
-                    {ownershipReady ? "Other Rooms" : "All Rooms"}
-                  </p>
-                  <p className="text-sm font-bold text-[#131218] tracking-tight mt-0.5">
-                    {ownershipReady ? "Rest of the portfolio — for reference" : "All active projects"}
-                  </p>
-                </div>
-                <span className="text-[10px] text-[#131218]/25 font-bold uppercase tracking-widest">
-                  {otherProjects.length} project{otherProjects.length !== 1 ? "s" : ""}
+            <section className="mb-7">
+              <div
+                className="flex items-baseline justify-between gap-3 pb-2 mb-3.5"
+                style={{ borderBottom: "1px solid var(--hall-ink-0)" }}
+              >
+                <h2
+                  className="text-[19px] font-bold leading-none"
+                  style={{ letterSpacing: "-0.02em", color: "var(--hall-ink-0)" }}
+                >
+                  {ownershipReady ? "Other" : "All"}{" "}
+                  <em
+                    style={{
+                      fontFamily: "var(--font-hall-display)",
+                      fontStyle: "italic",
+                      fontWeight: 400,
+                      color: "var(--hall-ink-0)",
+                    }}
+                  >
+                    rooms
+                  </em>
+                </h2>
+                <span
+                  style={{
+                    fontFamily: "var(--font-hall-mono)",
+                    fontSize: 10,
+                    color: "var(--hall-muted-2)",
+                    letterSpacing: "0.06em",
+                  }}
+                >
+                  {otherProjects.length} PROJECT{otherProjects.length !== 1 ? "S" : ""}
                 </span>
               </div>
-              <div className="divide-y divide-[#EFEFEA]">
+              <ul className="flex flex-col">
                 {otherProjects.map(p => (
-                  <Link
-                    key={p.id}
-                    href={`/admin/projects/${p.id}`}
-                    className="flex items-center gap-4 px-6 py-3.5 hover:bg-[#EFEFEA]/50 transition-colors group"
-                  >
-                    <ProjectAvatar name={p.name} size="sm" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-[#131218] truncate">{p.name}</p>
-                      {p.lastUpdate && (
-                        <p className="text-[10px] text-[#131218]/25 font-medium mt-0.5">
-                          Updated {new Date(p.lastUpdate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
-                        </p>
-                      )}
-                    </div>
-                    <StatusBadge value={p.stage} />
-                    <span className="text-[#131218]/20 group-hover:text-[#131218]/60 transition-colors text-sm">→</span>
-                  </Link>
+                  <li key={p.id} style={{ borderTop: "1px solid var(--hall-line-soft)" }}>
+                    <Link
+                      href={`/admin/projects/${p.id}`}
+                      className="flex items-center gap-4 px-1 py-3 transition-colors group"
+                    >
+                      <ProjectAvatar name={p.name} size="sm" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold truncate" style={{ color: "var(--hall-ink-0)" }}>{p.name}</p>
+                        {p.lastUpdate && (
+                          <p
+                            className="mt-0.5"
+                            style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--hall-muted-3)" }}
+                          >
+                            Updated {new Date(p.lastUpdate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                          </p>
+                        )}
+                      </div>
+                      <StatusBadge value={p.stage} />
+                      <span className="text-sm" style={{ color: "var(--hall-muted-3)" }}>→</span>
+                    </Link>
+                  </li>
                 ))}
-              </div>
-            </div>
+              </ul>
+            </section>
           )}
 
         </div>

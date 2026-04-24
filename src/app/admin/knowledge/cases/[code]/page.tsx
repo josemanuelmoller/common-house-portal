@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Sidebar } from "@/components/Sidebar";
-import { MetricCard } from "@/components/MetricCard";
 import { NAV } from "../../../page";
 import { requireAdmin } from "@/lib/require-admin";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
@@ -33,13 +32,13 @@ type EvidenceRow = {
   date_captured: string | null;
 };
 
-function confidenceBadge(conf: string | null, hasExcerpt: boolean): { label: string; cls: string } {
-  if (!conf) return { label: "?",  cls: "bg-[#EFEFEA] text-[#131218]/30" };
-  if (conf === "High"   && hasExcerpt) return { label: "H", cls: "bg-[#B2FF59] text-[#131218]" };
-  if (conf === "High")                 return { label: "H*", cls: "bg-amber-50 text-amber-700" };
-  if (conf === "Medium")               return { label: "M", cls: "bg-[#EFEFEA] text-[#131218]/70" };
-  if (conf === "Low")                  return { label: "L", cls: "bg-red-50 text-red-600" };
-  return { label: "?", cls: "bg-[#EFEFEA] text-[#131218]/30" };
+function confidenceBadge(conf: string | null, hasExcerpt: boolean): { label: string; bg: string; fg: string } {
+  if (!conf) return { label: "?",  bg: "var(--hall-fill-soft)", fg: "var(--hall-muted-3)" };
+  if (conf === "High"   && hasExcerpt) return { label: "H",  bg: "var(--hall-ok-soft)",     fg: "var(--hall-ok)" };
+  if (conf === "High")                 return { label: "H*", bg: "var(--hall-warn-soft)",   fg: "var(--hall-warn)" };
+  if (conf === "Medium")               return { label: "M",  bg: "var(--hall-fill-soft)",   fg: "var(--hall-ink-3)" };
+  if (conf === "Low")                  return { label: "L",  bg: "var(--hall-danger-soft)", fg: "var(--hall-danger)" };
+  return { label: "?", bg: "var(--hall-fill-soft)", fg: "var(--hall-muted-3)" };
 }
 
 export default async function CaseDetailPage({
@@ -85,109 +84,295 @@ export default async function CaseDetailPage({
   });
 
   return (
-    <div className="flex min-h-screen bg-[#EFEFEA]">
+    <div className="flex min-h-screen" style={{ background: "var(--hall-paper-0)" }}>
       <Sidebar items={NAV} isAdmin />
-      <main className="flex-1 ml-[228px] overflow-auto">
-        <div className="bg-[#131218] px-10 py-10">
-          <Link href="/admin/knowledge/cases" className="text-[10px] text-white/30 font-bold uppercase tracking-widest hover:text-[#c8f55a] transition-colors">
-            ← All cases
+      <main
+        className="flex-1 ml-[228px] overflow-auto"
+        style={{ fontFamily: "var(--font-hall-sans)", background: "var(--hall-paper-0)" }}
+      >
+        {/* K-v2 collapsed header */}
+        <header
+          className="flex items-center justify-between gap-6 px-9 py-3.5"
+          style={{ borderBottom: "1px solid var(--hall-ink-0)" }}
+        >
+          <div className="flex items-baseline gap-4 min-w-0">
+            <span
+              className="text-[10px] tracking-[0.08em] whitespace-nowrap uppercase"
+              style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+            >
+              CASE · <b style={{ color: "var(--hall-ink-0)" }}>{caseData.code}</b>
+            </span>
+            <h1
+              className="text-[16px] font-medium tracking-[-0.01em] truncate"
+              style={{ color: "var(--hall-ink-0)" }}
+            >
+              <em
+                style={{
+                  fontFamily: "var(--font-hall-display)",
+                  fontStyle: "italic",
+                  fontWeight: 400,
+                }}
+              >
+                {caseData.project_name ?? caseData.code}
+              </em>
+              .
+            </h1>
+          </div>
+          <Link
+            href="/admin/knowledge/cases"
+            className="text-[11px]"
+            style={{
+              fontFamily: "var(--font-hall-mono)",
+              color: "var(--hall-muted-2)",
+              letterSpacing: "0.06em",
+            }}
+          >
+            ← ALL CASES
           </Link>
-          <p className="text-[10px] font-bold font-mono text-white/30 uppercase tracking-widest mt-3">{caseData.code}</p>
-          <h1 className="text-[2.6rem] font-[300] text-white leading-[1] tracking-[-1.5px] mt-1">
-            <em className="font-[900] italic text-[#c8f55a]">{caseData.project_name ?? caseData.code}</em>
-          </h1>
-          <div className="flex items-center gap-3 mt-3 flex-wrap">
+        </header>
+
+        <div className="px-9 py-6 space-y-7 max-w-[960px]">
+
+          {/* Case meta strip */}
+          <div
+            className="flex items-center gap-4 flex-wrap pb-3"
+            style={{
+              borderBottom: "1px solid var(--hall-line-soft)",
+              fontFamily: "var(--font-hall-mono)",
+              fontSize: 10,
+              color: "var(--hall-muted-2)",
+              letterSpacing: "0.06em",
+            }}
+          >
             {caseData.geography && (
-              <span className="text-[10px] font-bold bg-white/5 text-white/50 border border-white/10 px-2 py-0.5 rounded-full font-mono">
+              <span
+                className="px-2 py-0.5 uppercase"
+                style={{
+                  border: "1px solid var(--hall-line-strong)",
+                  color: "var(--hall-ink-0)",
+                  borderRadius: 3,
+                }}
+              >
                 {caseData.geography}
               </span>
             )}
-            {caseData.year && (
-              <span className="text-[10px] text-white/40">{caseData.year}</span>
-            )}
-            <span className="text-[10px] text-white/40">· {evidence.length} evidence</span>
-            <span className="text-[10px] text-white/40">· {leavesReferencing.length} leaves referencing</span>
+            {caseData.year && <span>{caseData.year}</span>}
+            <span>· {evidence.length} EVIDENCE</span>
+            <span>· {leavesReferencing.length} LEAVES REFERENCING</span>
           </div>
-        </div>
-
-        <div className="px-8 py-6 space-y-6 max-w-[960px]">
 
           {/* Leaves that reference this case */}
           {leavesReferencing.length > 0 && (
-            <div className="bg-white rounded-[14px] border border-[#E0E0D8] overflow-hidden">
-              <div className="h-1 bg-[#B2FF59]" />
-              <div className="px-6 py-4 border-b border-[#EFEFEA]">
-                <h2 className="text-sm font-bold text-[#131218] tracking-tight">Leaves that reference this case</h2>
-                <p className="text-xs text-[#131218]/40 mt-0.5">Knowledge nodes where this case appears in at least one bullet.</p>
+            <div>
+              <div
+                className="flex items-baseline justify-between gap-3 pb-2 mb-3.5"
+                style={{ borderBottom: "1px solid var(--hall-ink-0)" }}
+              >
+                <h2
+                  className="text-[19px] font-bold leading-none"
+                  style={{ letterSpacing: "-0.02em", color: "var(--hall-ink-0)" }}
+                >
+                  Leaves that{" "}
+                  <em
+                    style={{
+                      fontFamily: "var(--font-hall-display)",
+                      fontStyle: "italic",
+                      fontWeight: 400,
+                      color: "var(--hall-ink-0)",
+                    }}
+                  >
+                    reference
+                  </em>{" "}
+                  this case
+                </h2>
+                <span
+                  style={{
+                    fontFamily: "var(--font-hall-mono)",
+                    fontSize: 10,
+                    color: "var(--hall-muted-2)",
+                    letterSpacing: "0.06em",
+                  }}
+                >
+                  {leavesReferencing.length} NODES
+                </span>
               </div>
-              <div className="divide-y divide-[#EFEFEA]">
+              <ul className="flex flex-col">
                 {leavesReferencing.map(n => (
-                  <Link key={n.id} href={`/admin/knowledge/${n.path}`}
-                        className="block px-6 py-3 hover:bg-[#EFEFEA]/40 transition-colors">
-                    <p className="text-[10px] font-bold font-mono text-[#131218]/25 uppercase tracking-widest">{n.path}</p>
-                    <p className="text-sm font-semibold text-[#131218] mt-0.5">{n.title}</p>
-                  </Link>
+                  <li
+                    key={n.id}
+                    style={{ borderTop: "1px solid var(--hall-line-soft)" }}
+                  >
+                    <Link
+                      href={`/admin/knowledge/${n.path}`}
+                      className="block py-2.5 transition-colors"
+                    >
+                      <p
+                        className="text-[10px] uppercase tracking-[0.06em]"
+                        style={{
+                          fontFamily: "var(--font-hall-mono)",
+                          color: "var(--hall-muted-3)",
+                        }}
+                      >
+                        {n.path}
+                      </p>
+                      <p
+                        className="text-sm font-semibold mt-0.5"
+                        style={{ color: "var(--hall-ink-0)" }}
+                      >
+                        {n.title}
+                      </p>
+                    </Link>
+                  </li>
                 ))}
-              </div>
+              </ul>
             </div>
           )}
 
           {/* Evidence grouped by type */}
-          <div className="bg-white rounded-[14px] border border-[#E0E0D8] overflow-hidden">
-            <div className="h-1 bg-[#131218]" />
-            <div className="px-6 py-4 border-b border-[#EFEFEA]">
-              <h2 className="text-sm font-bold text-[#131218] tracking-tight">All evidence for this case</h2>
-              <p className="text-xs text-[#131218]/40 mt-0.5">{evidence.length} validated evidence records tagged with <code className="text-[11px] bg-[#EFEFEA] px-1 py-0.5 rounded">{caseData.code}</code>.</p>
+          <div>
+            <div
+              className="flex items-baseline justify-between gap-3 pb-2 mb-3.5"
+              style={{ borderBottom: "1px solid var(--hall-ink-0)" }}
+            >
+              <h2
+                className="text-[19px] font-bold leading-none"
+                style={{ letterSpacing: "-0.02em", color: "var(--hall-ink-0)" }}
+              >
+                All{" "}
+                <em
+                  style={{
+                    fontFamily: "var(--font-hall-display)",
+                    fontStyle: "italic",
+                    fontWeight: 400,
+                    color: "var(--hall-ink-0)",
+                  }}
+                >
+                  evidence
+                </em>{" "}
+                for this case
+              </h2>
+              <span
+                style={{
+                  fontFamily: "var(--font-hall-mono)",
+                  fontSize: 10,
+                  color: "var(--hall-muted-2)",
+                  letterSpacing: "0.06em",
+                }}
+              >
+                {evidence.length} VALIDATED
+              </span>
             </div>
+
             {evidence.length === 0 ? (
-              <div className="px-6 py-10 text-center text-sm text-[#131218]/30">
+              <div
+                className="px-6 py-10 text-center text-sm"
+                style={{ color: "var(--hall-muted-3)" }}
+              >
                 No evidence found for this case.
               </div>
             ) : (
-              <div className="divide-y divide-[#EFEFEA]">
+              <div>
                 {sortedTypes.map(type => (
                   <div key={type}>
-                    <div className="px-6 py-2 bg-[#F7F7F2] border-y border-[#EFEFEA]">
-                      <p className="text-[10px] font-bold text-[#131218]/40 uppercase tracking-widest">
+                    <div
+                      className="py-2 mt-2"
+                      style={{
+                        borderTop: "1px solid var(--hall-line-soft)",
+                        borderBottom: "1px solid var(--hall-line-soft)",
+                      }}
+                    >
+                      <p
+                        className="text-[10px] uppercase tracking-[0.08em]"
+                        style={{
+                          fontFamily: "var(--font-hall-mono)",
+                          color: "var(--hall-muted-2)",
+                        }}
+                      >
                         {type} · {byType[type].length}
                       </p>
                     </div>
-                    {byType[type].map(e => {
-                      const d = e.date_captured ? new Date(e.date_captured) : null;
-                      const conf = confidenceBadge(e.confidence_level, Boolean(e.source_excerpt?.trim()));
-                      return (
-                        <div key={e.notion_id} className="px-6 py-4">
-                          <div className="flex items-start gap-3">
-                            <div className="shrink-0 w-16 text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest pt-0.5">
-                              {d ? d.toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : "—"}
-                            </div>
-                            <span className={`shrink-0 inline-flex items-center justify-center w-6 h-6 text-[10px] font-bold rounded-full ${conf.cls}`} title={`Confidence: ${e.confidence_level ?? "?"}${e.source_excerpt ? " · has excerpt" : " · no excerpt"}`}>
-                              {conf.label}
-                            </span>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-[13px] font-semibold text-[#131218] leading-snug">{e.title}</p>
-                              {e.evidence_statement && (
-                                <p className="text-[12px] text-[#131218]/60 mt-1 leading-relaxed">
-                                  {e.evidence_statement.slice(0, 400)}{e.evidence_statement.length > 400 ? "…" : ""}
+                    <ul className="flex flex-col">
+                      {byType[type].map(e => {
+                        const d = e.date_captured ? new Date(e.date_captured) : null;
+                        const conf = confidenceBadge(e.confidence_level, Boolean(e.source_excerpt?.trim()));
+                        return (
+                          <li
+                            key={e.notion_id}
+                            className="py-3"
+                            style={{ borderTop: "1px solid var(--hall-line-soft)" }}
+                          >
+                            <div className="flex items-start gap-3">
+                              <div
+                                className="shrink-0 w-16 text-[10px] uppercase tracking-[0.06em] pt-0.5"
+                                style={{
+                                  fontFamily: "var(--font-hall-mono)",
+                                  color: "var(--hall-muted-3)",
+                                }}
+                              >
+                                {d ? d.toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : "—"}
+                              </div>
+                              <span
+                                className="shrink-0 inline-flex items-center justify-center w-6 h-6 text-[10px] font-bold"
+                                style={{
+                                  background: conf.bg,
+                                  color: conf.fg,
+                                  borderRadius: 3,
+                                  fontFamily: "var(--font-hall-mono)",
+                                }}
+                                title={`Confidence: ${e.confidence_level ?? "?"}${e.source_excerpt ? " · has excerpt" : " · no excerpt"}`}
+                              >
+                                {conf.label}
+                              </span>
+                              <div className="flex-1 min-w-0">
+                                <p
+                                  className="text-[13px] font-semibold leading-snug"
+                                  style={{ color: "var(--hall-ink-0)" }}
+                                >
+                                  {e.title}
                                 </p>
-                              )}
-                              <div className="flex items-center gap-2 mt-2 flex-wrap">
-                                {e.workstream && (
-                                  <span className="text-[9px] font-bold bg-[#EFEFEA] text-[#131218]/60 px-2 py-0.5 rounded-full uppercase tracking-widest">
-                                    {e.workstream}
-                                  </span>
+                                {e.evidence_statement && (
+                                  <p
+                                    className="text-[12px] mt-1 leading-relaxed"
+                                    style={{ color: "var(--hall-ink-3)" }}
+                                  >
+                                    {e.evidence_statement.slice(0, 400)}
+                                    {e.evidence_statement.length > 400 ? "…" : ""}
+                                  </p>
                                 )}
-                                {e.stakeholder_function && (
-                                  <span className="text-[9px] font-bold bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full uppercase tracking-widest">
-                                    {e.stakeholder_function}
-                                  </span>
-                                )}
+                                <div className="flex items-center gap-2 mt-2 flex-wrap">
+                                  {e.workstream && (
+                                    <span
+                                      className="text-[9px] px-2 py-0.5 uppercase tracking-[0.06em]"
+                                      style={{
+                                        fontFamily: "var(--font-hall-mono)",
+                                        background: "var(--hall-fill-soft)",
+                                        color: "var(--hall-ink-3)",
+                                        borderRadius: 3,
+                                      }}
+                                    >
+                                      {e.workstream}
+                                    </span>
+                                  )}
+                                  {e.stakeholder_function && (
+                                    <span
+                                      className="text-[9px] px-2 py-0.5 uppercase tracking-[0.06em]"
+                                      style={{
+                                        fontFamily: "var(--font-hall-mono)",
+                                        border: "1px solid var(--hall-line-strong)",
+                                        color: "var(--hall-ink-3)",
+                                        borderRadius: 3,
+                                      }}
+                                    >
+                                      {e.stakeholder_function}
+                                    </span>
+                                  )}
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        </div>
-                      );
-                    })}
+                          </li>
+                        );
+                      })}
+                    </ul>
                   </div>
                 ))}
               </div>

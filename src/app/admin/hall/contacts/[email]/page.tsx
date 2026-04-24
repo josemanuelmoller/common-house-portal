@@ -128,19 +128,48 @@ export default async function ContactDrawerPage({ params }: Props) {
   };
 
   return (
-    <div className="flex min-h-screen bg-[#EFEFEA]">
+    <div className="flex min-h-screen">
       <Sidebar adminNav />
 
-      <main className="flex-1 ml-[228px]">
-        {/* Dark header */}
-        <header className="bg-[#131218] px-12 pt-10 pb-11">
-          <div className="flex items-center gap-3 text-[10px] font-bold uppercase tracking-widest text-white/30 mb-3">
-            <Link href="/admin/hall/contacts" className="hover:text-white/80 transition-colors">Contacts</Link>
-            <span>›</span>
-            <span className="text-white/50">{contact.display_name || email.split("@")[0]}</span>
-            <div className="flex-1" />
+      <main
+        className="flex-1 ml-[228px]"
+        style={{ fontFamily: "var(--font-hall-sans)", background: "var(--hall-paper-0)" }}
+      >
+        {/* ── K-v2 one-line header ─────────────────────────────────────── */}
+        <header
+          className="flex items-center justify-between gap-6 px-9 py-3.5"
+          style={{ borderBottom: "1px solid var(--hall-ink-0)" }}
+        >
+          <div className="flex items-baseline gap-4 min-w-0">
+            <span
+              className="text-[10px] tracking-[0.08em] whitespace-nowrap uppercase"
+              style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+            >
+              HALL · <Link href="/admin/hall/contacts" className="hover:underline" style={{ color: "var(--hall-ink-0)" }}><b>CONTACTS</b></Link>
+            </span>
+            <h1
+              className="text-[16px] font-medium tracking-[-0.01em] truncate"
+              style={{ color: "var(--hall-ink-0)" }}
+            >
+              {contact.display_name || (
+                <em
+                  style={{
+                    fontFamily: "var(--font-hall-display)",
+                    fontStyle: "italic",
+                    fontWeight: 400,
+                  }}
+                >
+                  {email.split("@")[0]}
+                </em>
+              )}
+            </h1>
+          </div>
+          <div
+            className="flex items-center gap-3 text-[10px] tracking-[0.08em] uppercase"
+            style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+          >
             {adjacent.position != null && (
-              <span className="text-white/30 tabular-nums">
+              <span className="tabular-nums">
                 {adjacent.position} / {adjacent.total}
               </span>
             )}
@@ -148,89 +177,128 @@ export default async function ContactDrawerPage({ params }: Props) {
               <Link
                 href={`/admin/hall/contacts/${encodeURIComponent(adjacent.prev.email)}`}
                 prefetch={false}
-                className="text-white/50 hover:text-white border border-white/10 hover:border-white/30 rounded-lg px-2 py-1"
+                className="hall-btn-outline"
+                style={{ padding: "4px 10px", fontSize: 10 }}
                 title={`← ${adjacent.prev.display_name ?? adjacent.prev.full_name ?? adjacent.prev.email}`}
               >
                 ← Prev
               </Link>
             ) : (
-              <span className="text-white/15 border border-white/5 rounded-lg px-2 py-1">← Prev</span>
+              <span className="hall-btn-outline" style={{ padding: "4px 10px", fontSize: 10, opacity: 0.35 }}>← Prev</span>
             )}
             {adjacent.next ? (
               <Link
                 href={`/admin/hall/contacts/${encodeURIComponent(adjacent.next.email)}`}
                 prefetch={false}
-                className="text-white/50 hover:text-white border border-white/10 hover:border-white/30 rounded-lg px-2 py-1"
+                className="hall-btn-outline"
+                style={{ padding: "4px 10px", fontSize: 10 }}
                 title={`${adjacent.next.display_name ?? adjacent.next.full_name ?? adjacent.next.email} →`}
               >
                 Next →
               </Link>
             ) : (
-              <span className="text-white/15 border border-white/5 rounded-lg px-2 py-1">Next →</span>
+              <span className="hall-btn-outline" style={{ padding: "4px 10px", fontSize: 10, opacity: 0.35 }}>Next →</span>
             )}
           </div>
-          <div className="flex items-end justify-between gap-6">
-            <div className="flex items-center gap-5 min-w-0">
-              <ContactAvatar
-                photoUrl={enrichment?.photo_url ?? null}
-                display={contact.display_name || email.split("@")[0] || "?"}
-                size={88}
-                rounded="lg"
-              />
+        </header>
+
+        {/* ── Profile strip ─────────────────────────────────────────────── */}
+        <div
+          className="flex items-start justify-between gap-6 px-9 py-6"
+          style={{ borderBottom: "1px solid var(--hall-line)" }}
+        >
+          <div className="flex items-center gap-5 min-w-0">
+            <ContactAvatar
+              photoUrl={enrichment?.photo_url ?? null}
+              display={contact.display_name || email.split("@")[0] || "?"}
+              size={72}
+              rounded="lg"
+            />
             <div className="min-w-0">
-              <h1 className="text-[2.6rem] font-light text-white tracking-[-1.5px] leading-none truncate">
-                {contact.display_name || (
-                  <em className="font-black italic text-[#c8f55a]">{email.split("@")[0]}</em>
-                )}
-              </h1>
+              <h2
+                className="text-[24px] font-bold tracking-[-0.02em] leading-tight truncate"
+                style={{ color: "var(--hall-ink-0)" }}
+              >
+                {contact.display_name || email.split("@")[0]}
+              </h2>
               {enrichment?.job_title && (
-                <p className="text-[13px] text-white/70 mt-2 truncate">{enrichment.job_title}</p>
+                <p className="text-[13px] mt-1 truncate" style={{ color: "var(--hall-ink-3)" }}>
+                  {enrichment.job_title}
+                </p>
               )}
-              <p className="text-sm text-white/40 mt-3 truncate">{email}</p>
-              <div className="flex items-center gap-2 mt-4 flex-wrap">
+              <p
+                className="text-[11px] mt-1 truncate"
+                style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+              >
+                {email}
+              </p>
+              <div className="flex items-center gap-1.5 mt-3 flex-wrap">
                 {contact.relationship_classes.map(cls => (
                   <span
                     key={cls}
-                    className={`text-[9px] font-bold tracking-wide uppercase px-2 py-0.5 rounded ${
-                      ["Family", "Personal Service", "Friend"].includes(cls) ? "bg-amber-500/20 text-amber-300"
-                      : cls === "VIP"                                        ? "bg-[#B2FF59]/30 text-[#c8f55a]"
-                      : "bg-white/10 text-white/70"
-                    }`}
+                    className="text-[9px] px-2 py-0.5 uppercase"
+                    style={{
+                      fontFamily: "var(--font-hall-mono)",
+                      fontWeight: 700,
+                      letterSpacing: "0.08em",
+                      background: cls === "VIP" ? "var(--hall-ink-0)" : "var(--hall-fill-soft)",
+                      color: cls === "VIP" ? "var(--hall-paper-0)" : "var(--hall-ink-0)",
+                    }}
                   >
                     {cls}
                   </span>
                 ))}
                 {enrichment?.role_category && (
-                  <span className="text-[9px] font-bold tracking-wide uppercase px-2 py-0.5 rounded bg-white text-[#131218]">
+                  <span
+                    className="text-[9px] px-2 py-0.5 uppercase"
+                    style={{
+                      fontFamily: "var(--font-hall-mono)",
+                      fontWeight: 700,
+                      letterSpacing: "0.08em",
+                      border: "1px solid var(--hall-ink-0)",
+                      color: "var(--hall-ink-0)",
+                    }}
+                  >
                     {enrichment.role_category}
                   </span>
                 )}
                 {enrichment?.function_area && (
-                  <span className="text-[9px] font-bold tracking-wide uppercase px-2 py-0.5 rounded bg-[#c8f55a] text-[#131218]">
+                  <span
+                    className="text-[9px] px-2 py-0.5 uppercase"
+                    style={{
+                      fontFamily: "var(--font-hall-mono)",
+                      fontWeight: 700,
+                      letterSpacing: "0.08em",
+                      border: "1px solid var(--hall-ink-0)",
+                      color: "var(--hall-ink-0)",
+                    }}
+                  >
                     {enrichment.function_area}
                   </span>
                 )}
                 {contact.relationship_classes.length === 0 && !hasRoleSignal && (
-                  <span className="text-[9px] font-bold tracking-widest uppercase text-amber-400/80">
+                  <span
+                    className="text-[9px] tracking-[0.08em] uppercase"
+                    style={{ fontFamily: "var(--font-hall-mono)", fontWeight: 700, color: "var(--hall-warn)" }}
+                  >
                     Untagged — no relationship class set
                   </span>
                 )}
               </div>
             </div>
-            </div>
-            <div className="flex items-center gap-5 pb-1">
-              <Stat label="Meetings"      value={contact.meeting_count} />
-              <div className="w-px h-10 bg-white/10" />
-              <Stat label="Email threads" value={contact.email_thread_count} />
-              <div className="w-px h-10 bg-white/10" />
-              <Stat label="Transcripts"   value={contact.transcript_count} />
-              <div className="w-px h-10 bg-white/10" />
-              <Stat label="Total touches" value={totalTouches} color="text-[#c8f55a]" />
-            </div>
           </div>
-        </header>
+          <div className="flex items-center gap-5 shrink-0">
+            <Stat label="Meetings"      value={contact.meeting_count} />
+            <div className="w-px h-8" style={{ background: "var(--hall-line)" }} />
+            <Stat label="Email threads" value={contact.email_thread_count} />
+            <div className="w-px h-8" style={{ background: "var(--hall-line)" }} />
+            <Stat label="Transcripts"   value={contact.transcript_count} />
+            <div className="w-px h-8" style={{ background: "var(--hall-line)" }} />
+            <Stat label="Total touches" value={totalTouches} />
+          </div>
+        </div>
 
-        <div className="px-12 py-9 max-w-5xl space-y-8">
+        <div className="px-9 py-7 max-w-5xl space-y-7">
 
           {/* ═══ Block 0 · AI summary + Open loops (briefing strip) ═════════════ */}
           {enrichment && (
