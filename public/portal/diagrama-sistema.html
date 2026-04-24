@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Common House OS — System Diagram</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,700;1,800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --lime:#c8f55a; --black:#000; --white:#fff; --ink:#0e0e0e;
+    --muted:#6b6b6b; --border:#d8d8d0; --bg:#eeeee8;
+    --agent:#dbeafe; --agent-bd:#3b82f6;
+    --collab:#fee2e2; --collab-bd:#ef4444;
+    --ctx:#fef3c7;  --ctx-bd:#f59e0b;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+  body{
+    font-family:'Inter',-apple-system,sans-serif;
+    background:var(--bg); color:var(--ink);
+    min-height:100vh; padding:40px 32px 64px;
+  }
+  .wrap{max-width:1180px;margin:0 auto;}
+  .page-header{
+    display:flex;justify-content:space-between;align-items:flex-end;
+    margin-bottom:36px;padding-bottom:18px;border-bottom:2px solid var(--ink);
+  }
+  .page-title{font-size:2.4rem;font-weight:300;letter-spacing:-1.5px;line-height:1;}
+  .page-title em{font-style:italic;font-weight:900;}
+  .page-sub{font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+  .legend{display:flex;gap:14px;font-size:10px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);}
+  .legend span{display:inline-flex;align-items:center;gap:6px;}
+  .dot{width:10px;height:10px;border-radius:3px;display:inline-block;}
+
+  .layer{
+    border:2px solid; border-radius:18px;
+    margin-bottom:22px; padding:22px 24px;
+    display:grid; grid-template-columns:170px 1fr; gap:24px;
+    background:var(--white);
+  }
+  .layer.agent{border-color:var(--agent-bd); background:#f5f9ff;}
+  .layer.collab{border-color:var(--collab-bd); background:#fff7f6;}
+  .layer.ctx{border-color:var(--ctx-bd); background:#fffaf0;}
+
+  .layer-spine{
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    text-align:center; padding:14px 8px;
+    border-right:1.5px dashed var(--border);
+  }
+  .spine-icon{
+    width:54px;height:54px;border-radius:50%;
+    border:2px solid var(--ink);background:var(--white);
+    display:flex;align-items:center;justify-content:center;
+    font-size:22px; margin-bottom:12px;
+  }
+  .spine-name{font-size:13px;font-weight:800;letter-spacing:-0.3px;}
+  .spine-tag{font-size:9px;font-weight:700;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;margin-top:4px;}
+
+  .layer-body{display:flex;flex-direction:column;gap:10px;}
+  .row{
+    display:flex;align-items:center;gap:14px;
+    background:var(--white); border:1px solid var(--border); border-radius:12px;
+    padding:12px 16px; cursor:pointer; transition:all .15s ease;
+  }
+  .row:hover{transform:translateY(-1px);border-color:var(--ink);box-shadow:0 4px 0 var(--ink);}
+  .row-title{font-size:13px;font-weight:800;letter-spacing:-0.2px;width:170px;flex-shrink:0;}
+  .row-desc{font-size:11.5px;color:var(--muted);font-weight:500;flex:1;line-height:1.45;}
+  .row-count{
+    font-size:9px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;
+    background:var(--ink);color:var(--white);padding:4px 8px;border-radius:6px;flex-shrink:0;
+  }
+  .row.agent .row-count{background:var(--agent-bd);}
+  .row.collab .row-count{background:var(--collab-bd);}
+  .row.ctx .row-count{background:var(--ctx-bd);}
+
+  .substrate{
+    display:flex;gap:8px;flex-wrap:wrap;
+    padding:10px 14px;background:rgba(0,0,0,.03);border-radius:10px;
+    border:1px dashed var(--border);
+  }
+  .chip{
+    font-size:10px;font-weight:700;letter-spacing:0.4px;
+    padding:5px 10px;border-radius:14px;background:var(--white);
+    border:1px solid var(--border); cursor:pointer;
+  }
+  .chip:hover{border-color:var(--ink);background:var(--lime);}
+  .chip img{width:12px;height:12px;display:inline-block;vertical-align:-2px;margin-right:5px;}
+
+  /* Logo strip at bottom of context layer */
+  .logo-strip{
+    margin-top:14px;padding:18px 16px;background:var(--white);
+    border:1px solid var(--border);border-radius:14px;
+    display:flex;align-items:center;justify-content:space-around;flex-wrap:wrap;gap:18px;
+  }
+  .logo-strip .logo-item{
+    display:flex;flex-direction:column;align-items:center;gap:6px;
+    text-decoration:none;color:var(--ink);min-width:60px;
+  }
+  .logo-strip img{width:30px;height:30px;object-fit:contain;}
+  .logo-strip .logo-name{font-size:9px;font-weight:700;letter-spacing:0.6px;text-transform:uppercase;color:var(--muted);}
+  .logo-strip-label{font-size:9px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;text-align:center;}
+
+  /* Modal */
+  .modal-back{
+    position:fixed;inset:0;background:rgba(0,0,0,.55);
+    display:none;align-items:center;justify-content:center;z-index:50;padding:24px;
+  }
+  .modal-back.open{display:flex;}
+  .modal{
+    background:var(--white);border-radius:16px;max-width:680px;width:100%;
+    max-height:82vh;overflow:auto;padding:28px 30px;border:2px solid var(--ink);
+  }
+  .modal h2{font-size:1.4rem;font-weight:900;letter-spacing:-0.6px;margin-bottom:6px;}
+  .modal h2 em{color:var(--collab-bd);font-style:italic;}
+  .modal .sub{font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:18px;}
+  .modal p{font-size:13px;line-height:1.55;margin-bottom:14px;color:var(--ink);}
+  .modal ul{list-style:none;display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;margin-top:8px;}
+  .modal li{font-size:12px;padding:8px 10px;background:var(--bg);border-radius:7px;font-weight:600;}
+  .modal li b{font-weight:800;}
+  .modal .closex{
+    position:sticky;top:-28px;float:right;background:var(--ink);color:var(--white);
+    border:none;width:30px;height:30px;border-radius:50%;cursor:pointer;font-weight:800;font-size:14px;
+  }
+
+  .footnote{
+    margin-top:12px;font-size:10.5px;color:var(--muted);text-align:center;font-weight:500;
+  }
+  .footnote b{color:var(--ink);font-weight:800;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="page-header">
+    <div>
+      <h1 class="page-title">Common House <em>OS</em></h1>
+      <div class="page-sub" style="margin-top:6px;">System Diagram · v2 · 2026</div>
+    </div>
+    <div class="legend">
+      <span><i class="dot" style="background:var(--agent-bd)"></i>Agent layer</span>
+      <span><i class="dot" style="background:var(--collab-bd)"></i>Collaboration layer</span>
+      <span><i class="dot" style="background:var(--ctx-bd)"></i>Context layer</span>
+    </div>
+  </header>
+
+  <!-- ============ AGENT LAYER ============ -->
+  <section class="layer agent">
+    <div class="layer-spine">
+      <div class="spine-icon">⚙︎</div>
+      <div class="spine-name">Agent<br>Layer</div>
+      <div class="spine-tag">Autonomous · Cron</div>
+    </div>
+    <div class="layer-body">
+
+      <div class="row agent" data-key="custom-agents">
+        <div class="row-title">Custom Agents</div>
+        <div class="row-desc">Briefing, deal-flow, grants, portfolio-health, weekly-synthesis, knowledge-curator…</div>
+        <div class="row-count">19 agents</div>
+      </div>
+
+      <div class="row agent" data-key="orchestrators">
+        <div class="row-title">Orchestrators</div>
+        <div class="row-desc">os-runner (6-step cadence), plan-master-agent, hygiene loop, validation operator</div>
+        <div class="row-count">5 runners</div>
+      </div>
+
+      <div class="row agent" data-key="skills">
+        <div class="row-title">Skills</div>
+        <div class="row-desc">Atomic capabilities the agents call: ingest, upsert, draft, score, package, send</div>
+        <div class="row-count">48 skills</div>
+      </div>
+
+      <div class="substrate">
+        <span class="chip" data-key="cron"><img src="https://www.google.com/s2/favicons?domain=vercel.com&sz=64" alt="">Cron · vercel.json</span>
+        <span class="chip" data-key="hooks"><img src="https://www.google.com/s2/favicons?domain=anthropic.com&sz=64" alt="">Hooks · settings.json</span>
+        <span class="chip" data-key="models"><img src="https://www.google.com/s2/favicons?domain=anthropic.com&sz=64" alt="">Claude Opus 4.7 / Sonnet 4.6</span>
+        <span class="chip" data-key="mcp"><img src="https://www.google.com/s2/favicons?domain=anthropic.com&sz=64" alt="">MCP servers</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ COLLABORATION LAYER ============ -->
+  <section class="layer collab">
+    <div class="layer-spine">
+      <div class="spine-icon">⌂</div>
+      <div class="spine-name">Collaboration<br>Layer</div>
+      <div class="spine-tag">Portal · Surfaces</div>
+    </div>
+    <div class="layer-body">
+
+      <div class="row collab" data-key="hall">
+        <div class="row-title">The Hall</div>
+        <div class="row-desc">Front door — contacts, focus of day, inbox triage, follow-up desk, candidates</div>
+        <div class="row-count">10 sections</div>
+      </div>
+
+      <div class="row collab" data-key="control-room">
+        <div class="row-title">Control Room</div>
+        <div class="row-desc">Projects, opportunities, decisions, evidence, sources, knowledge — the OS v2 cockpit</div>
+        <div class="row-count">11 surfaces</div>
+      </div>
+
+      <div class="row collab" data-key="garage">
+        <div class="row-title">The Garage</div>
+        <div class="row-desc">Portfolio startups · cap table · valuations · data room · investor updates</div>
+        <div class="row-count">7 modules</div>
+      </div>
+
+      <div class="row collab" data-key="living-room">
+        <div class="row-title">Living Room</div>
+        <div class="row-desc">Community-facing layer — people, projects, briefs, content pipeline (read-only)</div>
+        <div class="row-count">5 modules</div>
+      </div>
+
+      <div class="row collab" data-key="plan">
+        <div class="row-title">The Plan</div>
+        <div class="row-desc">Strategic objectives Q2 26 → Q1 27 · revenue events · pillars/audiences/channels</div>
+        <div class="row-count">48 objectives</div>
+      </div>
+
+      <div class="substrate">
+        <span class="chip" data-key="prep">Prep Brief</span>
+        <span class="chip" data-key="comms">Comms System</span>
+        <span class="chip" data-key="grants-surf">Grants Radar</span>
+        <span class="chip" data-key="brand">Brand Brain</span>
+        <span class="chip" data-key="insights">Insight Engine</span>
+        <span class="chip" data-key="proposal">Proposal / Offer</span>
+      </div>
+
+      <div class="logo-strip" style="margin-top:6px;">
+        <div class="logo-strip-label" style="width:100%;">Built on</div>
+        <a class="logo-item" href="#" onclick="openM('vercel');return false;">
+          <img src="https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/nextjs.png" alt=""><span class="logo-name">Next.js</span>
+        </a>
+        <a class="logo-item" href="#" onclick="openM('clerk');return false;">
+          <img src="https://icons.duckduckgo.com/ip3/clerk.com.ico" alt=""><span class="logo-name">Clerk</span>
+        </a>
+        <a class="logo-item" href="#" onclick="openM('vercel');return false;">
+          <img src="https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/vercel.png" alt=""><span class="logo-name">Vercel</span>
+        </a>
+        <a class="logo-item" href="#" onclick="openM('notion-os');return false;">
+          <img src="https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/notion.png" alt=""><span class="logo-name">Notion</span>
+        </a>
+        <a class="logo-item" href="#" onclick="openM('supabase');return false;">
+          <img src="https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/supabase.png" alt=""><span class="logo-name">Supabase</span>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ CONTEXT LAYER ============ -->
+  <section class="layer ctx">
+    <div class="layer-spine">
+      <div class="spine-icon">▤</div>
+      <div class="spine-name">Context<br>Layer</div>
+      <div class="spine-tag">Data · Connected tools</div>
+    </div>
+    <div class="layer-body">
+
+      <div class="row ctx" data-key="notion-os">
+        <div class="row-title">Notion · OS v2</div>
+        <div class="row-desc">CH Sources, Evidence, Projects, People, Orgs, Knowledge, Decisions, Opportunities…</div>
+        <div class="row-count">14 DBs</div>
+      </div>
+
+      <div class="row ctx" data-key="supabase">
+        <div class="row-title">Supabase · commonhouse</div>
+        <div class="row-desc">strategic_objectives, revenue_events, pillars, content_pitches, opportunities, tasks, knowledge_nodes</div>
+        <div class="row-count">12 tables</div>
+      </div>
+
+      <div class="row ctx" data-key="library">
+        <div class="row-title">Library Storage</div>
+        <div class="row-desc">Supabase bucket <code>library-docs</code> + Drive <code>CH OS/Plan/{Q}/</code> for produced artifacts</div>
+        <div class="row-count">2 stores</div>
+      </div>
+
+      <div class="logo-strip">
+        <div class="logo-strip-label" style="width:100%;">Connected Tools</div>
+        <a class="logo-item" href="#" onclick="openM('gmail');return false;">
+          <img src="https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/gmail.png" alt=""><span class="logo-name">Gmail</span>
+        </a>
+        <a class="logo-item" href="#" onclick="openM('drive');return false;">
+          <img src="https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/google-drive.png" alt=""><span class="logo-name">Drive</span>
+        </a>
+        <a class="logo-item" href="#" onclick="openM('calendar');return false;">
+          <img src="https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/google-calendar.png" alt=""><span class="logo-name">Calendar</span>
+        </a>
+        <a class="logo-item" href="#" onclick="openM('contacts');return false;">
+          <img src="https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/google-contacts.png" alt=""><span class="logo-name">Contacts</span>
+        </a>
+        <a class="logo-item" href="#" onclick="openM('linkedin');return false;">
+          <img src="https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/linkedin.png" alt=""><span class="logo-name">LinkedIn</span>
+        </a>
+        <a class="logo-item" href="#" onclick="openM('whatsapp');return false;">
+          <img src="https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/whatsapp.png" alt=""><span class="logo-name">WhatsApp</span>
+        </a>
+        <a class="logo-item" href="#" onclick="openM('fireflies');return false;">
+          <img src="https://icons.duckduckgo.com/ip3/fireflies.ai.ico" alt=""><span class="logo-name">Fireflies</span>
+        </a>
+        <a class="logo-item" href="#" onclick="openM('notion-os');return false;">
+          <img src="https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/notion.png" alt=""><span class="logo-name">Notion</span>
+        </a>
+        <a class="logo-item" href="#" onclick="openM('supabase');return false;">
+          <img src="https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/supabase.png" alt=""><span class="logo-name">Supabase</span>
+        </a>
+        <a class="logo-item" href="#" onclick="openM('vercel');return false;">
+          <img src="https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/vercel.png" alt=""><span class="logo-name">Vercel</span>
+        </a>
+        <a class="logo-item" href="#" onclick="openM('clerk');return false;">
+          <img src="https://icons.duckduckgo.com/ip3/clerk.com.ico" alt=""><span class="logo-name">Clerk</span>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <p class="footnote">
+    Click any row or chip to expand. Source of truth: <b>portal.wearecommonhouse.com</b> · Repo: <b>Claude Code</b> · Updated 2026-04-24.
+  </p>
+</div>
+
+<!-- Modal -->
+<div class="modal-back" id="mb">
+  <div class="modal" id="mc">
+    <button class="closex" onclick="closeM()">×</button>
+    <h2 id="mt"></h2>
+    <div class="sub" id="ms"></div>
+    <p id="md"></p>
+    <ul id="ml"></ul>
+  </div>
+</div>
+
+<script>
+const DATA = {
+  "custom-agents":{t:"Custom <em>Agents</em>",s:"Agent layer · 19 agents",d:"Specialized agents that wake on cron or on-demand. Each has a narrow brief, reads from Notion + Supabase, and writes back proposals (never silent mutations).",i:["briefing-agent","deal-flow-agent","grant-monitor-agent","portfolio-health-agent","weekly-synthesis","knowledge-curator","living-room-agent","plan-master-agent","competitive-monitor-agent","grant-radar-agent","linkedin-post-agent","review-queue","source-intake","evidence-review","validation-operator","project-operator","update-project-status","update-knowledge-asset","score-signal"]},
+  "orchestrators":{t:"<em>Orchestrators</em>",s:"Agent layer · 5 runners",d:"Meta-agents that chain other agents into a single cadence. The 6-step os-runner is the daily backbone.",i:["os-runner (6-step daily)","plan-master-agent","db-hygiene-operator","hygiene-agent","validation-operator"]},
+  "skills":{t:"<em>Skills</em>",s:"Agent layer · 48 atomic skills",d:"Reusable building blocks that agents call. Skills do exactly one thing — ingest, upsert, draft, score, send.",i:["ingest-email-thread","ingest-conversation","ingest-garage-docs","extract-evidence","triage-knowledge","update-knowledge-asset","update-project-status","propose-entities-from-conversation","create-approved-entitie","upsert-organization-profile","upsert-person-profile","upsert-proposal-brief","upsert-offer","upsert-captable-entry","upsert-valuation","upsert-data-room-item","generate-investor-update","send-investor-update","portfolio-vc-eyes-report","vc-eyes-evaluator","process-startup-financials","update-financial-snapshot","investor-matchmaker","grant-fit-scanner","extract-agreement-obligations","proposal-packager","draft-followup-email","draft-checkin-email","linkedin-post-agent","propose-content-pitches","control-room-summarizer","living-room-curator","relationship-warmth-compute","review-relationship-health","market-signal-extractor","startup-opportunity-scout","identify-quick-win","delegate-to-desk","resolve-entities","save-artifact-to-drive","apply-safe-fixes","suggest-safe-fixes","audit-evidence-integrity","audit-source-integrity","batch-source-excerpt-fill","automation-health-review","agent-scorecard","finalize-source-processing"]},
+  "hall":{t:"The <em>Hall</em>",s:"Collaboration layer · Front door",d:"José's daily entry point. Combines contacts, focus of day, inbox triage, follow-up desk and candidate intake.",i:["Focus of Day","Inbox Triage","Follow-up Desk","Candidates","Contacts (warmth-ranked)","News + LinkedIn monitor","Photo enrichment","Search operators","Open Loops","Today's Briefing"]},
+  "control-room":{t:"Control <em>Room</em>",s:"Collaboration layer · OS v2 cockpit",d:"The structured layer. Every entity in OS v2 is visible and editable here.",i:["Projects [OS v2]","Opportunities","Decision Items","Evidence","Sources","Knowledge Assets","Knowledge Tree","Routines","Ops Mirror","Pipelines","Workrooms"]},
+  "garage":{t:"The <em>Garage</em>",s:"Collaboration layer · Portfolio",d:"Everything related to portfolio startups, valuations, and investor reporting.",i:["Portfolio view","Cap Table","Valuations","Data Room","Financial snapshots","Investor Updates","VC Eyes report"]},
+  "living-room":{t:"<em>Living</em> Room",s:"Collaboration layer · Community",d:"Read-only community-facing surface curated by living-room-agent every Monday.",i:["People","Projects","Insight Briefs","Content Pipeline","Knowledge Assets"]},
+  "plan":{t:"The <em>Plan</em>",s:"Collaboration layer · Strategic OS",d:"48 strategic objectives Q2 2026 → Q1 2027. Tracks revenue, milestones, assets, hires. plan-master-agent ensures every producible has an artifact.",i:["48 strategic_objectives","revenue_events","pillars / audiences / channels","content_pitches","objective_artifacts","Plan PM agent","12 metric_types","Tier model HIGH/MID/LOW"]},
+  "notion-os":{t:"Notion · <em>OS v2</em>",s:"Context layer · 14 databases",d:"Source of truth for entities. Every write goes through a skill — never freeform.",i:["CH Sources [OS v2]","CH Evidence [OS v2]","CH Projects [OS v2]","CH People [OS v2]","CH Organizations [OS v2]","CH Knowledge Assets","CH Conversations","Decision Items","Opportunities","Style Profiles","Reference Assets","Content Pipeline","Cap Table","Data Room"]},
+  "supabase":{t:"Supabase · <em>commonhouse</em>",s:"Context layer · 12 tables",d:"Project ID rjcsasbaxihaubkkkxrt. Hosts the strategic plan, opportunities pipeline, content pitches, knowledge tree.",i:["strategic_objectives","revenue_events","pillars","audiences","channels","content_pitches","objective_artifacts","opportunities","opportunity_candidates","chief_of_staff_tasks","knowledge_nodes","knowledge_node_changelog"]},
+  "library":{t:"<em>Library</em> Storage",s:"Context layer · Files",d:"Where artifacts produced by skills live. Drive for Plan deliverables, Supabase bucket for Library docs.",i:["library-docs (Supabase bucket)","CH OS/Plan/{Q}/{slug} (Drive)","Super-admin gate"]},
+  "cron":{t:"Cron",s:"vercel.json",d:"Scheduled triggers for every recurring agent — daily briefing, weekly synthesis, biweekly grant radar."},
+  "hooks":{t:"Hooks",s:"settings.json",d:"Harness-level triggers (e.g. Monday 08:45 living-room-agent)."},
+  "models":{t:"Models",s:"Anthropic",d:"Claude Opus 4.7 (1M context) for orchestration · Sonnet 4.6 for skills · Haiku 4.5 for cheap classifiers."},
+  "mcp":{t:"MCP servers",s:"External integrations",d:"Notion, Supabase, Gmail, Drive, Calendar, Fireflies, Figma, Spotify."},
+  "prep":{t:"Prep Brief",s:"3-layer disclosure model",d:"Generates intent/angle/draft layered briefs filtered by relationship type, trust tier and NDA status."},
+  "comms":{t:"Comms System",s:"Voice + Platform + Format",d:"5 channel profiles · 14 views · LinkedIn, newsletter, podcast, Twitter pipelines."},
+  "grants-surf":{t:"Grants Radar",s:"Sprint 30",d:"88 grant sources · biweekly grant-radar-agent · opt-in tracking model (deadline only after interest)."},
+  "brand":{t:"Brand Brain",s:"Sprint 16",d:"Style Profiles + Reference Assets + Content Pipeline. Wired into investor updates."},
+  "insights":{t:"Insight Engine",s:"Sprint 17",d:"Insight Briefs DB · 5 briefs · 5 pilots · feeds Comms + Living Room."},
+  "proposal":{t:"Proposal / Offer",s:"Sprint 21",d:"Proposal briefs and Offers as separate DBs. Wired to Opportunity stages."},
+  "gmail":{t:"Gmail",s:"Email rail",d:"ingest-email-thread reads threads → CH Sources. send-draft writes back drafts."},
+  "drive":{t:"Google Drive",s:"Artifacts",d:"save-artifact-to-drive uploads Plan deliverables under CH OS/Plan/{Q}/{slug}."},
+  "calendar":{t:"Google Calendar",s:"Time blocks",d:"plan-master-agent proposes calendar blocks for José to work on artifacts."},
+  "fireflies":{t:"Fireflies",s:"Meeting capture",d:"ingest-conversation pulls transcripts into CH Conversations."},
+  "linkedin":{t:"LinkedIn",s:"Activity monitor",d:"Phase B Hall contacts: biweekly news + LinkedIn activity scan."},
+  "whatsapp":{t:"WhatsApp",s:"Conversational rail",d:"Mensajes y notas de voz que entran como Sources cuando se reenvían a la inbox del OS — alimentan CH Conversations y Evidence."},
+  "contacts":{t:"Google Contacts",s:"Photos",d:"Phase A Hall: contact photos via Google Contacts + Gravatar fallback."},
+  "vercel":{t:"Vercel runtime",s:"Production",d:"portal.wearecommonhouse.com. Cron + edge functions live here."},
+  "clerk":{t:"Clerk auth",s:"User identity",d:"Session middleware. Note: /api/* is public — every route uses adminGuardApi() or CRON_SECRET."}
+};
+const mb=document.getElementById('mb'),mt=document.getElementById('mt'),ms=document.getElementById('ms'),md=document.getElementById('md'),ml=document.getElementById('ml');
+function openM(k){const x=DATA[k];if(!x)return;mt.innerHTML=x.t;ms.textContent=x.s;md.textContent=x.d||'';ml.innerHTML=(x.i||[]).map(i=>`<li>${i}</li>`).join('');mb.classList.add('open');}
+function closeM(){mb.classList.remove('open');}
+mb.addEventListener('click',e=>{if(e.target===mb)closeM();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeM();});
+document.querySelectorAll('[data-key]').forEach(el=>el.addEventListener('click',()=>openM(el.dataset.key)));
+</script>
+</body>
+</html>
