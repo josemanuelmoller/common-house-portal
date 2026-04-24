@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Sidebar } from "@/components/Sidebar";
+import { HallSection } from "@/components/HallSection";
 import { MetricCard } from "@/components/MetricCard";
 import { ProposalActions } from "@/components/ProposalActions";
 import { KnowledgeSearch } from "@/components/KnowledgeSearch";
@@ -42,13 +43,31 @@ function countBullets(body_md: string): number {
   return (body_md.match(/^[ \t]*-\s+/gm) ?? []).length;
 }
 
-function freshnessClass(dEvidence: number | null): { pill: string; label: string } {
-  if (dEvidence === null) return { pill: "bg-[#EFEFEA] text-[#131218]/25", label: "empty" };
-  if (dEvidence === 0)    return { pill: "bg-[#131218] text-[#B2FF59]",    label: "Today" };
-  if (dEvidence <= 7)     return { pill: "bg-[#B2FF59] text-[#131218]",    label: `${dEvidence}d ago` };
-  if (dEvidence <= 30)    return { pill: "bg-[#EFEFEA] text-[#131218]/70", label: `${dEvidence}d ago` };
-  if (dEvidence <= 60)    return { pill: "bg-amber-50 text-amber-700",     label: `${dEvidence}d ago` };
-  return { pill: "bg-red-50 text-red-600",                                 label: `${dEvidence}d · stale` };
+function freshnessStyle(dEvidence: number | null): { style: React.CSSProperties; label: string } {
+  if (dEvidence === null) return {
+    style: { background: "var(--hall-fill-soft)", color: "var(--hall-muted-3)" },
+    label: "empty",
+  };
+  if (dEvidence === 0) return {
+    style: { background: "var(--hall-ink-0)", color: "var(--hall-paper-0)" },
+    label: "Today",
+  };
+  if (dEvidence <= 7) return {
+    style: { background: "var(--hall-ok-soft)", color: "var(--hall-ok)" },
+    label: `${dEvidence}d ago`,
+  };
+  if (dEvidence <= 30) return {
+    style: { background: "var(--hall-fill-soft)", color: "var(--hall-ink-3)" },
+    label: `${dEvidence}d ago`,
+  };
+  if (dEvidence <= 60) return {
+    style: { background: "var(--hall-warn-paper)", color: "var(--hall-warn)" },
+    label: `${dEvidence}d ago`,
+  };
+  return {
+    style: { background: "var(--hall-danger-soft)", color: "var(--hall-danger)" },
+    label: `${dEvidence}d · stale`,
+  };
 }
 
 // Modality glyphs — Unicode icons that visually encode the node type.
@@ -81,7 +100,7 @@ function glyphForNode(path: string): string {
 /** Populated leaf — full card with preview + cases + meta. */
 function LeafCard({ leaf }: { leaf: TreeNode }) {
   const dEvidence = daysSince(leaf.last_evidence_at);
-  const freshness = freshnessClass(dEvidence);
+  const freshness = freshnessStyle(dEvidence);
   const preview = extractOverviewPreview(leaf.body_md);
   const cases = extractCaseCodes(leaf.body_md);
   const bulletCount = countBullets(leaf.body_md);
@@ -91,42 +110,59 @@ function LeafCard({ leaf }: { leaf: TreeNode }) {
 
   return (
     <div
-      className={`group relative flex flex-col bg-white rounded-[14px] border transition-all duration-150 ease-out hover:-translate-y-[2px] hover:border-[#131218]/30 ${
-        isStale ? "border-amber-200" : "border-[#E0E0D8]"
-      }`}
+      className="group relative flex flex-col transition-all duration-150 ease-out hover:-translate-y-[2px]"
+      style={{
+        border: `1px solid ${isStale ? "var(--hall-warn)" : "var(--hall-line)"}`,
+        background: "var(--hall-paper-0)",
+      }}
     >
       {/* Card-wide navigation overlay (behind interactive children) */}
       <Link
         href={`/admin/knowledge/${leaf.path}`}
         aria-label={`Open ${leaf.title}`}
-        className="absolute inset-0 rounded-[14px] z-0"
+        className="absolute inset-0 z-0"
       />
       {isHot && (
-        <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-[#B2FF59] via-[#B2FF59] to-transparent rounded-t-[14px] pointer-events-none" />
+        <div
+          className="absolute top-0 left-0 right-0 h-[2px] pointer-events-none"
+          style={{ background: "var(--hall-ok)" }}
+        />
       )}
       <div className="relative p-5 flex-1 flex flex-col min-h-0 pointer-events-none">
         {/* Path breadcrumb with modality glyph */}
         <div className="flex items-center gap-2 mb-2">
-          <span className="text-[14px] text-[#131218]/30 leading-none">{glyphForNode(leaf.path)}</span>
-          <p className="text-[9px] font-bold font-mono text-[#131218]/25 uppercase tracking-widest truncate">
+          <span className="text-[14px] leading-none" style={{ color: "var(--hall-muted-3)" }}>{glyphForNode(leaf.path)}</span>
+          <p
+            className="text-[9px] font-bold uppercase tracking-widest truncate"
+            style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-3)" }}
+          >
             {leaf.path.split("/").slice(0, -1).join(" › ") || leaf.path}
           </p>
         </div>
 
         {/* Title */}
         <div className="flex items-start justify-between gap-2 mb-3">
-          <h3 className="text-[22px] font-semibold tracking-tight text-[#131218] leading-[1.15] group-hover:text-[#131218]">
+          <h3
+            className="text-[22px] font-semibold tracking-tight leading-[1.15]"
+            style={{ color: "var(--hall-ink-0)" }}
+          >
             {leaf.title}
           </h3>
           {hasChildren && (
-            <span className="shrink-0 text-[9px] font-bold bg-[#131218] text-[#B2FF59] px-2 py-0.5 rounded-full uppercase tracking-widest">
+            <span
+              className="shrink-0 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-widest"
+              style={{ background: "var(--hall-ink-0)", color: "var(--hall-paper-0)", fontFamily: "var(--font-hall-mono)" }}
+            >
               {leaf.children.length} modes
             </span>
           )}
         </div>
 
         {/* Preview or summary */}
-        <p className="text-[12.5px] text-[#131218]/55 leading-relaxed line-clamp-3 flex-1">
+        <p
+          className="text-[12.5px] leading-relaxed line-clamp-3 flex-1"
+          style={{ color: "var(--hall-muted-2)" }}
+        >
           {preview ?? leaf.summary ?? "—"}
         </p>
 
@@ -136,9 +172,14 @@ function LeafCard({ leaf }: { leaf: TreeNode }) {
             {leaf.children.map(c => (
               <span
                 key={c.id}
-                className="inline-flex items-center gap-1.5 text-[10px] font-semibold text-[#131218] bg-[#EFEFEA] pl-2 pr-2.5 py-1 rounded-full border border-[#E0E0D8]"
+                className="inline-flex items-center gap-1.5 text-[10px] font-semibold pl-2 pr-2.5 py-1 rounded-full"
+                style={{
+                  background: "var(--hall-fill-soft)",
+                  border: "1px solid var(--hall-line)",
+                  color: "var(--hall-ink-0)",
+                }}
               >
-                <span className="text-[12px] text-[#131218]/50 leading-none">{glyphForNode(c.path)}</span>
+                <span className="text-[12px] leading-none" style={{ color: "var(--hall-muted-2)" }}>{glyphForNode(c.path)}</span>
                 {c.title}
               </span>
             ))}
@@ -152,28 +193,48 @@ function LeafCard({ leaf }: { leaf: TreeNode }) {
               <Link
                 key={c}
                 href={`/admin/knowledge/cases/${encodeURIComponent(c)}`}
-                className="text-[9.5px] font-mono font-medium text-[#131218]/60 bg-[#F7F7F2] px-2 py-0.5 rounded border border-[#EFEFEA] tracking-tight hover:bg-[#131218] hover:text-[#B2FF59] hover:border-[#131218] transition-colors"
+                className="text-[9.5px] font-medium px-2 py-0.5 tracking-tight transition-colors uppercase"
+                style={{
+                  fontFamily: "var(--font-hall-mono)",
+                  color: "var(--hall-ink-0)",
+                  background: "var(--hall-paper-0)",
+                  border: "1px solid var(--hall-ink-0)",
+                }}
               >
                 {c}
               </Link>
             ))}
             {cases.length > 3 && (
-              <span className="text-[9.5px] font-mono text-[#131218]/40">+{cases.length - 3}</span>
+              <span
+                className="text-[9.5px]"
+                style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-3)" }}
+              >
+                +{cases.length - 3}
+              </span>
             )}
           </div>
         )}
       </div>
 
       {/* Footer meta */}
-      <div className="relative px-5 py-3 border-t border-[#EFEFEA] flex items-center justify-between gap-3 pointer-events-none">
-        <div className="flex items-center gap-3 text-[10px] font-bold uppercase tracking-widest text-[#131218]/35">
+      <div
+        className="relative px-5 py-3 flex items-center justify-between gap-3 pointer-events-none"
+        style={{ borderTop: "1px solid var(--hall-line-soft)" }}
+      >
+        <div
+          className="flex items-center gap-3 text-[10px] uppercase tracking-widest"
+          style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-3)" }}
+        >
           <span>{bulletCount} bullet{bulletCount !== 1 ? "s" : ""}</span>
-          {cases.length > 0 && <span className="text-[#131218]/15">·</span>}
+          {cases.length > 0 && <span style={{ color: "var(--hall-line)" }}>·</span>}
           {cases.length > 0 && <span>{cases.length} case{cases.length !== 1 ? "s" : ""}</span>}
-          {leaf.reference_count > 0 && <span className="text-[#131218]/15">·</span>}
+          {leaf.reference_count > 0 && <span style={{ color: "var(--hall-line)" }}>·</span>}
           {leaf.reference_count > 0 && <span>{leaf.reference_count} cited</span>}
         </div>
-        <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-widest ${freshness.pill}`}>
+        <span
+          className="text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-widest"
+          style={{ ...freshness.style, fontFamily: "var(--font-hall-mono)" }}
+        >
           {freshness.label}
         </span>
       </div>
@@ -186,12 +247,22 @@ function EmptyLeafChip({ leaf }: { leaf: TreeNode }) {
   return (
     <Link
       href={`/admin/knowledge/${leaf.path}`}
-      className="inline-flex items-center gap-2 px-3 py-1.5 bg-[#EFEFEA]/60 border border-dashed border-[#E0E0D8] rounded-full hover:bg-[#EFEFEA] transition-colors"
+      className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full transition-colors"
+      style={{
+        background: "var(--hall-fill-soft)",
+        border: "1px dashed var(--hall-line-strong)",
+      }}
     >
-      <span className="text-[9px] font-bold text-[#131218]/25 uppercase tracking-widest">
+      <span
+        className="text-[9px] font-bold uppercase tracking-widest"
+        style={{ color: "var(--hall-muted-3)", fontFamily: "var(--font-hall-mono)" }}
+      >
         {leaf.title}
       </span>
-      <span className="text-[8px] font-bold text-[#131218]/20 uppercase tracking-widest">
+      <span
+        className="text-[8px] font-bold uppercase tracking-widest"
+        style={{ color: "var(--hall-muted-3)", fontFamily: "var(--font-hall-mono)" }}
+      >
         empty
       </span>
     </Link>
@@ -226,22 +297,46 @@ function ThemeSection({ theme }: { theme: TreeNode }) {
 
   return (
     <section className="space-y-5">
-      <header className="flex items-baseline justify-between gap-4 pb-2 border-b-2 border-[#131218]">
+      <header
+        className="flex items-baseline justify-between gap-4 pb-2"
+        style={{ borderBottom: "1px solid var(--hall-ink-0)" }}
+      >
         <div>
-          <h2 className="text-[28px] font-[300] tracking-tight text-[#131218] leading-none">
-            <em className="font-[900] italic text-[#131218]">{theme.title}</em>
+          <h2
+            className="text-[19px] font-bold leading-none"
+            style={{ letterSpacing: "-0.02em", color: "var(--hall-ink-0)" }}
+          >
+            <em
+              style={{
+                fontFamily: "var(--font-hall-display)",
+                fontStyle: "italic",
+                fontWeight: 400,
+                color: "var(--hall-ink-0)",
+              }}
+            >
+              {theme.title}
+            </em>
           </h2>
           {theme.summary && (
-            <p className="text-[12px] text-[#131218]/45 mt-1.5 leading-relaxed max-w-[560px]">
+            <p
+              className="text-[12px] mt-1.5 leading-relaxed max-w-[560px]"
+              style={{ color: "var(--hall-muted-2)" }}
+            >
               {theme.summary}
             </p>
           )}
         </div>
         <div className="shrink-0 text-right">
-          <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">
+          <p
+            className="text-[10px] font-bold uppercase tracking-widest"
+            style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+          >
             {populatedTotal}/{totalLeaves} populated
           </p>
-          <p className="text-[10px] text-[#131218]/25 mt-0.5 font-mono">
+          <p
+            className="text-[10px] mt-0.5"
+            style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-3)" }}
+          >
             {totalBullets} bullets · {uniqueCases.size} case{uniqueCases.size !== 1 ? "s" : ""}
           </p>
         </div>
@@ -250,10 +345,17 @@ function ThemeSection({ theme }: { theme: TreeNode }) {
       {groups.map(g => (
         <div key={g.subtheme.id} className="space-y-3">
           <div className="flex items-baseline justify-between">
-            <Link href={`/admin/knowledge/${g.subtheme.path}`} className="text-[10px] font-bold text-[#131218]/40 uppercase tracking-[2px] hover:text-[#131218] transition-colors">
+            <Link
+              href={`/admin/knowledge/${g.subtheme.path}`}
+              className="text-[10px] font-bold uppercase tracking-[2px] transition-colors"
+              style={{ color: "var(--hall-muted-2)", fontFamily: "var(--font-hall-mono)" }}
+            >
               {g.subtheme.title}
             </Link>
-            <p className="text-[9px] text-[#131218]/25 font-mono">
+            <p
+              className="text-[9px]"
+              style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-3)" }}
+            >
               {g.populatedLeaves.length}/{g.populatedLeaves.length + g.emptyLeaves.length}
             </p>
           </div>
@@ -335,22 +437,41 @@ export default async function KnowledgePage() {
     <div className="flex min-h-screen bg-[#EFEFEA]">
       <Sidebar items={NAV} isAdmin />
 
-      <main className="flex-1 ml-[228px] overflow-auto">
-        {/* Header */}
-        <div className="bg-[#131218] px-10 py-10">
-          <p className="text-[8px] font-bold uppercase tracking-[2.5px] text-white/20 mb-3">
-            CONTROL ROOM · KNOWLEDGE
-          </p>
-          <h1 className="text-[2.6rem] font-[300] text-white leading-[1] tracking-[-1.5px]">
-            Knowledge <em className="font-[900] italic text-[#c8f55a]">tree</em>
-          </h1>
-          <p className="text-[12.5px] text-white/40 mt-3 max-w-[560px] leading-[1.65]">
-            Conocimiento destilado por el OS desde reuniones, emails y whatsapp validados. Árbol: themes → subthemes → topics; cada hoja es una página consumible que crece con cada reu.
-            Para documentos externos (papers, reports, PDFs subidos), ver <a href="/library" className="underline decoration-[#c8f55a] decoration-2 underline-offset-2 text-white/70 hover:text-[#c8f55a]">Library</a>.
-          </p>
-        </div>
+      <main
+        className="flex-1 ml-[228px] overflow-auto"
+        style={{ fontFamily: "var(--font-hall-sans)", background: "var(--hall-paper-0)" }}
+      >
+        <header
+          className="flex items-center justify-between gap-6 px-9 py-3.5"
+          style={{ borderBottom: "1px solid var(--hall-ink-0)" }}
+        >
+          <div className="flex items-baseline gap-4 min-w-0">
+            <span
+              className="text-[10px] tracking-[0.08em] whitespace-nowrap uppercase"
+              style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+            >
+              KNOWLEDGE · <b style={{ color: "var(--hall-ink-0)" }}>{allFlat.length} NODES</b>
+            </span>
+            <h1
+              className="text-[16px] font-medium tracking-[-0.01em] truncate"
+              style={{ color: "var(--hall-ink-0)" }}
+            >
+              Knowledge{" "}
+              <em style={{ fontFamily: "var(--font-hall-display)", fontStyle: "italic", fontWeight: 400 }}>
+                tree
+              </em>.
+            </h1>
+          </div>
+          <Link
+            href="/admin/knowledge/add"
+            className="hall-btn-primary"
+            style={{ padding: "6px 12px", fontSize: 12 }}
+          >
+            + Add external
+          </Link>
+        </header>
 
-        <div className="px-8 py-6 space-y-6">
+        <div className="px-9 py-6 space-y-6">
 
           {/* Metrics — compact strip */}
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
@@ -364,25 +485,41 @@ export default async function KnowledgePage() {
           {/* Quick links row */}
           <div className="flex items-center gap-2 flex-wrap">
             <KnowledgeSearch items={searchItems} />
-            <Link href="/admin/knowledge/add" className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest bg-[#131218] text-[#B2FF59] hover:bg-[#131218]/85 px-3 py-1.5 rounded-full transition-colors">
-              <span className="text-[13px]">+</span>
-              Add external
-            </Link>
-            <Link href="/admin/knowledge/cases" className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest bg-white border border-[#E0E0D8] hover:border-[#131218]/30 text-[#131218]/70 hover:text-[#131218] px-3 py-1.5 rounded-full transition-colors">
-              <span className="text-[13px] text-[#131218]/40">◆</span>
+            <Link
+              href="/admin/knowledge/cases"
+              className="hall-btn-outline"
+              style={{ padding: "6px 12px", fontSize: 12 }}
+            >
+              <span className="mr-1" style={{ color: "var(--hall-muted-3)" }}>◆</span>
               Cases
             </Link>
-            <Link href="/admin/knowledge/reading-room" className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest bg-white border border-[#E0E0D8] hover:border-[#131218]/30 text-[#131218]/70 hover:text-[#131218] px-3 py-1.5 rounded-full transition-colors">
-              <span className="text-[13px] text-[#131218]/40">◫</span>
+            <Link
+              href="/admin/knowledge/reading-room"
+              className="hall-btn-outline"
+              style={{ padding: "6px 12px", fontSize: 12 }}
+            >
+              <span className="mr-1" style={{ color: "var(--hall-muted-3)" }}>◫</span>
               Reading room
             </Link>
           </div>
 
+          <p
+            className="text-[12px] leading-relaxed max-w-[720px]"
+            style={{ color: "var(--hall-muted-2)" }}
+          >
+            Conocimiento destilado por el OS desde reuniones, emails y whatsapp validados. Árbol: themes → subthemes → topics; cada hoja es una página consumible que crece con cada reu.
+            Para documentos externos (papers, reports, PDFs subidos), ver{" "}
+            <a href="/library" className="underline underline-offset-2" style={{ color: "var(--hall-ink-0)" }}>Library</a>.
+          </p>
+
           {/* Themes — primary surface. Theme sections with leaf cards. */}
           {tree.length === 0 ? (
-            <div className="bg-white rounded-[14px] border border-[#E0E0D8] px-6 py-10 text-center">
-              <p className="text-sm font-medium text-[#131218]/30">El árbol está vacío.</p>
-              <p className="text-xs text-[#131218]/20 mt-1">Seed el schema con nodos iniciales para empezar.</p>
+            <div
+              className="px-6 py-10 text-center"
+              style={{ border: "1px solid var(--hall-line)", background: "var(--hall-paper-1)" }}
+            >
+              <p className="text-sm font-medium" style={{ color: "var(--hall-muted-3)" }}>El árbol está vacío.</p>
+              <p className="text-xs mt-1" style={{ color: "var(--hall-muted-3)" }}>Seed el schema con nodos iniciales para empezar.</p>
             </div>
           ) : (
             <div className="space-y-10">
@@ -392,59 +529,80 @@ export default async function KnowledgePage() {
 
           {/* Activity — everything operational lives here, collapsed by default */}
           {(proposals.length > 0 || recentLog.length > 0) && (
-            <div className="space-y-3">
-              <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest px-1">
-                Activity
-              </p>
+            <HallSection title="Activity">
+              <div className="space-y-3">
 
               {/* Pending proposals — open by default if there are any */}
               {proposals.length > 0 && (
-                <details open className="bg-white rounded-2xl border border-amber-200 overflow-hidden group">
-                  <summary className="px-6 py-3 cursor-pointer list-none flex items-center justify-between hover:bg-amber-50/30 transition-colors">
+                <details open className="overflow-hidden group" style={{ border: "1px solid var(--hall-warn)", background: "var(--hall-warn-paper)" }}>
+                  <summary className="px-6 py-3 cursor-pointer list-none flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span className="text-[10px] opacity-40 group-open:rotate-90 transition-transform">▶</span>
-                      <span className="text-sm font-bold text-[#131218] tracking-tight">Pending proposals</span>
-                      <span className="text-xs text-[#131218]/40">— SPLIT / AMEND del curator</span>
+                      <span className="text-[10px] group-open:rotate-90 transition-transform" style={{ color: "var(--hall-muted-3)" }}>▶</span>
+                      <span className="text-sm font-bold tracking-tight" style={{ color: "var(--hall-ink-0)" }}>Pending proposals</span>
+                      <span className="text-xs" style={{ color: "var(--hall-muted-2)" }}>— SPLIT / AMEND del curator</span>
                     </div>
-                    <span className="text-[10px] font-bold bg-amber-100 text-amber-700 px-2.5 py-1 rounded-full uppercase tracking-widest">
+                    <span
+                      className="text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-widest"
+                      style={{ background: "var(--hall-warn-soft)", color: "var(--hall-warn)", fontFamily: "var(--font-hall-mono)" }}
+                    >
                       {proposals.length} pending
                     </span>
                   </summary>
-                  <div className="divide-y divide-[#EFEFEA] border-t border-[#EFEFEA]">
+                  <div style={{ borderTop: "1px solid var(--hall-line-soft)", background: "var(--hall-paper-0)" }}>
                     {proposals.map(p => {
                       const split = p.action === "SPLIT" ? parseSplitSuggestion(p.reasoning) : null;
                       return (
-                        <div key={p.id} className="px-6 py-4">
+                        <div
+                          key={p.id}
+                          className="px-6 py-4"
+                          style={{ borderBottom: "1px solid var(--hall-line-soft)" }}
+                        >
                           <div className="flex items-start gap-3">
-                            <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-widest shrink-0 ${
-                              p.action === "SPLIT" ? "bg-purple-50 text-purple-700 border-purple-200"
-                              : "bg-orange-50 text-orange-700 border-orange-200"
-                            }`}>
+                            <span
+                              className="text-[9px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-widest shrink-0"
+                              style={{
+                                fontFamily: "var(--font-hall-mono)",
+                                background: "var(--hall-fill-soft)",
+                                color: "var(--hall-muted-2)",
+                                borderColor: "var(--hall-line)",
+                              }}
+                            >
                               {p.action}
                             </span>
                             <div className="flex-1 min-w-0">
                               {p.action === "SPLIT" && split ? (
-                                <p className="text-sm font-semibold text-[#131218]">
-                                  <span className="text-[#131218]/40 font-mono text-xs">{split.path}</span>
+                                <p className="text-sm font-semibold" style={{ color: "var(--hall-ink-0)" }}>
+                                  <span className="text-xs" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-3)" }}>{split.path}</span>
                                   {" — "}
                                   {split.title}
                                 </p>
                               ) : (
-                                <p className="text-sm font-semibold text-[#131218]">
+                                <p className="text-sm font-semibold" style={{ color: "var(--hall-ink-0)" }}>
                                   <Link href={`/admin/knowledge/${p.node_path}`} className="hover:underline">
                                     {p.node_title}
                                   </Link>
-                                  {p.section && <span className="text-[#131218]/40 ml-2">→ {p.section}</span>}
+                                  {p.section && <span className="ml-2" style={{ color: "var(--hall-muted-3)" }}>→ {p.section}</span>}
                                 </p>
                               )}
-                              <p className="text-[12px] text-[#131218]/60 mt-1 leading-relaxed line-clamp-2">{p.reasoning}</p>
+                              <p
+                                className="text-[12px] mt-1 leading-relaxed line-clamp-2"
+                                style={{ color: "var(--hall-muted-2)" }}
+                              >
+                                {p.reasoning}
+                              </p>
                               {p.action === "AMEND" && p.diff_before && (
-                                <p className="text-[11px] text-red-600/70 bg-red-50/50 px-3 py-2 rounded-lg border border-red-100 mt-2 line-through">
+                                <p
+                                  className="text-[11px] px-3 py-2 mt-2 line-through"
+                                  style={{ color: "var(--hall-danger)", background: "var(--hall-danger-soft)", border: "1px solid var(--hall-danger-soft)" }}
+                                >
                                   {p.diff_before}
                                 </p>
                               )}
                               {p.action === "AMEND" && p.diff_after && (
-                                <p className="text-[11px] text-green-700 bg-green-50/50 px-3 py-2 rounded-lg border border-green-100 mt-1">
+                                <p
+                                  className="text-[11px] px-3 py-2 mt-1"
+                                  style={{ color: "var(--hall-ok)", background: "var(--hall-ok-soft)", border: "1px solid var(--hall-ok-soft)" }}
+                                >
                                   {p.diff_after}
                                 </p>
                               )}
@@ -467,47 +625,63 @@ export default async function KnowledgePage() {
                 const preview = items.slice(0, 5);
                 const rest    = items.slice(5);
                 return (
-                  <details className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden group">
-                    <summary className="px-6 py-3 cursor-pointer list-none flex items-center justify-between hover:bg-[#EFEFEA]/40 transition-colors">
+                  <details className="overflow-hidden group" style={{ border: "1px solid var(--hall-line)" }}>
+                    <summary className="px-6 py-3 cursor-pointer list-none flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <span className="text-[10px] opacity-40 group-open:rotate-90 transition-transform">▶</span>
-                        <span className="text-sm font-bold text-[#131218] tracking-tight">What&apos;s new this week</span>
-                        <span className="text-xs text-[#131218]/40">— últimos cambios del curator</span>
+                        <span className="text-[10px] group-open:rotate-90 transition-transform" style={{ color: "var(--hall-muted-3)" }}>▶</span>
+                        <span className="text-sm font-bold tracking-tight" style={{ color: "var(--hall-ink-0)" }}>What&apos;s new this week</span>
+                        <span className="text-xs" style={{ color: "var(--hall-muted-2)" }}>— últimos cambios del curator</span>
                       </div>
-                      <span className="text-[10px] font-bold text-[#131218]/40 uppercase tracking-widest">
+                      <span
+                        className="text-[10px] uppercase tracking-widest"
+                        style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+                      >
                         {appendsThisWeek} appended · {ignoresThisWeek} ignored · {proposalsThisWeek} proposed
                       </span>
                     </summary>
 
                     {/* Preview strip — first 5 always visible when the details is open */}
-                    <div className="divide-y divide-[#EFEFEA] border-t border-[#EFEFEA]">
+                    <div style={{ borderTop: "1px solid var(--hall-line-soft)" }}>
                       {preview.map(e => {
                         const d = new Date(e.created_at);
                         return (
                           <Link
                             key={e.id}
                             href={`/admin/knowledge/${e.node_path}`}
-                            className="block px-6 py-3 hover:bg-[#EFEFEA]/40 transition-colors"
+                            className="block px-6 py-3 transition-colors"
+                            style={{ borderBottom: "1px solid var(--hall-line-soft)" }}
                           >
                             <div className="flex items-start gap-3">
-                              <div className="shrink-0 w-14 text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest pt-0.5">
+                              <div
+                                className="shrink-0 w-14 text-[10px] font-bold uppercase tracking-widest pt-0.5"
+                                style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-3)" }}
+                              >
                                 {d.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
                               </div>
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2 flex-wrap">
-                                  <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-widest ${
-                                    e.action === "APPEND" ? "bg-green-50 text-green-700 border border-green-200"
-                                    : e.action === "AMEND" ? "bg-orange-50 text-orange-700 border border-orange-200"
-                                    : e.action === "SPLIT" ? "bg-purple-50 text-purple-700 border border-purple-200"
-                                    : e.action === "CREATED" ? "bg-blue-50 text-blue-700 border border-blue-200"
-                                    : "bg-[#EFEFEA] text-[#131218]/40"
-                                  }`}>
+                                  <span
+                                    className="text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-widest"
+                                    style={{
+                                      fontFamily: "var(--font-hall-mono)",
+                                      ...(e.action === "APPEND" ? { background: "var(--hall-ok-soft)", color: "var(--hall-ok)", border: "1px solid var(--hall-ok-soft)" }
+                                      : e.action === "AMEND" ? { background: "var(--hall-warn-soft)", color: "var(--hall-warn)", border: "1px solid var(--hall-warn-soft)" }
+                                      : e.action === "SPLIT" ? { background: "var(--hall-fill-soft)", color: "var(--hall-muted-2)", border: "1px solid var(--hall-line)" }
+                                      : e.action === "CREATED" ? { background: "var(--hall-info-soft)", color: "var(--hall-info)", border: "1px solid var(--hall-info-soft)" }
+                                      : { background: "var(--hall-fill-soft)", color: "var(--hall-muted-3)" }),
+                                    }}
+                                  >
                                     {e.action}
                                   </span>
-                                  <span className="text-xs font-semibold text-[#131218]">{e.node_title}</span>
-                                  {e.section && <span className="text-[10px] text-[#131218]/40">→ {e.section}</span>}
+                                  <span className="text-xs font-semibold" style={{ color: "var(--hall-ink-0)" }}>{e.node_title}</span>
+                                  {e.section && <span className="text-[10px]" style={{ color: "var(--hall-muted-3)" }}>→ {e.section}</span>}
                                 </div>
-                                <p className="text-[12px] text-[#131218]/55 mt-1 line-clamp-1 leading-relaxed">{e.reasoning}</p>
+                                <p
+                                  className="text-[12px] mt-1 line-clamp-1 leading-relaxed"
+                                  style={{ color: "var(--hall-muted-2)" }}
+                                >
+                                  {e.reasoning}
+                                </p>
                               </div>
                             </div>
                           </Link>
@@ -517,37 +691,53 @@ export default async function KnowledgePage() {
                       {/* Remaining entries inside a nested details */}
                       {rest.length > 0 && (
                         <details className="group/more">
-                          <summary className="px-6 py-2 cursor-pointer list-none text-[10px] font-bold text-[#131218]/40 uppercase tracking-widest hover:bg-[#EFEFEA]/40 transition-colors">
+                          <summary
+                            className="px-6 py-2 cursor-pointer list-none text-[10px] font-bold uppercase tracking-widest"
+                            style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+                          >
                             + {rest.length} more
                           </summary>
-                          <div className="divide-y divide-[#EFEFEA]">
+                          <div>
                             {rest.map(e => {
                               const d = new Date(e.created_at);
                               return (
                                 <Link
                                   key={e.id}
                                   href={`/admin/knowledge/${e.node_path}`}
-                                  className="block px-6 py-3 hover:bg-[#EFEFEA]/40 transition-colors"
+                                  className="block px-6 py-3 transition-colors"
+                                  style={{ borderBottom: "1px solid var(--hall-line-soft)" }}
                                 >
                                   <div className="flex items-start gap-3">
-                                    <div className="shrink-0 w-14 text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest pt-0.5">
+                                    <div
+                                      className="shrink-0 w-14 text-[10px] font-bold uppercase tracking-widest pt-0.5"
+                                      style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-3)" }}
+                                    >
                                       {d.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
                                     </div>
                                     <div className="flex-1 min-w-0">
                                       <div className="flex items-center gap-2 flex-wrap">
-                                        <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-widest ${
-                                          e.action === "APPEND" ? "bg-green-50 text-green-700 border border-green-200"
-                                          : e.action === "AMEND" ? "bg-orange-50 text-orange-700 border border-orange-200"
-                                          : e.action === "SPLIT" ? "bg-purple-50 text-purple-700 border border-purple-200"
-                                          : e.action === "CREATED" ? "bg-blue-50 text-blue-700 border border-blue-200"
-                                          : "bg-[#EFEFEA] text-[#131218]/40"
-                                        }`}>
+                                        <span
+                                          className="text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-widest"
+                                          style={{
+                                            fontFamily: "var(--font-hall-mono)",
+                                            ...(e.action === "APPEND" ? { background: "var(--hall-ok-soft)", color: "var(--hall-ok)", border: "1px solid var(--hall-ok-soft)" }
+                                            : e.action === "AMEND" ? { background: "var(--hall-warn-soft)", color: "var(--hall-warn)", border: "1px solid var(--hall-warn-soft)" }
+                                            : e.action === "SPLIT" ? { background: "var(--hall-fill-soft)", color: "var(--hall-muted-2)", border: "1px solid var(--hall-line)" }
+                                            : e.action === "CREATED" ? { background: "var(--hall-info-soft)", color: "var(--hall-info)", border: "1px solid var(--hall-info-soft)" }
+                                            : { background: "var(--hall-fill-soft)", color: "var(--hall-muted-3)" }),
+                                          }}
+                                        >
                                           {e.action}
                                         </span>
-                                        <span className="text-xs font-semibold text-[#131218]">{e.node_title}</span>
-                                        {e.section && <span className="text-[10px] text-[#131218]/40">→ {e.section}</span>}
+                                        <span className="text-xs font-semibold" style={{ color: "var(--hall-ink-0)" }}>{e.node_title}</span>
+                                        {e.section && <span className="text-[10px]" style={{ color: "var(--hall-muted-3)" }}>→ {e.section}</span>}
                                       </div>
-                                      <p className="text-[12px] text-[#131218]/55 mt-1 line-clamp-1 leading-relaxed">{e.reasoning}</p>
+                                      <p
+                                        className="text-[12px] mt-1 line-clamp-1 leading-relaxed"
+                                        style={{ color: "var(--hall-muted-2)" }}
+                                      >
+                                        {e.reasoning}
+                                      </p>
                                     </div>
                                   </div>
                                 </Link>
@@ -560,21 +750,30 @@ export default async function KnowledgePage() {
                   </details>
                 );
               })()}
-            </div>
+              </div>
+            </HallSection>
           )}
 
           {/* How it works — collapsed, foot-of-page reference */}
-          <details className="bg-white rounded-[14px] border border-[#E0E0D8] group">
-            <summary className="px-6 py-3 cursor-pointer list-none flex items-center gap-2 hover:bg-[#EFEFEA]/40 transition-colors">
-              <span className="text-[10px] opacity-40 group-open:rotate-90 transition-transform">▶</span>
-              <span className="text-[10px] font-bold text-[#131218]/40 uppercase tracking-widest">How it works</span>
+          <details style={{ border: "1px solid var(--hall-line)" }} className="group">
+            <summary className="px-6 py-3 cursor-pointer list-none flex items-center gap-2">
+              <span className="text-[10px] group-open:rotate-90 transition-transform" style={{ color: "var(--hall-muted-3)" }}>▶</span>
+              <span
+                className="text-[10px] font-bold uppercase tracking-widest"
+                style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+              >
+                How it works
+              </span>
             </summary>
-            <ul className="px-6 pb-5 pt-1 text-[12px] text-[#131218]/60 space-y-1.5 leading-relaxed border-t border-[#EFEFEA]">
-              <li>• <strong>Cada reu validada</strong> pasa por el <code className="text-[11px] bg-[#EFEFEA] px-1 py-0.5 rounded">knowledge-curator</code> agent.</li>
+            <ul
+              className="px-6 pb-5 pt-1 text-[12px] space-y-1.5 leading-relaxed"
+              style={{ borderTop: "1px solid var(--hall-line-soft)", color: "var(--hall-muted-2)" }}
+            >
+              <li>• <strong style={{ color: "var(--hall-ink-0)" }}>Cada reu validada</strong> pasa por el <code className="text-[11px] px-1 py-0.5" style={{ fontFamily: "var(--font-hall-mono)", background: "var(--hall-fill-soft)" }}>knowledge-curator</code> agent.</li>
               <li>• El agent decide si la evidencia contiene un <em>insight de dominio</em> (generaliza) o solo un <em>project fact</em> (se ignora).</li>
-              <li>• Cada bullet lleva un código de case (ej. <code className="text-[11px] bg-[#EFEFEA] px-1 py-0.5 rounded">[AUTOMERCADO-CR-2026]</code>) para identificar la instancia concreta.</li>
+              <li>• Cada bullet lleva un código de case (ej. <code className="text-[11px] px-1 py-0.5" style={{ fontFamily: "var(--font-hall-mono)", background: "var(--hall-fill-soft)" }}>[AUTOMERCADO-CR-2026]</code>) para identificar la instancia concreta.</li>
               <li>• El synthesizer genera playbooks prosa agrupando por modalidad y case. El árbol acumula bullets; el playbook narra.</li>
-              <li>• Cuando otros agents (prep-brief, proposal-brief) citan una hoja, incrementa <code className="text-[11px] bg-[#EFEFEA] px-1 py-0.5 rounded">reference_count</code> — señal de valor real.</li>
+              <li>• Cuando otros agents (prep-brief, proposal-brief) citan una hoja, incrementa <code className="text-[11px] px-1 py-0.5" style={{ fontFamily: "var(--font-hall-mono)", background: "var(--hall-fill-soft)" }}>reference_count</code> — señal de valor real.</li>
             </ul>
           </details>
 

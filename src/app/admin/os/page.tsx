@@ -1,4 +1,6 @@
+import type { CSSProperties } from "react";
 import { Sidebar } from "@/components/Sidebar";
+import { HallSection } from "@/components/HallSection";
 import { StatusBadge } from "@/components/StatusBadge";
 import { MetricCard } from "@/components/MetricCard";
 import { EvidenceQueueTable, EvidenceQueueReadOnlyTable } from "@/components/EvidenceQueueTable";
@@ -14,19 +16,19 @@ const PRIORITY_RANK: Record<string, number> = {
   "Low": 3,
 };
 
-const PRIORITY_DOT: Record<string, string> = {
-  "P1 Critical": "bg-red-500",
-  "High":        "bg-amber-400",
-  "Medium":      "bg-blue-400",
-  "Low":         "bg-[#131218]/15",
+const PRIORITY_DOT_STYLE: Record<string, CSSProperties> = {
+  "P1 Critical": { background: "var(--hall-danger)" },
+  "High":        { background: "var(--hall-warn)" },
+  "Medium":      { background: "var(--hall-info)" },
+  "Low":         { background: "var(--hall-muted-3)" },
 };
 
-const TYPE_ICON: Record<string, { icon: string; color: string }> = {
-  "Approval":                   { icon: "✓", color: "text-green-600 bg-green-50" },
-  "Missing Input":              { icon: "?", color: "text-amber-600 bg-amber-50" },
-  "Ambiguity Resolution":       { icon: "⊡", color: "text-blue-600 bg-blue-50" },
-  "Policy/Automation Decision": { icon: "◎", color: "text-purple-600 bg-purple-50" },
-  "Draft Review":               { icon: "▤", color: "text-[#131218] bg-[#EFEFEA]" },
+const TYPE_ICON: Record<string, { icon: string; style: CSSProperties }> = {
+  "Approval":                   { icon: "✓", style: { color: "var(--hall-ok)",       background: "var(--hall-ok-soft)" } },
+  "Missing Input":              { icon: "?", style: { color: "var(--hall-warn)",     background: "var(--hall-warn-soft)" } },
+  "Ambiguity Resolution":       { icon: "⊡", style: { color: "var(--hall-info)",     background: "var(--hall-info-soft)" } },
+  "Policy/Automation Decision": { icon: "◎", style: { color: "var(--hall-muted-2)",  background: "var(--hall-fill-soft)" } },
+  "Draft Review":               { icon: "▤", style: { color: "var(--hall-ink-0)",    background: "var(--hall-fill-soft)" } },
 };
 
 function daysSince(iso: string | null): number {
@@ -36,38 +38,70 @@ function daysSince(iso: string | null): number {
 
 function DecisionCard({ d }: { d: DecisionItem }) {
   const needsExecute = d.requiresExecute && !d.executeApproved;
-  const tCfg = TYPE_ICON[d.decisionType] ?? { icon: "·", color: "text-[#131218]/40 bg-[#EFEFEA]" };
+  const tCfg = TYPE_ICON[d.decisionType] ?? { icon: "·", style: { color: "var(--hall-muted-3)", background: "var(--hall-fill-soft)" } };
   const overdue = d.dueDate && daysSince(d.dueDate) > 0;
   return (
-    <div className={`px-6 py-4 flex items-start gap-4 ${needsExecute ? "bg-red-50/30" : ""}`}>
+    <div
+      className="px-6 py-4 flex items-start gap-4"
+      style={needsExecute ? { background: "var(--hall-danger-soft)" } : undefined}
+    >
       <div className="mt-1 shrink-0">
-        <span className={`w-2 h-2 rounded-full inline-block ${PRIORITY_DOT[d.priority] ?? PRIORITY_DOT["Low"]}`} />
+        <span
+          className="w-2 h-2 rounded-full inline-block"
+          style={PRIORITY_DOT_STYLE[d.priority] ?? PRIORITY_DOT_STYLE["Low"]}
+        />
       </div>
-      <div className={`w-6 h-6 rounded-lg flex items-center justify-center text-[11px] font-bold shrink-0 ${tCfg.color}`}>
+      <div
+        className="w-6 h-6 rounded-lg flex items-center justify-center text-[11px] font-bold shrink-0"
+        style={tCfg.style}
+      >
         {tCfg.icon}
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-start gap-2 flex-wrap">
-          <p className="text-sm font-semibold text-[#131218] leading-snug">{d.title}</p>
+          <p className="text-sm font-semibold leading-snug" style={{ color: "var(--hall-ink-0)" }}>{d.title}</p>
           {needsExecute && (
-            <span className="text-[9px] font-bold bg-red-100 text-red-700 border border-red-200 px-2 py-0.5 rounded-full uppercase tracking-widest">
+            <span
+              className="text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-widest"
+              style={{
+                fontFamily: "var(--font-hall-mono)",
+                background: "var(--hall-danger-soft)",
+                color: "var(--hall-danger)",
+                border: "1px solid var(--hall-danger)",
+              }}
+            >
               × Execute blocked
             </span>
           )}
         </div>
         <div className="flex items-center gap-3 mt-1.5 flex-wrap">
-          <span className="text-[10px] text-[#131218]/30 font-medium">{d.decisionType}</span>
-          {d.sourceAgent && <span className="text-[10px] text-[#131218]/25 font-medium">via {d.sourceAgent}</span>}
+          <span
+            className="text-[10px] font-medium"
+            style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+          >
+            {d.decisionType}
+          </span>
+          {d.sourceAgent && (
+            <span
+              className="text-[10px] font-medium"
+              style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-3)" }}
+            >
+              via {d.sourceAgent}
+            </span>
+          )}
           {d.dueDate && (
-            <span className={`text-[10px] font-bold ${overdue ? "text-red-500" : "text-[#131218]/25"}`}>
+            <span
+              className="text-[10px] font-bold"
+              style={{ fontFamily: "var(--font-hall-mono)", color: overdue ? "var(--hall-danger)" : "var(--hall-muted-3)" }}
+            >
               {overdue ? "! Overdue" : "Due"} {new Date(d.dueDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
             </span>
           )}
         </div>
         {d.notes ? (
-          <p className="text-[12px] text-[#131218]/65 mt-2 leading-relaxed">{d.notes}</p>
+          <p className="text-[12px] mt-2 leading-relaxed" style={{ color: "var(--hall-ink-3)" }}>{d.notes}</p>
         ) : (
-          <p className="text-[11px] text-[#131218]/25 italic mt-1.5">No context provided.</p>
+          <p className="text-[11px] italic mt-1.5" style={{ color: "var(--hall-muted-3)" }}>No context provided.</p>
         )}
         <DecisionActions
           id={d.id}
@@ -166,21 +200,40 @@ export default async function OSPage() {
     <div className="flex min-h-screen bg-[#EFEFEA]">
       <Sidebar items={NAV} isAdmin />
 
-      <main className="flex-1 ml-[228px] overflow-auto">
-        {/* Header */}
-        <div className="bg-[#131218] px-10 py-10">
-          <p className="text-[8px] font-bold uppercase tracking-[2.5px] text-white/20 mb-3">
-            CONTROL ROOM · INTAKE
-          </p>
-          <h1 className="text-[2.6rem] font-[300] text-white leading-[1] tracking-[-1.5px]">
-            Intake &amp; <em className="font-[900] italic text-[#c8f55a]">Exceptions</em>
-          </h1>
-          <p className="text-[12.5px] text-white/40 mt-3 max-w-[520px] leading-[1.65]">
-            Decisions · Evidence · Sources. Todo lo que el engine no pudo resolver solo.
-          </p>
-        </div>
+      <main
+        className="flex-1 ml-[228px] overflow-auto"
+        style={{ fontFamily: "var(--font-hall-sans)", background: "var(--hall-paper-0)" }}
+      >
+        <header
+          className="flex items-center justify-between gap-6 px-9 py-3.5"
+          style={{ borderBottom: "1px solid var(--hall-ink-0)" }}
+        >
+          <div className="flex items-baseline gap-4 min-w-0">
+            <span
+              className="text-[10px] tracking-[0.08em] whitespace-nowrap uppercase"
+              style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+            >
+              OS · <b style={{ color: "var(--hall-ink-0)" }}>INTAKE</b>
+            </span>
+            <h1
+              className="text-[16px] font-medium tracking-[-0.01em] truncate"
+              style={{ color: "var(--hall-ink-0)" }}
+            >
+              Needs your{" "}
+              <em style={{ fontFamily: "var(--font-hall-display)", fontStyle: "italic", fontWeight: 400 }}>
+                call
+              </em>.
+            </h1>
+          </div>
+          <span
+            className="text-[10px] uppercase tracking-widest"
+            style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+          >
+            {totalPending > 0 ? `${totalPending} PENDING` : "ALL CLEAR"}
+          </span>
+        </header>
 
-        <div className="px-8 py-6 space-y-6">
+        <div className="px-9 py-6 space-y-6">
 
           {/* Pipeline metrics */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
@@ -194,38 +247,41 @@ export default async function OSPage() {
 
           {/* Active blockers — shown prominently if any */}
           {blockers.length > 0 && (
-            <div className="bg-white rounded-2xl border border-red-200 overflow-hidden">
-              <div className="h-1 bg-red-400" />
-              <div className="px-6 py-4 border-b border-[#EFEFEA] flex items-center justify-between">
-                <div>
-                  <h2 className="text-sm font-bold text-[#131218] tracking-tight">Active Blockers</h2>
-                  <p className="text-xs text-[#131218]/40 mt-0.5">Validated blockers requiring immediate attention</p>
-                </div>
-                <span className="text-[10px] font-bold bg-red-100 text-red-600 px-2.5 py-1 rounded-full uppercase tracking-widest">
-                  {blockers.length} blocker{blockers.length !== 1 ? "s" : ""}
-                </span>
-              </div>
+            <HallSection
+              title="Active " flourish="blockers"
+              meta={`${blockers.length} BLOCKER${blockers.length !== 1 ? "S" : ""}`}
+            >
+              <p className="text-xs mb-2" style={{ color: "var(--hall-muted-2)" }}>
+                Validated blockers requiring immediate attention
+              </p>
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-[#EFEFEA]">
-                    <th className="text-left px-6 py-3 text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Blocker</th>
-                    <th className="text-left px-4 py-3 text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Project</th>
-                    <th className="text-left px-4 py-3 text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Confidence</th>
-                    <th className="text-left px-4 py-3 text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Captured</th>
+                  <tr style={{ background: "var(--hall-paper-1)", borderBottom: "1px solid var(--hall-line-soft)" }}>
+                    <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}>Blocker</th>
+                    <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}>Project</th>
+                    <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}>Confidence</th>
+                    <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}>Captured</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#EFEFEA]">
+                <tbody>
                   {blockers.map(e => (
-                    <tr key={e.id} className="hover:bg-[#EFEFEA]/60 transition-colors">
-                      <td className="px-6 py-3">
-                        <p className="font-semibold text-[#131218] text-sm">{e.title}</p>
-                        {e.excerpt && <p className="text-xs text-[#131218]/35 mt-0.5 line-clamp-1 max-w-sm">{e.excerpt}</p>}
+                    <tr key={e.id} style={{ borderBottom: "1px solid var(--hall-line-soft)" }}>
+                      <td className="px-4 py-3">
+                        <p className="font-semibold text-sm" style={{ color: "var(--hall-ink-0)" }}>{e.title}</p>
+                        {e.excerpt && (
+                          <p className="text-xs mt-0.5 line-clamp-1 max-w-sm" style={{ color: "var(--hall-muted-2)" }}>
+                            {e.excerpt}
+                          </p>
+                        )}
                       </td>
-                      <td className="px-4 py-3 text-xs font-medium text-[#131218]/50">
+                      <td className="px-4 py-3 text-xs font-medium" style={{ color: "var(--hall-muted-2)" }}>
                         {e.projectId ? (projectNames[e.projectId] ?? "—") : "—"}
                       </td>
                       <td className="px-4 py-3"><StatusBadge value={e.confidence} /></td>
-                      <td className="px-4 py-3 text-xs text-[#131218]/35 font-medium">
+                      <td
+                        className="px-4 py-3 text-xs font-medium"
+                        style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-3)" }}
+                      >
                         {e.dateCaptured
                           ? new Date(e.dateCaptured).toLocaleDateString("en-GB", { day: "numeric", month: "short" })
                           : "—"}
@@ -234,205 +290,285 @@ export default async function OSPage() {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </HallSection>
           )}
 
           {/* Needs Your Call — unified: decisions + flagged evidence + passing through */}
-          <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-            <div className="h-1 bg-amber-400" />
-            <div className="px-6 py-4 border-b border-[#EFEFEA] flex items-center justify-between">
-              <div>
-                <h2 className="text-sm font-bold text-[#131218] tracking-tight">Needs Your Call</h2>
-                <p className="text-xs text-[#131218]/40 mt-0.5">Decisions + exceptions que el engine no pudo resolver solo</p>
-              </div>
-              {totalPending > 0 ? (
-                <span className="text-[10px] font-bold bg-amber-100 text-amber-700 px-2.5 py-1 rounded-full uppercase tracking-widest">
-                  {totalPending} pending
-                </span>
-              ) : (
-                <span className="text-[10px] font-bold bg-[#EFEFEA] text-[#131218]/30 px-2.5 py-1 rounded-full uppercase tracking-widest">
-                  All clear
-                </span>
+          <HallSection
+            title="Needs your " flourish="call"
+            meta={totalPending > 0 ? `${totalPending} PENDING` : "ALL CLEAR"}
+          >
+            <p className="text-xs mb-3" style={{ color: "var(--hall-muted-2)" }}>
+              Decisions + exceptions que el engine no pudo resolver solo
+            </p>
+
+            <div style={{ border: "1px solid var(--hall-line)" }}>
+
+              {/* Decisions — top priority */}
+              {openDecisions.length > 0 && (
+                <div style={{ borderBottom: "1px solid var(--hall-line-soft)" }}>
+                  <div
+                    className="px-6 py-2 flex items-center justify-between"
+                    style={{ background: "var(--hall-danger-soft)", borderBottom: "1px solid var(--hall-line-soft)" }}
+                  >
+                    <p
+                      className="text-[9px] font-bold uppercase tracking-widest"
+                      style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-danger)" }}
+                    >
+                      Decisions · {openDecisions.length} item{openDecisions.length !== 1 ? "s" : ""}
+                    </p>
+                    {(executeGateCount > 0 || p1DecisionCount > 0) && (
+                      <p
+                        className="text-[9px] font-bold uppercase tracking-widest"
+                        style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-danger)" }}
+                      >
+                        {executeGateCount > 0 && `${executeGateCount} × execute blocked`}
+                        {executeGateCount > 0 && p1DecisionCount > 0 && " · "}
+                        {p1DecisionCount > 0 && `${p1DecisionCount} P1`}
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    {openDecisions.map(d => (
+                      <div key={d.id} style={{ borderBottom: "1px solid var(--hall-line-soft)" }}>
+                        <DecisionCard d={d} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Flagged evidence — action required */}
+              {newEvidence.length > 0 && (
+                <div style={{ borderBottom: "1px solid var(--hall-line-soft)" }}>
+                  <div
+                    className="px-6 py-2"
+                    style={{ background: "var(--hall-warn-paper)", borderBottom: "1px solid var(--hall-line-soft)" }}
+                  >
+                    <p
+                      className="text-[9px] font-bold uppercase tracking-widest"
+                      style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-warn)" }}
+                    >
+                      Flagged evidence · {newEvidence.length} item{newEvidence.length !== 1 ? "s" : ""}
+                    </p>
+                  </div>
+                  <EvidenceQueueTable
+                    items={newEvidence.slice(0, 30)}
+                    projectNames={projectNames}
+                  />
+                </div>
+              )}
+
+              {/* In Review — recent (<=14d), engine will validate */}
+              {reviewEvidence.length > 0 && (
+                <>
+                  <div
+                    className="px-6 py-2 flex items-center justify-between"
+                    style={{ background: "var(--hall-fill-soft)", borderBottom: "1px solid var(--hall-line-soft)" }}
+                  >
+                    <p
+                      className="text-[9px] font-bold uppercase tracking-widest"
+                      style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+                    >
+                      Passing through · {reviewEvidence.length} item{reviewEvidence.length !== 1 ? "s" : ""}
+                    </p>
+                    <p
+                      className="text-[9px] italic"
+                      style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-3)" }}
+                    >
+                      Engine validará automáticamente
+                    </p>
+                  </div>
+                  <EvidenceQueueReadOnlyTable items={reviewEvidence} projectNames={projectNames} />
+                </>
+              )}
+
+              {totalPending === 0 && (
+                <div className="px-6 py-10 text-center">
+                  <p className="text-sm font-medium" style={{ color: "var(--hall-muted-3)" }}>
+                    Nothing pending — engine handled everything ✓
+                  </p>
+                </div>
+              )}
+
+              {totalPending > 0 && (
+                <div className="px-6 py-3" style={{ borderTop: "1px solid var(--hall-line-soft)" }}>
+                  <p
+                    className="text-[10px] font-bold uppercase tracking-widest"
+                    style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-3)" }}
+                  >
+                    {openDecisions.length} decisions · {newEvidence.length} flagged · {reviewEvidence.length} passing · {validatedEvidence.length} validated ({validationRate}% rate)
+                  </p>
+                </div>
               )}
             </div>
-
-            {/* Decisions — top priority */}
-            {openDecisions.length > 0 && (
-              <div className="border-b border-[#EFEFEA]">
-                <div className="px-6 py-2 bg-red-50/40 border-b border-red-100 flex items-center justify-between">
-                  <p className="text-[9px] font-bold text-red-600 uppercase tracking-widest">
-                    Decisions · {openDecisions.length} item{openDecisions.length !== 1 ? "s" : ""}
-                  </p>
-                  {(executeGateCount > 0 || p1DecisionCount > 0) && (
-                    <p className="text-[9px] font-bold text-red-500 uppercase tracking-widest">
-                      {executeGateCount > 0 && `${executeGateCount} × execute blocked`}
-                      {executeGateCount > 0 && p1DecisionCount > 0 && " · "}
-                      {p1DecisionCount > 0 && `${p1DecisionCount} P1`}
-                    </p>
-                  )}
-                </div>
-                <div className="divide-y divide-[#EFEFEA]">
-                  {openDecisions.map(d => <DecisionCard key={d.id} d={d} />)}
-                </div>
-              </div>
-            )}
-
-            {/* Flagged evidence — action required */}
-            {newEvidence.length > 0 && (
-              <div className="border-b border-[#EFEFEA]">
-                <div className="px-6 py-2 bg-amber-50/60 border-b border-amber-100">
-                  <p className="text-[9px] font-bold text-amber-600 uppercase tracking-widest">
-                    Flagged evidence · {newEvidence.length} item{newEvidence.length !== 1 ? "s" : ""}
-                  </p>
-                </div>
-                <EvidenceQueueTable
-                  items={newEvidence.slice(0, 30)}
-                  projectNames={projectNames}
-                />
-              </div>
-            )}
-
-            {/* In Review — recent (<=14d), engine will validate */}
-            {reviewEvidence.length > 0 && (
-              <>
-                <div className="px-6 py-2 bg-[#EFEFEA]/60 border-y border-[#EFEFEA] flex items-center justify-between">
-                  <p className="text-[9px] font-bold text-[#131218]/40 uppercase tracking-widest">
-                    Passing through · {reviewEvidence.length} item{reviewEvidence.length !== 1 ? "s" : ""}
-                  </p>
-                  <p className="text-[9px] text-[#131218]/25 italic">Engine validará automáticamente</p>
-                </div>
-                <EvidenceQueueReadOnlyTable items={reviewEvidence} projectNames={projectNames} />
-              </>
-            )}
-
-            {totalPending === 0 && (
-              <div className="px-6 py-10 text-center">
-                <p className="text-sm font-medium text-[#131218]/30">Nothing pending — engine handled everything ✓</p>
-              </div>
-            )}
-
-            {totalPending > 0 && (
-              <div className="px-6 py-3 border-t border-[#EFEFEA]">
-                <p className="text-[10px] text-[#131218]/25 font-bold uppercase tracking-widest">
-                  {openDecisions.length} decisions · {newEvidence.length} flagged · {reviewEvidence.length} passing · {validatedEvidence.length} validated ({validationRate}% rate)
-                </p>
-              </div>
-            )}
-          </div>
+          </HallSection>
 
           {/* Evidence per project breakdown */}
-          <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-            <div className="h-1 bg-[#B2FF59]" />
-            <div className="px-6 py-4 border-b border-[#EFEFEA]">
-              <h2 className="text-sm font-bold text-[#131218] tracking-tight">Evidence by Project</h2>
-              <p className="text-xs text-[#131218]/40 mt-0.5">Processing and validation progress per project</p>
-            </div>
-            <div className="divide-y divide-[#EFEFEA]">
+          <HallSection title="Evidence by " flourish="project">
+            <p className="text-xs mb-2" style={{ color: "var(--hall-muted-2)" }}>
+              Processing and validation progress per project
+            </p>
+            <ul className="flex flex-col">
               {projects.map(p => {
                 const stats = evidenceByProject[p.id] ?? { total: 0, validated: 0, pending: 0 };
                 const rate  = stats.total > 0 ? Math.round((stats.validated / stats.total) * 100) : 0;
                 return (
-                  <div key={p.id} className="px-6 py-4 flex items-center gap-4">
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-[#131218] text-sm tracking-tight truncate">{p.name}</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <StatusBadge value={p.stage} />
-                        {p.geography.map(g => (
-                          <span key={g} className="text-[9px] font-bold text-[#131218]/25 uppercase tracking-widest">{g}</span>
-                        ))}
+                  <li key={p.id} style={{ borderTop: "1px solid var(--hall-line-soft)" }}>
+                    <div className="py-4 flex items-center gap-4">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm tracking-tight truncate" style={{ color: "var(--hall-ink-0)" }}>{p.name}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <StatusBadge value={p.stage} />
+                          {p.geography.map(g => (
+                            <span
+                              key={g}
+                              className="text-[9px] font-bold uppercase tracking-widest"
+                              style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-3)" }}
+                            >
+                              {g}
+                            </span>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                    <div className="w-32 shrink-0">
-                      <div className="flex justify-between text-[9px] font-bold text-[#131218]/40 uppercase tracking-widest mb-1">
-                        <span>{stats.validated} validated</span>
-                        <span>{rate}%</span>
-                      </div>
-                      <div className="h-1.5 bg-[#EFEFEA] rounded-full overflow-hidden">
+                      <div className="w-32 shrink-0">
                         <div
-                          className="h-full bg-[#B2FF59] rounded-full transition-all"
-                          style={{ width: `${rate}%` }}
-                        />
+                          className="flex justify-between text-[9px] font-bold uppercase tracking-widest mb-1"
+                          style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+                        >
+                          <span>{stats.validated} validated</span>
+                          <span>{rate}%</span>
+                        </div>
+                        <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "var(--hall-fill-soft)" }}>
+                          <div
+                            className="h-full rounded-full transition-all"
+                            style={{ width: `${rate}%`, background: "var(--hall-ok)" }}
+                          />
+                        </div>
+                      </div>
+                      <div className="flex gap-4 shrink-0">
+                        <div className="text-center">
+                          <p className="text-lg font-bold" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-ink-0)" }}>{stats.total}</p>
+                          <p
+                            className="text-[9px] font-bold uppercase tracking-widest"
+                            style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-3)" }}
+                          >
+                            Total
+                          </p>
+                        </div>
+                        <div className="text-center">
+                          <p
+                            className="text-lg font-bold"
+                            style={{ fontFamily: "var(--font-hall-mono)", color: stats.pending > 0 ? "var(--hall-warn)" : "var(--hall-muted-3)" }}
+                          >
+                            {stats.pending}
+                          </p>
+                          <p
+                            className="text-[9px] font-bold uppercase tracking-widest"
+                            style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-3)" }}
+                          >
+                            Pending
+                          </p>
+                        </div>
                       </div>
                     </div>
-                    <div className="flex gap-4 shrink-0">
-                      <div className="text-center">
-                        <p className="text-lg font-bold text-[#131218]">{stats.total}</p>
-                        <p className="text-[9px] font-bold text-[#131218]/30 uppercase tracking-widest">Total</p>
-                      </div>
-                      <div className="text-center">
-                        <p className={`text-lg font-bold ${stats.pending > 0 ? "text-amber-500" : "text-[#131218]/20"}`}>
-                          {stats.pending}
-                        </p>
-                        <p className="text-[9px] font-bold text-[#131218]/30 uppercase tracking-widest">Pending</p>
-                      </div>
-                    </div>
-                  </div>
+                  </li>
                 );
               })}
               {projects.length === 0 && (
-                <div className="px-6 py-8 text-center text-sm text-[#131218]/30">
+                <li className="py-8 text-center text-sm" style={{ color: "var(--hall-muted-3)" }}>
                   No projects found.
-                </div>
+                </li>
               )}
-            </div>
-          </div>
+            </ul>
+          </HallSection>
 
           {/* Source Log */}
-          <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-            <div className="h-1 bg-[#B2FF59]" />
-            <div className="px-6 py-4 border-b border-[#EFEFEA]">
-              <div className="flex items-start justify-between">
-                <div>
-                  <h2 className="text-sm font-bold text-[#131218] tracking-tight">Source Pipeline</h2>
-                  <p className="text-xs text-[#131218]/40 mt-0.5">Ingested → Processed by the engine · emails, meetings, and documents</p>
-                </div>
-                <div className="flex items-center gap-2 shrink-0 mt-0.5">
-                  <span className="text-[9px] font-bold bg-[#EFEFEA] text-[#131218]/40 px-2 py-1 rounded-full uppercase tracking-widest">
-                    {processedSources} processed
+          <HallSection title="Source " flourish="pipeline">
+            <div className="flex items-start justify-between mb-3">
+              <p className="text-xs" style={{ color: "var(--hall-muted-2)" }}>
+                Ingested → Processed by the engine · emails, meetings, and documents
+              </p>
+              <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                <span
+                  className="text-[9px] font-bold px-2 py-1 rounded-full uppercase tracking-widest"
+                  style={{
+                    fontFamily: "var(--font-hall-mono)",
+                    background: "var(--hall-fill-soft)",
+                    color: "var(--hall-muted-2)",
+                  }}
+                >
+                  {processedSources} processed
+                </span>
+                {ingestedSources > 0 && (
+                  <span
+                    className="text-[9px] font-bold px-2 py-1 rounded-full uppercase tracking-widest"
+                    style={{
+                      fontFamily: "var(--font-hall-mono)",
+                      background: "var(--hall-warn-paper)",
+                      color: "var(--hall-warn)",
+                      border: "1px solid var(--hall-warn-soft)",
+                    }}
+                  >
+                    {ingestedSources} ingested
                   </span>
-                  {ingestedSources > 0 && (
-                    <span className="text-[9px] font-bold bg-amber-50 text-amber-600 border border-amber-200 px-2 py-1 rounded-full uppercase tracking-widest">
-                      {ingestedSources} ingested
-                    </span>
-                  )}
-                  {needsReviewSources > 0 && (
-                    <span className="text-[9px] font-bold bg-red-50 text-red-500 border border-red-200 px-2 py-1 rounded-full uppercase tracking-widest">
-                      {needsReviewSources} needs review
-                    </span>
-                  )}
-                  {unlinkedSources > 0 && (
-                    <span className="text-[9px] font-bold bg-gray-50 text-gray-400 border border-gray-200 px-2 py-1 rounded-full uppercase tracking-widest">
-                      {unlinkedSources} unlinked
-                    </span>
-                  )}
-                </div>
+                )}
+                {needsReviewSources > 0 && (
+                  <span
+                    className="text-[9px] font-bold px-2 py-1 rounded-full uppercase tracking-widest"
+                    style={{
+                      fontFamily: "var(--font-hall-mono)",
+                      background: "var(--hall-danger-soft)",
+                      color: "var(--hall-danger)",
+                      border: "1px solid var(--hall-danger-soft)",
+                    }}
+                  >
+                    {needsReviewSources} needs review
+                  </span>
+                )}
+                {unlinkedSources > 0 && (
+                  <span
+                    className="text-[9px] font-bold px-2 py-1 rounded-full uppercase tracking-widest"
+                    style={{
+                      fontFamily: "var(--font-hall-mono)",
+                      background: "var(--hall-fill-soft)",
+                      color: "var(--hall-muted-3)",
+                      border: "1px solid var(--hall-line)",
+                    }}
+                  >
+                    {unlinkedSources} unlinked
+                  </span>
+                )}
               </div>
             </div>
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-[#EFEFEA]">
-                  <th className="text-left px-6 py-3 text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Source</th>
-                  <th className="text-left px-4 py-3 text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Project</th>
-                  <th className="text-left px-4 py-3 text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Type</th>
-                  <th className="text-left px-4 py-3 text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Status</th>
-                  <th className="text-left px-4 py-3 text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Ingested</th>
+                <tr style={{ background: "var(--hall-paper-1)", borderBottom: "1px solid var(--hall-line-soft)" }}>
+                  <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}>Source</th>
+                  <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}>Project</th>
+                  <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}>Type</th>
+                  <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}>Status</th>
+                  <th className="text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}>Ingested</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#EFEFEA]">
+              <tbody>
                 {sources.slice(0, 50).map(s => (
-                  <tr key={s.id} className="hover:bg-[#EFEFEA]/60 transition-colors">
-                    <td className="px-6 py-3 font-semibold text-[#131218] text-sm max-w-xs">
+                  <tr key={s.id} style={{ borderBottom: "1px solid var(--hall-line-soft)" }}>
+                    <td className="px-4 py-3 font-semibold text-sm max-w-xs" style={{ color: "var(--hall-ink-0)" }}>
                       <div className="flex items-center gap-2 min-w-0">
-                        <span className="text-[11px] text-[#131218]/30 shrink-0">{sourceIcon(s.sourceType)}</span>
+                        <span className="text-[11px] shrink-0" style={{ color: "var(--hall-muted-3)" }}>{sourceIcon(s.sourceType)}</span>
                         <p className="truncate">{s.title || "—"}</p>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-xs font-medium text-[#131218]/50">
+                    <td className="px-4 py-3 text-xs font-medium" style={{ color: "var(--hall-muted-2)" }}>
                       {s.projectId ? (projectNames[s.projectId] ?? "—") : "—"}
                     </td>
                     <td className="px-4 py-3"><StatusBadge value={s.sourceType} /></td>
                     <td className="px-4 py-3"><StatusBadge value={s.status} /></td>
-                    <td className="px-4 py-3 text-xs text-[#131218]/35 font-medium">
+                    <td
+                      className="px-4 py-3 text-xs font-medium"
+                      style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-3)" }}
+                    >
                       {s.dateIngested
                         ? new Date(s.dateIngested).toLocaleDateString("en-GB", { day: "numeric", month: "short" })
                         : "—"}
@@ -441,7 +577,7 @@ export default async function OSPage() {
                 ))}
                 {sources.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-6 py-8 text-center text-sm text-[#131218]/30">
+                    <td colSpan={5} className="px-6 py-8 text-center text-sm" style={{ color: "var(--hall-muted-3)" }}>
                       No sources ingested yet.
                     </td>
                   </tr>
@@ -449,15 +585,18 @@ export default async function OSPage() {
               </tbody>
             </table>
             {sources.length > 0 && (
-              <div className="px-6 py-3 border-t border-[#EFEFEA]">
-                <p className="text-[10px] text-[#131218]/25 font-bold uppercase tracking-widest">
+              <div className="py-3" style={{ borderTop: "1px solid var(--hall-line-soft)" }}>
+                <p
+                  className="text-[10px] font-bold uppercase tracking-widest"
+                  style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-3)" }}
+                >
                   {sources.length <= 50
                     ? `${sources.length} registro${sources.length !== 1 ? "s" : ""}`
                     : `Últimos 50 de ${sources.length} registros`}
                 </p>
               </div>
             )}
-          </div>
+          </HallSection>
 
         </div>
       </main>

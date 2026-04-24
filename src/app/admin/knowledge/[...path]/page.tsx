@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Sidebar } from "@/components/Sidebar";
+import { HallSection } from "@/components/HallSection";
 import { LeafContentTabs } from "@/components/LeafContentTabs";
 import { SynthesizeLeafButton } from "@/components/SynthesizeLeafButton";
 import { NAV } from "../../page";
@@ -79,14 +80,14 @@ function renderMarkdown(md: string): string {
   return out.join("");
 }
 
-function actionColor(action: string, status: string): string {
-  if (status === "proposed") return "bg-amber-50 text-amber-700 border-amber-200";
-  if (action === "APPEND")   return "bg-green-50 text-green-700 border-green-200";
-  if (action === "AMEND")    return "bg-orange-50 text-orange-700 border-orange-200";
-  if (action === "SPLIT")    return "bg-purple-50 text-purple-700 border-purple-200";
-  if (action === "IGNORE")   return "bg-[#EFEFEA] text-[#131218]/40 border-[#E0E0D8]";
-  if (action === "CREATED")  return "bg-blue-50 text-blue-700 border-blue-200";
-  return "bg-[#EFEFEA] text-[#131218]/40 border-[#E0E0D8]";
+function actionStyle(action: string, status: string): React.CSSProperties {
+  if (status === "proposed") return { background: "var(--hall-warn-paper)", color: "var(--hall-warn)", border: "1px solid var(--hall-warn-soft)" };
+  if (action === "APPEND")   return { background: "var(--hall-ok-soft)", color: "var(--hall-ok)", border: "1px solid var(--hall-ok-soft)" };
+  if (action === "AMEND")    return { background: "var(--hall-warn-soft)", color: "var(--hall-warn)", border: "1px solid var(--hall-warn-soft)" };
+  if (action === "SPLIT")    return { background: "var(--hall-fill-soft)", color: "var(--hall-muted-2)", border: "1px solid var(--hall-line)" };
+  if (action === "IGNORE")   return { background: "var(--hall-fill-soft)", color: "var(--hall-muted-3)", border: "1px solid var(--hall-line)" };
+  if (action === "CREATED")  return { background: "var(--hall-info-soft)", color: "var(--hall-info)", border: "1px solid var(--hall-info-soft)" };
+  return { background: "var(--hall-fill-soft)", color: "var(--hall-muted-3)", border: "1px solid var(--hall-line)" };
 }
 
 function BreadcrumbTrail({ path, allNodes }: { path: string; allNodes: KnowledgeNode[] }) {
@@ -98,15 +99,18 @@ function BreadcrumbTrail({ path, allNodes }: { path: string; allNodes: Knowledge
     if (node) trail.push({ path: p, title: node.title });
   }
   return (
-    <nav className="flex items-center gap-2 text-[10px] text-white/30 font-bold uppercase tracking-widest">
-      <Link href="/admin/knowledge" className="hover:text-[#c8f55a] transition-colors">Knowledge</Link>
+    <nav
+      className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest"
+      style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+    >
+      <Link href="/admin/knowledge" className="hover:underline" style={{ color: "var(--hall-muted-2)" }}>Knowledge</Link>
       {trail.map((t, i) => (
         <span key={t.path} className="flex items-center gap-2">
-          <span className="opacity-30">/</span>
+          <span style={{ color: "var(--hall-muted-3)" }}>/</span>
           {i === trail.length - 1 ? (
-            <span className="text-white/80">{t.title}</span>
+            <span style={{ color: "var(--hall-ink-0)" }}>{t.title}</span>
           ) : (
-            <Link href={`/admin/knowledge/${t.path}`} className="hover:text-[#c8f55a] transition-colors">{t.title}</Link>
+            <Link href={`/admin/knowledge/${t.path}`} className="hover:underline" style={{ color: "var(--hall-muted-2)" }}>{t.title}</Link>
           )}
         </span>
       ))}
@@ -122,48 +126,85 @@ function daysSince(iso: string | null): number | null {
 function ChangelogRow({ entry }: { entry: NodeChangelogEntry }) {
   const d = new Date(entry.created_at);
   return (
-    <div className="px-6 py-4 border-b border-[#EFEFEA] flex items-start gap-4">
+    <div
+      className="px-6 py-4 flex items-start gap-4"
+      style={{ borderBottom: "1px solid var(--hall-line-soft)" }}
+    >
       <div className="shrink-0 w-20">
-        <p className="text-[10px] font-bold text-[#131218]/40 uppercase tracking-widest">
+        <p
+          className="text-[10px] font-bold uppercase tracking-widest"
+          style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+        >
           {d.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
         </p>
-        <p className="text-[9px] text-[#131218]/25 mt-0.5">
+        <p
+          className="text-[9px] mt-0.5"
+          style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-3)" }}
+        >
           {d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
         </p>
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-widest ${actionColor(entry.action, entry.status)}`}>
+          <span
+            className="text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-widest"
+            style={{ fontFamily: "var(--font-hall-mono)", ...actionStyle(entry.action, entry.status) }}
+          >
             {entry.action}
           </span>
           {entry.status === "proposed" && (
-            <span className="text-[9px] font-bold bg-amber-100 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full uppercase tracking-widest">
+            <span
+              className="text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-widest"
+              style={{
+                fontFamily: "var(--font-hall-mono)",
+                background: "var(--hall-warn-soft)",
+                color: "var(--hall-warn)",
+                border: "1px solid var(--hall-warn-soft)",
+              }}
+            >
               needs review
             </span>
           )}
           {entry.section && (
-            <span className="text-[10px] text-[#131218]/40 font-medium">→ {entry.section}</span>
+            <span className="text-[10px] font-medium" style={{ color: "var(--hall-muted-2)" }}>→ {entry.section}</span>
           )}
-          <span className="text-[10px] text-[#131218]/25 font-medium">via {entry.applied_by}</span>
+          <span
+            className="text-[10px] font-medium"
+            style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-3)" }}
+          >
+            via {entry.applied_by}
+          </span>
         </div>
-        <p className="text-[12px] text-[#131218]/70 mt-1.5 leading-relaxed">{entry.reasoning}</p>
+        <p className="text-[12px] mt-1.5 leading-relaxed" style={{ color: "var(--hall-ink-3)" }}>{entry.reasoning}</p>
         {entry.diff_after && entry.action === "APPEND" && (
-          <p className="text-[11px] text-[#131218]/50 mt-2 bg-[#F7F7F2] px-3 py-2 rounded-lg border border-[#EFEFEA] line-clamp-3">
+          <p
+            className="text-[11px] mt-2 px-3 py-2 line-clamp-3"
+            style={{ color: "var(--hall-muted-2)", background: "var(--hall-paper-1)", border: "1px solid var(--hall-line-soft)" }}
+          >
             {entry.diff_after}
           </p>
         )}
         {entry.diff_before && entry.action === "AMEND" && (
           <div className="mt-2 space-y-1">
-            <p className="text-[11px] text-red-600/70 bg-red-50/50 px-3 py-2 rounded-lg border border-red-100 line-through line-clamp-2">
+            <p
+              className="text-[11px] px-3 py-2 line-through line-clamp-2"
+              style={{ color: "var(--hall-danger)", background: "var(--hall-danger-soft)", border: "1px solid var(--hall-danger-soft)" }}
+            >
               {entry.diff_before}
             </p>
-            <p className="text-[11px] text-green-700 bg-green-50/50 px-3 py-2 rounded-lg border border-green-100 line-clamp-2">
+            <p
+              className="text-[11px] px-3 py-2 line-clamp-2"
+              style={{ color: "var(--hall-ok)", background: "var(--hall-ok-soft)", border: "1px solid var(--hall-ok-soft)" }}
+            >
               {entry.diff_after}
             </p>
           </div>
         )}
         {entry.evidence_notion_id && (
-          <p className="text-[9px] text-[#131218]/20 font-mono mt-2 truncate">
+          <p
+            className="text-[9px] mt-2 truncate"
+            style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-3)" }}
+          >
             evidence: {entry.evidence_notion_id}
           </p>
         )}
@@ -206,130 +247,179 @@ export default async function KnowledgeDetailPage({
     <div className="flex min-h-screen bg-[#EFEFEA]">
       <Sidebar items={NAV} isAdmin />
 
-      <main className="flex-1 ml-[228px] overflow-auto">
-        {/* Header */}
-        <div className="bg-[#131218] px-10 py-10">
+      <main
+        className="flex-1 ml-[228px] overflow-auto"
+        style={{ fontFamily: "var(--font-hall-sans)", background: "var(--hall-paper-0)" }}
+      >
+        <header
+          className="flex items-center justify-between gap-6 px-9 py-3.5"
+          style={{ borderBottom: "1px solid var(--hall-ink-0)" }}
+        >
+          <div className="flex items-baseline gap-4 min-w-0">
+            <span
+              className="text-[10px] tracking-[0.08em] whitespace-nowrap uppercase"
+              style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+            >
+              KNOWLEDGE · <b style={{ color: "var(--hall-ink-0)" }}>{node.path}</b>
+            </span>
+            <h1
+              className="text-[16px] font-medium tracking-[-0.01em] truncate"
+              style={{ color: "var(--hall-ink-0)" }}
+            >
+              {isLeaf ? (
+                <em style={{ fontFamily: "var(--font-hall-display)", fontStyle: "italic", fontWeight: 400 }}>
+                  {node.title}
+                </em>
+              ) : (
+                node.title
+              )}
+            </h1>
+          </div>
+          {isLeaf && currentSourceCount > 0 && (
+            <SynthesizeLeafButton path={node.path} hasPlaybook={Boolean(node.playbook_md)} />
+          )}
+        </header>
+
+        {/* Meta / trail sub-header */}
+        <div
+          className="px-9 py-4 space-y-2"
+          style={{ borderBottom: "1px solid var(--hall-line-soft)", background: "var(--hall-paper-1)" }}
+        >
           <BreadcrumbTrail path={node.path} allNodes={allNodes} />
-          <h1 className="text-[2.6rem] font-[300] text-white leading-[1] tracking-[-1.5px] mt-3">
-            {isLeaf ? (
-              <span className="font-[900] italic text-[#c8f55a]">{node.title}</span>
-            ) : (
-              node.title
-            )}
-          </h1>
           {node.summary && (
-            <p className="text-[12.5px] text-white/40 mt-3 max-w-[620px] leading-[1.65]">
+            <p className="text-[12.5px] max-w-[620px] leading-[1.65]" style={{ color: "var(--hall-muted-2)" }}>
               {node.summary}
             </p>
           )}
-          <div className="flex items-center gap-4 mt-4 flex-wrap">
-            <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-widest ${
-              node.status === "Active" ? "bg-[#B2FF59] text-[#131218]" :
-              node.status === "Stale"  ? "bg-amber-400 text-[#131218]" :
-              "bg-white/10 text-white/40"
-            }`}>
+          <div className="flex items-center gap-3 flex-wrap">
+            <span
+              className="text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-widest"
+              style={{
+                fontFamily: "var(--font-hall-mono)",
+                ...(node.status === "Active"
+                  ? { background: "var(--hall-ok-soft)", color: "var(--hall-ok)" }
+                  : node.status === "Stale"
+                  ? { background: "var(--hall-warn-soft)", color: "var(--hall-warn)" }
+                  : { background: "var(--hall-fill-soft)", color: "var(--hall-muted-3)" }),
+              }}
+            >
               {node.status}
             </span>
             {node.tags.map(t => (
-              <span key={t} className="text-[9px] font-bold bg-white/5 text-white/40 border border-white/10 px-2 py-0.5 rounded-full uppercase tracking-widest">
+              <span
+                key={t}
+                className="text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-widest"
+                style={{
+                  fontFamily: "var(--font-hall-mono)",
+                  background: "var(--hall-fill-soft)",
+                  color: "var(--hall-muted-2)",
+                  border: "1px solid var(--hall-line)",
+                }}
+              >
                 {t}
               </span>
             ))}
-            <span className="text-[10px] text-white/30 font-medium">
+            <span
+              className="text-[10px] font-medium"
+              style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+            >
               {node.reference_count} citation{node.reference_count !== 1 ? "s" : ""}
             </span>
             {evidenceAge !== null && (
-              <span className="text-[10px] text-white/30 font-medium">
+              <span
+                className="text-[10px] font-medium"
+                style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+              >
                 Last evidence {evidenceAge === 0 ? "today" : `${evidenceAge}d ago`}
               </span>
             )}
             {reviewAge !== null ? (
-              <span className="text-[10px] text-white/30 font-medium">
+              <span
+                className="text-[10px] font-medium"
+                style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+              >
                 Reviewed {reviewAge === 0 ? "today" : `${reviewAge}d ago`}
               </span>
             ) : (
-              <span className="text-[10px] text-amber-300/70 font-medium">Never reviewed by human</span>
+              <span
+                className="text-[10px] font-medium"
+                style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-warn)" }}
+              >
+                Never reviewed by human
+              </span>
             )}
           </div>
-          {isLeaf && currentSourceCount > 0 && (
-            <div className="mt-5">
-              <SynthesizeLeafButton path={node.path} hasPlaybook={Boolean(node.playbook_md)} />
-            </div>
-          )}
         </div>
 
-        <div className="px-8 py-6 space-y-6 max-w-[960px]">
+        <div className="px-9 py-6 max-w-[960px]">
 
           {/* Children (only if this is a category node) */}
           {!isLeaf && (
-            <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-              <div className="h-1 bg-[#131218]" />
-              <div className="px-6 py-4 border-b border-[#EFEFEA]">
-                <h2 className="text-sm font-bold text-[#131218] tracking-tight">Sub-topics</h2>
-                <p className="text-xs text-[#131218]/40 mt-0.5">{children.length} child{children.length !== 1 ? "ren" : ""}</p>
-              </div>
-              <div>
+            <HallSection
+              title="Sub-" flourish="topics"
+              meta={`${children.length} CHILD${children.length !== 1 ? "REN" : ""}`}
+            >
+              <ul className="flex flex-col">
                 {children.map(c => (
-                  <Link
-                    key={c.id}
-                    href={`/admin/knowledge/${c.path}`}
-                    className="flex items-center gap-3 px-6 py-3 border-b border-[#EFEFEA] hover:bg-[#EFEFEA]/40 transition-colors"
-                  >
-                    <span className="text-xs font-bold text-[#131218]/30">▸</span>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-[#131218]">{c.title}</p>
-                      {c.summary && <p className="text-[11px] text-[#131218]/40 mt-0.5 truncate">{c.summary}</p>}
-                    </div>
-                    <span className="text-[10px] text-[#131218]/30 font-bold uppercase tracking-widest">
-                      {c.reference_count > 0 ? `${c.reference_count} cited` : "—"}
-                    </span>
-                  </Link>
+                  <li key={c.id} style={{ borderTop: "1px solid var(--hall-line-soft)" }}>
+                    <Link
+                      href={`/admin/knowledge/${c.path}`}
+                      className="flex items-center gap-3 py-3 transition-colors"
+                    >
+                      <span className="text-xs font-bold" style={{ color: "var(--hall-muted-3)" }}>▸</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold" style={{ color: "var(--hall-ink-0)" }}>{c.title}</p>
+                        {c.summary && (
+                          <p className="text-[11px] mt-0.5 truncate" style={{ color: "var(--hall-muted-2)" }}>
+                            {c.summary}
+                          </p>
+                        )}
+                      </div>
+                      <span
+                        className="text-[10px] font-bold uppercase tracking-widest"
+                        style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-3)" }}
+                      >
+                        {c.reference_count > 0 ? `${c.reference_count} cited` : "—"}
+                      </span>
+                    </Link>
+                  </li>
                 ))}
-              </div>
-            </div>
+              </ul>
+            </HallSection>
           )}
 
           {/* Content — Playbook (default) / Source bullets tabs for leaves */}
           {(isLeaf || node.body_md.trim().length > 100) && (
             isLeaf ? (
-              <LeafContentTabs
-                playbookHtml={playbookHtml}
-                bulletsHtml={bulletsHtml}
-                playbookGeneratedAt={node.playbook_generated_at}
-                playbookSourceCount={node.playbook_source_count}
-                currentSourceCount={currentSourceCount}
-                leafPath={node.path}
-              />
+              <HallSection title="Content">
+                <LeafContentTabs
+                  playbookHtml={playbookHtml}
+                  bulletsHtml={bulletsHtml}
+                  playbookGeneratedAt={node.playbook_generated_at}
+                  playbookSourceCount={node.playbook_source_count}
+                  currentSourceCount={currentSourceCount}
+                  leafPath={node.path}
+                />
+              </HallSection>
             ) : (
-              <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-                <div className="h-1 bg-[#B2FF59]" />
-                <div className="px-6 py-4 border-b border-[#EFEFEA] flex items-center justify-between">
-                  <h2 className="text-sm font-bold text-[#131218] tracking-tight">Content</h2>
-                  <span className="text-[10px] text-[#131218]/25 font-mono">{node.path}</span>
-                </div>
-                <div className="px-8 py-6" dangerouslySetInnerHTML={{ __html: bulletsHtml }} />
-              </div>
+              <HallSection title="Content" meta={node.path.toUpperCase()}>
+                <div className="py-4" dangerouslySetInnerHTML={{ __html: bulletsHtml }} />
+              </HallSection>
             )
           )}
 
           {/* Changelog */}
-          <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-            <div className="h-1 bg-[#EFEFEA]" />
-            <div className="px-6 py-4 border-b border-[#EFEFEA] flex items-center justify-between">
-              <div>
-                <h2 className="text-sm font-bold text-[#131218] tracking-tight">Changelog</h2>
-                <p className="text-xs text-[#131218]/40 mt-0.5">
-                  Cada acción del knowledge-curator (aplicada o propuesta) con razón.
-                </p>
-              </div>
-              <span className="text-[10px] text-[#131218]/30 font-bold uppercase tracking-widest">
-                {changelog.length} entries
-              </span>
-            </div>
+          <HallSection
+            title="Changelog"
+            meta={`${changelog.length} ENTRIES`}
+          >
+            <p className="text-xs mb-2" style={{ color: "var(--hall-muted-2)" }}>
+              Cada acción del knowledge-curator (aplicada o propuesta) con razón.
+            </p>
             {changelog.length === 0 ? (
-              <div className="px-6 py-10 text-center">
-                <p className="text-sm font-medium text-[#131218]/30">Sin cambios todavía.</p>
-                <p className="text-xs text-[#131218]/20 mt-1">
+              <div className="px-6 py-10 text-center" style={{ border: "1px solid var(--hall-line-soft)" }}>
+                <p className="text-sm font-medium" style={{ color: "var(--hall-muted-3)" }}>Sin cambios todavía.</p>
+                <p className="text-xs mt-1" style={{ color: "var(--hall-muted-3)" }}>
                   Cuando el curator procese evidencia relacionada, aparecerán aquí sus decisiones.
                 </p>
               </div>
@@ -338,7 +428,7 @@ export default async function KnowledgeDetailPage({
                 {changelog.map(entry => <ChangelogRow key={entry.id} entry={entry} />)}
               </div>
             )}
-          </div>
+          </HallSection>
 
         </div>
       </main>
