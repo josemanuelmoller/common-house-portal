@@ -2,13 +2,34 @@ import { SignIn } from "@clerk/nextjs";
 
 export default function SignInPage() {
   return (
-    <div className="min-h-screen bg-[#131218] flex flex-col items-center justify-center">
+    <div
+      className="min-h-screen flex flex-col items-center justify-center"
+      style={{
+        background: "var(--hall-paper-1)",
+        fontFamily: "var(--font-hall-sans)",
+      }}
+    >
       {/* Logo */}
       <div className="mb-8 text-center">
-        <p className="text-white font-bold text-2xl tracking-tight leading-tight">
-          common<br />house
+        <p
+          className="font-bold text-2xl tracking-tight leading-tight"
+          style={{ color: "var(--hall-ink-0)" }}
+        >
+          common
+          <br />
+          <em style={{ fontFamily: "var(--font-hall-display)", fontStyle: "italic", fontWeight: 400 }}>
+            house
+          </em>
         </p>
-        <span className="mt-3 inline-block bg-[#B2FF59] text-[#131218] text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-widest">
+        <span
+          className="mt-3 inline-block text-[10px] font-bold px-3 py-1 rounded-full uppercase"
+          style={{
+            fontFamily: "var(--font-hall-mono)",
+            background: "var(--hall-lime-soft)",
+            color: "var(--hall-lime-ink)",
+            letterSpacing: "0.14em",
+          }}
+        >
           Client Portal
         </span>
       </div>
@@ -17,14 +38,14 @@ export default function SignInPage() {
         appearance={{
           elements: {
             rootBox: "shadow-none",
-            card: "rounded-2xl border border-white/10 shadow-none bg-white",
+            card: "rounded-[3px] shadow-none",
             headerTitle: "hidden",
             headerSubtitle: "hidden",
             formButtonPrimary:
-              "bg-[#131218] hover:bg-[#131218]/80 text-white rounded-xl text-sm font-semibold tracking-wide",
+              "bg-[#0a0a0a] hover:bg-[#2a2a2a] text-white rounded-[3px] text-sm font-semibold tracking-wide",
             formFieldInput:
-              "rounded-xl border-[#E0E0D8] focus:border-[#131218] focus:ring-0",
-            footerActionLink: "text-[#131218] font-semibold",
+              "rounded-[3px] border-[#e4e4dd] focus:border-[#0a0a0a] focus:ring-0",
+            footerActionLink: "text-[#0a0a0a] font-semibold",
           },
         }}
       />
