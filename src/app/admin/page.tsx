@@ -598,50 +598,88 @@ export default async function AdminPage() {
         >
         <div className="px-8 py-6 space-y-6 max-w-6xl mx-auto">
 
-          {/* ── 1. Focus of the Day ───────────────────────────────────────── */}
+          {/* ── 1. Focus of the Day — K-v2 lime hero ────────────────────── */}
           {focusRec ? (
-            <div className="bg-[#131218] rounded-2xl px-6 py-5 border border-[#131218]">
-              <div className="flex items-start justify-between gap-6">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2.5 mb-2.5">
-                    <p className="text-[9px] font-bold uppercase tracking-[2.5px] text-[#c8f55a]/60">
-                      Focus of the Day
-                    </p>
-                    <span className="text-[9px] font-bold text-[#131218] bg-[#c8f55a]/90 px-2 py-0.5 rounded-full">
-                      {focusRec.timeEstimate}
-                    </span>
-                    {dailyBriefing?.generatedAt && (
-                      <span className="text-[8px] text-white/25 ml-auto md:ml-0">
-                        briefing {new Date(dailyBriefing.generatedAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-[14px] font-semibold text-white leading-[1.5] max-w-[640px]">
-                    {focusRec.action}
-                  </p>
-                  <p className="text-[11px] text-white/45 mt-1.5 leading-snug">
-                    {focusRec.whyToday}
-                  </p>
-                </div>
-                <div className="flex flex-col items-end gap-1.5 shrink-0">
-                  {focusRec.links.map(link => (
-                    <a
-                      key={link.url}
-                      href={link.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={
-                        link.style === "primary"
-                          ? "text-[10px] font-bold text-[#131218] bg-[#c8f55a] hover:bg-white px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap"
-                          : "text-[10px] font-bold text-white/50 hover:text-white border border-white/10 hover:border-white/30 px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap"
-                      }
+            <section className="mb-7">
+              <div className="flex gap-1.5 mb-2.5">
+                <span className="hall-chip-dark">FOCUS OF THE DAY</span>
+              </div>
+              <div className="hall-focus-card">
+                <div className="flex items-center justify-between mb-3.5 gap-3">
+                  <span
+                    className="uppercase"
+                    style={{
+                      fontFamily: "var(--font-hall-mono)",
+                      fontSize: 10,
+                      color: "var(--hall-muted-2)",
+                      letterSpacing: "0.08em",
+                    }}
+                  >
+                    {focusRec.timeEstimate} WINDOW
+                  </span>
+                  {dailyBriefing?.generatedAt && (
+                    <span
+                      style={{
+                        fontFamily: "var(--font-hall-mono)",
+                        fontSize: 9.5,
+                        color: "var(--hall-muted-3)",
+                        letterSpacing: "0.04em",
+                      }}
                     >
-                      {link.label} →
-                    </a>
-                  ))}
+                      briefing {new Date(dailyBriefing.generatedAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                  )}
+                </div>
+                <div
+                  className="hall-focus-grid grid items-start"
+                  style={{ gridTemplateColumns: "72px 1fr", gap: "22px" }}
+                >
+                  <div className="hall-focus-icon" aria-hidden>
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+                      <circle cx="12" cy="12" r="3" />
+                      <path d="M12 1v6M12 17v6M1 12h6M17 12h6" />
+                    </svg>
+                  </div>
+                  <div className="min-w-0">
+                    <h3
+                      className="font-bold mb-2.5"
+                      style={{
+                        fontSize: 26,
+                        letterSpacing: "-0.02em",
+                        lineHeight: 1.15,
+                        color: "var(--hall-ink-0)",
+                      }}
+                    >
+                      {focusRec.action}
+                    </h3>
+                    <p
+                      className="mb-3"
+                      style={{
+                        fontSize: 13.5,
+                        lineHeight: 1.55,
+                        color: "var(--hall-ink-3)",
+                        maxWidth: "60ch",
+                      }}
+                    >
+                      {focusRec.whyToday}
+                    </p>
+                    <div className="flex items-center gap-2 flex-wrap mt-4">
+                      {focusRec.links.map((link) => (
+                        <a
+                          key={link.url}
+                          href={link.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={link.style === "primary" ? "hall-btn-primary" : "hall-btn-outline"}
+                        >
+                          {link.label} →
+                        </a>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
+            </section>
           ) : (() => {
             // Smarter empty state — surface up to 2 lightweight alternatives
             // so the slot is never a dead dialogue box.
