@@ -9,7 +9,7 @@ export default function SignInPage() {
         fontFamily: "var(--font-hall-sans)",
       }}
     >
-      {/* Logo */}
+      {/* Logo — original wordmark, untouched */}
       <div className="mb-8 text-center">
         <p
           className="font-bold text-2xl tracking-tight leading-tight"
@@ -17,9 +17,18 @@ export default function SignInPage() {
         >
           common
           <br />
-          <em style={{ fontFamily: "var(--font-hall-display)", fontStyle: "italic", fontWeight: 400 }}>
-            house
-          </em>
+          house
+        </p>
+        <p
+          className="text-[18px] tracking-tight mt-1"
+          style={{
+            fontFamily: "var(--font-hall-display)",
+            fontStyle: "italic",
+            fontWeight: 400,
+            color: "var(--hall-ink-0)",
+          }}
+        >
+          portal
         </p>
         <span
           className="mt-3 inline-block text-[10px] font-bold px-3 py-1 rounded-full uppercase"
