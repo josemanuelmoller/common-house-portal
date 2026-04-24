@@ -1,4 +1,5 @@
 import { SignIn } from "@clerk/nextjs";
+import { BrandLogo } from "@/components/BrandLogo";
 
 export default function SignInPage() {
   return (
@@ -9,18 +10,10 @@ export default function SignInPage() {
         fontFamily: "var(--font-hall-sans)",
       }}
     >
-      {/* Logo — original wordmark, untouched */}
-      <div className="mb-8 text-center">
+      <div className="mb-8 text-center flex flex-col items-center">
+        <BrandLogo variant="black" height={72} priority />
         <p
-          className="font-bold text-2xl tracking-tight leading-tight"
-          style={{ color: "var(--hall-ink-0)" }}
-        >
-          common
-          <br />
-          house
-        </p>
-        <p
-          className="text-[18px] tracking-tight mt-1"
+          className="text-[18px] tracking-tight mt-3"
           style={{
             fontFamily: "var(--font-hall-display)",
             fontStyle: "italic",

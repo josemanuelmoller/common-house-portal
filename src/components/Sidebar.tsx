@@ -3,6 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { UserButton, useUser, SignOutButton } from "@clerk/nextjs";
+import { BrandLogo } from "./BrandLogo";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -126,21 +127,11 @@ export function Sidebar({ items, projectName, isAdmin, adminNav }: Props) {
   return (
     <aside className="w-[228px] min-h-screen bg-white border-r border-[#d8d8d0] flex flex-col flex-shrink-0 fixed top-0 left-0 z-10 overflow-y-auto">
 
-      {/* Logo */}
+      {/* Logo — official wordmark */}
       <div className="px-[18px] pt-5 pb-[18px] border-b border-[#d8d8d0] mb-3">
-        <div className="flex items-center gap-2.5">
-          {/* CO mark */}
-          <svg viewBox="0 0 40 18" fill="none" className="w-8 h-auto flex-shrink-0">
-            <path d="M7 2 A7 7 0 1 0 7 16" stroke="#0e0e0e" strokeWidth="3.5" strokeLinecap="butt"/>
-            <circle cx="31" cy="9" r="7" stroke="#0e0e0e" strokeWidth="3.5"/>
-          </svg>
-          <div className="flex flex-col leading-tight">
-            <span className="text-[11px] font-medium text-[#0e0e0e] tracking-[0.2px]">common</span>
-            <span className="text-[11px] font-medium text-[#0e0e0e] tracking-[0.2px]">house</span>
-          </div>
-        </div>
+        <BrandLogo variant="black" height={34} />
         {projectName && (
-          <p className="text-[#0e0e0e]/40 text-xs mt-2 truncate font-medium">{projectName}</p>
+          <p className="text-[#0a0a0a]/40 text-xs mt-2 truncate font-medium">{projectName}</p>
         )}
       </div>
 

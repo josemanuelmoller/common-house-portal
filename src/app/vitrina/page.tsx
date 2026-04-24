@@ -2,6 +2,7 @@
 // Ported from hall-vitrina.html
 
 import { getLivingRoomPeople } from "@/lib/notion";
+import { BrandLogo } from "@/components/BrandLogo";
 
 export const metadata = {
   title: "Common House — The Hall",
@@ -10,20 +11,6 @@ export const metadata = {
 };
 
 // ─── Inline SVG helpers ────────────────────────────────────────────────────────
-
-function CoMark({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 108 50" fill="none" className={className}>
-      <path
-        d="M42 4 A21 21 0 1 0 42 46"
-        stroke="white"
-        strokeWidth="10"
-        strokeLinecap="butt"
-      />
-      <circle cx="84" cy="25" r="21" stroke="white" strokeWidth="10" />
-    </svg>
-  );
-}
 
 function ArrowRight({ size = 12 }: { size?: number }) {
   return (
@@ -107,12 +94,8 @@ export default async function VitrinaPage() {
 
       {/* ── TOP NAV ─────────────────────────────────────────────────────────── */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-black h-[60px] flex items-center px-12 gap-0">
-        <a href="#top" className="flex items-center gap-3 shrink-0 no-underline">
-          <CoMark className="w-[38px] h-[18px]" />
-          <div className="flex flex-col leading-[1.1]">
-            <span className="text-[12px] font-normal text-white tracking-[0.3px]">common</span>
-            <span className="text-[12px] font-normal text-white tracking-[0.3px]">house</span>
-          </div>
+        <a href="#top" className="flex items-center shrink-0 no-underline">
+          <BrandLogo variant="white" height={32} priority />
         </a>
         <div className="flex items-center gap-8 ml-auto">
           <a href="#capabilities" className="text-[12px] font-medium text-white/45 no-underline hover:text-white/85 transition-colors">
