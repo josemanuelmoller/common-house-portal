@@ -156,6 +156,14 @@
     {
       "path": "/api/ingest/loops",
       "schedule": "45 18 * * *"
+    },
+    {
+      "path": "/api/ingest/calendar",
+      "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/ingest/calendar",
+      "schedule": "0 19 * * *"
     }
   ]
 }
