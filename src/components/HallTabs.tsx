@@ -78,7 +78,7 @@ export function HallTabs({ children, badges = {}, alerts = {} }: Props) {
           fontFamily: "var(--font-hall-sans)",
         }}
       >
-        <div className="flex items-center gap-6 px-9 py-2.5">
+        <div className="flex items-center gap-4 sm:gap-6 px-4 sm:px-9 py-2.5 overflow-x-auto">
           {TABS.map((t) => {
             const isActive = t.key === active;
             const badge = badges[t.key];
