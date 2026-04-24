@@ -27,32 +27,58 @@ export default async function ResidentsPage() {
   const humanCount = coFounders.length + coreTeam.length + eirs.length;
 
   return (
-    <div className="flex min-h-screen bg-[#EFEFEA]">
+    <div className="flex min-h-screen" style={{ background: "var(--hall-paper-0)" }}>
       <Sidebar items={NAV} isAdmin />
 
-      <main className="flex-1 overflow-auto ml-[228px]">
-
-        {/* ── Page header ──────────────────────────────────────────────────── */}
-        <header className="bg-[#131218] px-10 pt-10 pb-11">
-          <p className="text-[8px] font-bold tracking-[2.5px] uppercase text-white/20 mb-3">
-            COMMON HOUSE · DIRECTORY
-          </p>
-          <h1 className="text-[2.6rem] font-[300] text-white tracking-[-1.5px] leading-none">
-            The <em className="font-[900] italic text-[#c8f55a]">Residents</em>
-          </h1>
-          <p className="text-[12.5px] text-white/40 mt-3 max-w-[520px] leading-[1.65]">
-            Humans and digital agents that make the House run. A living directory of activatable capabilities.
-          </p>
+      <main
+        className="flex-1 overflow-auto ml-[228px]"
+        style={{ fontFamily: "var(--font-hall-sans)" }}
+      >
+        {/* K-v2 thin 1-line header */}
+        <header
+          className="flex items-center justify-between gap-6 px-9 py-3.5"
+          style={{ borderBottom: "1px solid var(--hall-ink-0)" }}
+        >
+          <div className="flex items-baseline gap-4 min-w-0">
+            <span
+              className="text-[10px] tracking-[0.08em] whitespace-nowrap uppercase"
+              style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+            >
+              COMMON HOUSE · <b style={{ color: "var(--hall-ink-0)" }}>DIRECTORY</b>
+            </span>
+            <h1
+              className="text-[16px] font-medium tracking-[-0.01em]"
+              style={{ color: "var(--hall-ink-0)" }}
+            >
+              The{" "}
+              <em style={{ fontFamily: "var(--font-hall-display)", fontStyle: "italic", fontWeight: 400 }}>
+                residents
+              </em>
+              .
+            </h1>
+          </div>
+          <span
+            className="text-[10px] font-bold tracking-[0.14em] uppercase whitespace-nowrap"
+            style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+          >
+            {humanCount} HUMANS
+          </span>
         </header>
 
-        {/* ── Client: filter pills + content sections ───────────────────── */}
+        <p
+          className="px-9 py-4 text-[11.5px] max-w-[640px] leading-relaxed"
+          style={{ color: "var(--hall-muted-2)" }}
+        >
+          Humans and digital agents that make the House run. A living directory of activatable capabilities.
+        </p>
+
+        {/* Client: filter pills + content sections */}
         <ResidentsClient
           coFounders={coFounders}
           eirs={eirs}
           coreTeam={coreTeam}
           humanCount={humanCount}
         />
-
       </main>
     </div>
   );

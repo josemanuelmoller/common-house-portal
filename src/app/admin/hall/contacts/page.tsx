@@ -347,119 +347,100 @@ export default async function HallContactsPage({ searchParams }: PageProps) {
     <div className="flex min-h-screen bg-[#EFEFEA]">
       <Sidebar adminNav />
 
-      <main className="flex-1 ml-[228px]">
-        <header className="bg-[#131218] px-12 pt-10 pb-11">
-          <p className="text-[8px] font-bold tracking-[2.5px] uppercase text-white/20 mb-3">
-            Hall · Intelligence
-          </p>
-          <div className="flex items-end justify-between">
-            <div>
-              <h1 className="text-[2.6rem] font-light text-white tracking-[-1.5px] leading-none">
-                <em className="font-black italic text-[#c8f55a]">Contacts</em>
-              </h1>
-              <p className="text-sm text-white/40 mt-3 max-w-2xl">
-                {mode === "attention"
-                  ? "Everything in your contact base that needs a decision — untagged people, matches to approve, VIPs gone cold. Aggregated from all the other tabs so you have one ritual to keep the base clean."
-                  : mode === "browse"
-                  ? "People who appear across your calendar, email, meeting transcripts and WhatsApp — ranked by relationship intensity. Click a name to dive in."
-                  : mode === "classify"
-                  ? "Classify attendees so Suggested Time Blocks treats them correctly: personal meetings skip prep, VIP meetings get urgency boost."
-                  : mode === "orphans"
-                  ? "WhatsApp and Fireflies senders the clipper flagged as medium-confidence matches to existing contacts. Approve to backfill + teach the resolver."
-                  : "Candidates from the LinkedIn enrichment agent with confidence between 0.4 and 0.8 — one click to approve, override, or reject."
-                }
-              </p>
-            </div>
-            <div className="flex items-center gap-5 pb-1">
-              <Stat label="Observed" value={contacts.length} />
-              <div className="w-px h-10 bg-white/10" />
-              <Stat label="Untagged" value={unclassified.length} color={unclassified.length > 0 ? "text-amber-400" : "text-white/30"} />
-              <div className="w-px h-10 bg-white/10" />
-              <Stat label="Personal" value={personal.length} />
-              <div className="w-px h-10 bg-white/10" />
-              <Stat label="VIP" value={vip.length} color="text-[#c8f55a]" />
-            </div>
+      <main
+        className="flex-1 ml-[228px]"
+        style={{ fontFamily: "var(--font-hall-sans)", background: "var(--hall-paper-0)" }}
+      >
+        <header
+          className="flex items-center justify-between gap-6 px-9 py-3.5"
+          style={{ borderBottom: "1px solid var(--hall-ink-0)" }}
+        >
+          <div className="flex items-baseline gap-4 min-w-0">
+            <span
+              className="text-[10px] tracking-[0.08em] whitespace-nowrap uppercase"
+              style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+            >
+              HALL · <b style={{ color: "var(--hall-ink-0)" }}>INTELLIGENCE</b>
+            </span>
+            <h1
+              className="text-[16px] font-medium tracking-[-0.01em]"
+              style={{ color: "var(--hall-ink-0)" }}
+            >
+              <em style={{ fontFamily: "var(--font-hall-display)", fontStyle: "italic", fontWeight: 400 }}>
+                Contacts
+              </em>
+              .
+            </h1>
+          </div>
+          <div
+            className="flex items-center gap-4 text-[10px] whitespace-nowrap"
+            style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+          >
+            <Stat label="OBSERVED" value={contacts.length} />
+            <span style={{ color: "var(--hall-muted-3)" }}>·</span>
+            <Stat label="UNTAGGED" value={unclassified.length} color={unclassified.length > 0 ? "var(--hall-warn)" : "var(--hall-muted-3)"} />
+            <span style={{ color: "var(--hall-muted-3)" }}>·</span>
+            <Stat label="PERSONAL" value={personal.length} />
+            <span style={{ color: "var(--hall-muted-3)" }}>·</span>
+            <Stat label="VIP" value={vip.length} color="var(--hall-lime-ink)" />
           </div>
         </header>
 
-        <div className="px-12 py-9 max-w-5xl space-y-8">
+        <p
+          className="px-9 pt-4 pb-2 text-[11.5px] max-w-3xl leading-relaxed"
+          style={{ color: "var(--hall-muted-2)" }}
+        >
+          {mode === "attention"
+            ? "Everything in your contact base that needs a decision — untagged people, matches to approve, VIPs gone cold. Aggregated from all the other tabs so you have one ritual to keep the base clean."
+            : mode === "browse"
+            ? "People who appear across your calendar, email, meeting transcripts and WhatsApp — ranked by relationship intensity. Click a name to dive in."
+            : mode === "classify"
+            ? "Classify attendees so Suggested Time Blocks treats them correctly: personal meetings skip prep, VIP meetings get urgency boost."
+            : mode === "orphans"
+            ? "WhatsApp and Fireflies senders the clipper flagged as medium-confidence matches to existing contacts. Approve to backfill + teach the resolver."
+            : "Candidates from the LinkedIn enrichment agent with confidence between 0.4 and 0.8 — one click to approve, override, or reject."
+          }
+        </p>
+
+        <div className="px-9 py-6 max-w-5xl space-y-8">
           {/* Tab navigation */}
-          <div className="flex items-center gap-1 border-b border-[#E0E0D8]">
-            <Link
-              href="?mode=attention"
-              prefetch={false}
-              className={`px-4 py-2.5 text-[11px] font-bold tracking-widest uppercase border-b-2 transition-colors ${
-                mode === "attention"
-                  ? "border-[#131218] text-[#131218]"
-                  : "border-transparent text-[#131218]/40 hover:text-[#131218]/70"
-              }`}
-            >
-              Attention
-              {attentionCount > 0 && (
-                <span className="ml-2 text-[10px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full">
-                  {attentionCount}
-                </span>
-              )}
-            </Link>
-            <Link
-              href="?mode=browse"
-              prefetch={false}
-              className={`px-4 py-2.5 text-[11px] font-bold tracking-widest uppercase border-b-2 transition-colors ${
-                mode === "browse"
-                  ? "border-[#131218] text-[#131218]"
-                  : "border-transparent text-[#131218]/40 hover:text-[#131218]/70"
-              }`}
-            >
-              Browse
-            </Link>
-            <Link
-              href="?mode=classify"
-              prefetch={false}
-              className={`px-4 py-2.5 text-[11px] font-bold tracking-widest uppercase border-b-2 transition-colors ${
-                mode === "classify"
-                  ? "border-[#131218] text-[#131218]"
-                  : "border-transparent text-[#131218]/40 hover:text-[#131218]/70"
-              }`}
-            >
-              Classify
-              {unclassified.length > 0 && (
-                <span className="ml-2 text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">
-                  {unclassified.length}
-                </span>
-              )}
-            </Link>
-            <Link
-              href="?mode=orphans"
-              prefetch={false}
-              className={`px-4 py-2.5 text-[11px] font-bold tracking-widest uppercase border-b-2 transition-colors ${
-                mode === "orphans"
-                  ? "border-[#131218] text-[#131218]"
-                  : "border-transparent text-[#131218]/40 hover:text-[#131218]/70"
-              }`}
-            >
-              Orphans
-              {orphanPending > 0 && (
-                <span className="ml-2 text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">
-                  {orphanPending}
-                </span>
-              )}
-            </Link>
-            <Link
-              href="?mode=linkedin"
-              prefetch={false}
-              className={`px-4 py-2.5 text-[11px] font-bold tracking-widest uppercase border-b-2 transition-colors ${
-                mode === "linkedin"
-                  ? "border-[#131218] text-[#131218]"
-                  : "border-transparent text-[#131218]/40 hover:text-[#131218]/70"
-              }`}
-            >
-              LinkedIn
-              {linkedinPending > 0 && (
-                <span className="ml-2 text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">
-                  {linkedinPending}
-                </span>
-              )}
-            </Link>
+          <div className="flex items-center gap-1" style={{ borderBottom: "1px solid var(--hall-line)" }}>
+            {([
+              { mode: "attention", label: "Attention", count: attentionCount, alert: true },
+              { mode: "browse",    label: "Browse",    count: 0,               alert: false },
+              { mode: "classify",  label: "Classify",  count: unclassified.length, alert: false },
+              { mode: "orphans",   label: "Orphans",   count: orphanPending,   alert: false },
+              { mode: "linkedin",  label: "LinkedIn",  count: linkedinPending, alert: false },
+            ] as const).map((t) => {
+              const isActive = mode === t.mode;
+              return (
+                <Link
+                  key={t.mode}
+                  href={`?mode=${t.mode}`}
+                  prefetch={false}
+                  className="px-4 py-2.5 text-[11.5px] font-semibold tracking-[0.01em] transition-colors flex items-baseline gap-1.5"
+                  style={{
+                    color: isActive ? "var(--hall-ink-0)" : "var(--hall-muted-2)",
+                    borderBottom: isActive ? "2px solid var(--hall-ink-0)" : "2px solid transparent",
+                    marginBottom: "-1px",
+                  }}
+                >
+                  <span>{t.label}</span>
+                  {t.count > 0 && (
+                    <span
+                      style={{
+                        fontFamily: "var(--font-hall-mono)",
+                        fontSize: 10,
+                        fontWeight: isActive ? 600 : 400,
+                        color: t.alert ? "var(--hall-danger)" : isActive ? "var(--hall-ink-0)" : "var(--hall-muted-3)",
+                      }}
+                    >
+                      {t.count}
+                    </span>
+                  )}
+                </Link>
+              );
+            })}
             <div className="flex-1" />
             <HallContactsAutoRefresh />
           </div>
@@ -496,37 +477,63 @@ export default async function HallContactsPage({ searchParams }: PageProps) {
           {mode === "classify" && <>
 
           {/* Activation rule */}
-          <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-3.5">
-            <p className="text-[11px] text-[#131218]/60 leading-snug">
-              <strong className="text-[#131218]">How it works.</strong>{" "}
+          <div
+            className="px-3.5 py-3 rounded-[3px]"
+            style={{ border: "1px solid var(--hall-line-soft)", background: "var(--hall-paper-1)" }}
+          >
+            <p className="text-[11.5px] leading-snug" style={{ color: "var(--hall-muted-2)" }}>
+              <strong style={{ color: "var(--hall-ink-0)" }}>How it works.</strong>{" "}
               When all non-you attendees are classified Family / Personal Service / Friend,
               the meeting stays on your calendar for slot planning but no prep / follow-up
               task is emitted. Only the <strong>VIP</strong> tag boosts prep urgency —
               add it on top of any role (Client, Investor, Partner, …) to mark a decision-maker.
-              Unclassified attendees default to "unknown" — prep still emitted (fail-open).
+              Unclassified attendees default to &quot;unknown&quot; — prep still emitted (fail-open).
             </p>
           </div>
 
           {/* Untagged queue */}
           <section>
-            <div className="flex items-center gap-3 mb-3">
-              <h2 className="text-[11px] font-bold tracking-widest uppercase text-[#131218]/60">Untagged — needs review</h2>
-              <div className="flex-1 h-px bg-[#E0E0D8]" />
-              {unclassified.length > 0 && (
-                <span className="text-[10px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">
-                  {unclassified.length}
+            <div
+              className="flex items-baseline justify-between gap-3 pb-2 mb-3.5"
+              style={{ borderBottom: "1px solid var(--hall-ink-0)" }}
+            >
+              <h2
+                className="text-[19px] font-bold leading-none flex items-baseline gap-2"
+                style={{ letterSpacing: "-0.02em", color: "var(--hall-ink-0)" }}
+              >
+                <span>
+                  Untagged ·{" "}
+                  <em style={{ fontFamily: "var(--font-hall-display)", fontStyle: "italic", fontWeight: 400 }}>
+                    needs review
+                  </em>
                 </span>
-              )}
+                {unclassified.length > 0 && (
+                  <span
+                    style={{
+                      fontFamily: "var(--font-hall-mono)",
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: "var(--hall-warn)",
+                    }}
+                  >
+                    {unclassified.length}
+                  </span>
+                )}
+              </h2>
             </div>
-            <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden divide-y divide-[#EFEFEA]">
+            <ul className="flex flex-col">
               {unclassified.length === 0 ? (
-                <div className="px-5 py-8 text-center">
-                  <p className="text-sm text-[#131218]/25">Nothing to tag. Every observed attendee has a class.</p>
-                </div>
+                <li className="py-6 text-center" style={{ borderTop: "1px solid var(--hall-line-soft)" }}>
+                  <p className="text-[12px]" style={{ color: "var(--hall-muted-3)" }}>
+                    Nothing to tag. Every observed attendee has a class.
+                  </p>
+                </li>
               ) : unclassified.map(c => (
-                <HallContactRow key={c.email} {...c} />
+                <li key={c.email} style={{ borderTop: "1px solid var(--hall-line-soft)" }}>
+                  <HallContactRow {...c} />
+                </li>
               ))}
-            </div>
+            </ul>
           </section>
 
           {/* By organization — bulk tag + rollup */}
@@ -534,10 +541,26 @@ export default async function HallContactsPage({ searchParams }: PageProps) {
 
           {/* Classified */}
           <section>
-            <div className="flex items-center gap-3 mb-3">
-              <h2 className="text-[11px] font-bold tracking-widest uppercase text-[#131218]/60">Classified</h2>
-              <div className="flex-1 h-px bg-[#E0E0D8]" />
-              <span className="text-[10px] font-semibold text-[#131218]/30">{classified.length}</span>
+            <div
+              className="flex items-baseline justify-between gap-3 pb-2 mb-3.5"
+              style={{ borderBottom: "1px solid var(--hall-ink-0)" }}
+            >
+              <h2
+                className="text-[19px] font-bold leading-none"
+                style={{ letterSpacing: "-0.02em", color: "var(--hall-ink-0)" }}
+              >
+                Classified
+              </h2>
+              <span
+                style={{
+                  fontFamily: "var(--font-hall-mono)",
+                  fontSize: 10,
+                  color: "var(--hall-muted-2)",
+                  letterSpacing: "0.06em",
+                }}
+              >
+                {classified.length} CONTACTS
+              </span>
             </div>
             <HallContactsCollapsibleList
               rows={classified}
@@ -559,12 +582,26 @@ export default async function HallContactsPage({ searchParams }: PageProps) {
   );
 }
 
-function Stat({ label, value, color = "text-white" }: { label: string; value: number; color?: string }) {
+function Stat({ label, value, color }: { label: string; value: number; color?: string }) {
   return (
-    <div className="text-right">
-      <p className={`text-[2rem] font-black tracking-tight leading-none ${color}`}>{value}</p>
-      <p className="text-[9px] font-bold tracking-[1.5px] uppercase text-white/30 mt-0.5">{label}</p>
-    </div>
+    <span className="inline-flex items-baseline gap-1">
+      <span
+        style={{
+          fontFamily: "var(--font-hall-mono)",
+          fontSize: 12,
+          fontWeight: 600,
+          color: color ?? "var(--hall-ink-0)",
+        }}
+      >
+        {value}
+      </span>
+      <span
+        className="uppercase tracking-[0.08em]"
+        style={{ fontSize: 9.5, color: "var(--hall-muted-2)" }}
+      >
+        {label}
+      </span>
+    </span>
   );
 }
 

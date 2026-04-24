@@ -83,46 +83,76 @@ export default async function LibraryPage() {
   const totalItems = assets.length + canonical.length;
 
   return (
-    <div className="flex min-h-screen bg-[#EFEFEA]">
+    <div className="flex min-h-screen" style={{ background: "var(--hall-paper-0)" }}>
       <Sidebar items={NAV} isAdmin />
 
-      <main className="flex-1 overflow-auto">
-
-        {/* Header — reading room */}
-        <div className="bg-[#131218] px-10 py-10">
-          <div className="max-w-4xl mx-auto">
-            <p className="text-[8px] font-bold text-white/20 uppercase tracking-[2.5px] mb-3">
-              THE LIBRARY · COMMON HOUSE
-            </p>
-            <h1 className="text-[2.6rem] font-[300] text-white leading-[1] tracking-[-1.5px]">
-              External <em className="font-[900] italic text-[#c8f55a]">references</em>
+      <main
+        className="flex-1 overflow-auto"
+        style={{ fontFamily: "var(--font-hall-sans)" }}
+      >
+        {/* K-v2 thin 1-line header */}
+        <header
+          className="flex items-center justify-between gap-6 px-9 py-3.5"
+          style={{ borderBottom: "1px solid var(--hall-ink-0)" }}
+        >
+          <div className="flex items-baseline gap-4 min-w-0">
+            <span
+              className="text-[10px] tracking-[0.08em] whitespace-nowrap uppercase"
+              style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+            >
+              LIBRARY · <b style={{ color: "var(--hall-ink-0)" }}>COMMON HOUSE</b>
+            </span>
+            <h1
+              className="text-[16px] font-medium tracking-[-0.01em]"
+              style={{ color: "var(--hall-ink-0)" }}
+            >
+              External{" "}
+              <em style={{ fontFamily: "var(--font-hall-display)", fontStyle: "italic", fontWeight: 400 }}>
+                references
+              </em>
+              .
             </h1>
-            <p className="text-[12.5px] text-white/40 mt-3 max-w-[560px] leading-[1.65]">
-              Papers, reports, playbooks y documentos externos subidos manualmente.
-              Para conocimiento destilado desde reuniones y emails por el OS, ver <a href="/admin/knowledge" className="underline decoration-[#c8f55a] decoration-2 underline-offset-2 text-white/70 hover:text-[#c8f55a]">Knowledge</a>.
-            </p>
-            {totalItems > 0 && (
-              <div className="flex items-center gap-2 mt-5">
-                <span className="text-[10px] font-bold text-[#131218] bg-[#B2FF59] px-3 py-1.5 rounded-full uppercase tracking-widest">
-                  {totalItems} item{totalItems !== 1 ? "s" : ""}
-                </span>
-                {canonical.length > 0 && (
-                  <span className="text-[10px] font-bold text-white/40 border border-white/15 px-3 py-1.5 rounded-full uppercase tracking-widest">
-                    {canonical.length} canonical
-                  </span>
-                )}
-              </div>
-            )}
-            {assetsFiltered && (
-              <p className="text-[11px] text-white/25 mt-3">
-                Mostrando recursos disponibles para tu perfil
-              </p>
-            )}
           </div>
+          {totalItems > 0 && (
+            <div
+              className="flex items-center gap-2 text-[10px] whitespace-nowrap"
+              style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+            >
+              <span className="uppercase tracking-[0.08em]" style={{ color: "var(--hall-ink-0)", fontWeight: 600 }}>
+                {totalItems} ITEM{totalItems !== 1 ? "S" : ""}
+              </span>
+              {canonical.length > 0 && (
+                <>
+                  <span style={{ color: "var(--hall-muted-3)" }}>·</span>
+                  <span className="uppercase tracking-[0.08em]">
+                    {canonical.length} CANONICAL
+                  </span>
+                </>
+              )}
+            </div>
+          )}
+        </header>
+
+        <div className="px-9 py-4">
+          <p
+            className="text-[11.5px] max-w-[640px] leading-relaxed"
+            style={{ color: "var(--hall-muted-2)" }}
+          >
+            Papers, reports, playbooks y documentos externos subidos manualmente.
+            Para conocimiento destilado desde reuniones y emails por el OS, ver{" "}
+            <a href="/admin/knowledge" className="underline underline-offset-2" style={{ color: "var(--hall-ink-0)", textDecorationColor: "var(--hall-ink-0)" }}>
+              Knowledge
+            </a>
+            .
+          </p>
+          {assetsFiltered && (
+            <p className="text-[11px] mt-2" style={{ color: "var(--hall-muted-3)" }}>
+              Mostrando recursos disponibles para tu perfil
+            </p>
+          )}
         </div>
 
-        <div className="px-8 py-6">
-          <div className="max-w-4xl mx-auto space-y-10">
+        <div className="px-9 pb-10 max-w-4xl space-y-8">
 
             {/* Ingest panel — super-admin only */}
             {isSuperAdmin && (
@@ -132,57 +162,79 @@ export default async function LibraryPage() {
             {/* Canonical — most authoritative, featured treatment */}
             {canonical.length > 0 && (
               <section>
-                <div className="mb-4">
-                  <div className="flex items-center gap-3 mb-1">
-                    <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">
-                      Canonical
-                    </p>
-                    <span className="text-[10px] font-bold text-[#131218] bg-[#B2FF59] px-2 py-0.5 rounded-full">
-                      {canonical.length}
-                    </span>
-                  </div>
-                  <p className="text-xs text-[#131218]/35 leading-relaxed">
-                    The highest-confidence cross-project evidence — validated, reusable, and
-                    worth reading regardless of which project you're in.
-                  </p>
+                <div
+                  className="flex items-baseline justify-between gap-3 pb-2 mb-3.5"
+                  style={{ borderBottom: "1px solid var(--hall-ink-0)" }}
+                >
+                  <h2
+                    className="text-[19px] font-bold leading-none"
+                    style={{ letterSpacing: "-0.02em", color: "var(--hall-ink-0)" }}
+                  >
+                    Canonical{" "}
+                    <em style={{ fontFamily: "var(--font-hall-display)", fontStyle: "italic", fontWeight: 400 }}>
+                      references
+                    </em>
+                  </h2>
+                  <span
+                    className="uppercase"
+                    style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--hall-muted-2)", letterSpacing: "0.06em" }}
+                  >
+                    {canonical.length} CANONICAL
+                  </span>
                 </div>
-                <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-                  <div className="h-1 bg-[#131218]" />
-                  <div className="divide-y divide-[#EFEFEA]">
-                    {canonical.map((e) => (
-                      <div key={e.id} className="px-6 py-5 flex gap-4">
-                        <span className="text-[#B2FF59] bg-[#131218] rounded-full w-5 h-5 flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5">
-                          ✦
-                        </span>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold text-[#131218] leading-snug">
-                            {e.title}
+                <p
+                  className="text-[11.5px] leading-relaxed mb-4"
+                  style={{ color: "var(--hall-muted-2)" }}
+                >
+                  The highest-confidence cross-project evidence — validated, reusable, and
+                  worth reading regardless of which project you&apos;re in.
+                </p>
+                <ul className="flex flex-col">
+                  {canonical.map((e) => (
+                    <li
+                      key={e.id}
+                      className="flex gap-4 py-4"
+                      style={{ borderTop: "1px solid var(--hall-line-soft)" }}
+                    >
+                      <span
+                        className="shrink-0 mt-0.5 flex items-center justify-center"
+                        style={{
+                          width: 20,
+                          height: 20,
+                          borderRadius: "50%",
+                          background: "var(--hall-ink-0)",
+                          color: "var(--hall-paper-0)",
+                          fontSize: 10,
+                          fontWeight: 700,
+                        }}
+                      >
+                        ✦
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[13px] font-semibold leading-snug" style={{ color: "var(--hall-ink-0)" }}>
+                          {e.title}
+                        </p>
+                        {e.excerpt && (
+                          <p className="text-[12.5px] mt-2 leading-relaxed" style={{ color: "var(--hall-muted-2)" }}>
+                            {e.excerpt}
                           </p>
-                          {e.excerpt && (
-                            <p className="text-sm text-[#131218]/50 mt-2 leading-relaxed">
-                              {e.excerpt}
-                            </p>
-                          )}
-                          <div className="flex items-center gap-3 mt-3">
-                            <span className="text-[10px] font-bold text-[#131218]/25 uppercase tracking-widest">
-                              {e.type}
+                        )}
+                        <div
+                          className="flex items-center gap-3 mt-3 text-[10px] uppercase"
+                          style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-3)", letterSpacing: "0.06em" }}
+                        >
+                          <span>{e.type}</span>
+                          {e.confidence && <span>· {e.confidence} CONFIDENCE</span>}
+                          {e.dateCaptured && (
+                            <span>
+                              · {new Date(e.dateCaptured).toLocaleDateString("en-GB", { month: "short", year: "numeric" })}
                             </span>
-                            {e.confidence && (
-                              <span className="text-[10px] text-[#131218]/20 uppercase tracking-widest">
-                                · {e.confidence} confidence
-                              </span>
-                            )}
-                            {e.dateCaptured && (
-                              <span className="text-[10px] text-[#131218]/20">
-                                · {new Date(e.dateCaptured).toLocaleDateString("en-GB", { month: "short", year: "numeric" })}
-                              </span>
-                            )}
-                          </div>
+                          )}
                         </div>
                       </div>
-                    ))}
-                  </div>
-                </div>
+                    </li>
+                  ))}
+                </ul>
               </section>
             )}
 
@@ -192,88 +244,115 @@ export default async function LibraryPage() {
               const items = byFamily[family];
               return (
                 <section key={family}>
-                  <div className="mb-4">
-                    <div className="flex items-center gap-3 mb-1">
-                      <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">
-                        {meta.label}
-                      </p>
-                      <span className="text-[10px] font-bold text-[#131218]/40 bg-[#EFEFEA] border border-[#E0E0D8] px-2 py-0.5 rounded-full">
-                        {items.length}
-                      </span>
-                    </div>
-                    <p className="text-xs text-[#131218]/35 leading-relaxed">
-                      {meta.rationale}
-                    </p>
+                  <div
+                    className="flex items-baseline justify-between gap-3 pb-2 mb-3.5"
+                    style={{ borderBottom: "1px solid var(--hall-ink-0)" }}
+                  >
+                    <h2
+                      className="text-[19px] font-bold leading-none"
+                      style={{ letterSpacing: "-0.02em", color: "var(--hall-ink-0)" }}
+                    >
+                      {meta.label}
+                    </h2>
+                    <span
+                      className="uppercase"
+                      style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--hall-muted-2)", letterSpacing: "0.06em" }}
+                    >
+                      {items.length} ITEM{items.length !== 1 ? "S" : ""}
+                    </span>
                   </div>
-                  <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-                    <div className="h-1 bg-[#EFEFEA]" />
-                    <div className="divide-y divide-[#EFEFEA]">
-                      {items.map((asset) => (
-                        <div key={asset.id} className="px-6 py-4">
-                          <div className="flex items-start justify-between gap-4">
-                            <div className="min-w-0 flex-1">
-                              <p className="text-sm font-semibold text-[#131218] leading-snug">
-                                {asset.name}
-                              </p>
-                              <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                                {asset.assetType && (
-                                  <span className="text-[10px] font-medium text-[#131218]/35 bg-[#EFEFEA] px-2 py-0.5 rounded-full">
-                                    {asset.assetType}
-                                  </span>
-                                )}
-                                {asset.category && (
-                                  <span className="text-[10px] text-[#131218]/25 font-medium">
-                                    {asset.category}
-                                  </span>
-                                )}
-                                {asset.sourceFileUrl && (
-                                  <a
-                                    href={asset.sourceFileUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-[10px] font-medium text-[#131218]/35 hover:text-[#131218] transition-colors flex items-center gap-0.5"
-                                  >
-                                    ↓ archivo
-                                  </a>
-                                )}
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2 shrink-0">
-                              {asset.status === "Active" || asset.status === "Live" ? (
-                                <span className="text-[10px] font-bold text-[#131218] bg-[#B2FF59] px-2 py-0.5 rounded-full uppercase tracking-widest">
-                                  {asset.status}
-                                </span>
-                              ) : asset.status ? (
-                                <span className="text-[10px] font-medium text-[#131218]/25 uppercase tracking-widest">
-                                  {asset.status}
-                                </span>
-                              ) : null}
-                              {asset.lastUpdated && (
-                                <span className="text-[10px] text-[#131218]/20 font-medium">
-                                  {new Date(asset.lastUpdated).toLocaleDateString("en-GB", {
-                                    day: "numeric",
-                                    month: "short",
-                                  })}
-                                </span>
-                              )}
-                            </div>
+                  <p className="text-[11.5px] leading-relaxed mb-3" style={{ color: "var(--hall-muted-2)" }}>
+                    {meta.rationale}
+                  </p>
+                  <ul className="flex flex-col">
+                    {items.map((asset) => (
+                      <li
+                        key={asset.id}
+                        className="flex items-start justify-between gap-4 py-3"
+                        style={{ borderTop: "1px solid var(--hall-line-soft)" }}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[13px] font-semibold leading-snug" style={{ color: "var(--hall-ink-0)" }}>
+                            {asset.name}
+                          </p>
+                          <div
+                            className="flex items-center gap-2 mt-1.5 flex-wrap text-[10px]"
+                            style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-3)" }}
+                          >
+                            {asset.assetType && (
+                              <span
+                                className="uppercase px-2 py-0.5 rounded-[2px]"
+                                style={{ background: "var(--hall-fill-soft)", letterSpacing: "0.08em" }}
+                              >
+                                {asset.assetType}
+                              </span>
+                            )}
+                            {asset.category && (
+                              <span>{asset.category}</span>
+                            )}
+                            {asset.sourceFileUrl && (
+                              <a
+                                href={asset.sourceFileUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="hover:underline"
+                                style={{ color: "var(--hall-muted-2)" }}
+                              >
+                                ↓ archivo
+                              </a>
+                            )}
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  </div>
+                        <div
+                          className="flex items-center gap-2 shrink-0 text-[10px]"
+                          style={{ fontFamily: "var(--font-hall-mono)" }}
+                        >
+                          {asset.status === "Active" || asset.status === "Live" ? (
+                            <span
+                              className="uppercase px-1.5 py-0.5 rounded-[2px] font-bold"
+                              style={{
+                                background: "var(--hall-ok-soft)",
+                                color: "var(--hall-ok)",
+                                letterSpacing: "0.08em",
+                              }}
+                            >
+                              {asset.status}
+                            </span>
+                          ) : asset.status ? (
+                            <span className="uppercase" style={{ color: "var(--hall-muted-3)", letterSpacing: "0.08em" }}>
+                              {asset.status}
+                            </span>
+                          ) : null}
+                          {asset.lastUpdated && (
+                            <span style={{ color: "var(--hall-muted-3)" }}>
+                              {new Date(asset.lastUpdated).toLocaleDateString("en-GB", {
+                                day: "numeric",
+                                month: "short",
+                              })}
+                            </span>
+                          )}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
                 </section>
               );
             })}
 
             {/* Knowledge Assets locked — admin but not super-admin */}
             {isAdmin && !isSuperAdmin && allAssets.length > 0 && (
-              <div className="bg-white rounded-2xl border border-[#E0E0D8] p-10 text-center">
-                <div className="w-10 h-10 bg-[#131218] rounded-full flex items-center justify-center mx-auto mb-3">
-                  <span className="text-white text-sm">⊘</span>
+              <div
+                className="p-10 text-center rounded-[3px]"
+                style={{ border: "1px solid var(--hall-line-soft)" }}
+              >
+                <div
+                  className="flex items-center justify-center mx-auto mb-3"
+                  style={{ width: 40, height: 40, borderRadius: "50%", background: "var(--hall-ink-0)", color: "var(--hall-paper-0)" }}
+                >
+                  <span className="text-sm">⊘</span>
                 </div>
-                <p className="text-sm font-bold text-[#131218]">Knowledge Assets — acceso restringido</p>
-                <p className="text-xs text-[#131218]/40 mt-2 max-w-[320px] mx-auto leading-relaxed">
+                <p className="text-[13px] font-bold" style={{ color: "var(--hall-ink-0)" }}>Knowledge Assets — acceso restringido</p>
+                <p className="text-[11px] mt-2 max-w-[320px] mx-auto leading-relaxed" style={{ color: "var(--hall-muted-3)" }}>
                   Los Knowledge Assets contienen IP institucional de Common House y están disponibles
                   solo para super-admins.
                 </p>
@@ -282,19 +361,24 @@ export default async function LibraryPage() {
 
             {/* Empty state — no accessible content at all */}
             {totalItems === 0 && !(isAdmin && !isSuperAdmin && allAssets.length > 0) && (
-              <div className="bg-white rounded-2xl border border-[#E0E0D8] p-12 text-center">
-                <div className="w-12 h-12 bg-[#131218] rounded-full flex items-center justify-center mx-auto mb-4">
-                  <span className="text-[#B2FF59] text-lg">◉</span>
+              <div
+                className="p-12 text-center rounded-[3px]"
+                style={{ border: "1px solid var(--hall-line-soft)" }}
+              >
+                <div
+                  className="flex items-center justify-center mx-auto mb-4"
+                  style={{ width: 48, height: 48, borderRadius: "50%", background: "var(--hall-ink-0)", color: "var(--hall-lime)" }}
+                >
+                  <span className="text-lg">◉</span>
                 </div>
-                <p className="text-sm font-bold text-[#131218]">The Library is building</p>
-                <p className="text-xs text-[#131218]/40 mt-2 max-w-xs mx-auto leading-relaxed">
+                <p className="text-[13px] font-bold" style={{ color: "var(--hall-ink-0)" }}>The Library is building</p>
+                <p className="text-[11px] mt-2 max-w-xs mx-auto leading-relaxed" style={{ color: "var(--hall-muted-3)" }}>
                   Knowledge assets emerge from validated, reusable evidence across projects.
                   They accumulate as the work deepens.
                 </p>
               </div>
             )}
 
-          </div>
         </div>
       </main>
     </div>
