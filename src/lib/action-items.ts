@@ -98,9 +98,10 @@ export async function getInboxActions(limit = DEFAULT_INBOX_LIMIT): Promise<Inbo
     const label: InboxActionView["label"] =
       score >= 70 ? "Urgent" : score >= 40 ? "Needs Reply" : "FYI";
     const nextAction = r.next_action ?? "";
-    // UX: summary (headline) = imperative next_action; snippet (subtitle) =
-    // original email subject, so the row reads "[what to do] / [who sent what]"
-    // instead of repeating the next_action twice.
+    // UX mapping (matches what the client component actually renders):
+    //   summary (headline)        = imperative next_action
+    //   fromName · reason (subtitle) = "Counterparty · Original email subject"
+    //   snippet                   = subject (used by createCandidate payload)
     return {
       actionItemId: r.id,
       threadId: r.source_id,
@@ -113,7 +114,7 @@ export async function getInboxActions(limit = DEFAULT_INBOX_LIMIT): Promise<Inbo
       daysWaiting,
       isUnread: score >= 70,
       label,
-      reason: nextAction,
+      reason: r.subject,
       gmailUrl: r.source_url ?? "",
       summary: nextAction || null,
     };
