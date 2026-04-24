@@ -65,7 +65,7 @@ import { SuggestedTimeBlocks } from "@/components/SuggestedTimeBlocks";
 import { HallManualTriggers } from "@/components/HallManualTriggers";
 import { HallLiveClock } from "@/components/HallLiveClock";
 import { getAgentsOnlineCount } from "@/lib/hall-agents-count";
-import { getInboxActions, countOpenGmailActions } from "@/lib/action-items";
+import { getInboxActions, countOpenGmailActions, getCoSActions } from "@/lib/action-items";
 
 export { ADMIN_NAV as NAV } from "@/lib/admin-nav";
 export const dynamic = "force-dynamic";
@@ -506,7 +506,7 @@ export default async function AdminPage() {
     getOutboxDrafts(),
     getAgentDrafts("Draft Created"),
     getAgentDrafts("Approved"),
-    getCoSTasks(),
+    getCoSActions(40),  // Phase 6.5: CoS desk reads from action_items layer
     getParkedLoops(),
     getRadarLoops(),
     getCandidateOpportunities(),

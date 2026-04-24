@@ -4,14 +4,19 @@ import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { currentUser } from "@clerk/nextjs/server";
 
 /**
- * G3 — Commitment mark-done write-back.
+ * @deprecated Phase 5 of the normalization architecture replaced this
+ * route. The Commitments surface now resolves dismissals via
+ * POST /api/action-items/:id/resolve (writes to action_items.status).
  *
- * PATCH  /api/hall/commitments/[id]   → mark done (insert into hall_commitment_dismissals)
- * DELETE /api/hall/commitments/[id]   → undo (remove the dismissal)
+ * This route still runs against the legacy `hall_commitment_dismissals`
+ * table — any callers still hitting it will succeed, but the row will
+ * not be reflected in the new Commitments surface (which queries
+ * action_items). No in-repo caller as of Phase 10.
  *
- * id is the evidence notion_id. This is the persistent analogue to the
- * localStorage cache in HallCommitmentLedgerRows — it survives device
- * switches and tab refreshes.
+ * Original contract (for reference):
+ *   PATCH  /api/hall/commitments/[id]  → mark done (insert into hall_commitment_dismissals)
+ *   DELETE /api/hall/commitments/[id]  → undo
+ *   id is the evidence notion_id.
  */
 
 type Ctx = { params: Promise<{ id: string }> };

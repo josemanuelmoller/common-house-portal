@@ -1,19 +1,20 @@
 /**
- * GET /api/inbox-triage
+ * @deprecated Phase 3 of the normalization architecture replaced this
+ * route's role. The Inbox surface now reads from `action_items`
+ * (src/lib/action-items.ts#getInboxActions) populated by the Gmail
+ * ingestor (src/lib/ingestors/gmail.ts).
  *
- * Scans Gmail main inbox for threads that need Jose's attention:
- *   — Unread for 2+ days
- *   — Read but no reply from Jose in 2+ days
+ * This route still exists and still classifies live if called — kept
+ * alive as a safety net during the migration. Nothing in the portal
+ * calls it as of Phase 10. Safe to delete in a future cleanup pass;
+ * left in place to avoid broken-link noise in external integrations
+ * (if any) that may still hit it.
  *
- * Uses Claude Haiku to classify each candidate as:
- *   Urgent   — partner/funder/investor or explicit deadline/request
- *   Needs Reply — clear question or action required
- *   FYI      — informational, low pressure
- *
- * Returns top 10 flagged threads sorted by urgency then days waiting.
- *
- * Auth: x-agent-key header or Vercel cron CRON_SECRET.
- * Called on-demand from the Hall admin UI (client-side fetch).
+ * Original contract (for reference):
+ *   GET /api/inbox-triage
+ *   Scans Gmail main inbox for threads that need Jose's attention.
+ *   Uses Claude Haiku to classify as Urgent / Needs Reply / FYI.
+ *   Auth: x-agent-key header or Vercel cron CRON_SECRET.
  */
 
 import { NextRequest, NextResponse } from "next/server";

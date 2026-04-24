@@ -166,6 +166,18 @@
       "schedule": "0 19 * * *"
     },
     {
+      "path": "/api/ingest/whatsapp",
+      "schedule": "15 8 * * *"
+    },
+    {
+      "path": "/api/ingest/whatsapp",
+      "schedule": "15 17 * * *"
+    },
+    {
+      "path": "/api/ingest/drive",
+      "schedule": "0 6 * * *"
+    },
+    {
       "path": "/api/competitive-monitor",
       "schedule": "0 7 * * 1"
     }
