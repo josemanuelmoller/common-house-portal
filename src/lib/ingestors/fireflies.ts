@@ -26,6 +26,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { getSelfEmails } from "@/lib/hall-self";
 import { buildFactors } from "./priority";
+import { loadProjectRoles, passesManagementGate } from "./project-roles";
 import {
   getWatermark,
   startIngestorRun,
@@ -43,7 +44,7 @@ import type {
   Signal,
 } from "./types";
 
-const INGESTOR_VERSION = "fireflies@1.0.0";
+const INGESTOR_VERSION = "fireflies@1.1.0";
 const SOURCE_TYPE = "fireflies" as const;
 const DEFAULT_MAX_ITEMS = 60;
 const DEFAULT_BACKFILL_DAYS = 14;
@@ -109,6 +110,9 @@ export async function runFirefliesIngestor(input: IngestInput): Promise<IngestRe
     const sb = getSupabaseServerClient();
     const selfSet = await getSelfEmails();
 
+    // Management-level gate (Phase 11). Loaded once per run.
+    const projectRoles = await loadProjectRoles();
+
     // ─── Fetch evidence since watermark ─────────────────────────────────
     const rows = await fetchFirefliesEvidenceSince(since, input.maxItems ?? DEFAULT_MAX_ITEMS);
     if (rows.length === 0) {
@@ -138,6 +142,17 @@ export async function runFirefliesIngestor(input: IngestInput): Promise<IngestRe
         const cls = classifications.get(row.notion_id);
         if (!cls || !cls.is_actionable || cls.intent === "skip") { skipped++; continue; }
         if (cls.actor === "ambiguous" || cls.actor === "none") { skipped++; continue; }
+
+        // Phase 11 — Management-level gate. Mentorship projects only pass
+        // items where Jose is the EXPLICIT actor. Observer projects pass
+        // nothing. Evidence without a project context falls through
+        // (defensive: let the item through, let downstream dedup handle it).
+        const gate = passesManagementGate({
+          projectNotionId: row.project_notion_id,
+          roles: projectRoles,
+          actorIsSelf: cls.actor === "jose",
+        });
+        if (!gate.pass) { skipped++; continue; }
 
         // When actor=counterparty, ball is still 'jose' with intent=chase
         // (Jose's next action is to nudge them) — per architecture doc §8.

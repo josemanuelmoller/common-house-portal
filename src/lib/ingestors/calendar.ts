@@ -40,7 +40,7 @@ import type {
   Signal,
 } from "./types";
 
-const INGESTOR_VERSION = "calendar@1.0.0";
+const INGESTOR_VERSION = "calendar@1.1.0";
 const SOURCE_TYPE = "calendar" as const;
 const DEFAULT_MAX_ITEMS = 80;
 const PREP_WINDOW_HOURS = 48;
@@ -147,35 +147,13 @@ export async function runCalendarIngestor(input: IngestInput): Promise<IngestRes
           continue;
         }
 
-        // (2) Past meeting with no Fireflies transcript → follow_up
+        // (2) Past meeting → RETIRED. Used to emit follow_up "no transcript yet",
+        // but that's a data-quality signal about Fireflies, NOT a personal
+        // commitment. It polluted the Commitments surface with 4-of-5 items
+        // that weren't actionable by Jose. Past meetings now only produce
+        // RelationshipSignals (the touch below) — no ActionSignal.
         if (e.endMs > 0 && e.endMs < followupCutoff) {
-          if (transcriptedTitles.has(e.summary)) { skipped++; continue; }
-          // Only emit if the meeting had >1 external attendee (solo events are not actionable)
-          const externals = e.attendees.filter(a => !selfSet.has(a.toLowerCase()));
-          if (externals.length === 0) { skipped++; continue; }
-
-          const intent = "follow_up" as const;
-          const factors = buildFactors({
-            intent,
-            deadline: null,
-            lastMotionAt: new Date(e.endMs).toISOString(),
-            tier: null,
-            warmth: null,
-            objectiveTier: null,
-            founderOwned: false,
-          });
-          signals.push(buildActionSignal({
-            sourceId:     `event:${e.id}:followup`,
-            sourceUrl:    e.htmlLink,
-            intent,
-            subject:      e.summary || "(untitled event)",
-            nextAction:   `Follow up on "${e.summary}" — no transcript yet`,
-            counterparty: firstNonSelfAttendeeName(e.attendees, selfSet),
-            deadline:     null,
-            lastMotionAt: new Date(e.endMs).toISOString(),
-            factors,
-          }));
-          processed++;
+          skipped++;
         } else {
           skipped++;
         }

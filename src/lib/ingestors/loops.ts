@@ -13,6 +13,7 @@
 
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { buildFactors } from "./priority";
+import { loadProjectRoles, passesManagementGate } from "./project-roles";
 import {
   getWatermark,
   startIngestorRun,
@@ -30,7 +31,27 @@ import type {
   Signal,
 } from "./types";
 
-const INGESTOR_VERSION = "loops@1.0.0";
+const INGESTOR_VERSION = "loops@1.1.0";
+
+/**
+ * Reject obviously-malformed values in loops.linked_entity_name.
+ * A proper entity name is short (org/project label), has no sentence
+ * punctuation, no stats or percentages, no colons/semicolons. Return null
+ * when the value looks like loop content rather than an entity label.
+ */
+function cleanEntityName(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const v = raw.trim();
+  if (!v) return null;
+  if (v.length > 60) return null;                    // too long to be a name
+  if (/[.!?]\s/.test(v)) return null;                // has a sentence break
+  if (/[:;]/.test(v)) return null;                   // colon/semicolon = structured content
+  if (/%/.test(v)) return null;                      // has a percentage
+  if (/\d{2,}[-–]\d{2,}/.test(v)) return null;       // numeric ranges like "20-30"
+  const wordCount = v.split(/\s+/).filter(Boolean).length;
+  if (wordCount > 6) return null;                    // entity names are typically ≤6 words
+  return v;
+}
 const SOURCE_TYPE = "loops" as const;
 const DEFAULT_MAX_ITEMS = 200;
 
@@ -102,6 +123,9 @@ export async function runLoopsIngestor(input: IngestInput): Promise<IngestResult
   try {
     const sb = getSupabaseServerClient();
 
+    // Management-level gate (Phase 11). Loaded once per run.
+    const projectRoles = await loadProjectRoles();
+
     // ─── Fetch active loops updated since watermark ─────────────────────
     const { data, error } = await sb
       .from("loops")
@@ -135,6 +159,16 @@ export async function runLoopsIngestor(input: IngestInput): Promise<IngestResult
       if (!passiveGate) { skipped++; continue; }
       if (r.founder_interest === "dropped") { skipped++; continue; }
 
+      // Phase 11 — Management-level gate. For loops attached to mentorship
+      // projects, only emit if founder_owned=true (Jose explicitly
+      // claimed ownership). Observer projects emit nothing.
+      const gate = passesManagementGate({
+        projectNotionId: r.parent_project_id,
+        roles: projectRoles,
+        actorIsSelf: !!r.founder_owned,
+      });
+      if (!gate.pass) { skipped++; continue; }
+
       const intent = mapLoopTypeToIntent(r.loop_type);
       const founderOwned = !!r.founder_owned;
 
@@ -156,6 +190,15 @@ export async function runLoopsIngestor(input: IngestInput): Promise<IngestResult
         founderOwned,
       });
 
+      // `linked_entity_name` is expected to be a short entity name
+      // ("iRefill", "Greenleaf Retail"). Upstream sync-loops sometimes
+      // stuffs the loop content into this field by mistake — when that
+      // happens, using it as counterparty produces double-concatenated
+      // subjects in downstream surfaces. Reject obviously-malformed values.
+      const entity = cleanEntityName(r.linked_entity_name);
+      const title = r.title || "(untitled loop)";
+      const subject = entity ? `${entity}: ${title}` : title;
+
       const signal: ActionSignal = {
         kind: "action",
         source_type: SOURCE_TYPE,
@@ -169,11 +212,9 @@ export async function runLoopsIngestor(input: IngestInput): Promise<IngestResult
           ball_in_court: "jose",
           owner_person_id: null,
           founder_owned: founderOwned,
-          next_action: r.title || "(untitled loop)",
-          subject: r.linked_entity_name
-            ? `${r.linked_entity_name}: ${r.title}`
-            : r.title || "(untitled loop)",
-          counterparty: r.linked_entity_name,
+          next_action: title,
+          subject,
+          counterparty: entity,
           deadline: r.due_at,
           last_motion_at: lastMotionIso,
           consequence: null,

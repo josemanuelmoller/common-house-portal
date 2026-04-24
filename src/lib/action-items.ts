@@ -149,6 +149,10 @@ export type CommitmentActionView = {
 
 export async function getCommitmentActions(limit = 60): Promise<CommitmentActionView[]> {
   const sb = getSupabaseServerClient();
+  // Calendar is excluded: its follow_up emission ("meeting happened, no
+  // transcript yet") is a data-quality prompt, not a personal commitment.
+  // Calendar only contributes to the CoS desk via `prep` intents.
+  const COMMITMENT_SOURCES = ["gmail", "fireflies", "whatsapp", "loops", "drive", "evidence_derived"];
   const { data, error } = await sb
     .from("action_items")
     .select(
@@ -156,6 +160,7 @@ export async function getCommitmentActions(limit = 60): Promise<CommitmentAction
       "intent, priority_score, last_motion_at"
     )
     .in("intent", ["deliver", "chase", "follow_up", "close_loop"])
+    .in("source_type", COMMITMENT_SOURCES)
     .eq("ball_in_court", "jose")
     .eq("status", "open")
     .order("priority_score", { ascending: false })
