@@ -390,17 +390,38 @@ function SectionHeader({ label, count, action, href }: {
   action?: string;
   href?: string;
 }) {
+  // K-v2 — h2 ink-underlined, mono meta on right. Same visual as HallSection's
+  // head; used in places where we don't want the HallSection <section> wrapper
+  // (e.g. sections that are siblings of other sections, not nested content).
   return (
-    <div className="flex items-center gap-3 mb-3">
-      <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">{label}</p>
-      {count !== undefined && (
-        <span className="text-[9px] font-bold bg-[#131218]/6 text-[#131218]/40 px-1.5 py-0.5 rounded-full">
-          {count}
-        </span>
-      )}
-      <div className="flex-1 h-px bg-[#E0E0D8]" />
+    <div
+      className="flex items-baseline justify-between gap-3 pb-2 mb-3.5"
+      style={{ borderBottom: "1px solid var(--hall-ink-0)" }}
+    >
+      <h2
+        className="text-[19px] font-bold leading-none flex items-baseline gap-2"
+        style={{ letterSpacing: "-0.02em", color: "var(--hall-ink-0)" }}
+      >
+        <span>{label}</span>
+        {count !== undefined && (
+          <span
+            style={{
+              fontFamily: "var(--font-hall-mono)",
+              fontSize: 12,
+              fontWeight: 600,
+              color: "var(--hall-muted-2)",
+            }}
+          >
+            {count}
+          </span>
+        )}
+      </h2>
       {action && href && (
-        <Link href={href} className="text-[9px] font-bold text-[#131218]/30 hover:text-[#131218]/70 transition-colors uppercase tracking-widest whitespace-nowrap">
+        <Link
+          href={href}
+          className="text-[9px] font-bold uppercase tracking-widest whitespace-nowrap transition-colors"
+          style={{ color: "var(--hall-muted-2)" }}
+        >
           {action} →
         </Link>
       )}
@@ -1038,65 +1059,102 @@ export default async function AdminPage() {
                 return (
                   <div>
                     <SectionHeader label="Open decisions" count={openDecisions.length} action="All decisions" href="/admin/decisions" />
-                    <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-                      {substantiveCommitments && (
-                        <div className="px-5 py-3.5 border-b border-[#EFEFEA] bg-[#EFEFEA]/40">
-                          <p className="text-[9px] font-bold uppercase tracking-widest text-[#131218]/30 mb-1.5">From today&apos;s briefing</p>
-                          <pre className="text-[11.5px] text-[#131218]/70 leading-[1.6] whitespace-pre-wrap font-sans">
-                            {dailyBriefing!.myCommitments.slice(0, 500)}
-                          </pre>
-                        </div>
-                      )}
+                    {substantiveCommitments && (
+                      <div
+                        className="px-3.5 py-3 mb-3 rounded-[3px]"
+                        style={{ background: "var(--hall-paper-1)", border: "1px solid var(--hall-line-soft)" }}
+                      >
+                        <p
+                          className="font-bold uppercase mb-1.5"
+                          style={{ fontSize: 9, letterSpacing: "0.18em", color: "var(--hall-muted-3)", fontFamily: "var(--font-hall-mono)" }}
+                        >
+                          From today&apos;s briefing
+                        </p>
+                        <pre
+                          className="text-[11.5px] leading-[1.6] whitespace-pre-wrap font-sans"
+                          style={{ color: "var(--hall-muted-2)" }}
+                        >
+                          {dailyBriefing!.myCommitments.slice(0, 500)}
+                        </pre>
+                      </div>
+                    )}
+                    <ul className="flex flex-col">
                       {sortedDecisions.slice(0, 5).map(d => {
                         const isP1  = d.priority === "P1 Critical";
                         const isHigh = d.priority === "High";
                         const daysToDue = d.dueDate ? Math.floor((new Date(d.dueDate).getTime() - Date.now()) / 86400000) : null;
-                        const dueBadgeClass = daysToDue === null ? "text-[#131218]/30"
-                          : daysToDue < 0 ? "text-red-600"
-                          : daysToDue <= 3 ? "text-amber-600"
-                          : "text-[#131218]/40";
-                        // N1 — differentiate P1/High/normal via icon glyph, not just color.
+                        const dueColor = daysToDue === null ? "var(--hall-muted-3)"
+                          : daysToDue < 0 ? "var(--hall-danger)"
+                          : daysToDue <= 3 ? "var(--hall-warn)"
+                          : "var(--hall-muted-3)";
                         const priorityIcon = isP1 ? "⬤" : isHigh ? "◐" : "○";
                         const priorityLabel = isP1 ? "P1" : isHigh ? "P2" : "P3";
-                        // N2 — show 1-line preview of notes/context when available (first 100 chars).
+                        const iconBg = isP1 ? "var(--hall-danger-soft)" : isHigh ? "var(--hall-warn-paper)" : "var(--hall-fill-soft)";
+                        const iconColor = isP1 ? "var(--hall-danger)" : isHigh ? "var(--hall-warn)" : "var(--hall-muted-3)";
+                        const leftBorder = isP1 ? "2px solid var(--hall-danger)" : isHigh ? "2px solid var(--hall-warn)" : "none";
                         const preview = d.notes
                           ? d.notes.replace(/\[[A-Z_]+:[^\]]+\]/g, "").replace(/\n+/g, " ").trim().slice(0, 110)
                           : null;
                         return (
-                          <Link key={d.id} href="/admin/decisions" className={`flex items-start gap-3 px-5 py-3 hover:bg-[#EFEFEA]/40 transition-colors border-b border-[#EFEFEA] last:border-0 ${isP1 ? "border-l-2 border-l-red-400" : isHigh ? "border-l-2 border-l-amber-300" : ""}`}>
-                            <div className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 mt-[1px] ${isP1 ? "bg-red-100" : isHigh ? "bg-amber-50" : "bg-[#EFEFEA]"}`}
-                                 title={`${priorityLabel} priority`}>
-                              <span className={`text-[10px] font-bold ${isP1 ? "text-red-600" : isHigh ? "text-amber-600" : "text-[#131218]/35"}`}>{priorityIcon}</span>
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-[11.5px] font-medium text-[#131218] truncate">{d.title}</p>
-                              {preview && (
-                                <p className="text-[9.5px] text-[#131218]/45 truncate mt-0.5">{preview}{d.notes && d.notes.length > 110 ? "…" : ""}</p>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-2 shrink-0">
-                              {/* N4 — always reserve due-date column; show "no SLA" when missing */}
-                              <span className={`text-[9px] font-bold ${dueBadgeClass} w-14 text-right`}>
-                                {d.dueDate
-                                  ? new Date(d.dueDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })
-                                  : <span className="text-[#131218]/20 italic">no SLA</span>}
+                          <li key={d.id} style={{ borderTop: "1px solid var(--hall-line-soft)" }}>
+                            <Link
+                              href="/admin/decisions"
+                              className="flex items-start gap-3 py-2.5"
+                              style={{ borderLeft: leftBorder, paddingLeft: leftBorder !== "none" ? 8 : 0 }}
+                            >
+                              <span
+                                className="flex items-center justify-center shrink-0 mt-[1px]"
+                                style={{ width: 22, height: 22, borderRadius: 4, background: iconBg, color: iconColor, fontSize: 10, fontWeight: 700 }}
+                                title={`${priorityLabel} priority`}
+                              >
+                                {priorityIcon}
                               </span>
-                              {/* N3 — move decision type to a dedicated column (right) so type pills align */}
-                              <span className="text-[9px] font-bold text-[#131218]/25 w-28 text-right truncate">{d.decisionType}</span>
-                            </div>
-                          </Link>
+                              <div className="flex-1 min-w-0">
+                                <span
+                                  className="block text-[12px] font-semibold truncate"
+                                  style={{ color: "var(--hall-ink-0)" }}
+                                >
+                                  {d.title}
+                                </span>
+                                {preview && (
+                                  <span
+                                    className="block text-[10.5px] truncate mt-0.5"
+                                    style={{ color: "var(--hall-muted-2)" }}
+                                  >
+                                    {preview}{d.notes && d.notes.length > 110 ? "…" : ""}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <span
+                                  className="font-bold w-14 text-right"
+                                  style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10, color: dueColor }}
+                                >
+                                  {d.dueDate
+                                    ? new Date(d.dueDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })
+                                    : <span className="italic" style={{ color: "var(--hall-muted-3)" }}>no SLA</span>}
+                                </span>
+                                <span
+                                  className="w-28 text-right truncate uppercase"
+                                  style={{ fontFamily: "var(--font-hall-mono)", fontSize: 9, color: "var(--hall-muted-3)", letterSpacing: "0.06em" }}
+                                >
+                                  {d.decisionType}
+                                </span>
+                              </div>
+                            </Link>
+                          </li>
                         );
                       })}
-                    </div>
+                    </ul>
                   </div>
                 );
               })()}
 
-              {/* ── 7. Relationship Queue ─────────────────────────────────── */}
+              {/* ── Relationship Queue ─────────────────────────────────── */}
               {coldRelationships.length > 0 && (
                 <div>
                   <SectionHeader label="Relationship queue" count={coldRelationships.length} />
-                  <div className="bg-white rounded-2xl border border-[#E0E0D8] divide-y divide-[#EFEFEA] overflow-hidden">
+                  <ul className="flex flex-col">
                     {coldRelationships.slice(0, 6).map(r => {
                       const badge = personWarmthBadge(r.warmth);
                       const lastContactDays = r.lastContactDate ? daysSince(r.lastContactDate) : null;
@@ -1104,70 +1162,101 @@ export default async function AdminPage() {
                         ? `https://calendar.google.com/calendar/r/eventedit?add=${encodeURIComponent(r.email)}&text=Catch+up+with+${encodeURIComponent(r.name)}`
                         : "https://calendar.google.com/calendar/r/eventedit";
                       return (
-                        <div key={r.id} className="flex items-center gap-3 px-5 py-3">
-                          <div className={`w-2 h-2 rounded-full shrink-0 ${badge.dot}`} />
+                        <li
+                          key={r.id}
+                          className="group flex items-center gap-3 py-2.5"
+                          style={{ borderTop: "1px solid var(--hall-line-soft)" }}
+                        >
+                          <span className={`shrink-0 ${badge.dot}`} style={{ width: 8, height: 8, borderRadius: "50%" }} />
                           <div className="flex-1 min-w-0">
-                            <p className="text-[12px] font-semibold text-[#131218] truncate">{r.name}</p>
-                            <p className="text-[10px] text-[#131218]/35 truncate mt-0.5">
+                            <span className="block text-[12px] font-semibold truncate" style={{ color: "var(--hall-ink-0)" }}>{r.name}</span>
+                            <span className="block text-[10.5px] mt-0.5 truncate" style={{ color: "var(--hall-muted-2)" }}>
                               {r.jobTitle}
                               {lastContactDays !== null ? ` · ${lastContactDays}d silent` : " · never contacted"}
-                            </p>
+                            </span>
                           </div>
-                          <div className="flex items-center gap-2 shrink-0">
-                            <span className={`text-[8px] font-bold px-2 py-0.5 rounded-full border ${badge.bg} ${badge.text}`}>
+                          <div className="flex items-center gap-2 shrink-0 opacity-70 group-hover:opacity-100 transition-opacity">
+                            <span
+                              className="uppercase"
+                              style={{
+                                fontFamily: "var(--font-hall-mono)",
+                                fontSize: 9,
+                                fontWeight: 700,
+                                letterSpacing: "0.08em",
+                                color: "var(--hall-muted-2)",
+                              }}
+                            >
                               {r.warmth}
                             </span>
                             <a
                               href={calUrl}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-[#c8f55a] text-[#131218] hover:bg-[#b8e54a] transition-colors"
+                              className="hall-btn-primary"
+                              style={{ padding: "4px 10px", fontSize: 10.5 }}
                             >
-                              Catch up
+                              Catch up →
                             </a>
                             <DraftCheckinButton
                               personId={r.id}
                               notionUrl={r.notionUrl}
                             />
                           </div>
-                        </div>
+                        </li>
                       );
                     })}
-                  </div>
+                  </ul>
                 </div>
               )}
 
             </div>
 
             {/* ── RIGHT COLUMN ──────────────────────────────────────────────── */}
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-7">
 
               {/* Stale projects */}
               {staleProjects.length > 0 && (
-                <div className="bg-white rounded-2xl border border-red-200 overflow-hidden">
-                  <div className="h-1 bg-red-400" />
-                  <div className="px-5 py-3 border-b border-[#EFEFEA] flex items-center justify-between">
-                    <p className="text-xs font-bold text-red-600">Stale — 30d+ no update</p>
-                    <span className="text-[10px] font-bold bg-red-50 text-red-600 border border-red-200 px-2 py-0.5 rounded-full">{staleProjects.length}</span>
-                  </div>
-                  <div className="divide-y divide-[#EFEFEA]">
+                <div>
+                  <SectionHeader label="Stale projects" count={staleProjects.length} />
+                  <ul className="flex flex-col">
                     {staleProjects.slice(0, 3).map(p => (
-                      <Link key={p.id} href={`/admin/projects/${p.id}`} className="flex items-center gap-3 px-5 py-3.5 hover:bg-[#EFEFEA]/40 transition-colors group">
-                        <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" />
-                        <p className="text-[11px] font-medium text-[#131218] flex-1 min-w-0 truncate">{p.name}</p>
-                        <span className="text-[10px] font-bold text-red-400 shrink-0">{daysSince(bestActivity(p)) ?? "—"}d</span>
-                      </Link>
+                      <li key={p.id} style={{ borderTop: "1px solid var(--hall-line-soft)" }}>
+                        <Link href={`/admin/projects/${p.id}`} className="flex items-center gap-3 py-2.5">
+                          <span className="shrink-0" style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--hall-danger)" }} />
+                          <span className="flex-1 min-w-0 truncate text-[12px] font-semibold" style={{ color: "var(--hall-ink-0)" }}>{p.name}</span>
+                          <span className="font-semibold shrink-0" style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--hall-danger)" }}>
+                            {daysSince(bestActivity(p)) ?? "—"}d
+                          </span>
+                        </Link>
+                      </li>
                     ))}
-                  </div>
+                  </ul>
                 </div>
               )}
 
               {/* OS pulse */}
-              <div className="bg-[#131218]/4 rounded-xl px-4 py-3 flex items-center gap-2.5">
-                <div className="w-2 h-2 rounded-full bg-[#c8f55a]" />
-                <div>
-                  <p className="text-[10px] font-bold text-[#131218]/50">OS v2 · {coldOnly.length} cold · {dormantRelationships.length} dormant</p>
-                  <a href="/admin/agents" className="text-[9px] text-[#131218]/30 hover:text-[#131218]/60 transition-colors">Agent log →</a>
+              <div
+                className="flex items-center gap-2.5 px-3 py-2.5 rounded-[3px]"
+                style={{ background: "var(--hall-paper-1)", border: "1px solid var(--hall-line-soft)" }}
+              >
+                <span
+                  className="shrink-0"
+                  style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--hall-ok)" }}
+                />
+                <div className="flex-1 min-w-0">
+                  <p
+                    className="text-[10.5px] font-semibold"
+                    style={{ color: "var(--hall-ink-3)", fontFamily: "var(--font-hall-mono)" }}
+                  >
+                    OS v2 · {coldOnly.length} COLD · {dormantRelationships.length} DORMANT
+                  </p>
+                  <a
+                    href="/admin/agents"
+                    className="text-[9px] uppercase tracking-widest font-bold"
+                    style={{ color: "var(--hall-muted-2)" }}
+                  >
+                    Agent log →
+                  </a>
                 </div>
               </div>
 
@@ -1217,33 +1306,36 @@ export default async function AdminPage() {
                 <SectionHeader label="Active portfolio" count={projects.length} />
 
                 {/* Editorial summary — read in 2 seconds */}
-                <div className="flex flex-wrap items-center gap-x-5 gap-y-1 mb-3 px-1 text-[11px]">
+                <div
+                  className="flex flex-wrap items-center gap-x-5 gap-y-1 mb-4 text-[11px]"
+                  style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+                >
                   {projBlocked.length > 0 && (
                     <span className="flex items-center gap-1.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
-                      <span className="font-bold text-red-500">{projBlocked.length} blocked</span>
+                      <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--hall-danger)" }} />
+                      <span style={{ color: "var(--hall-danger)", fontWeight: 700 }}>{projBlocked.length} BLOCKED</span>
                     </span>
                   )}
                   {projUpdate.length > 0 && (
                     <span className="flex items-center gap-1.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                      <span className="font-bold text-amber-600">{projUpdate.length} need update</span>
+                      <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--hall-warn)" }} />
+                      <span style={{ color: "var(--hall-warn)", fontWeight: 700 }}>{projUpdate.length} NEED UPDATE</span>
                     </span>
                   )}
                   {projStale.length > 0 && (
                     <span className="flex items-center gap-1.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-red-300" />
-                      <span className="text-[#131218]/60">{projStale.length} stale 30d+</span>
+                      <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--hall-danger)", opacity: 0.4 }} />
+                      <span>{projStale.length} STALE 30D+</span>
                     </span>
                   )}
                   <span className="flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#c8f55a]" />
-                    <span className="text-[#131218]/55">{projHealthy} healthy</span>
+                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--hall-ok)" }} />
+                    <span>{projHealthy} HEALTHY</span>
                   </span>
                   {projDormant.length > 0 && (
                     <span className="flex items-center gap-1.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#131218]/20" />
-                      <span className="text-[#131218]/40">{projDormant.length} dormant</span>
+                      <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--hall-muted-3)" }} />
+                      <span style={{ color: "var(--hall-muted-3)" }}>{projDormant.length} DORMANT</span>
                     </span>
                   )}
                 </div>
@@ -1255,8 +1347,7 @@ export default async function AdminPage() {
                   const actionableRows = ranked.filter(p => !dormantIds.has(p.id));
                   const dormantRows = ranked.filter(p => dormantIds.has(p.id));
                   return (
-                <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-                  <div className="divide-y divide-[#EFEFEA]">
+                <div className="flex flex-col">
                     {actionableRows.map(p => {
                       const activityDate = bestActivity(p);
                       const days    = daysSince(activityDate);
@@ -1264,22 +1355,35 @@ export default async function AdminPage() {
                       const typeLbl = projectTypeLabel(p.primaryWorkspace);
                       const typeCls = projectTypeBadge(p.primaryWorkspace);
                       const hasSignal = p.blockerCount > 0 || p.updateNeeded;
+                      const leftBorder = p.blockerCount > 0 ? "2px solid var(--hall-danger)"
+                        : p.updateNeeded ? "2px solid var(--hall-warn)"
+                        : "none";
                       return (
                         <Link
                           key={p.id}
                           href={`/admin/projects/${p.id}`}
-                          className={`grid grid-cols-[minmax(0,2.2fr)_minmax(0,1fr)_110px_110px_24px] gap-3 px-5 py-3 hover:bg-[#EFEFEA]/50 transition-colors group items-center ${p.blockerCount > 0 ? "border-l-2 border-l-red-400" : p.updateNeeded ? "border-l-2 border-l-amber-300" : ""}`}
+                          className="grid grid-cols-[minmax(0,2.2fr)_minmax(0,1fr)_110px_110px_24px] gap-3 py-2.5 group items-center"
+                          style={{
+                            borderTop: "1px solid var(--hall-line-soft)",
+                            borderLeft: leftBorder,
+                            paddingLeft: leftBorder !== "none" ? 8 : 0,
+                          }}
                         >
                           {/* Project name + inline type + geography */}
                           <div className="min-w-0">
                             <div className="flex items-center gap-2 min-w-0">
-                              <p className="text-[12px] font-semibold text-[#131218] truncate">{p.name}</p>
+                              <span className="text-[12.5px] font-semibold truncate" style={{ color: "var(--hall-ink-0)" }}>{p.name}</span>
                               {typeLbl !== "—" && (
-                                <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${typeCls}`}>{typeLbl}</span>
+                                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${typeCls}`}>{typeLbl}</span>
                               )}
                             </div>
                             {p.geography.length > 0 && (
-                              <p className="text-[10px] text-[#131218]/30 font-medium truncate mt-0.5">{p.geography.slice(0, 2).join(" · ")}</p>
+                              <span
+                                className="block text-[10px] font-medium truncate mt-0.5"
+                                style={{ color: "var(--hall-muted-3)", fontFamily: "var(--font-hall-mono)" }}
+                              >
+                                {p.geography.slice(0, 2).join(" · ")}
+                              </span>
                             )}
                           </div>
 
@@ -1289,69 +1393,82 @@ export default async function AdminPage() {
                               <span className={`inline-block text-[9px] font-bold px-2 py-0.5 rounded-full truncate max-w-full ${STAGE_COLORS[p.stage] ?? "bg-[#EFEFEA] text-[#131218]/50"}`}>
                                 {p.stage}
                               </span>
-                            ) : <span className="text-[#131218]/15 text-xs">—</span>}
+                            ) : <span className="text-xs" style={{ color: "var(--hall-muted-3)" }}>—</span>}
                           </div>
 
                           {/* Warmth */}
                           <div className="flex items-center gap-1.5">
-                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${warmth.dot}`} />
-                            <span className={`text-[10px] font-semibold ${warmth.text}`}>{warmth.label}</span>
+                            <span className={`shrink-0 ${warmth.dot}`} style={{ width: 8, height: 8, borderRadius: "50%" }} />
+                            <span
+                              className="text-[10px] font-bold uppercase"
+                              style={{ fontFamily: "var(--font-hall-mono)", letterSpacing: "0.06em", color: "var(--hall-muted-2)" }}
+                            >
+                              {warmth.label}
+                            </span>
                           </div>
 
-                          {/* Signal OR last-update date — never both empty */}
+                          {/* Signal OR last-update date */}
                           <div className="text-right min-w-0">
                             {hasSignal ? (
-                              <div className="flex flex-col items-end gap-0.5">
+                              <div className="flex flex-col items-end gap-0.5" style={{ fontFamily: "var(--font-hall-mono)" }}>
                                 {p.blockerCount > 0 && (
-                                  <span className="text-[9px] font-bold text-red-500">↯ Blocked</span>
+                                  <span className="text-[9px] font-bold uppercase" style={{ color: "var(--hall-danger)", letterSpacing: "0.06em" }}>↯ BLOCKED</span>
                                 )}
                                 {p.updateNeeded && p.blockerCount === 0 && (
-                                  <span className="text-[9px] font-bold text-amber-500">! Update due</span>
+                                  <span className="text-[9px] font-bold uppercase" style={{ color: "var(--hall-warn)", letterSpacing: "0.06em" }}>! UPDATE DUE</span>
                                 )}
                               </div>
                             ) : p.lastUpdate ? (
-                              <p className="text-[10px] text-[#131218]/50 font-medium">
+                              <span className="text-[10px] font-medium" style={{ color: "var(--hall-muted-2)", fontFamily: "var(--font-hall-mono)" }}>
                                 {new Date(p.lastUpdate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
-                              </p>
+                              </span>
                             ) : days !== null ? (
-                              <p className="text-[10px] text-[#131218]/30 font-medium">{days}d silent</p>
+                              <span className="text-[10px] font-medium" style={{ color: "var(--hall-muted-3)", fontFamily: "var(--font-hall-mono)" }}>{days}d silent</span>
                             ) : (
-                              <span className="text-[#131218]/15 text-xs">—</span>
+                              <span className="text-xs" style={{ color: "var(--hall-muted-3)" }}>—</span>
                             )}
                           </div>
 
-                          <div className="text-[#131218]/20 group-hover:text-[#131218]/60 transition-colors text-sm text-right">→</div>
+                          <div className="text-sm text-right transition-colors" style={{ color: "var(--hall-muted-3)" }}>→</div>
                         </Link>
                       );
                     })}
                     {projects.length === 0 && (
-                      <div className="px-5 py-6 text-center">
-                        <p className="text-[11px] text-[#131218]/25 font-medium">No active projects</p>
-                      </div>
+                      <p className="py-6 text-center text-[11px] font-medium" style={{ color: "var(--hall-muted-3)" }}>No active projects</p>
                     )}
-                    {/* H4 — collapsed dormant tail */}
+                    {/* Collapsed dormant tail */}
                     {dormantRows.length > 0 && (
                       <details className="group">
-                        <summary className="list-none cursor-pointer px-5 py-2.5 flex items-center gap-3 hover:bg-[#EFEFEA]/40 transition-colors">
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#131218]/20 shrink-0" />
-                          <span className="text-[10px] font-semibold text-[#131218]/45">
+                        <summary
+                          className="list-none cursor-pointer py-2 flex items-center gap-3"
+                          style={{ borderTop: "1px solid var(--hall-line-soft)" }}
+                        >
+                          <span className="shrink-0" style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--hall-muted-3)" }} />
+                          <span
+                            className="text-[10px] font-bold uppercase"
+                            style={{ fontFamily: "var(--font-hall-mono)", letterSpacing: "0.08em", color: "var(--hall-muted-2)" }}
+                          >
                             + {dormantRows.length} dormant
                           </span>
-                          <span className="text-[9px] text-[#131218]/30 group-open:hidden">show →</span>
-                          <span className="text-[9px] text-[#131218]/30 hidden group-open:inline">hide ↑</span>
+                          <span className="text-[9px] group-open:hidden" style={{ color: "var(--hall-muted-3)" }}>show →</span>
+                          <span className="text-[9px] hidden group-open:inline" style={{ color: "var(--hall-muted-3)" }}>hide ↑</span>
                         </summary>
-                        <div className="divide-y divide-[#EFEFEA] border-t border-[#EFEFEA]">
+                        <div className="flex flex-col">
                           {dormantRows.map(p => {
                             const typeLbl = projectTypeLabel(p.primaryWorkspace);
                             const typeCls = projectTypeBadge(p.primaryWorkspace);
                             const activityDate = bestActivity(p);
                             const days = daysSince(activityDate);
                             return (
-                              <Link key={p.id} href={`/admin/projects/${p.id}`}
-                                    className="grid grid-cols-[minmax(0,2.2fr)_minmax(0,1fr)_110px_110px_24px] gap-3 px-5 py-2.5 hover:bg-[#EFEFEA]/50 transition-colors items-center opacity-60">
+                              <Link
+                                key={p.id}
+                                href={`/admin/projects/${p.id}`}
+                                className="grid grid-cols-[minmax(0,2.2fr)_minmax(0,1fr)_110px_110px_24px] gap-3 py-2 items-center opacity-60"
+                                style={{ borderTop: "1px solid var(--hall-line-soft)" }}
+                              >
                                 <div className="min-w-0">
                                   <div className="flex items-center gap-2 min-w-0">
-                                    <p className="text-[11.5px] text-[#131218]/70 truncate">{p.name}</p>
+                                    <span className="text-[11.5px] truncate" style={{ color: "var(--hall-muted-2)" }}>{p.name}</span>
                                     {typeLbl !== "—" && (
                                       <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${typeCls}`}>{typeLbl}</span>
                                     )}
@@ -1360,16 +1477,15 @@ export default async function AdminPage() {
                                 <div>
                                   {p.stage && <span className={`inline-block text-[9px] font-bold px-2 py-0.5 rounded-full ${STAGE_COLORS[p.stage] ?? "bg-[#EFEFEA] text-[#131218]/50"}`}>{p.stage}</span>}
                                 </div>
-                                <div className="text-[10px] text-[#131218]/35">Dormant</div>
-                                <div className="text-right text-[10px] text-[#131218]/30">{days != null ? `${days}d silent` : "—"}</div>
-                                <div className="text-[#131218]/15 text-sm text-right">→</div>
+                                <div className="text-[10px]" style={{ color: "var(--hall-muted-3)", fontFamily: "var(--font-hall-mono)" }}>DORMANT</div>
+                                <div className="text-right text-[10px]" style={{ color: "var(--hall-muted-3)", fontFamily: "var(--font-hall-mono)" }}>{days != null ? `${days}d silent` : "—"}</div>
+                                <div className="text-sm text-right" style={{ color: "var(--hall-muted-3)" }}>→</div>
                               </Link>
                             );
                           })}
                         </div>
                       </details>
                     )}
-                  </div>
                 </div>
                   );
                 })()}
@@ -1378,77 +1494,86 @@ export default async function AdminPage() {
           })()}
           </div>
 
-          {/* ── Opportunities Explorer — PORTFOLIO tab only (Phase 5) ─── */}
+          {/* ── Opportunities Explorer — PORTFOLIO tab only ─────────────── */}
           <div data-hall-tab="portfolio">
           {(() => {
             const total = filteredOpps.ch.length + filteredOpps.portfolio.length;
             if (total === 0) return null;
-            // O1 — if ≤3 opps, render inline so the section has visible content
-            // (fixes page-9-blank peak-end). Above 3, keep collapsed details.
             const renderInline = total <= 3;
 
             if (renderInline) {
               return (
-                <div>
-                  <div className="flex items-center gap-3 px-1 py-2">
-                    <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Opportunities — explore</p>
-                    <span className="text-[9px] font-bold bg-[#131218]/6 text-[#131218]/40 px-1.5 py-0.5 rounded-full">
-                      {total}
-                    </span>
-                    <div className="flex-1 h-px bg-[#E0E0D8]" />
-                  </div>
-                  <div className="mt-2">
-                    <OpportunityExplorer ch={filteredOpps.ch} portfolio={filteredOpps.portfolio} />
-                  </div>
-                </div>
+                <HallSection title="Opportunities · " flourish="explore" meta={`${total} TOTAL`}>
+                  <OpportunityExplorer ch={filteredOpps.ch} portfolio={filteredOpps.portfolio} />
+                </HallSection>
               );
             }
 
             return (
-              <details className="group">
-                <summary className="list-none cursor-pointer flex items-center gap-3 px-1 py-2 hover:opacity-80 transition-opacity">
-                  <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Opportunities — explore</p>
-                  <span className="text-[9px] font-bold bg-[#131218]/6 text-[#131218]/40 px-1.5 py-0.5 rounded-full">
-                    {total}
-                  </span>
-                  <div className="flex-1 h-px bg-[#E0E0D8]" />
-                  <span className="text-[9px] font-bold text-[#131218]/30 uppercase tracking-widest whitespace-nowrap group-open:hidden">
+              <details className="group mb-7">
+                <summary
+                  className="list-none cursor-pointer flex items-baseline justify-between gap-3 pb-2 mb-3.5"
+                  style={{ borderBottom: "1px solid var(--hall-ink-0)" }}
+                >
+                  <h2
+                    className="text-[19px] font-bold leading-none flex items-baseline gap-2"
+                    style={{ letterSpacing: "-0.02em", color: "var(--hall-ink-0)" }}
+                  >
+                    <span>Opportunities · <em className="hall-flourish">explore</em></span>
+                    <span style={{ fontFamily: "var(--font-hall-mono)", fontSize: 12, fontWeight: 600, color: "var(--hall-muted-2)" }}>
+                      {total}
+                    </span>
+                  </h2>
+                  <span
+                    className="text-[9px] font-bold uppercase tracking-widest whitespace-nowrap group-open:hidden"
+                    style={{ color: "var(--hall-muted-2)" }}
+                  >
                     Show →
                   </span>
-                  <span className="text-[9px] font-bold text-[#131218]/30 uppercase tracking-widest whitespace-nowrap hidden group-open:inline">
+                  <span
+                    className="text-[9px] font-bold uppercase tracking-widest whitespace-nowrap hidden group-open:inline"
+                    style={{ color: "var(--hall-muted-2)" }}
+                  >
                     Hide ↑
                   </span>
                 </summary>
-                <div className="mt-2">
-                  <p className="text-[10px] text-[#131218]/30 mb-2 px-1">
-                    Low-pressure exploration. Nothing requires action — flag anything that looks worth pursuing.
-                  </p>
-                  <OpportunityExplorer ch={filteredOpps.ch} portfolio={filteredOpps.portfolio} />
-                </div>
+                <p className="text-[10.5px] mb-3" style={{ color: "var(--hall-muted-2)" }}>
+                  Low-pressure exploration. Nothing requires action — flag anything that looks worth pursuing.
+                </p>
+                <OpportunityExplorer ch={filteredOpps.ch} portfolio={filteredOpps.portfolio} />
               </details>
             );
           })()}
           </div>
 
-          {/* ── Ready to Publish — moved to SIGNALS in Phase 5 ─────────── */}
+          {/* ── Ready to Publish ─────────────────────────────────────── */}
           {readyContent.length > 0 && (
             <div data-hall-tab="signals">
               <SectionHeader label="Ready to publish" count={readyContent.length} />
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {readyContent.map(c => (
                   <a
                     key={c.id}
                     href={c.notionUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="bg-white rounded-xl border border-[#E0E0D8] px-4 py-3.5 hover:bg-[#EFEFEA]/50 transition-colors"
+                    className="px-3.5 py-3 rounded-[3px] transition-colors"
+                    style={{ border: "1px solid var(--hall-line-soft)", background: "var(--hall-paper-0)" }}
                   >
-                    <p className="text-[9px] font-bold uppercase tracking-widest text-[#131218]/25 mb-1">
+                    <p
+                      className="font-bold uppercase mb-1"
+                      style={{
+                        fontFamily: "var(--font-hall-mono)",
+                        fontSize: 9,
+                        letterSpacing: "0.1em",
+                        color: "var(--hall-muted-3)",
+                      }}
+                    >
                       {c.platform} · {c.contentType}
                     </p>
-                    <p className="text-[12px] font-semibold text-[#131218] leading-snug">{c.title}</p>
+                    <p className="text-[12.5px] font-semibold leading-snug" style={{ color: "var(--hall-ink-0)" }}>{c.title}</p>
                     {c.publishWindow && (
-                      <p className="text-[10px] text-[#131218]/35 mt-1">Window: {c.publishWindow}</p>
+                      <p className="text-[10.5px] mt-1" style={{ color: "var(--hall-muted-2)" }}>Window: {c.publishWindow}</p>
                     )}
                   </a>
                 ))}
@@ -1460,30 +1585,47 @@ export default async function AdminPage() {
               now lives in the repurposed signals grid higher up. */}
 
           {/* ── RELATIONSHIPS tab — network, classes, time allocation ────── */}
-          <div data-hall-tab="relationships" className="space-y-6">
-            <div className="flex items-center gap-3">
-              <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Relationships</p>
-              <div className="flex-1 h-px bg-[#E0E0D8]" />
-              <Link href="/admin/hall/network" className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/40 hover:text-[#131218]/80">
-                Network graph →
-              </Link>
+          <div data-hall-tab="relationships" className="hall-today-grid">
+            <div className="hall-today-col-left">
+              <HallSection title="Time " flourish="allocation">
+                <HallTimeAllocation />
+              </HallSection>
+              <HallSection title="Cold " flourish="orgs">
+                <HallOrgsColdRelations />
+              </HallSection>
             </div>
-            <HallTimeAllocation />
-            <HallOrgsColdRelations />
-            <HallOrgsClassMix />
-            <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-4 flex items-center justify-between">
-              <div>
-                <p className="text-[11px] font-bold text-[#131218]">Contacts & Organizations</p>
-                <p className="text-[10px] text-[#131218]/45 mt-0.5">Tag who's who · classify senders · maintain the registry</p>
-              </div>
-              <div className="flex gap-2">
-                <Link href="/admin/hall/contacts" className="text-[10px] font-bold uppercase tracking-wider bg-[#131218] text-white hover:bg-[#2a2938] px-3 py-1.5 rounded-md transition-colors">
-                  Contacts →
-                </Link>
-                <Link href="/admin/hall/organizations" className="text-[10px] font-bold uppercase tracking-wider bg-[#EFEFEA] text-[#131218] hover:bg-[#E0E0D8] px-3 py-1.5 rounded-md transition-colors">
-                  Orgs →
-                </Link>
-              </div>
+            <div className="hall-today-col-right">
+              <HallSection title="Network " flourish="mix">
+                <HallOrgsClassMix />
+              </HallSection>
+              <HallSection title="Contacts & " flourish="organizations">
+                <p className="text-[11px] mb-3" style={{ color: "var(--hall-muted-2)" }}>
+                  Tag who&apos;s who · classify senders · maintain the registry
+                </p>
+                <div className="flex gap-2">
+                  <Link
+                    href="/admin/hall/contacts"
+                    className="hall-btn-primary"
+                    style={{ padding: "6px 12px", fontSize: 11 }}
+                  >
+                    Contacts →
+                  </Link>
+                  <Link
+                    href="/admin/hall/organizations"
+                    className="hall-btn-outline"
+                    style={{ padding: "5px 11px", fontSize: 11 }}
+                  >
+                    Orgs →
+                  </Link>
+                  <Link
+                    href="/admin/hall/network"
+                    className="hall-btn-ghost"
+                    style={{ fontSize: 11 }}
+                  >
+                    Network graph →
+                  </Link>
+                </div>
+              </HallSection>
             </div>
           </div>
 

@@ -205,23 +205,36 @@ export function AgentQueueSection({ drafts }: { drafts: AgentDraft[] }) {
         return (
           <div
             key={draft.id}
-            className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden flex flex-col"
+            className="flex flex-col rounded-xl overflow-hidden"
+            style={{ border: "1px solid var(--hall-line)", background: "#fff" }}
           >
             {/* ── Header ─────────────────────────────────────────────────── */}
-            <div className="px-4 py-3.5 border-b border-[#EFEFEA] flex-1">
+            <div
+              className="px-4 py-3.5 flex-1"
+              style={{ borderBottom: "1px solid var(--hall-line-soft)" }}
+            >
               <div className="flex items-start gap-2.5">
                 <div
-                  className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-[10px] font-black ${
-                    isLinkedIn ? "bg-[#0077B5] text-white" : "bg-[#EFEFEA] text-[#131218]/50"
-                  }`}
+                  className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-[10px] font-black"
+                  style={
+                    isLinkedIn
+                      ? { background: "#0077B5", color: "#fff" }
+                      : { background: "var(--hall-fill-soft)", color: "var(--hall-muted-2)" }
+                  }
                 >
                   {icon}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-[9px] font-bold uppercase tracking-widest text-[#131218]/30 mb-0.5">
+                  <p
+                    className="text-[9px] font-bold uppercase tracking-widest mb-0.5"
+                    style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-3)" }}
+                  >
                     {draft.draftType}
                   </p>
-                  <p className="text-[12px] font-semibold text-[#131218] leading-snug">
+                  <p
+                    className="text-[12px] font-semibold leading-snug"
+                    style={{ color: "var(--hall-ink-0)" }}
+                  >
                     {draft.title}
                   </p>
 
@@ -229,15 +242,38 @@ export function AgentQueueSection({ drafts }: { drafts: AgentDraft[] }) {
                   {isEmail && (
                     <div className="mt-1">
                       {needsContact ? (
-                        <span className="inline-flex items-center gap-1 text-[9px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">
+                        <span
+                          className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded"
+                          style={{
+                            fontFamily: "var(--font-hall-mono)",
+                            color: "var(--hall-warn)",
+                            background: "var(--hall-warn-paper)",
+                            border: "1px solid var(--hall-warn)",
+                          }}
+                        >
                           ⚠ No contact set
                         </span>
                       ) : localPerson ? (
-                        <span className="inline-flex items-center gap-1 text-[9px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
+                        <span
+                          className="inline-flex items-center gap-1 text-[9px] font-medium px-1.5 py-0.5 rounded"
+                          style={{
+                            fontFamily: "var(--font-hall-mono)",
+                            color: "var(--hall-ok)",
+                            background: "#fff",
+                            border: "1px solid var(--hall-ok)",
+                          }}
+                        >
                           → {localPerson.name}
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 text-[9px] font-medium text-[#131218]/30 bg-[#EFEFEA] px-1.5 py-0.5 rounded">
+                        <span
+                          className="inline-flex items-center gap-1 text-[9px] font-medium px-1.5 py-0.5 rounded"
+                          style={{
+                            fontFamily: "var(--font-hall-mono)",
+                            color: "var(--hall-muted-3)",
+                            background: "var(--hall-fill-soft)",
+                          }}
+                        >
                           ✓ Contact set
                         </span>
                       )}
@@ -259,14 +295,24 @@ export function AgentQueueSection({ drafts }: { drafts: AgentDraft[] }) {
                         autoFocus
                         value={editText}
                         onChange={(e) => setEditText(e.target.value)}
-                        className="w-full text-[10.5px] text-[#131218] leading-[1.6] font-sans border border-[#131218]/20 rounded-lg px-2 py-1.5 outline-none focus:border-[#131218] min-h-[180px] bg-white resize-y"
+                        className="w-full text-[10.5px] leading-[1.6] font-sans rounded-lg px-2 py-1.5 outline-none min-h-[180px] bg-white resize-y"
+                        style={{
+                          color: "var(--hall-ink-0)",
+                          border: "1px solid var(--hall-line)",
+                        }}
                       />
                     ) : isExpanded ? (
-                      <pre className="text-[10.5px] text-[#131218]/60 leading-[1.6] whitespace-pre-wrap font-sans max-h-48 overflow-y-auto">
+                      <pre
+                        className="text-[10.5px] leading-[1.6] whitespace-pre-wrap font-sans max-h-48 overflow-y-auto"
+                        style={{ color: "var(--hall-muted-2)" }}
+                      >
                         {effectiveText}
                       </pre>
                     ) : (
-                      <p className="text-[11px] text-[#131218]/45 leading-[1.55] line-clamp-3">
+                      <p
+                        className="text-[11px] leading-[1.55] line-clamp-3"
+                        style={{ color: "var(--hall-muted-2)" }}
+                      >
                         {effectiveText.slice(0, 180)}
                         {effectiveText.length > 180 ? "…" : ""}
                       </p>
@@ -278,14 +324,16 @@ export function AgentQueueSection({ drafts }: { drafts: AgentDraft[] }) {
                           <button
                             onClick={() => saveEdit(draft.id)}
                             disabled={savingEdit}
-                            className="text-[9px] font-bold text-[#131218] hover:text-emerald-700 transition-colors disabled:opacity-50"
+                            className="text-[9px] font-bold transition-colors disabled:opacity-50"
+                            style={{ color: "var(--hall-ink-0)" }}
                           >
                             {savingEdit ? "Saving…" : "Save edit"}
                           </button>
                           <button
                             onClick={cancelEdit}
                             disabled={savingEdit}
-                            className="text-[9px] font-bold text-[#131218]/30 hover:text-[#131218] transition-colors disabled:opacity-50"
+                            className="text-[9px] font-bold transition-colors disabled:opacity-50"
+                            style={{ color: "var(--hall-muted-3)" }}
                           >
                             Cancel
                           </button>
@@ -294,14 +342,16 @@ export function AgentQueueSection({ drafts }: { drafts: AgentDraft[] }) {
                         <>
                           <button
                             onClick={() => setExpandedId(isExpanded ? null : draft.id)}
-                            className="text-[9px] font-bold text-[#131218]/30 hover:text-[#131218] transition-colors"
+                            className="text-[9px] font-bold transition-colors"
+                            style={{ color: "var(--hall-muted-3)" }}
                           >
                             {isExpanded ? "Collapse ↑" : "Expand ↓"}
                           </button>
                           {state === "pending" && (
                             <button
                               onClick={() => startEdit(draft.id, effectiveText)}
-                              className="text-[9px] font-bold text-[#131218]/30 hover:text-[#131218] transition-colors"
+                              className="text-[9px] font-bold transition-colors"
+                              style={{ color: "var(--hall-muted-3)" }}
                             >
                               Edit
                             </button>
@@ -321,40 +371,59 @@ export function AgentQueueSection({ drafts }: { drafts: AgentDraft[] }) {
               {state === "sent" ? (
                 gmailIds[draft.id] ? (
                   <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-bold text-emerald-600 shrink-0">
+                    <span
+                      className="text-[10px] font-bold shrink-0"
+                      style={{ color: "var(--hall-ok)" }}
+                    >
                       ✓ Draft in Gmail
                     </span>
                     <a
                       href={gmailDraftUrl(gmailIds[draft.id])}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex-1 text-center text-[10px] font-bold bg-[#131218] text-white rounded-lg py-1.5 hover:bg-[#2a2938] transition-colors"
+                      className="hall-btn-primary flex-1 text-center"
+                      style={{ padding: "6px 10px", fontSize: 10 }}
                     >
                       Open in Gmail ↗
                     </a>
                   </div>
                 ) : (
-                  <span className="text-center text-[10px] font-bold text-emerald-600">
+                  <span
+                    className="text-center text-[10px] font-bold"
+                    style={{ color: "var(--hall-ok)" }}
+                  >
                     ✓ Enviado a Gmail
                   </span>
                 )
               ) : state === "send_error" ? (
-                <span className="text-center text-[10px] font-bold text-red-500">
+                <span
+                  className="text-center text-[10px] font-bold"
+                  style={{ color: "var(--hall-danger)" }}
+                >
                   ✗ Error al enviar
                 </span>
               ) : state === "revision" ? (
-                <span className="text-center text-[10px] font-bold text-amber-500">
+                <span
+                  className="text-center text-[10px] font-bold"
+                  style={{ color: "var(--hall-warn)" }}
+                >
                   ↩ Revision requested
                 </span>
 
               /* ── Approved email WITH recipient → normal send ─────────── */
               ) : state === "approved" && isEmail && !needsContact ? (
                 <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-bold text-emerald-600 shrink-0">✓ Aprobado</span>
+                  <span
+                    className="text-[10px] font-bold shrink-0"
+                    style={{ color: "var(--hall-ok)" }}
+                  >
+                    ✓ Aprobado
+                  </span>
                   <button
                     onClick={() => handleSend(draft.id)}
                     disabled={state === ("sending" as DraftState)}
-                    className="flex-1 text-center text-[10px] font-bold bg-[#131218] text-white rounded-lg py-1.5 hover:bg-[#2a2938] transition-colors disabled:opacity-50"
+                    className="hall-btn-primary flex-1 text-center disabled:opacity-50"
+                    style={{ padding: "6px 10px", fontSize: 10 }}
                   >
                     Enviar →
                   </button>
@@ -362,7 +431,8 @@ export function AgentQueueSection({ drafts }: { drafts: AgentDraft[] }) {
                     href={draft.notionUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-[10px] font-bold text-[#131218]/25 hover:text-[#131218] transition-colors shrink-0"
+                    className="text-[10px] font-bold transition-colors shrink-0"
+                    style={{ color: "var(--hall-muted-3)" }}
                   >
                     ↗
                   </a>
@@ -380,34 +450,59 @@ export function AgentQueueSection({ drafts }: { drafts: AgentDraft[] }) {
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                         placeholder="Search people…"
-                        className="text-[10px] border border-[#E0E0D8] rounded-lg px-2 py-1.5 outline-none focus:border-[#131218] bg-white"
+                        className="text-[10px] rounded-lg px-2 py-1.5 outline-none bg-white"
+                        style={{
+                          color: "var(--hall-ink-0)",
+                          border: "1px solid var(--hall-line)",
+                        }}
                       />
                       {loadingPeople ? (
-                        <p className="text-[9px] text-[#131218]/40 text-center py-1">Loading…</p>
+                        <p
+                          className="text-[9px] text-center py-1"
+                          style={{ color: "var(--hall-muted-3)" }}
+                        >
+                          Loading…
+                        </p>
                       ) : filteredPeople.length === 0 ? (
-                        <p className="text-[9px] text-[#131218]/40 text-center py-1">
+                        <p
+                          className="text-[9px] text-center py-1"
+                          style={{ color: "var(--hall-muted-3)" }}
+                        >
                           {search ? "No match" : "No contacts with email"}
                         </p>
                       ) : (
-                        <div className="flex flex-col divide-y divide-[#EFEFEA] max-h-36 overflow-y-auto rounded-lg border border-[#E0E0D8]">
+                        <div
+                          className="flex flex-col max-h-36 overflow-y-auto rounded-lg"
+                          style={{ border: "1px solid var(--hall-line)" }}
+                        >
                           {filteredPeople.map((p) => (
                             <button
                               key={p.id}
                               disabled={assigningId === draft.id}
                               onClick={() => assignContact(draft.id, p)}
-                              className="flex flex-col items-start px-2 py-1.5 text-left hover:bg-[#EFEFEA] transition-colors disabled:opacity-50"
+                              className="flex flex-col items-start px-2 py-1.5 text-left transition-colors disabled:opacity-50 hover:bg-[color:var(--hall-fill-soft)]"
+                              style={{ borderTop: "1px solid var(--hall-line-soft)" }}
                             >
-                              <span className="text-[10px] font-semibold text-[#131218] leading-tight">
+                              <span
+                                className="text-[10px] font-semibold leading-tight"
+                                style={{ color: "var(--hall-ink-0)" }}
+                              >
                                 {assigningId === draft.id ? "Assigning…" : p.name}
                               </span>
-                              <span className="text-[9px] text-[#131218]/40">{p.email}</span>
+                              <span
+                                className="text-[9px]"
+                                style={{ color: "var(--hall-muted-3)" }}
+                              >
+                                {p.email}
+                              </span>
                             </button>
                           ))}
                         </div>
                       )}
                       <button
                         onClick={() => setPickerDraftId(null)}
-                        className="text-[9px] text-[#131218]/30 hover:text-[#131218] text-center transition-colors"
+                        className="text-[9px] text-center transition-colors"
+                        style={{ color: "var(--hall-muted-3)" }}
                       >
                         Cancel
                       </button>
@@ -416,10 +511,16 @@ export function AgentQueueSection({ drafts }: { drafts: AgentDraft[] }) {
                     /* No-recipient action bar */
                     <div className="flex flex-col gap-1">
                       <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-bold text-emerald-600 shrink-0">✓ Aprobado</span>
+                        <span
+                          className="text-[10px] font-bold shrink-0"
+                          style={{ color: "var(--hall-ok)" }}
+                        >
+                          ✓ Aprobado
+                        </span>
                         <button
                           onClick={() => openPicker(draft.id)}
-                          className="flex-1 text-center text-[10px] font-bold bg-[#c8f55a] text-[#131218] rounded-lg py-1.5 hover:bg-[#b8e54a] transition-colors"
+                          className="hall-btn-primary flex-1 text-center"
+                          style={{ padding: "6px 10px", fontSize: 10 }}
                         >
                           Assign contact →
                         </button>
@@ -427,14 +528,16 @@ export function AgentQueueSection({ drafts }: { drafts: AgentDraft[] }) {
                           href={draft.notionUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-[10px] font-bold text-[#131218]/25 hover:text-[#131218] transition-colors shrink-0"
+                          className="text-[10px] font-bold transition-colors shrink-0"
+                          style={{ color: "var(--hall-muted-3)" }}
                         >
                           ↗
                         </a>
                       </div>
                       <button
                         onClick={() => handleSend(draft.id)}
-                        className="text-[10px] text-[#131218]/40 hover:text-[#131218] text-center transition-colors"
+                        className="text-[10px] text-center transition-colors"
+                        style={{ color: "var(--hall-muted-3)" }}
                       >
                         Save to my inbox instead
                       </button>
@@ -444,7 +547,10 @@ export function AgentQueueSection({ drafts }: { drafts: AgentDraft[] }) {
 
               /* ── Approved non-email ───────────────────────────────────── */
               ) : state === "approved" ? (
-                <span className="text-center text-[10px] font-bold text-emerald-600">
+                <span
+                  className="text-center text-[10px] font-bold"
+                  style={{ color: "var(--hall-ok)" }}
+                >
                   ✓ Approved
                 </span>
 
@@ -454,14 +560,16 @@ export function AgentQueueSection({ drafts }: { drafts: AgentDraft[] }) {
                   <button
                     onClick={() => handleAction(draft.id, "approve", draft.draftType)}
                     disabled={state === "approving"}
-                    className="flex-1 text-center text-[10px] font-bold bg-[#c8f55a] text-[#131218] rounded-lg py-1.5 hover:bg-[#b8e54a] transition-colors disabled:opacity-50"
+                    className="hall-btn-primary flex-1 text-center disabled:opacity-50"
+                    style={{ padding: "6px 10px", fontSize: 10 }}
                   >
                     {state === "approving" ? "…" : "Approve"}
                   </button>
                   <button
                     onClick={() => handleAction(draft.id, "revision", draft.draftType)}
                     disabled={state === "approving"}
-                    className="text-[10px] font-bold text-[#131218]/30 hover:text-[#131218] transition-colors border border-[#E0E0D8] rounded-lg px-2.5 py-1.5 disabled:opacity-50"
+                    className="hall-btn-outline disabled:opacity-50"
+                    style={{ padding: "6px 10px", fontSize: 10 }}
                   >
                     Revise
                   </button>
@@ -469,7 +577,8 @@ export function AgentQueueSection({ drafts }: { drafts: AgentDraft[] }) {
                     href={draft.notionUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-[10px] font-bold text-[#131218]/25 hover:text-[#131218] transition-colors shrink-0"
+                    className="text-[10px] font-bold transition-colors shrink-0"
+                    style={{ color: "var(--hall-muted-3)" }}
                   >
                     ↗
                   </a>

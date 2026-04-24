@@ -47,11 +47,6 @@ function typeIcon(draftType: string): string {
   return "·";
 }
 
-function typeBadgeColor(draftType: string): string {
-  if (draftType === "LinkedIn Post") return "bg-[#0077B5] text-white";
-  return "bg-[#EFEFEA] text-[#131218]/50";
-}
-
 // Gmail drafts link — takes user straight to their drafts folder
 const GMAIL_DRAFTS_URL = "https://mail.google.com/mail/u/0/#drafts";
 
@@ -105,9 +100,18 @@ export function ReadyForJoseSection({
 
   if (allItems.length === 0) {
     return (
-      <div className="flex items-center gap-3 bg-white/50 border border-dashed border-[#E0E0D8] rounded-xl px-4 py-2">
-        <span className="w-1.5 h-1.5 rounded-full bg-[#131218]/15 shrink-0" />
-        <p className="text-[11px] text-[#131218]/40 flex-1 min-w-0">
+      <div
+        className="flex items-center gap-3 px-4 py-2 rounded-xl"
+        style={{ border: "1px dashed var(--hall-line)" }}
+      >
+        <span
+          className="w-1.5 h-1.5 rounded-full shrink-0"
+          style={{ background: "var(--hall-muted-3)" }}
+        />
+        <p
+          className="text-[11px] flex-1 min-w-0"
+          style={{ color: "var(--hall-muted-2)" }}
+        >
           No prepared work yet — approve a draft or let an agent generate one.
         </p>
       </div>
@@ -123,43 +127,90 @@ export function ReadyForJoseSection({
         const icon    = typeIcon(item.draftType);
         const state   = states[item.id] ?? "idle";
         const isEmail = item.draftType === "Follow-up Email" || item.draftType === "Check-in Email";
+        const isLinkedIn = item.draftType === "LinkedIn Post";
 
         return (
           <div
             key={item.id}
-            className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden flex flex-col"
+            className="flex flex-col rounded-xl overflow-hidden"
+            style={{ border: "1px solid var(--hall-line)", background: "#fff" }}
           >
             {/* ── Header ─────────────────────────────────────────────────── */}
             <div className="px-4 py-3.5 flex-1">
               <div className="flex items-start gap-2.5">
-                <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-[10px] font-black ${typeBadgeColor(item.draftType)}`}>
+                <div
+                  className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-[10px] font-black"
+                  style={
+                    isLinkedIn
+                      ? { background: "#0077B5", color: "#fff" }
+                      : { background: "var(--hall-fill-soft)", color: "var(--hall-muted-2)" }
+                  }
+                >
                   {icon}
                 </div>
                 <div className="flex-1 min-w-0">
                   {/* Kind + source + type chips */}
                   <div className="flex items-center gap-1.5 mb-1 flex-wrap">
-                    <span className="text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full border bg-[#c8f55a]/25 text-[#131218]/70 border-[#c8f55a]">
+                    <span
+                      className="text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full"
+                      style={{
+                        fontFamily: "var(--font-hall-mono)",
+                        background: "#c8f55a",
+                        color: "var(--hall-ink-0)",
+                      }}
+                    >
                       Draft
                     </span>
-                    <span className="text-[8px] font-bold uppercase tracking-widest text-[#131218]/35">
+                    <span
+                      className="text-[8px] font-bold uppercase tracking-widest"
+                      style={{
+                        fontFamily: "var(--font-hall-mono)",
+                        color: "var(--hall-muted-3)",
+                      }}
+                    >
                       · {item.draftType}
                     </span>
                     {item.source === "gmail" && (
-                      <span className="text-[8px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-full">
+                      <span
+                        className="text-[8px] font-bold px-1.5 py-0.5 rounded-full"
+                        style={{
+                          fontFamily: "var(--font-hall-mono)",
+                          color: "var(--hall-ok)",
+                          border: "1px solid var(--hall-ok)",
+                          background: "#fff",
+                        }}
+                      >
                         In Gmail
                       </span>
                     )}
                     {item.source === "approved" && isEmail && (
-                      <span className="text-[8px] font-bold text-blue-600 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded-full">
+                      <span
+                        className="text-[8px] font-bold px-1.5 py-0.5 rounded-full"
+                        style={{
+                          fontFamily: "var(--font-hall-mono)",
+                          color: "var(--hall-ink-3)",
+                          border: "1px solid var(--hall-line)",
+                          background: "var(--hall-fill-soft)",
+                        }}
+                      >
                         Ready to send
                       </span>
                     )}
                   </div>
-                  <p className="text-[12px] font-semibold text-[#131218] leading-snug">
+                  <p
+                    className="text-[12px] font-semibold leading-snug"
+                    style={{ color: "var(--hall-ink-0)" }}
+                  >
                     {item.title}
                   </p>
                   {/* Time estimate */}
-                  <p className="text-[9px] text-[#131218]/30 mt-0.5">
+                  <p
+                    className="text-[9px] mt-0.5"
+                    style={{
+                      fontFamily: "var(--font-hall-mono)",
+                      color: "var(--hall-muted-3)",
+                    }}
+                  >
                     ~{estimatedTime(item.draftType)}
                   </p>
                 </div>
@@ -167,7 +218,10 @@ export function ReadyForJoseSection({
 
               {/* Preview */}
               {item.draftText && (
-                <p className="mt-2 text-[10.5px] text-[#131218]/40 leading-[1.55] line-clamp-2">
+                <p
+                  className="mt-2 text-[10.5px] leading-[1.55] line-clamp-2"
+                  style={{ color: "var(--hall-muted-2)" }}
+                >
                   {item.draftText.slice(0, 160)}
                   {item.draftText.length > 160 ? "…" : ""}
                 </p>
@@ -175,13 +229,22 @@ export function ReadyForJoseSection({
             </div>
 
             {/* ── Actions ────────────────────────────────────────────────── */}
-            <div className="px-4 py-2.5 border-t border-[#EFEFEA] flex items-center gap-2">
+            <div
+              className="px-4 py-2.5 flex items-center gap-2"
+              style={{ borderTop: "1px solid var(--hall-line-soft)" }}
+            >
               {state === "sent" ? (
-                <span className="flex-1 text-center text-[10px] font-bold text-emerald-600">
+                <span
+                  className="flex-1 text-center text-[10px] font-bold"
+                  style={{ color: "var(--hall-ok)" }}
+                >
                   ✓ Sent to Gmail
                 </span>
               ) : state === "error" ? (
-                <span className="flex-1 text-center text-[10px] font-bold text-red-500">
+                <span
+                  className="flex-1 text-center text-[10px] font-bold"
+                  style={{ color: "var(--hall-danger)" }}
+                >
                   ✗ Error — retry?
                 </span>
               ) : item.source === "gmail" ? (
@@ -191,7 +254,8 @@ export function ReadyForJoseSection({
                     href={GMAIL_DRAFTS_URL}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex-1 text-center text-[10px] font-bold bg-[#c8f55a] text-[#131218] rounded-lg py-1.5 hover:bg-[#b8e54a] transition-colors"
+                    className="hall-btn-primary flex-1 text-center"
+                    style={{ padding: "6px 10px", fontSize: 10 }}
                   >
                     Open in Gmail →
                   </a>
@@ -199,14 +263,16 @@ export function ReadyForJoseSection({
                     href={item.notionUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-[10px] font-bold text-[#131218]/25 hover:text-[#131218] transition-colors shrink-0"
+                    className="text-[10px] font-bold shrink-0 transition-colors"
+                    style={{ color: "var(--hall-muted-3)" }}
                     title="View in Notion"
                   >
                     ↗
                   </a>
                   <button
                     onClick={() => dismiss(item.id)}
-                    className="text-[10px] text-[#131218]/20 hover:text-[#131218]/60 transition-colors shrink-0"
+                    className="text-[10px] shrink-0 transition-colors"
+                    style={{ color: "var(--hall-muted-3)" }}
                     title="Dismiss"
                   >
                     ✕
@@ -218,7 +284,8 @@ export function ReadyForJoseSection({
                   <button
                     onClick={() => pushToGmail(item)}
                     disabled={state === "sending"}
-                    className="flex-1 text-center text-[10px] font-bold bg-[#131218] text-white rounded-lg py-1.5 hover:bg-[#2a2938] transition-colors disabled:opacity-50"
+                    className="hall-btn-primary flex-1 text-center disabled:opacity-50"
+                    style={{ padding: "6px 10px", fontSize: 10 }}
                   >
                     {state === "sending" ? "Sending…" : "Send to Gmail →"}
                   </button>
@@ -226,14 +293,16 @@ export function ReadyForJoseSection({
                     href={item.notionUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-[10px] font-bold text-[#131218]/25 hover:text-[#131218] transition-colors shrink-0"
+                    className="text-[10px] font-bold shrink-0 transition-colors"
+                    style={{ color: "var(--hall-muted-3)" }}
                     title="View in Notion"
                   >
                     ↗
                   </a>
                   <button
                     onClick={() => dismiss(item.id)}
-                    className="text-[10px] text-[#131218]/20 hover:text-[#131218]/60 transition-colors shrink-0"
+                    className="text-[10px] shrink-0 transition-colors"
+                    style={{ color: "var(--hall-muted-3)" }}
                     title="Dismiss"
                   >
                     ✕

@@ -31,20 +31,26 @@ export function DiscoverySection({ candidates, radarLoops }: Props) {
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className={
-                active
-                  ? "text-[10px] font-bold px-3 py-1.5 rounded-full bg-[#131218] text-white transition-colors"
-                  : "text-[10px] font-bold px-3 py-1.5 rounded-full bg-white border border-[#E0E0D8] text-[#131218]/55 hover:text-[#131218] transition-colors"
-              }
+              className={active ? "hall-btn-primary" : "hall-btn-outline"}
+              style={{ padding: "4px 10px", fontSize: 10 }}
             >
               {t.label}
-              <span className={active ? "ml-1.5 text-white/60" : "ml-1.5 text-[#131218]/30"}>
+              <span
+                className="ml-1.5"
+                style={{
+                  fontFamily: "var(--font-hall-mono)",
+                  color: active ? "rgba(255,255,255,0.6)" : "var(--hall-muted-3)",
+                }}
+              >
                 {t.count}
               </span>
             </button>
           );
         })}
-        <p className="ml-3 text-[9px] text-[#131218]/30 leading-snug">
+        <p
+          className="ml-3 text-[9px] leading-snug"
+          style={{ color: "var(--hall-muted-3)" }}
+        >
           {tab === "candidates"
             ? "Unreviewed opportunity candidates — use Scan inbox or the + on inbox rows."
             : "Grants and low-signal opportunities — not in CoS until you mark them Interested."}

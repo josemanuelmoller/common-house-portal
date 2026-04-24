@@ -441,34 +441,47 @@ export function ChiefOfStaffDesk({ tasks }: { tasks: CoSTask[] }) {
   const highCount     = visible.filter(t => t.urgency === "high").length;
 
   return (
-    <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-      {/* Urgency stripe */}
-      {criticalCount > 0
-        ? <div className="h-0.5 bg-red-400" />
-        : highCount > 0
-          ? <div className="h-0.5 bg-amber-400" />
-          : <div className="h-0.5 bg-[#E0E0D8]" />
-      }
-
-      {/* Summary strip */}
+    <div>
+      {/* Summary strip — mono K-v2 style */}
       {(criticalCount > 0 || highCount > 0) && (
-        <div className="px-5 py-2.5 bg-[#FAFAF8] border-b border-[#EFEFEA] flex items-center gap-3">
+        <div
+          className="flex items-center gap-3 mb-3 text-[10px]"
+          style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+        >
           {criticalCount > 0 && (
-            <span className="text-[9px] font-bold text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full uppercase tracking-widest">
-              {criticalCount} critical
+            <span
+              className="font-bold uppercase px-1.5 py-0.5 rounded-[3px]"
+              style={{
+                fontSize: 9,
+                letterSpacing: "0.12em",
+                color: "var(--hall-danger)",
+                background: "var(--hall-danger-soft)",
+                border: "1px solid var(--hall-danger)",
+              }}
+            >
+              {criticalCount} CRITICAL
             </span>
           )}
           {highCount > 0 && (
-            <span className="text-[9px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full uppercase tracking-widest">
-              {highCount} high priority
+            <span
+              className="font-bold uppercase px-1.5 py-0.5 rounded-[3px]"
+              style={{
+                fontSize: 9,
+                letterSpacing: "0.12em",
+                color: "var(--hall-warn)",
+                background: "var(--hall-warn-soft)",
+                border: "1px solid var(--hall-warn)",
+              }}
+            >
+              {highCount} HIGH PRIORITY
             </span>
           )}
-          <p className="text-[9px] text-[#131218]/25 font-medium">Tasks · not opportunities</p>
+          <span style={{ color: "var(--hall-muted-3)" }}>Tasks · not opportunities</span>
         </div>
       )}
 
       {/* Task list */}
-      <div className="divide-y divide-[#EFEFEA]">
+      <div className="flex flex-col">
         {visible.map(task => (
           <TaskCard
             key={task.id}
@@ -518,51 +531,67 @@ export function ParkedLoopsSection({ tasks }: { tasks: CoSTask[] }) {
   if (visible.length === 0) return null;
 
   return (
-    <div className="bg-[#FAFAF8] border border-dashed border-[#E0E0D8] rounded-2xl overflow-hidden">
-      <div className="px-5 py-2.5 border-b border-[#EFEFEA] flex items-center gap-2">
-        <span className="text-[9px] font-bold uppercase tracking-widest text-[#131218]/35">
+    <div>
+      <div
+        className="flex items-center gap-2 mb-3"
+        style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+      >
+        <span
+          className="font-bold uppercase"
+          style={{ fontSize: 9, letterSpacing: "0.12em" }}
+        >
           Parked · Waiting
         </span>
-        <span className="text-[9px] text-[#131218]/25">{visible.length}</span>
-        <span className="text-[9px] text-[#131218]/25 ml-auto">
+        <span style={{ fontSize: 9, color: "var(--hall-muted-3)" }}>{visible.length}</span>
+        <span className="ml-auto" style={{ fontSize: 9, color: "var(--hall-muted-3)" }}>
           Out of the urgent queue until you resume
         </span>
       </div>
-      <ul className="divide-y divide-[#EFEFEA]">
+      <ul className="flex flex-col">
         {visible.map(task => {
           const loopId = task.loopEngineId;
           if (!loopId) return null;
           const isUpdating = updating === task.id;
           return (
-            <li key={task.id} className="px-5 py-2.5 flex items-center gap-3">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#131218]/20 shrink-0" />
+            <li
+              key={task.id}
+              className="group py-2 flex items-center gap-3"
+              style={{ borderTop: "1px solid var(--hall-line-soft)" }}
+            >
+              <span
+                className="shrink-0"
+                style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--hall-muted-3)" }}
+              />
               <div className="flex-1 min-w-0">
-                <p className="text-[11.5px] font-semibold text-[#131218]/70 truncate">
+                <span className="block text-[11.5px] font-semibold truncate" style={{ color: "var(--hall-ink-3)" }}>
                   {task.taskTitle}
-                </p>
-                <p className="text-[9.5px] text-[#131218]/30 truncate">
+                </span>
+                <span className="block text-[10.5px] truncate" style={{ color: "var(--hall-muted-3)" }}>
                   {task.opportunityName}
-                </p>
+                </span>
               </div>
-              <div className="flex items-center gap-1 shrink-0">
+              <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                 <button
                   onClick={() => transition(task.id, loopId, "Needed")}
                   disabled={isUpdating}
-                  className="text-[9px] font-bold text-[#131218]/50 bg-white border border-[#E0E0D8] hover:bg-[#EFEFEA] px-2 py-1 rounded-full transition-colors disabled:opacity-40"
+                  className="hall-btn-outline disabled:opacity-40"
+                  style={{ padding: "3px 9px", fontSize: 10 }}
                 >
                   Resume
                 </button>
                 <button
                   onClick={() => transition(task.id, loopId, "Done")}
                   disabled={isUpdating}
-                  className="text-[9px] font-bold text-green-600 bg-green-50 border border-green-200 hover:bg-green-100 px-2 py-1 rounded-full transition-colors disabled:opacity-40"
+                  className="hall-btn-primary disabled:opacity-40"
+                  style={{ padding: "3px 9px", fontSize: 10 }}
                 >
                   ✓ Done
                 </button>
                 <button
                   onClick={() => transition(task.id, loopId, "Dropped")}
                   disabled={isUpdating}
-                  className="text-[9px] font-bold text-[#131218]/30 hover:text-[#131218]/50 transition-colors px-1"
+                  className="text-[11px] transition-colors px-1"
+                  style={{ color: "var(--hall-muted-3)" }}
                   title="Drop"
                 >
                   ×
