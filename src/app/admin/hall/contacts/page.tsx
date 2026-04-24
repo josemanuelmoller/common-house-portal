@@ -352,18 +352,18 @@ export default async function HallContactsPage({ searchParams }: PageProps) {
         style={{ fontFamily: "var(--font-hall-sans)", background: "var(--hall-paper-0)" }}
       >
         <header
-          className="flex items-center justify-between gap-6 px-9 py-3.5"
+          className="flex items-center justify-between gap-3 sm:gap-6 px-4 sm:px-9 py-3.5"
           style={{ borderBottom: "1px solid var(--hall-ink-0)" }}
         >
-          <div className="flex items-baseline gap-4 min-w-0">
+          <div className="flex items-baseline gap-3 sm:gap-4 min-w-0 flex-1">
             <span
-              className="text-[10px] tracking-[0.08em] whitespace-nowrap uppercase"
+              className="hidden sm:inline text-[10px] tracking-[0.08em] whitespace-nowrap uppercase"
               style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
             >
               HALL · <b style={{ color: "var(--hall-ink-0)" }}>INTELLIGENCE</b>
             </span>
             <h1
-              className="text-[16px] font-medium tracking-[-0.01em]"
+              className="text-[15px] sm:text-[16px] font-medium tracking-[-0.01em] truncate"
               style={{ color: "var(--hall-ink-0)" }}
             >
               <em style={{ fontFamily: "var(--font-hall-display)", fontStyle: "italic", fontWeight: 400 }}>
@@ -372,8 +372,13 @@ export default async function HallContactsPage({ searchParams }: PageProps) {
               .
             </h1>
           </div>
+          {/* Mobile: compact 2-stat. Desktop: full 4-stat row. */}
+          <div className="sm:hidden text-[10px] whitespace-nowrap" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}>
+            <b style={{ color: "var(--hall-ink-0)" }}>{contacts.length}</b>
+            {unclassified.length > 0 && <> · <b style={{ color: "var(--hall-warn)" }}>{unclassified.length}</b></>}
+          </div>
           <div
-            className="flex items-center gap-4 text-[10px] whitespace-nowrap"
+            className="hidden sm:flex items-center gap-4 text-[10px] whitespace-nowrap"
             style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
           >
             <Stat label="OBSERVED" value={contacts.length} />
@@ -387,7 +392,7 @@ export default async function HallContactsPage({ searchParams }: PageProps) {
         </header>
 
         <p
-          className="px-9 pt-4 pb-2 text-[11.5px] max-w-3xl leading-relaxed"
+          className="px-4 sm:px-9 pt-4 pb-2 text-[11.5px] max-w-3xl leading-relaxed"
           style={{ color: "var(--hall-muted-2)" }}
         >
           {mode === "attention"
@@ -402,9 +407,9 @@ export default async function HallContactsPage({ searchParams }: PageProps) {
           }
         </p>
 
-        <div className="px-9 py-6 max-w-5xl space-y-8">
-          {/* Tab navigation */}
-          <div className="hall-scroll-x flex items-center gap-1 flex-nowrap" style={{ borderBottom: "1px solid var(--hall-line)" }}>
+        <div className="px-4 sm:px-9 py-5 sm:py-6 max-w-5xl space-y-8">
+          {/* Tab navigation — horizontal scroll when tabs exceed screen width */}
+          <div className="flex items-center gap-1 flex-nowrap overflow-x-auto" style={{ borderBottom: "1px solid var(--hall-line)" }}>
             {([
               { mode: "attention", label: "Attention", count: attentionCount, alert: true },
               { mode: "browse",    label: "Browse",    count: 0,               alert: false },

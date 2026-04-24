@@ -64,18 +64,18 @@ export default async function HallOrganizationsPage() {
       >
         {/* ── K-v2 one-line header ─────────────────────────────────────── */}
         <header
-          className="flex items-center justify-between gap-6 px-9 py-3.5"
+          className="flex items-center justify-between gap-3 sm:gap-6 px-4 sm:px-9 py-3.5"
           style={{ borderBottom: "1px solid var(--hall-ink-0)" }}
         >
-          <div className="flex items-baseline gap-4 min-w-0">
+          <div className="flex items-baseline gap-3 sm:gap-4 min-w-0 flex-1">
             <span
-              className="text-[10px] tracking-[0.08em] whitespace-nowrap uppercase"
+              className="hidden sm:inline text-[10px] tracking-[0.08em] whitespace-nowrap uppercase"
               style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
             >
               HALL · <b style={{ color: "var(--hall-ink-0)" }}>INTELLIGENCE</b>
             </span>
             <h1
-              className="text-[16px] font-medium tracking-[-0.01em]"
+              className="text-[15px] sm:text-[16px] font-medium tracking-[-0.01em] truncate"
               style={{ color: "var(--hall-ink-0)" }}
             >
               <em
@@ -89,7 +89,11 @@ export default async function HallOrganizationsPage() {
               </em>
             </h1>
           </div>
-          <div className="flex items-center gap-5">
+          {/* Compact 2-stat summary on mobile; full stats row on desktop */}
+          <div className="sm:hidden text-[10px] whitespace-nowrap" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}>
+            <b style={{ color: "var(--hall-ink-0)" }}>{active.length}</b>{proposed.length > 0 && <> · <b style={{ color: "var(--hall-warn)" }}>{proposed.length}</b></>}
+          </div>
+          <div className="hidden sm:flex items-center gap-5">
             <Stat label="Registered" value={active.length} />
             <div className="w-px h-8" style={{ background: "var(--hall-line)" }} />
             <Stat label="Proposed"   value={proposed.length} tone={proposed.length > 0 ? "warn" : "muted"} />
@@ -104,7 +108,7 @@ export default async function HallOrganizationsPage() {
           </div>
         </header>
 
-        <div className="px-9 py-7 max-w-5xl space-y-7">
+        <div className="px-4 sm:px-9 py-5 sm:py-7 max-w-5xl space-y-7">
 
           {/* Explainer */}
           <p className="text-[11px] leading-snug" style={{ color: "var(--hall-muted-2)" }}>
@@ -218,7 +222,7 @@ function ProposedRow({ org }: { org: ProposedOrganization }) {
   const touches = org.meeting_sum + org.email_sum + org.transcript_sum;
   return (
     <li style={{ borderTop: "1px solid var(--hall-line-soft)" }}>
-      <div className="flex items-start gap-4 py-3 transition-colors hover:bg-[var(--hall-fill-soft)] px-1">
+      <div className="flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-4 py-3 transition-colors hover:bg-[var(--hall-fill-soft)] px-1">
         <div className="flex-1 min-w-0">
           <p
             className="text-[12.5px] font-semibold truncate"
@@ -254,7 +258,7 @@ function OrgRow({ org }: { org: OrganizationListEntry }) {
   const touches = org.meeting_sum + org.email_sum + org.transcript_sum;
   return (
     <li style={{ borderTop: "1px solid var(--hall-line-soft)" }}>
-      <div className="flex items-start gap-4 py-3 transition-colors hover:bg-[var(--hall-fill-soft)] px-1">
+      <div className="flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-4 py-3 transition-colors hover:bg-[var(--hall-fill-soft)] px-1">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <Link
