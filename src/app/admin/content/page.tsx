@@ -23,7 +23,7 @@ export default async function ContentPipelinePage() {
       <Sidebar adminNav />
 
       <main
-        className="flex-1 ml-[228px]"
+        className="flex-1 md:ml-[228px]"
         style={{ fontFamily: "var(--font-hall-sans)", background: "var(--hall-paper-0)" }}
       >
 

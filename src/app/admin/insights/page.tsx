@@ -9,7 +9,7 @@ export default async function InsightsPage() {
     <div className="flex min-h-screen" style={{ background: "var(--hall-paper-0)" }}>
       <Sidebar adminNav />
       <main
-        className="flex-1 ml-[228px]"
+        className="flex-1 md:ml-[228px]"
         style={{ fontFamily: "var(--font-hall-sans)", background: "var(--hall-paper-0)" }}
       >
         {/* InsightsTabs renders its own header + tab bar + content */}

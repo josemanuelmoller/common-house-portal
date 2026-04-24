@@ -31,7 +31,7 @@ export default async function ResidentsPage() {
       <Sidebar items={NAV} isAdmin />
 
       <main
-        className="flex-1 overflow-auto ml-[228px]"
+        className="flex-1 overflow-auto md:ml-[228px]"
         style={{ fontFamily: "var(--font-hall-sans)" }}
       >
         {/* K-v2 thin 1-line header */}

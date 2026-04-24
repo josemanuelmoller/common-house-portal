@@ -105,7 +105,7 @@ export default async function AgentHealthPage() {
       <Sidebar adminNav />
 
       <main
-        className="flex-1 ml-60 flex flex-col"
+        className="flex-1 md:ml-60 flex flex-col"
         style={{ fontFamily: "var(--font-hall-sans)", background: "var(--hall-paper-0)" }}
       >
         <header

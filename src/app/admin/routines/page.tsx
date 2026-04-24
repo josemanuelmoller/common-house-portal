@@ -148,7 +148,7 @@ export default async function RoutinesPage() {
       <Sidebar adminNav />
 
       <main
-        className="flex-1 ml-60 overflow-x-auto"
+        className="flex-1 md:ml-60 overflow-x-auto"
         style={{ fontFamily: "var(--font-hall-sans)", background: "var(--hall-paper-0)" }}
       >
 

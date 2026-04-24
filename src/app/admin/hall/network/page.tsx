@@ -11,7 +11,7 @@ export default async function NetworkPage() {
     <div className="flex min-h-screen" style={{ background: "var(--hall-paper-0)" }}>
       <Sidebar adminNav />
       <main
-        className="flex-1 ml-60 overflow-auto"
+        className="flex-1 md:ml-60 overflow-auto"
         style={{ fontFamily: "var(--font-hall-sans)" }}
       >
         <header

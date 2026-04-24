@@ -245,7 +245,7 @@ export default function LivingRoomAdminPage() {
       <Sidebar adminNav />
 
       <main
-        className="flex-1 ml-[228px] overflow-auto flex flex-col"
+        className="flex-1 md:ml-[228px] overflow-auto flex flex-col"
         style={{ fontFamily: "var(--font-hall-sans)", background: "var(--hall-paper-0)" }}
       >
 

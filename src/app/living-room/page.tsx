@@ -59,7 +59,7 @@ export default async function LivingRoomPage() {
     <div className="flex min-h-screen" style={{ background: "var(--hall-paper-0)" }}>
       <Sidebar items={nav} isAdmin={isAdmin} />
 
-      <main className="flex-1 ml-[228px] overflow-auto" style={{ fontFamily: "var(--font-hall-sans)" }}>
+      <main className="flex-1 md:ml-[228px] overflow-auto" style={{ fontFamily: "var(--font-hall-sans)" }}>
 
         {/* K-v2 thin header */}
         <header

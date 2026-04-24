@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { UserButton, useUser, SignOutButton } from "@clerk/nextjs";
 import { BrandLogo } from "./BrandLogo";
 
@@ -81,6 +81,7 @@ export const ADMIN_NAV_V2: NavEntry[] = [
       { label: "Network",         href: "/admin/hall/network" },
       { label: "Commitments",     href: "/admin/hall/commitments" },
       { label: "System Health",   href: "/admin/health" },
+      { label: "My identity",     href: "/admin/settings/identity" },
     ],
   },
   { kind: "link",  label: "Living Room",  href: "/living-room",   icon: "◐" },
@@ -118,6 +119,12 @@ export function Sidebar({ items, projectName, isAdmin, adminNav }: Props) {
     : {};
 
   const [open, setOpen] = useState<Record<string, boolean>>(initialOpen);
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  // Close the mobile drawer whenever the route changes.
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
 
   const toggle = (label: string) =>
     setOpen((prev) => ({ ...prev, [label]: !prev[label] }));
@@ -125,7 +132,45 @@ export function Sidebar({ items, projectName, isAdmin, adminNav }: Props) {
   const useCollapsible = adminNav ?? isAdmin;
 
   return (
-    <aside className="w-[228px] min-h-screen bg-white border-r border-[#d8d8d0] flex flex-col flex-shrink-0 fixed top-0 left-0 z-10 overflow-y-auto">
+    <>
+      {/* Mobile hamburger — visible only < md, hidden when drawer is already open */}
+      {!mobileOpen && (
+        <button
+          type="button"
+          onClick={() => setMobileOpen(true)}
+          aria-label="Open navigation"
+          className="md:hidden fixed top-3 left-3 z-30 w-10 h-10 flex items-center justify-center rounded bg-white border border-[#d8d8d0] shadow-sm"
+        >
+          <span className="block w-4 h-[2px] bg-[#0e0e0e] relative before:content-[''] before:block before:w-4 before:h-[2px] before:bg-[#0e0e0e] before:absolute before:-top-[5px] after:content-[''] after:block after:w-4 after:h-[2px] after:bg-[#0e0e0e] after:absolute after:top-[5px]" />
+        </button>
+      )}
+
+      {/* Backdrop — tap to dismiss on mobile */}
+      {mobileOpen && (
+        <button
+          type="button"
+          onClick={() => setMobileOpen(false)}
+          aria-label="Close navigation"
+          className="md:hidden fixed inset-0 z-20 bg-black/40"
+        />
+      )}
+
+      <aside
+        className={`w-[228px] min-h-screen bg-white border-r border-[#d8d8d0] flex flex-col flex-shrink-0 fixed top-0 left-0 z-30 overflow-y-auto transform transition-transform duration-200 ${
+          mobileOpen ? "translate-x-0" : "-translate-x-full"
+        } md:translate-x-0`}
+      >
+        {/* Mobile-only close button inside the drawer */}
+        {mobileOpen && (
+          <button
+            type="button"
+            onClick={() => setMobileOpen(false)}
+            aria-label="Close navigation"
+            className="md:hidden absolute top-3 right-3 w-8 h-8 flex items-center justify-center text-[18px] text-[#0e0e0e]/60"
+          >
+            ✕
+          </button>
+        )}
 
       {/* Logo — official wordmark. */}
       <div className="px-[18px] pt-5 pb-[18px] border-b border-[#d8d8d0] mb-3">
@@ -285,6 +330,7 @@ export function Sidebar({ items, projectName, isAdmin, adminNav }: Props) {
           </button>
         </SignOutButton>
       </div>
-    </aside>
+      </aside>
+    </>
   );
 }

@@ -201,7 +201,7 @@ export default async function OSPage() {
       <Sidebar items={NAV} isAdmin />
 
       <main
-        className="flex-1 ml-[228px] overflow-auto"
+        className="flex-1 md:ml-[228px] overflow-auto"
         style={{ fontFamily: "var(--font-hall-sans)", background: "var(--hall-paper-0)" }}
       >
         <header
