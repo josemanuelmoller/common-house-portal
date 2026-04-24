@@ -127,9 +127,22 @@ export function Sidebar({ items, projectName, isAdmin, adminNav }: Props) {
   return (
     <aside className="w-[228px] min-h-screen bg-white border-r border-[#d8d8d0] flex flex-col flex-shrink-0 fixed top-0 left-0 z-10 overflow-y-auto">
 
-      {/* Logo — official wordmark */}
+      {/* Logo — official wordmark + italic "portal" strapline */}
       <div className="px-[18px] pt-5 pb-[18px] border-b border-[#d8d8d0] mb-3">
-        <BrandLogo variant="black" height={34} />
+        <div className="flex items-end gap-2">
+          <BrandLogo variant="black" height={34} />
+          <span
+            className="text-[14px] leading-none pb-[2px]"
+            style={{
+              fontFamily: "var(--font-hall-display)",
+              fontStyle: "italic",
+              fontWeight: 400,
+              color: "var(--hall-ink-0)",
+            }}
+          >
+            portal
+          </span>
+        </div>
         {projectName && (
           <p className="text-[#0a0a0a]/40 text-xs mt-2 truncate font-medium">{projectName}</p>
         )}
