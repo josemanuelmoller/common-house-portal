@@ -105,7 +105,7 @@ export function ArtifactRow({ artifact }: { artifact: ObjectiveArtifactWithObjec
 
   return (
     <div>
-      <div className="grid grid-cols-[1.6fr_1.4fr_0.7fr_0.9fr_0.9fr_0.9fr_0.4fr] gap-4 px-5 py-4 items-center hover:bg-[#f4f4ef]/50 transition-colors">
+      <div className="flex flex-col gap-2 px-5 py-4 sm:grid sm:grid-cols-[1.6fr_1.4fr_0.7fr_0.9fr_0.9fr_0.9fr_0.4fr] sm:gap-4 sm:items-center hover:bg-[#f4f4ef]/50 transition-colors">
         {/* Objective */}
         <div className="flex flex-col gap-1 min-w-0">
           <div className="flex items-center gap-2">

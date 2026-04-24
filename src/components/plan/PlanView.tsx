@@ -213,7 +213,7 @@ function ObjectiveCard({ obj, onClick }: { obj: StrategicObjective; onClick: () 
 
 function RevenueStrip({ summaries, currentQuarter }: { summaries: QuarterRevenueSummary[]; currentQuarter: number }) {
   return (
-    <div className="grid grid-cols-5 gap-3 mb-7">
+    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 mb-7">
       {summaries.map((s) => {
         const paid = s.paid ?? 0;
         const target = s.target ?? 0;
@@ -1052,7 +1052,7 @@ function CreateObjectiveModal({
             />
           </FormField>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <FormField label="Year">
               <input
                 value={year}

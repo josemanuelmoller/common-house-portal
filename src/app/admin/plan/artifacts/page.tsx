@@ -44,7 +44,7 @@ export default async function PlanArtifactsPage() {
       >
         {/* K-v2 collapsed header */}
         <header
-          className="flex items-center justify-between gap-6 px-9 py-3.5"
+          className="flex items-center justify-between gap-3 sm:gap-6 px-4 sm:px-9 py-3.5"
           style={{ borderBottom: "1px solid var(--hall-ink-0)" }}
         >
           <div className="flex items-baseline gap-4 min-w-0">
@@ -94,13 +94,13 @@ export default async function PlanArtifactsPage() {
         </header>
 
         <div
-          className="px-9 pt-3"
+          className="px-4 sm:px-9 pt-3"
           style={{ borderBottom: "1px solid var(--hall-line-soft)" }}
         >
           <PlanNav active="artifacts" />
         </div>
 
-        <div className="px-9 py-6">
+        <div className="px-4 sm:px-9 py-5 sm:py-6">
           <p
             className="text-[12px] leading-relaxed max-w-2xl mb-6"
             style={{ color: "var(--hall-muted-2)" }}
@@ -139,7 +139,7 @@ export default async function PlanArtifactsPage() {
           ) : (
             <div>
               <div
-                className="grid grid-cols-[1.6fr_1.4fr_0.7fr_0.9fr_0.9fr_0.9fr_0.4fr] gap-4 px-2 py-2"
+                className="hidden sm:grid sm:grid-cols-[1.6fr_1.4fr_0.7fr_0.9fr_0.9fr_0.9fr_0.4fr] gap-4 px-2 py-2"
                 style={{
                   borderBottom: "1px solid var(--hall-ink-0)",
                   fontFamily: "var(--font-hall-mono)",

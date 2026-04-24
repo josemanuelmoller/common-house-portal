@@ -40,7 +40,7 @@ export default async function PlanCommsPage() {
       >
         {/* K-v2 collapsed header */}
         <header
-          className="flex items-center justify-between gap-6 px-9 py-3.5"
+          className="flex items-center justify-between gap-3 sm:gap-6 px-4 sm:px-9 py-3.5"
           style={{ borderBottom: "1px solid var(--hall-ink-0)" }}
         >
           <div className="flex items-baseline gap-4 min-w-0">
@@ -70,13 +70,13 @@ export default async function PlanCommsPage() {
         </header>
 
         <div
-          className="px-9 pt-3"
+          className="px-4 sm:px-9 pt-3"
           style={{ borderBottom: "1px solid var(--hall-line-soft)" }}
         >
           <PlanNav active="comms" />
         </div>
 
-        <div className="px-9 py-6">
+        <div className="px-4 sm:px-9 py-5 sm:py-6">
           <p
             className="text-[12px] leading-relaxed max-w-2xl mb-6"
             style={{ color: "var(--hall-muted-2)" }}

@@ -318,7 +318,7 @@ export default function CommsView({ pillars, audiences, channels, pitches, outco
         <div className="px-6 py-4 border-b border-[#f4f4ef]">
           <h2 className="text-[13px] font-bold text-[#0a0a0a]">Strategy · revised quarterly</h2>
         </div>
-        <div className="grid grid-cols-[1fr_1fr_1fr] gap-0 divide-x divide-[#f4f4ef]">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-0 divide-x divide-[#f4f4ef]">
 
           <div className="px-6 py-4">
             <p className="text-[9px] font-bold uppercase tracking-[2.5px] text-[#0a0a0a]/40 mb-3">
@@ -775,7 +775,7 @@ export default function CommsView({ pillars, audiences, channels, pitches, outco
                                     </button>
                                   </div>
                                 </div>
-                                <div className="grid grid-cols-3 gap-3">
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                   <label className="flex flex-col gap-1">
                                     <span className="text-[9px] font-bold uppercase tracking-wider text-[#0a0a0a]/40">Impressions</span>
                                     <input type="number" value={outcomeForm.impressions} onChange={e => setOutcomeForm(f => ({ ...f, impressions: e.target.value }))} className="text-[11px] border border-[#e4e4dd] rounded px-2 py-1 outline-none focus:border-[#0a0a0a]" />
