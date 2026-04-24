@@ -880,95 +880,15 @@ export default async function AdminPage() {
             </div>{/* /hall-today-col-right */}
           </div>{/* /hall-today-grid */}
 
-          {/* ── 3. Stats row — B6: hero tile wider, 2 satellites narrower. B7: expand abbreviations. ── */}
-          <div className="grid grid-cols-[1.6fr_1fr_1fr] gap-3 items-stretch">
+          {/* Stats row removed in Phase 5 — data was redundant with the
+              K-v2 right col (Allocation + Agents + Deadline). */}
 
-            {/* Tile 1 — Portfolio (hero) */}
-            <div className="bg-white rounded-xl border border-[#E0E0D8] px-4 py-3 flex flex-col">
-              <p className="text-[9px] font-bold text-[#131218]/25 uppercase tracking-widest mb-1">Active portfolio</p>
-              <div className="flex items-baseline gap-3">
-                <p className="text-[28px] font-[800] text-[#131218] tracking-tight leading-none">{projects.length}</p>
-                <span className="text-[10px] font-semibold text-[#131218]/50 leading-tight">
-                  {workroomCount} Workroom{workroomCount !== 1 ? "s" : ""} · {garageCount} Garage{untypedCount > 0 ? ` · ${untypedCount} untyped` : ""}
-                </span>
-              </div>
-              <div className="mt-auto pt-1.5 flex items-center gap-2.5 text-[10px]">
-                {blockerCount > 0 ? (
-                  <span className="flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" />
-                    <span className="font-bold text-red-500">{blockerCount} blocker{blockerCount !== 1 ? "s" : ""}</span>
-                  </span>
-                ) : (
-                  <span className="text-[#131218]/35">No blockers</span>
-                )}
-                {staleProjects.length > 0 && (
-                  <span className="text-[#131218]/40">· {staleProjects.length} stale 30d+</span>
-                )}
-              </div>
-            </div>
-
-            {/* Tile 2 — Decisiones + updates */}
-            <Link href="/admin/decisions" className="bg-white rounded-xl border border-[#E0E0D8] px-3.5 py-2 hover:bg-[#EFEFEA]/40 transition-colors flex flex-col">
-              <p className="text-[9px] font-bold text-[#131218]/25 uppercase tracking-widest mb-0.5">Decisions + updates</p>
-              <div className="flex items-baseline gap-2">
-                <p className={`text-[18px] font-[800] tracking-tight leading-none ${openDecisions.length > 0 ? "text-amber-500" : "text-[#131218]/15"}`}>
-                  {openDecisions.length}
-                </p>
-                <span className="text-[9.5px] font-semibold text-[#131218]/40 leading-tight">
-                  {totalPending > 0 ? `${totalPending} need action` : "desk clear"}
-                </span>
-              </div>
-              <div className="mt-auto pt-1 flex items-center gap-2.5 text-[9.5px]">
-                <span className="text-[#131218]/40">
-                  {urgentDecisions.length} urgent · {needsUpdate.length} to update
-                </span>
-                {withDeadlines.length > 0 && (
-                  <span className="flex items-center gap-1">
-                    <span className="w-1 h-1 rounded-full bg-amber-400 shrink-0" />
-                    <span className="font-bold text-amber-500">{withDeadlines.length} this week</span>
-                  </span>
-                )}
-              </div>
-            </Link>
-
-            {/* Tile 3 — OS activity. B8 — only show non-zero metrics. */}
-            <div className="bg-white rounded-xl border border-[#E0E0D8] px-3.5 py-2">
-              <p className="text-[9px] font-bold text-[#131218]/25 uppercase tracking-widest mb-1">OS activity</p>
-              {(() => {
-                const metrics = [
-                  { label: "Outbox",         count: agentDrafts.length,   activeColor: "text-[#131218]" },
-                  { label: "CoS tasks",      count: cosTasks.length,      activeColor: "text-amber-500" },
-                  { label: "Candidates",     count: candidates.length,    activeColor: "text-amber-400" },
-                  { label: "Cold relations", count: coldOnly.length,      activeColor: "text-blue-500" },
-                  { label: "Dormant",        count: dormantRelationships.length, activeColor: "text-[#131218]/40" },
-                ].filter(m => m.count > 0);
-
-                if (metrics.length === 0) {
-                  return (
-                    <p className="text-[10px] text-[#131218]/35 italic py-1">All queues clear.</p>
-                  );
-                }
-
-                return (
-                  <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
-                    {metrics.map(({ label, count, activeColor }) => (
-                      <div key={label} className="flex items-center justify-between">
-                        <span className="text-[9.5px] text-[#131218]/50 truncate">{label}</span>
-                        <span className={`text-[10.5px] font-[800] ${activeColor}`}>{count}</span>
-                      </div>
-                    ))}
-                  </div>
-                );
-              })()}
-            </div>
-          </div>
-
-          {/* ── 4. Outbox (TODAY) ──────────────────────────────────────────
+          {/* ── Outbox (moved to SIGNALS in Phase 5) ───────────────────────
              Drafts whose approval sends something out of the house —
              LinkedIn posts, emails, delegation briefs. Internal digests
              (Market Signal, Quick Win Scan) surface in their own panels. */}
           {agentDrafts.length > 0 && (
-            <div data-hall-tab="today">
+            <div data-hall-tab="signals">
               <SectionHeader label="Outbox" count={agentDrafts.length} />
               <AgentQueueSection drafts={agentDrafts} />
             </div>
@@ -1016,8 +936,11 @@ export default async function AdminPage() {
             </div>
           </div>
 
-          {/* ── Two-column main layout — TODAY tab ─────── */}
-          <div data-hall-tab="today" className="grid grid-cols-[1fr_340px] gap-6 items-start">
+          {/* ── Two-column main layout — moved to SIGNALS in Phase 5 ──
+              Discovery / CoS desk / Parked / Open Decisions / Relationship
+              Queue all live here. Today's primary view is now just the
+              K-v2 grid above. ── */}
+          <div data-hall-tab="signals" className="grid grid-cols-[1fr_340px] gap-6 items-start">
 
             {/* ── LEFT COLUMN ───────────────────────────────────────────────── */}
             <div className="space-y-6">
@@ -1243,8 +1166,8 @@ export default async function AdminPage() {
               Two-column grid ends above. Everything below is full-width so the
               right rail never goes visually idle while the portfolio scrolls. */}
 
-          {/* ── 8. Active Portfolio — TODAY + PORTFOLIO tabs ──────── */}
-          <div data-hall-tab="today portfolio">
+          {/* ── Active Portfolio — PORTFOLIO tab only (Phase 5) ──────── */}
+          <div data-hall-tab="portfolio">
           {(() => {
             // Editorial summary counts — computed once so summary and rows agree.
             const projBlocked  = projects.filter(p => p.blockerCount > 0);
@@ -1443,8 +1366,8 @@ export default async function AdminPage() {
           })()}
           </div>
 
-          {/* ── 9. Opportunities Explorer — TODAY + PORTFOLIO tabs ─────── */}
-          <div data-hall-tab="today portfolio">
+          {/* ── Opportunities Explorer — PORTFOLIO tab only (Phase 5) ─── */}
+          <div data-hall-tab="portfolio">
           {(() => {
             const total = filteredOpps.ch.length + filteredOpps.portfolio.length;
             if (total === 0) return null;
@@ -1495,9 +1418,9 @@ export default async function AdminPage() {
           })()}
           </div>
 
-          {/* ── 10. Ready to Publish — TODAY ─────────────────────────────── */}
+          {/* ── Ready to Publish — moved to SIGNALS in Phase 5 ─────────── */}
           {readyContent.length > 0 && (
-            <div data-hall-tab="today">
+            <div data-hall-tab="signals">
               <SectionHeader label="Ready to publish" count={readyContent.length} />
               <div className="grid grid-cols-3 gap-3">
                 {readyContent.map(c => (
