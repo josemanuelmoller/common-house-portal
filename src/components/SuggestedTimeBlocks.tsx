@@ -144,135 +144,169 @@ export function SuggestedTimeBlocks() {
 
   if (loading) {
     return (
-      <div className="flex items-center gap-3 bg-white/50 border border-dashed border-[#E0E0D8] rounded-xl px-4 py-2">
-        <span className="w-1.5 h-1.5 rounded-full bg-[#131218]/30 animate-pulse shrink-0" />
-        <p className="text-[11px] text-[#131218]/45">Scanning calendar + loops for time-block suggestions…</p>
-      </div>
+      <p className="text-[11px]" style={{ color: "var(--hall-muted-3)" }}>
+        Scanning calendar + loops for time-block suggestions…
+      </p>
     );
   }
 
   if (error) {
     if (error === "__consent_needed__") {
-      // Soft, non-alarming state — feature is deployed, just needs the one-time
-      // Google consent. Doesn't read like something is broken.
       return (
-        <div className="flex items-center gap-3 bg-white/50 border border-dashed border-[#E0E0D8] rounded-xl px-4 py-2">
-          <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
-          <p className="text-[11px] text-[#131218]/50 flex-1 min-w-0 truncate">
-            Waiting on Google Calendar consent — activates as soon as the refresh token has calendar scope.
-          </p>
+        <p className="text-[11px] flex items-center gap-3" style={{ color: "var(--hall-muted-2)" }}>
+          <span className="shrink-0">Waiting on Google Calendar consent — activates as soon as the refresh token has calendar scope.</span>
           <a
             href="/api/google/auth"
-            className="text-[9px] font-bold text-[#131218]/50 hover:text-[#131218] uppercase tracking-widest shrink-0"
+            className="text-[9px] font-bold uppercase tracking-widest shrink-0"
+            style={{ color: "var(--hall-ink-0)" }}
           >
             Re-authorise →
           </a>
-        </div>
+        </p>
       );
     }
     return (
-      <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-xl px-4 py-2">
-        <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" />
-        <p className="text-[11px] text-red-700 flex-1 min-w-0 truncate" title={error}>{error}</p>
+      <p className="text-[11px] flex items-center gap-3" style={{ color: "var(--hall-danger)" }} title={error}>
+        <span className="truncate flex-1">{error}</span>
         <button
           onClick={() => load(true)}
-          className="text-[9px] font-bold text-red-700 hover:text-red-900 uppercase tracking-widest shrink-0"
+          className="text-[9px] font-bold uppercase tracking-widest shrink-0"
+          style={{ color: "var(--hall-danger)" }}
         >
           Retry
         </button>
-      </div>
+      </p>
     );
   }
 
   if (items.length === 0) {
     return (
-      <div className="flex items-center gap-3 bg-white/50 border border-dashed border-[#E0E0D8] rounded-xl px-4 py-2">
-        <span className="w-1.5 h-1.5 rounded-full bg-[#131218]/15 shrink-0" />
-        <p className="text-[11px] text-[#131218]/40 flex-1 min-w-0 truncate">
-          {emptyReason ?? "No time-block suggestions right now."}
-        </p>
+      <p className="text-[11px] flex items-center gap-3" style={{ color: "var(--hall-muted-3)" }}>
+        <span className="truncate flex-1">{emptyReason ?? "No time-block suggestions right now."}</span>
         <button
           onClick={() => load(true)}
-          className="text-[9px] font-bold text-[#131218]/40 hover:text-[#131218] uppercase tracking-widest shrink-0"
+          className="text-[9px] font-bold uppercase tracking-widest shrink-0"
+          style={{ color: "var(--hall-muted-2)" }}
         >
           Re-scan →
         </button>
-      </div>
+      </p>
     );
   }
 
   return (
     <div className="relative">
       {toast && (
-        <div className="absolute -top-9 right-0 text-[10px] font-bold bg-[#131218] text-white px-3 py-1.5 rounded-md z-10 shadow-lg">
+        <div
+          className="absolute -top-9 right-0 text-[10px] font-bold px-3 py-1.5 rounded-[3px] z-10"
+          style={{ background: "var(--hall-ink-0)", color: "var(--hall-paper-0)", boxShadow: "0 4px 12px rgba(10,10,10,0.15)" }}
+        >
           {toast}
         </div>
       )}
-      <div className="bg-white rounded-2xl border border-[#E0E0D8] divide-y divide-[#EFEFEA] overflow-hidden">
+      <div className="flex flex-col">
         {items.map(item => (
-          <div key={item.id} className={`px-5 py-3.5 ${acting === item.id ? "opacity-50" : ""}`}>
+          <div
+            key={item.id}
+            className={`group py-3.5 px-2.5 -mx-2.5 transition-colors hover:bg-[var(--hall-paper-1)] ${acting === item.id ? "opacity-50" : ""}`}
+            style={{ borderTop: "1px solid var(--hall-line-soft)" }}
+          >
             <div className="flex items-start gap-4">
               {/* Time window column */}
-              <div className="shrink-0 w-[138px]">
-                <p className="text-[11px] font-bold text-[#131218] leading-snug">
+              <div className="shrink-0 w-[100px]">
+                <p
+                  className="font-bold leading-snug"
+                  style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10.5, color: "var(--hall-ink-0)" }}
+                >
                   {item.slot_label}
                 </p>
-                <p className="text-[9px] text-[#131218]/35 mt-0.5">
+                <p
+                  className="mt-0.5"
+                  style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--hall-muted-2)" }}
+                >
                   {item.duration_min} min
                 </p>
-                <span className={`inline-block mt-1 text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full ${TASK_TYPE_CLASS[item.task_type] ?? "bg-[#EFEFEA] text-[#131218]/50"}`}>
+                <span
+                  className="inline-block mt-1.5"
+                  style={{
+                    fontFamily: "var(--font-hall-mono)",
+                    fontSize: 9,
+                    letterSpacing: "0.1em",
+                    textTransform: "uppercase",
+                    color: "var(--hall-muted-2)",
+                    background: "var(--hall-fill-soft)",
+                    padding: "2px 6px",
+                    borderRadius: 2,
+                  }}
+                >
                   {TASK_TYPE_LABEL[item.task_type] ?? item.task_type}
                 </span>
               </div>
 
               {/* Content column */}
               <div className="flex-1 min-w-0">
-                <p className="text-[12.5px] font-semibold text-[#131218] leading-snug">
+                <p
+                  className="text-[13px] font-semibold leading-snug"
+                  style={{ color: "var(--hall-ink-0)" }}
+                >
                   {item.title}
                 </p>
-                <p className="text-[10.5px] text-[#131218]/45 mt-0.5 truncate">
+                <p
+                  className="text-[11px] mt-0.5 truncate"
+                  style={{ color: "var(--hall-muted-2)" }}
+                >
                   {item.entity_label}
                 </p>
-                <p className="text-[10.5px] text-[#131218]/60 mt-1.5 leading-[1.5]">
-                  <span className="font-semibold text-[#131218]/75">Why now: </span>{item.why_now}
+                <p
+                  className="text-[11px] mt-1.5 leading-[1.5]"
+                  style={{ color: "var(--hall-muted-2)" }}
+                >
+                  <span className="font-semibold" style={{ color: "var(--hall-ink-3)" }}>Why now: </span>{item.why_now}
                 </p>
-                <p className="text-[10.5px] text-[#131218]/60 mt-0.5 leading-[1.5]">
-                  <span className="font-semibold text-[#131218]/75">Outcome: </span>{item.expected_outcome}
+                <p
+                  className="text-[11px] mt-0.5 leading-[1.5]"
+                  style={{ color: "var(--hall-muted-2)" }}
+                >
+                  <span className="font-semibold" style={{ color: "var(--hall-ink-3)" }}>Outcome: </span>{item.expected_outcome}
                 </p>
               </div>
 
-              {/* Actions column */}
-              <div className="flex flex-col items-end gap-1 shrink-0">
+              {/* Actions column — K-v2 hover-reveal pattern */}
+              <div className="flex flex-col items-end gap-1.5 shrink-0 opacity-50 group-hover:opacity-100 transition-opacity">
                 <button
                   onClick={() => act(item.id, "accept")}
                   disabled={acting === item.id}
-                  className="text-[10px] font-bold text-[#131218] bg-[#c8f55a] hover:bg-[#b8e54a] disabled:opacity-50 transition-colors px-3 py-1.5 rounded-md whitespace-nowrap"
+                  className="hall-btn-primary disabled:opacity-50"
+                  style={{ padding: "5px 12px", fontSize: 11 }}
                 >
-                  Block time →
+                  Block →
                 </button>
                 {item.task_type === "prep" && item.entity_type === "meeting_prep" && (
                   <button
                     onClick={() => setBriefOpen({ eventId: item.entity_id, title: item.entity_label })}
-                    className="text-[10px] font-bold text-[#131218] bg-white border border-[#131218] hover:bg-[#131218] hover:text-white transition-colors px-3 py-1.5 rounded-md whitespace-nowrap"
+                    className="hall-btn-outline"
+                    style={{ padding: "4px 10px", fontSize: 10.5 }}
                   >
                     Open brief →
                   </button>
                 )}
-                <div className="flex items-center gap-1 mt-0.5">
+                <div className="flex items-center gap-1.5 mt-0.5">
                   <button
                     onClick={() => act(item.id, "snooze", 24)}
                     disabled={acting === item.id}
                     title="Snooze 24h"
-                    className="text-[9px] font-bold text-[#131218]/40 hover:text-[#131218] transition-colors uppercase tracking-widest disabled:opacity-50"
+                    className="text-[9px] font-bold uppercase tracking-widest transition-colors disabled:opacity-50"
+                    style={{ color: "var(--hall-muted-3)" }}
                   >
                     Not now
                   </button>
-                  <span className="text-[#131218]/20">·</span>
+                  <span style={{ color: "var(--hall-muted-3)" }}>·</span>
                   <button
                     onClick={() => act(item.id, "dismiss")}
                     disabled={acting === item.id}
                     title="Dismiss"
-                    className="text-[9px] font-bold text-[#131218]/25 hover:text-[#131218]/70 transition-colors uppercase tracking-widest disabled:opacity-50"
+                    className="text-[9px] font-bold uppercase tracking-widest transition-colors disabled:opacity-50"
+                    style={{ color: "var(--hall-muted-3)" }}
                   >
                     Dismiss
                   </button>

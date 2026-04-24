@@ -44,11 +44,6 @@ function writeDismissed(ids: Set<string>): void {
   } catch { /* quota exceeded etc. */ }
 }
 
-function staleColor(days: number): string {
-  if (days >= 21) return "text-red-600";
-  if (days >= 10) return "text-amber-700";
-  return "text-[#131218]/50";
-}
 
 export function HallCommitmentLedgerRows({
   joseCommits,
@@ -99,80 +94,102 @@ export function HallCommitmentLedgerRows({
   const visibleOthers = othersCommits.filter(c => !isHidden(c.id));
   const dismissedCount = joseCommits.concat(othersCommits).filter(c => dismissed.has(c.id)).length;
 
+  if (visibleJose.length === 0 && visibleOthers.length === 0) {
+    return (
+      <p className="text-[11px]" style={{ color: "var(--hall-muted-3)" }}>
+        {joseCommits.length + othersCommits.length > 0
+          ? "All caught up — nothing open."
+          : "No open action items from the last 60 days."}
+      </p>
+    );
+  }
+
   return (
-    <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-      <div className="flex items-center justify-between px-5 py-3 border-b border-[#EFEFEA]">
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] font-bold tracking-widest uppercase text-[#131218]/50">Commitments</span>
-          {visibleJose.length > 0 && (
-            <span className="text-[9px] font-bold bg-red-50 text-red-700 px-1.5 py-0.5 rounded-full">
-              {visibleJose.length} you owe
+    <div>
+      {/* K-v2 2-col split: I OWE / OWED TO ME */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+        <div>
+          <h4
+            className="font-bold uppercase mb-2 flex items-baseline gap-1.5"
+            style={{ fontSize: 10, letterSpacing: "0.16em", color: "var(--hall-muted-3)" }}
+          >
+            <span style={{ fontFamily: "var(--font-hall-mono)", fontSize: 11, color: "var(--hall-ink-0)" }}>
+              {visibleJose.length}
             </span>
-          )}
-          {visibleOthers.length > 0 && (
-            <span className="text-[9px] font-bold bg-[#131218]/6 text-[#131218]/60 px-1.5 py-0.5 rounded-full">
-              {visibleOthers.length} owed to you
-            </span>
+            <span>I OWE</span>
+          </h4>
+          {visibleJose.length === 0 ? (
+            <p className="text-[10px]" style={{ color: "var(--hall-muted-3)" }}>—</p>
+          ) : (
+            <ul className="flex flex-col">
+              {visibleJose.map(c => (
+                <CommitmentRow key={c.id} c={c} kind="jose"
+                  isDone={dismissed.has(c.id)}
+                  onMarkDone={() => markDone(c.id)}
+                  onUndo={() => undo(c.id)} />
+              ))}
+            </ul>
           )}
         </div>
-        <div className="flex items-center gap-3">
+        <div>
+          <h4
+            className="font-bold uppercase mb-2 flex items-baseline gap-1.5"
+            style={{ fontSize: 10, letterSpacing: "0.16em", color: "var(--hall-muted-3)" }}
+          >
+            <span style={{ fontFamily: "var(--font-hall-mono)", fontSize: 11, color: "var(--hall-ink-0)" }}>
+              {visibleOthers.length}
+            </span>
+            <span>OWED TO ME</span>
+          </h4>
+          {visibleOthers.length === 0 ? (
+            <p className="text-[10px]" style={{ color: "var(--hall-muted-3)" }}>—</p>
+          ) : (
+            <ul className="flex flex-col">
+              {visibleOthers.map(c => (
+                <CommitmentRow key={c.id} c={c} kind="others"
+                  isDone={dismissed.has(c.id)}
+                  onMarkDone={() => markDone(c.id)}
+                  onUndo={() => undo(c.id)} />
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+
+      {/* Footer: show-done toggle + All link */}
+      {(dismissedCount > 0 || true) && (
+        <div className="flex items-center justify-end gap-3 mt-3 pt-2" style={{ borderTop: "1px solid var(--hall-line-soft)" }}>
           {dismissedCount > 0 && (
             <button
               onClick={() => setShowDismissed(s => !s)}
-              className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/40 hover:text-[#131218]/80"
+              className="text-[9px] font-bold tracking-widest uppercase transition-colors"
+              style={{ color: "var(--hall-muted-2)" }}
             >
               {showDismissed ? "hide done" : `show ${dismissedCount} done`}
             </button>
           )}
-          <Link href={allUrl} className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/40 hover:text-[#131218]/80">
+          <Link
+            href={allUrl}
+            className="text-[9px] font-bold tracking-widest uppercase transition-colors"
+            style={{ color: "var(--hall-muted-2)" }}
+          >
             All →
           </Link>
         </div>
-      </div>
-
-      {visibleJose.length === 0 && visibleOthers.length === 0 ? (
-        <div className="px-5 py-6 text-center">
-          <p className="text-[11px] text-[#131218]/35">
-            {joseCommits.length + othersCommits.length > 0
-              ? "All caught up — nothing open."
-              : "No open action items from the last 60 days."}
-          </p>
-        </div>
-      ) : (
-        <>
-          {visibleJose.length > 0 && (
-            <div className="px-5 pt-3 pb-1">
-              <p className="text-[9px] font-bold uppercase tracking-widest text-red-700/80 mb-1">You committed</p>
-            </div>
-          )}
-          {visibleJose.map(c => (
-            <CommitmentRow key={c.id} c={c} kind="jose"
-              isDone={dismissed.has(c.id)}
-              onMarkDone={() => markDone(c.id)}
-              onUndo={() => undo(c.id)} />
-          ))}
-
-          {visibleOthers.length > 0 && (
-            <div className="px-5 pt-3 pb-1 border-t border-[#EFEFEA]">
-              <p className="text-[9px] font-bold uppercase tracking-widest text-[#131218]/50 mb-1">Owed to you</p>
-            </div>
-          )}
-          {visibleOthers.map(c => (
-            <CommitmentRow key={c.id} c={c} kind="others"
-              isDone={dismissed.has(c.id)}
-              onMarkDone={() => markDone(c.id)}
-              onUndo={() => undo(c.id)} />
-          ))}
-        </>
       )}
 
-      {/* R3 — undo toast */}
       {recentlyDismissed && (
-        <div className="px-5 py-2 bg-emerald-50 border-t border-emerald-200 flex items-center justify-between">
-          <p className="text-[10px] text-emerald-700">Marked done · synced across your devices. Refine in Notion if permanent.</p>
+        <div
+          className="mt-2 px-3 py-2 flex items-center justify-between rounded-[3px]"
+          style={{ background: "var(--hall-ok-soft)", border: "1px solid var(--hall-ok)" }}
+        >
+          <p className="text-[10px]" style={{ color: "var(--hall-ok)" }}>
+            Marked done · synced.
+          </p>
           <button
             onClick={() => undo(recentlyDismissed)}
-            className="text-[10px] font-bold text-emerald-700 hover:text-emerald-900 underline"
+            className="text-[10px] font-bold underline"
+            style={{ color: "var(--hall-ok)" }}
           >
             Undo
           </button>
@@ -193,27 +210,51 @@ function CommitmentRow({
 }) {
   // G8 — red border only for jose-owed items older than 14 days (reserve rojo for actionable).
   const showBorder = kind === "jose" && c.daysAgo >= 14;
-  const borderColor = showBorder ? "border-l-[3px] border-red-400" : "border-l-[3px] border-transparent";
+  const ageColor = c.daysAgo >= 21 ? "var(--hall-danger)"
+    : c.daysAgo >= 10 ? "var(--hall-warn)"
+    : "var(--hall-muted-3)";
 
   return (
-    <div className={`group flex items-start gap-3 px-5 py-2.5 hover:bg-[#EFEFEA]/40 transition-colors ${borderColor} ${isDone ? "opacity-40" : ""}`}>
+    <li
+      className={`group flex items-baseline justify-between gap-2.5 py-2 ${isDone ? "opacity-40" : ""}`}
+      style={{
+        borderTop: "1px solid var(--hall-line-soft)",
+        paddingLeft: showBorder ? 6 : 0,
+        borderLeft: showBorder ? "2px solid var(--hall-danger)" : undefined,
+      }}
+    >
       <a
         href={c.notionUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className="flex-1 min-w-0"
+        className="min-w-0 flex-1"
       >
-        <p className={`text-[11px] font-bold text-[#131218] line-clamp-1 ${isDone ? "line-through" : ""}`}>{c.title}</p>
-        <p className="text-[9px] text-[#131218]/55 mt-0.5 line-clamp-1" title={c.snippet}>{c.snippet}</p>
+        <span
+          className={`block text-[12px] font-semibold line-clamp-1 ${isDone ? "line-through" : ""}`}
+          style={{ color: "var(--hall-ink-0)" }}
+        >
+          {c.title}
+        </span>
+        <span
+          className="block text-[10.5px] line-clamp-1"
+          style={{ color: "var(--hall-muted-2)" }}
+          title={c.snippet}
+        >
+          {c.snippet}
+        </span>
       </a>
-      <div className="flex items-center gap-2 shrink-0">
-        <span className={`text-[10px] font-bold tabular-nums ${staleColor(c.daysAgo)}`}>
+      <div className="flex items-center gap-1.5 shrink-0">
+        <span
+          className="font-semibold whitespace-nowrap"
+          style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10, color: ageColor }}
+        >
           {c.daysAgo}d
         </span>
         {isDone ? (
           <button
             onClick={onUndo}
-            className="text-[9px] font-semibold text-emerald-700 hover:text-emerald-900 opacity-0 group-hover:opacity-100 transition-opacity"
+            className="text-[9px] font-semibold opacity-0 group-hover:opacity-100 transition-opacity"
+            style={{ color: "var(--hall-ok)" }}
             title="Undo mark done"
           >
             Undo
@@ -221,7 +262,11 @@ function CommitmentRow({
         ) : (
           <button
             onClick={onMarkDone}
-            className="w-6 h-6 rounded-full border border-[#E0E0D8] hover:bg-emerald-50 hover:border-emerald-400 hover:text-emerald-700 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all text-[#131218]/40 text-[10px] font-bold"
+            className="w-5 h-5 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all text-[10px] font-bold"
+            style={{
+              border: "1px solid var(--hall-line-strong)",
+              color: "var(--hall-muted-3)",
+            }}
             title="Mark done"
             aria-label="Mark done"
           >
@@ -229,6 +274,6 @@ function CommitmentRow({
           </button>
         )}
       </div>
-    </div>
+    </li>
   );
 }

@@ -152,91 +152,154 @@ async function loadNext(): Promise<NextMeeting | null> {
 export async function HallNextMeeting() {
   const m = await loadNext();
 
+  if (!m) {
+    return (
+      <p className="text-[11px]" style={{ color: "var(--hall-muted-3)" }}>
+        No upcoming meeting in the calendar.
+      </p>
+    );
+  }
+
+  const minsAway = Math.round((m.startMs - Date.now()) / 60_000);
+  const imminent = minsAway >= 0 && minsAway <= 15;
+
   return (
-    <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-      <div className="flex items-center justify-between px-5 py-3 border-b border-[#EFEFEA]">
-        <span className="text-[10px] font-bold tracking-widest uppercase text-[#131218]/50">Next meeting · playbook</span>
-        {m && (
-          <span className="text-[9px] font-semibold text-[#131218]/40 tabular-nums">
-            {formatAway(m.startMs)}
-          </span>
+    <div>
+      <div className="flex items-start justify-between gap-3 mb-1">
+        <h4
+          className="font-bold leading-snug"
+          style={{ fontSize: 16, color: "var(--hall-ink-0)", letterSpacing: "-0.01em" }}
+        >
+          {m.title}
+        </h4>
+        {m.htmlLink && (
+          imminent ? (
+            <a
+              href={m.htmlLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hall-btn-primary"
+              style={{ padding: "5px 11px", fontSize: 11 }}
+            >
+              Join →
+            </a>
+          ) : (
+            <a
+              href={m.htmlLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[9px] font-bold tracking-widest uppercase shrink-0"
+              style={{ color: "var(--hall-muted-2)" }}
+            >
+              Open →
+            </a>
+          )
         )}
       </div>
-      {!m ? (
-        <div className="px-5 py-6 text-center">
-          <p className="text-[11px] text-[#131218]/35">No upcoming meeting in the calendar.</p>
+      <div
+        className="mb-3"
+        style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10.5, color: "var(--hall-muted-2)" }}
+      >
+        {m.startLocal} · {formatAway(m.startMs)}
+      </div>
+
+      {minsAway >= 0 && minsAway < 90 && (
+        <span
+          className="inline-flex items-center gap-1.5 mb-3.5"
+          style={{
+            fontFamily: "var(--font-hall-mono)",
+            fontSize: 10.5,
+            fontWeight: 600,
+            color: "var(--hall-ink-0)",
+            background: "var(--hall-paper-0)",
+            border: "1px solid var(--hall-ink-0)",
+            padding: "3px 8px",
+            borderRadius: 100,
+          }}
+        >
+          <span
+            className="hall-pulse"
+            style={{ width: 5, height: 5, borderRadius: "50%", background: "var(--hall-lime-ink)" }}
+          />
+          Starts in {minsAway} min
+        </span>
+      )}
+
+      <div className="mb-3">
+        <p
+          className="font-bold uppercase mb-1.5"
+          style={{ fontSize: 9, letterSpacing: "0.18em", color: "var(--hall-muted-3)" }}
+        >
+          Attendees
+        </p>
+        <div className="flex flex-wrap gap-1.5">
+          {m.attendees.slice(0, 6).map(a => {
+            const top = a.classes[0];
+            return (
+              <span
+                key={a.email}
+                className="text-[10.5px]"
+                style={{
+                  background: "var(--hall-fill-soft)",
+                  color: "var(--hall-ink-3)",
+                  padding: "2px 8px",
+                  borderRadius: 100,
+                }}
+              >
+                {a.name ?? (a.email ?? "").split("@")[0]}
+                {top && <span className="ml-1 opacity-70">· {top}</span>}
+              </span>
+            );
+          })}
+          {m.attendees.length > 6 && (
+            <span className="text-[10px] px-1 py-0.5" style={{ color: "var(--hall-muted-3)" }}>
+              +{m.attendees.length - 6}
+            </span>
+          )}
         </div>
-      ) : (
-        <div className="px-5 py-4 space-y-3">
-          <div>
-            <div className="flex items-start justify-between gap-3">
-              <p className="text-[13px] font-bold text-[#131218] leading-snug">{m.title}</p>
-              {m.htmlLink && (() => {
-                // F1 — when meeting is imminent (<=15min), promote the "Open" link
-                // to a bright Join CTA. Past that, keep it quiet.
-                const minsAway = Math.round((m.startMs - Date.now()) / 60_000);
-                const imminent = minsAway >= 0 && minsAway <= 15;
-                return imminent ? (
-                  <a href={m.htmlLink} target="_blank" rel="noopener noreferrer"
-                     className="text-[10px] font-bold uppercase tracking-wider text-[#131218] bg-[#c8f55a] hover:bg-[#b2ea3f] px-2.5 py-1 rounded-md shrink-0 transition-colors">
-                    Join →
-                  </a>
-                ) : (
-                  <a href={m.htmlLink} target="_blank" rel="noopener noreferrer"
-                     className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/40 hover:text-[#131218]/80 shrink-0">
-                    Open →
-                  </a>
-                );
-              })()}
-            </div>
-            <p className="text-[10px] text-[#131218]/50 mt-0.5">{m.startLocal}</p>
-          </div>
+      </div>
 
-          <div>
-            <p className="text-[9px] font-bold uppercase tracking-widest text-[#131218]/40 mb-1">Attendees</p>
-            <div className="flex flex-wrap gap-1.5">
-              {m.attendees.slice(0, 6).map(a => {
-                const top = a.classes[0];
-                const cls = top ? pillColor(top) : "bg-[#EFEFEA] text-[#131218]/50";
-                return (
-                  <span key={a.email} className={`text-[9px] font-semibold px-2 py-0.5 rounded ${cls}`}>
-                    {a.name ?? (a.email ?? "").split("@")[0]}
-                    {top && <span className="ml-1 opacity-70">· {top}</span>}
-                  </span>
-                );
-              })}
-              {m.attendees.length > 6 && (
-                <span className="text-[9px] text-[#131218]/40 px-1 py-0.5">+{m.attendees.length - 6}</span>
-              )}
-            </div>
-          </div>
+      {m.lastTouch && (
+        <div className="mb-3">
+          <p
+            className="font-bold uppercase mb-1"
+            style={{ fontSize: 9, letterSpacing: "0.18em", color: "var(--hall-muted-3)" }}
+          >
+            Last touch
+          </p>
+          <p className="text-[11px] leading-snug" style={{ color: "var(--hall-muted-2)" }}>
+            <span className="font-semibold" style={{ color: "var(--hall-ink-3)" }}>{m.lastTouch.kind}</span>
+            <span> · {m.lastTouch.at.slice(0, 10)} · </span>
+            <span className="line-clamp-1">{m.lastTouch.title}</span>
+          </p>
+        </div>
+      )}
 
-          {m.lastTouch && (
-            <div>
-              <p className="text-[9px] font-bold uppercase tracking-widest text-[#131218]/40 mb-0.5">Last touch</p>
-              <p className="text-[10px] text-[#131218]/70 leading-snug">
-                <span className="font-semibold">{m.lastTouch.kind}</span>
-                <span className="text-[#131218]/40"> · {m.lastTouch.at.slice(0, 10)} · </span>
-                <span className="line-clamp-1">{m.lastTouch.title}</span>
-              </p>
-            </div>
-          )}
-
-          {m.talkingPoints && m.talkingPoints.length > 0 && (
-            <div>
-              <p className="text-[9px] font-bold uppercase tracking-widest text-[#c8f55a] mb-1 bg-[#131218] inline-block px-2 py-0.5 rounded">
-                Talking points
-              </p>
-              <ul className="mt-1.5 space-y-1">
-                {m.talkingPoints.map((p, i) => (
-                  <li key={i} className="text-[11px] text-[#131218]/80 leading-snug flex gap-2">
-                    <span className="text-[#c8f55a] font-bold shrink-0">·</span>
-                    <span>{p}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+      {m.talkingPoints && m.talkingPoints.length > 0 && (
+        <div>
+          <p
+            className="font-bold uppercase mb-1.5"
+            style={{ fontSize: 9, letterSpacing: "0.18em", color: "var(--hall-muted-3)" }}
+          >
+            Talking points
+          </p>
+          <ul className="flex flex-col gap-1.5">
+            {m.talkingPoints.map((p, i) => (
+              <li
+                key={i}
+                className="text-[11.5px] leading-[1.5] pl-3.5 relative"
+                style={{ color: "var(--hall-ink-3)" }}
+              >
+                <span
+                  className="absolute left-0"
+                  style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+                >
+                  →
+                </span>
+                {p}
+              </li>
+            ))}
+          </ul>
         </div>
       )}
     </div>
@@ -251,17 +314,3 @@ function formatAway(startMs: number): string {
   return `in ${Math.round(mins / 1440)}d`;
 }
 
-function pillColor(cls: string): string {
-  switch (cls) {
-    case "Client":    return "bg-[#c8f55a]/40 text-green-900";
-    case "Investor":  return "bg-[#a78bfa]/30 text-purple-900";
-    case "Funder":    return "bg-[#f472b6]/30 text-pink-900";
-    case "Portfolio": return "bg-[#fbbf24]/30 text-amber-900";
-    case "Partner":   return "bg-[#7dd3fc]/30 text-sky-900";
-    case "VIP":       return "bg-[#B2FF59]/40 text-green-900";
-    case "Team":      return "bg-[#131218] text-white";
-    case "Family":    return "bg-amber-100 text-amber-900";
-    case "Friend":    return "bg-amber-100 text-amber-900";
-    default:          return "bg-[#EFEFEA] text-[#131218]/60";
-  }
-}

@@ -180,106 +180,140 @@ export function InboxTriage({ initialItems, initialScanned = 0 }: Props) {
   const overflow = visible.length > MAX_VISIBLE_ROWS;
 
   return (
-    <div className="max-w-[760px]">
-      <div
-        className={`bg-white rounded-xl border border-[#E0E0D8] divide-y divide-[#E0E0D8] ${
-          overflow ? "max-h-[380px] overflow-y-auto" : ""
-        }`}
+    <div>
+      <ul
+        className={`flex flex-col ${overflow ? "max-h-[380px] overflow-y-auto" : ""}`}
       >
         {visible.map((item) => (
-          <div
+          <li
             key={item.threadId}
-            className="px-3.5 py-2.5 flex items-start gap-3 hover:bg-[#FAFAF5] transition-colors"
+            className="group grid items-center py-2.5 gap-3"
+            style={{
+              gridTemplateColumns: "32px 1fr auto",
+              borderTop: "1px solid var(--hall-line-soft)",
+            }}
           >
-            <span className={`mt-[5px] w-1.5 h-1.5 rounded-full shrink-0 ${LABEL_DOT[item.label]}`} />
+            <div
+              className="grid place-items-center"
+              style={{
+                width: 32,
+                height: 32,
+                borderRadius: "50%",
+                background: "var(--hall-fill-soft)",
+                border: "1px solid var(--hall-line)",
+              }}
+              aria-hidden
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" style={{ color: "var(--hall-ink-3)" }}>
+                <rect x="3" y="5" width="18" height="14" rx="2" />
+                <path d="M3 7l9 6 9-6" />
+              </svg>
+            </div>
 
-            <div className="flex-1 min-w-0">
-              <div className="flex items-start gap-2">
-                {/* D1 — when Haiku summary exists, lead with it (clearer than subject);
-                    keep subject as a secondary cue. Falls back to subject when summary absent. */}
-                <span className="text-[12px] font-semibold text-[#131218] line-clamp-2 leading-snug">
+            <div className="min-w-0">
+              <div className="flex items-start gap-2 min-w-0">
+                <span
+                  className="text-[12.8px] font-semibold line-clamp-1 leading-snug"
+                  style={{ color: "var(--hall-ink-0)" }}
+                >
                   {item.summary ?? item.subject}
                 </span>
                 {item.isUnread && (
-                  <span className="text-[8px] font-black uppercase tracking-widest text-[#131218]/30 bg-[#131218]/6 px-1.5 py-0.5 rounded-full shrink-0 mt-[1px]">
+                  <span
+                    className="font-bold uppercase tracking-widest shrink-0 mt-[2px]"
+                    style={{
+                      fontFamily: "var(--font-hall-mono)",
+                      fontSize: 8,
+                      color: "var(--hall-muted-3)",
+                      background: "var(--hall-fill-soft)",
+                      padding: "1px 5px",
+                      borderRadius: 100,
+                    }}
+                  >
                     Unread
                   </span>
                 )}
               </div>
-              {item.summary && item.subject && item.summary !== item.subject && (
-                <p className="text-[9.5px] text-[#131218]/35 truncate mt-0.5" title={item.subject}>
-                  re: {item.subject}
-                </p>
-              )}
-              <p className="text-[10.5px] text-[#131218]/45 truncate mt-0.5">
-                <span className="font-semibold">{item.fromName}</span>
-                <span className="text-[#131218]/25"> · </span>
-                <span className={item.daysWaiting >= 5 ? "text-red-500 font-bold" : "text-[#131218]/35"}>
-                  {item.daysWaiting}d
-                </span>
+              <span
+                className="block text-[11px] line-clamp-1"
+                style={{ color: "var(--hall-muted-2)" }}
+              >
+                <span className="font-semibold" style={{ color: "var(--hall-ink-3)" }}>{item.fromName}</span>
                 {item.reason && (
                   <>
-                    <span className="text-[#131218]/25"> · </span>
+                    <span> · </span>
                     <span className="italic">{item.reason}</span>
                   </>
                 )}
-              </p>
+              </span>
             </div>
 
             <div className="flex items-center gap-2 shrink-0">
-              {/* Classification label — informational, not a CTA */}
-              <span className={`text-[8.5px] font-bold px-2 py-0.5 rounded-full ${LABEL_STYLE[item.label]}`}>
-                {item.label}
+              <span
+                className="font-semibold tabular-nums"
+                style={{
+                  fontFamily: "var(--font-hall-mono)",
+                  fontSize: 10,
+                  color: item.daysWaiting >= 5 ? "var(--hall-danger)" : "var(--hall-muted-3)",
+                }}
+              >
+                {item.daysWaiting}d
               </span>
-
-              {/* PRIMARY ACTION — solid pill */}
-              <a
-                href={item.gmailUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[10px] font-bold text-white bg-[#131218] hover:bg-[#2a2938] transition-colors px-2.5 py-1 rounded-md whitespace-nowrap"
-              >
-                Open →
-              </a>
-
-              {/* SECONDARY — candidate creation, 24x24 hit area (D3) */}
-              {created.has(item.threadId) ? (
-                <span className="text-[11px] font-bold text-emerald-600 w-6 h-6 flex items-center justify-center" title="Candidate created">✓</span>
-              ) : failed.has(item.threadId) ? (
-                <button
-                  onClick={() => createCandidate(item)}
-                  disabled={creating === item.threadId}
-                  title="Failed — click to retry"
-                  className="w-6 h-6 flex items-center justify-center rounded-md text-[11px] font-bold text-red-500 hover:text-red-700 hover:bg-red-50 transition-colors disabled:opacity-40"
+              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <a
+                  href={item.gmailUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hall-btn-primary"
+                  style={{ padding: "4px 10px", fontSize: 10.5 }}
                 >
-                  {creating === item.threadId ? "…" : "↻"}
-                </button>
-              ) : (
+                  Open →
+                </a>
+                {created.has(item.threadId) ? (
+                  <span
+                    className="text-[11px] font-bold w-5 h-5 flex items-center justify-center"
+                    style={{ color: "var(--hall-ok)" }}
+                    title="Candidate created"
+                  >
+                    ✓
+                  </span>
+                ) : failed.has(item.threadId) ? (
+                  <button
+                    onClick={() => createCandidate(item)}
+                    disabled={creating === item.threadId}
+                    title="Failed — click to retry"
+                    className="w-5 h-5 flex items-center justify-center text-[11px] font-bold disabled:opacity-40"
+                    style={{ color: "var(--hall-danger)" }}
+                  >
+                    {creating === item.threadId ? "…" : "↻"}
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => createCandidate(item)}
+                    disabled={creating === item.threadId}
+                    title="Create opportunity candidate from this email"
+                    aria-label="Create opportunity candidate"
+                    className="w-5 h-5 flex items-center justify-center text-[13px] font-bold leading-none disabled:opacity-40"
+                    style={{ color: "var(--hall-muted-3)" }}
+                  >
+                    {creating === item.threadId ? "…" : "+"}
+                  </button>
+                )}
                 <button
-                  onClick={() => createCandidate(item)}
-                  disabled={creating === item.threadId}
-                  title="Create opportunity candidate from this email"
-                  aria-label="Create opportunity candidate"
-                  className="w-6 h-6 flex items-center justify-center rounded-md text-[13px] font-bold text-[#131218]/30 hover:text-amber-600 hover:bg-amber-50 transition-colors disabled:opacity-40 leading-none"
+                  onClick={() => ignoreItem(item)}
+                  disabled={ignoring === item.threadId}
+                  title="Ignore this thread — won't resurface"
+                  aria-label="Ignore"
+                  className="w-5 h-5 flex items-center justify-center text-[12px] leading-none disabled:opacity-40"
+                  style={{ color: "var(--hall-muted-3)" }}
                 >
-                  {creating === item.threadId ? "…" : "+"}
+                  {ignoring === item.threadId ? "…" : "×"}
                 </button>
-              )}
-
-              {/* TERTIARY — quiet dismiss, 24x24 hit area (D3) */}
-              <button
-                onClick={() => ignoreItem(item)}
-                disabled={ignoring === item.threadId}
-                title="Ignore this thread — won't resurface"
-                aria-label="Ignore"
-                className="w-6 h-6 flex items-center justify-center rounded-md text-[12px] text-[#131218]/25 hover:text-[#131218]/80 hover:bg-[#EFEFEA] transition-colors disabled:opacity-40 leading-none"
-              >
-                {ignoring === item.threadId ? "…" : "×"}
-              </button>
+              </div>
             </div>
-          </div>
+          </li>
         ))}
-      </div>
+      </ul>
 
       <div className="flex items-center justify-between pt-1.5 px-1">
         <p className="text-[9px] text-[#131218]/25">

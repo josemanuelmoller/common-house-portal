@@ -72,58 +72,114 @@ export async function HallAutopilotLog() {
   if (totalRuns === 0) return null;
 
   return (
-    <details className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-      <summary className="px-5 py-3 cursor-pointer list-none flex items-center gap-3 hover:bg-[#FAFAF7] transition-colors">
-        <span className="text-[9px] font-bold uppercase tracking-[2.5px] text-[#131218]/40">
-          Autopilot
-        </span>
-        <span className="text-[11px] text-[#131218]/55">
-          {totalRuns} run{totalRuns === 1 ? "" : "s"} · {totalWrites} record{totalWrites === 1 ? "" : "s"} written
-          {totalErrors > 0 && (
-            <span className="text-red-500 font-bold"> · {totalErrors} error{totalErrors === 1 ? "" : "s"}</span>
-          )}
-          <span className="text-[#131218]/30"> · last 7 days</span>
-        </span>
-        <span className="ml-auto text-[9px] text-[#131218]/25">expand ↓</span>
-      </summary>
-
-      <div className="px-5 py-3 border-t border-[#EFEFEA] divide-y divide-[#F3F3EE]">
-        {aggregates.map((a) => {
-          const catalog = ROUTINE_CATALOG[a.routine];
-          return (
-            <div key={a.routine} className="py-2 flex items-start gap-3">
-              <div className="flex-1 min-w-0">
-                <p className="text-[11px] font-semibold text-[#131218] truncate">
-                  {a.routine}
-                </p>
-                {catalog && (
-                  <p className="text-[9px] text-[#131218]/40 truncate">
-                    {catalog.writes} → {catalog.output_surface}
-                  </p>
-                )}
-              </div>
-              <div className="text-right shrink-0">
-                <p className="text-[11px] font-bold text-[#131218]">
-                  {a.writes > 0 ? `+${a.writes}` : "·"}
-                </p>
-                <p className="text-[9px] text-[#131218]/40">
-                  {a.runs}×{a.errors > 0 && (
-                    <span className="text-red-500 font-bold"> · {a.errors} err</span>
-                  )}
-                </p>
-              </div>
-            </div>
-          );
-        })}
-        <div className="pt-3 flex justify-end">
-          <Link
-            href="/admin/routines"
-            className="text-[10px] font-bold text-[#131218]/40 hover:text-[#131218] transition-colors"
+    <div>
+      {/* K-v2 3-stat grid: runs / writes / errors */}
+      <div
+        className="grid grid-cols-3 gap-2.5 pb-3 mb-2.5"
+        style={{ borderBottom: "1px solid var(--hall-line-soft)" }}
+      >
+        <div>
+          <span
+            className="block leading-none font-bold"
+            style={{ fontSize: 20, color: "var(--hall-ink-0)", letterSpacing: "-0.02em" }}
           >
-            Full routine health ↗
-          </Link>
+            {totalRuns}
+          </span>
+          <span
+            className="block mt-0.5 uppercase"
+            style={{ fontSize: 10, letterSpacing: "0.06em", color: "var(--hall-muted-2)" }}
+          >
+            runs
+          </span>
+        </div>
+        <div>
+          <span
+            className="block leading-none font-bold"
+            style={{ fontSize: 20, color: "var(--hall-ink-0)", letterSpacing: "-0.02em" }}
+          >
+            {totalWrites.toLocaleString()}
+          </span>
+          <span
+            className="block mt-0.5 uppercase"
+            style={{ fontSize: 10, letterSpacing: "0.06em", color: "var(--hall-muted-2)" }}
+          >
+            writes
+          </span>
+        </div>
+        <div>
+          <span
+            className="block leading-none font-bold"
+            style={{
+              fontSize: 20,
+              color: totalErrors > 0 ? "var(--hall-danger)" : "var(--hall-ink-0)",
+              letterSpacing: "-0.02em",
+            }}
+          >
+            {totalErrors}
+          </span>
+          <span
+            className="block mt-0.5 uppercase"
+            style={{ fontSize: 10, letterSpacing: "0.06em", color: "var(--hall-muted-2)" }}
+          >
+            errors 7d
+          </span>
         </div>
       </div>
-    </details>
+
+      {/* Agent rows */}
+      <ul className="flex flex-col">
+        {aggregates.slice(0, 5).map((a) => {
+          const catalog = ROUTINE_CATALOG[a.routine];
+          const status = a.errors > 0 ? "ERR" : a.runs === 0 ? "IDLE" : "OK";
+          const statusColor = a.errors > 0 ? "var(--hall-danger)"
+            : a.runs === 0 ? "var(--hall-muted-3)"
+            : "var(--hall-ok)";
+          return (
+            <li
+              key={a.routine}
+              className="grid items-center py-2"
+              style={{
+                gridTemplateColumns: "1fr auto",
+                gap: 10,
+                borderTop: "1px solid var(--hall-line-soft)",
+              }}
+            >
+              <div className="min-w-0">
+                <span
+                  className="block text-[12px] font-semibold truncate"
+                  style={{ color: "var(--hall-ink-0)" }}
+                >
+                  {a.routine}
+                </span>
+                {catalog && (
+                  <span
+                    className="block text-[10px] truncate"
+                    style={{ color: "var(--hall-muted-2)" }}
+                  >
+                    {catalog.writes} → {catalog.output_surface}
+                  </span>
+                )}
+              </div>
+              <span
+                className="text-[10px] font-bold"
+                style={{ fontFamily: "var(--font-hall-mono)", color: statusColor, letterSpacing: "0.08em" }}
+              >
+                {status}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+
+      <div className="pt-3 flex justify-end">
+        <Link
+          href="/admin/routines"
+          className="text-[10px] font-bold uppercase tracking-widest transition-colors"
+          style={{ color: "var(--hall-muted-2)" }}
+        >
+          Full routine health ↗
+        </Link>
+      </div>
+    </div>
   );
 }

@@ -96,61 +96,90 @@ export async function HallTimeAllocation() {
   const allocation = await loadAllocation();
   const totalHours = allocation.reduce((s, a) => s + a.hours, 0);
 
+  if (totalHours === 0) {
+    return (
+      <p className="text-[11px]" style={{ color: "var(--hall-muted-3)" }}>
+        No meetings in the last 7 days.
+      </p>
+    );
+  }
+
   return (
-    <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-      <div className="flex items-center justify-between px-5 py-3 border-b border-[#EFEFEA]">
-        <span className="text-[10px] font-bold tracking-widest uppercase text-[#131218]/50">Time allocation · last 7d</span>
-        <span className="text-[9px] font-semibold text-[#131218]/30">{totalHours.toFixed(1)}h total</span>
+    <div>
+      <div
+        className="flex items-center justify-between mb-2 text-[10px]"
+        style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+      >
+        <span>WEEK · 7D</span>
+        <span style={{ color: "var(--hall-ink-0)", fontWeight: 600 }}>{totalHours.toFixed(1)}H TOTAL</span>
       </div>
-      <div className="px-5 py-4">
-        {totalHours === 0 ? (
-          <p className="text-[11px] text-[#131218]/35 text-center">No meetings in the last 7 days.</p>
-        ) : (
-          <>
-            {/* Stacked bar — h-3 is more readable than h-2 and survives PDF render */}
-            <div className="flex w-full h-3 rounded-full overflow-hidden bg-[#E0E0D8] mb-4 ring-1 ring-[#E0E0D8]">
-              {allocation.filter(a => a.hours > 0).map(a => (
-                <div
-                  key={a.bucket.key}
-                  className={`h-full ${a.bucket.color}`}
-                  style={{ width: `${(a.hours / totalHours) * 100}%`, minWidth: "2px" }}
-                  title={`${a.bucket.label}: ${a.hours.toFixed(1)}h · ${((a.hours / totalHours) * 100).toFixed(0)}%`}
-                />
-              ))}
-            </div>
-            {/* Table — Q3: amber for "below target", red reserved for 0 with target */}
-            <div className="space-y-1">
-              {allocation
-                .filter(a => a.hours > 0 || a.bucket.target > 0)
-                .map(a => {
-                  const pct = totalHours > 0 ? (a.hours / totalHours) * 100 : 0;
-                  const target = a.bucket.target;
-                  const far  = target > 0 && a.hours === 0;           // red only when totally neglected
-                  const near = target > 0 && pct > 0 && pct < target; // amber when present but under
-                  const over = target > 0 && pct > target * 1.5;      // K2 — highlight over-served
-                  const color = far ? "text-red-600 font-bold"
-                              : near ? "text-amber-700 font-semibold"
-                              : over ? "text-emerald-700 font-semibold"
-                              : "text-[#131218]/40";
-                  return (
-                    <div key={a.bucket.key} className="flex items-center gap-2 text-[10px]">
-                      <span className={`w-2 h-2 rounded-full ${a.bucket.color}`} />
-                      <span className="font-semibold text-[#131218]/75 w-20">{a.bucket.label}</span>
-                      <span className="text-[#131218]/50 w-14 text-right tabular-nums">{a.hours.toFixed(1)}h</span>
-                      <span className={`w-12 text-right tabular-nums ${color}`}>
-                        {pct.toFixed(0)}%
-                      </span>
-                      {target > 0 && (
-                        <span className="text-[#131218]/30 text-[9px] w-16">
-                          target {target}%
-                        </span>
-                      )}
-                    </div>
-                  );
-                })}
-            </div>
-          </>
-        )}
+      <div
+        className="flex w-full h-2 rounded-full overflow-hidden mb-4"
+        style={{ background: "var(--hall-paper-3)" }}
+      >
+        {allocation.filter(a => a.hours > 0).map(a => (
+          <div
+            key={a.bucket.key}
+            className={`h-full ${a.bucket.color}`}
+            style={{ width: `${(a.hours / totalHours) * 100}%`, minWidth: "2px" }}
+            title={`${a.bucket.label}: ${a.hours.toFixed(1)}h · ${((a.hours / totalHours) * 100).toFixed(0)}%`}
+          />
+        ))}
+      </div>
+      <div>
+        {allocation
+          .filter(a => a.hours > 0 || a.bucket.target > 0)
+          .map(a => {
+            const pct = totalHours > 0 ? (a.hours / totalHours) * 100 : 0;
+            const target = a.bucket.target;
+            const far  = target > 0 && a.hours === 0;
+            const near = target > 0 && pct > 0 && pct < target;
+            const over = target > 0 && pct > target * 1.5;
+            const status = far ? "OVER" : near ? "UNDER" : over ? "OVER" : target > 0 ? "OK" : "";
+            const statusColor = far ? "var(--hall-danger)"
+              : near ? "var(--hall-warn)"
+              : over ? "var(--hall-danger)"
+              : "var(--hall-muted-2)";
+            return (
+              <div
+                key={a.bucket.key}
+                className="grid items-center py-2"
+                style={{
+                  gridTemplateColumns: "80px 1fr 58px 42px",
+                  gap: 10,
+                  borderTop: "1px solid var(--hall-line-soft)",
+                }}
+              >
+                <span className="text-[12px] font-semibold" style={{ color: "var(--hall-ink-0)" }}>
+                  {a.bucket.label}
+                </span>
+                <div className="relative" style={{ height: 6, background: "var(--hall-line-soft)", borderRadius: 2 }}>
+                  <span
+                    className="absolute left-0 top-0 bottom-0 rounded-[2px]"
+                    style={{ width: `${Math.min(pct, 100)}%`, background: "var(--hall-ink-0)" }}
+                  />
+                  {target > 0 && (
+                    <span
+                      className="absolute"
+                      style={{ left: `${target}%`, top: -3, bottom: -3, width: 1.5, background: "var(--hall-warn)" }}
+                    />
+                  )}
+                </div>
+                <span
+                  className="text-right tabular-nums text-[11px] font-bold"
+                  style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-ink-0)" }}
+                >
+                  {pct.toFixed(0)}%{target > 0 ? `/${target}%` : ""}
+                </span>
+                <span
+                  className="text-[9px] tracking-[0.08em]"
+                  style={{ fontFamily: "var(--font-hall-mono)", color: statusColor }}
+                >
+                  {status}
+                </span>
+              </div>
+            );
+          })}
       </div>
     </div>
   );

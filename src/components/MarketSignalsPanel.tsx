@@ -69,10 +69,9 @@ export function MarketSignalsPanel({ text, date, generatedAt, briefs = [] }: Pro
   const stamp = formatStamp(generatedAt ?? date);
 
   return (
-    <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-      <div className="px-5 py-3 border-b border-[#EFEFEA] flex items-center justify-between gap-2">
+    <div>
+      <div className="flex items-center justify-between gap-2 mb-3">
         <div className="flex items-center gap-2 min-w-0">
-          <p className="text-xs font-bold text-[#131218]">Market signals</p>
           {state === "just-updated" ? (
             <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-full whitespace-nowrap">
               Updated · refreshed
@@ -82,13 +81,25 @@ export function MarketSignalsPanel({ text, date, generatedAt, briefs = [] }: Pro
             const isFresh = generatedAt && (Date.now() - new Date(generatedAt).getTime() < 3600_000);
             if (isFresh) {
               return (
-                <span className="text-[9px] font-bold text-[#131218] bg-[#c8f55a]/50 border border-[#c8f55a] px-1.5 py-0.5 rounded-full whitespace-nowrap" title={stamp}>
+                <span
+                  className="text-[9px] font-bold whitespace-nowrap px-1.5 py-0.5 rounded-full"
+                  style={{
+                    color: "var(--hall-ink-0)",
+                    background: "var(--hall-lime-soft)",
+                    border: "1px solid var(--hall-lime)",
+                  }}
+                  title={stamp}
+                >
                   Fresh · {age}
                 </span>
               );
             }
             return (
-              <span className="text-[9px] font-semibold text-[#131218]/35 whitespace-nowrap" title={stamp}>
+              <span
+                className="text-[9px] font-semibold whitespace-nowrap"
+                style={{ color: "var(--hall-muted-3)", fontFamily: "var(--font-hall-mono)" }}
+                title={stamp}
+              >
                 {age ?? stamp}
               </span>
             );
@@ -97,7 +108,8 @@ export function MarketSignalsPanel({ text, date, generatedAt, briefs = [] }: Pro
         <button
           onClick={refresh}
           disabled={state === "running"}
-          className="text-[9px] font-bold uppercase tracking-widest text-[#131218]/35 hover:text-[#131218] transition-colors disabled:opacity-50 shrink-0"
+          className="text-[9px] font-bold uppercase tracking-widest transition-colors disabled:opacity-50 shrink-0"
+          style={{ color: "var(--hall-muted-2)" }}
         >
           {state === "running"
             ? "Running…"
@@ -106,17 +118,20 @@ export function MarketSignalsPanel({ text, date, generatedAt, briefs = [] }: Pro
               : "Refresh"}
         </button>
       </div>
-      <div className="px-5 py-4">
+      <div>
         {text ? <SignalList raw={text} /> : (
-          <p className="text-[11px] text-[#131218]/30">
+          <p className="text-[11px]" style={{ color: "var(--hall-muted-3)" }}>
             No market signals captured yet. Press Refresh to run the briefing.
           </p>
         )}
       </div>
 
       {briefs.length > 0 && (
-        <div className="px-5 py-3 border-t border-[#EFEFEA] bg-[#FAFAF8]">
-          <p className="text-[8.5px] font-bold uppercase tracking-widest text-[#131218]/35 mb-2">
+        <div className="mt-3 pt-3" style={{ borderTop: "1px solid var(--hall-line-soft)" }}>
+          <p
+            className="text-[8.5px] font-bold uppercase tracking-widest mb-2"
+            style={{ color: "var(--hall-muted-3)", fontFamily: "var(--font-hall-mono)" }}
+          >
             Sources · {briefs.length}
           </p>
           <ul className="flex flex-wrap gap-1.5">
@@ -130,7 +145,12 @@ export function MarketSignalsPanel({ text, date, generatedAt, briefs = [] }: Pro
                     target="_blank"
                     rel="noopener noreferrer"
                     title={isOriginal ? "Open original source" : "Open in Notion"}
-                    className="inline-flex items-center gap-1 text-[9.5px] font-semibold text-[#131218]/60 bg-white border border-[#E0E0D8] hover:border-[#131218]/30 hover:text-[#131218] transition-colors px-2 py-0.5 rounded-full max-w-[220px]"
+                    className="inline-flex items-center gap-1 text-[9.5px] font-semibold transition-colors px-2 py-0.5 rounded-full max-w-[220px]"
+                    style={{
+                      color: "var(--hall-muted-2)",
+                      background: "var(--hall-paper-0)",
+                      border: "1px solid var(--hall-line)",
+                    }}
                   >
                     <span className="truncate">{b.title}</span>
                     <span className="text-[8px] opacity-60 shrink-0">{isOriginal ? "↗" : "N↗"}</span>
