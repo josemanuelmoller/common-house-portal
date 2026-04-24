@@ -404,7 +404,7 @@ export default async function HallContactsPage({ searchParams }: PageProps) {
 
         <div className="px-9 py-6 max-w-5xl space-y-8">
           {/* Tab navigation */}
-          <div className="flex items-center gap-1" style={{ borderBottom: "1px solid var(--hall-line)" }}>
+          <div className="hall-scroll-x flex items-center gap-1 flex-nowrap" style={{ borderBottom: "1px solid var(--hall-line)" }}>
             {([
               { mode: "attention", label: "Attention", count: attentionCount, alert: true },
               { mode: "browse",    label: "Browse",    count: 0,               alert: false },

@@ -1391,7 +1391,7 @@ export default async function AdminPage() {
                         <Link
                           key={p.id}
                           href={`/admin/projects/${p.id}`}
-                          className="grid grid-cols-[minmax(0,2.2fr)_minmax(0,1fr)_110px_110px_24px] gap-3 py-2.5 group items-center"
+                          className="grid grid-cols-[minmax(0,1fr)_72px_90px_18px] md:grid-cols-[minmax(0,2.2fr)_minmax(0,1fr)_110px_110px_24px] gap-2 md:gap-3 py-2.5 group items-center"
                           style={{
                             borderTop: "1px solid var(--hall-line-soft)",
                             borderLeft: leftBorder,
@@ -1400,10 +1400,16 @@ export default async function AdminPage() {
                         >
                           {/* Project name + inline type + geography */}
                           <div className="min-w-0">
-                            <div className="flex items-center gap-2 min-w-0">
-                              <span className="text-[12.5px] font-semibold truncate" style={{ color: "var(--hall-ink-0)" }}>{p.name}</span>
+                            <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                              <span className="text-[12.5px] font-semibold truncate max-w-full" style={{ color: "var(--hall-ink-0)" }}>{p.name}</span>
                               {typeLbl !== "—" && (
                                 <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${typeCls}`}>{typeLbl}</span>
+                              )}
+                              {/* Mobile-only: show stage inline under the name since the stage column is hidden */}
+                              {p.stage && (
+                                <span className={`md:hidden text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${STAGE_COLORS[p.stage] ?? "bg-[#f4f4ef] text-[#0a0a0a]/50"}`}>
+                                  {p.stage}
+                                </span>
                               )}
                             </div>
                             {p.geography.length > 0 && (
@@ -1416,8 +1422,8 @@ export default async function AdminPage() {
                             )}
                           </div>
 
-                          {/* Stage */}
-                          <div className="min-w-0">
+                          {/* Stage — hidden on mobile, shown inline under project name instead */}
+                          <div className="min-w-0 hidden md:block">
                             {p.stage ? (
                               <span className={`inline-block text-[9px] font-bold px-2 py-0.5 rounded-full truncate max-w-full ${STAGE_COLORS[p.stage] ?? "bg-[#f4f4ef] text-[#0a0a0a]/50"}`}>
                                 {p.stage}

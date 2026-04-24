@@ -337,7 +337,56 @@ body {
   box-shadow: 0 6px 20px rgba(10, 10, 10, 0.12);
   flex-shrink: 0;
 }
-/* Mobile: icon goes above body instead of beside. */
+/* ── Mobile-wide responsive system (phase 2) ─────────────────────────────────
+   Most admin pages share the same one-line header + content-below layout.
+   These rules handle the two systemic problems on phones:
+     1. Hamburger (fixed at left:12px, 40px wide) overlapped the header
+        breadcrumb because `main > header` started at `px-9` (36px).
+     2. Right-side stat rows (Organizations, Plan, etc.) had no wrap/scroll
+        and clipped the last chips at the viewport edge.
+   We keep desktop styles untouched and only intervene below 640px. */
+@media (max-width: 640px) {
+  /* Reserve space for the hamburger on the left of every admin header. */
+  main > header {
+    padding-left: 52px !important;
+    padding-right: 12px !important;
+    flex-wrap: wrap !important;
+    row-gap: 6px !important;
+    column-gap: 12px !important;
+  }
+  /* When the header stats row overflows, let it scroll horizontally
+     instead of clipping behind the viewport edge. */
+  main > header > div {
+    min-width: 0;
+  }
+  main > header > div:last-child {
+    flex-wrap: wrap !important;
+    gap: 10px !important;
+  }
+  /* Reduce the outer px-9 padding that every admin page uses below the
+     header so content breathes at 375px. */
+  main > header + div,
+  main > div.px-9 {
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+  }
+}
+
+/* Mobile-scroll utility — pattern for tab bars and pill rows that must stay
+   horizontal. Keeps the visual row intact; adds scroll on overflow and
+   hides the native scrollbar. */
+.hall-scroll-x {
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.hall-scroll-x::-webkit-scrollbar {
+  display: none;
+}
+.hall-scroll-x > * {
+  flex-shrink: 0;
+}
+
 @media (max-width: 640px) {
   .hall-focus-card {
     /* tighter padding so narrow viewports don't crush the hero */

@@ -317,7 +317,7 @@ export function HallContactsSearchable({
         </div>
         {/* Filter dropdowns — only shown when we have values to filter by */}
         {(availableTiers.length > 0 || availableAreas.length > 0 || availableClasses.length > 0) && (
-          <div className="flex items-center gap-2 px-4 py-2 border-t border-[#f4f4ef] bg-[#FAFAF6]">
+          <div className="flex items-center gap-2 px-4 py-2 border-t border-[#f4f4ef] bg-[#FAFAF6] flex-wrap">
             <span className="text-[9px] font-bold tracking-widest uppercase text-[#0a0a0a]/40">Filter</span>
             {availableClasses.length > 0 && (
               <FilterSelect
