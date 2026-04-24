@@ -37,43 +37,65 @@ function fmtDate(val: string | null): string {
 
 // ── Pill components ───────────────────────────────────────────────────────────
 
+const PILL_BASE = {
+  fontFamily: "var(--font-hall-mono)",
+  fontSize: 9.5,
+  fontWeight: 700,
+  letterSpacing: "0.06em",
+};
+
 function StatusPill({ s }: { s: string | null }) {
   const v = s ?? "—";
-  const cls: Record<string, string> = {
-    "Active":      "bg-[#B2FF59]/20 text-green-800",
-    "Qualifying":  "bg-blue-50 text-blue-700",
-    "New":         "bg-slate-100 text-slate-600",
-    "Stalled":     "bg-[#EFEFEA] text-[#131218]/40",
-    "Closed Lost": "bg-red-50 text-red-500",
-    "Won":         "bg-[#B2FF59]/30 text-green-800",
+  const styles: Record<string, { bg: string; color: string }> = {
+    "Active":      { bg: "var(--hall-ok-soft)",     color: "var(--hall-ok)" },
+    "Qualifying":  { bg: "var(--hall-info-soft)",   color: "var(--hall-info)" },
+    "New":         { bg: "var(--hall-fill-soft)",   color: "var(--hall-ink-3)" },
+    "Stalled":     { bg: "var(--hall-fill-soft)",   color: "var(--hall-muted-3)" },
+    "Closed Lost": { bg: "var(--hall-danger-soft)", color: "var(--hall-danger)" },
+    "Won":         { bg: "var(--hall-ok-soft)",     color: "var(--hall-ok)" },
   };
+  const style = styles[v] ?? { bg: "var(--hall-fill-soft)", color: "var(--hall-muted-3)" };
   return (
-    <span className={`text-[8px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${cls[v] ?? "bg-[#EFEFEA] text-[#131218]/35"}`}>
+    <span className="px-2 py-0.5 rounded-full whitespace-nowrap" style={{ ...PILL_BASE, fontSize: 9, ...style }}>
       {v}
     </span>
   );
 }
 
 function PriorityPill({ p }: { p: string | null }) {
-  if (!p) return <span className="text-[#131218]/20 text-[9px]">—</span>;
-  const cls = p.startsWith("P1")
-    ? "text-red-600 bg-red-50"
+  if (!p) return <span style={{ color: "var(--hall-muted-3)", fontSize: 9 }}>—</span>;
+  const style = p.startsWith("P1")
+    ? { color: "var(--hall-danger)", bg: "var(--hall-danger-soft)" }
     : p.startsWith("P2")
-    ? "text-amber-700 bg-amber-50"
+    ? { color: "var(--hall-warn)", bg: "var(--hall-warn-soft)" }
     : p.startsWith("P3")
-    ? "text-[#131218]/40 bg-[#EFEFEA]"
-    : "text-[#131218]/30 bg-[#EFEFEA]";
+    ? { color: "var(--hall-muted-3)", bg: "var(--hall-fill-soft)" }
+    : { color: "var(--hall-muted-3)", bg: "var(--hall-fill-soft)" };
   return (
-    <span className={`text-[8px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${cls}`}>
+    <span
+      className="px-2 py-0.5 rounded-full whitespace-nowrap"
+      style={{ ...PILL_BASE, fontSize: 9, background: style.bg, color: style.color }}
+    >
       {p.slice(0, 2)}
     </span>
   );
 }
 
 function ScopePill({ s }: { s: string | null }) {
-  if (!s) return <span className="text-[#131218]/20 text-[9px]">—</span>;
+  if (!s) return <span style={{ color: "var(--hall-muted-3)", fontSize: 9 }}>—</span>;
   return (
-    <span className="text-[7.5px] font-bold px-1.5 py-0.5 rounded bg-[#131218]/6 text-[#131218]/45 uppercase tracking-wide">
+    <span
+      className="px-1.5 py-0.5 rounded"
+      style={{
+        fontFamily: "var(--font-hall-mono)",
+        fontSize: 9,
+        fontWeight: 700,
+        background: "var(--hall-fill-soft)",
+        color: "var(--hall-muted-2)",
+        textTransform: "uppercase",
+        letterSpacing: "0.06em",
+      }}
+    >
       {s}
     </span>
   );
@@ -81,14 +103,15 @@ function ScopePill({ s }: { s: string | null }) {
 
 function QualPill({ q }: { q: string | null }) {
   const v = q ?? "—";
-  const cls: Record<string, string> = {
-    "Qualified":       "bg-[#B2FF59]/25 text-green-800",
-    "Needs Review":    "bg-amber-50 text-amber-700",
-    "Below Threshold": "bg-red-50 text-red-500",
-    "Not Scored":      "bg-[#EFEFEA] text-[#131218]/30",
+  const styles: Record<string, { bg: string; color: string }> = {
+    "Qualified":       { bg: "var(--hall-ok-soft)",     color: "var(--hall-ok)" },
+    "Needs Review":    { bg: "var(--hall-warn-soft)",   color: "var(--hall-warn)" },
+    "Below Threshold": { bg: "var(--hall-danger-soft)", color: "var(--hall-danger)" },
+    "Not Scored":      { bg: "var(--hall-fill-soft)",   color: "var(--hall-muted-3)" },
   };
+  const style = styles[v] ?? { bg: "var(--hall-fill-soft)", color: "var(--hall-muted-3)" };
   return (
-    <span className={`text-[8px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${cls[v] ?? "bg-[#EFEFEA] text-[#131218]/30"}`}>
+    <span className="px-2 py-0.5 rounded-full whitespace-nowrap" style={{ ...PILL_BASE, fontSize: 9, ...style }}>
       {v}
     </span>
   );
@@ -98,14 +121,16 @@ function QualPill({ q }: { q: string | null }) {
 
 function OppRow({ row }: { row: OpportunityRow }) {
   return (
-    <tr className="border-b border-[#E0E0D8] hover:bg-[#FAFAF8] transition-colors group">
+    <tr className="transition-colors group" style={{ borderBottom: "1px solid var(--hall-line-soft)" }}>
       {/* Title + org */}
       <td className="px-4 py-3 max-w-[240px]">
-        <p className="text-[11.5px] font-bold text-[#131218] leading-snug line-clamp-2">
+        <p className="text-[11.5px] font-bold leading-snug line-clamp-2" style={{ color: "var(--hall-ink-0)" }}>
           {fmt(row.title)}
         </p>
         {row.org_name && (
-          <p className="text-[9px] text-[#131218]/40 mt-0.5 font-medium">{row.org_name}</p>
+          <p className="mt-0.5" style={{ fontFamily: "var(--font-hall-mono)", fontSize: 9, color: "var(--hall-muted-2)" }}>
+            {row.org_name}
+          </p>
         )}
       </td>
 
@@ -116,7 +141,9 @@ function OppRow({ row }: { row: OpportunityRow }) {
 
       {/* Type */}
       <td className="px-3 py-3 whitespace-nowrap">
-        <span className="text-[9px] text-[#131218]/45 font-medium">{fmt(row.opportunity_type)}</span>
+        <span style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--hall-muted-2)" }}>
+          {fmt(row.opportunity_type)}
+        </span>
       </td>
 
       {/* Scope */}
@@ -136,28 +163,36 @@ function OppRow({ row }: { row: OpportunityRow }) {
 
       {/* Trigger signal */}
       <td className="px-3 py-3 max-w-[200px]">
-        <p className="text-[9.5px] text-[#131218]/55 leading-snug line-clamp-3">
+        <p className="leading-snug line-clamp-3" style={{ fontSize: 10, color: "var(--hall-muted-2)" }}>
           {fmt(row.trigger_signal)}
         </p>
       </td>
 
       {/* Suggested next step */}
       <td className="px-3 py-3 max-w-[200px]">
-        <p className="text-[9.5px] text-[#131218]/55 leading-snug line-clamp-3">
+        <p className="leading-snug line-clamp-3" style={{ fontSize: 10, color: "var(--hall-muted-2)" }}>
           {fmt(row.suggested_next_step)}
         </p>
       </td>
 
       {/* Value */}
       <td className="px-3 py-3 whitespace-nowrap text-right">
-        <span className="text-[10px] font-bold text-[#131218]/60 tabular-nums">
+        <span
+          className="tabular-nums"
+          style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10, fontWeight: 700, color: "var(--hall-ink-3)" }}
+        >
           {fmtCurrency(row.value_estimate)}
         </span>
       </td>
 
       {/* Close date */}
       <td className="px-3 py-3 whitespace-nowrap">
-        <span className="text-[9.5px] text-[#131218]/45 tabular-nums">{fmtDate(row.expected_close_date)}</span>
+        <span
+          className="tabular-nums"
+          style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--hall-muted-2)" }}
+        >
+          {fmtDate(row.expected_close_date)}
+        </span>
       </td>
     </tr>
   );
@@ -182,60 +217,95 @@ export default async function OpsMirrorPage() {
   const { rows, error } = await fetchOpportunitiesFromSupabase();
   const c = counts(rows);
 
+  const todayLabel = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+
   return (
-    <div className="flex min-h-screen bg-[#EFEFEA]">
+    <div className="flex min-h-screen" style={{ background: "var(--hall-paper-0)" }}>
       <Sidebar adminNav />
 
-      <main className="flex-1 ml-[228px]">
+      <main
+        className="flex-1 ml-[228px]"
+        style={{ fontFamily: "var(--font-hall-sans)", background: "var(--hall-paper-0)" }}
+      >
 
-        {/* Dark header */}
-        <header className="bg-[#131218] px-12 pt-10 pb-11">
-          <p className="text-[8px] font-bold tracking-[2.5px] uppercase text-white/20 mb-3">
-            Internal · Supabase Read Test
-          </p>
-          <div className="flex items-end justify-between">
-            <div>
-              <h1 className="text-[2.6rem] font-light text-white tracking-[-1.5px] leading-none">
-                Ops <em className="font-black italic text-[#c8f55a]">mirror.</em>
-              </h1>
-              <p className="text-sm text-white/40 mt-3">
-                Opportunities read directly from Supabase — server-side only, no Notion call.
-              </p>
-            </div>
-            <div className="flex items-center gap-4 pb-1">
-              <div className="text-right">
-                <p className="text-[2rem] font-black text-white tracking-tight leading-none">{c.total}</p>
-                <p className="text-[9px] font-bold tracking-[1.5px] uppercase text-white/30 mt-0.5">Total rows</p>
-              </div>
-              <div className="w-px h-10 bg-white/10" />
-              <div className="text-right">
-                <p className={`text-[2rem] font-black tracking-tight leading-none ${c.active > 0 ? "text-[#c8f55a]" : "text-white/20"}`}>
-                  {c.active}
-                </p>
-                <p className="text-[9px] font-bold tracking-[1.5px] uppercase text-white/30 mt-0.5">Active</p>
-              </div>
-              <div className="w-px h-10 bg-white/10" />
-              <div className="text-right">
-                <p className={`text-[2rem] font-black tracking-tight leading-none ${c.p1 > 0 ? "text-red-400" : "text-white/20"}`}>
-                  {c.p1}
-                </p>
-                <p className="text-[9px] font-bold tracking-[1.5px] uppercase text-white/30 mt-0.5">P1 — Act Now</p>
-              </div>
-            </div>
+        {/* K-v2 thin header */}
+        <header
+          className="flex items-center justify-between gap-6 px-9 py-3.5"
+          style={{ borderBottom: "1px solid var(--hall-ink-0)" }}
+        >
+          <div className="flex items-baseline gap-4 min-w-0">
+            <span
+              className="text-[10px] tracking-[0.08em] whitespace-nowrap"
+              style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+            >
+              INTERNAL · SUPABASE READ TEST ·{" "}
+              <b style={{ color: "var(--hall-ink-0)" }}>{todayLabel}</b>
+            </span>
+            <h1
+              className="text-[16px] font-medium tracking-[-0.01em]"
+              style={{ color: "var(--hall-ink-0)" }}
+            >
+              Ops{" "}
+              <em
+                style={{
+                  fontFamily: "var(--font-hall-display)",
+                  fontStyle: "italic",
+                  fontWeight: 400,
+                  color: "var(--hall-ink-0)",
+                }}
+              >
+                mirror
+              </em>
+            </h1>
+          </div>
+          <div
+            className="flex items-center gap-4"
+            style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10.5, color: "var(--hall-muted-2)" }}
+          >
+            <span>
+              <b style={{ color: "var(--hall-ink-0)" }}>{c.total}</b> TOTAL
+            </span>
+            <span style={{ color: "var(--hall-muted-3)" }}>·</span>
+            <span>
+              <b style={{ color: c.active > 0 ? "var(--hall-ok)" : "var(--hall-muted-3)" }}>{c.active}</b> ACTIVE
+            </span>
+            <span style={{ color: "var(--hall-muted-3)" }}>·</span>
+            <span>
+              <b style={{ color: c.p1 > 0 ? "var(--hall-danger)" : "var(--hall-muted-3)" }}>{c.p1}</b> P1
+            </span>
           </div>
         </header>
 
-        <div className="px-12 py-8 space-y-5">
+        <div className="px-9 py-7 space-y-5">
 
           {/* Read-test banner */}
-          <div className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-xl px-5 py-3">
-            <span className="text-amber-500 text-base leading-none">⚡</span>
+          <div
+            className="flex items-center gap-3 px-5 py-3"
+            style={{ background: "var(--hall-warn-paper)", border: "1px solid var(--hall-warn)" }}
+          >
+            <span className="text-base leading-none" style={{ color: "var(--hall-warn)" }}>⚡</span>
             <div>
-              <p className="text-[10px] font-bold text-amber-800 uppercase tracking-wider">
+              <p
+                style={{
+                  fontFamily: "var(--font-hall-mono)",
+                  fontSize: 10,
+                  fontWeight: 700,
+                  color: "var(--hall-warn)",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.08em",
+                }}
+              >
                 Supabase read test — internal only
               </p>
-              <p className="text-[9.5px] text-amber-700 mt-0.5">
-                Data source: <code className="font-mono bg-amber-100 px-1 rounded">opportunities</code> table in Supabase (rjcsasbaxihaubkkkxrt).
+              <p className="mt-0.5" style={{ fontSize: 10, color: "var(--hall-ink-3)" }}>
+                Data source: <code
+                  style={{
+                    fontFamily: "var(--font-hall-mono)",
+                    background: "var(--hall-warn-soft)",
+                    padding: "0 4px",
+                    borderRadius: 2,
+                  }}
+                >opportunities</code> table in Supabase (rjcsasbaxihaubkkkxrt).
                 Server-side fetch only. Anon key never sent to browser.
                 Hall and client-facing surfaces are unaffected.
                 Writes remain on Notion.
@@ -245,18 +315,33 @@ export default async function OpsMirrorPage() {
 
           {/* Error state */}
           {error && (
-            <div className="bg-red-50 border border-red-200 rounded-xl px-5 py-4">
-              <p className="text-[10px] font-bold text-red-700 uppercase tracking-wider mb-1">Supabase error</p>
-              <p className="text-[10.5px] text-red-600 font-mono">{error}</p>
+            <div
+              className="px-5 py-4"
+              style={{ background: "var(--hall-danger-soft)", border: "1px solid var(--hall-danger)" }}
+            >
+              <p
+                className="mb-1"
+                style={{
+                  fontFamily: "var(--font-hall-mono)",
+                  fontSize: 10,
+                  fontWeight: 700,
+                  color: "var(--hall-danger)",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.08em",
+                }}
+              >
+                Supabase error
+              </p>
+              <p style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10.5, color: "var(--hall-danger)" }}>{error}</p>
             </div>
           )}
 
           {/* Table */}
           {!error && rows.length > 0 && (
-            <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-x-auto">
+            <div className="overflow-x-auto" style={{ border: "1px solid var(--hall-line)" }}>
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="border-b border-[#E0E0D8] bg-[#FAFAF8]">
+                  <tr style={{ borderBottom: "1px solid var(--hall-line)", background: "var(--hall-fill-soft)" }}>
                     {[
                       "Title / Org",
                       "Status",
@@ -271,7 +356,15 @@ export default async function OpsMirrorPage() {
                     ].map(h => (
                       <th
                         key={h}
-                        className="px-3 py-2.5 text-[8px] font-bold tracking-widest uppercase text-[#131218]/30 whitespace-nowrap first:px-4"
+                        className="px-3 py-2.5 whitespace-nowrap first:px-4"
+                        style={{
+                          fontFamily: "var(--font-hall-mono)",
+                          fontSize: 10,
+                          fontWeight: 700,
+                          letterSpacing: "0.08em",
+                          textTransform: "uppercase",
+                          color: "var(--hall-muted-2)",
+                        }}
                       >
                         {h}
                       </th>
@@ -289,13 +382,20 @@ export default async function OpsMirrorPage() {
 
           {/* Empty state */}
           {!error && rows.length === 0 && (
-            <div className="bg-white rounded-2xl border border-[#E0E0D8] px-8 py-16 text-center">
-              <p className="text-sm text-[#131218]/25">No rows returned from Supabase.</p>
+            <div className="px-8 py-16 text-center" style={{ border: "1px solid var(--hall-line)" }}>
+              <p className="text-sm" style={{ color: "var(--hall-muted-3)" }}>No rows returned from Supabase.</p>
             </div>
           )}
 
           {/* Footer meta */}
-          <p className="text-[8.5px] text-[#131218]/20 font-medium text-right">
+          <p
+            className="text-right"
+            style={{
+              fontFamily: "var(--font-hall-mono)",
+              fontSize: 10,
+              color: "var(--hall-muted-3)",
+            }}
+          >
             {c.total} rows · {c.withDate} with close date · Supabase project rjcsasbaxihaubkkkxrt
           </p>
 

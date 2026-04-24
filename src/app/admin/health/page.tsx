@@ -1,10 +1,8 @@
-import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Sidebar } from "@/components/Sidebar";
 import { MetricCard } from "@/components/MetricCard";
 import { StatusBadge } from "@/components/StatusBadge";
 import { getAllEvidence, getAllSources, getAllProjects } from "@/lib/notion";
-import { NAV } from "../page";
 import { requireAdmin } from "@/lib/require-admin";
 
 function daysSince(dateStr: string | null): number | null {
@@ -20,6 +18,35 @@ function bestActivity(p: { lastUpdate: string | null; lastEvidenceDate?: string 
     .pop() ?? null;
 }
 
+function HallSectionHead({ title, flourish, meta }: { title: string; flourish?: string; meta?: string }) {
+  return (
+    <div
+      className="flex items-baseline justify-between gap-3 pb-2 mb-3.5"
+      style={{ borderBottom: "1px solid var(--hall-ink-0)" }}
+    >
+      <h2
+        className="text-[19px] font-bold leading-none"
+        style={{ letterSpacing: "-0.02em", color: "var(--hall-ink-0)" }}
+      >
+        {title}
+        {flourish && (
+          <>
+            {" "}
+            <em className="hall-flourish">{flourish}</em>
+          </>
+        )}
+      </h2>
+      {meta && (
+        <span
+          style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--hall-muted-2)", letterSpacing: "0.06em" }}
+        >
+          {meta}
+        </span>
+      )}
+    </div>
+  );
+}
+
 export default async function HealthPage() {
   await requireAdmin();
 
@@ -29,7 +56,6 @@ export default async function HealthPage() {
     getAllProjects(),
   ]);
 
-  // Build project name lookup
   const projectNames: Record<string, string> = {};
   for (const p of projects) projectNames[p.id] = p.name;
 
@@ -44,13 +70,11 @@ export default async function HealthPage() {
     ? Math.round((validatedEvidence.length / allEvidence.length) * 100)
     : 0;
 
-  // Source pipeline breakdown
   const ingestedSources    = sources.filter(s => s.status === "Ingested");
   const processedSources   = sources.filter(s => s.status === "Processed");
   const needsReviewSources = sources.filter(s => s.status === "Needs Review");
   const unlinkedSources    = sources.filter(s => !s.projectId);
 
-  // Evidence backlog per project (projects with pending evidence)
   const backlogByProject = projects
     .map(p => {
       const pending = allEvidence.filter(
@@ -61,53 +85,88 @@ export default async function HealthPage() {
     .filter(p => p.pending > 0)
     .sort((a, b) => b.pending - a.pending);
 
-  // Project health
   const updateNeededProjects = projects.filter(p => p.updateNeeded);
   const staleProjects        = projects.filter(p => { const d = daysSince(bestActivity(p)); return d !== null && d > 30; });
 
-  // Missing excerpts intentionally excluded from overallHealthy — it is a content quality
-  // metric (tracked separately on the health page) not an operational blocker. Including it
-  // would permanently suppress "All clear" on any active system with large evidence volumes.
   const overallHealthy =
     newEvidence.length === 0 &&
     blockers.length === 0 &&
     updateNeededProjects.length === 0 &&
     needsReviewSources.length === 0;
 
+  const eyebrowDate = new Date()
+    .toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })
+    .toUpperCase();
+
   return (
-    <div className="flex min-h-screen bg-[#EFEFEA]">
-      <Sidebar items={NAV} isAdmin />
+    <div className="flex min-h-screen" style={{ background: "var(--hall-paper-0)" }}>
+      <Sidebar adminNav />
 
-      <main className="flex-1 ml-[228px] overflow-auto">
-        {/* Header */}
-        <div className="bg-[#131218] px-10 py-10">
-          <p className="text-[8px] font-bold uppercase tracking-[2.5px] text-white/20 mb-3">
-            CONTROL ROOM · SYSTEM HEALTH
-          </p>
-          <h1 className="text-[2.6rem] font-[300] text-white leading-[1] tracking-[-1.5px]">
-            System <em className="font-[900] italic text-[#c8f55a]">Health</em>
-          </h1>
-          <p className="text-[12.5px] text-white/40 mt-3 max-w-[520px] leading-[1.65]">
-            Live signals from the OS engine — hygiene and backlog status.
-          </p>
-        </div>
+      <main
+        className="flex-1 ml-[228px] overflow-auto"
+        style={{ fontFamily: "var(--font-hall-sans)", background: "var(--hall-paper-0)" }}
+      >
+        {/* K-v2 collapsed header */}
+        <header
+          className="flex items-center justify-between gap-6 px-9 py-3.5"
+          style={{ borderBottom: "1px solid var(--hall-ink-0)" }}
+        >
+          <div className="flex items-baseline gap-4 min-w-0">
+            <span
+              className="text-[10px] tracking-[0.08em] whitespace-nowrap"
+              style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+            >
+              HEALTH · <b style={{ color: "var(--hall-ink-0)" }}>{eyebrowDate}</b>
+            </span>
+            <h1
+              className="text-[16px] font-medium tracking-[-0.01em] truncate"
+              style={{ color: "var(--hall-ink-0)" }}
+            >
+              System <em className="hall-flourish">Health</em>
+            </h1>
+          </div>
+          <span
+            style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10, color: overallHealthy ? "var(--hall-ok)" : "var(--hall-warn)", letterSpacing: "0.08em" }}
+          >
+            {overallHealthy ? "ALL CLEAR" : "INTERVENTION NEEDED"}
+          </span>
+        </header>
 
-        <div className="px-8 py-6 space-y-6">
+        <div className="px-9 py-6 space-y-7">
 
-          {/* Intervention summary — what needs action right now */}
+          {/* Intervention summary */}
           {overallHealthy ? (
-            <div className="bg-[#131218] rounded-2xl px-6 py-5 flex items-center gap-4">
-              <span className="w-2 h-2 rounded-full bg-[#B2FF59] shrink-0" />
+            <div
+              className="flex items-center gap-4 px-6 py-5"
+              style={{ background: "var(--hall-ink-0)", borderRadius: 3 }}
+            >
+              <span className="w-2 h-2 rounded-full shrink-0" style={{background: "var(--hall-ok)"}} />
               <div>
-                <p className="text-sm font-bold text-white tracking-tight">All clear — no intervention needed</p>
-                <p className="text-xs text-white/30 font-medium mt-0.5">Evidence is clean, blockers are resolved, sources are linked.</p>
+                <p className="text-sm font-bold tracking-tight" style={{color: "var(--hall-paper-0)"}}>All clear — no intervention needed</p>
+                <p className="text-xs font-medium mt-0.5" style={{color: "var(--hall-muted-3)"}}>Evidence is clean, blockers are resolved, sources are linked.</p>
               </div>
             </div>
           ) : (
-            <div className="bg-[#131218] rounded-2xl overflow-hidden">
-              <div className="px-6 py-4 border-b border-white/8 flex items-center justify-between">
-                <p className="text-[10px] font-bold text-white/30 uppercase tracking-widest">Intervention Needed</p>
-                <span className="text-[10px] font-bold bg-red-500 text-white px-2.5 py-1 rounded-full uppercase tracking-widest">
+            <div style={{ background: "var(--hall-ink-0)", borderRadius: 3, overflow: "hidden" }}>
+              <div
+                className="px-6 py-4 flex items-center justify-between"
+                style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}
+              >
+                <p
+                  className="text-[10px] font-bold uppercase tracking-widest"
+                  style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-3)" }}
+                >
+                  Intervention Needed
+                </p>
+                <span
+                  className="text-[10px] font-bold px-2.5 py-1 rounded-full uppercase"
+                  style={{
+                    fontFamily: "var(--font-hall-mono)",
+                    letterSpacing: "0.08em",
+                    background: "var(--hall-danger)",
+                    color: "var(--hall-paper-0)",
+                  }}
+                >
                   {[
                     blockers.length > 0 && "blockers",
                     newEvidence.length > 0 && "pending evidence",
@@ -116,54 +175,77 @@ export default async function HealthPage() {
                   ].filter(Boolean).length} signals
                 </span>
               </div>
-              <div className="divide-y divide-white/5">
+              <div>
                 {blockers.length > 0 && (
-                  <div className="px-6 py-3 flex items-center gap-3">
-                    <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" />
-                    <p className="text-sm text-white/80 font-semibold flex-1">
+                  <div className="px-6 py-3 flex items-center gap-3" style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+                    <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{background: "var(--hall-danger)"}} />
+                    <p className="text-sm font-semibold flex-1" style={{color: "rgba(255,255,255,0.8)"}}>
                       {blockers.length} active blocker{blockers.length !== 1 ? "s" : ""}
                     </p>
-                    <p className="text-[10px] text-red-400 font-bold uppercase tracking-widest">Act now</p>
+                    <p
+                      className="text-[10px] font-bold uppercase tracking-widest"
+                      style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-danger)" }}
+                    >
+                      Act now
+                    </p>
                   </div>
                 )}
                 {needsReviewSources.length > 0 && (
-                  <div className="px-6 py-3 flex items-center gap-3">
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
-                    <p className="text-sm text-white/80 font-semibold flex-1">
+                  <div className="px-6 py-3 flex items-center gap-3" style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+                    <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{background: "var(--hall-warn)"}} />
+                    <p className="text-sm font-semibold flex-1" style={{color: "rgba(255,255,255,0.8)"}}>
                       {needsReviewSources.length} source{needsReviewSources.length !== 1 ? "s" : ""} need review
                     </p>
-                    <Link href="/admin/os" className="text-[10px] text-amber-400 font-bold uppercase tracking-widest hover:text-amber-300 transition-colors">
+                    <Link
+                      href="/admin/os"
+                      className="text-[10px] font-bold uppercase tracking-widest transition-colors"
+                      style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-warn)" }}
+                    >
                       Go to Intake →
                     </Link>
                   </div>
                 )}
                 {newEvidence.length > 0 && (
-                  <div className="px-6 py-3 flex items-center gap-3">
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
-                    <p className="text-sm text-white/80 font-semibold flex-1">
+                  <div className="px-6 py-3 flex items-center gap-3" style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+                    <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{background: "var(--hall-warn)"}} />
+                    <p className="text-sm font-semibold flex-1" style={{color: "rgba(255,255,255,0.8)"}}>
                       {newEvidence.length} evidence item{newEvidence.length !== 1 ? "s" : ""} pending validation
                     </p>
-                    <Link href="/admin/os" className="text-[10px] text-amber-400 font-bold uppercase tracking-widest hover:text-amber-300 transition-colors">
+                    <Link
+                      href="/admin/os"
+                      className="text-[10px] font-bold uppercase tracking-widest transition-colors"
+                      style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-warn)" }}
+                    >
                       Go to Intake →
                     </Link>
                   </div>
                 )}
                 {updateNeededProjects.length > 0 && (
-                  <div className="px-6 py-3 flex items-center gap-3">
-                    <span className="w-1.5 h-1.5 rounded-full bg-white/20 shrink-0" />
-                    <p className="text-sm text-white/80 font-semibold flex-1">
+                  <div className="px-6 py-3 flex items-center gap-3" style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+                    <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{background: "rgba(255,255,255,0.2)"}} />
+                    <p className="text-sm font-semibold flex-1" style={{color: "rgba(255,255,255,0.8)"}}>
                       {updateNeededProjects.length} project{updateNeededProjects.length !== 1 ? "s" : ""} need a status update
                     </p>
-                    <p className="text-[10px] text-white/25 font-bold uppercase tracking-widest">This week</p>
+                    <p
+                      className="text-[10px] font-bold uppercase tracking-widest"
+                      style={{ fontFamily: "var(--font-hall-mono)", color: "rgba(255,255,255,0.25)" }}
+                    >
+                      This week
+                    </p>
                   </div>
                 )}
                 {staleProjects.filter(p => !p.updateNeeded).length > 0 && (
-                  <div className="px-6 py-3 flex items-center gap-3">
-                    <span className="w-1.5 h-1.5 rounded-full bg-white/10 shrink-0" />
-                    <p className="text-sm text-white/50 font-semibold flex-1">
+                  <div className="px-6 py-3 flex items-center gap-3" style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+                    <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{background: "rgba(255,255,255,0.1)"}} />
+                    <p className="text-sm font-semibold flex-1" style={{color: "rgba(255,255,255,0.5)"}}>
                       {staleProjects.filter(p => !p.updateNeeded).length} project{staleProjects.filter(p => !p.updateNeeded).length !== 1 ? "s" : ""} stale (30d+)
                     </p>
-                    <p className="text-[10px] text-white/20 font-bold uppercase tracking-widest">Watch</p>
+                    <p
+                      className="text-[10px] font-bold uppercase tracking-widest"
+                      style={{ fontFamily: "var(--font-hall-mono)", color: "rgba(255,255,255,0.2)" }}
+                    >
+                      Watch
+                    </p>
                   </div>
                 )}
               </div>
@@ -179,260 +261,303 @@ export default async function HealthPage() {
           </div>
 
           {/* Evidence hygiene */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-6">
 
             {/* Missing excerpts */}
-            <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-              <div className={`h-1 ${evidenceMissingExcerpt.length > 0 ? "bg-amber-400" : "bg-[#B2FF59]"}`} />
-              <div className="px-6 py-4 border-b border-[#EFEFEA] flex items-center justify-between">
-                <div>
-                  <h2 className="text-sm font-bold text-[#131218] tracking-tight">Missing Excerpts</h2>
-                  <p className="text-xs text-[#131218]/40 mt-0.5">Evidence records with no excerpt text</p>
-                </div>
-                <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-widest ${
-                  evidenceMissingExcerpt.length > 0
-                    ? "bg-amber-100 text-amber-700"
-                    : "bg-[#EFEFEA] text-[#131218]/30"
-                }`}>
-                  {evidenceMissingExcerpt.length} missing
-                </span>
-              </div>
-              <div className="px-6 py-4">
+            <section>
+              <HallSectionHead
+                title="Missing"
+                flourish="excerpts"
+                meta={`${evidenceMissingExcerpt.length} MISSING`}
+              />
+              <div className="py-4">
                 <div className="flex items-center gap-4">
                   <div>
-                    <p className="text-2xl font-bold text-[#131218]">{evidenceMissingExcerpt.length}</p>
-                    <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest mt-0.5">Without excerpt</p>
+                    <p className="text-2xl font-bold tabular-nums" style={{color: "var(--hall-ink-0)"}}>{evidenceMissingExcerpt.length}</p>
+                    <p
+                      className="text-[10px] font-bold uppercase tracking-widest mt-0.5"
+                      style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-3)" }}
+                    >
+                      Without excerpt
+                    </p>
                   </div>
-                  <div className="text-[#131218]/20 text-lg">·</div>
+                  <div className="text-lg" style={{color: "var(--hall-muted-3)"}}>·</div>
                   <div>
-                    <p className="text-2xl font-bold text-[#131218]">{evidenceWithExcerpt.length}</p>
-                    <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest mt-0.5">With excerpt</p>
+                    <p className="text-2xl font-bold tabular-nums" style={{color: "var(--hall-ink-0)"}}>{evidenceWithExcerpt.length}</p>
+                    <p
+                      className="text-[10px] font-bold uppercase tracking-widest mt-0.5"
+                      style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-3)" }}
+                    >
+                      With excerpt
+                    </p>
                   </div>
                   <div className="flex-1">
-                    <div className="h-2 bg-[#EFEFEA] rounded-full overflow-hidden">
+                    <div className="h-2 rounded-full overflow-hidden" style={{background: "var(--hall-fill-soft)"}}>
                       <div
-                        className="h-full bg-[#B2FF59] rounded-full"
-                        style={{ width: allEvidence.length > 0 ? `${Math.round((evidenceWithExcerpt.length / allEvidence.length) * 100)}%` : "0%" }}
+                        className="h-full rounded-full"
+                        style={{
+                          background: "var(--hall-ok)",
+                          width: allEvidence.length > 0 ? `${Math.round((evidenceWithExcerpt.length / allEvidence.length) * 100)}%` : "0%",
+                        }}
                       />
                     </div>
-                    <p className="text-[9px] font-bold text-[#131218]/25 uppercase tracking-widest mt-1">
+                    <p
+                      className="text-[9px] font-bold uppercase tracking-widest mt-1"
+                      style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-3)" }}
+                    >
                       {allEvidence.length > 0 ? Math.round((evidenceWithExcerpt.length / allEvidence.length) * 100) : 0}% coverage
                     </p>
                   </div>
                 </div>
               </div>
-            </div>
+            </section>
 
             {/* Validation backlog */}
-            <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-              <div className={`h-1 ${newEvidence.length > 0 ? "bg-amber-400" : "bg-[#B2FF59]"}`} />
-              <div className="px-6 py-4 border-b border-[#EFEFEA] flex items-center justify-between">
-                <div>
-                  <h2 className="text-sm font-bold text-[#131218] tracking-tight">Validation Backlog</h2>
-                  <p className="text-xs text-[#131218]/40 mt-0.5">Evidence awaiting review or validation</p>
-                </div>
-                <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-widest ${
-                  newEvidence.length > 0
-                    ? "bg-amber-100 text-amber-700"
-                    : "bg-[#EFEFEA] text-[#131218]/30"
-                }`}>
-                  {newEvidence.length} pending
-                </span>
-              </div>
-              <div className="px-6 py-4">
+            <section>
+              <HallSectionHead
+                title="Validation"
+                flourish="backlog"
+                meta={`${newEvidence.length} PENDING`}
+              />
+              <div className="py-4">
                 <div className="flex items-center gap-4">
                   <div>
-                    <p className="text-2xl font-bold text-[#131218]">{newEvidence.length}</p>
-                    <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest mt-0.5">New</p>
+                    <p className="text-2xl font-bold tabular-nums" style={{color: "var(--hall-ink-0)"}}>{newEvidence.length}</p>
+                    <p
+                      className="text-[10px] font-bold uppercase tracking-widest mt-0.5"
+                      style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-3)" }}
+                    >
+                      New
+                    </p>
                   </div>
-                  <div className="text-[#131218]/20 text-lg">·</div>
+                  <div className="text-lg" style={{color: "var(--hall-muted-3)"}}>·</div>
                   <div>
-                    <p className="text-2xl font-bold text-[#131218]">{validatedEvidence.length}</p>
-                    <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest mt-0.5">Validated</p>
+                    <p className="text-2xl font-bold tabular-nums" style={{color: "var(--hall-ink-0)"}}>{validatedEvidence.length}</p>
+                    <p
+                      className="text-[10px] font-bold uppercase tracking-widest mt-0.5"
+                      style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-3)" }}
+                    >
+                      Validated
+                    </p>
                   </div>
                   <div className="flex-1">
-                    <div className="h-2 bg-[#EFEFEA] rounded-full overflow-hidden">
+                    <div className="h-2 rounded-full overflow-hidden" style={{background: "var(--hall-fill-soft)"}}>
                       <div
-                        className="h-full bg-[#B2FF59] rounded-full"
-                        style={{ width: `${validationRate}%` }}
+                        className="h-full rounded-full"
+                        style={{ background: "var(--hall-ok)", width: `${validationRate}%` }}
                       />
                     </div>
-                    <p className="text-[9px] font-bold text-[#131218]/25 uppercase tracking-widest mt-1">
+                    <p
+                      className="text-[9px] font-bold uppercase tracking-widest mt-1"
+                      style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-3)" }}
+                    >
                       {validationRate}% validated
                     </p>
                   </div>
                 </div>
               </div>
-            </div>
+            </section>
           </div>
 
           {/* Backlog by project */}
           {backlogByProject.length > 0 && (
-            <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-              <div className="h-1 bg-amber-400" />
-              <div className="px-6 py-4 border-b border-[#EFEFEA] flex items-center justify-between">
-                <div>
-                  <h2 className="text-sm font-bold text-[#131218] tracking-tight">Pending by Project</h2>
-                  <p className="text-xs text-[#131218]/40 mt-0.5">Projects with unreviewed evidence in the queue</p>
-                </div>
-                <span className="text-[10px] font-bold bg-amber-100 text-amber-700 px-2.5 py-1 rounded-full uppercase tracking-widest">
-                  {backlogByProject.length} project{backlogByProject.length !== 1 ? "s" : ""}
-                </span>
-              </div>
-              <div className="divide-y divide-[#EFEFEA]">
-                {backlogByProject.map(p => (
-                  <Link
+            <section>
+              <HallSectionHead
+                title="Pending"
+                flourish="by project"
+                meta={`${backlogByProject.length} PROJECT${backlogByProject.length !== 1 ? "S" : ""}`}
+              />
+              <ul className="flex flex-col">
+                {backlogByProject.map((p, idx) => (
+                  <li
                     key={p.id}
-                    href={`/admin/projects/${p.id}`}
-                    className="flex items-center gap-4 px-6 py-3 hover:bg-[#EFEFEA]/50 transition-colors group"
+                    style={idx === 0 ? undefined : { borderTop: "1px solid var(--hall-line-soft)" }}
                   >
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-[#131218] text-sm truncate">{p.name}</p>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <StatusBadge value={p.stage} />
+                    <Link
+                      href={`/admin/projects/${p.id}`}
+                      className="flex items-center gap-4 py-3 transition-colors group"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm truncate" style={{color: "var(--hall-ink-0)"}}>{p.name}</p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <StatusBadge value={p.stage} />
+                        </div>
                       </div>
-                    </div>
-                    <span className="text-[10px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full uppercase tracking-widest shrink-0">
-                      {p.pending} pending
-                    </span>
-                    <span className="text-[#131218]/20 group-hover:text-[#131218]/60 transition-colors text-sm shrink-0">→</span>
-                  </Link>
+                      <span
+                        className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-widest shrink-0"
+                        style={{
+                          fontFamily: "var(--font-hall-mono)",
+                          background: "var(--hall-warn-soft)",
+                          color: "var(--hall-warn)",
+                        }}
+                      >
+                        {p.pending} pending
+                      </span>
+                      <span className="transition-colors text-sm shrink-0" style={{color: "var(--hall-muted-3)"}}>→</span>
+                    </Link>
+                  </li>
                 ))}
-              </div>
-            </div>
+              </ul>
+            </section>
           )}
 
           {/* Active blockers */}
           {blockers.length > 0 && (
-            <div className="bg-white rounded-2xl border border-red-200 overflow-hidden">
-              <div className="h-1 bg-red-400" />
-              <div className="px-6 py-4 border-b border-[#EFEFEA] flex items-center justify-between">
-                <div>
-                  <h2 className="text-sm font-bold text-[#131218] tracking-tight">Active Blockers</h2>
-                  <p className="text-xs text-[#131218]/40 mt-0.5">Validated blockers across all projects</p>
-                </div>
-                <span className="text-[10px] font-bold bg-red-100 text-red-600 px-2.5 py-1 rounded-full uppercase tracking-widest">
-                  {blockers.length} blocker{blockers.length !== 1 ? "s" : ""}
-                </span>
-              </div>
-              <div className="divide-y divide-[#EFEFEA]">
-                {blockers.map(e => (
-                  <div key={e.id} className="px-6 py-3 flex items-start gap-3">
-                    <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0 mt-1.5" />
+            <section>
+              <HallSectionHead
+                title="Active"
+                flourish="blockers"
+                meta={`${blockers.length} BLOCKER${blockers.length !== 1 ? "S" : ""}`}
+              />
+              <ul className="flex flex-col">
+                {blockers.map((e, idx) => (
+                  <li
+                    key={e.id}
+                    className="py-3 flex items-start gap-3"
+                    style={idx === 0 ? undefined : { borderTop: "1px solid var(--hall-line-soft)" }}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full shrink-0 mt-1.5" style={{background: "var(--hall-danger)"}} />
                     <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-[#131218] text-sm">{e.title}</p>
+                      <p className="font-semibold text-sm" style={{color: "var(--hall-ink-0)"}}>{e.title}</p>
                       {e.projectId && (
                         <Link
                           href={`/admin/projects/${e.projectId}`}
-                          className="text-xs text-[#131218]/40 hover:text-[#131218]/70 font-medium mt-0.5 inline-block transition-colors"
+                          className="text-xs font-medium mt-0.5 inline-block transition-colors"
+                          style={{color: "var(--hall-muted-2)"}}
                         >
                           {projectNames[e.projectId] ?? "—"} →
                         </Link>
                       )}
                     </div>
-                  </div>
+                  </li>
                 ))}
-              </div>
-            </div>
+              </ul>
+            </section>
           )}
 
           {/* Project health */}
           {(updateNeededProjects.length > 0 || staleProjects.length > 0) && (
-            <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-              <div className="h-1 bg-amber-400" />
-              <div className="px-6 py-4 border-b border-[#EFEFEA] flex items-center justify-between">
-                <div>
-                  <h2 className="text-sm font-bold text-[#131218] tracking-tight">Project Status</h2>
-                  <p className="text-xs text-[#131218]/40 mt-0.5">Projects needing a status update or showing no recent activity</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  {updateNeededProjects.length > 0 && (
-                    <span className="text-[10px] font-bold bg-amber-100 text-amber-700 px-2.5 py-1 rounded-full uppercase tracking-widest">
-                      {updateNeededProjects.length} update needed
-                    </span>
-                  )}
-                  {staleProjects.length > 0 && (
-                    <span className="text-[10px] font-bold bg-red-50 text-red-500 border border-red-200 px-2.5 py-1 rounded-full uppercase tracking-widest">
-                      {staleProjects.length} stale
-                    </span>
-                  )}
-                </div>
-              </div>
-              <div className="divide-y divide-[#EFEFEA]">
-                {updateNeededProjects.map(p => (
-                  <Link key={`upd-${p.id}`} href={`/admin/projects/${p.id}`}
-                    className="flex items-center gap-3 px-6 py-3 hover:bg-[#EFEFEA]/50 transition-colors group">
-                    <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-[#131218] text-sm truncate">{p.name}</p>
-                      <p className="text-[10px] text-amber-500 font-bold uppercase tracking-widest mt-0.5">
-                        Update needed · {daysSince(bestActivity(p)) !== null ? `${daysSince(bestActivity(p))}d ago` : "no activity recorded"}
-                      </p>
-                    </div>
-                    <StatusBadge value={p.stage} />
-                    <span className="text-[#131218]/20 group-hover:text-[#131218]/60 transition-colors text-sm shrink-0">→</span>
-                  </Link>
+            <section>
+              <HallSectionHead
+                title="Project"
+                flourish="status"
+                meta={[
+                  updateNeededProjects.length > 0 ? `${updateNeededProjects.length} UPDATE NEEDED` : null,
+                  staleProjects.length > 0 ? `${staleProjects.length} STALE` : null,
+                ].filter(Boolean).join(" · ")}
+              />
+              <ul className="flex flex-col">
+                {updateNeededProjects.map((p, idx) => (
+                  <li
+                    key={`upd-${p.id}`}
+                    style={idx === 0 ? undefined : { borderTop: "1px solid var(--hall-line-soft)" }}
+                  >
+                    <Link
+                      href={`/admin/projects/${p.id}`}
+                      className="flex items-center gap-3 py-3 transition-colors group"
+                    >
+                      <span className="w-2 h-2 rounded-full shrink-0" style={{background: "var(--hall-warn)"}} />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm truncate" style={{color: "var(--hall-ink-0)"}}>{p.name}</p>
+                        <p
+                          className="text-[10px] font-bold uppercase tracking-widest mt-0.5"
+                          style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-warn)" }}
+                        >
+                          Update needed · {daysSince(bestActivity(p)) !== null ? `${daysSince(bestActivity(p))}d ago` : "no activity recorded"}
+                        </p>
+                      </div>
+                      <StatusBadge value={p.stage} />
+                      <span className="transition-colors text-sm shrink-0" style={{color: "var(--hall-muted-3)"}}>→</span>
+                    </Link>
+                  </li>
                 ))}
-                {staleProjects.filter(p => !p.updateNeeded).map(p => (
-                  <Link key={`stale-${p.id}`} href={`/admin/projects/${p.id}`}
-                    className="flex items-center gap-3 px-6 py-3 hover:bg-[#EFEFEA]/50 transition-colors group">
-                    <span className="w-2 h-2 rounded-full bg-red-400 shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-[#131218] text-sm truncate">{p.name}</p>
-                      <p className="text-[10px] text-red-400 font-bold uppercase tracking-widest mt-0.5">
-                        Stale · {daysSince(bestActivity(p)) ?? "—"}d since last activity
-                      </p>
-                    </div>
-                    <StatusBadge value={p.stage} />
-                    <span className="text-[#131218]/20 group-hover:text-[#131218]/60 transition-colors text-sm shrink-0">→</span>
-                  </Link>
+                {staleProjects.filter(p => !p.updateNeeded).map((p, idx) => (
+                  <li
+                    key={`stale-${p.id}`}
+                    style={(idx === 0 && updateNeededProjects.length === 0) ? undefined : { borderTop: "1px solid var(--hall-line-soft)" }}
+                  >
+                    <Link
+                      href={`/admin/projects/${p.id}`}
+                      className="flex items-center gap-3 py-3 transition-colors group"
+                    >
+                      <span className="w-2 h-2 rounded-full shrink-0" style={{background: "var(--hall-danger)"}} />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm truncate" style={{color: "var(--hall-ink-0)"}}>{p.name}</p>
+                        <p
+                          className="text-[10px] font-bold uppercase tracking-widest mt-0.5"
+                          style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-danger)" }}
+                        >
+                          Stale · {daysSince(bestActivity(p)) ?? "—"}d since last activity
+                        </p>
+                      </div>
+                      <StatusBadge value={p.stage} />
+                      <span className="transition-colors text-sm shrink-0" style={{color: "var(--hall-muted-3)"}}>→</span>
+                    </Link>
+                  </li>
                 ))}
-              </div>
-            </div>
+              </ul>
+            </section>
           )}
 
           {/* Source exceptions */}
           {(needsReviewSources.length > 0 || unlinkedSources.length > 0) && (
-            <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-              <div className="h-1 bg-amber-400" />
-              <div className="px-6 py-4 border-b border-[#EFEFEA]">
-                <h2 className="text-sm font-bold text-[#131218] tracking-tight">Source Exceptions</h2>
-                <p className="text-xs text-[#131218]/40 mt-0.5">Sources blocked or unlinked — require manual triage</p>
-              </div>
-              <div className="divide-y divide-[#EFEFEA]">
-                {needsReviewSources.map(s => (
-                  <div key={s.id} className="px-6 py-3 flex items-center gap-3">
-                    <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
+            <section>
+              <HallSectionHead
+                title="Source"
+                flourish="exceptions"
+                meta="MANUAL TRIAGE"
+              />
+              <ul className="flex flex-col">
+                {needsReviewSources.map((s, idx) => (
+                  <li
+                    key={s.id}
+                    className="py-3 flex items-center gap-3"
+                    style={idx === 0 ? undefined : { borderTop: "1px solid var(--hall-line-soft)" }}
+                  >
+                    <span className="w-2 h-2 rounded-full shrink-0" style={{background: "var(--hall-warn)"}} />
                     <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-[#131218] text-sm truncate">{s.title}</p>
-                      <p className="text-[10px] text-amber-500 font-bold uppercase tracking-widest mt-0.5">
+                      <p className="font-semibold text-sm truncate" style={{color: "var(--hall-ink-0)"}}>{s.title}</p>
+                      <p
+                        className="text-[10px] font-bold uppercase tracking-widest mt-0.5"
+                        style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-warn)" }}
+                      >
                         Needs Review · {s.sourceType}
                       </p>
                     </div>
                     <StatusBadge value={s.status} />
-                  </div>
+                  </li>
                 ))}
-                {unlinkedSources.slice(0, 5).map(s => (
-                  <div key={`unlinked-${s.id}`} className="px-6 py-3 flex items-center gap-3">
-                    <span className="w-2 h-2 rounded-full bg-gray-300 shrink-0" />
+                {unlinkedSources.slice(0, 5).map((s, idx) => (
+                  <li
+                    key={`unlinked-${s.id}`}
+                    className="py-3 flex items-center gap-3"
+                    style={(idx === 0 && needsReviewSources.length === 0) ? undefined : { borderTop: "1px solid var(--hall-line-soft)" }}
+                  >
+                    <span className="w-2 h-2 rounded-full shrink-0" style={{background: "var(--hall-muted-3)"}} />
                     <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-[#131218] text-sm truncate">{s.title}</p>
-                      <p className="text-[10px] text-[#131218]/30 font-bold uppercase tracking-widest mt-0.5">
+                      <p className="font-semibold text-sm truncate" style={{color: "var(--hall-ink-0)"}}>{s.title}</p>
+                      <p
+                        className="text-[10px] font-bold uppercase tracking-widest mt-0.5"
+                        style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-3)" }}
+                      >
                         Unlinked · {s.sourceType}
                       </p>
                     </div>
                     <StatusBadge value={s.status} />
-                  </div>
+                  </li>
                 ))}
                 {unlinkedSources.length > 5 && (
-                  <div className="px-6 py-3 text-center">
-                    <p className="text-[10px] text-[#131218]/30 font-bold uppercase tracking-widest">
+                  <li className="py-3 text-center" style={{ borderTop: "1px solid var(--hall-line-soft)" }}>
+                    <p
+                      className="text-[10px] font-bold uppercase tracking-widest"
+                      style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-3)" }}
+                    >
                       +{unlinkedSources.length - 5} more unlinked sources
                     </p>
-                  </div>
+                  </li>
                 )}
-              </div>
-            </div>
+              </ul>
+            </section>
           )}
 
         </div>
