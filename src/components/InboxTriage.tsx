@@ -4,6 +4,12 @@ import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 export type InboxItem = {
+  /**
+   * action_items.id (uuid). Present when the item comes from the normalization
+   * layer (Phase 3+). Older flows may omit it. Required for the new resolve
+   * route; fallback path below uses threadId against /api/inbox-ignore.
+   */
+  actionItemId?: string;
   threadId: string;
   subject: string;
   from: string;
@@ -14,7 +20,7 @@ export type InboxItem = {
   label: "Urgent" | "Needs Reply" | "FYI";
   reason: string;
   gmailUrl: string;
-  /** D1 — 1-line Haiku summary of what the thread is about. Null while generating. */
+  /** Imperative next-action line (Phase 3) or 1-line Haiku summary (legacy). */
   summary?: string | null;
 };
 
@@ -53,29 +59,22 @@ export function InboxTriage({ initialItems, initialScanned = 0 }: Props) {
   const router = useRouter();
 
   const refresh = useCallback(async () => {
+    // Phase 3: data source is now the server component (action_items layer),
+    // so refresh = re-render the server. No direct /api/inbox-triage fetch.
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/inbox-triage", {
-        headers: { "x-agent-key": "ch-os-agent-2024-secure" },
-      });
-      if (!res.ok) {
-        setError("Failed to refresh inbox");
-        return;
-      }
-      const data = await res.json();
-      setItems(data.items ?? []);
-      setScanned(data.total_scanned ?? 0);
-    } catch {
-      setError("Could not reach inbox-triage");
+      router.refresh();
     } finally {
-      setLoading(false);
+      // Next server render will reset items via fresh props; clear loading
+      // state after a short beat so the spinner doesn't flash forever.
+      setTimeout(() => setLoading(false), 300);
     }
-  }, []);
+  }, [router]);
 
   // Auto-load on mount when the server didn't provide data
   useEffect(() => {
-    if (!serverHasData) refresh();
+    if (!serverHasData) router.refresh();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -112,18 +111,29 @@ export function InboxTriage({ initialItems, initialScanned = 0 }: Props) {
     // Optimistic hide — server persists it, refresh confirms it won't resurface.
     setHidden(prev => new Set(prev).add(item.threadId));
     try {
-      const res = await fetch("/api/inbox-ignore", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          threadId: item.threadId,
-          subject:  item.subject,
-          from:     item.from,
-        }),
-      });
+      // Phase 3: resolve via the normalized action_items layer when we have
+      // an actionItemId. Legacy fallback (threadId → inbox_ignores) kept for
+      // any stale items still flowing through the old path.
+      const res = item.actionItemId
+        ? await fetch(`/api/action-items/${item.actionItemId}/resolve`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ reason: "manual_dismiss" }),
+          })
+        : await fetch("/api/inbox-ignore", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              threadId: item.threadId,
+              subject:  item.subject,
+              from:     item.from,
+            }),
+          });
       if (!res.ok) {
         // Rollback on failure so the user sees the real state.
         setHidden(prev => { const s = new Set(prev); s.delete(item.threadId); return s; });
+      } else {
+        router.refresh();
       }
     } catch {
       setHidden(prev => { const s = new Set(prev); s.delete(item.threadId); return s; });

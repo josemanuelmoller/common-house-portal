@@ -63,6 +63,7 @@ import { SuggestedTimeBlocks } from "@/components/SuggestedTimeBlocks";
 import { HallManualTriggers } from "@/components/HallManualTriggers";
 import { HallLiveClock } from "@/components/HallLiveClock";
 import { getAgentsOnlineCount } from "@/lib/hall-agents-count";
+import { getInboxActions, countOpenGmailActions } from "@/lib/action-items";
 
 export { ADMIN_NAV as NAV } from "@/lib/admin-nav";
 export const dynamic = "force-dynamic";
@@ -449,18 +450,21 @@ function QuietRow({ label, note, action }: {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
+/**
+ * Phase 3 of the normalization architecture (docs/NORMALIZATION_ARCHITECTURE.md §15):
+ * Inbox reads from the action_items layer instead of live-classifying Gmail.
+ * The Gmail ingestor (src/lib/ingestors/gmail.ts, cron at 8/12/16/20 UTC)
+ * populates action_items; this function is a pure SELECT over it.
+ */
 async function fetchInboxServer(): Promise<{ items: InboxItem[]; total_scanned: number }> {
   try {
-    const base = process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : "http://localhost:3000";
-    const res = await fetch(`${base}/api/inbox-triage`, {
-      headers: { "x-agent-key": "ch-os-agent-2024-secure" },
-      cache: "no-store",
-    });
-    if (!res.ok) return { items: [], total_scanned: 0 };
-    return res.json();
-  } catch {
+    const [items, total] = await Promise.all([
+      getInboxActions(20),
+      countOpenGmailActions(),
+    ]);
+    return { items, total_scanned: total };
+  } catch (err) {
+    console.error("[fetchInboxServer] action_items read failed:", err);
     return { items: [], total_scanned: 0 };
   }
 }
