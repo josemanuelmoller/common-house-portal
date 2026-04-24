@@ -119,7 +119,19 @@
     },
     {
       "path": "/api/ingest/gmail",
-      "schedule": "*/30 * * * *"
+      "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/ingest/gmail",
+      "schedule": "0 12 * * *"
+    },
+    {
+      "path": "/api/ingest/gmail",
+      "schedule": "0 16 * * *"
+    },
+    {
+      "path": "/api/ingest/gmail",
+      "schedule": "0 20 * * *"
     }
   ]
 }
