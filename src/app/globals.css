@@ -339,6 +339,10 @@ body {
 }
 /* Mobile: icon goes above body instead of beside. */
 @media (max-width: 640px) {
+  .hall-focus-card {
+    /* tighter padding so narrow viewports don't crush the hero */
+    padding: 18px 16px 16px !important;
+  }
   .hall-focus-grid {
     grid-template-columns: 1fr !important;
     gap: 16px !important;
@@ -346,6 +350,16 @@ body {
   .hall-focus-icon {
     width: 56px;
     height: 56px;
+  }
+  /* Hero title — inline style sets 26px; override for phones. */
+  .hall-focus-card h3 {
+    font-size: 19px !important;
+    line-height: 1.2 !important;
+    letter-spacing: -0.01em !important;
+  }
+  .hall-focus-card p {
+    font-size: 12.5px !important;
+    line-height: 1.5 !important;
   }
 }
 
