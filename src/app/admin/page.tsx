@@ -27,6 +27,7 @@ import { DraftCheckinButton } from "@/components/DraftCheckinButton";
 import { ChiefOfStaffDesk, ParkedLoopsSection } from "@/components/ChiefOfStaffDesk";
 import { DiscoverySection } from "@/components/DiscoverySection";
 import { MarketSignalsPanel } from "@/components/MarketSignalsPanel";
+import { CompetitiveIntelPanel } from "@/components/CompetitiveIntelPanel";
 import { HallOrgsColdRelations, HallOrgsClassMix } from "@/components/HallOrgsWidgets";
 import { HallOppFreshnessRadar } from "@/components/HallOppFreshnessRadar";
 import { HallPortfolioPulse } from "@/components/HallPortfolioPulse";
@@ -44,6 +45,7 @@ import {
   getDailyBriefing,
   getLatestMarketSignals,
   getRecentInsightBriefBriefs,
+  getRecentCompetitiveIntel,
   getAgentDrafts,
   getOutboxDrafts,
   getCoSTasks,
@@ -478,6 +480,7 @@ export default async function AdminPage() {
     dailyBriefing,
     latestMarketSignals,
     marketSignalBriefs,
+    competitiveIntel,
     agentDrafts,
     gmailDrafts,
     approvedDrafts,
@@ -496,6 +499,7 @@ export default async function AdminPage() {
     getDailyBriefing(),
     getLatestMarketSignals(),
     getRecentInsightBriefBriefs(),
+    getRecentCompetitiveIntel(30),
     // Outbox: only Pending Review drafts whose approval triggers an external
     // action (LinkedIn, email, delegation). Market Signal + Quick Win Scan are
     // filtered out — they surface in their own Hall sections, not in approval.
@@ -512,6 +516,13 @@ export default async function AdminPage() {
     fetchInboxServer(),
     getAgentsOnlineCount(),
   ]);
+
+  const competitiveLastScan = competitiveIntel.reduce<string | null>(
+    (latest, r) =>
+      r.dateCaptured && (!latest || r.dateCaptured > latest) ? r.dateCaptured : latest,
+    null
+  );
+  const competitiveHighCount = competitiveIntel.filter((r) => r.relevance === "Alta").length;
 
   // ── Ready for Jose — only actionable draft types (email drafts, posts, briefs)
   // Market Signal and other system-generated signals are excluded: they have no
@@ -932,6 +943,20 @@ export default async function AdminPage() {
                   generatedAt={latestMarketSignals?.generatedAt ?? null}
                   briefs={marketSignalBriefs}
                 />
+              </HallSection>
+
+              <HallSection
+                title="Competitive "
+                flourish="intel"
+                meta={
+                  competitiveIntel.length > 0
+                    ? `${competitiveIntel.length} SIGNALS${
+                        competitiveHighCount > 0 ? ` · ${competitiveHighCount} ALTA` : ""
+                      }`
+                    : "WATCHLIST IDLE"
+                }
+              >
+                <CompetitiveIntelPanel rows={competitiveIntel} lastScanAt={competitiveLastScan} />
               </HallSection>
 
               <HallSection

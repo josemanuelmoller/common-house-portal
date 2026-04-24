@@ -53,6 +53,12 @@ export const DB = {
   // Daily Briefings [OS v2] — collection: 17585064-56f1-4af6-9030-4af4294c0a99
   // Written daily by generate-daily-briefing skill; read by Hall on every load
   dailyBriefings:     "d206d6cdb09040d3ac2f34a977ad9f2a",
+  // CH Watchlist [OS v2] — collection: a7ba452a-78f5-4c9f-bc5a-71a63e4e248a
+  // Competitors, sector bodies, partners, referentes, clients potenciales
+  watchlist:          "d5fad9978ed0436baae4964a0ad0e211",
+  // CH Competitive Intel [OS v2] — collection: b3607003-470c-413e-999e-94788f7c1b7c
+  // Written by competitive-monitor; surfaced on the Hall
+  competitiveIntel:   "af8d7edb750b4131b3b55ef5ee83556a",
 };
 
 // ─── Shared property helpers ──────────────────────────────────────────────────

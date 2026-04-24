@@ -13,13 +13,11 @@
  *
  * Auth: x-agent-key / CRON_SECRET header OR authenticated admin session.
  *
- * STATUS (2026-04-20): cron disabled. Output DB (CH Competitive Intel [OS v2],
- * af8d7edb750b4131b3b55ef5ee83556a) is not read by any server-rendered surface
- * in src/. The only consumer is the static mockup public/portal/competitive-intel.html
- * which shows "Watchlist vacia" copy and points users back to Notion.
- * Running weekly burned Anthropic web-search tool budget on invisible output.
- * Route retained for manual/admin invocation; re-add cron once a product surface
- * consumes DB_INTEL.
+ * STATUS (2026-04-24): cron re-enabled weekly (Mon 07:00 UTC). Output now
+ * consumed by the Hall "Competitive intel" panel (src/components/
+ * CompetitiveIntelPanel.tsx), fed by getRecentCompetitiveIntel() which
+ * joins Intel records with CH Watchlist entries. Re-enabled because
+ * there is a real product surface reading the writes.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -27,6 +25,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { Client } from "@notionhq/client";
 import { auth } from "@clerk/nextjs/server";
 import { isAdminUser } from "@/lib/clients";
+import { withRoutineLog } from "@/lib/routine-log";
 
 export const maxDuration = 300;
 export const dynamic = "force-dynamic";
@@ -270,7 +269,7 @@ After the JSON array, add a brief human-readable summary section with:
 
 // ─── Main handler ─────────────────────────────────────────────────────────────
 
-export async function POST(req: NextRequest) {
+async function _POST(req: NextRequest): Promise<Response> {
   if (!await authCheck(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -361,12 +360,15 @@ export async function POST(req: NextRequest) {
   });
 }
 
-// Vercel cron calls GET
+export const POST = withRoutineLog("competitive-monitor", _POST);
+
+// Vercel cron calls GET — invoke execute mode with 7-day lookback through
+// the same wrapped handler so runs are captured in routine_runs.
 export async function GET(req: NextRequest) {
-  // Cron runs in dry_run by default — change to execute once confirmed working
-  return POST(new Request(req.url, {
+  const wrapped = new Request(req.url, {
     method:  "POST",
     headers: req.headers,
     body:    JSON.stringify({ mode: "execute", lookback_days: 7 }),
-  }) as NextRequest);
+  }) as NextRequest;
+  return POST(wrapped);
 }

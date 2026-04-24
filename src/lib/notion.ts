@@ -51,6 +51,12 @@ export * from "./notion/projects";
 // getColdRelationships. WarmthRecord moved here from the commercial section (queries DB.people).
 export * from "./notion/people";
 
+// ─── Competitive Intel ────────────────────────────────────────────────────────
+// CH Competitive Intel records written by /api/competitive-monitor, joined
+// with CH Watchlist entity names/types so the Hall panel can group signals
+// into Competitor Pulse vs Sector Signal vs Other.
+export * from "./notion/competitive";
+
 // ─── Content Pipeline ─────────────────────────────────────────────────────────
 
 export type StyleProfile = {

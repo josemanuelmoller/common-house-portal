@@ -338,4 +338,12 @@ export const ROUTINE_CATALOG: Record<string, RoutineCatalogEntry> = {
     visible_in_product: true,
     priority: 2,
   },
+  "competitive-monitor": {
+    schedule: "07:00 Mon (weekly)",
+    reads: "CH Watchlist (Active) + Anthropic web-search",
+    writes: "Notion CH Competitive Intel (New signals)",
+    output_surface: "/admin Competitive intel panel",
+    visible_in_product: true,
+    priority: 2,
+  },
 };

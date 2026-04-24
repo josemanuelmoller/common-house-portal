@@ -164,6 +164,10 @@
     {
       "path": "/api/ingest/calendar",
       "schedule": "0 19 * * *"
+    },
+    {
+      "path": "/api/competitive-monitor",
+      "schedule": "0 7 * * 1"
     }
   ]
 }

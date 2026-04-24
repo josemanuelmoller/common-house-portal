@@ -11,3 +11,4 @@ export * from "./evidence";
 export * from "./sources";
 export * from "./projects";
 export * from "./people";
+export * from "./competitive";
