@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Sidebar } from "@/components/Sidebar";
 import { MetricCard } from "@/components/MetricCard";
+import { HallSection } from "@/components/HallSection";
 import { NAV } from "../page";
 import { requireAdmin } from "@/lib/require-admin";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
@@ -93,24 +94,53 @@ export default async function PrepListPage() {
   const briefedProjects = rows.filter(r => r.last_brief_at !== null);
 
   return (
-    <div className="flex min-h-screen bg-[#EFEFEA]">
+    <div className="flex min-h-screen" style={{ background: "var(--hall-paper-0)" }}>
       <Sidebar items={NAV} isAdmin />
 
-      <main className="flex-1 ml-[228px] overflow-auto">
-        {/* Header */}
-        <div className="bg-[#131218] px-10 py-10">
-          <p className="text-[8px] font-bold uppercase tracking-[2.5px] text-white/20 mb-3">
-            CONTROL ROOM · PREP BRIEFS
-          </p>
-          <h1 className="text-[2.6rem] font-[300] text-white leading-[1] tracking-[-1.5px]">
-            Project <em className="font-[900] italic text-[#c8f55a]">prep briefs</em>
-          </h1>
-          <p className="text-[12.5px] text-white/40 mt-3 max-w-[560px] leading-[1.65]">
-            Estrategia pre-conversación generada desde evidencia reciente, preguntas abiertas, y commitments vivos. Click en un proyecto para abrir o regenerar.
-          </p>
-        </div>
+      <main
+        className="flex-1 ml-[228px] overflow-auto"
+        style={{ fontFamily: "var(--font-hall-sans)", background: "var(--hall-paper-0)" }}
+      >
+        {/* K-v2 collapsed header */}
+        <header
+          className="flex items-center justify-between gap-6 px-9 py-3.5"
+          style={{ borderBottom: "1px solid var(--hall-ink-0)" }}
+        >
+          <div className="flex items-baseline gap-4 min-w-0">
+            <span
+              className="text-[10px] tracking-[0.08em] uppercase whitespace-nowrap"
+              style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+            >
+              PREP · <b style={{ color: "var(--hall-ink-0)" }}>{rows.length} BRIEFS</b>
+            </span>
+            <h1
+              className="text-[16px] font-medium tracking-[-0.01em] truncate"
+              style={{ color: "var(--hall-ink-0)" }}
+            >
+              Meeting{" "}
+              <em
+                style={{
+                  fontFamily: "var(--font-hall-display)",
+                  fontStyle: "italic",
+                  fontWeight: 400,
+                }}
+              >
+                prep
+              </em>
+              .
+            </h1>
+          </div>
+          <div
+            className="flex items-center gap-4"
+            style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--hall-muted-2)", letterSpacing: "0.06em" }}
+          >
+            <span>{activeProjects.length} ACTIVE</span>
+            <span style={{ color: totalOpen > 0 ? "var(--hall-warn)" : "var(--hall-muted-3)" }}>{totalOpen} OPEN</span>
+            <span style={{ color: totalStale > 0 ? "var(--hall-danger)" : "var(--hall-muted-3)" }}>{totalStale} STALE</span>
+          </div>
+        </header>
 
-        <div className="px-8 py-6 space-y-6">
+        <div className="px-9 py-6 space-y-7">
 
           {/* Metrics */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -121,83 +151,166 @@ export default async function PrepListPage() {
           </div>
 
           {/* Project list */}
-          <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-            <div className="h-1 bg-[#B2FF59]" />
-            <div className="px-6 py-4 border-b border-[#EFEFEA] flex items-center justify-between">
-              <div>
-                <h2 className="text-sm font-bold text-[#131218] tracking-tight">All projects</h2>
-                <p className="text-xs text-[#131218]/40 mt-0.5">
-                  Projects sorted by recent activity. Open questions highlight relational signal.
-                </p>
-              </div>
-              <p className="text-[10px] text-[#131218]/30 font-bold uppercase tracking-widest">{rows.length} total</p>
-            </div>
+          <HallSection
+            title="All"
+            flourish="projects"
+            meta={`${rows.length} TOTAL`}
+          >
+            <p
+              className="mb-3"
+              style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--hall-muted-2)", letterSpacing: "0.06em" }}
+            >
+              Projects sorted by recent activity. Open questions highlight relational signal.
+            </p>
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-[#EFEFEA]">
-                  <th className="text-left px-6 py-3 text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Project</th>
-                  <th className="text-center px-3 py-3 text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Sources 30d</th>
-                  <th className="text-center px-3 py-3 text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Evidence 30d</th>
-                  <th className="text-center px-3 py-3 text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Open Q</th>
-                  <th className="text-center px-3 py-3 text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Stale Q</th>
-                  <th className="text-center px-3 py-3 text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Last brief</th>
+                <tr style={{ borderBottom: "1px solid var(--hall-line-soft)" }}>
+                  <th
+                    className="text-left px-3 py-2 text-[10px] font-bold uppercase tracking-widest"
+                    style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+                  >
+                    Project
+                  </th>
+                  <th
+                    className="text-center px-3 py-2 text-[10px] font-bold uppercase tracking-widest"
+                    style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+                  >
+                    Sources 30d
+                  </th>
+                  <th
+                    className="text-center px-3 py-2 text-[10px] font-bold uppercase tracking-widest"
+                    style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+                  >
+                    Evidence 30d
+                  </th>
+                  <th
+                    className="text-center px-3 py-2 text-[10px] font-bold uppercase tracking-widest"
+                    style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+                  >
+                    Open Q
+                  </th>
+                  <th
+                    className="text-center px-3 py-2 text-[10px] font-bold uppercase tracking-widest"
+                    style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+                  >
+                    Stale Q
+                  </th>
+                  <th
+                    className="text-center px-3 py-2 text-[10px] font-bold uppercase tracking-widest"
+                    style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+                  >
+                    Last brief
+                  </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#EFEFEA]">
+              <tbody>
                 {rows
                   .sort((a, b) => (b.sources_30d + b.evidence_30d) - (a.sources_30d + a.evidence_30d))
                   .map(p => {
                   const briefAge = daysSince(p.last_brief_at);
                   return (
-                    <tr key={p.notion_id} className="hover:bg-[#EFEFEA]/60 transition-colors">
-                      <td className="px-6 py-3">
+                    <tr
+                      key={p.notion_id}
+                      className="transition-colors"
+                      style={{ borderBottom: "1px solid var(--hall-line-soft)" }}
+                    >
+                      <td className="px-3 py-3">
                         <Link href={`/admin/prep/${p.notion_id}`} className="block">
-                          <p className="font-semibold text-[#131218] text-sm">{p.name ?? "—"}</p>
+                          <p className="font-semibold text-sm" style={{ color: "var(--hall-ink-0)" }}>{p.name ?? "—"}</p>
                           <div className="flex items-center gap-2 mt-0.5">
                             {p.current_stage && (
-                              <span className="text-[9px] font-bold bg-[#EFEFEA] text-[#131218]/50 px-2 py-0.5 rounded-full uppercase tracking-widest">
+                              <span
+                                className="text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-widest"
+                                style={{
+                                  fontFamily: "var(--font-hall-mono)",
+                                  background: "var(--hall-fill-soft)",
+                                  color: "var(--hall-muted-2)",
+                                }}
+                              >
                                 {p.current_stage}
                               </span>
                             )}
                             {p.primary_workspace && (
-                              <span className="text-[9px] text-[#131218]/30 font-medium">{p.primary_workspace}</span>
+                              <span
+                                className="text-[9px] font-medium"
+                                style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-3)" }}
+                              >
+                                {p.primary_workspace}
+                              </span>
                             )}
                           </div>
                         </Link>
                       </td>
                       <td className="px-3 py-3 text-center">
-                        <span className={`text-base font-bold ${p.sources_30d > 0 ? "text-[#131218]" : "text-[#131218]/20"}`}>
+                        <span
+                          className="text-base font-bold tabular-nums"
+                          style={{
+                            fontFamily: "var(--font-hall-mono)",
+                            color: p.sources_30d > 0 ? "var(--hall-ink-0)" : "var(--hall-muted-3)",
+                          }}
+                        >
                           {p.sources_30d || "—"}
                         </span>
                       </td>
                       <td className="px-3 py-3 text-center">
-                        <span className={`text-base font-bold ${p.evidence_30d > 0 ? "text-[#131218]" : "text-[#131218]/20"}`}>
+                        <span
+                          className="text-base font-bold tabular-nums"
+                          style={{
+                            fontFamily: "var(--font-hall-mono)",
+                            color: p.evidence_30d > 0 ? "var(--hall-ink-0)" : "var(--hall-muted-3)",
+                          }}
+                        >
                           {p.evidence_30d || "—"}
                         </span>
                       </td>
                       <td className="px-3 py-3 text-center">
                         {p.open_q > 0 ? (
-                          <span className="inline-block bg-amber-100 text-amber-700 text-xs font-bold px-2 py-0.5 rounded-full">
+                          <span
+                            className="inline-block text-xs font-bold px-2 py-0.5 rounded-full tabular-nums"
+                            style={{
+                              fontFamily: "var(--font-hall-mono)",
+                              background: "var(--hall-warn-soft)",
+                              color: "var(--hall-warn)",
+                            }}
+                          >
                             {p.open_q}
                           </span>
                         ) : (
-                          <span className="text-[#131218]/15">—</span>
+                          <span style={{ color: "var(--hall-muted-3)" }}>—</span>
                         )}
                       </td>
                       <td className="px-3 py-3 text-center">
                         {p.stale_q > 0 ? (
-                          <span className="inline-block bg-red-100 text-red-700 text-xs font-bold px-2 py-0.5 rounded-full">
+                          <span
+                            className="inline-block text-xs font-bold px-2 py-0.5 rounded-full tabular-nums"
+                            style={{
+                              fontFamily: "var(--font-hall-mono)",
+                              background: "var(--hall-danger-soft)",
+                              color: "var(--hall-danger)",
+                            }}
+                          >
                             {p.stale_q}
                           </span>
                         ) : (
-                          <span className="text-[#131218]/15">—</span>
+                          <span style={{ color: "var(--hall-muted-3)" }}>—</span>
                         )}
                       </td>
                       <td className="px-3 py-3 text-center">
                         {briefAge === null ? (
-                          <span className="text-[10px] text-[#131218]/25 font-bold uppercase tracking-widest">No brief</span>
+                          <span
+                            className="text-[10px] font-bold uppercase tracking-widest"
+                            style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-3)" }}
+                          >
+                            No brief
+                          </span>
                         ) : (
-                          <span className={`text-[10px] font-bold uppercase tracking-widest ${briefAge <= 3 ? "text-[#131218]" : "text-[#131218]/40"}`}>
+                          <span
+                            className="text-[10px] font-bold uppercase tracking-widest"
+                            style={{
+                              fontFamily: "var(--font-hall-mono)",
+                              color: briefAge <= 3 ? "var(--hall-ink-0)" : "var(--hall-muted-2)",
+                            }}
+                          >
                             {briefAge === 0 ? "Today" : `${briefAge}d ago`}
                           </span>
                         )}
@@ -207,7 +320,7 @@ export default async function PrepListPage() {
                 })}
               </tbody>
             </table>
-          </div>
+          </HallSection>
 
         </div>
       </main>

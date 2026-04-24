@@ -11,9 +11,9 @@ function daysSince(dateStr: string | null): number {
 type WarmthKey = "hot" | "warm" | "cold";
 
 function warmth(days: number): { key: WarmthKey; label: string; dot: string; text: string } {
-  if (days < 7)  return { key: "hot",  label: "Hot",  dot: "#ef4444", text: "#dc2626" };
-  if (days <= 30) return { key: "warm", label: "Warm", dot: "#f59e0b", text: "#d97706" };
-  return              { key: "cold", label: "Cold", dot: "#93c5fd", text: "#3b82f6" };
+  if (days < 7)  return { key: "hot",  label: "Hot",  dot: "var(--hall-danger)", text: "var(--hall-danger)" };
+  if (days <= 30) return { key: "warm", label: "Warm", dot: "var(--hall-warn)",  text: "var(--hall-warn)" };
+  return              { key: "cold", label: "Cold", dot: "var(--hall-info)",   text: "var(--hall-info)" };
 }
 
 // Commercial pipeline stages in funnel order
@@ -26,14 +26,14 @@ const COMMERCIAL_STAGES = [
   "Lost",
 ];
 
-// Map stages to display styles
+// Map stages to display styles — tokenized to K-v2 palette
 const STAGE_STYLE: Record<string, { bg: string; text: string; border: string }> = {
-  "Prospecting":  { bg: "#f5f5f0", text: "#131218", border: "#d4d4cc" },
-  "Qualified":    { bg: "#eff6ff", text: "#1d4ed8", border: "#bfdbfe" },
-  "Proposal":     { bg: "#fffbeb", text: "#b45309", border: "#fde68a" },
-  "Negotiation":  { bg: "#131218", text: "#B2FF59", border: "#131218" },
-  "Won":          { bg: "#f0fdf4", text: "#15803d", border: "#bbf7d0" },
-  "Lost":         { bg: "#fff1f2", text: "#be123c", border: "#fecdd3" },
+  "Prospecting":  { bg: "var(--hall-fill-soft)", text: "var(--hall-ink-3)",   border: "var(--hall-line-soft)" },
+  "Qualified":    { bg: "var(--hall-info-soft)", text: "var(--hall-info)",    border: "var(--hall-info-soft)" },
+  "Proposal":     { bg: "var(--hall-warn-soft)", text: "var(--hall-warn)",    border: "var(--hall-warn-soft)" },
+  "Negotiation":  { bg: "var(--hall-ink-0)",     text: "var(--hall-paper-0)", border: "var(--hall-ink-0)" },
+  "Won":          { bg: "var(--hall-ok-soft)",   text: "var(--hall-ok)",      border: "var(--hall-ok-soft)" },
+  "Lost":         { bg: "var(--hall-danger-soft)", text: "var(--hall-danger)", border: "var(--hall-danger-soft)" },
 };
 
 export default async function DealFlowPage() {
@@ -44,10 +44,8 @@ export default async function DealFlowPage() {
     getDecisionItems(),
   ]);
 
-  // All projects — commercial pipeline spans workroom and garage
   const projects = allProjects;
 
-  // Commercial decisions — open items only
   const commercialDecisions = decisions.filter(d =>
     d.category === "Commercial" &&
     d.status !== "Approved" &&
@@ -59,7 +57,6 @@ export default async function DealFlowPage() {
     d.priority === "P1" || d.priority === "P1 Critical" || d.priority === "Urgent"
   );
 
-  // Group by engagementStage first, fall back to stage
   const byStage = projects.reduce((acc, p) => {
     const s = p.engagementStage || p.stage || "Unknown";
     if (!acc[s]) acc[s] = [];
@@ -67,81 +64,79 @@ export default async function DealFlowPage() {
     return acc;
   }, {} as Record<string, typeof projects>);
 
-  // Counts for the header
   const openCount = projects.filter(p => {
     const s = p.engagementStage || p.stage || "";
     return s !== "Won" && s !== "Lost";
   }).length;
 
+  const eyebrowDate = new Date()
+    .toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })
+    .toUpperCase();
+
   return (
-    <div className="flex min-h-screen bg-[#EFEFEA]">
+    <div className="flex min-h-screen" style={{ background: "var(--hall-paper-0)" }}>
       <Sidebar adminNav />
 
-      <main className="flex-1 ml-[228px]">
+      <main
+        className="flex-1 ml-[228px]"
+        style={{ fontFamily: "var(--font-hall-sans)", background: "var(--hall-paper-0)" }}
+      >
 
-        {/* Dark header */}
-        <header className="bg-[#131218] px-12 pt-10 pb-11">
-          <p className="text-[8px] font-bold tracking-[2.5px] uppercase text-white/20 mb-3">
-            CONTROL ROOM · COMMERCIAL
-          </p>
-          <div className="flex items-end justify-between">
-            <div>
-              <h1 className="text-[2.6rem] font-light text-white tracking-[-1.5px] leading-none">
-                Deal <em className="font-black italic text-[#c8f55a]">Flow</em>
-              </h1>
-              <p className="text-sm text-white/40 mt-3">
-                Commercial opportunity pipeline. Qualify, advance, and close across every stage.
-              </p>
-            </div>
-            <div className="flex items-center gap-4 pb-1">
-              <div className="text-right">
-                <p className="text-[2rem] font-black text-white tracking-tight leading-none">{openCount}</p>
-                <p className="text-[9px] font-bold tracking-[1.5px] uppercase text-white/30 mt-0.5">Open</p>
-              </div>
-              <div className="w-px h-10 bg-white/10" />
-              <div className="text-right">
-                <p className={`text-[2rem] font-black tracking-tight leading-none ${urgentDecisions.length > 0 ? "text-red-400" : "text-[#c8f55a]"}`}>
-                  {commercialDecisions.length}
-                </p>
-                <p className="text-[9px] font-bold tracking-[1.5px] uppercase text-white/30 mt-0.5">Decisions</p>
-              </div>
-            </div>
+        {/* K-v2 collapsed header */}
+        <header
+          className="flex items-center justify-between gap-6 px-9 py-3.5"
+          style={{ borderBottom: "1px solid var(--hall-ink-0)" }}
+        >
+          <div className="flex items-baseline gap-4 min-w-0">
+            <span
+              className="text-[10px] tracking-[0.08em] whitespace-nowrap"
+              style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+            >
+              DEAL FLOW · <b style={{ color: "var(--hall-ink-0)" }}>{eyebrowDate}</b>
+            </span>
+            <h1
+              className="text-[16px] font-medium tracking-[-0.01em] truncate"
+              style={{ color: "var(--hall-ink-0)" }}
+            >
+              Deal <em className="hall-flourish">Flow</em>
+            </h1>
+          </div>
+          <div
+            className="flex items-center gap-4"
+            style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--hall-muted-2)", letterSpacing: "0.06em" }}
+          >
+            <span>{openCount} OPEN</span>
+            <span style={{color: urgentDecisions.length > 0 ? "var(--hall-danger)" : "var(--hall-muted-3)"}}>
+              {commercialDecisions.length} DECISIONS
+            </span>
           </div>
         </header>
 
-        <div style={{ padding: "36px 48px", maxWidth: 1200, display: "flex", flexDirection: "column", gap: 24 }}>
+        <div className="px-9 py-6 max-w-[1200px] space-y-7">
 
           {/* P1 alert */}
           {urgentDecisions.length > 0 && (
-            <div style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 12,
-              background: "#fef2f2",
-              border: "1.5px solid #fecaca",
-              borderRadius: 14,
-              padding: "14px 20px",
-            }}>
-              <span style={{
-                width: 8,
-                height: 8,
-                borderRadius: "50%",
-                background: "#ef4444",
-                flexShrink: 0,
-              }} />
-              <p style={{ fontSize: 14, color: "#0a0a0a", flex: 1 }}>
+            <div
+              className="flex items-center gap-3 px-5 py-3.5"
+              style={{ border: "1px solid var(--hall-danger)", background: "var(--hall-danger-soft)", borderRadius: 3 }}
+            >
+              <span
+                className="shrink-0"
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: "50%",
+                  background: "var(--hall-danger)",
+                }}
+              />
+              <p className="text-sm flex-1" style={{color: "var(--hall-ink-0)"}}>
                 <strong>{urgentDecisions.length} urgent commercial decision{urgentDecisions.length !== 1 ? "s" : ""}</strong>
                 {" — "}{urgentDecisions[0].title}
               </p>
               <Link
                 href="/admin/decisions"
-                style={{
-                  fontSize: 11,
-                  fontWeight: 700,
-                  color: "#dc2626",
-                  textDecoration: "none",
-                  whiteSpace: "nowrap",
-                }}
+                className="text-[11px] font-bold whitespace-nowrap"
+                style={{ color: "var(--hall-danger)" }}
               >
                 Review →
               </Link>
@@ -149,106 +144,110 @@ export default async function DealFlowPage() {
           )}
 
           {/* Stage summary strip */}
-          <div>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
-              <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: "4px", textTransform: "uppercase", color: "rgba(10,10,10,0.3)" }}>
-                By stage
-              </p>
-              <div style={{ flex: 1, height: 1, background: "#d4d4cc" }} />
+          <section>
+            <div
+              className="flex items-baseline justify-between gap-3 pb-2 mb-3.5"
+              style={{borderBottom: "1px solid var(--hall-ink-0)"}}
+            >
+              <h2
+                className="text-[19px] font-bold leading-none"
+                style={{letterSpacing: "-0.02em", color: "var(--hall-ink-0)"}}
+              >
+                By <em className="hall-flourish">stage</em>
+              </h2>
             </div>
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <div className="flex gap-2.5 flex-wrap">
               {COMMERCIAL_STAGES.filter(s => (byStage[s]?.length ?? 0) > 0).map(stage => {
-                const style = STAGE_STYLE[stage] ?? { bg: "#f5f5f0", text: "rgba(10,10,10,0.5)", border: "#d4d4cc" };
+                const style = STAGE_STYLE[stage] ?? { bg: "var(--hall-fill-soft)", text: "var(--hall-muted-2)", border: "var(--hall-line-soft)" };
                 return (
                   <div
                     key={stage}
+                    className="flex items-center gap-2 px-4 py-2.5"
                     style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      padding: "10px 16px",
-                      borderRadius: 14,
-                      border: `1.5px solid ${style.border}`,
+                      border: `1px solid ${style.border}`,
                       background: style.bg,
+                      borderRadius: 3,
                     }}
                   >
-                    <span style={{ fontSize: 14, fontWeight: 700, color: style.text }}>
+                    <span className="text-sm font-bold tabular-nums" style={{color: style.text}}>
                       {byStage[stage].length}
                     </span>
-                    <span style={{ fontSize: 11, fontWeight: 600, color: style.text, opacity: 0.7 }}>
+                    <span
+                      className="text-[11px] font-semibold"
+                      style={{ fontFamily: "var(--font-hall-mono)", letterSpacing: "0.06em", color: style.text }}
+                    >
                       {stage}
                     </span>
                   </div>
                 );
               })}
-              {/* Any stage not in our list */}
               {Object.entries(byStage)
                 .filter(([s]) => !COMMERCIAL_STAGES.includes(s) && s !== "Unknown")
                 .map(([stage, items]) => (
                   <div
                     key={stage}
+                    className="flex items-center gap-2 px-4 py-2.5"
                     style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      padding: "10px 16px",
-                      borderRadius: 14,
-                      border: "1.5px solid #d4d4cc",
-                      background: "#f5f5f0",
+                      border: "1px solid var(--hall-line-soft)",
+                      background: "var(--hall-fill-soft)",
+                      borderRadius: 3,
                     }}
                   >
-                    <span style={{ fontSize: 14, fontWeight: 700, color: "rgba(10,10,10,0.5)" }}>
+                    <span className="text-sm font-bold tabular-nums" style={{color: "var(--hall-muted-2)"}}>
                       {items.length}
                     </span>
-                    <span style={{ fontSize: 11, fontWeight: 600, color: "rgba(10,10,10,0.4)" }}>
+                    <span
+                      className="text-[11px] font-semibold"
+                      style={{ fontFamily: "var(--font-hall-mono)", letterSpacing: "0.06em", color: "var(--hall-muted-3)" }}
+                    >
                       {stage}
                     </span>
                   </div>
                 ))}
               {projects.length === 0 && (
-                <p style={{ fontSize: 13, color: "rgba(10,10,10,0.25)" }}>No projects in pipeline</p>
+                <p className="text-sm" style={{color: "var(--hall-muted-3)"}}>No projects in pipeline</p>
               )}
             </div>
-          </div>
+          </section>
 
           {/* Two-column: opportunity table + commercial decisions */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: 24, alignItems: "start" }}>
+          <div className="grid grid-cols-[1fr_340px] gap-6 items-start">
 
             {/* Opportunity table */}
-            <div>
-              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
-                <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: "4px", textTransform: "uppercase", color: "rgba(10,10,10,0.3)" }}>
-                  All opportunities
-                </p>
-                <div style={{ flex: 1, height: 1, background: "#d4d4cc" }} />
-                <p style={{ fontSize: 9, fontWeight: 700, color: "rgba(10,10,10,0.25)" }}>
-                  {projects.length}
-                </p>
+            <section>
+              <div
+                className="flex items-baseline justify-between gap-3 pb-2 mb-3.5"
+                style={{borderBottom: "1px solid var(--hall-ink-0)"}}
+              >
+                <h2
+                  className="text-[19px] font-bold leading-none"
+                  style={{letterSpacing: "-0.02em", color: "var(--hall-ink-0)"}}
+                >
+                  All <em className="hall-flourish">opportunities</em>
+                </h2>
+                <span
+                  style={{fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--hall-muted-2)", letterSpacing: "0.06em"}}
+                >
+                  {projects.length} TOTAL
+                </span>
               </div>
 
               {projects.length > 0 ? (
-                <div style={{
-                  background: "#ffffff",
-                  borderRadius: 14,
-                  border: "1.5px solid #d4d4cc",
-                  overflow: "hidden",
-                }}>
+                <div style={{ border: "1px solid var(--hall-line-soft)", borderRadius: 3, overflow: "hidden" }}>
                   {/* Table header */}
-                  <div style={{
-                    display: "grid",
-                    gridTemplateColumns: "2fr 90px 80px 70px 90px 20px",
-                    padding: "10px 20px",
-                    borderBottom: "1px solid #eeeee8",
-                  }}>
+                  <div
+                    className="grid grid-cols-[2fr_90px_80px_70px_90px_20px] px-5 py-2.5"
+                    style={{
+                      borderBottom: "1px solid var(--hall-line-soft)",
+                      background: "var(--hall-paper-1)",
+                    }}
+                  >
                     {["Opportunity", "Stage", "Type", "Update", "Warmth", ""].map(h => (
-                      <p key={h} style={{
-                        fontSize: 9,
-                        fontWeight: 700,
-                        textTransform: "uppercase",
-                        letterSpacing: "3px",
-                        color: "rgba(10,10,10,0.25)",
-                        margin: 0,
-                      }}>
+                      <p
+                        key={h}
+                        className="text-[9px] font-bold uppercase tracking-widest"
+                        style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-3)" }}
+                      >
                         {h}
                       </p>
                     ))}
@@ -256,51 +255,34 @@ export default async function DealFlowPage() {
 
                   {/* Rows */}
                   <div>
-                    {projects.map(p => {
+                    {projects.map((p, idx) => {
                       const activityDate = [p.lastUpdate, p.lastEvidenceDate, p.lastMeetingDate].filter(Boolean).sort().pop() ?? null;
                       const days = daysSince(activityDate);
                       const w = warmth(days);
                       const stg = p.engagementStage || p.stage || "";
-                      const stageStyle = STAGE_STYLE[stg] ?? { bg: "#f5f5f0", text: "rgba(10,10,10,0.5)", border: "#d4d4cc" };
+                      const stageStyle = STAGE_STYLE[stg] ?? { bg: "var(--hall-fill-soft)", text: "var(--hall-muted-2)", border: "var(--hall-line-soft)" };
                       const typeLabel = p.primaryWorkspace === "garage" ? "Garage"
                         : p.primaryWorkspace === "workroom" ? "Room"
                         : "Hall";
                       const typeBg = p.primaryWorkspace === "garage"
-                        ? { bg: "#0a0a0a", text: "#B2FF59", border: "#0a0a0a" }
-                        : p.primaryWorkspace === "workroom"
-                          ? { bg: "#f5f5f0", text: "rgba(10,10,10,0.6)", border: "#d4d4cc" }
-                          : { bg: "#f5f5f0", text: "rgba(10,10,10,0.3)", border: "#d4d4cc" };
+                        ? { bg: "var(--hall-ink-0)", text: "var(--hall-paper-0)", border: "var(--hall-ink-0)" }
+                        : { bg: "var(--hall-fill-soft)", text: "var(--hall-muted-2)", border: "var(--hall-line-soft)" };
 
                       return (
                         <Link
                           key={p.id}
                           href={`/admin/projects/${p.id}`}
-                          style={{
-                            display: "grid",
-                            gridTemplateColumns: "2fr 90px 80px 70px 90px 20px",
-                            padding: "12px 20px",
-                            borderBottom: "1px solid #eeeee8",
-                            alignItems: "center",
-                            textDecoration: "none",
-                            transition: "background 0.15s",
-                          }}
-                          className="hover:bg-[#f5f5f0]"
+                          className="grid grid-cols-[2fr_90px_80px_70px_90px_20px] items-center px-5 py-3 transition-colors"
+                          style={idx === 0 ? undefined : { borderTop: "1px solid var(--hall-line-soft)" }}
                         >
                           {/* Name */}
-                          <div style={{ minWidth: 0 }}>
-                            <p style={{
-                              fontSize: 12,
-                              fontWeight: 600,
-                              color: "#0a0a0a",
-                              margin: 0,
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                              whiteSpace: "nowrap",
-                            }}>
-                              {p.name}
-                            </p>
+                          <div className="min-w-0">
+                            <p className="text-[12px] font-semibold truncate" style={{color: "var(--hall-ink-0)"}}>{p.name}</p>
                             {p.blockerCount > 0 && (
-                              <p style={{ fontSize: 9, fontWeight: 700, color: "#ef4444", margin: "2px 0 0" }}>
+                              <p
+                                className="text-[9px] font-bold mt-0.5"
+                                style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-danger)", letterSpacing: "0.06em" }}
+                              >
                                 ↯ {p.blockerCount} blocker{p.blockerCount !== 1 ? "s" : ""}
                               </p>
                             )}
@@ -309,35 +291,35 @@ export default async function DealFlowPage() {
                           {/* Stage */}
                           <div>
                             {stg ? (
-                              <span style={{
-                                display: "inline-block",
-                                fontSize: 8,
-                                fontWeight: 700,
-                                padding: "2px 6px",
-                                borderRadius: 99,
-                                background: stageStyle.bg,
-                                color: stageStyle.text,
-                                border: `1px solid ${stageStyle.border}`,
-                              }}>
+                              <span
+                                className="inline-block text-[8px] font-bold px-2 py-0.5 rounded-full"
+                                style={{
+                                  fontFamily: "var(--font-hall-mono)",
+                                  letterSpacing: "0.06em",
+                                  background: stageStyle.bg,
+                                  color: stageStyle.text,
+                                  border: `1px solid ${stageStyle.border}`,
+                                }}
+                              >
                                 {stg}
                               </span>
                             ) : (
-                              <span style={{ fontSize: 12, color: "rgba(10,10,10,0.2)" }}>—</span>
+                              <span className="text-[12px]" style={{color: "var(--hall-muted-3)"}}>—</span>
                             )}
                           </div>
 
                           {/* Type */}
                           <div>
-                            <span style={{
-                              display: "inline-block",
-                              fontSize: 8,
-                              fontWeight: 700,
-                              padding: "2px 6px",
-                              borderRadius: 99,
-                              background: typeBg.bg,
-                              color: typeBg.text,
-                              border: `1px solid ${typeBg.border}`,
-                            }}>
+                            <span
+                              className="inline-block text-[8px] font-bold px-2 py-0.5 rounded-full"
+                              style={{
+                                fontFamily: "var(--font-hall-mono)",
+                                letterSpacing: "0.06em",
+                                background: typeBg.bg,
+                                color: typeBg.text,
+                                border: `1px solid ${typeBg.border}`,
+                              }}
+                            >
                               {typeLabel}
                             </span>
                           </div>
@@ -345,180 +327,153 @@ export default async function DealFlowPage() {
                           {/* Last update */}
                           <div>
                             {p.lastUpdate ? (
-                              <p style={{
-                                fontSize: 10,
-                                fontWeight: 500,
-                                color: days > 30 ? "#f87171" : "rgba(10,10,10,0.4)",
-                                margin: 0,
-                              }}>
+                              <p
+                                className="text-[10px] font-medium tabular-nums"
+                                style={{
+                                  fontFamily: "var(--font-hall-mono)",
+                                  color: days > 30 ? "var(--hall-danger)" : "var(--hall-muted-2)",
+                                }}
+                              >
                                 {days < 999 ? `${days}d` : "—"}
                               </p>
                             ) : (
-                              <span style={{ fontSize: 12, color: "rgba(10,10,10,0.2)" }}>—</span>
+                              <span className="text-[12px]" style={{color: "var(--hall-muted-3)"}}>—</span>
                             )}
                           </div>
 
                           {/* Warmth */}
-                          <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                          <div className="flex items-center gap-1.5">
                             {days < 999 ? (
                               <>
-                                <span style={{
-                                  width: 6,
-                                  height: 6,
-                                  borderRadius: "50%",
-                                  background: w.dot,
-                                  flexShrink: 0,
-                                }} />
-                                <span style={{ fontSize: 9, fontWeight: 600, color: w.text }}>
+                                <span
+                                  className="shrink-0"
+                                  style={{ width: 6, height: 6, borderRadius: "50%", background: w.dot }}
+                                />
+                                <span
+                                  className="text-[9px] font-semibold"
+                                  style={{ fontFamily: "var(--font-hall-mono)", color: w.text, letterSpacing: "0.06em" }}
+                                >
                                   {w.label}
                                 </span>
                               </>
                             ) : (
-                              <span style={{ fontSize: 9, color: "rgba(10,10,10,0.2)" }}>No data</span>
+                              <span className="text-[9px]" style={{color: "var(--hall-muted-3)"}}>No data</span>
                             )}
                           </div>
 
                           {/* Arrow */}
-                          <span style={{ fontSize: 14, color: "rgba(10,10,10,0.2)", textAlign: "right" }}>→</span>
+                          <span className="text-right text-sm" style={{color: "var(--hall-muted-3)"}}>→</span>
                         </Link>
                       );
                     })}
                   </div>
                 </div>
               ) : (
-                <div style={{
-                  background: "#ffffff",
-                  borderRadius: 14,
-                  border: "1.5px solid #d4d4cc",
-                  padding: 40,
-                  textAlign: "center",
-                }}>
-                  <p style={{ fontSize: 13, color: "rgba(10,10,10,0.25)" }}>
+                <div
+                  className="p-10 text-center"
+                  style={{ border: "1px solid var(--hall-line-soft)", borderRadius: 3 }}
+                >
+                  <p className="text-sm" style={{color: "var(--hall-muted-3)"}}>
                     No active projects found. Create projects in Notion to populate the pipeline.
                   </p>
                 </div>
               )}
-            </div>
+            </section>
 
             {/* Commercial decisions sidebar */}
-            <div>
-              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
-                <p style={{ fontSize: 9, fontWeight: 700, letterSpacing: "4px", textTransform: "uppercase", color: "rgba(10,10,10,0.3)" }}>
-                  Commercial decisions
-                </p>
-                <div style={{ flex: 1, height: 1, background: "#d4d4cc" }} />
+            <section>
+              <div
+                className="flex items-baseline justify-between gap-3 pb-2 mb-3.5"
+                style={{borderBottom: "1px solid var(--hall-ink-0)"}}
+              >
+                <h2
+                  className="text-[19px] font-bold leading-none"
+                  style={{letterSpacing: "-0.02em", color: "var(--hall-ink-0)"}}
+                >
+                  Commercial <em className="hall-flourish">decisions</em>
+                </h2>
                 {commercialDecisions.length > 0 && (
-                  <span style={{
-                    fontSize: 9,
-                    fontWeight: 700,
-                    background: "#fef3c7",
-                    color: "#b45309",
-                    padding: "2px 8px",
-                    borderRadius: 99,
-                  }}>
-                    {commercialDecisions.length}
+                  <span
+                    style={{fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--hall-warn)", letterSpacing: "0.06em"}}
+                  >
+                    {commercialDecisions.length} OPEN
                   </span>
                 )}
               </div>
 
-              <div style={{
-                background: "#ffffff",
-                borderRadius: 14,
-                border: "1.5px solid #d4d4cc",
-                overflow: "hidden",
-              }}>
-                <div>
-                  {commercialDecisions.slice(0, 10).map(d => {
-                    const isUrgent = d.priority === "P1" || d.priority === "P1 Critical" || d.priority === "Urgent";
-                    return (
+              <ul className="flex flex-col">
+                {commercialDecisions.slice(0, 10).map((d, idx) => {
+                  const isUrgent = d.priority === "P1" || d.priority === "P1 Critical" || d.priority === "Urgent";
+                  return (
+                    <li
+                      key={d.id}
+                      style={idx === 0 ? undefined : { borderTop: "1px solid var(--hall-line-soft)" }}
+                    >
                       <Link
-                        key={d.id}
                         href="/admin/decisions"
-                        style={{
-                          display: "flex",
-                          alignItems: "flex-start",
-                          gap: 12,
-                          padding: "12px 16px",
-                          borderBottom: "1px solid #eeeee8",
-                          textDecoration: "none",
-                        }}
-                        className="hover:bg-[#f5f5f0]"
+                        className="flex items-start gap-3 py-3 transition-colors"
                       >
-                        {/* Priority dot */}
-                        <div style={{
-                          width: 20,
-                          height: 20,
-                          borderRadius: 6,
-                          background: isUrgent ? "#fee2e2" : "#eeeee8",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          flexShrink: 0,
-                          marginTop: 1,
-                        }}>
-                          <span style={{
-                            fontSize: 8,
-                            fontWeight: 700,
-                            color: isUrgent ? "#dc2626" : "rgba(10,10,10,0.3)",
-                          }}>
+                        <div
+                          className="shrink-0 flex items-center justify-center"
+                          style={{
+                            width: 20,
+                            height: 20,
+                            borderRadius: 3,
+                            background: isUrgent ? "var(--hall-danger-soft)" : "var(--hall-fill-soft)",
+                            marginTop: 1,
+                          }}
+                        >
+                          <span
+                            className="text-[8px] font-bold"
+                            style={{
+                              fontFamily: "var(--font-hall-mono)",
+                              color: isUrgent ? "var(--hall-danger)" : "var(--hall-muted-3)",
+                            }}
+                          >
                             {isUrgent ? "P1" : "·"}
                           </span>
                         </div>
-                        {/* Content */}
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <p style={{
-                            fontSize: 11,
-                            fontWeight: 600,
-                            color: "#0a0a0a",
-                            lineHeight: 1.4,
-                            margin: 0,
-                            display: "-webkit-box",
-                            WebkitLineClamp: 2,
-                            WebkitBoxOrient: "vertical",
-                            overflow: "hidden",
-                          }}>
+                        <div className="flex-1 min-w-0">
+                          <p
+                            className="text-[11px] font-semibold leading-snug line-clamp-2"
+                            style={{color: "var(--hall-ink-0)"}}
+                          >
                             {d.title}
                           </p>
-                          <p style={{ fontSize: 9, color: "rgba(10,10,10,0.35)", marginTop: 2 }}>
+                          <p
+                            className="text-[9px] mt-0.5"
+                            style={{fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-3)", letterSpacing: "0.06em"}}
+                          >
                             {d.decisionType || "Decision"}
                             {d.dueDate && ` · Due ${new Date(d.dueDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`}
                           </p>
                         </div>
                       </Link>
-                    );
-                  })}
+                    </li>
+                  );
+                })}
 
-                  {commercialDecisions.length === 0 && (
-                    <div style={{ padding: "24px 16px", textAlign: "center" }}>
-                      <p style={{ fontSize: 11, fontWeight: 500, color: "rgba(10,10,10,0.25)", margin: 0 }}>
-                        No open commercial decisions
-                      </p>
-                      <p style={{ fontSize: 9, color: "rgba(10,10,10,0.2)", marginTop: 4 }}>
-                        Tag decisions &ldquo;Commercial&rdquo; in Notion to see them here
-                      </p>
-                    </div>
-                  )}
-                </div>
+                {commercialDecisions.length === 0 && (
+                  <li className="py-6 text-center">
+                    <p className="text-[11px] font-medium" style={{color: "var(--hall-muted-3)"}}>
+                      No open commercial decisions
+                    </p>
+                    <p className="text-[9px] mt-1" style={{color: "var(--hall-muted-3)"}}>
+                      Tag decisions &ldquo;Commercial&rdquo; in Notion to see them here
+                    </p>
+                  </li>
+                )}
+              </ul>
 
-                {/* Footer */}
-                <div style={{ padding: "10px 16px", borderTop: "1px solid #eeeee8" }}>
-                  <Link
-                    href="/admin/decisions"
-                    style={{
-                      fontSize: 9,
-                      fontWeight: 700,
-                      color: "rgba(10,10,10,0.3)",
-                      textDecoration: "none",
-                      textTransform: "uppercase",
-                      letterSpacing: "3px",
-                    }}
-                    className="hover:text-black"
-                  >
-                    All decisions →
-                  </Link>
-                </div>
+              <div className="pt-3 mt-2" style={{ borderTop: "1px solid var(--hall-line-soft)" }}>
+                <Link
+                  href="/admin/decisions"
+                  style={{fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--hall-muted-2)", letterSpacing: "0.06em"}}
+                >
+                  ALL DECISIONS →
+                </Link>
               </div>
-            </div>
+            </section>
 
           </div>
 

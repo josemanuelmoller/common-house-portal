@@ -78,40 +78,54 @@ export default async function MyRoomsPage() {
     .slice(0, 12)
     .map(s => ({ ...s, projectName: (s.projectId && projectById[s.projectId]) || "—" }));
 
+  const todayLabel = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+
   return (
-    <div className="flex min-h-screen bg-[#EFEFEA]">
+    <div className="flex min-h-screen" style={{ background: "var(--hall-paper-0)" }}>
       <Sidebar items={NAV} isAdmin />
 
-      <main className="flex-1 ml-[228px] overflow-auto">
+      <main
+        className="flex-1 ml-[228px] overflow-auto"
+        style={{ fontFamily: "var(--font-hall-sans)", background: "var(--hall-paper-0)" }}
+      >
 
-        {/* Header */}
-        <div className="bg-[#131218] px-10 py-10">
-          <p className="text-[8px] font-bold uppercase tracking-[2.5px] text-white/20 mb-3">
-            CONTROL ROOM · MY ROOMS
-          </p>
-          <h1 className="text-[2.6rem] font-[300] text-white leading-[1] tracking-[-1.5px]">
-            My <em className="font-[900] italic text-[#c8f55a]">Rooms</em>
-          </h1>
-          <p className="text-[12.5px] text-white/40 mt-3 max-w-[520px] leading-[1.65]">
-            What belongs to you. What needs to move next.
-          </p>
-        </div>
+        {/* K-v2 thin header */}
+        <header
+          className="flex items-center justify-between gap-6 px-9 py-3.5"
+          style={{ borderBottom: "1px solid var(--hall-ink-0)" }}
+        >
+          <div className="flex items-baseline gap-4 min-w-0">
+            <span
+              className="text-[10px] tracking-[0.08em] whitespace-nowrap"
+              style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+            >
+              CONTROL ROOM · MY ROOMS ·{" "}
+              <b style={{ color: "var(--hall-ink-0)" }}>{todayLabel}</b>
+            </span>
+            <h1
+              className="text-[16px] font-medium tracking-[-0.01em]"
+              style={{ color: "var(--hall-ink-0)" }}
+            >
+              My Rooms
+            </h1>
+          </div>
+        </header>
 
         <div className="px-8 py-6 space-y-6">
 
           {/* Ownership setup prompt — shown when ADMIN_STAFF_REGISTRY is not configured */}
           {!ownershipReady && (
-            <div className="bg-[#131218] rounded-2xl px-6 py-5">
+            <div className="px-6 py-5" style={{ background: "var(--hall-warn-paper)", border: "1px solid var(--hall-warn)" }}>
               <div className="flex items-start gap-4">
-                <span className="text-[#B2FF59] text-lg shrink-0 mt-0.5">◈</span>
+                <span className="text-lg shrink-0 mt-0.5" style={{ color: "var(--hall-warn)" }}>◈</span>
                 <div>
-                  <p className="text-sm font-bold text-white tracking-tight">Ownership not configured</p>
-                  <p className="text-xs text-white/40 mt-1 leading-relaxed">
+                  <p className="text-sm font-bold tracking-tight" style={{ color: "var(--hall-ink-0)" }}>Ownership not configured</p>
+                  <p className="text-xs mt-1 leading-relaxed" style={{ color: "var(--hall-muted-2)" }}>
                     My Rooms shows your projects and queue. Add your email and project IDs to{" "}
-                    <code className="text-[#B2FF59] text-[11px] font-mono">ADMIN_STAFF_REGISTRY</code>{" "}
-                    in <code className="text-[#B2FF59] text-[11px] font-mono">src/lib/clients.ts</code>.
+                    <code className="text-[11px]" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-ink-0)" }}>ADMIN_STAFF_REGISTRY</code>{" "}
+                    in <code className="text-[11px]" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-ink-0)" }}>src/lib/clients.ts</code>.
                   </p>
-                  <p className="text-[10px] text-white/20 font-mono mt-2">{email}</p>
+                  <p className="text-[10px] mt-2" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-3)" }}>{email}</p>
                 </div>
               </div>
             </div>

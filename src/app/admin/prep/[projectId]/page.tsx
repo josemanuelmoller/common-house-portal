@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Sidebar } from "@/components/Sidebar";
+import { HallSection } from "@/components/HallSection";
 import { NAV } from "../../page";
 import { requireAdmin } from "@/lib/require-admin";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
@@ -10,37 +11,37 @@ import { GenerateBriefButton } from "@/components/GenerateBriefButton";
 function renderInline(text: string): string {
   let out = text
     .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  out = out.replace(/`([^`]+)`/g, '<code class="text-[11px] bg-[#EFEFEA] px-1 py-0.5 rounded">$1</code>');
-  out = out.replace(/\*\*([^*]+)\*\*/g, '<strong class="font-semibold text-[#131218]">$1</strong>');
+  out = out.replace(/`([^`]+)`/g, '<code class="text-[11px] px-1 py-0.5 rounded" style="background: var(--hall-fill-soft); font-family: var(--font-hall-mono);">$1</code>');
+  out = out.replace(/\*\*([^*]+)\*\*/g, '<strong class="font-semibold" style="color: var(--hall-ink-0);">$1</strong>');
   out = out.replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '<em class="italic">$1</em>');
-  out = out.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-[#131218] underline decoration-[#B2FF59] decoration-2 underline-offset-2 hover:text-[#B2FF59]">$1</a>');
+  out = out.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="underline underline-offset-2" style="color: var(--hall-ink-0); text-decoration-color: var(--hall-ink-0);">$1</a>');
   return out;
 }
 
 function renderMarkdown(md: string): string {
-  if (!md.trim()) return '<p class="text-sm text-[#131218]/30 italic">(sin contenido)</p>';
+  if (!md.trim()) return '<p class="text-sm italic" style="color: var(--hall-muted-3);">(sin contenido)</p>';
   const lines = md.split(/\r?\n/);
   const out: string[] = [];
   let inList = false;
   for (const line of lines) {
     if (/^#\s+/.test(line)) {
       if (inList) { out.push("</ul>"); inList = false; }
-      out.push(`<h1 class="text-xl font-bold text-[#131218] mt-4 mb-3">${renderInline(line.replace(/^#\s+/, ""))}</h1>`);
+      out.push(`<h1 class="text-xl font-bold mt-4 mb-3" style="color: var(--hall-ink-0);">${renderInline(line.replace(/^#\s+/, ""))}</h1>`);
       continue;
     }
     if (/^##\s+/.test(line)) {
       if (inList) { out.push("</ul>"); inList = false; }
-      out.push(`<h2 class="text-[11px] font-bold text-[#131218]/40 uppercase tracking-widest mt-6 mb-2">${renderInline(line.replace(/^##\s+/, ""))}</h2>`);
+      out.push(`<h2 class="text-[11px] font-bold uppercase tracking-widest mt-6 mb-2" style="color: var(--hall-muted-2); font-family: var(--font-hall-mono);">${renderInline(line.replace(/^##\s+/, ""))}</h2>`);
       continue;
     }
     if (/^###\s+/.test(line)) {
       if (inList) { out.push("</ul>"); inList = false; }
-      out.push(`<h3 class="text-sm font-semibold text-[#131218] mt-4 mb-1.5">${renderInline(line.replace(/^###\s+/, ""))}</h3>`);
+      out.push(`<h3 class="text-sm font-semibold mt-4 mb-1.5" style="color: var(--hall-ink-0);">${renderInline(line.replace(/^###\s+/, ""))}</h3>`);
       continue;
     }
     if (/^[-*]\s+/.test(line)) {
       if (!inList) { out.push('<ul class="space-y-1.5 my-2">'); inList = true; }
-      out.push(`<li class="text-[13px] text-[#131218]/80 leading-relaxed pl-4 relative before:content-['•'] before:absolute before:left-0 before:text-[#131218]/30">${renderInline(line.replace(/^[-*]\s+/, ""))}</li>`);
+      out.push(`<li class="text-[13px] leading-relaxed pl-4 relative before:content-['•'] before:absolute before:left-0" style="color: var(--hall-ink-3);">${renderInline(line.replace(/^[-*]\s+/, ""))}</li>`);
       continue;
     }
     if (line.trim() === "") {
@@ -48,7 +49,7 @@ function renderMarkdown(md: string): string {
       continue;
     }
     if (inList) { out.push("</ul>"); inList = false; }
-    out.push(`<p class="text-[13px] text-[#131218]/80 leading-relaxed my-2">${renderInline(line)}</p>`);
+    out.push(`<p class="text-[13px] leading-relaxed my-2" style="color: var(--hall-ink-3);">${renderInline(line)}</p>`);
   }
   if (inList) out.push("</ul>");
   return out.join("");
@@ -92,86 +93,150 @@ export default async function PrepDetailPage({
   const latest = briefList[0] ?? null;
   const history = briefList.slice(1);
 
+  const projectSlug = (proj.name ?? projectId)
+    .toString()
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "")
+    .slice(0, 40) || projectId.slice(0, 8);
+
   return (
-    <div className="flex min-h-screen bg-[#EFEFEA]">
+    <div className="flex min-h-screen" style={{ background: "var(--hall-paper-0)" }}>
       <Sidebar items={NAV} isAdmin />
 
-      <main className="flex-1 ml-[228px] overflow-auto">
-        <div className="bg-[#131218] px-10 py-10">
-          <Link href="/admin/prep" className="text-[10px] text-white/30 font-bold uppercase tracking-widest hover:text-[#c8f55a] transition-colors">
-            ← All projects
-          </Link>
-          <h1 className="text-[2.6rem] font-[300] text-white leading-[1] tracking-[-1.5px] mt-3">
-            <em className="font-[900] italic text-[#c8f55a]">{proj.name ?? projectId}</em>
-          </h1>
-          <div className="flex items-center gap-3 mt-3 flex-wrap">
+      <main
+        className="flex-1 ml-[228px] overflow-auto"
+        style={{ fontFamily: "var(--font-hall-sans)", background: "var(--hall-paper-0)" }}
+      >
+        {/* K-v2 collapsed header */}
+        <header
+          className="flex items-center justify-between gap-6 px-9 py-3.5"
+          style={{ borderBottom: "1px solid var(--hall-ink-0)" }}
+        >
+          <div className="flex items-baseline gap-4 min-w-0">
+            <span
+              className="text-[10px] tracking-[0.08em] uppercase whitespace-nowrap"
+              style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+            >
+              PREP · <b style={{ color: "var(--hall-ink-0)" }}>{projectSlug}</b>
+            </span>
+            <h1
+              className="text-[16px] font-medium tracking-[-0.01em] truncate"
+              style={{ color: "var(--hall-ink-0)" }}
+            >
+              {proj.name ?? projectId}{" "}
+              <em
+                style={{
+                  fontFamily: "var(--font-hall-display)",
+                  fontStyle: "italic",
+                  fontWeight: 400,
+                }}
+              >
+                brief
+              </em>
+            </h1>
+          </div>
+          <div className="flex items-center gap-4">
+            <Link
+              href="/admin/prep"
+              className="text-[10px] uppercase tracking-widest"
+              style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+            >
+              ← All
+            </Link>
+            <GenerateBriefButton projectId={projectId} />
+          </div>
+        </header>
+
+        <div className="px-9 py-6 space-y-7 max-w-[960px]">
+
+          {/* Meta row */}
+          <div
+            className="flex items-center gap-3 flex-wrap"
+            style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--hall-muted-2)", letterSpacing: "0.06em" }}
+          >
             {proj.current_stage && (
-              <span className="text-[9px] font-bold bg-white/5 text-white/50 border border-white/10 px-2 py-0.5 rounded-full uppercase tracking-widest">
+              <span
+                className="px-2 py-0.5 rounded-full uppercase tracking-widest font-bold"
+                style={{
+                  background: "var(--hall-fill-soft)",
+                  color: "var(--hall-muted-2)",
+                }}
+              >
                 {proj.current_stage}
               </span>
             )}
             {latest && (
-              <span className="text-[10px] text-white/40 font-medium">
-                Último brief {daysSince(latest.generated_at) === 0 ? "hoy" : `${daysSince(latest.generated_at)}d ago`}
+              <span style={{ color: "var(--hall-muted-2)" }}>
+                LAST BRIEF {daysSince(latest.generated_at) === 0 ? "TODAY" : `${daysSince(latest.generated_at)}D AGO`}
               </span>
             )}
           </div>
-          <div className="mt-5">
-            <GenerateBriefButton projectId={projectId} />
-          </div>
-        </div>
-
-        <div className="px-8 py-6 space-y-6 max-w-[960px]">
 
           {/* Latest brief */}
           {latest ? (
-            <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-              <div className="h-1 bg-[#B2FF59]" />
-              <div className="px-6 py-4 border-b border-[#EFEFEA] flex items-center justify-between">
-                <div>
-                  <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">Latest brief</p>
-                  <p className="text-sm font-bold text-[#131218] mt-0.5">
-                    {new Date(latest.generated_at).toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
-                  </p>
+            <HallSection
+              title="Latest"
+              flourish="brief"
+              meta={new Date(latest.generated_at).toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }).toUpperCase()}
+            >
+              {latest.signals_summary && typeof latest.signals_summary === "object" && (
+                <div
+                  className="flex gap-3 flex-wrap mb-4"
+                  style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--hall-muted-2)", letterSpacing: "0.04em" }}
+                >
+                  {(["sources_count","evidence_count","open_questions","stale_questions","commitments"] as const).map(k => {
+                    const v = (latest.signals_summary as Record<string, unknown>)[k];
+                    return typeof v === "number" ? (
+                      <span key={k}>
+                        {k.replace(/_/g," ")}: <strong style={{ color: "var(--hall-ink-0)" }}>{v}</strong>
+                      </span>
+                    ) : null;
+                  })}
                 </div>
-                {latest.signals_summary && typeof latest.signals_summary === "object" && (
-                  <div className="flex gap-3 text-[10px] text-[#131218]/40 font-medium">
-                    {(["sources_count","evidence_count","open_questions","stale_questions","commitments"] as const).map(k => {
-                      const v = (latest.signals_summary as Record<string, unknown>)[k];
-                      return typeof v === "number" ? (
-                        <span key={k}>{k.replace(/_/g," ")}: <strong className="text-[#131218]">{v}</strong></span>
-                      ) : null;
-                    })}
-                  </div>
-                )}
-              </div>
+              )}
               <div
-                className="px-8 py-6"
+                className="py-2"
                 dangerouslySetInnerHTML={{ __html: renderMarkdown(latest.content_md) }}
               />
-            </div>
+            </HallSection>
           ) : (
-            <div className="bg-white rounded-2xl border border-[#E0E0D8] px-8 py-12 text-center">
-              <p className="text-sm font-semibold text-[#131218]">Aún no hay brief generado</p>
-              <p className="text-xs text-[#131218]/40 mt-1">Click en &quot;Generate brief&quot; arriba para crear el primero.</p>
-            </div>
+            <HallSection title="Latest" flourish="brief">
+              <div className="py-8 text-center">
+                <p className="text-sm font-semibold" style={{ color: "var(--hall-ink-0)" }}>Aún no hay brief generado</p>
+                <p
+                  className="text-xs mt-1"
+                  style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+                >
+                  Click en &quot;Generate brief&quot; arriba para crear el primero.
+                </p>
+              </div>
+            </HallSection>
           )}
 
           {/* History */}
           {history.length > 0 && (
-            <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
-              <div className="px-6 py-4 border-b border-[#EFEFEA]">
-                <p className="text-[10px] font-bold text-[#131218]/30 uppercase tracking-widest">History</p>
-                <p className="text-xs text-[#131218]/40 mt-0.5">Previous briefs for this project</p>
-              </div>
-              <div className="divide-y divide-[#EFEFEA]">
+            <HallSection title="History" flourish="briefs" meta={`${history.length} PREVIOUS`}>
+              <ul className="flex flex-col">
                 {history.map(b => (
-                  <div key={b.id} className="px-6 py-3 text-xs text-[#131218]/50 font-medium">
-                    {new Date(b.generated_at).toLocaleString("en-GB")} — {b.content_md.slice(0, 120)}…
-                  </div>
+                  <li
+                    key={b.id}
+                    className="px-1 py-3 text-xs"
+                    style={{
+                      borderTop: "1px solid var(--hall-line-soft)",
+                      fontFamily: "var(--font-hall-mono)",
+                      color: "var(--hall-muted-2)",
+                    }}
+                  >
+                    <span style={{ color: "var(--hall-ink-0)" }}>
+                      {new Date(b.generated_at).toLocaleString("en-GB")}
+                    </span>{" "}
+                    — {b.content_md.slice(0, 120)}…
+                  </li>
                 ))}
-              </div>
-            </div>
+              </ul>
+            </HallSection>
           )}
 
         </div>
