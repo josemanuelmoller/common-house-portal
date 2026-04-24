@@ -284,6 +284,9 @@ export default async function AgentsPage() {
             </h1>
           </div>
           <div className="flex items-center gap-2">
+            <a href="/admin/agents/health" className="hall-btn-ghost" style={{ fontSize: 11 }}>
+              Health ↗
+            </a>
             {errorCount > 0 && (
               <span
                 className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1"

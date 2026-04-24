@@ -132,6 +132,14 @@
     {
       "path": "/api/ingest/gmail",
       "schedule": "0 20 * * *"
+    },
+    {
+      "path": "/api/diagnose-agent-errors",
+      "schedule": "30 8 * * *"
+    },
+    {
+      "path": "/api/diagnose-agent-errors",
+      "schedule": "30 17 * * *"
     }
   ]
 }

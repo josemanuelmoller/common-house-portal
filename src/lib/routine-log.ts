@@ -330,4 +330,12 @@ export const ROUTINE_CATALOG: Record<string, RoutineCatalogEntry> = {
     visible_in_product: true,
     priority: 2,
   },
+  "diagnose-agent-errors": {
+    schedule: "08:30 + 17:30 daily",
+    reads: "Supabase routine_runs (errors, 7d)",
+    writes: "Supabase agent_health_diagnoses (clusters, classifications)",
+    output_surface: "/admin/agents/health",
+    visible_in_product: true,
+    priority: 2,
+  },
 };
