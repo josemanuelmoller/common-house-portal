@@ -140,6 +140,14 @@
     {
       "path": "/api/diagnose-agent-errors",
       "schedule": "30 17 * * *"
+    },
+    {
+      "path": "/api/ingest/fireflies",
+      "schedule": "30 9 * * *"
+    },
+    {
+      "path": "/api/ingest/fireflies",
+      "schedule": "30 18 * * *"
     }
   ]
 }
