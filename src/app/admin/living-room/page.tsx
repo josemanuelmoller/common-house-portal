@@ -238,65 +238,94 @@ export default function LivingRoomAdminPage() {
 
   const VIS_OPTS = ["public-safe", "community", "private"] as const;
 
+  const todayLabel = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+
   return (
-    <div className="flex min-h-screen bg-[#EFEFEA]">
+    <div className="flex min-h-screen" style={{ background: "var(--hall-paper-0)" }}>
       <Sidebar adminNav />
 
-      <main className="flex-1 ml-[228px] overflow-auto flex flex-col">
+      <main
+        className="flex-1 ml-[228px] overflow-auto flex flex-col"
+        style={{ fontFamily: "var(--font-hall-sans)", background: "var(--hall-paper-0)" }}
+      >
 
-        {/* ── Dark header ── */}
-        <header className="bg-[#131218] flex-shrink-0 px-[52px] pt-10 pb-11">
-          <p className="text-[8px] font-bold tracking-[2.5px] uppercase text-white/20 mb-3">
-            LIVING ROOM · EDITORIAL CURATOR
-          </p>
-          <div className="flex items-end justify-between gap-5 flex-wrap">
-            <div>
-              <h1 className="text-[2.6rem] font-[300] text-white tracking-[-1.5px] leading-none">
-                Curate the <em className="font-[900] italic text-[#c8f55a]">community</em>
-                <br />
-                layer.
-              </h1>
-              <p className="text-[12.5px] text-white/40 mt-3 max-w-xl leading-relaxed">
-                Control who appears, which milestones surface, which signals are shared,
-                and what themes are in motion — without touching Notion directly.
-              </p>
-            </div>
-            <div className="flex gap-2.5 flex-wrap items-end">
-              <a
-                href="/living-room"
-                className="text-[10.5px] font-bold px-4 py-2 rounded-lg border border-white/18 text-white/70 hover:text-white hover:border-white/35 transition-colors"
+        {/* K-v2 thin header */}
+        <header
+          className="flex items-center justify-between gap-6 px-9 py-3.5 flex-shrink-0"
+          style={{ borderBottom: "1px solid var(--hall-ink-0)" }}
+        >
+          <div className="flex items-baseline gap-4 min-w-0">
+            <span
+              className="text-[10px] tracking-[0.08em] whitespace-nowrap"
+              style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+            >
+              LIVING ROOM · EDITORIAL CURATOR ·{" "}
+              <b style={{ color: "var(--hall-ink-0)" }}>{todayLabel}</b>
+            </span>
+            <h1
+              className="text-[16px] font-medium tracking-[-0.01em]"
+              style={{ color: "var(--hall-ink-0)" }}
+            >
+              Curate the{" "}
+              <em
+                style={{
+                  fontFamily: "var(--font-hall-display)",
+                  fontStyle: "italic",
+                  fontWeight: 400,
+                  color: "var(--hall-ink-0)",
+                }}
               >
-                ↗ Preview Living Room
-              </a>
-              {dirtyCount > 0 && (
-                <button
-                  onClick={saveAll}
-                  disabled={saving}
-                  className="text-[10.5px] font-bold px-4 py-2 rounded-lg bg-[#B2FF59] text-black hover:bg-[#c8f55a] transition-colors disabled:opacity-50"
-                >
-                  {saving ? "Saving…" : "Save all changes"}
-                </button>
-              )}
-            </div>
+                community
+              </em>
+              {" "}layer
+            </h1>
+          </div>
+          <div className="flex gap-2 flex-wrap items-center">
+            <a
+              href="/living-room"
+              className="hall-btn-outline"
+              style={{ padding: "6px 12px", fontSize: 12 }}
+            >
+              ↗ Preview Living Room
+            </a>
+            {dirtyCount > 0 && (
+              <button
+                onClick={saveAll}
+                disabled={saving}
+                className="hall-btn-primary disabled:opacity-50"
+                style={{ padding: "6px 12px", fontSize: 12 }}
+              >
+                {saving ? "Saving…" : "Save all changes"}
+              </button>
+            )}
           </div>
         </header>
 
-        {/* ── White tab bar ── */}
-        <div className="bg-white border-b border-[#D8D8D0] flex gap-0 flex-shrink-0" style={{ padding: "0 52px" }}>
+        {/* ── Tab bar ── */}
+        <div
+          className="flex gap-0 flex-shrink-0"
+          style={{ padding: "0 36px", borderBottom: "1px solid var(--hall-line)" }}
+        >
           {TABS.map(t => (
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className={`px-5 py-4 text-[11.5px] font-semibold border-b-2 transition-colors whitespace-nowrap ${
-                tab === t.id
-                  ? "text-[#131218] border-[#B2FF59]"
-                  : "text-[#131218]/38 border-transparent hover:text-[#131218]"
-              }`}
+              className="px-5 py-4 text-[11.5px] font-semibold border-b-2 transition-colors whitespace-nowrap"
+              style={{
+                color: tab === t.id ? "var(--hall-ink-0)" : "var(--hall-muted-2)",
+                borderBottomColor: tab === t.id ? "var(--hall-ink-0)" : "transparent",
+              }}
             >
               {t.emoji} {t.label}
-              <span className={`ml-1.5 text-[9px] px-1.5 py-0.5 rounded-full font-bold ${
-                tab === t.id ? "bg-[#EFEFEA] text-[#131218]/50" : "bg-[#EFEFEA] text-[#131218]/25"
-              }`}>
+              <span
+                className="ml-1.5 px-1.5 py-0.5 rounded-full font-bold"
+                style={{
+                  fontFamily: "var(--font-hall-mono)",
+                  fontSize: 9,
+                  background: "var(--hall-fill-soft)",
+                  color: tab === t.id ? "var(--hall-ink-0)" : "var(--hall-muted-3)",
+                }}
+              >
                 {t.count}
               </span>
             </button>
@@ -304,10 +333,10 @@ export default function LivingRoomAdminPage() {
         </div>
 
         {/* ── Content ── */}
-        <div className="flex-1" style={{ padding: "36px 52px 60px" }}>
+        <div className="flex-1" style={{ padding: "28px 36px 60px" }}>
           {loading ? (
             <div className="flex items-center justify-center py-20">
-              <p className="text-sm text-[#131218]/30 font-medium">Loading from Notion…</p>
+              <p className="text-sm" style={{ color: "var(--hall-muted-3)" }}>Loading from Notion…</p>
             </div>
           ) : (
             <>
@@ -343,60 +372,101 @@ export default function LivingRoomAdminPage() {
                     />
                   </div>
 
-                  <div className="bg-white rounded-2xl border border-[#D8D8D0] overflow-hidden">
-                    <div className="px-5 py-4 border-b border-[#D8D8D0] flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-lg bg-[#B2FF59] flex items-center justify-center text-[11px]">○</div>
-                        <span className="text-[12px] font-extrabold text-[#131218] tracking-tight">People Visibility</span>
-                      </div>
+                  <section>
+                    <div
+                      className="flex items-baseline justify-between gap-3 pb-2 mb-3.5"
+                      style={{ borderBottom: "1px solid var(--hall-ink-0)" }}
+                    >
+                      <h2
+                        className="text-[19px] font-bold leading-none"
+                        style={{ letterSpacing: "-0.02em", color: "var(--hall-ink-0)" }}
+                      >
+                        People{" "}
+                        <em
+                          style={{
+                            fontFamily: "var(--font-hall-display)",
+                            fontStyle: "italic",
+                            fontWeight: 400,
+                            color: "var(--hall-ink-0)",
+                          }}
+                        >
+                          visibility
+                        </em>
+                      </h2>
                     </div>
 
                     {people.length === 0 ? (
                       <div className="px-6 py-10 text-center">
-                        <p className="text-sm text-[#131218]/30">
+                        <p className="text-sm" style={{ color: "var(--hall-muted-3)" }}>
                           No people records found. Add people to CH People [OS v2] in Notion.
                         </p>
                       </div>
                     ) : (
-                      <div className="px-5 divide-y divide-[#EFEFEA]">
+                      <div>
                         {/* Header row */}
-                        <div className="grid gap-3.5 py-2.5 items-center" style={{ gridTemplateColumns: "1.8fr 1.2fr 1fr 160px" }}>
+                        <div
+                          className="grid gap-3.5 py-2.5 items-center"
+                          style={{ gridTemplateColumns: "1.8fr 1.2fr 1fr 160px", borderBottom: "1px solid var(--hall-line)" }}
+                        >
                           {["Name", "Role", "Location", "Visibility"].map(l => (
-                            <span key={l} className="text-[8px] font-bold tracking-[1.8px] uppercase text-[#131218]/22">{l}</span>
+                            <span
+                              key={l}
+                              style={{
+                                fontFamily: "var(--font-hall-mono)",
+                                fontSize: 10,
+                                letterSpacing: "0.08em",
+                                textTransform: "uppercase",
+                                color: "var(--hall-muted-2)",
+                              }}
+                            >
+                              {l}
+                            </span>
                           ))}
                         </div>
                         {people.map(p => (
                           <div
                             key={p.id}
                             className="grid gap-3.5 py-3 items-center"
-                            style={{ gridTemplateColumns: "1.8fr 1.2fr 1fr 160px" }}
+                            style={{ gridTemplateColumns: "1.8fr 1.2fr 1fr 160px", borderTop: "1px solid var(--hall-line-soft)" }}
                           >
                             <div>
-                              <div className="text-[13px] font-bold text-[#131218] tracking-tight">{p.name}</div>
-                              <div className="text-[10px] text-[#6b6b6b] mt-0.5">{p.jobTitle || "—"}</div>
+                              <div className="text-[13px] font-bold tracking-tight" style={{ color: "var(--hall-ink-0)" }}>{p.name}</div>
+                              <div className="mt-0.5" style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--hall-muted-2)" }}>
+                                {p.jobTitle || "—"}
+                              </div>
                             </div>
-                            <div className="text-[10.5px] text-[#555]">
+                            <div style={{ fontSize: 10.5, color: "var(--hall-ink-3)" }}>
                               {p.roles.slice(0, 1).join(", ") || "—"}
                             </div>
-                            <div className="text-[10.5px] text-[#555]">{p.location || "—"}</div>
+                            <div style={{ fontSize: 10.5, color: "var(--hall-ink-3)" }}>{p.location || "—"}</div>
                             <div className="flex gap-1">
                               {VIS_OPTS.map(v => {
                                 const isActive = p.visibility === v;
-                                const activeCls =
+                                const activeStyle =
                                   v === "public-safe"
-                                    ? "bg-[rgba(200,245,90,0.25)] text-[#3a6600] border-[rgba(200,245,90,0.5)]"
+                                    ? { background: "var(--hall-ok-soft)", color: "var(--hall-ok)", borderColor: "var(--hall-ok)" }
                                     : v === "community"
-                                    ? "bg-blue-50 text-blue-700 border-blue-200"
-                                    : "bg-[#f3f4f6] text-[#6b7280] border-[#e5e7eb]";
+                                    ? { background: "var(--hall-info-soft)", color: "var(--hall-info)", borderColor: "var(--hall-info)" }
+                                    : { background: "var(--hall-fill-soft)", color: "var(--hall-muted-3)", borderColor: "var(--hall-line)" };
+                                const inactiveStyle = {
+                                  background: "var(--hall-paper-0)",
+                                  color: "var(--hall-muted-3)",
+                                  borderColor: "var(--hall-line)",
+                                };
                                 return (
                                   <button
                                     key={v}
                                     onClick={() => markPersonVisibility(p.id, v)}
-                                    className={`text-[8px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide border transition-all ${
-                                      isActive
-                                        ? activeCls
-                                        : "bg-white text-[#131218]/25 border-[#E0E0D8] hover:border-[#131218]/20"
-                                    }`}
+                                    className="rounded-full border transition-all"
+                                    style={{
+                                      fontFamily: "var(--font-hall-mono)",
+                                      fontSize: 9,
+                                      fontWeight: 700,
+                                      letterSpacing: "0.06em",
+                                      textTransform: "uppercase",
+                                      padding: "2px 8px",
+                                      ...(isActive ? activeStyle : inactiveStyle),
+                                    }}
                                   >
                                     {v === "public-safe" ? "Public" : v}
                                   </button>
@@ -407,7 +477,7 @@ export default function LivingRoomAdminPage() {
                         ))}
                       </div>
                     )}
-                  </div>
+                  </section>
                 </div>
               )}
 
@@ -440,36 +510,74 @@ export default function LivingRoomAdminPage() {
                     />
                   </div>
 
-                  <div className="bg-white rounded-2xl border border-[#D8D8D0] overflow-hidden">
-                    <div className="px-5 py-4 border-b border-[#D8D8D0] flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-lg bg-[#B2FF59] flex items-center justify-center text-[11px]">◈</div>
-                      <span className="text-[12px] font-extrabold text-[#131218] tracking-tight">Milestone Curator</span>
+                  <section>
+                    <div
+                      className="flex items-baseline justify-between gap-3 pb-2 mb-3.5"
+                      style={{ borderBottom: "1px solid var(--hall-ink-0)" }}
+                    >
+                      <h2
+                        className="text-[19px] font-bold leading-none"
+                        style={{ letterSpacing: "-0.02em", color: "var(--hall-ink-0)" }}
+                      >
+                        Milestone{" "}
+                        <em
+                          style={{
+                            fontFamily: "var(--font-hall-display)",
+                            fontStyle: "italic",
+                            fontWeight: 400,
+                            color: "var(--hall-ink-0)",
+                          }}
+                        >
+                          curator
+                        </em>
+                      </h2>
                     </div>
 
                     {milestones.length === 0 ? (
                       <div className="px-6 py-10 text-center">
-                        <p className="text-sm text-[#131218]/30">No active projects found.</p>
+                        <p className="text-sm" style={{ color: "var(--hall-muted-3)" }}>No active projects found.</p>
                       </div>
                     ) : (
-                      <div className="px-5 divide-y divide-[#EFEFEA]">
+                      <div>
                         {/* Header */}
-                        <div className="grid gap-3.5 py-2.5 items-center" style={{ gridTemplateColumns: "2fr 110px 72px 80px" }}>
+                        <div
+                          className="grid gap-3.5 py-2.5 items-center"
+                          style={{ gridTemplateColumns: "2fr 110px 72px 80px", borderBottom: "1px solid var(--hall-line)" }}
+                        >
                           {["Project", "Milestone type", "Share", "Status"].map(l => (
-                            <span key={l} className="text-[8px] font-bold tracking-[1.8px] uppercase text-[#131218]/22">{l}</span>
+                            <span
+                              key={l}
+                              style={{
+                                fontFamily: "var(--font-hall-mono)",
+                                fontSize: 10,
+                                letterSpacing: "0.08em",
+                                textTransform: "uppercase",
+                                color: "var(--hall-muted-2)",
+                              }}
+                            >
+                              {l}
+                            </span>
                           ))}
                         </div>
                         {milestones.map(m => (
                           <div
                             key={m.id}
                             className="grid gap-3.5 py-3 items-center"
-                            style={{ gridTemplateColumns: "2fr 110px 72px 80px" }}
+                            style={{ gridTemplateColumns: "2fr 110px 72px 80px", borderTop: "1px solid var(--hall-line-soft)" }}
                           >
                             <div>
-                              <div className="text-[13px] font-bold text-[#131218] tracking-tight">{m.name}</div>
+                              <div className="text-[13px] font-bold tracking-tight" style={{ color: "var(--hall-ink-0)" }}>{m.name}</div>
                               <div className="flex items-center gap-2 mt-0.5">
-                                {m.stage && <span className="text-[10px] text-[#6b6b6b]">{m.stage}</span>}
+                                {m.stage && <span style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--hall-muted-2)" }}>{m.stage}</span>}
                                 {m.geography.length > 0 && (
-                                  <span className="text-[9px] font-bold text-[#131218]/30">
+                                  <span
+                                    style={{
+                                      fontFamily: "var(--font-hall-mono)",
+                                      fontSize: 9.5,
+                                      fontWeight: 700,
+                                      color: "var(--hall-muted-3)",
+                                    }}
+                                  >
                                     {m.geography.join(", ")}
                                   </span>
                                 )}
@@ -477,11 +585,22 @@ export default function LivingRoomAdminPage() {
                             </div>
                             <div>
                               {m.milestoneType ? (
-                                <span className="text-[8.5px] font-bold text-[#131218]/40 bg-[#EFEFEA] px-2 py-0.5 rounded-full uppercase tracking-widest">
+                                <span
+                                  className="px-2 py-0.5 rounded-full"
+                                  style={{
+                                    fontFamily: "var(--font-hall-mono)",
+                                    fontSize: 9.5,
+                                    fontWeight: 700,
+                                    background: "var(--hall-fill-soft)",
+                                    color: "var(--hall-muted-2)",
+                                    letterSpacing: "0.06em",
+                                    textTransform: "uppercase",
+                                  }}
+                                >
                                   {m.milestoneType}
                                 </span>
                               ) : (
-                                <span className="text-[10px] text-[#131218]/20">—</span>
+                                <span style={{ fontSize: 10, color: "var(--hall-muted-3)" }}>—</span>
                               )}
                             </div>
                             <div className="flex items-center gap-2">
@@ -490,14 +609,21 @@ export default function LivingRoomAdminPage() {
                                 onChange={() => markMilestoneShare(m.id, !m.shareToLivingRoom)}
                               />
                             </div>
-                            <span className={`text-[10px] font-bold ${m.shareToLivingRoom ? "text-[#3a8c00]" : "text-[#131218]/20"}`}>
+                            <span
+                              style={{
+                                fontFamily: "var(--font-hall-mono)",
+                                fontSize: 10,
+                                fontWeight: 700,
+                                color: m.shareToLivingRoom ? "var(--hall-ok)" : "var(--hall-muted-3)",
+                              }}
+                            >
                               {m.shareToLivingRoom ? "Shared" : "Hidden"}
                             </span>
                           </div>
                         ))}
                       </div>
                     )}
-                  </div>
+                  </section>
                 </div>
               )}
 

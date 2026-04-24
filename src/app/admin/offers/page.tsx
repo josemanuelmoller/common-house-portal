@@ -40,19 +40,42 @@ export default async function OffersPage() {
 
   const projectNames = allProjects.map(p => p.name).filter(Boolean).sort();
 
-  return (
-    <div className="flex min-h-screen bg-[#EFEFEA]">
-      <Sidebar adminNav />
-      <main className="flex-1 ml-[228px]">
+  const eyebrowDate = new Date()
+    .toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })
+    .toUpperCase();
 
-        <header className="bg-[#131218] px-12 pt-10 pb-11">
-          <p className="text-[8px] font-bold tracking-[2.5px] uppercase text-white/20 mb-3">Desks · Producción visual</p>
-          <h1 className="text-[2.6rem] font-light text-white tracking-[-1.5px] leading-none">
-            Offers &amp; <em className="font-black italic text-[#c8f55a]">Proposals</em>
-          </h1>
-          <p className="text-sm text-white/40 mt-3 leading-relaxed">
-            Propuestas, offer decks y scope documents — generados con el brand de CH, listos para presentar.
-          </p>
+  return (
+    <div className="flex min-h-screen" style={{ background: "var(--hall-paper-0)" }}>
+      <Sidebar adminNav />
+      <main
+        className="flex-1 ml-[228px]"
+        style={{ fontFamily: "var(--font-hall-sans)", background: "var(--hall-paper-0)" }}
+      >
+
+        {/* K-v2 collapsed header */}
+        <header
+          className="flex items-center justify-between gap-6 px-9 py-3.5"
+          style={{ borderBottom: "1px solid var(--hall-ink-0)" }}
+        >
+          <div className="flex items-baseline gap-4 min-w-0">
+            <span
+              className="text-[10px] tracking-[0.08em] whitespace-nowrap"
+              style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+            >
+              OFFERS · <b style={{ color: "var(--hall-ink-0)" }}>{eyebrowDate}</b>
+            </span>
+            <h1
+              className="text-[16px] font-medium tracking-[-0.01em] truncate"
+              style={{ color: "var(--hall-ink-0)" }}
+            >
+              Offers &amp; <em className="hall-flourish">Proposals</em>
+            </h1>
+          </div>
+          <span
+            style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--hall-muted-2)", letterSpacing: "0.06em" }}
+          >
+            {deskItems.length} ITEMS
+          </span>
         </header>
 
         <div className="px-8 py-8 flex gap-8 items-start">

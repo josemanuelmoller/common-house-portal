@@ -317,12 +317,11 @@ export default async function ContactDrawerPage({ params }: Props) {
           )}
 
           {/* ═══ Block 1 · Identity ═══════════════════════════════════════════ */}
-          <section>
-            <div className="flex items-center gap-3 mb-3">
-              <h2 className="text-[11px] font-bold tracking-widest uppercase text-[#131218]/60">Identity</h2>
-              <div className="flex-1 h-px bg-[#E0E0D8]" />
-              {enrichment && (
-                <>
+          <section className="mb-7">
+            <SectionHead
+              title="Identity"
+              right={enrichment && (
+                <div className="flex items-center gap-2">
                   <ContactIdentityEditor
                     personId={enrichment.id}
                     initial={{
@@ -337,66 +336,88 @@ export default async function ContactDrawerPage({ params }: Props) {
                     }}
                   />
                   <ReEnrichButton personId={enrichment.id} />
-                </>
+                </div>
               )}
-            </div>
-            <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-4 space-y-3">
+            />
+            <div className="space-y-3">
               {!hasLinkedIn && !hasRoleSignal ? (
-                <p className="text-[11.5px] text-[#131218]/50 leading-snug">
+                <p className="text-[11.5px] leading-snug" style={{ color: "var(--hall-muted-2)" }}>
                   Not enriched yet. Click <em>Re-enrich</em> above to have the agent search LinkedIn for this contact and extract their current role. This is also scheduled weekly via cron.
                 </p>
               ) : (
                 <>
                   {enrichment?.linkedin && (
                     <div className="flex items-center gap-2 text-[12px]">
-                      <span className="text-[#131218]/40">🔗</span>
+                      <span style={{ color: "var(--hall-muted-3)" }}>linkedin</span>
                       <a
                         href={enrichment.linkedin}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-[#131218] underline decoration-[#131218]/30 underline-offset-2 hover:decoration-[#131218]/80 break-all"
+                        className="underline underline-offset-2 break-all hover:opacity-80"
+                        style={{ color: "var(--hall-ink-0)" }}
                       >
                         {enrichment.linkedin.replace(/^https?:\/\//, "")}
                       </a>
                       {enrichment.linkedin_confidence != null && (
-                        <span className="text-[9px] font-bold uppercase tracking-widest bg-[#EFEFEA] text-[#131218]/70 px-2 py-0.5 rounded-full ml-1">
+                        <span
+                          className="text-[9px] uppercase tracking-[0.08em] px-2 py-0.5 ml-1"
+                          style={{
+                            fontFamily: "var(--font-hall-mono)",
+                            fontWeight: 700,
+                            background: "var(--hall-fill-soft)",
+                            color: "var(--hall-muted-2)",
+                          }}
+                        >
                           {Math.round(enrichment.linkedin_confidence * 100)}%
                         </span>
                       )}
                       {enrichment.linkedin_needs_review && (
-                        <span className="text-[9px] font-bold uppercase tracking-widest bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">
+                        <span
+                          className="text-[9px] uppercase tracking-[0.08em] px-2 py-0.5"
+                          style={{
+                            fontFamily: "var(--font-hall-mono)",
+                            fontWeight: 700,
+                            background: "var(--hall-warn-soft)",
+                            color: "var(--hall-warn)",
+                          }}
+                        >
                           Needs review
                         </span>
                       )}
                     </div>
                   )}
                   {enrichment?.organization_detected && (
-                    <p className="text-[11.5px] text-[#131218]/70">
-                      🏢 <span className="font-semibold">{enrichment.organization_detected}</span>
-                      <span className="text-[#131218]/40"> — detected from LinkedIn</span>
+                    <p className="text-[11.5px]" style={{ color: "var(--hall-ink-3)" }}>
+                      <span className="font-semibold">{enrichment.organization_detected}</span>
+                      <span style={{ color: "var(--hall-muted-3)" }}> — detected from LinkedIn</span>
                     </p>
                   )}
                   {enrichment?.job_title && (
-                    <p className="text-[11.5px] text-[#131218]/70">
+                    <p className="text-[11.5px]" style={{ color: "var(--hall-ink-3)" }}>
                       {enrichment.job_title}
                       {enrichment.job_title_source && (
-                        <span className="text-[10px] text-[#131218]/40"> · {labelForSource(enrichment.job_title_source)}</span>
+                        <span className="text-[10px]" style={{ color: "var(--hall-muted-3)" }}> · {labelForSource(enrichment.job_title_source)}</span>
                       )}
                       {enrichment.job_title_updated_at && (
-                        <span className="text-[10px] text-[#131218]/40"> · {timeAgo(enrichment.job_title_updated_at)}</span>
+                        <span className="text-[10px]" style={{ color: "var(--hall-muted-3)", fontFamily: "var(--font-hall-mono)" }}> · {timeAgo(enrichment.job_title_updated_at)}</span>
                       )}
                     </p>
                   )}
                   {enrichment?.phone && (
-                    <p className="text-[11.5px] text-[#131218]/70">📞 {enrichment.phone}</p>
+                    <p className="text-[11.5px]" style={{ color: "var(--hall-ink-3)" }}>{enrichment.phone}</p>
                   )}
                   {(enrichment?.city || enrichment?.country) && (
-                    <p className="text-[11.5px] text-[#131218]/70">📍 {[enrichment.city, enrichment.country].filter(Boolean).join(", ")}</p>
+                    <p className="text-[11.5px]" style={{ color: "var(--hall-ink-3)" }}>{[enrichment.city, enrichment.country].filter(Boolean).join(", ")}</p>
                   )}
                   {enrichment?.notes && (
-                    <div className="mt-2 pt-3 border-t border-[#EFEFEA]">
-                      <p className="text-[9px] font-bold uppercase tracking-widest text-[#131218]/45 mb-1">Notes</p>
-                      <p className="text-[11.5px] text-[#131218]/70 whitespace-pre-wrap leading-snug">{enrichment.notes}</p>
+                    <div className="mt-2 pt-3" style={{ borderTop: "1px solid var(--hall-line-soft)" }}>
+                      <p
+                        className="text-[9px] uppercase tracking-[0.08em] mb-1"
+                        style={{ fontFamily: "var(--font-hall-mono)", fontWeight: 700, color: "var(--hall-muted-2)" }}
+                      >
+                        Notes
+                      </p>
+                      <p className="text-[11.5px] whitespace-pre-wrap leading-snug" style={{ color: "var(--hall-ink-3)" }}>{enrichment.notes}</p>
                     </div>
                   )}
                 </>
@@ -405,32 +426,39 @@ export default async function ContactDrawerPage({ params }: Props) {
           </section>
 
           {/* ═══ Block 2 · Relationship with CH ════════════════════════════════ */}
-          <section>
-            <div className="flex items-center gap-3 mb-3">
-              <h2 className="text-[11px] font-bold tracking-widest uppercase text-[#131218]/60">Relationship</h2>
-              <div className="flex-1 h-px bg-[#E0E0D8]" />
-            </div>
+          <section className="mb-7">
+            <SectionHead title="Relationship" flourish="with CH" />
 
             <div className="grid grid-cols-3 gap-3 mb-4">
-              <Card label="First seen"      value={timeAgo(contact.first_seen_at)} subtitle={formatWhen(contact.first_seen_at)} />
+              <Card label="First seen"       value={timeAgo(contact.first_seen_at)} subtitle={formatWhen(contact.first_seen_at)} />
               <Card label="Last interaction" value={timeAgo(contact.last_seen_at)} subtitle={contact.last_seen_at ? formatWhen(contact.last_seen_at) : "—"} />
-              <Card label="Warmth"          value={warmth.label} subtitle={`${totalTouches} touches total`} valueClass={warmth.tone} />
+              <Card label="Warmth"           value={warmth.label} subtitle={`${totalTouches} touches total`} valueColor={warmth.tone} />
             </div>
 
             {/* Shared projects / recurring meetings */}
             {sharedProjects.length > 0 && (
-              <div className="bg-white rounded-2xl border border-[#E0E0D8] mb-3 overflow-hidden">
-                <p className="px-5 pt-4 pb-2 text-[9px] font-bold uppercase tracking-widest text-[#131218]/45">
+              <div className="mb-4">
+                <p
+                  className="text-[9px] uppercase tracking-[0.08em] mb-2"
+                  style={{ fontFamily: "var(--font-hall-mono)", fontWeight: 700, color: "var(--hall-muted-2)" }}
+                >
                   Projects & recurring meetings
                 </p>
-                <ul className="divide-y divide-[#EFEFEA]">
+                <ul className="flex flex-col">
                   <CollapsibleList initialVisible={5} moreLabel="more">
                     {sharedProjects.map(p => (
-                      <li key={p.project_name} className="flex items-center gap-3 px-5 py-2.5 text-[12px]">
-                        <span className="flex-1 truncate text-[#131218]">{p.project_name}</span>
-                        <span className="text-[10.5px] text-[#131218]/50 shrink-0 tabular-nums">
-                          {p.meeting_count > 0 && <>📅 {p.meeting_count} </>}
-                          {p.transcript_count > 0 && <>🎙️ {p.transcript_count} </>}
+                      <li
+                        key={p.project_name}
+                        className="flex items-center gap-3 py-2.5 text-[12px]"
+                        style={{ borderTop: "1px solid var(--hall-line-soft)" }}
+                      >
+                        <span className="flex-1 truncate" style={{ color: "var(--hall-ink-0)" }}>{p.project_name}</span>
+                        <span
+                          className="text-[10.5px] shrink-0 tabular-nums"
+                          style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+                        >
+                          {p.meeting_count > 0 && <>{p.meeting_count} mtg </>}
+                          {p.transcript_count > 0 && <>{p.transcript_count} tx </>}
                           · {timeAgo(p.last_ts)}
                         </span>
                       </li>
@@ -442,15 +470,22 @@ export default async function ContactDrawerPage({ params }: Props) {
 
             {/* Co-attendees on CH side */}
             {coAttendees.some(a => a.is_self) && (
-              <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-4 mb-3">
-                <p className="text-[9px] font-bold uppercase tracking-widest text-[#131218]/45 mb-2">
+              <div className="mb-4">
+                <p
+                  className="text-[9px] uppercase tracking-[0.08em] mb-2"
+                  style={{ fontFamily: "var(--font-hall-mono)", fontWeight: 700, color: "var(--hall-muted-2)" }}
+                >
                   Co-attended with (CH side)
                 </p>
                 <div className="flex flex-wrap gap-1.5">
                   {coAttendees.filter(a => a.is_self).map(a => (
-                    <span key={a.email} className="text-[11px] bg-[#131218] text-white px-2.5 py-1 rounded-full">
+                    <span
+                      key={a.email}
+                      className="text-[11px] px-2.5 py-1"
+                      style={{ background: "var(--hall-ink-0)", color: "var(--hall-paper-0)" }}
+                    >
                       {a.display_name ?? a.email.split("@")[0]}{" "}
-                      <span className="text-white/50 text-[10px]">· {a.shared_touches}</span>
+                      <span className="text-[10px]" style={{ opacity: 0.6 }}>· {a.shared_touches}</span>
                     </span>
                   ))}
                 </div>
@@ -458,11 +493,11 @@ export default async function ContactDrawerPage({ params }: Props) {
             )}
 
             {/* Classification editor (existing UI) */}
-            <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden">
+            <div>
               <HallContactRow {...rowProps} />
             </div>
             {(personal || vip) && (
-              <p className="text-[10px] text-[#131218]/50 mt-2 leading-snug">
+              <p className="text-[10px] mt-2 leading-snug" style={{ color: "var(--hall-muted-2)" }}>
                 {personal && "All classes are personal — meetings with this contact skip prep in Suggested Time Blocks."}
                 {vip && " This contact is a decision-maker: prep urgency is boosted +15."}
               </p>
@@ -471,46 +506,73 @@ export default async function ContactDrawerPage({ params }: Props) {
 
           {/* ═══ Block 3 · Organizations network ═══════════════════════════════ */}
           {organizations.length > 0 && (
-            <section>
-              <div className="flex items-center gap-3 mb-3">
-                <h2 className="text-[11px] font-bold tracking-widest uppercase text-[#131218]/60">Organizations</h2>
-                <div className="flex-1 h-px bg-[#E0E0D8]" />
-                <span className="text-[10px] text-[#131218]/40 tabular-nums">{organizations.length}</span>
-              </div>
-              <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden divide-y divide-[#EFEFEA]">
+            <section className="mb-7">
+              <SectionHead title="Organizations" meta={`${organizations.length} TOTAL`} />
+              <ul className="flex flex-col">
                 <CollapsibleList
                   initialVisible={5}
                   moreLabel={organizations.length - 5 === 1 ? "more organization" : "more organizations"}
                 >
                   {organizations.map((o, i) => (
-                    <div key={`${o.domain || "enrichment"}:${i}`} className="px-5 py-4">
+                    <li
+                      key={`${o.domain || "enrichment"}:${i}`}
+                      className="py-4"
+                      style={{ borderTop: "1px solid var(--hall-line-soft)" }}
+                    >
                       <div className="flex items-baseline justify-between gap-3">
                         <div className="min-w-0 flex items-baseline gap-2 flex-wrap">
-                          <span className="text-[13px] font-semibold text-[#131218] truncate">
-                            🏢 {o.org_name ?? o.domain}
+                          <span className="text-[13px] font-semibold truncate" style={{ color: "var(--hall-ink-0)" }}>
+                            {o.org_name ?? o.domain}
                           </span>
                           {o.is_primary && (
-                            <span className="text-[9px] font-bold uppercase tracking-widest bg-[#c8f55a] text-[#131218] px-2 py-0.5 rounded-full">
+                            <span
+                              className="text-[9px] uppercase tracking-[0.08em] px-2 py-0.5"
+                              style={{
+                                fontFamily: "var(--font-hall-mono)",
+                                fontWeight: 700,
+                                background: "var(--hall-ink-0)",
+                                color: "var(--hall-paper-0)",
+                              }}
+                            >
                               Primary
                             </span>
                           )}
                           {o.is_ch && (
-                            <span className="text-[9px] font-bold uppercase tracking-widest bg-[#131218] text-white px-2 py-0.5 rounded-full">
+                            <span
+                              className="text-[9px] uppercase tracking-[0.08em] px-2 py-0.5"
+                              style={{
+                                fontFamily: "var(--font-hall-mono)",
+                                fontWeight: 700,
+                                border: "1px solid var(--hall-ink-0)",
+                                color: "var(--hall-ink-0)",
+                              }}
+                            >
                               Common House
                             </span>
                           )}
                           {o.domain && o.domain !== o.org_name && (
-                            <span className="text-[10px] text-[#131218]/40">{o.domain}</span>
+                            <span
+                              className="text-[10px]"
+                              style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-3)" }}
+                            >
+                              {o.domain}
+                            </span>
                           )}
                         </div>
-                        <div className="text-[10px] text-[#131218]/50 shrink-0 tabular-nums">
-                          {o.shared_meetings > 0 && <>🎙️ {o.shared_meetings} shared </>}
+                        <div
+                          className="text-[10px] shrink-0 tabular-nums"
+                          style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+                        >
+                          {o.shared_meetings > 0 && <>{o.shared_meetings} shared </>}
                           {o.last_ts && <>· {timeAgo(o.last_ts)}</>}
                         </div>
                       </div>
                       {o.other_contacts.length > 0 && (
-                        <div className="mt-2 flex flex-wrap gap-1.5">
-                          <span className="text-[9px] font-bold uppercase tracking-widest text-[#131218]/40 self-center">
+                        <div className="mt-2 flex flex-wrap gap-1.5 items-center">
+                          <span
+                            className="text-[9px] uppercase tracking-[0.08em] self-center"
+                            style={{ fontFamily: "var(--font-hall-mono)", fontWeight: 700, color: "var(--hall-muted-3)" }}
+                          >
                             You also know
                           </span>
                           {o.other_contacts.map(c => (
@@ -518,58 +580,65 @@ export default async function ContactDrawerPage({ params }: Props) {
                               key={c.email}
                               href={`/admin/hall/contacts/${encodeURIComponent(c.email)}`}
                               prefetch={false}
-                              className="text-[10.5px] bg-[#EFEFEA] text-[#131218]/80 hover:text-[#131218] hover:bg-[#E0E0D8] px-2 py-0.5 rounded-full transition-colors"
+                              className="text-[10.5px] px-2 py-0.5 transition-colors hover:opacity-80"
+                              style={{ background: "var(--hall-fill-soft)", color: "var(--hall-ink-3)" }}
                             >
                               {c.display_name ?? c.email.split("@")[0]}
                             </Link>
                           ))}
                         </div>
                       )}
-                    </div>
+                    </li>
                   ))}
                 </CollapsibleList>
-              </div>
+              </ul>
             </section>
           )}
 
           {/* ═══ Block 3.5 · News & LinkedIn activity (VIPs only) ═════════════ */}
           {enrichment && contact.relationship_classes.includes("VIP") && (
-            <section>
-              <div className="flex items-center gap-3 mb-3">
-                <h2 className="text-[11px] font-bold tracking-widest uppercase text-[#131218]/60">News & activity</h2>
-                <div className="flex-1 h-px bg-[#E0E0D8]" />
-                <ScanNewsButton personId={enrichment.id} />
-              </div>
+            <section className="mb-7">
+              <SectionHead
+                title="News"
+                flourish="& activity"
+                right={<ScanNewsButton personId={enrichment.id} />}
+              />
               <ContactNewsMentions personId={enrichment.id} lastScanAt={enrichment.last_news_scan_at} />
             </section>
           )}
 
           {/* ═══ Block 4 · Conversation intelligence ═══════════════════════════ */}
-          <section>
-            <div className="flex items-center gap-3 mb-3">
-              <h2 className="text-[11px] font-bold tracking-widest uppercase text-[#131218]/60">Conversation</h2>
-              <div className="flex-1 h-px bg-[#E0E0D8]" />
-              {enrichment && (
+          <section className="mb-7">
+            <SectionHead
+              title="Conversation"
+              right={enrichment && (
                 <SynthesizeTopicsButton
                   personId={enrichment.id}
                   label={enrichment.recurring_topics && enrichment.recurring_topics.length > 0 ? "Refresh topics" : "Synthesise topics"}
                   force={!!(enrichment.recurring_topics && enrichment.recurring_topics.length > 0)}
                 />
               )}
-            </div>
+            />
 
             {/* Topics */}
             {enrichment?.recurring_topics && enrichment.recurring_topics.length > 0 && (
-              <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-4 mb-3">
-                <p className="text-[9px] font-bold uppercase tracking-widest text-[#131218]/45 mb-2">
+              <div className="mb-4">
+                <p
+                  className="text-[9px] uppercase tracking-[0.08em] mb-2"
+                  style={{ fontFamily: "var(--font-hall-mono)", fontWeight: 700, color: "var(--hall-muted-2)" }}
+                >
                   Recurring topics
                   {enrichment.recurring_topics_updated_at && (
-                    <span className="text-[#131218]/30"> · {timeAgo(enrichment.recurring_topics_updated_at)}</span>
+                    <span style={{ color: "var(--hall-muted-3)" }}> · {timeAgo(enrichment.recurring_topics_updated_at)}</span>
                   )}
                 </p>
                 <div className="flex flex-wrap gap-1.5">
                   {enrichment.recurring_topics.map(t => (
-                    <span key={t} className="text-[11px] bg-[#c8f55a]/30 text-[#131218] px-2.5 py-1 rounded-full">
+                    <span
+                      key={t}
+                      className="text-[11px] px-2.5 py-1"
+                      style={{ background: "var(--hall-fill-soft)", color: "var(--hall-ink-0)", border: "1px solid var(--hall-line)" }}
+                    >
                       {t}
                     </span>
                   ))}
@@ -579,11 +648,14 @@ export default async function ContactDrawerPage({ params }: Props) {
 
             {/* WhatsApp clips */}
             {whatsappClips.length > 0 && (
-              <div className="mb-3">
-                <p className="text-[9px] font-bold uppercase tracking-widest text-[#131218]/45 mb-2">
+              <div className="mb-4">
+                <p
+                  className="text-[9px] uppercase tracking-[0.08em] mb-2"
+                  style={{ fontFamily: "var(--font-hall-mono)", fontWeight: 700, color: "var(--hall-muted-2)" }}
+                >
                   WhatsApp conversations · {whatsappClips.length}
                 </p>
-                <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden divide-y divide-[#EFEFEA]">
+                <ul className="flex flex-col">
                   <CollapsibleList
                     initialVisible={3}
                     moreLabel={whatsappClips.length - 3 === 1 ? "more conversation" : "more conversations"}
@@ -599,13 +671,19 @@ export default async function ContactDrawerPage({ params }: Props) {
                       ? `https://www.notion.so/${clip.notion_id.replace(/-/g, "")}`
                       : null;
                     return (
-                      <div key={clip.source_id} className="px-5 py-4 hover:bg-[#EFEFEA]/40 transition-colors">
+                      <li
+                        key={clip.source_id}
+                        className="py-4 transition-colors hover:bg-[var(--hall-fill-soft)]"
+                        style={{ borderTop: "1px solid var(--hall-line-soft)" }}
+                      >
                         <div className="flex items-start gap-4">
-                          <span className="text-[15px] leading-none mt-0.5">💬</span>
                           <div className="flex-1 min-w-0">
-                            <p className="text-[12px] font-semibold text-[#131218] truncate">{clip.title}</p>
-                            <p className="text-[10px] text-[#131218]/45 mt-0.5">
-                              <span className="uppercase tracking-wide font-bold">WhatsApp</span>
+                            <p className="text-[12.5px] font-semibold truncate" style={{ color: "var(--hall-ink-0)" }}>{clip.title}</p>
+                            <p
+                              className="text-[10px] mt-0.5"
+                              style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+                            >
+                              <span className="uppercase tracking-wide">WhatsApp</span>
                               {" · "}{range}
                               {" · "}{timeAgo(clip.last_ts)}
                               {" · "}{clip.their_count}/{clip.total_count} msgs
@@ -613,8 +691,8 @@ export default async function ContactDrawerPage({ params }: Props) {
                             {clip.preview.length > 0 && (
                               <div className="mt-2 space-y-1">
                                 {clip.preview.map((p, i) => (
-                                  <p key={i} className="text-[11px] text-[#131218]/60 leading-snug">
-                                    <span className="font-semibold text-[#131218]/80">{p.sender}:</span>{" "}
+                                  <p key={i} className="text-[11px] leading-snug" style={{ color: "var(--hall-ink-3)" }}>
+                                    <span className="font-semibold" style={{ color: "var(--hall-ink-0)" }}>{p.sender}:</span>{" "}
                                     {p.text}
                                   </p>
                                 ))}
@@ -622,55 +700,77 @@ export default async function ContactDrawerPage({ params }: Props) {
                             )}
                           </div>
                           {notionHref && (
-                            <a href={notionHref} target="_blank" rel="noopener noreferrer" className="text-[9px] font-bold uppercase tracking-widest text-[#131218]/40 hover:text-[#131218]/80 self-center">
+                            <a
+                              href={notionHref}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[9px] uppercase tracking-[0.08em] self-center"
+                              style={{ fontFamily: "var(--font-hall-mono)", fontWeight: 700, color: "var(--hall-muted-2)" }}
+                            >
                               Open ↗
                             </a>
                           )}
                         </div>
-                      </div>
+                      </li>
                     );
                   })}
                   </CollapsibleList>
-                </div>
+                </ul>
               </div>
             )}
 
             {/* Timeline */}
             <div>
-              <p className="text-[9px] font-bold uppercase tracking-widest text-[#131218]/45 mb-2">
+              <p
+                className="text-[9px] uppercase tracking-[0.08em] mb-2"
+                style={{ fontFamily: "var(--font-hall-mono)", fontWeight: 700, color: "var(--hall-muted-2)" }}
+              >
                 Recent activity · last {timeline.length}
               </p>
               {timeline.length === 0 ? (
-                <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-8 text-center">
-                  <p className="text-sm text-[#131218]/25">No cross-channel activity recorded yet.</p>
+                <div className="px-1 py-6 text-center">
+                  <p className="text-sm" style={{ color: "var(--hall-muted-3)" }}>No cross-channel activity recorded yet.</p>
                 </div>
               ) : (
-                <div className="bg-white rounded-2xl border border-[#E0E0D8] overflow-hidden divide-y divide-[#EFEFEA]">
+                <ul className="flex flex-col">
                   <CollapsibleList
                     initialVisible={5}
                     moreLabel={timeline.length - 5 === 1 ? "more event" : "more events"}
                   >
                     {timeline.map((entry, idx) => (
-                      <div key={`${entry.kind}:${idx}`} className="flex items-start gap-4 px-5 py-3.5 hover:bg-[#EFEFEA]/40 transition-colors">
-                        <span className="text-[15px] leading-none mt-0.5">{entryGlyph(entry.kind)}</span>
+                      <li
+                        key={`${entry.kind}:${idx}`}
+                        className="flex items-start gap-4 py-3 transition-colors hover:bg-[var(--hall-fill-soft)]"
+                        style={{ borderTop: "1px solid var(--hall-line-soft)" }}
+                      >
+                        <span className="text-[14px] leading-none mt-0.5" aria-hidden>{entryGlyph(entry.kind)}</span>
                         <div className="flex-1 min-w-0">
-                          <p className="text-[12px] font-semibold text-[#131218] truncate">{entry.title}</p>
-                          <p className="text-[10px] text-[#131218]/45 mt-0.5">
-                            <span className="uppercase tracking-wide font-bold">{entry.kind}</span>
+                          <p className="text-[12.5px] font-semibold truncate" style={{ color: "var(--hall-ink-0)" }}>{entry.title}</p>
+                          <p
+                            className="text-[10px] mt-0.5"
+                            style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+                          >
+                            <span className="uppercase tracking-wide">{entry.kind}</span>
                             {" · "}{formatWhen(entry.at)}
                             {" · "}{timeAgo(entry.at)}
                             {entry.kind === "meeting" && ` · ${entry.attendee_count} attendee${entry.attendee_count === 1 ? "" : "s"}`}
                           </p>
                         </div>
                         {entry.kind === "transcript" && entry.meeting_link && (
-                          <a href={entry.meeting_link} target="_blank" rel="noopener noreferrer" className="text-[9px] font-bold uppercase tracking-widest text-[#131218]/40 hover:text-[#131218]/80 self-center">
+                          <a
+                            href={entry.meeting_link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[9px] uppercase tracking-[0.08em] self-center"
+                            style={{ fontFamily: "var(--font-hall-mono)", fontWeight: 700, color: "var(--hall-muted-2)" }}
+                          >
                             Open ↗
                           </a>
                         )}
-                      </div>
+                      </li>
                     ))}
                   </CollapsibleList>
-                </div>
+                </ul>
               )}
             </div>
           </section>
@@ -683,28 +783,96 @@ export default async function ContactDrawerPage({ params }: Props) {
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
-function Stat({ label, value, color = "text-white" }: { label: string; value: number; color?: string }) {
+function Stat({ label, value }: { label: string; value: number }) {
   return (
     <div className="text-right">
-      <p className={`text-[2rem] font-black tracking-tight leading-none ${color}`}>{value}</p>
-      <p className="text-[9px] font-bold tracking-[1.5px] uppercase text-white/30 mt-0.5">{label}</p>
+      <p
+        className="text-[20px] font-bold leading-none"
+        style={{ letterSpacing: "-0.02em", color: "var(--hall-ink-0)" }}
+      >
+        {value}
+      </p>
+      <p
+        className="text-[9px] tracking-[0.08em] uppercase mt-1"
+        style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+      >
+        {label}
+      </p>
     </div>
   );
 }
 
 function Card({
-  label, value, subtitle, valueClass = "text-[#131218]",
+  label, value, subtitle, valueColor,
 }: {
   label: string;
   value: string;
   subtitle: string;
-  valueClass?: string;
+  valueColor?: string;
 }) {
   return (
-    <div className="bg-white rounded-2xl border border-[#E0E0D8] px-5 py-4">
-      <p className="text-[9px] font-bold tracking-widest uppercase text-[#131218]/30 mb-2">{label}</p>
-      <p className={`text-[18px] font-bold tracking-tight ${valueClass}`}>{value}</p>
-      <p className="text-[10px] text-[#131218]/40 font-medium mt-1.5">{subtitle}</p>
+    <div
+      className="px-4 py-3"
+      style={{ border: "1px solid var(--hall-line)" }}
+    >
+      <p
+        className="text-[9px] uppercase tracking-[0.08em] mb-2"
+        style={{ fontFamily: "var(--font-hall-mono)", fontWeight: 700, color: "var(--hall-muted-3)" }}
+      >
+        {label}
+      </p>
+      <p
+        className="text-[17px] font-bold leading-tight"
+        style={{ letterSpacing: "-0.02em", color: valueColor ?? "var(--hall-ink-0)" }}
+      >
+        {value}
+      </p>
+      <p
+        className="text-[10px] mt-1"
+        style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-3)" }}
+      >
+        {subtitle}
+      </p>
+    </div>
+  );
+}
+
+function SectionHead({ title, flourish, meta, right }: { title: string; flourish?: string; meta?: string; right?: React.ReactNode }) {
+  return (
+    <div
+      className="flex items-baseline justify-between gap-3 pb-2 mb-3.5"
+      style={{ borderBottom: "1px solid var(--hall-ink-0)" }}
+    >
+      <h2
+        className="text-[19px] font-bold leading-none"
+        style={{ letterSpacing: "-0.02em", color: "var(--hall-ink-0)" }}
+      >
+        {title}
+        {flourish && (
+          <>
+            {" "}
+            <em
+              style={{
+                fontFamily: "var(--font-hall-display)",
+                fontStyle: "italic",
+                fontWeight: 400,
+                color: "var(--hall-ink-0)",
+              }}
+            >
+              {flourish}
+            </em>
+          </>
+        )}
+      </h2>
+      {meta && (
+        <span
+          className="text-[10px] tracking-[0.06em] whitespace-nowrap"
+          style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+        >
+          {meta}
+        </span>
+      )}
+      {right}
     </div>
   );
 }
