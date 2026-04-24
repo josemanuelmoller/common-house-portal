@@ -60,6 +60,8 @@ import { TriggerBriefingButton } from "@/components/TriggerBriefingButton";
 import { ReadyForJoseSection } from "@/components/ReadyForJoseSection";
 import { SuggestedTimeBlocks } from "@/components/SuggestedTimeBlocks";
 import { HallManualTriggers } from "@/components/HallManualTriggers";
+import { HallLiveClock } from "@/components/HallLiveClock";
+import { getAgentsOnlineCount } from "@/lib/hall-agents-count";
 
 export { ADMIN_NAV as NAV } from "@/lib/admin-nav";
 export const dynamic = "force-dynamic";
@@ -461,6 +463,7 @@ export default async function AdminPage() {
     coldRelationships,
     readyContent,
     inboxData,
+    agentsOnline,
   ] = await Promise.all([
     getProjectsOverview(),
     getDecisionItems("Open"),
@@ -481,6 +484,7 @@ export default async function AdminPage() {
     getColdRelationships(),
     getReadyContent(),
     fetchInboxServer(),
+    getAgentsOnlineCount(),
   ]);
 
   // ── Ready for Jose — only actionable draft types (email drafts, posts, briefs)
@@ -539,47 +543,57 @@ export default async function AdminPage() {
     return msTo >= 0 && msTo <= 7 * 86400000;
   }) ?? cosTasks[0] ?? null;
 
-  // ── Date + greeting ──────────────────────────────────────────────────────────
+  // ── Date + greeting (K-v2: one-line collapsed header) ────────────────────────
   const today = new Date();
-  const dateLabel = today.toLocaleDateString("en-GB", {
-    weekday: "long", day: "numeric", month: "long", year: "numeric",
-  });
-  const hour      = today.getHours();
-  const greeting  = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+  // Short mono eyebrow: "THU 23 APR" — capitalized, no year, no comma.
+  const eyebrowDate = today
+    .toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })
+    .toUpperCase();
   const firstName = adminUser.firstName || adminUser.primaryEmailAddress?.emailAddress?.split("@")[0] || "Common House";
 
   return (
     <div className="flex min-h-screen bg-[#EFEFEA]">
       <Sidebar adminNav />
 
-      <main className="flex-1 ml-60 overflow-auto">
+      <main
+        className="flex-1 ml-60 overflow-auto"
+        style={{ fontFamily: "var(--font-hall-sans)", background: "var(--hall-paper-0)" }}
+      >
 
-        {/* ── 0. Header ─────────────────────────────────────────────────── */}
-        <div className="bg-[#131218] px-10 pt-7 pb-6">
-          <p className="text-[8px] font-bold uppercase tracking-[2.5px] text-white/20 mb-2">
-            HOME · {dateLabel.toUpperCase()} · v2
-          </p>
-          <h1 className="text-[1.85rem] font-[300] text-white leading-[1.1] tracking-[-1px]">
-            {greeting}, <em className="font-[900] italic text-[#c8f55a] not-italic-fallback">{firstName}.</em>
-          </h1>
-          <p className="text-[12px] text-white/40 mt-2 leading-[1.5]">
-            {(() => {
-              // B1 — dynamic subtitle replaces poetic copy with state at a glance.
-              const bits: string[] = [];
-              if (p1Decisions.length > 0) bits.push(`${p1Decisions.length} P1 decision${p1Decisions.length > 1 ? "s" : ""}`);
-              if (imminentDeadlines.length > 0 && p1Decisions.length === 0) bits.push(`${imminentDeadlines.length} deadline${imminentDeadlines.length > 1 ? "s" : ""} this week`);
-              const blocked = projects.filter(p => p.blockerCount > 0).length;
-              if (blocked > 0) bits.push(`${blocked} blocked project${blocked > 1 ? "s" : ""}`);
-              if (bits.length === 0) return "Queue is clear. Good window for deep work.";
-              return bits.join(" · ") + ".";
-            })()}
-          </p>
-        </div>
+        {/* ── 0. Header — K-v2 one-line ─────────────────────────────────── */}
+        <header
+          className="flex items-center justify-between gap-6 px-9 py-3.5"
+          style={{ borderBottom: "1px solid var(--hall-ink-0)" }}
+        >
+          <div className="flex items-baseline gap-4 min-w-0">
+            <span
+              className="text-[10px] tracking-[0.08em] whitespace-nowrap"
+              style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+            >
+              THE HALL · <b style={{ color: "var(--hall-ink-0)" }}>{eyebrowDate}</b>
+            </span>
+            <h1
+              className="text-[16px] font-medium tracking-[-0.01em] truncate"
+              style={{ color: "var(--hall-ink-0)" }}
+            >
+              Hi <span style={{ fontWeight: 700 }}>{firstName}</span>.
+            </h1>
+          </div>
+          <HallLiveClock
+            initialIso={today.toISOString()}
+            agentsOnline={agentsOnline ?? undefined}
+          />
+        </header>
 
         <HallTabs
           badges={{
-            today:   (p1Decisions.length + imminentDeadlines.length) || undefined,
-            signals: undefined,
+            today:         (p1Decisions.length + imminentDeadlines.length) || undefined,
+            signals:       marketSignalBriefs.length > 0 ? `${marketSignalBriefs.length} new` : undefined,
+            relationships: coldRelationships.length || undefined,
+            portfolio:     projects.length || undefined,
+          }}
+          alerts={{
+            signals: marketSignalBriefs.length > 0,
           }}
         >
         <div className="px-8 py-6 space-y-6 max-w-6xl mx-auto">
