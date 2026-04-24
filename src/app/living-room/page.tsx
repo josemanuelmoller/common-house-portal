@@ -56,44 +56,75 @@ export default async function LivingRoomPage() {
   const nav = isAdmin ? LIVING_ROOM_NAV : CLIENT_NAV;
 
   return (
-    <div className="flex min-h-screen bg-[#EFEFEA]">
+    <div className="flex min-h-screen" style={{ background: "var(--hall-paper-0)" }}>
       <Sidebar items={nav} isAdmin={isAdmin} />
 
-      <main className="flex-1 ml-[228px] overflow-auto">
+      <main className="flex-1 ml-[228px] overflow-auto" style={{ fontFamily: "var(--font-hall-sans)" }}>
 
-        {/* ── Dark header ── */}
-        <header className="bg-[#131218] flex-shrink-0" style={{ padding: "40px 52px 44px" }}>
-          <p className="text-[8px] font-bold tracking-[2.5px] uppercase text-white/20 mb-3">
-            COMMUNITY LAYER · COMMON HOUSE
-          </p>
-          <div className="flex items-end justify-between gap-6 flex-wrap">
-            <div>
-              <h1 className="text-[2.6rem] font-[300] text-white tracking-[-1.5px] leading-none">
-                Living <em className="font-[900] italic text-[#c8f55a]">Room</em>
-              </h1>
-              <p className="text-[12.5px] text-white/40 mt-3 max-w-lg leading-relaxed">
-                How life moves inside the House. Members, expertise, themes in motion, and shared
-                milestones — curated, not scrolled.
-              </p>
-            </div>
-            <div className="flex gap-7 self-end">
-              {[
-                { num: people.length, label: "Members" },
-                { num: themes.length, label: "Themes" },
-                { num: milestones.length, label: "Milestones" },
-              ].map((s) => (
-                <div key={s.label} className="text-right">
-                  <div className="text-[26px] font-black text-[#B2FF59] tracking-tight leading-none">
-                    {s.num}
-                  </div>
-                  <div className="text-[8.5px] font-bold text-white/22 tracking-[1.5px] uppercase mt-1">
-                    {s.label}
-                  </div>
-                </div>
-              ))}
-            </div>
+        {/* K-v2 thin header */}
+        <header
+          className="flex items-center justify-between gap-6 px-9 py-3.5"
+          style={{ borderBottom: "1px solid var(--hall-ink-0)" }}
+        >
+          <div className="flex items-baseline gap-4 min-w-0">
+            <span
+              className="text-[10px] tracking-[0.08em] whitespace-nowrap uppercase"
+              style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+            >
+              COMMON HOUSE ·{" "}
+              <b style={{ color: "var(--hall-ink-0)" }}>LIVING ROOM</b>
+            </span>
+            <h1
+              className="text-[16px] font-medium tracking-[-0.01em]"
+              style={{ color: "var(--hall-ink-0)" }}
+            >
+              The{" "}
+              <em
+                style={{
+                  fontFamily: "var(--font-hall-display)",
+                  fontStyle: "italic",
+                  fontWeight: 400,
+                }}
+              >
+                living room
+              </em>
+              .
+            </h1>
+          </div>
+          <div className="flex items-center gap-5 shrink-0">
+            {[
+              { num: people.length, label: "Members" },
+              { num: themes.length, label: "Themes" },
+              { num: milestones.length, label: "Milestones" },
+            ].map((s) => (
+              <div key={s.label} className="flex items-baseline gap-1.5">
+                <span
+                  className="text-[13px] font-semibold"
+                  style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-ink-0)" }}
+                >
+                  {s.num}
+                </span>
+                <span
+                  className="text-[10px] uppercase tracking-[0.08em]"
+                  style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+                >
+                  {s.label}
+                </span>
+              </div>
+            ))}
           </div>
         </header>
+
+        {/* Subheader tagline */}
+        <div className="px-9 py-5" style={{ borderBottom: "1px solid var(--hall-line-soft)" }}>
+          <p
+            className="text-[13px] leading-relaxed max-w-2xl"
+            style={{ color: "var(--hall-muted-2)" }}
+          >
+            How life moves inside the House. Members, expertise, themes in motion, and shared
+            milestones — curated, not scrolled.
+          </p>
+        </div>
 
         <LivingRoomClient
           people={people}

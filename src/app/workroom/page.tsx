@@ -1,7 +1,6 @@
 import { currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/Sidebar";
-import { WorkroomHeader } from "@/components/workroom/WorkroomHeader";
 import { ExecutiveSnapshot } from "@/components/workroom/ExecutiveSnapshot";
 import { ActiveBlockers } from "@/components/workroom/ActiveBlockers";
 import { WorkroomDelta } from "@/components/workroom/WorkroomDelta";
@@ -76,17 +75,17 @@ export default async function WorkroomPage() {
 
   if (!projectId) {
     return (
-      <div className="flex min-h-screen bg-[#EFEFEA]">
+      <div className="flex min-h-screen" style={{ background: "var(--hall-paper-0)" }}>
         <Sidebar items={NAV} />
-        <main className="flex-1 flex items-center justify-center">
-          <div className="text-center bg-white rounded-2xl border border-[#E0E0D8] p-10 max-w-sm">
-            <div className="w-12 h-12 bg-[#131218] rounded-full flex items-center justify-center mx-auto mb-4">
-              <span className="text-[#B2FF59] text-lg">◻</span>
+        <main className="flex-1 flex items-center justify-center" style={{ fontFamily: "var(--font-hall-sans)" }}>
+          <div className="text-center p-10 max-w-sm" style={{ border: "1px solid var(--hall-ink-0)", borderRadius: 3 }}>
+            <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4" style={{ background: "var(--hall-ink-0)" }}>
+              <span className="text-lg" style={{ color: "var(--hall-lime)" }}>◻</span>
             </div>
-            <h2 className="text-lg font-bold text-[#131218] tracking-tight">
+            <h2 className="text-lg font-bold tracking-tight" style={{ color: "var(--hall-ink-0)" }}>
               No project linked
             </h2>
-            <p className="text-sm text-[#131218]/40 mt-2 leading-relaxed">
+            <p className="text-sm mt-2 leading-relaxed" style={{ color: "var(--hall-muted-2)" }}>
               Your account hasn&apos;t been linked to a project yet. Reach out
               to your Common House contact.
             </p>
@@ -109,18 +108,47 @@ export default async function WorkroomPage() {
   // Non-workroom projects or when workroom is not yet ready → show status screen.
   if (project.primaryWorkspace !== "workroom" || !WORKSPACE_READY.workroom) {
     return (
-      <div style={{ minHeight: "100vh", background: "var(--bg, #eeeee8)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div
+        style={{
+          minHeight: "100vh",
+          background: "var(--hall-paper-0)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontFamily: "var(--font-hall-sans)",
+        }}
+      >
         <div style={{ maxWidth: 480, textAlign: "center", padding: "2rem" }}>
-          <p style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(0,0,0,0.38)", marginBottom: "1rem" }}>
+          <p
+            style={{
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              color: "var(--hall-muted-2)",
+              marginBottom: "1rem",
+              fontFamily: "var(--font-hall-mono)",
+            }}
+          >
             {project.name}
           </p>
-          <h1 style={{ fontSize: "2rem", fontWeight: 300, marginBottom: "0.5rem" }}>
-            Tu <em style={{ fontWeight: 900, fontStyle: "italic" }}>Workroom</em> está en preparación
+          <h1 style={{ fontSize: "1.75rem", fontWeight: 500, marginBottom: "0.5rem", color: "var(--hall-ink-0)", letterSpacing: "-0.01em" }}>
+            Tu{" "}
+            <em
+              style={{
+                fontFamily: "var(--font-hall-display)",
+                fontStyle: "italic",
+                fontWeight: 400,
+              }}
+            >
+              Workroom
+            </em>{" "}
+            está en preparación
           </h1>
-          <p style={{ color: "rgba(0,0,0,0.55)", marginBottom: "2rem" }}>
+          <p style={{ color: "var(--hall-muted-2)", marginBottom: "2rem", fontSize: 14 }}>
             El equipo Common House está configurando tu espacio. Te avisaremos cuando esté listo.
           </p>
-          <a href="/hall" style={{ display: "inline-block", background: "#B2FF59", color: "#000", fontWeight: 700, padding: "0.75rem 1.5rem", borderRadius: 8, textDecoration: "none", fontSize: 14 }}>
+          <a href="/hall" className="hall-btn-primary">
             Volver al Hall
           </a>
         </div>
@@ -180,35 +208,91 @@ export default async function WorkroomPage() {
   };
 
   return (
-    <div className="flex min-h-screen bg-[#EFEFEA]">
+    <div className="flex min-h-screen" style={{ background: "var(--hall-paper-0)" }}>
       <Sidebar items={NAV} projectName={project.name} />
 
-      <main className="flex-1 overflow-auto">
-        <WorkroomHeader project={workroomProject} />
+      <main className="flex-1 overflow-auto" style={{ fontFamily: "var(--font-hall-sans)" }}>
 
-        <div className="px-8 py-6">
-          <div className="max-w-4xl mx-auto space-y-6">
+        {/* K-v2 thin header */}
+        <header
+          className="flex items-center justify-between gap-6 px-9 py-3.5"
+          style={{ borderBottom: "1px solid var(--hall-ink-0)" }}
+        >
+          <div className="flex items-baseline gap-4 min-w-0">
+            <span
+              className="text-[10px] tracking-[0.08em] whitespace-nowrap uppercase"
+              style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+            >
+              COMMON HOUSE · WORKROOM ·{" "}
+              <b style={{ color: "var(--hall-ink-0)" }}>{workroomProject.name}</b>
+            </span>
+            <h1
+              className="text-[16px] font-medium tracking-[-0.01em]"
+              style={{ color: "var(--hall-ink-0)" }}
+            >
+              The{" "}
+              <em
+                style={{
+                  fontFamily: "var(--font-hall-display)",
+                  fontStyle: "italic",
+                  fontWeight: 400,
+                }}
+              >
+                workroom
+              </em>
+              .
+            </h1>
+          </div>
+          <div className="flex items-center gap-3 shrink-0">
+            <span
+              className="text-[10px] uppercase tracking-[0.08em]"
+              style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+            >
+              {workroomProject.stage}
+              {workroomProject.workroomMode ? ` · ${workroomProject.workroomMode}` : ""}
+            </span>
+            <span
+              className="text-[10px]"
+              style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-3)" }}
+            >
+              {workroomProject.lastUpdated}
+            </span>
+          </div>
+        </header>
+
+        <div className="px-9 py-7">
+          <div className="max-w-4xl mx-auto">
 
             {/* Latest OS status — distinct from editorial currentFocus */}
-            <ExecutiveSnapshot project={workroomProject} />
+            <div className="mb-7">
+              <ExecutiveSnapshot project={workroomProject} />
+            </div>
 
             {/* Active blockers — surface before anything else */}
-            <ActiveBlockers blockers={blockers} />
+            <div className="mb-7">
+              <ActiveBlockers blockers={blockers} />
+            </div>
 
             {/* Activity pulse — sessions, decisions, blocker count */}
-            <WorkroomDelta activity={activitySummary} />
+            <div className="mb-7">
+              <WorkroomDelta activity={activitySummary} />
+            </div>
 
             {/* What's in motion + Operational materials */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-7 items-start mb-7">
               <WhatsInMotion project={workroomProject} />
               <DocumentsSection documents={documents} />
             </div>
 
             {/* Session log — working session recaps */}
-            <SessionLog sessions={sessions} />
+            <div className="mb-7">
+              <SessionLog sessions={sessions} />
+            </div>
 
             {/* Agreements reached — validated decisions */}
-            <AgreementsReached decisions={decisions} />
+            <div className="mb-7">
+              <AgreementsReached decisions={decisions} />
+            </div>
 
             {/* Digital Residents — capability layer, closes the Workroom */}
             <WorkroomDigitalResidents />

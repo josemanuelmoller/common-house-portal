@@ -2,7 +2,6 @@ import { currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { unstable_cache } from "next/cache";
 import { Sidebar } from "@/components/Sidebar";
-import { HallHero } from "@/components/hall/HallHero";
 import { WhatsHappeningNow } from "@/components/hall/WhatsHappeningNow";
 import { WhatWeHeard } from "@/components/hall/WhatWeHeard";
 import { SharedMaterials } from "@/components/hall/SharedMaterials";
@@ -108,17 +107,17 @@ export default async function HallPage() {
   if (!projectId) {
     const fallbackNav = [{ label: "The Hall", href: "/hall", icon: "◈" }];
     return (
-      <div className="flex min-h-screen bg-[#EFEFEA]">
+      <div className="flex min-h-screen" style={{ background: "var(--hall-paper-0)" }}>
         <Sidebar items={fallbackNav} />
-        <main className="flex-1 flex items-center justify-center">
-          <div className="text-center bg-white rounded-2xl border border-[#E0E0D8] p-10 max-w-sm">
-            <div className="w-12 h-12 bg-[#131218] rounded-full flex items-center justify-center mx-auto mb-4">
-              <span className="text-[#B2FF59] text-lg">◈</span>
+        <main className="flex-1 flex items-center justify-center" style={{ fontFamily: "var(--font-hall-sans)" }}>
+          <div className="text-center p-10 max-w-sm" style={{ border: "1px solid var(--hall-ink-0)", borderRadius: 3 }}>
+            <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4" style={{ background: "var(--hall-ink-0)" }}>
+              <span className="text-lg" style={{ color: "var(--hall-lime)" }}>◈</span>
             </div>
-            <h2 className="text-lg font-bold text-[#131218] tracking-tight">
+            <h2 className="text-lg font-bold tracking-tight" style={{ color: "var(--hall-ink-0)" }}>
               No project linked
             </h2>
-            <p className="text-sm text-[#131218]/40 mt-2 leading-relaxed">
+            <p className="text-sm mt-2 leading-relaxed" style={{ color: "var(--hall-muted-2)" }}>
               Your account hasn&apos;t been linked to a project yet. Reach out
               to your Common House contact.
             </p>
@@ -326,20 +325,101 @@ export default async function HallPage() {
       : undefined;
 
   return (
-    <div className="flex min-h-screen bg-[#EFEFEA]">
+    <div className="flex min-h-screen" style={{ background: "var(--hall-paper-0)" }}>
       <Sidebar items={NAV} projectName={project.name} />
 
-      <main className="flex-1 overflow-auto">
-        <HallHero project={hallProject} cta={heroCta} />
+      <main className="flex-1 overflow-auto" style={{ fontFamily: "var(--font-hall-sans)" }}>
 
-        <div className="px-8 py-6">
-          <div className="max-w-4xl mx-auto space-y-6">
+        {/* K-v2 thin header */}
+        <header
+          className="flex items-center justify-between gap-6 px-9 py-3.5"
+          style={{ borderBottom: "1px solid var(--hall-ink-0)" }}
+        >
+          <div className="flex items-baseline gap-4 min-w-0">
+            <span
+              className="text-[10px] tracking-[0.08em] whitespace-nowrap uppercase"
+              style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+            >
+              COMMON HOUSE · HALL ·{" "}
+              <b style={{ color: "var(--hall-ink-0)" }}>{hallProject.name}</b>
+            </span>
+            <h1
+              className="text-[16px] font-medium tracking-[-0.01em]"
+              style={{ color: "var(--hall-ink-0)" }}
+            >
+              The{" "}
+              <em
+                style={{
+                  fontFamily: "var(--font-hall-display)",
+                  fontStyle: "italic",
+                  fontWeight: 400,
+                }}
+              >
+                hall
+              </em>
+              .
+            </h1>
+          </div>
+          <div className="flex items-center gap-3 shrink-0">
+            <span
+              className="text-[10px] uppercase tracking-[0.08em]"
+              style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+            >
+              {hallProject.stage}
+            </span>
+            <span
+              className="text-[10px]"
+              style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-3)" }}
+            >
+              {hallProject.lastUpdated}
+            </span>
+          </div>
+        </header>
+
+        {/* Welcome — narrative intro */}
+        <section
+          className="px-9 py-7"
+          style={{ borderBottom: "1px solid var(--hall-line-soft)" }}
+        >
+          <div className="max-w-4xl">
+            <p
+              className="text-[10px] uppercase tracking-[0.08em] mb-3"
+              style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+            >
+              Welcome to The Hall
+            </p>
+            <p
+              className="text-[15px] leading-[1.7] max-w-[660px]"
+              style={{ color: "var(--hall-ink-3)" }}
+            >
+              {hallProject.welcomeNote}
+            </p>
+            {heroCta && (
+              <a
+                href={heroCta.href}
+                className="hall-btn-primary mt-5"
+              >
+                {heroCta.label}
+                <span aria-hidden="true">→</span>
+              </a>
+            )}
+            <p
+              className="text-[10px] mt-5 uppercase tracking-[0.08em]"
+              style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-3)" }}
+            >
+              {hallProject.preparedNote}
+            </p>
+          </div>
+        </section>
+
+        <div className="px-9 py-7">
+          <div className="max-w-4xl mx-auto">
 
             {/* Needs your input — position 2, ALWAYS in live mode.
                 Serial Position + Zeigarnik: open loops surface immediately after
                 the Hero so the client sees what's open before any narrative. */}
             {isLive && (
-              <section id="asks" className="scroll-mt-6">
+              <section id="asks" className="scroll-mt-6 mb-7">
                 <NeedsYourInput asks={asks} />
               </section>
             )}
@@ -347,22 +427,26 @@ export default async function HallPage() {
             {/* Onboarding: workroom_activation — threshold block.
                 Pass the most recent session as a "something is already moving" signal. */}
             {showWorkspaceActivation && (
-              <WorkspaceActivation
-                project={hallProject}
-                lastSession={conversations[0] ?? undefined}
-              />
+              <div className="mb-7">
+                <WorkspaceActivation
+                  project={hallProject}
+                  lastSession={conversations[0] ?? undefined}
+                />
+              </div>
             )}
 
             {/* Onboarding: garage_activation — startup workspace threshold block. */}
             {showGarageActivation && (
-              <GarageActivation
-                project={hallProject}
-                lastSession={conversations[0] ?? undefined}
-              />
+              <div className="mb-7">
+                <GarageActivation
+                  project={hallProject}
+                  lastSession={conversations[0] ?? undefined}
+                />
+              </div>
             )}
 
             {/* What's Happening Now (2/3) + Team (1/3) */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-7 mb-7">
               <div className="lg:col-span-2">
                 <WhatsHappeningNow project={hallProject} />
               </div>
@@ -372,30 +456,46 @@ export default async function HallPage() {
             </div>
 
             {/* What We Heard — hidden until editorial fields are populated */}
-            {showWhatWeHeard && <WhatWeHeard project={hallProject} />}
+            {showWhatWeHeard && (
+              <div className="mb-7">
+                <WhatWeHeard project={hallProject} />
+              </div>
+            )}
 
             {/* Next steps — closes the Zeigarnik loop opened by asks.
                 Only renders when there are validated Process Step evidence items. */}
             {isLive && nextSteps.length > 0 && (
-              <NextSteps nextSteps={nextSteps} />
+              <div className="mb-7">
+                <NextSteps nextSteps={nextSteps} />
+              </div>
             )}
 
             {/* Materials + Decisions — pair side-by-side when both present */}
             {materials.length > 0 && isLive && decisions.length > 0 ? (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-7 items-start mb-7">
                 <SharedMaterials materials={materials} />
                 <HallDecisions decisions={decisions} />
               </div>
             ) : (
               <>
-                {materials.length > 0 && <SharedMaterials materials={materials} />}
-                {isLive && decisions.length > 0 && <HallDecisions decisions={decisions} />}
+                {materials.length > 0 && (
+                  <div className="mb-7">
+                    <SharedMaterials materials={materials} />
+                  </div>
+                )}
+                {isLive && decisions.length > 0 && (
+                  <div className="mb-7">
+                    <HallDecisions decisions={decisions} />
+                  </div>
+                )}
               </>
             )}
 
             {/* Conversations */}
             {conversations.length > 0 && (
-              <Conversations conversations={conversations} />
+              <div className="mb-7">
+                <Conversations conversations={conversations} />
+              </div>
             )}
 
             {/* Digital Residents — capability layer, closes the Hall */}
