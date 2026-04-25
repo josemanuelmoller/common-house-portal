@@ -41,6 +41,13 @@ export type PriorityFactors = {
   objective_link: number;
   /** +20 when the item is founder-owned (capped at 100 downstream). */
   founder_bonus: number;
+  /**
+   * −20 when the item comes from a mentorship-level project on a substrate
+   * (Gmail / Calendar / WhatsApp) that has no per-item actor classifier.
+   * Lets the item still surface, but ranks it below operational items
+   * in the CoS desk and the Inbox. Default 0.
+   */
+  mentorship_penalty?: number;
 };
 
 /** Common envelope for every signal. */

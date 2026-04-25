@@ -47,7 +47,7 @@ import type {
   Signal,
 } from "./types";
 
-const INGESTOR_VERSION = "whatsapp@1.1.0";
+const INGESTOR_VERSION = "whatsapp@1.2.0";
 const SOURCE_TYPE = "whatsapp" as const;
 const DEFAULT_MAX_SOURCES = 50;
 const DEFAULT_BACKFILL_DAYS = 14;
@@ -212,6 +212,7 @@ export async function runWhatsAppIngestor(input: IngestInput): Promise<IngestRes
           actorIsSelf:     true, // they messaged Jose directly = explicit ask
         });
         if (!gate.pass) { skipped++; continue; }
+        const mentorshipPenalty = gate.reason === "mentorship_explicit_self" ? 20 : 0;
 
         const meta = srcMeta.get(sourceId);
         const chatName = meta?.title ?? "(unknown chat)";
@@ -224,6 +225,7 @@ export async function runWhatsAppIngestor(input: IngestInput): Promise<IngestRes
           warmth: null,
           objectiveTier: null,
           founderOwned: false,
+          mentorshipPenalty,
         });
 
         const signal: ActionSignal = {

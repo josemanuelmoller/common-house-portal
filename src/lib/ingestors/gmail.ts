@@ -48,7 +48,7 @@ import type {
   Signal,
 } from "./types";
 
-const INGESTOR_VERSION = "gmail@1.2.0";
+const INGESTOR_VERSION = "gmail@1.3.0";
 const SOURCE_TYPE = "gmail" as const;
 const DEFAULT_MAX_ITEMS = 100;
 const DEFAULT_BACKFILL_DAYS = 7;
@@ -233,10 +233,14 @@ export async function runGmailIngestor(input: IngestInput): Promise<IngestResult
         // For Gmail there's no per-thread "actor=Jose" classification;
         // the user being on To: AND last sender is not self already implies
         // Jose owes a reply. Treat as actor=self for the gate so mentorship
-        // emails where Jose IS the addressee still pass.
+        // emails where Jose IS the addressee still pass — but with a
+        // priority demotion (see mentorshipPenalty below).
         actorIsSelf: true,
       });
       if (!gate.pass) { skipped++; continue; }
+      // Demote mentorship-project items by 20 points so operational items
+      // rank above them in the CoS desk and Inbox. Item still surfaces.
+      const mentorshipPenalty = gate.reason === "mentorship_explicit_self" ? 20 : 0;
 
       const contact = contactMap.get(t.fromEmail.toLowerCase());
       // Relationship Tier lives in Notion; not yet mirrored to Supabase people.
@@ -254,6 +258,7 @@ export async function runGmailIngestor(input: IngestInput): Promise<IngestResult
         warmth,
         objectiveTier:  null,
         founderOwned,
+        mentorshipPenalty,
       });
 
       const signal: ActionSignal = {

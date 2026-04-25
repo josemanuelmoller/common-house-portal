@@ -48,7 +48,7 @@ import type {
   Signal,
 } from "./types";
 
-const INGESTOR_VERSION = "calendar@1.2.0";
+const INGESTOR_VERSION = "calendar@1.3.0";
 const SOURCE_TYPE = "calendar" as const;
 const DEFAULT_MAX_ITEMS = 80;
 const PREP_WINDOW_HOURS = 48;
@@ -148,6 +148,7 @@ export async function runCalendarIngestor(input: IngestInput): Promise<IngestRes
           actorIsSelf: true,
         });
         if (!gate.pass) { skipped++; continue; }
+        const mentorshipPenalty = gate.reason === "mentorship_explicit_self" ? 20 : 0;
 
         // (1) Upcoming meeting within prep window, no agenda → prep
         if (e.startMs > now && e.startMs <= prepCutoff) {
@@ -162,6 +163,7 @@ export async function runCalendarIngestor(input: IngestInput): Promise<IngestRes
               warmth: null,
               objectiveTier: null,
               founderOwned: false,
+              mentorshipPenalty,
             });
             signals.push(buildActionSignal({
               sourceId:      `event:${e.id}:prep`,

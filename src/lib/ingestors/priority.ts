@@ -98,7 +98,8 @@ export function computePriorityScore(factors: PriorityFactors): number {
     factors.recency +
     factors.relationship_weight +
     factors.objective_link +
-    factors.founder_bonus;
+    factors.founder_bonus -
+    (factors.mentorship_penalty ?? 0);
   return Math.max(0, Math.min(100, Math.round(raw)));
 }
 
@@ -110,6 +111,12 @@ export function buildFactors(params: {
   warmth?: Warmth | null;
   objectiveTier?: "HIGH" | "MID" | "LOW" | null;
   founderOwned?: boolean;
+  /**
+   * Set to 20 when the item comes from a mentorship project via a
+   * substrate without per-item actor classification (Gmail/Calendar/
+   * WhatsApp). The item still surfaces but ranks below operational items.
+   */
+  mentorshipPenalty?: number;
   now?: Date;
 }): PriorityFactors {
   const now = params.now ?? new Date();
@@ -120,6 +127,7 @@ export function buildFactors(params: {
     relationship_weight: relationshipWeight({ tier: params.tier ?? null, warmth: params.warmth ?? null }),
     objective_link:      objectiveLink(params.objectiveTier ?? null),
     founder_bonus:       params.founderOwned ? 20 : 0,
+    mentorship_penalty:  params.mentorshipPenalty ?? 0,
   };
 }
 
