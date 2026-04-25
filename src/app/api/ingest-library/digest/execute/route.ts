@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminGuardApi } from "@/lib/require-admin";
+import { pushProposal } from "@/lib/notion-push";
 import type { DigestProposal, ProposalAnswers } from "@/types/digest-proposal";
 
 export const maxDuration = 300;
@@ -13,16 +14,22 @@ export const maxDuration = 300;
  * Body: {
  *   proposal: DigestProposal,
  *   answers: ProposalAnswers,
- *   storagePath?: string  // for the Source URL signed-link generation
+ *   storagePath?: string,
+ *   pipelineMeta?: { model: string; inputTokens: number; outputTokens: number }
  * }
  *
- * Currently a STUB — returns 501 until src/lib/notion-push.ts ships.
+ * Response: { ok, sourceId, sourceUrl, evidenceCount, kaCount, applied, ... }
  */
 export async function POST(req: NextRequest) {
   const guard = await adminGuardApi();
   if (guard) return guard;
 
-  let body: { proposal?: DigestProposal; answers?: ProposalAnswers; storagePath?: string };
+  let body: {
+    proposal?: DigestProposal;
+    answers?: ProposalAnswers;
+    storagePath?: string;
+    pipelineMeta?: { model: string; inputTokens: number; outputTokens: number };
+  };
   try {
     body = await req.json();
   } catch {
@@ -36,7 +43,6 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Light validation that survives until commit 2 (Phase C TS port)
   const p = body.proposal;
   if (!p.source?.title || !Array.isArray(p.evidence) || !Array.isArray(p.knowledge_assets)) {
     return NextResponse.json(
@@ -45,7 +51,6 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Verify all required questions have answers
   const missing = (p.questions ?? [])
     .filter((q) => q.required !== false)
     .filter((q) => {
@@ -60,17 +65,28 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  return NextResponse.json(
-    {
-      error: "Phase C push to Notion not yet implemented in TS. Use the agent CLI for now.",
-      proposalSummary: {
-        source_title: p.source.title,
-        evidence_count: p.evidence.length,
-        ka_count: p.knowledge_assets.length,
-        question_count: p.questions?.length ?? 0,
-        answers_received: Object.keys(body.answers).length,
-      },
-    },
-    { status: 501 },
-  );
+  try {
+    const result = await pushProposal({
+      proposal: p,
+      answers: body.answers,
+      storagePath: body.storagePath,
+      pipelineMeta: body.pipelineMeta,
+    });
+
+    return NextResponse.json({
+      ok: true,
+      sourceId: result.sourceId,
+      sourceUrl: result.sourceUrl,
+      evidenceCount: result.evidence.length,
+      kaCount: result.knowledgeAssets.length,
+      evidence: result.evidence,
+      knowledgeAssets: result.knowledgeAssets,
+    });
+  } catch (err) {
+    console.error("[ingest-library/digest/execute] push error:", err);
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Phase C push failed" },
+      { status: 500 },
+    );
+  }
 }

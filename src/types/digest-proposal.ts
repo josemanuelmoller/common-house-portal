@@ -122,6 +122,20 @@ export type ProposalQuestion = {
   required?: boolean;
   /** Human-readable description of what this answer modifies. Used as a label. */
   affects: string;
+  /**
+   * Optional machine-readable target so the push step can apply the answer to
+   * a field automatically. Supported paths:
+   *   - "source.source_date"           → ProposalSource.source_date
+   *   - "source.sensitivity"           → "Internal" / "Client Confidential" / "Leadership Only"
+   *   - "all.sensitivity"              → applies to source.sensitivity AND all evidence/KA sensitivity levels
+   *   - "evidence.sensitivity_level"   → all evidence records
+   *   - "ka.sensitivity_level"         → all KA records
+   *   - "ka.knowledge_update_needed"   → boolean
+   *   - "ka.status"                    → "Draft" / "Active" / "Archived" / etc.
+   * If omitted, the answer is logged in the audit only — the user can hand-edit
+   * the Notion records afterward.
+   */
+  target_field?: string;
 };
 
 export type DigestProposal = {

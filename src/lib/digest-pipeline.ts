@@ -325,6 +325,11 @@ const PROPOSAL_TOOL: Anthropic.Tool = {
               description:
                 "Plain-language description of what this answer modifies (e.g. 'Source date - picks correct publication year').",
             },
+            target_field: {
+              type: "string",
+              description:
+                "Optional machine-readable path. Recognised values: 'source.source_date', 'source.sensitivity', 'all.sensitivity', 'evidence.sensitivity_level', 'ka.sensitivity_level', 'ka.knowledge_update_needed', 'ka.status'. Use only when the answer maps cleanly to one of these fields. For free-text or narrative answers, omit and the answer will be logged in the Source audit only.",
+            },
           },
         },
       },

@@ -219,6 +219,11 @@ export function LibraryIngestPanel() {
           proposal: digestResult.proposal,
           answers,
           storagePath: digestResult.storagePath,
+          pipelineMeta: {
+            model: digestResult.modelUsed,
+            inputTokens: digestResult.inputTokens,
+            outputTokens: digestResult.outputTokens,
+          },
         }),
       });
       const data = await res.json();
