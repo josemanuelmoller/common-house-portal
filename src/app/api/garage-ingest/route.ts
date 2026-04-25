@@ -5,8 +5,7 @@ import { notion, DB, createKnowledgeAssetDraft } from "@/lib/notion";
 import { isAdminUser, isAdminEmail } from "@/lib/clients";
 import * as XLSX from "xlsx";
 import mammoth from "mammoth";
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const officeparser = require("officeparser") as { parseOfficeAsync: (input: Buffer) => Promise<string> };
+import { extractPptxText } from "@/lib/office-text-extract";
 
 // PDF/Excel analysis + multi-DB writes can take up to 2 minutes
 export const maxDuration = 120;
@@ -378,8 +377,8 @@ export async function POST(req: NextRequest) {
         },
       ];
     } else if (isPptx) {
-      // PowerPoint PPTX: extract text from all slides with officeparser
-      const pptxText: string = await officeparser.parseOfficeAsync(Buffer.from(fileBuffer));
+      // PowerPoint PPTX: extract text from all slides via in-house JSZip extractor
+      const pptxText = await extractPptxText(Buffer.from(fileBuffer));
       userContent = [
         {
           type: "text",
