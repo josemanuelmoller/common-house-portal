@@ -1035,11 +1035,6 @@ export default async function AdminPage() {
             <InboxTriage initialItems={inboxData.items} initialScanned={inboxData.total_scanned} />
           </HallSection>
 
-          {/* ── Commitments — K-v2 left col ──────────────────────────────── */}
-          <HallSection title="Commitments">
-            <HallCommitmentLedger />
-          </HallSection>
-
             </div>{/* /hall-today-col-left */}
 
             <div className="hall-today-col-right">
@@ -1081,10 +1076,73 @@ export default async function AdminPage() {
                 </HallSection>
               )}
 
-              {/* ── Time allocation ──────────────────────────────────────── */}
-              <HallSection title="Time " flourish="allocation">
-                <HallTimeAllocation />
+              {/* ── Upcoming commitments ─────────────────────────────────── */}
+              <HallSection title="Commitments">
+                <HallCommitmentLedger />
               </HallSection>
+
+              {/* ── Open decisions (compact right-col peek) ──────────────── */}
+              {deskDecisions.length > 0 && (() => {
+                const sorted = [...deskDecisions].sort((a, b) => {
+                  const pri = (p: string) => p === "P1 Critical" ? 0 : p === "High" ? 1 : 2;
+                  return pri(a.priority) - pri(b.priority) ||
+                    ((a.dueDate ?? "").localeCompare(b.dueDate ?? ""));
+                });
+                return (
+                  <HallSection
+                    title="Open "
+                    flourish="decisions"
+                    meta={`${deskDecisions.length} OPEN`}
+                  >
+                    <ul className="flex flex-col">
+                      {sorted.slice(0, 4).map(d => {
+                        const isP1 = d.priority === "P1 Critical";
+                        const isHigh = d.priority === "High";
+                        const daysToDue = d.dueDate ? Math.floor((new Date(d.dueDate).getTime() - Date.now()) / 86400000) : null;
+                        const dueColor = daysToDue === null ? "var(--hall-muted-3)"
+                          : daysToDue < 0 ? "var(--hall-danger)"
+                          : daysToDue <= 3 ? "var(--hall-warn)"
+                          : "var(--hall-muted-3)";
+                        return (
+                          <li
+                            key={d.id}
+                            className="py-2.5"
+                            style={{ borderTop: "1px solid var(--hall-line-soft)" }}
+                          >
+                            <div className="flex items-start gap-2">
+                              <span
+                                className="shrink-0 mt-0.5 w-1.5 h-1.5 rounded-full"
+                                style={{ background: isP1 ? "var(--hall-danger)" : isHigh ? "var(--hall-warn)" : "var(--hall-muted-3)", marginTop: 5 }}
+                              />
+                              <div className="flex-1 min-w-0">
+                                <Link href="/admin/decisions">
+                                  <p className="text-[11.5px] font-semibold leading-snug hover:opacity-70 transition-opacity" style={{ color: "var(--hall-ink-0)" }}>
+                                    {d.title}
+                                  </p>
+                                </Link>
+                                {daysToDue !== null && (
+                                  <p className="text-[9px] font-bold uppercase tracking-wide mt-0.5" style={{ color: dueColor, fontFamily: "var(--font-hall-mono)" }}>
+                                    {daysToDue < 0 ? `Overdue ${Math.abs(daysToDue)}d` : daysToDue === 0 ? "Due today" : `Due in ${daysToDue}d`}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                    {deskDecisions.length > 4 && (
+                      <Link
+                        href="/admin/decisions"
+                        className="block text-center text-[9.5px] font-bold uppercase tracking-widest mt-2 hover:opacity-70 transition-opacity"
+                        style={{ color: "var(--hall-muted-3)", fontFamily: "var(--font-hall-mono)" }}
+                      >
+                        +{deskDecisions.length - 4} more →
+                      </Link>
+                    )}
+                  </HallSection>
+                );
+              })()}
 
               {/* ── Market signals (compact peek) ────────────────────────── */}
               <HallSection
@@ -1195,9 +1253,6 @@ export default async function AdminPage() {
                 </HallSection>
               )}
 
-              <HallSection title="Portfolio " flourish="check-ins">
-                <HallPortfolioPulse />
-              </HallSection>
             </div>
           </div>
 
