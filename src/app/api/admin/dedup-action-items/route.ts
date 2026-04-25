@@ -46,8 +46,19 @@ type Cluster = {
 };
 
 export async function POST(req: NextRequest) {
-  const guard = await adminGuardApi();
-  if (guard) return guard;
+  // Auth: accept either a logged-in admin session OR a CRON_SECRET bearer
+  // (allows operator-side maintenance via curl).
+  const cronSecret = process.env.CRON_SECRET;
+  const authHeader = req.headers.get("authorization") ?? "";
+  const xAgent = req.headers.get("x-agent-key") ?? "";
+  const bearerOk =
+    cronSecret &&
+    (authHeader === `Bearer ${cronSecret}` || xAgent === cronSecret);
+
+  if (!bearerOk) {
+    const guard = await adminGuardApi();
+    if (guard) return guard;
+  }
 
   let mode: "dry_run" | "execute" = "dry_run";
   try {
