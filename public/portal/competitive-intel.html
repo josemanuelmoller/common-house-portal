@@ -236,6 +236,149 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); display: flex; m
 /* ── Two col ── */
 .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
 .three-col { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+
+/* ── Waveform grid ── */
+.wave-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 28px; }
+.comp-wave-card {
+  background: var(--white); border: 1.5px solid var(--border); border-radius: 14px;
+  padding: 18px 20px 15px; cursor: pointer;
+  transition: border-color 0.2s, transform 0.15s, box-shadow 0.15s;
+}
+.comp-wave-card:hover { border-color: #aaa; transform: translateY(-2px); }
+.comp-wave-card.selected { border-color: var(--ink); }
+.comp-wave-card.status-threat { border-left: 3px solid var(--cold); }
+.comp-wave-card.status-rising { border-left: 3px solid var(--warm); }
+.comp-wave-card.status-stable { border-left: 3px solid var(--dormant); }
+.cwc-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+.cwc-name { font-size: 13px; font-weight: 800; letter-spacing: -0.3px; color: var(--ink); }
+.cwc-sector { font-size: 9px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: var(--muted); margin-top: 2px; }
+.cwc-wave { height: 50px; width: 100%; margin-bottom: 6px; }
+.cwc-wave svg { width: 100%; height: 100%; overflow: visible; }
+.wave-center { stroke: var(--border); stroke-width: 1; }
+.wave-b { rx: 2; transition: fill 0.15s; }
+.wave-b.def { fill: #e8e8e2; }
+.wave-b.act { fill: var(--ink); }
+.wave-b.acc { fill: var(--lime); }
+.wave-b.aln { fill: var(--cold); }
+.wave-b.wrn { fill: var(--warm); }
+.comp-wave-card:hover .wave-b.act { fill: #222; }
+.cwc-week-labels { display: flex; justify-content: space-between; margin-bottom: 10px; }
+.cwc-wl { font-size: 8px; color: var(--muted); font-weight: 600; }
+.cwc-footer { display: flex; justify-content: space-between; align-items: flex-end; }
+.cwc-signal { font-size: 11px; color: var(--ink); font-weight: 500; line-height: 1.4; flex: 1; padding-right: 10px; }
+.cwc-signal-meta { font-size: 9px; color: var(--muted); margin-top: 2px; }
+.cwc-count-val { font-size: 20px; font-weight: 900; letter-spacing: -0.8px; color: var(--ink); display: block; text-align: right; }
+.cwc-count-lbl { font-size: 8px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); }
+
+/* ── Slide panel ── */
+.panel-backdrop {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.18); z-index: 40;
+  opacity: 0; pointer-events: none; transition: opacity 0.25s;
+}
+.panel-backdrop.open { opacity: 1; pointer-events: all; }
+.slide-panel {
+  position: fixed; top: 0; right: 0; width: 400px; height: 100vh;
+  background: var(--white); border-left: 1.5px solid var(--border);
+  z-index: 50; transform: translateX(100%);
+  transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.slide-panel.open { transform: translateX(0); }
+.panel-header { padding: 20px 22px 0; flex-shrink: 0; position: relative; }
+.panel-close {
+  position: absolute; top: 18px; right: 18px;
+  width: 28px; height: 28px; border-radius: 7px;
+  background: var(--bg); border: 1.5px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; font-size: 14px; color: var(--muted);
+  transition: background 0.12s; line-height: 1;
+}
+.panel-close:hover { background: var(--border); color: var(--ink); }
+.panel-comp-name { font-size: 16px; font-weight: 800; letter-spacing: -0.4px; margin-bottom: 3px; padding-right: 36px; }
+.panel-comp-sector { font-size: 9px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: var(--muted); margin-bottom: 14px; }
+.panel-wave { height: 44px; width: 100%; margin-bottom: 14px; }
+.panel-wave svg { width: 100%; height: 100%; }
+.panel-stats {
+  display: flex; gap: 0; border-top: 1.5px solid var(--border);
+  border-bottom: 1.5px solid var(--border); margin: 0 -22px;
+}
+.panel-stat { flex: 1; padding: 12px 16px; text-align: center; border-right: 1px solid var(--border); }
+.panel-stat:last-child { border-right: none; }
+.panel-stat-val { font-size: 20px; font-weight: 900; letter-spacing: -0.8px; color: var(--ink); }
+.panel-stat-label { font-size: 8px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); margin-top: 1px; }
+.panel-body { flex: 1; overflow-y: auto; padding-bottom: 32px; }
+.panel-section-label {
+  font-size: 8px; font-weight: 700; letter-spacing: 1.8px; text-transform: uppercase;
+  color: var(--muted); padding: 16px 22px 8px; display: block;
+}
+.panel-signal-item {
+  padding: 14px 22px; border-bottom: 1px solid var(--border);
+  transition: background 0.12s;
+}
+.panel-signal-item:hover { background: rgba(0,0,0,0.018); }
+.panel-signal-item:last-child { border-bottom: none; }
+.panel-signal-tags { display: flex; align-items: center; gap: 7px; margin-bottom: 5px; }
+.panel-signal-title { font-size: 12.5px; font-weight: 700; color: var(--ink); letter-spacing: -0.2px; margin-bottom: 4px; line-height: 1.4; }
+.panel-signal-summary { font-size: 11px; color: #444; line-height: 1.55; margin-bottom: 7px; }
+.panel-signal-footer { display: flex; align-items: center; gap: 8px; }
+.panel-signal-date { font-size: 9.5px; color: var(--muted); }
+
+/* ── Aging bar (signals) ── */
+.signal-item { position: relative; overflow: hidden; }
+.aging-bar { position: absolute; bottom: 0; left: 0; height: 2px; border-radius: 0 2px 2px 0; transition: width 0.6s ease; }
+.aging-bar.fresh { background: var(--hot); }
+.aging-bar.mid-age { background: var(--warm); }
+.aging-bar.old { background: var(--cold); }
+
+/* ── Quick actions on hover ── */
+.signal-actions { transition: opacity 0.15s; }
+.signal-actions.qa-hidden { opacity: 0; pointer-events: none; }
+.signal-item:hover .signal-actions.qa-hidden { opacity: 1; pointer-events: all; }
+
+/* ── Agent log stream ── */
+.log-stream { display: flex; flex-direction: column; gap: 0; font-size: 11px; }
+.log-stream-item { padding: 8px 0; border-bottom: 1px solid var(--border); display: flex; gap: 10px; align-items: flex-start; opacity: 0; transform: translateY(4px); transition: opacity 0.4s, transform 0.4s; }
+.log-stream-item.visible { opacity: 1; transform: none; }
+.log-stream-item:last-child { border-bottom: none; }
+.ls-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; margin-top: 4px; }
+.ls-dot.ok { background: var(--hot); }
+.ls-dot.warn { background: var(--warm); }
+.ls-dot.info { background: #aaa; }
+.ls-text { color: var(--ink); line-height: 1.5; flex: 1; }
+.ls-time { font-size: 9px; color: var(--muted); margin-top: 2px; }
+.ls-cursor { display: inline-block; width: 6px; height: 11px; background: var(--ink); margin-left: 3px; animation: blink 1s step-end infinite; vertical-align: middle; }
+@keyframes blink { 50% { opacity: 0; } }
+
+/* ── Commitment balance ── */
+.commitment-row { display: flex; gap: 0; border-bottom: 1px solid var(--border); }
+.commitment-row:last-child { border-bottom: none; }
+.commitment-col { flex: 1; padding: 10px 12px; }
+.commitment-col.left { border-right: 1px solid var(--border); }
+.commitment-entity { font-size: 9.5px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 4px; }
+.commitment-item { font-size: 11px; color: var(--ink); line-height: 1.4; padding: 4px 0; border-bottom: 1px dotted var(--border); }
+.commitment-item:last-child { border-bottom: none; }
+.commitment-item.done { text-decoration: line-through; color: var(--muted); }
+.commitment-header { display: flex; gap: 0; background: var(--bg); border-bottom: 1.5px solid var(--border); border-radius: 10px 10px 0 0; }
+.commitment-header-col { flex: 1; padding: 8px 12px; font-size: 9px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); }
+.commitment-header-col.left { border-right: 1px solid var(--border); }
+
+/* ── Relationship sparkline cards ── */
+.rel-card { background: var(--white); border: 1.5px solid var(--border); border-radius: 14px; padding: 18px 20px 16px; }
+.rel-card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; }
+.rel-name { font-size: 13px; font-weight: 800; letter-spacing: -0.3px; color: var(--ink); }
+.rel-type { font-size: 9px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); margin-top: 2px; }
+.rel-warmth { font-size: 18px; font-weight: 900; letter-spacing: -0.6px; }
+.rel-warmth.hot { color: var(--hot); }
+.rel-warmth.warm { color: var(--warm); }
+.rel-warmth.cold { color: var(--dormant); }
+.sparkline-row { display: flex; gap: 3px; align-items: flex-end; height: 32px; margin-bottom: 8px; }
+.spark-bar { flex: 1; border-radius: 2px 2px 0 0; transition: opacity 0.15s; }
+.spark-bar.empty { background: var(--border); }
+.spark-bar.low { background: #b8e68a; }
+.spark-bar.mid { background: #8ed640; }
+.spark-bar.high { background: var(--hot); }
+.rel-contact { font-size: 10px; color: var(--ink); font-weight: 600; margin-bottom: 2px; }
+.rel-last { font-size: 9.5px; color: var(--muted); }
 </style>
 </head>
 <body>
@@ -322,6 +465,7 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); display: flex; m
     <div class="tab-btn" onclick="switchTab('tab-feed', this)">Signal Feed <span style="background:rgba(239,68,68,0.12);color:#dc2626;font-size:8px;font-weight:700;padding:2px 7px;border-radius:8px;margin-left:6px">3 New</span></div>
     <div class="tab-btn" onclick="switchTab('tab-benchmark', this)">Actividad</div>
     <div class="tab-btn" onclick="switchTab('tab-scan', this)">Scan Config</div>
+    <div class="tab-btn" onclick="switchTab('tab-relationships', this)">Key Relationships</div>
   </div>
 
   <!-- ═══ CONTENT ═══ -->
@@ -711,11 +855,10 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); display: flex; m
         </div>
       </div>
 
-      <!-- Demo: como se vera con datos -->
-      <div class="section-bar">
-        <span class="section-label">Ejemplo — como se vera con datos</span>
-        <div class="section-line"></div>
-      </div>
+      <!-- Waveform grid: competitor activity at a glance -->
+      <div class="wave-grid" id="waveGrid"></div>
+
+      <div style="display:none"><!-- legacy demo removed --></div>
 
       <!-- Month group: Abril -->
       <div style="margin-bottom:8px;display:flex;align-items:center;gap:10px">
@@ -1067,8 +1210,33 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); display: flex; m
       </div>
     </div><!-- /tab-scan -->
 
+    <!-- ──────────────── TAB: KEY RELATIONSHIPS ── -->
+    <div class="tab-panel" id="tab-relationships">
+
+      <div class="info-note" style="margin-bottom:20px">
+        <span style="flex-shrink:0;margin-top:1px">i</span>
+        <span>Calor de relacion con cada entidad del Watchlist — frecuencia de contacto semanal en las ultimas 12 semanas. Verde = contacto reciente, gris = inactivo.</span>
+      </div>
+
+      <div class="three-col" id="relGrid"></div>
+
+    </div><!-- /tab-relationships -->
+
   </div><!-- /content -->
 </div><!-- /main -->
+
+<!-- ── Slide panel ── -->
+<div class="panel-backdrop" id="panelBackdrop" onclick="closePanel()"></div>
+<div class="slide-panel" id="slidePanel">
+  <div class="panel-header">
+    <div class="panel-comp-name" id="panelName">—</div>
+    <div class="panel-comp-sector" id="panelSector">—</div>
+    <div class="panel-wave" id="panelWave"></div>
+    <div class="panel-stats" id="panelStats"></div>
+    <button class="panel-close" onclick="closePanel()">&#215;</button>
+  </div>
+  <div class="panel-body" id="panelBody"></div>
+</div>
 
 <script>
 function switchTab(id, btn) {
@@ -1099,7 +1267,380 @@ function injectSourceButtons() {
     }
   });
 }
-document.addEventListener('DOMContentLoaded', injectSourceButtons);
+// ── Competitor data ──────────────────────────────────
+const competitors = [
+  {
+    id: 'acme',
+    name: 'Acme Accelerator',
+    sector: 'Accelerator · Retail Sostenible',
+    type: 'Competitor',
+    status: 'threat',
+    statusLabel: 'Threat',
+    totalSignals: 14,
+    // 12 weeks of activity: 0=none, 1=low, 2=mid, 3=high
+    weeks: [0,1,0,2,1,0,3,1,2,1,3,2],
+    weekLabels: ['E-27','F-3','F-10','F-17','F-24','M-3','M-10','M-17','M-24','A-7','A-14','A-21'],
+    latestSignal: 'Acme gana grant Innovate UK £480K para expansion sostenible',
+    latestDate: '11 Apr',
+    latestType: 'Grant',
+    signals: [
+      { type: 'Grant', title: 'Acme gana grant Innovate UK £480K para expansion sostenible', summary: 'Financiacion no dilutiva para escalar su programa de impacto en retail a 3 nuevas ciudades britanicas en 2026-27.', date: '11 Apr 2026', rel: 'Alta' },
+      { type: 'Hiring', title: 'Nuevo Director of Partnerships — ex Waitrose y Co-op', summary: 'LinkedIn muestra senior hire con historial en los principales retailers britanicos. Refuerza su acceso a los mismos canales que CH persigue.', date: '9 Apr 2026', rel: 'Alta' },
+      { type: 'Evento', title: 'Acme en Sustainable Retail Summit — panel principal y sponsor', summary: 'Acme patrocina el evento mas importante de retail sostenible en UK y tiene a su CEO en el panel de apertura.', date: '3 Apr 2026', rel: 'Alta' },
+      { type: 'Grant', title: 'Solicitud a Horizon Europe — £1.2M programa paneuropeo', summary: 'Solicitud confirmada por documentos publicos de la UE. Resultado esperado Q3 2026. Potencial expansion a 5 paises.', date: '18 Mar 2026', rel: 'Alta' },
+      { type: 'Media', title: 'The Guardian: caso de estudio principal en retail sostenible', summary: 'Acme aparece como referencia editorial solida en el ecosistema de innovacion en retail UK.', date: '5 Mar 2026', rel: 'Media' }
+    ]
+  },
+  {
+    id: 'greenwave',
+    name: 'Greenwave Fund',
+    sector: 'Impact Fund · Sostenibilidad',
+    type: 'Competitor',
+    status: 'rising',
+    statusLabel: 'Rising',
+    totalSignals: 8,
+    weeks: [0,0,1,0,1,2,0,1,0,2,1,1],
+    weekLabels: ['E-27','F-3','F-10','F-17','F-24','M-3','M-10','M-17','M-24','A-7','A-14','A-21'],
+    latestSignal: 'Bloomberg entrevista a managing partner sobre fondos de impacto en Europa',
+    latestDate: '7 Apr',
+    latestType: 'Media',
+    signals: [
+      { type: 'Media', title: 'Bloomberg: "Por que los fondos de impacto estan ganando terreno en Europa"', summary: 'La managing partner de Greenwave aparece en Bloomberg Europe explicando su tesis de inversion en sostenibilidad de cadena de suministro.', date: '7 Apr 2026', rel: 'Media' },
+      { type: 'Partnership', title: 'Acuerdo de co-inversion con Bridges Fund Management', summary: 'Acuerdo marco para co-invertir en startups de impacto Seed y Series A en Europa. Amplia significativamente su capacidad de cheque y red.', date: '1 Apr 2026', rel: 'Media' }
+    ]
+  },
+  {
+    id: 'ecoretail',
+    name: 'EcoRetail UK',
+    sector: 'Consultoria · Retail Sostenible',
+    type: 'Competitor',
+    status: 'stable',
+    statusLabel: 'Stable',
+    totalSignals: 4,
+    weeks: [0,0,0,1,0,0,1,0,0,0,1,0],
+    weekLabels: ['E-27','F-3','F-10','F-17','F-24','M-3','M-10','M-17','M-24','A-7','A-14','A-21'],
+    latestSignal: 'Nuevo white paper sobre circularidad en supply chain retail UK',
+    latestDate: '14 Apr',
+    latestType: 'Contenido',
+    signals: [
+      { type: 'Contenido', title: 'White paper: circularidad en supply chain retail UK', summary: 'Publicacion tecnica con datos de 12 retailers UK. Posicionamiento de thought leadership en el mismo espacio que CH.', date: '14 Apr 2026', rel: 'Media' }
+    ]
+  },
+  {
+    id: 'unlitd',
+    name: 'UnLtd',
+    sector: 'Referente · Social Enterprise',
+    type: 'Referente',
+    status: 'stable',
+    statusLabel: 'Monitor',
+    totalSignals: 3,
+    weeks: [1,0,0,0,1,0,0,0,1,0,0,0],
+    weekLabels: ['E-27','F-3','F-10','F-17','F-24','M-3','M-10','M-17','M-24','A-7','A-14','A-21'],
+    latestSignal: 'Lanzamiento Award for Social Enterprises 2026 — deadline Mayo',
+    latestDate: '2 Mar',
+    latestType: 'Grant',
+    signals: [
+      { type: 'Grant', title: 'UnLtd Award for Social Enterprises 2026 abierto — deadline Mayo', summary: 'Convocatoria anual de UnLtd con cheques de hasta £15K para social enterprises en etapa temprana. Relevante para portfolio CH.', date: '2 Mar 2026', rel: 'Media' }
+    ]
+  },
+  {
+    id: 'bigsocsoc',
+    name: 'Big Society Capital',
+    sector: 'Referente · Impact Finance',
+    type: 'Referente',
+    status: 'stable',
+    statusLabel: 'Monitor',
+    totalSignals: 2,
+    weeks: [0,0,1,0,0,0,0,1,0,0,0,0],
+    weekLabels: ['E-27','F-3','F-10','F-17','F-24','M-3','M-10','M-17','M-24','A-7','A-14','A-21'],
+    latestSignal: 'Informe anual de impacto — cifras sector impact finance UK 2025',
+    latestDate: '10 Feb',
+    latestType: 'Media',
+    signals: [
+      { type: 'Media', title: 'Informe anual: impact finance UK 2025 — benchmarks del sector', summary: 'Datos de referencia para fundraising e impacto en el mercado UK. Util como contexto para conversaciones con inversores.', date: '10 Feb 2026', rel: 'Baja' }
+    ]
+  },
+  {
+    id: 'bridges',
+    name: 'Bridges Fund Mgmt',
+    sector: 'Partner / Inversor · Impact',
+    type: 'Partner',
+    status: 'rising',
+    statusLabel: 'Rising',
+    totalSignals: 6,
+    weeks: [0,1,0,1,0,2,0,1,2,0,1,2],
+    weekLabels: ['E-27','F-3','F-10','F-17','F-24','M-3','M-10','M-17','M-24','A-7','A-14','A-21'],
+    latestSignal: 'Co-inversion con Greenwave — expansion cartera impact en UK/EU',
+    latestDate: '1 Apr',
+    latestType: 'Partnership',
+    signals: [
+      { type: 'Partnership', title: 'Co-inversion con Greenwave Fund — expansion cartera UK/EU', summary: 'Acuerdo de co-inversion que amplia su presencia en sostenibilidad de supply chain. Puede volverse relevante para deals de portfolio CH.', date: '1 Apr 2026', rel: 'Media' }
+    ]
+  }
+];
+
+// ── Key relationships data ───────────────────────────
+const relationships = [
+  { entity: 'Acme Accelerator', type: 'Competitor', contact: 'Sarah Mills (CEO)', warmth: 'hot', warmthLabel: 'Activa', last: 'Hace 4 dias', weeks: [0,1,0,0,1,0,3,1,2,0,2,3] },
+  { entity: 'Greenwave Fund', type: 'Competitor', contact: 'Tom Hayward (Partner)', warmth: 'warm', warmthLabel: 'Tibia', last: 'Hace 3 semanas', weeks: [0,0,1,0,0,0,0,1,0,0,2,0] },
+  { entity: 'EcoRetail UK', type: 'Competitor', contact: 'Sin contacto directo', warmth: 'cold', warmthLabel: 'Fria', last: '—', weeks: [0,0,0,0,0,0,0,0,0,0,0,0] },
+  { entity: 'Bridges Fund Mgmt', type: 'Partner', contact: 'Anna Clarke (MD)', warmth: 'warm', warmthLabel: 'Tibia', last: 'Hace 2 semanas', weeks: [0,0,1,0,1,0,0,1,0,2,1,0] },
+  { entity: 'Big Society Capital', type: 'Referente', contact: 'James Ord (Director)', warmth: 'cold', warmthLabel: 'Fria', last: 'Hace 6 semanas', weeks: [0,0,0,0,1,0,0,0,0,0,0,0] },
+  { entity: 'UnLtd', type: 'Referente', contact: 'Paul Miller (CEO)', warmth: 'warm', warmthLabel: 'Tibia', last: 'Hace 1 mes', weeks: [0,0,0,1,0,0,0,0,1,0,0,0] }
+];
+
+// ── Waveform rendering ───────────────────────────────
+function buildWaveformSVG(weeks, width, height, forPanel) {
+  const n = weeks.length;
+  const barW = Math.floor(width / (n * 2 - 1));
+  const gap = barW;
+  const centerY = height / 2;
+  const maxH = centerY - 2;
+  const maxVal = Math.max(...weeks, 1);
+
+  let bars = '';
+  for (let i = 0; i < n; i++) {
+    const x = i * (barW + gap);
+    const h = weeks[i] === 0 ? 3 : Math.max(4, (weeks[i] / maxVal) * maxH);
+    const cls = weeks[i] === 0 ? 'wave-b def' : (i === n-1 ? 'wave-b acc' : 'wave-b act');
+    bars += `<rect class="${cls}" x="${x}" y="${centerY - h}" width="${barW}" height="${h * 2}" rx="2"/>`;
+  }
+  const totalW = n * barW + (n - 1) * gap;
+  return `<svg viewBox="0 0 ${totalW} ${height}" preserveAspectRatio="none">
+    <line class="wave-center" x1="0" y1="${centerY}" x2="${totalW}" y2="${centerY}"/>
+    ${bars}
+  </svg>`;
+}
+
+function renderWaveGrid() {
+  const grid = document.getElementById('waveGrid');
+  if (!grid) return;
+  grid.innerHTML = competitors.map(c => {
+    const totalW = c.weeks.length * 8 + (c.weeks.length - 1) * 4; // approx for viewBox calc
+    const svgHtml = buildWaveformSVG(c.weeks, totalW, 50, false);
+    const weekLabelsHtml = [c.weekLabels[0], c.weekLabels[3], c.weekLabels[6], c.weekLabels[9], c.weekLabels[11]]
+      .map(l => `<span class="cwc-wl">${l}</span>`).join('');
+    return `<div class="comp-wave-card status-${c.status}" onclick="openPanel('${c.id}')">
+      <div class="cwc-header">
+        <div>
+          <div class="cwc-name">${c.name}</div>
+          <div class="cwc-sector">${c.sector}</div>
+        </div>
+        <span class="pill ${c.status === 'threat' ? 'red' : c.status === 'rising' ? 'amber' : 'ghost'}">${c.statusLabel}</span>
+      </div>
+      <div class="cwc-wave">${svgHtml}</div>
+      <div class="cwc-week-labels">${weekLabelsHtml}</div>
+      <div class="cwc-footer">
+        <div>
+          <div class="cwc-signal">${c.latestSignal}</div>
+          <div class="cwc-signal-meta">${c.latestType} · ${c.latestDate}</div>
+        </div>
+        <div>
+          <span class="cwc-count-val">${c.totalSignals}</span>
+          <span class="cwc-count-lbl">Signals</span>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── Slide panel ──────────────────────────────────────
+let currentPanelId = null;
+
+function openPanel(id) {
+  const c = competitors.find(x => x.id === id);
+  if (!c) return;
+  currentPanelId = id;
+
+  document.getElementById('panelName').textContent = c.name;
+  document.getElementById('panelSector').textContent = c.sector;
+
+  // Panel waveform
+  const svgHtml = buildWaveformSVG(c.weeks, 320, 44, true);
+  document.getElementById('panelWave').innerHTML = svgHtml;
+
+  // Stats row
+  const typeCount = {};
+  c.signals.forEach(s => { typeCount[s.type] = (typeCount[s.type] || 0) + 1; });
+  const topTypes = Object.entries(typeCount).sort((a,b) => b[1]-a[1]).slice(0,2).map(e => e[0]).join(', ');
+  document.getElementById('panelStats').innerHTML = `
+    <div class="panel-stat"><div class="panel-stat-val">${c.totalSignals}</div><div class="panel-stat-label">Signals</div></div>
+    <div class="panel-stat"><div class="panel-stat-val">${c.signals.length}</div><div class="panel-stat-label">Archivadas</div></div>
+    <div class="panel-stat" style="flex:2"><div class="panel-stat-val" style="font-size:11px;font-weight:700">${topTypes || '—'}</div><div class="panel-stat-label">Top tipos</div></div>
+  `;
+
+  // Signals list
+  document.getElementById('panelBody').innerHTML =
+    `<span class="panel-section-label">Señales recientes</span>` +
+    c.signals.map(s => {
+      const relCls = s.rel === 'Alta' ? 'red' : s.rel === 'Media' ? 'amber' : 'ghost';
+      return `<div class="panel-signal-item">
+        <div class="panel-signal-tags">
+          <span class="pill ${relCls}" style="font-size:8px">${s.rel} relevancia</span>
+          <span class="pill ghost" style="font-size:8px">${s.type}</span>
+        </div>
+        <div class="panel-signal-title">${s.title}</div>
+        <div class="panel-signal-summary">${s.summary}</div>
+        <div class="panel-signal-footer">
+          <span class="panel-signal-date">${s.date}</span>
+        </div>
+      </div>`;
+    }).join('');
+
+  document.getElementById('panelBackdrop').classList.add('open');
+  document.getElementById('slidePanel').classList.add('open');
+  document.querySelectorAll('.comp-wave-card').forEach(el => el.classList.remove('selected'));
+  const card = document.querySelector(`.comp-wave-card[onclick="openPanel('${id}')"]`);
+  if (card) card.classList.add('selected');
+}
+
+function closePanel() {
+  document.getElementById('panelBackdrop').classList.remove('open');
+  document.getElementById('slidePanel').classList.remove('open');
+  document.querySelectorAll('.comp-wave-card').forEach(el => el.classList.remove('selected'));
+  currentPanelId = null;
+}
+
+// Close on Escape
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closePanel(); });
+
+// ── Key relationships sparklines ─────────────────────
+function renderRelGrid() {
+  const grid = document.getElementById('relGrid');
+  if (!grid) return;
+  grid.innerHTML = relationships.map(r => {
+    const maxVal = Math.max(...r.weeks, 1);
+    const bars = r.weeks.map(v => {
+      const pct = v === 0 ? 8 : Math.max(20, (v / maxVal) * 100);
+      const cls = v === 0 ? 'empty' : v < maxVal * 0.5 ? 'low' : v < maxVal * 0.8 ? 'mid' : 'high';
+      return `<div class="spark-bar ${cls}" style="height:${pct}%"></div>`;
+    }).join('');
+    const warmthColor = r.warmth === 'hot' ? 'hot' : r.warmth === 'warm' ? 'warm' : 'cold';
+    return `<div class="rel-card">
+      <div class="rel-card-header">
+        <div>
+          <div class="rel-name">${r.entity}</div>
+          <div class="rel-type">${r.type}</div>
+        </div>
+        <div style="text-align:right">
+          <div class="rel-warmth ${warmthColor}">${r.warmthLabel}</div>
+        </div>
+      </div>
+      <div class="sparkline-row">${bars}</div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:10px">
+        <span style="font-size:8px;color:var(--muted);font-weight:600">12 semanas atras</span>
+        <span style="font-size:8px;color:var(--muted);font-weight:600">Hoy</span>
+      </div>
+      <div class="rel-contact">${r.contact}</div>
+      <div class="rel-last">Ultimo contacto: ${r.last}</div>
+    </div>`;
+  }).join('');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  renderWaveGrid();
+  renderRelGrid();
+  injectSourceButtons();
+  initAgingBars();
+  initQuickActions();
+  initLogStream();
+  initCommitmentBalance();
+});
+
+// ── Aging bars on signal items ────────────────────────
+// Adds a 2px bottom bar showing how stale an unreviewed signal is
+function initAgingBars() {
+  const SIGNAL_DATES = {
+    '12 Apr 2026': 12, '9 Apr 2026': 15, '7 Apr 2026': 17,
+    '11 Apr 2026': 13, '3 Apr 2026': 21
+  };
+  document.querySelectorAll('.signal-item').forEach(item => {
+    const dateEl = item.querySelector('.signal-date');
+    const statusPill = item.querySelector('.signal-actions .pill');
+    if (!statusPill || statusPill.textContent.trim() === 'Reviewed' || statusPill.textContent.trim() === 'Archived') return;
+    const dateText = dateEl ? dateEl.textContent.trim() : '';
+    const daysAgo = SIGNAL_DATES[dateText] || 10;
+    const pct = Math.min(100, daysAgo * 4);
+    const cls = daysAgo < 7 ? 'fresh' : daysAgo < 14 ? 'mid-age' : 'old';
+    const bar = document.createElement('div');
+    bar.className = `aging-bar ${cls}`;
+    bar.style.width = '0';
+    item.style.position = 'relative';
+    item.appendChild(bar);
+    setTimeout(() => { bar.style.width = pct + '%'; }, 200);
+  });
+}
+
+// ── Quick actions: hide until hover ──────────────────
+function initQuickActions() {
+  document.querySelectorAll('.signal-item').forEach(item => {
+    const actions = item.querySelector('.signal-actions');
+    if (actions) actions.classList.add('qa-hidden');
+  });
+}
+
+// ── Agent log stream: animate scan log entries ────────
+const logStreamData = [
+  { dot: 'ok', text: '<strong>Acme Accelerator</strong> — 3 senales nuevas detectadas', time: 'Lun 21 Apr · 08:04' },
+  { dot: 'ok', text: '<strong>Greenwave Fund</strong> — 1 senal nueva detectada', time: 'Lun 21 Apr · 08:05' },
+  { dot: 'ok', text: '<strong>EcoRetail UK</strong> — 1 senal nueva detectada', time: 'Lun 21 Apr · 08:05' },
+  { dot: 'info', text: '<strong>Bridges Fund Mgmt</strong> — sin cambios detectados', time: 'Lun 21 Apr · 08:06' },
+  { dot: 'info', text: '<strong>Big Society Capital</strong> — sin cambios detectados', time: 'Lun 21 Apr · 08:06' },
+  { dot: 'ok', text: 'Scan completado · 5 senales guardadas en Notion', time: 'Lun 21 Apr · 08:07' }
+];
+
+function initLogStream() {
+  const scanLog = document.querySelector('.scan-log');
+  if (!scanLog) return;
+  scanLog.innerHTML = '<div class="log-stream" id="logStream"></div>';
+  const stream = document.getElementById('logStream');
+  logStreamData.forEach((entry, i) => {
+    const div = document.createElement('div');
+    div.className = 'log-stream-item';
+    div.innerHTML = `<div class="ls-dot ${entry.dot}"></div><div><div class="ls-text">${entry.text}${i === logStreamData.length - 1 ? '<span class="ls-cursor"></span>' : ''}</div><div class="ls-time">${entry.time}</div></div>`;
+    stream.appendChild(div);
+    setTimeout(() => div.classList.add('visible'), 300 + i * 250);
+  });
+}
+
+// ── Commitment balance for key relationships ──────────
+const commitments = [
+  { entity: 'Acme Accelerator', owe: ['Enviar deck actualizado', 'Confirmar fecha visita'], owedBy: [] },
+  { entity: 'Greenwave Fund', owe: [], owedBy: ['Intro a portfolio sostenible', 'Feedback a propuesta'] },
+  { entity: 'Bridges Fund Mgmt', owe: ['Follow-up post evento'], owedBy: ['Due diligence pendiente'] }
+];
+
+function initCommitmentBalance() {
+  const grid = document.getElementById('relGrid');
+  if (!grid) return;
+  const balanceSection = document.createElement('div');
+  balanceSection.style.cssText = 'margin-top:28px';
+  balanceSection.innerHTML = `
+    <div class="section-bar" style="margin-top:0">
+      <span class="section-label">Compromisos pendientes</span>
+      <div class="section-line"></div>
+    </div>
+    <div class="card">
+      <div class="commitment-header">
+        <div class="commitment-header-col left">CH debe hacer</div>
+        <div class="commitment-header-col">Ellos deben hacer</div>
+      </div>
+      ${commitments.map(c => `
+        <div class="commitment-row">
+          <div class="commitment-col left">
+            <div class="commitment-entity">${c.entity}</div>
+            ${c.owe.length ? c.owe.map(t => `<div class="commitment-item">${t}</div>`).join('') : '<div class="commitment-item done">—</div>'}
+          </div>
+          <div class="commitment-col">
+            <div class="commitment-entity">&nbsp;</div>
+            ${c.owedBy.length ? c.owedBy.map(t => `<div class="commitment-item">${t}</div>`).join('') : '<div class="commitment-item done">—</div>'}
+          </div>
+        </div>
+      `).join('')}
+    </div>`;
+  const panel = document.getElementById('tab-relationships');
+  if (panel) panel.appendChild(balanceSection);
+}
 
 function runScanNow() {
   const btn = event.target;

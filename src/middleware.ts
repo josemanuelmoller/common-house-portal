@@ -21,7 +21,7 @@ export default clerkMiddleware(async (auth, req) => {
 //                                      /admin/hall/contacts/foo@gmail.com.
 export const config = {
   matcher: [
-    "/((?!_next/|.*\\.(?:ico|png|jpe?g|gif|svg|webp|css|js|json|woff2?|ttf|otf|map|txt|xml|pdf|mp4|webm)$).*)",
+    "/((?!_next/|.*\\.(?:ico|png|jpe?g|gif|svg|webp|css|js|json|woff2?|ttf|otf|map|txt|xml|pdf|mp4|webm|html)$).*)",
     "/",
     "/(api|trpc)(.*)",
   ],
