@@ -78,6 +78,15 @@ export type ProposalSource = {
   sanitized_notes: string;
   publisher?: string;
   partner_org?: string;
+  /**
+   * Names of organizations mentioned in the doc that should be linked to the
+   * Source via the Linked Organizations relation. Phase C resolves each name
+   * to an existing CH Organizations [OS v2] record (case-insensitive name
+   * match) or creates a stub if not found. A user answer with
+   * target_field='source.linked_organizations' (comma-separated names or a
+   * single_choice option) replaces this list during the push.
+   */
+  linked_organizations?: string[];
 };
 
 export type ProposalEvidence = {
@@ -125,17 +134,26 @@ export type ProposalQuestion = {
   /**
    * Optional machine-readable target so the push step can apply the answer to
    * a field automatically. Supported paths:
-   *   - "source.source_date"           → ProposalSource.source_date
-   *   - "source.sensitivity"           → "Internal" / "Client Confidential" / "Leadership Only"
-   *   - "all.sensitivity"              → applies to source.sensitivity AND all evidence/KA sensitivity levels
-   *   - "evidence.sensitivity_level"   → all evidence records
-   *   - "ka.sensitivity_level"         → all KA records
-   *   - "ka.knowledge_update_needed"   → boolean
-   *   - "ka.status"                    → "Draft" / "Active" / "Archived" / etc.
+   *   - "source.source_date"             → ProposalSource.source_date
+   *   - "source.sensitivity"             → "Internal" / "Client Confidential" / "Leadership Only"
+   *   - "source.linked_organizations"    → comma-separated org names; resolved or stubbed in CH Organizations
+   *   - "all.sensitivity"                → applies to source.sensitivity AND all evidence/KA sensitivity levels
+   *   - "evidence.sensitivity_level"     → all evidence records
+   *   - "ka.sensitivity_level"           → all KA records
+   *   - "ka.knowledge_update_needed"     → boolean
+   *   - "ka.status"                      → "Draft" / "Active" / "Archived" / etc.
    * If omitted, the answer is logged in the audit only — the user can hand-edit
    * the Notion records afterward.
    */
   target_field?: string;
+  /**
+   * If true, the user's answer changes the depth/scope of evidence extraction
+   * (e.g. "extract these brand case studies as separate evidence" or "split
+   * KA X into two by region"). The portal surfaces a "Re-extract con respuestas"
+   * button when any answered question has this flag, which re-runs Phase B
+   * with the answer merged into scope hints.
+   */
+  triggers_refinement?: boolean;
 };
 
 export type DigestProposal = {

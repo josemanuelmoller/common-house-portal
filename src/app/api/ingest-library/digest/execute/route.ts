@@ -81,6 +81,7 @@ export async function POST(req: NextRequest) {
       kaCount: result.knowledgeAssets.length,
       evidence: result.evidence,
       knowledgeAssets: result.knowledgeAssets,
+      linkedOrgs: result.linkedOrgs,
     });
   } catch (err) {
     console.error("[ingest-library/digest/execute] push error:", err);

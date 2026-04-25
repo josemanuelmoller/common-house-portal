@@ -51,6 +51,7 @@ export type PushResult = {
   sourceUrl: string;
   evidence: { id: string; url: string; index: number; title: string }[];
   knowledgeAssets: { id: string; url: string; index: number; name: string }[];
+  linkedOrgs: { name: string; id: string }[];
 };
 
 function getNotionClient(): Client {
@@ -61,6 +62,89 @@ function getNotionClient(): Client {
 
 function rt(text: string) {
   return [{ type: "text" as const, text: { content: text.slice(0, 2000) } }];
+}
+
+/**
+ * Parse org names from a free-form or single_choice answer. Falls back to the
+ * candidate list (drafter's source.linked_organizations) when the answer is
+ * vague (e.g. "all" / "yes"). Returns deduplicated, trimmed, non-empty names.
+ */
+function parseOrgNamesFromAnswer(answer: string, candidates: string[]): string[] {
+  const a = answer.trim();
+  const lower = a.toLowerCase();
+
+  if (
+    lower === "" ||
+    lower === "none" ||
+    lower === "no" ||
+    lower === "skip" ||
+    lower === "skip linking"
+  ) {
+    return [];
+  }
+  if (lower === "all" || lower === "all of them" || lower === "yes" || lower === "both") {
+    return [...new Set(candidates.map((s) => s.trim()).filter(Boolean))];
+  }
+
+  // If the answer matches one of the candidates verbatim, take it.
+  // If it's a single_choice option like "Link Unilever only (primary owner)",
+  // extract candidate names that appear inside it.
+  const found = candidates.filter((c) =>
+    c.length > 1 && lower.includes(c.toLowerCase()),
+  );
+  if (found.length > 0) {
+    return [...new Set(found.map((s) => s.trim()))];
+  }
+
+  // Fallback: split by commas / "and" / "&" and trust the user's literal names.
+  const parts = a
+    .split(/,| and | & |;|\//i)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 1 && !/^\(/.test(s));
+  return [...new Set(parts)];
+}
+
+const ORG_DB_ID = DB.organizations;
+
+async function resolveOrCreateOrg(notion: Client, name: string): Promise<string | null> {
+  const trimmed = name.trim();
+  if (!trimmed) return null;
+
+  // Case-insensitive name match. Notion title filter is case-insensitive by default.
+  try {
+    const search = await notion.databases.query({
+      database_id: ORG_DB_ID,
+      filter: { property: "Name", title: { equals: trimmed } },
+      page_size: 1,
+    });
+    if (search.results.length > 0) {
+      return search.results[0].id;
+    }
+  } catch (err) {
+    console.error(`[notion-push] org search failed for "${trimmed}":`, err);
+  }
+
+  // Not found → create a stub
+  try {
+    const page = await notion.pages.create({
+      parent: { database_id: ORG_DB_ID },
+      properties: {
+        Name: { title: rt(trimmed) },
+        "Organization Category": { select: { name: "Corporation" } },
+        "Migration Status": { select: { name: "Not Migrated" } },
+        "Relationship Stage": { select: { name: "Prospect" } },
+        Notes: {
+          rich_text: rt(
+            `Auto-created stub from portal Full Digest pipeline (${new Date().toISOString().slice(0, 10)}). Update Category / Country / Themes manually.`,
+          ),
+        },
+      } as never,
+    });
+    return page.id;
+  } catch (err) {
+    console.error(`[notion-push] failed to create org stub for "${trimmed}":`, err);
+    return null;
+  }
 }
 
 /**
@@ -104,6 +188,19 @@ function applyAnswers(
           appliedLog.push(`source.sensitivity ← "${ansStr}" (from ${q.id})`);
         }
         break;
+      case "source.linked_organizations": {
+        // Answer can be a comma-separated string ("Unilever, Kantar"), a single
+        // org name, or a single_choice option that names specific orgs ("Link
+        // Unilever only (primary owner)" → ["Unilever"]). Parse loosely.
+        const namedOrgs = parseOrgNamesFromAnswer(ansStr, p.source.linked_organizations ?? []);
+        if (namedOrgs.length > 0) {
+          p.source.linked_organizations = namedOrgs;
+          appliedLog.push(
+            `source.linked_organizations ← [${namedOrgs.join(", ")}] (from ${q.id})`,
+          );
+        }
+        break;
+      }
       case "all.sensitivity": {
         // Map a single chosen sensitivity to the three different schemas.
         const lower = ansStr.toLowerCase();
@@ -185,10 +282,17 @@ async function createSource(
   notion: Client,
   proposal: DigestProposal,
   sourceUrlForFile: string | null,
-): Promise<{ id: string; url: string }> {
+): Promise<{ id: string; url: string; linkedOrgs: { name: string; id: string }[] }> {
   const src = proposal.source;
   const sensitivity =
     (src as ProposalSource & { sensitivity?: SourceSensitivity }).sensitivity ?? "Internal";
+
+  // Resolve linked_organizations names → existing or stub Notion org IDs.
+  const linkedOrgs: { name: string; id: string }[] = [];
+  for (const orgName of src.linked_organizations ?? []) {
+    const id = await resolveOrCreateOrg(notion, orgName);
+    if (id) linkedOrgs.push({ name: orgName, id });
+  }
 
   const properties: Record<string, unknown> = {
     "Source Title": { title: rt(src.title) },
@@ -208,12 +312,21 @@ async function createSource(
   if (sourceUrlForFile) {
     properties["Source URL"] = { url: sourceUrlForFile };
   }
+  if (linkedOrgs.length > 0) {
+    properties["Linked Organizations"] = {
+      relation: linkedOrgs.map((o) => ({ id: o.id })),
+    };
+  }
 
   const page = await notion.pages.create({
     parent: { database_id: DB.sources },
     properties: properties as never,
   });
-  return { id: page.id, url: ("url" in page && page.url) || `https://www.notion.so/${page.id.replace(/-/g, "")}` };
+  return {
+    id: page.id,
+    url: ("url" in page && page.url) || `https://www.notion.so/${page.id.replace(/-/g, "")}`,
+    linkedOrgs,
+  };
 }
 
 async function createEvidence(
@@ -342,6 +455,7 @@ function buildAuditMarkdown(args: {
   appliedLog: string[];
   evidence: { id: string; url: string; index: number; title: string }[];
   kas: { id: string; url: string; index: number; name: string }[];
+  linkedOrgs: { name: string; id: string }[];
   pipelineMeta: { model: string; inputTokens: number; outputTokens: number };
 }): string {
   const today = new Date().toISOString().slice(0, 10);
@@ -377,6 +491,13 @@ function buildAuditMarkdown(args: {
     })
     .join("\n");
 
+  const orgsLine =
+    args.linkedOrgs.length > 0
+      ? args.linkedOrgs
+          .map((o) => `[${o.name}](https://www.notion.so/${o.id.replace(/-/g, "")})`)
+          .join(", ")
+      : "(none)";
+
   return `## Digestion audit (${today})
 
 Pushed via portal Full Digest pipeline (Phase B drafter → /api/ingest-library/digest/execute Phase C).
@@ -389,6 +510,7 @@ Pushed via portal Full Digest pipeline (Phase B drafter → /api/ingest-library/
 | Evidence created | ${args.evidence.length} |
 | Knowledge Assets created | ${args.kas.length} |
 | Triage | ${tierLine || "(none)"} |
+| Linked Organizations | ${orgsLine} |
 
 ## User answers
 
@@ -494,6 +616,7 @@ export async function pushProposal(args: {
     appliedLog,
     evidence,
     kas,
+    linkedOrgs: source.linkedOrgs,
     pipelineMeta: args.pipelineMeta ?? { model: "unknown", inputTokens: 0, outputTokens: 0 },
   });
   await appendAudit(notion, source.id, audit);
@@ -503,6 +626,7 @@ export async function pushProposal(args: {
     sourceUrl: source.url,
     evidence,
     knowledgeAssets: kas,
+    linkedOrgs: source.linkedOrgs,
   };
 }
 

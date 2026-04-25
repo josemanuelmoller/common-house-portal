@@ -153,6 +153,12 @@ const PROPOSAL_TOOL: Anthropic.Tool = {
           sanitized_notes: { type: "string" },
           publisher: { type: "string" },
           partner_org: { type: "string" },
+          linked_organizations: {
+            type: "array",
+            items: { type: "string" },
+            description:
+              "Names of organizations mentioned in the doc that should be linked to the Source. Phase C resolves each to an existing CH Organizations record (case-insensitive name match) or creates a stub. Include the publisher, the contractor, any case-study companies, and any partner orgs. Use canonical names (e.g. 'Unilever', not 'Unilever PLC'). 0–6 entries.",
+          },
         },
       },
       evidence: {
@@ -328,7 +334,12 @@ const PROPOSAL_TOOL: Anthropic.Tool = {
             target_field: {
               type: "string",
               description:
-                "Optional machine-readable path. Recognised values: 'source.source_date', 'source.sensitivity', 'all.sensitivity', 'evidence.sensitivity_level', 'ka.sensitivity_level', 'ka.knowledge_update_needed', 'ka.status'. Use only when the answer maps cleanly to one of these fields. For free-text or narrative answers, omit and the answer will be logged in the Source audit only.",
+                "Optional machine-readable path. Recognised values: 'source.source_date', 'source.sensitivity', 'source.linked_organizations', 'all.sensitivity', 'evidence.sensitivity_level', 'ka.sensitivity_level', 'ka.knowledge_update_needed', 'ka.status'. Use only when the answer maps cleanly to one of these fields. For free-text or narrative answers, omit and the answer will be logged in the Source audit only.",
+            },
+            triggers_refinement: {
+              type: "boolean",
+              description:
+                "Set true ONLY for questions whose answer would change the EVIDENCE LIST or KA STRUCTURE itself — e.g. 'should brand case studies be extracted as separate evidence?', 'split KA X into two by region?'. The portal will surface a 'Re-extract' button when such a question is answered. Do NOT set this for sensitivity/date/org-linking — those are applied directly without re-extracting.",
             },
           },
         },

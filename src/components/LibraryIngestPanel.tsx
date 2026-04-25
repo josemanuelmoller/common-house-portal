@@ -166,6 +166,7 @@ export function LibraryIngestPanel() {
     sourceUrl?: string;
     evidenceCount?: number;
     kaCount?: number;
+    linkedOrgs?: { name: string; id: string }[];
   } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -206,6 +207,83 @@ export function LibraryIngestPanel() {
     return true;
   }
 
+  function pendingRefinements(
+    proposal: DigestProposal | undefined,
+    current: ProposalAnswers,
+  ): ProposalQuestion[] {
+    if (!proposal) return [];
+    return (proposal.questions ?? []).filter((q) => {
+      if (!q.triggers_refinement) return false;
+      const v = current[q.id];
+      return v !== undefined && v !== null && v !== "";
+    });
+  }
+
+  async function handleRefine() {
+    if (!digestResult || !digestResult.storagePath) return;
+    const refinements = pendingRefinements(digestResult.proposal, answers);
+    if (refinements.length === 0) return;
+
+    setStatus("processing");
+    setUploadPhase("digesting");
+    setError("");
+
+    // Build refinement context out of the answered triggers_refinement questions.
+    const refinementContext = refinements.map((q) => ({
+      directive: q.question,
+      answer: String(answers[q.id]),
+      affects: q.affects,
+    }));
+
+    // Merge into scopeHints so the drafter sees this as part of the user's intent.
+    let baseHints: Record<string, unknown> = {};
+    if (scopeHintsText.trim()) {
+      try {
+        baseHints = JSON.parse(scopeHintsText.trim());
+      } catch {
+        baseHints = { ch_relevance: scopeHintsText.trim() };
+      }
+    }
+    const mergedHints = {
+      ...baseHints,
+      _refinement_round: 1,
+      _previous_proposal_summary: {
+        evidence_count: digestResult.proposal?.evidence?.length ?? 0,
+        ka_count: digestResult.proposal?.knowledge_assets?.length ?? 0,
+      },
+      _user_refinement_directives: refinementContext,
+    };
+
+    try {
+      const res = await fetch("/api/ingest-library/digest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          storagePath: digestResult.storagePath,
+          fileName: digestResult.fileName,
+          source: source || undefined,
+          scopeHints: mergedHints,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error ?? "Re-extract failed");
+      setDigestResult(data as DigestResult);
+      if ((data as DigestResult).proposal) {
+        setAnswers(seedAnswersFromProposal((data as DigestResult).proposal));
+      }
+      setStatus("done");
+      setUploadPhase("");
+      // Reset push state since we have a fresh proposal
+      setPushStatus("idle");
+      setPushError("");
+      setPushResult(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Re-extract failed");
+      setStatus("error");
+      setUploadPhase("");
+    }
+  }
+
   async function handlePushToNotion() {
     if (!digestResult) return;
     setPushStatus("pushing");
@@ -232,6 +310,7 @@ export function LibraryIngestPanel() {
         sourceUrl: data.sourceUrl,
         evidenceCount: data.evidenceCount,
         kaCount: data.kaCount,
+        linkedOrgs: data.linkedOrgs ?? [],
       });
       setPushStatus("done");
     } catch (err) {
@@ -629,7 +708,7 @@ export function LibraryIngestPanel() {
         )}
 
         {/* Full digest result card */}
-        {status === "done" && digestResult && isFull && (
+        {digestResult && isFull && status !== "processing" && (
           <div className="bg-[#FAFAF8] border border-[#e4e4dd] rounded-xl px-4 py-4 flex flex-col gap-3">
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -718,28 +797,44 @@ export function LibraryIngestPanel() {
               </div>
             )}
 
-            {/* Push to Notion */}
+            {/* Push to Notion + Re-extract */}
             {pushStatus !== "done" && (
-              <div className="flex items-center gap-3 flex-wrap">
-                <button
-                  onClick={handlePushToNotion}
-                  disabled={pushStatus === "pushing" || !isPushReady(digestResult.proposal, answers)}
-                  className={`text-[11px] font-bold px-4 py-2 rounded-lg transition-all ${
-                    pushStatus === "pushing"
-                      ? "bg-[#0a0a0a]/40 text-white cursor-not-allowed"
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    onClick={handlePushToNotion}
+                    disabled={pushStatus === "pushing" || !isPushReady(digestResult.proposal, answers)}
+                    className={`text-[11px] font-bold px-4 py-2 rounded-lg transition-all ${
+                      pushStatus === "pushing"
+                        ? "bg-[#0a0a0a]/40 text-white cursor-not-allowed"
+                        : isPushReady(digestResult.proposal, answers)
+                        ? "bg-[#c6f24a] text-[#0a0a0a] hover:bg-[#b8e636]"
+                        : "bg-[#e4e4dd] text-[#0a0a0a]/30 cursor-not-allowed"
+                    }`}
+                  >
+                    {pushStatus === "pushing"
+                      ? "Pusheando a Notion... (~30-60s)"
                       : isPushReady(digestResult.proposal, answers)
-                      ? "bg-[#c6f24a] text-[#0a0a0a] hover:bg-[#b8e636]"
-                      : "bg-[#e4e4dd] text-[#0a0a0a]/30 cursor-not-allowed"
-                  }`}
-                >
-                  {pushStatus === "pushing"
-                    ? "Pusheando a Notion... (~30-60s)"
-                    : isPushReady(digestResult.proposal, answers)
-                    ? "Pushear Source + Evidence + KAs a Notion →"
-                    : "Respondé las preguntas para activar"}
-                </button>
+                      ? "Pushear Source + Evidence + KAs a Notion →"
+                      : "Respondé las preguntas para activar"}
+                  </button>
+                  {/* Re-extract button — shows when an answered question requires regenerating evidence */}
+                  {pendingRefinements(digestResult.proposal, answers).length > 0 && digestResult.storagePath && (
+                    <button
+                      onClick={handleRefine}
+                      disabled={pushStatus === "pushing"}
+                      className="text-[11px] font-bold px-4 py-2 rounded-lg border border-[#0a0a0a] text-[#0a0a0a] hover:bg-[#0a0a0a]/5 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                      title="Re-corre Phase B con tus respuestas como contexto adicional. Genera nueva propuesta con Evidence/KAs ajustados."
+                    >
+                      Re-extract con respuestas ({pendingRefinements(digestResult.proposal, answers).length}) ↻
+                    </button>
+                  )}
+                </div>
                 {pushStatus === "error" && (
                   <span className="text-[10px] font-bold text-red-600">Error: {pushError}</span>
+                )}
+                {status === "error" && error && (
+                  <span className="text-[10px] font-bold text-red-600">Error: {error}</span>
                 )}
               </div>
             )}
@@ -756,6 +851,14 @@ export function LibraryIngestPanel() {
                   <span>
                     <strong>{pushResult?.kaCount ?? 0}</strong> KAs
                   </span>
+                  {(pushResult?.linkedOrgs?.length ?? 0) > 0 && (
+                    <>
+                      <span>·</span>
+                      <span>
+                        <strong>{pushResult?.linkedOrgs?.length}</strong> Orgs linkeadas
+                      </span>
+                    </>
+                  )}
                   {pushResult?.sourceUrl && (
                     <>
                       <span>·</span>
@@ -770,6 +873,11 @@ export function LibraryIngestPanel() {
                     </>
                   )}
                 </div>
+                {(pushResult?.linkedOrgs?.length ?? 0) > 0 && (
+                  <p className="text-[9px] text-[#0a0a0a]/50">
+                    Linked: {pushResult?.linkedOrgs?.map((o) => o.name).join(", ")}
+                  </p>
+                )}
               </div>
             )}
           </div>
