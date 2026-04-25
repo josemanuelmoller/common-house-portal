@@ -25,7 +25,36 @@ export type CompetitiveIntelRow = {
   entityType: string | null;   // Competitor | Sector | Partner | Referente | Cliente potencial
 };
 
+export type WatchlistEntity = {
+  id: string;
+  name: string;
+  type: string | null;
+  website: string | null;
+  scanFrequency: string | null;
+};
+
 type WatchlistLite = { name: string; type: string | null };
+
+export async function getWatchlistEntities(): Promise<WatchlistEntity[]> {
+  try {
+    const res = await notion.databases.query({
+      database_id: DB.watchlist,
+      filter: { property: "Active", checkbox: { equals: true } },
+      sorts: [{ property: "Name", direction: "ascending" }],
+      page_size: 100,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (res.results as any[]).map((p) => ({
+      id:            p.id,
+      name:          text(prop(p, "Name")) || "Unknown",
+      type:          select(prop(p, "Type")) || null,
+      website:       p.properties?.["Website"]?.url ?? null,
+      scanFrequency: select(prop(p, "Scan Frequency")) || null,
+    }));
+  } catch {
+    return [];
+  }
+}
 
 async function fetchWatchlistMap(): Promise<Map<string, WatchlistLite>> {
   const map = new Map<string, WatchlistLite>();

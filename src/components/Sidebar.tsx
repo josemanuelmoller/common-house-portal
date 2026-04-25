@@ -58,6 +58,7 @@ export const ADMIN_NAV_V2: NavEntry[] = [
       { label: "Investor Match", href: "/admin/investors" },
     ],
   },
+  { kind: "link", label: "Competitive Intel", href: "/admin/competitive-intel", icon: "◎" },
   {
     kind: "group", label: "Desks", icon: "◒",
     items: [
