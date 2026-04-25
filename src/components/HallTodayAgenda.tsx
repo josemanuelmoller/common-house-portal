@@ -86,47 +86,32 @@ export async function HallTodayAgenda() {
   const selfSet = await getSelfEmails();
 
   const now = new Date();
-  const todayEnd = new Date(now);
-  todayEnd.setHours(23, 59, 59, 999);
+  const windowEnd = new Date(now);
+  windowEnd.setDate(windowEnd.getDate() + 7);
 
-  // First: try today
-  const { data: todayData } = await sb
+  const { data } = await sb
     .from("hall_calendar_events")
     .select("event_id, event_title, event_start, attendee_emails, html_link")
     .gte("event_start", now.toISOString())
-    .lte("event_start", todayEnd.toISOString())
+    .lte("event_start", windowEnd.toISOString())
     .eq("is_cancelled", false)
     .order("event_start", { ascending: true })
     .limit(20);
 
-  const todayRows = ((todayData ?? []) as CalRow[]).filter(r =>
-    (r.attendee_emails ?? []).some(e => e && !selfSet.has(e.toLowerCase()))
-  );
+  const allRows = ((data ?? []) as CalRow[])
+    .filter(r => (r.attendee_emails ?? []).some(e => e && !selfSet.has(e.toLowerCase())))
+    .slice(0, 7); // max 7 meetings
 
-  // If nothing today, fetch next upcoming meeting (up to 14 days ahead)
-  let rows = todayRows;
-  let isFallback = false;
-  if (todayRows.length === 0) {
-    const futureEnd = new Date(now);
-    futureEnd.setDate(futureEnd.getDate() + 14);
-    const { data: futureData } = await sb
-      .from("hall_calendar_events")
-      .select("event_id, event_title, event_start, attendee_emails, html_link")
-      .gt("event_start", todayEnd.toISOString())
-      .lte("event_start", futureEnd.toISOString())
-      .eq("is_cancelled", false)
-      .order("event_start", { ascending: true })
-      .limit(20);
-    rows = ((futureData ?? []) as CalRow[]).filter(r =>
-      (r.attendee_emails ?? []).some(e => e && !selfSet.has(e.toLowerCase()))
-    );
-    isFallback = rows.length > 0;
-  }
+  const rows = allRows;
+
+  // Show date label when the first meeting is not today
+  const todayStr = now.toDateString();
+  const isFallback = rows.length > 0 && new Date(rows[0].event_start).toDateString() !== todayStr;
 
   if (rows.length === 0) {
     return (
       <p className="text-[11px]" style={{ color: "var(--hall-muted-3)" }}>
-        No upcoming meetings in the next 14 days.
+        No meetings in the next 7 days.
       </p>
     );
   }
