@@ -1035,6 +1035,31 @@ export default async function AdminPage() {
             <InboxTriage initialItems={inboxData.items} initialScanned={inboxData.total_scanned} />
           </HallSection>
 
+          {/* ── Market signals — K-v2 left col (informational / reading) ─── */}
+          <HallSection
+            title="Market "
+            flourish="signals"
+            meta={marketSignalBriefs.length > 0 ? `${marketSignalBriefs.length} NEW` : undefined}
+          >
+            <MarketSignalsPanel
+              text={latestMarketSignals?.text ?? null}
+              date={latestMarketSignals?.date ?? null}
+              generatedAt={latestMarketSignals?.generatedAt ?? null}
+              briefs={marketSignalBriefs}
+            />
+          </HallSection>
+
+          {/* ── Competitive intel pulse — K-v2 left col ──────────────────── */}
+          <HallSection
+            title="Competitive "
+            flourish="radar"
+            meta={competitiveIntel.filter(r => r.status === "New").length > 0
+              ? `${competitiveIntel.filter(r => r.status === "New").length} NEW`
+              : undefined}
+          >
+            <CompetitiveIntelSummary rows={competitiveIntel} />
+          </HallSection>
+
             </div>{/* /hall-today-col-left */}
 
             <div className="hall-today-col-right">
@@ -1143,31 +1168,6 @@ export default async function AdminPage() {
                   </HallSection>
                 );
               })()}
-
-              {/* ── Market signals (compact peek) ────────────────────────── */}
-              <HallSection
-                title="Market "
-                flourish="signals"
-                meta={marketSignalBriefs.length > 0 ? `${marketSignalBriefs.length} NEW` : undefined}
-              >
-                <MarketSignalsPanel
-                  text={latestMarketSignals?.text ?? null}
-                  date={latestMarketSignals?.date ?? null}
-                  generatedAt={latestMarketSignals?.generatedAt ?? null}
-                  briefs={marketSignalBriefs}
-                />
-              </HallSection>
-
-              {/* ── Competitive intel pulse ──────────────────────────────── */}
-              <HallSection
-                title="Competitive "
-                flourish="radar"
-                meta={competitiveIntel.filter(r => r.status === "New").length > 0
-                  ? `${competitiveIntel.filter(r => r.status === "New").length} NEW`
-                  : undefined}
-              >
-                <CompetitiveIntelSummary rows={competitiveIntel} />
-              </HallSection>
 
               {/* ── Agents (system / ambient, last) ──────────────────────── */}
               <HallSection title="Agents" meta="24H · SYSTEM">
