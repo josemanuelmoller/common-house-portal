@@ -1,6 +1,15 @@
+/**
+ * Resolve a decision item from the portal.
+ *
+ * Phase 2 pattern: Supabase mirror is updated immediately (instant UI feedback);
+ * the same change is queued as `pending_notion_push` and pushed to Notion
+ * best-effort in the same request. If the Notion push fails, the cron retry
+ * route (/api/cron/push-pending-to-notion) will retry it.
+ */
+
 import { NextRequest, NextResponse } from "next/server";
 import { adminGuardApi } from "@/lib/require-admin";
-import { notion } from "@/lib/notion";
+import { applyMirrorEdit, pushPending } from "@/lib/notion-mirror-push";
 
 function corsHeaders() {
   return {
@@ -33,41 +42,36 @@ export async function POST(req: NextRequest) {
     resolve: "Resolved",
     dismiss: "Dismissed",
   };
-
   const newStatus = statusMap[action] ?? "Resolved";
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const properties: Record<string, any> = {
-    "Status": { select: { name: newStatus } },
-  };
+  // 1) Update Supabase mirror — UI sees the new state instantly on refresh.
+  const changes: Record<string, unknown> = { status: newStatus };
+  if (note) changes.resolution_note = note;
 
-  // Append resolution note if provided
-  if (note) {
-    properties["Resolution Note"] = {
-      rich_text: [{ text: { content: note.slice(0, 2000) } }],
-    };
+  const apply = await applyMirrorEdit({
+    table:   "notion_decision_items",
+    id,
+    changes,
+  });
+  if (!apply.ok) {
+    return NextResponse.json(
+      { error: "Mirror update failed", detail: apply.error },
+      { status: 500, headers: corsHeaders() }
+    );
   }
 
-  try {
-    await notion.pages.update({ page_id: id, properties });
-  } catch (err) {
-    // If "Resolution Note" field doesn't exist, retry without it
-    try {
-      await notion.pages.update({
-        page_id: id,
-        properties: { "Status": { select: { name: newStatus } } },
-      });
-    } catch (err2) {
-      return NextResponse.json(
-        { error: "Notion update failed", detail: String(err2) },
-        { status: 500, headers: corsHeaders() }
-      );
-    }
-    void err; // note field not present — that's fine
-  }
+  // 2) Best-effort push to Notion. Failure here is non-fatal — the cron retry
+  //    will pick it up. We surface the error in the response for visibility.
+  const push = await pushPending("notion_decision_items", id);
 
   return NextResponse.json(
-    { ok: true, id, status: newStatus },
+    {
+      ok: true,
+      id,
+      status: newStatus,
+      notion_push: push.ok ? "ok" : "pending_retry",
+      notion_error: push.ok ? undefined : push.error,
+    },
     { headers: corsHeaders() }
   );
 }

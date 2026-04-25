@@ -18,6 +18,10 @@
       "schedule": "0 6 * * *"
     },
     {
+      "path": "/api/cron/push-pending-to-notion",
+      "schedule": "30 6 * * *"
+    },
+    {
       "path": "/api/ingest-meetings",
       "schedule": "0 18 * * 1-5"
     },

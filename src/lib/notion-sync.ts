@@ -22,6 +22,24 @@ type SyncResult = {
   error?: string;
 };
 
+/**
+ * Phase 2 safety: get IDs in a mirror table that have a pending push to Notion.
+ * Forward sync skips these so we don't overwrite the user's unpushed edit
+ * with the stale Notion value.
+ */
+async function pendingIds(table: string): Promise<Set<string>> {
+  try {
+    const sb = getSupabaseServerClient();
+    const { data } = await sb
+      .from(table)
+      .select("id")
+      .not("pending_notion_push", "is", null);
+    return new Set(((data ?? []) as { id: string }[]).map(r => r.id));
+  } catch {
+    return new Set();
+  }
+}
+
 async function logRun(r: SyncResult) {
   try {
     const sb = getSupabaseServerClient();
@@ -44,6 +62,7 @@ export async function syncDecisions(): Promise<SyncResult> {
   const out: SyncResult = { table: "notion_decision_items", rows_seen: 0, rows_upserted: 0, duration_ms: 0 };
   try {
     const sb = getSupabaseServerClient();
+    const skip = await pendingIds("notion_decision_items");
     let cursor: string | undefined = undefined;
     const batch: Record<string, unknown>[] = [];
 
@@ -55,6 +74,7 @@ export async function syncDecisions(): Promise<SyncResult> {
       });
       out.rows_seen += res.results.length;
       for (const page of res.results as { id: string; url?: string; last_edited_time?: string; properties: Record<string, unknown> }[]) {
+        if (skip.has(page.id)) continue;
         const titleProp = Object.values(page.properties).find((p): p is { type: string; title?: { plain_text: string }[] } =>
           (p as { type?: string })?.type === "title");
         const title = titleProp?.title?.[0]?.plain_text
@@ -101,7 +121,7 @@ export async function syncDailyBriefings(): Promise<SyncResult> {
   const out: SyncResult = { table: "notion_daily_briefings", rows_seen: 0, rows_upserted: 0, duration_ms: 0 };
   try {
     const sb = getSupabaseServerClient();
-    // Only sync the last ~30 days — older briefings are immutable noise.
+    const skip = await pendingIds("notion_daily_briefings");
     const since = new Date(Date.now() - 30 * 86400_000).toISOString().slice(0, 10);
     const res = await notion.databases.query({
       database_id: DB.dailyBriefings,
@@ -112,6 +132,7 @@ export async function syncDailyBriefings(): Promise<SyncResult> {
     out.rows_seen = res.results.length;
     const batch: Record<string, unknown>[] = [];
     for (const page of res.results as { id: string; last_edited_time?: string; properties: Record<string, unknown> }[]) {
+      if (skip.has(page.id)) continue;
       batch.push({
         id:                 page.id,
         brief_date:         date(prop(page, "Date")),
@@ -148,6 +169,7 @@ export async function syncInsightBriefs(): Promise<SyncResult> {
   const out: SyncResult = { table: "notion_insight_briefs", rows_seen: 0, rows_upserted: 0, duration_ms: 0 };
   try {
     const sb = getSupabaseServerClient();
+    const skip = await pendingIds("notion_insight_briefs");
     const since = new Date(Date.now() - 60 * 86400_000).toISOString();
     const res = await notion.databases.query({
       database_id: DB.insightBriefs,
@@ -158,6 +180,7 @@ export async function syncInsightBriefs(): Promise<SyncResult> {
     out.rows_seen = res.results.length;
     const batch: Record<string, unknown>[] = [];
     for (const page of res.results as { id: string; url?: string; last_edited_time?: string; properties: Record<string, unknown> }[]) {
+      if (skip.has(page.id)) continue;
       const url = (page.properties?.["Source Link"] as { url?: string } | undefined)?.url ?? null;
       batch.push({
         id:              page.id,
@@ -228,9 +251,9 @@ export async function syncCompetitiveIntel(): Promise<SyncResult> {
   const out: SyncResult = { table: "notion_competitive_intel", rows_seen: 0, rows_upserted: 0, duration_ms: 0 };
   try {
     const sb = getSupabaseServerClient();
+    const skip = await pendingIds("notion_competitive_intel");
     const since = new Date(Date.now() - 90 * 86400_000).toISOString().slice(0, 10);
 
-    // Fetch watchlist map first so we can denormalize entity_name + entity_type.
     const wl = await sb
       .from("notion_watchlist")
       .select("id, name, type")
@@ -250,6 +273,7 @@ export async function syncCompetitiveIntel(): Promise<SyncResult> {
       });
       out.rows_seen += res.results.length;
       for (const page of res.results as { id: string; url?: string; created_time?: string; last_edited_time?: string; properties: Record<string, unknown> }[]) {
+        if (skip.has(page.id)) continue;
         const rel = (page.properties?.["Watchlist Entry"] as { relation?: { id: string }[] } | undefined)?.relation ?? [];
         const entityId = rel[0]?.id ?? null;
         const entity   = entityId ? wlMap.get(entityId) ?? null : null;
