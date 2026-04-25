@@ -1,8 +1,11 @@
+import { Suspense } from "react";
 /**
  * Control Room — The Hall v2
  *
  * Sprint A+B Hall redesign — productivity-first, OS-driven.
- * All data from Notion. Fresh read on every load (no caching).
+ * Notion reads cached 5 min via @/lib/notion-cached. Self-fetching
+ * components are wrapped in <Suspense> so the page streams instead
+ * of blocking on the slowest fetch.
  *
  * Sections:
  *   0  Header — greeting + date
@@ -56,8 +59,8 @@ import {
   getOpportunitiesByScope,
   getColdRelationships,
   getReadyContent,
-  type CoSTask,
-} from "@/lib/notion";
+} from "@/lib/notion-cached";
+import type { CoSTask } from "@/lib/notion";
 import { ADMIN_NAV } from "@/lib/admin-nav";
 import { requireAdmin } from "@/lib/require-admin";
 import { TriggerBriefingButton } from "@/components/TriggerBriefingButton";
@@ -73,6 +76,24 @@ export { ADMIN_NAV as NAV } from "@/lib/admin-nav";
 export const dynamic = "force-dynamic";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Tiny skeleton placeholder shown while a Suspense boundary resolves. */
+function HallSkeleton({ lines = 3 }: { lines?: number }) {
+  return (
+    <div className="flex flex-col gap-2 py-1" aria-hidden="true">
+      {Array.from({ length: lines }).map((_, i) => (
+        <div
+          key={i}
+          className="h-3 rounded animate-pulse"
+          style={{
+            background: "var(--hall-fill-soft)",
+            width: `${[100, 90, 80, 95, 70, 85][i % 6]}%`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
 
 function daysSince(dateStr: string | null): number | null {
   if (!dateStr) return null;
@@ -1023,7 +1044,7 @@ export default async function AdminPage() {
 
           {/* ── Suggested blocks — K-v2 left col ─────────────────────────── */}
           <HallSection title="Suggested" flourish="blocks">
-            <SuggestedTimeBlocks />
+            <Suspense fallback={<HallSkeleton lines={2} />}><SuggestedTimeBlocks /></Suspense>
           </HallSection>
 
           {/* ── Inbox · needs attention — K-v2 left col ──────────────────── */}
@@ -1037,7 +1058,7 @@ export default async function AdminPage() {
 
           {/* ── Commitments — left col, below inbox ──────────────────────── */}
           <HallSection title="Commitments">
-            <HallCommitmentLedger />
+            <Suspense fallback={<HallSkeleton lines={4} />}><HallCommitmentLedger /></Suspense>
           </HallSection>
 
             </div>{/* /hall-today-col-left */}
@@ -1046,12 +1067,12 @@ export default async function AdminPage() {
 
               {/* ── Manual triggers — top of right col ───────────────────── */}
               <HallSection title="Manual " flourish="triggers">
-                <HallManualTriggers />
+                <Suspense fallback={<HallSkeleton lines={2} />}><HallManualTriggers /></Suspense>
               </HallSection>
 
               {/* ── Today's agenda — next meeting rich + rest compact ────── */}
               <HallSection title="Today's " flourish="agenda">
-                <HallTodayAgenda />
+                <Suspense fallback={<HallSkeleton lines={6} />}><HallTodayAgenda /></Suspense>
               </HallSection>
 
               {/* ── This week — Deadline card (replaces old P1 Banner) ────
@@ -1204,11 +1225,11 @@ export default async function AdminPage() {
               </HallSection>
 
               <HallSection title="Waiting on " flourish="others">
-                <HallAskQueue />
+                <Suspense fallback={<HallSkeleton lines={3} />}><HallAskQueue /></Suspense>
               </HallSection>
 
               <HallSection title="Opps going " flourish="cold">
-                <HallOppFreshnessRadar />
+                <Suspense fallback={<HallSkeleton lines={3} />}><HallOppFreshnessRadar /></Suspense>
               </HallSection>
             </div>
 
