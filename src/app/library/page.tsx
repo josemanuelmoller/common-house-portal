@@ -87,7 +87,7 @@ export default async function LibraryPage() {
       <Sidebar items={NAV} isAdmin />
 
       <main
-        className="flex-1 overflow-auto"
+        className="flex-1 md:ml-60 overflow-auto"
         style={{ fontFamily: "var(--font-hall-sans)" }}
       >
         {/* K-v2 thin 1-line header */}
