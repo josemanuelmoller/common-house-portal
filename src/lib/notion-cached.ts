@@ -23,11 +23,16 @@ import {
   getCandidateOpportunities as _getCandidateOpportunities,
   getReadyContent as _getReadyContent,
 } from "@/lib/notion";
-import { getDailyBriefing as _getDailyBriefing } from "@/lib/notion/briefings";
-import { getRecentInsightBriefBriefs as _getRecentInsightBriefBriefs } from "@/lib/notion/briefings";
-import { getLatestMarketSignals as _getLatestMarketSignals } from "@/lib/notion/briefings";
-import { getRecentCompetitiveIntel as _getRecentCompetitiveIntel } from "@/lib/notion/competitive";
-import { getDecisionItems as _getDecisionItems } from "@/lib/notion/decisions";
+// Phase 1: these 5 read paths now go through Supabase mirrors (synced
+// from Notion every 5 min via /api/cron/sync-notion-mirror). Originals
+// in @/lib/notion/* stay intact for write paths and non-Hall callers.
+import {
+  getDailyBriefing as _getDailyBriefing,
+  getRecentInsightBriefBriefs as _getRecentInsightBriefBriefs,
+  getLatestMarketSignals as _getLatestMarketSignals,
+  getRecentCompetitiveIntel as _getRecentCompetitiveIntel,
+  getDecisionItems as _getDecisionItems,
+} from "@/lib/notion-mirror";
 import { getAgentDrafts as _getAgentDrafts, getOutboxDrafts as _getOutboxDrafts } from "@/lib/notion/drafts";
 import { getColdRelationships as _getColdRelationships } from "@/lib/notion/people";
 
