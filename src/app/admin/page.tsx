@@ -66,6 +66,7 @@ import { HallManualTriggers } from "@/components/HallManualTriggers";
 import { HallLiveClock } from "@/components/HallLiveClock";
 import { getAgentsOnlineCount } from "@/lib/hall-agents-count";
 import { getInboxActions, countOpenGmailActions, getCoSActions } from "@/lib/action-items";
+import { getObjectivesForYear } from "@/lib/plan";
 
 export { ADMIN_NAV as NAV } from "@/lib/admin-nav";
 export const dynamic = "force-dynamic";
@@ -136,14 +137,104 @@ type FocusRecommendation = {
   winReason: string;
 };
 
+// ─── Focus heuristics (Phase 13) ──────────────────────────────────────────
+// Verbs that signal "context awareness", not actionable decision/work.
+// When a task's title/pendingAction starts with these AND has no
+// counterparty/orgName, it's an observation about the world rather than
+// something Jose can move forward today. -25 score → drops out of Focus.
+const OBSERVATION_VERBS = [
+  "monitor", "track", "consider", "evaluate", "assess", "observe", "watch",
+  "review market", "explore", "research", "study", "review trends",
+  "awaiting", "waiting on", "watch for",
+];
+
+// Verbs that signal pure founder-leverage (only Jose can do, high stakes).
+const FOUNDER_VERBS = [
+  "decide", "approve", "sign", "hire", "fire", "pitch", "negotiate",
+  "close", "commit", "reject", "veto", "endorse",
+];
+
+function isObservationShaped(task: CoSTask): boolean {
+  const text = `${task.taskTitle ?? ""} ${task.pendingAction ?? ""}`.trim().toLowerCase();
+  if (!text) return false;
+  // No counterparty + no specific link = no concrete actor
+  const hasContext = !!task.orgName?.trim() || !!task.reviewUrl;
+  if (hasContext) return false;
+  return OBSERVATION_VERBS.some(v => text.includes(v));
+}
+
+function startsWithFounderVerb(task: CoSTask): boolean {
+  const t = task.taskTitle?.toLowerCase().trim() ?? "";
+  return FOUNDER_VERBS.some(v => t.startsWith(v));
+}
+
+// Match a task to a strategic objective by keyword overlap on title/area.
+// Returns the best-tier match found, or null. Cheap heuristic — replace
+// with a Haiku classifier at ingest if false-positive rate is too high.
+function matchObjective(
+  task: CoSTask,
+  objectives: { id: string; title: string; area: string; tier: string }[]
+): { id: string; tier: string; title: string } | null {
+  if (!objectives.length) return null;
+  const haystack = `${task.taskTitle ?? ""} ${task.opportunityName ?? ""} ${task.orgName ?? ""} ${task.pendingAction ?? ""}`.toLowerCase();
+  if (!haystack.trim()) return null;
+  let best: { id: string; tier: string; title: string; rank: number } | null = null;
+  const tierRank: Record<string, number> = { high: 3, mid: 2, low: 1 };
+  for (const o of objectives) {
+    const needle = o.title.toLowerCase();
+    if (needle.length < 6) continue; // avoid single-word matches
+    // Loose token overlap: any 3+ char word in objective title appears in haystack
+    const tokens = needle.split(/\s+/).filter(t => t.length >= 5);
+    if (tokens.length === 0) continue;
+    const matches = tokens.filter(t => haystack.includes(t)).length;
+    if (matches < 2) continue; // need at least 2 distinct token hits
+    const rank = tierRank[o.tier] ?? 0;
+    if (!best || rank > best.rank) best = { id: o.id, tier: o.tier, title: o.title, rank };
+  }
+  return best ? { id: best.id, tier: best.tier, title: best.title } : null;
+}
+
+// Match a task to an active Notion opportunity by org/name overlap.
+function matchOpportunity(
+  task: CoSTask,
+  opportunities: { id: string; name: string; stage: string; followUpStatus: string; orgName: string; type: string; score: number | null }[]
+): { name: string; stage: string; followUpStatus: string; daysQuiet: number } | null {
+  if (!opportunities.length) return null;
+  const orgLower = (task.orgName ?? "").toLowerCase().trim();
+  const titleLower = (task.taskTitle ?? "").toLowerCase();
+  if (!orgLower && !titleLower) return null;
+  const ACTIVE_STAGES = new Set(["Active", "Qualifying", "Proposal Sent", "Negotiation"]);
+  for (const o of opportunities) {
+    if (!ACTIVE_STAGES.has(o.stage)) continue;
+    const oOrg = o.orgName.toLowerCase();
+    const oName = o.name.toLowerCase();
+    if (oOrg && orgLower && (oOrg === orgLower || oOrg.includes(orgLower) || orgLower.includes(oOrg))) {
+      return { name: o.name, stage: o.stage, followUpStatus: o.followUpStatus, daysQuiet: 0 };
+    }
+    if (oName && titleLower.includes(oName)) {
+      return { name: o.name, stage: o.stage, followUpStatus: o.followUpStatus, daysQuiet: 0 };
+    }
+  }
+  return null;
+}
+
 function computeFocusRecommendation(
   cosTasks: CoSTask[],
   inboxItems: InboxItem[],
   agentDrafts: { id: string; title: string; notionUrl: string; opportunityId: string | null }[],
+  strategicObjectives: { id: string; title: string; area: string; tier: string }[] = [],
+  opportunities: { id: string; name: string; stage: string; followUpStatus: string; orgName: string; type: string; score: number | null }[] = [],
 ): FocusRecommendation | null {
   const now = Date.now();
 
-  type Candidate = { task: CoSTask; score: number; winReason: string };
+  type Candidate = {
+    task: CoSTask;
+    score: number;
+    winReason: string;
+    matchedObjective: ReturnType<typeof matchObjective>;
+    matchedOpportunity: ReturnType<typeof matchOpportunity>;
+    linkedDraft: typeof agentDrafts[0] | null;
+  };
   const candidates: Candidate[] = [];
 
   for (const task of cosTasks) {
@@ -186,6 +277,51 @@ function computeFocusRecommendation(
     let score = 1; // base: every non-suppressed task qualifies; scoring picks the best
     const reasons: string[] = [];
 
+    // ── PHASE 13 STEP 1 — Observation penalty ─────────────────────────
+    // Items shaped like "monitor X" / "evaluate Y" with no counterparty
+    // or link are CONTEXT, not actionable. Drop hard so they don't
+    // dominate Focus when their score is incidentally high.
+    if (isObservationShaped(task)) {
+      score -= 25;
+      reasons.push("(observation-shaped: -25)");
+    }
+
+    // ── PHASE 13 STEP 2 — Strategic objective leverage ────────────────
+    const matchedObj = matchObjective(task, strategicObjectives);
+    if (matchedObj) {
+      const tierBoost: Record<string, number> = { high: 30, mid: 15, low: 5 };
+      const boost = tierBoost[matchedObj.tier] ?? 0;
+      score += boost;
+      reasons.push(`tier-${matchedObj.tier} objective`);
+    }
+
+    // ── PHASE 13 STEP 3 — Active opportunity (revenue impact) ─────────
+    const matchedOpp = matchOpportunity(task, opportunities);
+    if (matchedOpp) {
+      score += 20;
+      reasons.push(`active opportunity (${matchedOpp.stage})`);
+      // Extra boost if proposal sent and stale (deal getting cold)
+      if (matchedOpp.followUpStatus === "Sent" || matchedOpp.followUpStatus === "Waiting") {
+        score += 15;
+        reasons.push("response pending");
+      }
+    }
+
+    // ── PHASE 13 STEP 3 (cont.) — Founder-only verb signal ────────────
+    if (startsWithFounderVerb(task)) {
+      score += 15;
+      reasons.push("founder-only verb");
+    }
+
+    // Linked agent draft = ready-to-approve = highest leverage
+    const linkedDraft = agentDrafts.find(d =>
+      d.opportunityId && task.linkedEntityId && d.opportunityId === task.linkedEntityId
+    ) ?? null;
+    if (linkedDraft) {
+      score += 25;
+      reasons.push("draft ready to approve");
+    }
+
     // Urgency
     if (task.urgency === "critical")  { score += 30; reasons.push("critical urgency"); }
     else if (task.urgency === "high") { score += 20; reasons.push("high urgency"); }
@@ -218,7 +354,13 @@ function computeFocusRecommendation(
       score += 15; reasons.push("founder-owned");
     }
 
-    candidates.push({ task, score, winReason: reasons.join(" · ") });
+    candidates.push({
+      task, score,
+      winReason: reasons.join(" · "),
+      matchedObjective: matchedObj,
+      matchedOpportunity: matchedOpp,
+      linkedDraft,
+    });
   }
 
   if (candidates.length === 0) {
@@ -239,7 +381,7 @@ function computeFocusRecommendation(
   }
 
   candidates.sort((a, b) => b.score - a.score);
-  const { task, winReason } = candidates[0];
+  const { task, winReason, matchedObjective, matchedOpportunity, linkedDraft } = candidates[0];
 
   const hasExplicitPending = !!task.pendingAction
     && !task.pendingAction.startsWith("SIGNALS:")
@@ -269,47 +411,68 @@ function computeFocusRecommendation(
       })()
     : null;
 
-  // Action sentence
+  // ── PHASE 13 STEP 4 — Action sentence by leverage type ────────────────
+  // Priority order — pick the FIRST framing that matches:
+  //   1. linkedDraft           → Approve [draft]. Ready to send.
+  //   2. matchedOpportunity    → Close / Reactivate [opportunity].
+  //   3. founder verb in title → use Jose's verb directly (Decide, Approve…)
+  //   4. blocker               → Resolve the X — blocking Y.
+  //   5. decision + counterpty → Decide on X — Y is waiting.
+  //   6. prep + due ≤ 7d       → Prep for the X meeting [date].
+  //   7. review (doc)          → Review the X doc.
+  //   8. chase / follow-up     → Nudge X on Y.
+  //   9. fallback              → Spend [time] on X with Y.
   let action: string;
   const pendingSnippet = hasExplicitPending
     ? task.pendingAction!.trim().replace(/\.$/, "").slice(0, 80)
     : null;
+  const orgFragment = task.orgName?.trim() ? task.orgName.trim() : null;
+  const titleClean = task.taskTitle.replace(/\.$/, "").slice(0, 90);
 
-  if (task.loopType === "blocker") {
-    action = `Spend ${timeEstimate} resolving ${pendingSnippet ?? `the ${task.opportunityName} blocker`} with ${task.orgName}.`;
+  if (linkedDraft) {
+    action = `Approve the ${orgFragment ?? linkedDraft.title} draft — ready to send.`;
+  } else if (matchedOpportunity && (matchedOpportunity.followUpStatus === "Sent" || matchedOpportunity.followUpStatus === "Waiting")) {
+    action = `Reactivate ${matchedOpportunity.name} — response pending.`;
+  } else if (matchedOpportunity && matchedOpportunity.stage === "Negotiation") {
+    action = `Close ${matchedOpportunity.name} — in negotiation.`;
+  } else if (matchedOpportunity) {
+    action = `Push ${matchedOpportunity.name} forward — ${matchedOpportunity.stage.toLowerCase()}.`;
+  } else if (startsWithFounderVerb(task)) {
+    // Use Jose's verb directly — already imperative
+    action = orgFragment
+      ? `${titleClean} — ${orgFragment} waiting.`
+      : `${titleClean}.`;
+  } else if (task.loopType === "blocker") {
+    action = `Resolve ${pendingSnippet ?? `the ${task.opportunityName} blocker`}${orgFragment ? ` — blocking ${orgFragment}` : ""}.`;
   } else if (task.loopType === "decision") {
-    action = `Spend ${timeEstimate} making the call on ${pendingSnippet ?? task.taskTitle} — ${task.orgName} is waiting.`;
+    action = `Decide on ${pendingSnippet ?? titleClean}${orgFragment ? ` — ${orgFragment} is waiting` : ""}.`;
   } else if (task.loopType === "prep") {
     if (pendingSnippet) {
-      action = `Spend ${timeEstimate} on ${pendingSnippet}${meetingLabel ? ` before the ${task.orgName} meeting ${meetingLabel}` : ""}.`;
+      action = `Prep: ${pendingSnippet}${meetingLabel ? ` before the ${orgFragment ?? "meeting"} ${meetingLabel}` : ""}.`;
     } else {
-      action = `Spend ${timeEstimate} preparing for the ${task.orgName} meeting${meetingLabel ? ` ${meetingLabel}` : ""}.`;
+      action = `Prep for the ${orgFragment ?? task.opportunityName} meeting${meetingLabel ? ` ${meetingLabel}` : ""}.`;
     }
   } else if (task.loopType === "review") {
     if (reviewIsDoc) {
-      action = `Spend ${timeEstimate} reviewing the ${task.opportunityName} document${pendingSnippet ? ` — ${pendingSnippet}` : ""}.`;
+      action = `Review the ${orgFragment ?? task.opportunityName} doc${pendingSnippet ? ` — ${pendingSnippet}` : ""}.`;
     } else {
-      action = `Spend ${timeEstimate} clearing the ${task.orgName} thread${pendingSnippet ? ` — ${pendingSnippet}` : ""}.`;
+      action = `Clear the ${orgFragment ?? task.opportunityName} thread${pendingSnippet ? ` — ${pendingSnippet}` : ""}.`;
     }
   } else if (task.loopType === "commitment") {
-    action = `Spend ${timeEstimate} delivering on your ${task.opportunityName} commitment to ${task.orgName}.`;
+    action = `Deliver on your ${task.opportunityName} commitment${orgFragment ? ` to ${orgFragment}` : ""}.`;
   } else if (task.loopType === "follow-up") {
     const reviewIsGmail = !!task.reviewUrl && task.reviewUrl.includes("mail.google.com");
     if (pendingSnippet) {
-      action = `Spend ${timeEstimate} on ${pendingSnippet} with ${task.orgName}.`;
+      action = `Nudge ${orgFragment ?? "them"}: ${pendingSnippet}.`;
     } else if (reviewIsGmail) {
-      action = `Spend ${timeEstimate} replying to the ${task.orgName} thread — ${task.opportunityName}.`;
+      action = `Reply to the ${orgFragment ?? task.opportunityName} thread.`;
     } else {
-      action = `Spend ${timeEstimate} following up with ${task.orgName} on ${task.opportunityName}.`;
+      action = `Nudge ${orgFragment ?? task.opportunityName} on ${titleClean}.`;
     }
   } else {
-    action = `Spend ${timeEstimate} on ${pendingSnippet ?? task.taskTitle} with ${task.orgName}.`;
+    action = `Spend ${timeEstimate} on ${pendingSnippet ?? titleClean}${orgFragment ? ` with ${orgFragment}` : ""}.`;
   }
-
-  // Check if there's a matching draft for this task
-  const linkedDraft = agentDrafts.find(d =>
-    d.opportunityId && task.linkedEntityId && d.opportunityId === task.linkedEntityId
-  );
+  // linkedDraft already destructured from candidates[0] above
 
   // Why today — C+: up to 2 specific reasons; avoid generic fallbacks
   const isFounderOwned = task.signalReason?.startsWith("Founder-owned") ?? false;
@@ -359,6 +522,10 @@ function computeFocusRecommendation(
   if (whyParts.length < 2) {
     if (linkedDraft) {
       whyParts.push("Draft is ready to send.");
+    } else if (matchedOpportunity && (matchedOpportunity.followUpStatus === "Sent" || matchedOpportunity.followUpStatus === "Waiting")) {
+      whyParts.push("Response pending — deal at risk of cooling.");
+    } else if (matchedObjective) {
+      whyParts.push(`Tied to a tier-${matchedObjective.tier} objective.`);
     } else if (isFounderOwned) {
       whyParts.push("You own this directly.");
     }
@@ -516,6 +683,9 @@ export default async function AdminPage() {
     fetchInboxServer(),
     getAgentsOnlineCount(),
   ]);
+  // Phase 13 — load strategic objectives separately (Supabase, fast).
+  // Used by computeFocusRecommendation to weight items by tier.
+  const strategicObjectives = await getObjectivesForYear(new Date().getFullYear());
 
   const competitiveLastScan = competitiveIntel.reduce<string | null>(
     (latest, r) =>
@@ -572,7 +742,15 @@ export default async function AdminPage() {
   const coldOnly             = coldRelationships.filter(r => r.warmth === "Cold");
 
   // ── Focus recommendation — scored selection from CoS tasks + inbox fallback
-  const focusRec = computeFocusRecommendation(cosTasks, inboxData.items, agentDrafts);
+  // Phase 13 — strategic objectives + active opportunities now feed scoring.
+  const focusOpportunities = [...opportunities.ch, ...opportunities.portfolio];
+  const focusRec = computeFocusRecommendation(
+    cosTasks,
+    inboxData.items,
+    agentDrafts,
+    strategicObjectives.map(o => ({ id: o.id, title: o.title, area: o.area, tier: o.tier })),
+    focusOpportunities,
+  );
   // focusSuggestion: top CoS task with imminent meeting (≤7 days), used in Focus of the Day section
   const focusSuggestion = cosTasks.find(task => {
     if (!task.dueDate) return false;
