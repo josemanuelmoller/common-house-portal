@@ -3,6 +3,9 @@
 import { useState, useRef } from "react";
 
 const FULL_DIGEST_EXTS = [".pdf", ".docx", ".pptx"];
+// Vercel serverless body cap is ~4.5 MB. Anything bigger goes through
+// /api/ingest-library/upload-url (signed-URL → Supabase) instead of multipart.
+const LARGE_FILE_THRESHOLD = 4 * 1024 * 1024;
 
 function isFullDigestAllowed(file: File | null): file is File {
   if (!file) return false;
@@ -39,6 +42,7 @@ export function LibraryIngestPanel() {
   const [scopeHintsText, setScopeHintsText] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [status, setStatus] = useState<"idle" | "processing" | "done" | "error">("idle");
+  const [uploadPhase, setUploadPhase] = useState<"" | "uploading" | "digesting">("");
   const [quickResult, setQuickResult] = useState<QuickResult | null>(null);
   const [digestResult, setDigestResult] = useState<DigestResult | null>(null);
   const [error, setError] = useState("");
@@ -71,28 +75,77 @@ export function LibraryIngestPanel() {
       setDigestResult(null);
       setError("");
 
-      try {
-        const fd = new FormData();
-        fd.append("file", file);
-        if (source) fd.append("source", source);
-        if (scopeHintsText.trim()) {
-          let scopeJson = scopeHintsText.trim();
-          try {
-            JSON.parse(scopeJson);
-          } catch {
-            // Treat as ch_relevance free-text if not valid JSON
-            scopeJson = JSON.stringify({ ch_relevance: scopeHintsText.trim() });
-          }
-          fd.append("scopeHints", scopeJson);
+      // Build scopeHints JSON once (reused in both paths)
+      let scopeJson: string | null = null;
+      if (scopeHintsText.trim()) {
+        const raw = scopeHintsText.trim();
+        try {
+          JSON.parse(raw);
+          scopeJson = raw;
+        } catch {
+          scopeJson = JSON.stringify({ ch_relevance: raw });
         }
-        const res = await fetch("/api/ingest-library/digest", { method: "POST", body: fd });
-        const data = await res.json();
-        if (!res.ok || !data.ok) throw new Error(data.error ?? "Unknown error");
+      }
+
+      try {
+        let data: DigestResult & { ok: boolean; error?: string };
+
+        if (file.size > LARGE_FILE_THRESHOLD) {
+          // Path 2 — direct-to-Supabase via signed upload URL (bypasses Vercel 4.5 MB cap)
+          setUploadPhase("uploading");
+          const urlRes = await fetch("/api/ingest-library/upload-url", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ fileName: file.name }),
+          });
+          const urlData = await urlRes.json();
+          if (!urlRes.ok || !urlData.ok) {
+            throw new Error(urlData.error ?? "Failed to get upload URL");
+          }
+
+          const putRes = await fetch(urlData.signedUrl, {
+            method: "PUT",
+            body: file,
+            headers: {
+              "Content-Type": file.type || "application/octet-stream",
+            },
+          });
+          if (!putRes.ok) {
+            throw new Error(`Supabase upload failed (${putRes.status})`);
+          }
+
+          setUploadPhase("digesting");
+          const digestRes = await fetch("/api/ingest-library/digest", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              storagePath: urlData.storagePath,
+              fileName: file.name,
+              source: source || undefined,
+              scopeHints: scopeJson ? JSON.parse(scopeJson) : undefined,
+            }),
+          });
+          data = await digestRes.json();
+          if (!digestRes.ok || !data.ok) throw new Error(data.error ?? "Unknown error");
+        } else {
+          // Path 1 — small files via multipart
+          setUploadPhase("digesting");
+          const fd = new FormData();
+          fd.append("file", file);
+          if (source) fd.append("source", source);
+          if (scopeJson) fd.append("scopeHints", scopeJson);
+          const res = await fetch("/api/ingest-library/digest", { method: "POST", body: fd });
+          data = await res.json();
+          if (!res.ok || !data.ok) throw new Error(data.error ?? "Unknown error");
+        }
+
         setDigestResult(data as DigestResult);
         setStatus("done");
+        setUploadPhase("");
       } catch (err) {
         setError(err instanceof Error ? err.message : "Error");
         setStatus("error");
+        setUploadPhase("");
       }
       return;
     }
@@ -332,7 +385,9 @@ export function LibraryIngestPanel() {
         >
           {status === "processing"
             ? isFull
-              ? "Generando propuesta de digestion... (~30s)"
+              ? uploadPhase === "uploading"
+                ? `Subiendo archivo a Supabase... (${file ? (file.size / 1024 / 1024).toFixed(1) : "?"} MB)`
+                : "Generando propuesta de digestion... (~30s)"
               : "Procesando con Claude... (~20s)"
             : status === "done"
             ? isFull

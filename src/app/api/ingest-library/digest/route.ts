@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 import { adminGuardApi } from "@/lib/require-admin";
 import {
   generateDigestionProposal,
@@ -6,7 +7,7 @@ import {
 } from "@/lib/digest-pipeline";
 import { OfficeParser } from "officeparser";
 
-export const maxDuration = 120;
+export const maxDuration = 300;
 
 const PDF_MIME = "application/pdf";
 const DOCX_MIME =
@@ -14,87 +15,153 @@ const DOCX_MIME =
 const PPTX_MIME =
   "application/vnd.openxmlformats-officedocument.presentationml.presentation";
 
+const BUCKET = "library-docs";
+
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_KEY!,
+    { auth: { persistSession: false } },
+  );
+}
+
 type DigestKind = "pdf" | "docx" | "pptx";
 
-function detectKind(file: File): DigestKind | null {
-  // Some browsers report empty / wrong mime for office files. Trust extension first.
-  const lower = file.name.toLowerCase();
+function detectKindByName(name: string, mime?: string): DigestKind | null {
+  const lower = name.toLowerCase();
   if (lower.endsWith(".pdf")) return "pdf";
   if (lower.endsWith(".docx")) return "docx";
   if (lower.endsWith(".pptx")) return "pptx";
-  if (file.type === PDF_MIME) return "pdf";
-  if (file.type === DOCX_MIME) return "docx";
-  if (file.type === PPTX_MIME) return "pptx";
+  if (mime === PDF_MIME) return "pdf";
+  if (mime === DOCX_MIME) return "docx";
+  if (mime === PPTX_MIME) return "pptx";
   return null;
 }
 
 /**
  * POST /api/ingest-library/digest
  *
- * Full Digest mode for strategic documents. Uploads a PDF and returns a
- * structured digestion proposal markdown (Phase A + B of the ingest-document
- * skill) for admin review.
+ * Full Digest mode for strategic documents. Returns a digestion proposal
+ * markdown (Phase A + B of the ingest-document skill) for admin review.
  *
- * Body: multipart/form-data with:
- *   - file: PDF
- *   - source: optional source/attribution string
- *   - scopeHints: optional JSON string with title_hint, publisher,
- *                 geographic_scope, partner_org, ch_relevance, etc.
+ * Two intake modes:
+ *   1. multipart/form-data — small files only (≤4 MB Vercel body cap):
+ *      - file: PDF / DOCX / PPTX
+ *      - source: optional string
+ *      - scopeHints: optional JSON string
  *
- * Response: { ok, proposalMarkdown, inputTokens, outputTokens, modelUsed }
+ *   2. application/json — for any size; bytes already uploaded directly to
+ *      Supabase via /api/ingest-library/upload-url:
+ *      - storagePath: string (e.g. "library/12345-deck.pptx")
+ *      - fileName: string (original file name)
+ *      - source: optional string
+ *      - scopeHints: optional object
  *
- * Phase C (Source + Evidence + KAs creation in Notion) is NOT done by this
- * route — it requires bidirectional linking, batched validation, and is run
- * after admin reviews + edits the proposal. Use the agent + notion_push.py
- * CLI to push (or future: a separate /digest/execute route + Supabase queue).
+ * Response: { ok, proposalMarkdown, modelUsed, inputTokens, cachedTokens,
+ *             outputTokens, fileName, fileSize, sourceFormat,
+ *             extractedTextChars, storagePath? }
+ *
+ * Phase C (push to Notion) stays out of this route. The agent runs
+ * notion_push.py after admin reviews + edits the proposal.
  */
 export async function POST(req: NextRequest) {
   const guard = await adminGuardApi();
   if (guard) return guard;
 
   const contentType = req.headers.get("content-type") ?? "";
-  if (!contentType.includes("multipart/form-data")) {
+
+  let fileBuffer: Buffer;
+  let fileName: string;
+  let fileMime: string | undefined;
+  let fileSize: number;
+  let sourceNote = "";
+  let scopeHints: Record<string, unknown> = {};
+  let storagePathFromUpload: string | null = null;
+
+  if (contentType.includes("application/json")) {
+    let body: {
+      storagePath?: string;
+      fileName?: string;
+      source?: string;
+      scopeHints?: Record<string, unknown>;
+    };
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
+    if (!body.storagePath || !body.fileName) {
+      return NextResponse.json(
+        { error: "JSON body must include storagePath and fileName" },
+        { status: 400 },
+      );
+    }
+
+    const supabase = getSupabase();
+    const { data: blob, error: dlErr } = await supabase.storage
+      .from(BUCKET)
+      .download(body.storagePath);
+    if (dlErr || !blob) {
+      console.error("[ingest-library/digest] Supabase download error:", dlErr);
+      return NextResponse.json(
+        { error: `Failed to download from Supabase: ${dlErr?.message ?? "unknown"}` },
+        { status: 500 },
+      );
+    }
+    const arrayBuffer = await blob.arrayBuffer();
+    fileBuffer = Buffer.from(arrayBuffer);
+    fileName = body.fileName;
+    fileMime = blob.type || undefined;
+    fileSize = fileBuffer.length;
+    sourceNote = body.source ?? "";
+    if (body.scopeHints && typeof body.scopeHints === "object") {
+      scopeHints = { ...body.scopeHints };
+    }
+    storagePathFromUpload = body.storagePath;
+  } else if (contentType.includes("multipart/form-data")) {
+    const formData = await req.formData();
+    const file = formData.get("file") as File | null;
+    if (!file) {
+      return NextResponse.json({ error: "Missing 'file' in form data" }, { status: 400 });
+    }
+    const arrayBuffer = await file.arrayBuffer();
+    fileBuffer = Buffer.from(arrayBuffer);
+    fileName = file.name;
+    fileMime = file.type;
+    fileSize = file.size;
+    sourceNote = (formData.get("source") as string | null) ?? "";
+    const scopeRaw = formData.get("scopeHints") as string | null;
+    if (scopeRaw) {
+      try {
+        const parsed = JSON.parse(scopeRaw);
+        if (parsed && typeof parsed === "object") scopeHints = parsed;
+      } catch {
+        // ignore malformed scopeHints — proposal will be drafted from file alone
+      }
+    }
+  } else {
     return NextResponse.json(
-      { error: "Expected multipart/form-data with 'file' (PDF)" },
+      { error: "Expected multipart/form-data or application/json with storagePath" },
       { status: 400 },
     );
   }
 
-  const formData = await req.formData();
-  const file = formData.get("file") as File | null;
-  if (!file) {
-    return NextResponse.json({ error: "Missing 'file' in form data" }, { status: 400 });
-  }
-  const kind = detectKind(file);
+  const kind = detectKindByName(fileName, fileMime);
   if (!kind) {
     return NextResponse.json(
       {
-        error: `Full Digest mode accepts PDF / DOCX / PPTX; got "${file.name}" (${file.type || "unknown"})`,
+        error: `Full Digest mode accepts PDF / DOCX / PPTX; got "${fileName}" (${fileMime || "unknown"})`,
       },
       { status: 400 },
     );
   }
 
-  const sourceNote = (formData.get("source") as string | null) ?? "";
-  let scopeHints: Record<string, unknown> = {};
-  const scopeRaw = formData.get("scopeHints") as string | null;
-  if (scopeRaw) {
-    try {
-      const parsed = JSON.parse(scopeRaw);
-      if (parsed && typeof parsed === "object") scopeHints = parsed;
-    } catch {
-      // ignore malformed scopeHints — proposal will be drafted from PDF alone
-    }
-  }
   if (sourceNote && !scopeHints.source_note) {
     scopeHints.source_note = sourceNote;
   }
-  if (file.name && !scopeHints.title_hint) {
-    scopeHints.title_hint = file.name.replace(/\.pdf$/i, "");
+  if (fileName && !scopeHints.title_hint) {
+    scopeHints.title_hint = fileName.replace(/\.(pdf|docx|pptx)$/i, "");
   }
-
-  const arrayBuffer = await file.arrayBuffer();
-  const fileBuffer = Buffer.from(arrayBuffer);
 
   try {
     let result;
@@ -103,9 +170,6 @@ export async function POST(req: NextRequest) {
     if (kind === "pdf") {
       result = await generateDigestionProposal(fileBuffer, scopeHints);
     } else {
-      // DOCX or PPTX — extract text via officeparser, then route through the
-      // text variant. Layout / images are lost; flagged in scopeHints so the
-      // drafter knows it's working from text-only content.
       const ast = await OfficeParser.parseOffice(fileBuffer);
       const extractedText = ast.toText();
       extractedChars = extractedText?.length ?? 0;
@@ -125,7 +189,7 @@ export async function POST(req: NextRequest) {
       };
       result = await generateDigestionProposalFromText(
         extractedText,
-        file.name,
+        fileName,
         augmentedHints,
       );
     }
@@ -138,10 +202,11 @@ export async function POST(req: NextRequest) {
       inputTokens: result.inputTokens,
       cachedTokens: result.cachedTokens,
       outputTokens: result.outputTokens,
-      fileName: file.name,
-      fileSize: file.size,
+      fileName,
+      fileSize,
       sourceFormat: kind,
       extractedTextChars: extractedChars,
+      storagePath: storagePathFromUpload,
     });
   } catch (err) {
     console.error("[ingest-library/digest] error:", err);
