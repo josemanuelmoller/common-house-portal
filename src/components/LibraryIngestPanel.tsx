@@ -1,6 +1,11 @@
 "use client";
 
 import { useState, useRef } from "react";
+import type {
+  DigestProposal,
+  ProposalAnswers,
+  ProposalQuestion,
+} from "@/types/digest-proposal";
 
 const FULL_DIGEST_EXTS = [".pdf", ".docx", ".pptx"];
 // Vercel serverless body cap is ~4.5 MB. Anything bigger goes through
@@ -24,6 +29,7 @@ type QuickResult = {
 };
 
 type DigestResult = {
+  proposal: DigestProposal;
   proposalMarkdown: string;
   proposalLengthChars: number;
   modelUsed: string;
@@ -32,7 +38,112 @@ type DigestResult = {
   outputTokens: number;
   fileName: string;
   fileSize: number;
+  storagePath: string | null;
 };
+
+type PushStatus = "idle" | "pushing" | "done" | "error";
+
+function QuestionInput({
+  question,
+  value,
+  onChange,
+}: {
+  question: ProposalQuestion;
+  value: string | boolean | undefined;
+  onChange: (v: string | boolean) => void;
+}) {
+  const required = question.required !== false;
+  const labelEl = (
+    <div className="flex flex-col gap-0.5 mb-2">
+      <p className="text-[11px] font-bold text-[#0a0a0a] leading-snug">
+        {question.question}
+        {required && <span className="text-red-500 ml-1">*</span>}
+      </p>
+      {question.affects && (
+        <p className="text-[9px] text-[#0a0a0a]/40 italic">Afecta: {question.affects}</p>
+      )}
+      {question.hint && (
+        <p className="text-[9px] text-[#0a0a0a]/40">{question.hint}</p>
+      )}
+    </div>
+  );
+
+  if (question.type === "single_choice" && question.options && question.options.length > 0) {
+    return (
+      <div>
+        {labelEl}
+        <div className="flex flex-col gap-1.5">
+          {question.options.map((opt) => (
+            <label
+              key={opt}
+              className={`flex items-start gap-2 px-3 py-2 rounded-md border cursor-pointer transition-colors text-[10.5px] leading-snug ${
+                value === opt
+                  ? "border-[#0a0a0a] bg-[#0a0a0a]/5"
+                  : "border-[#e4e4dd] hover:border-[#0a0a0a]/30"
+              }`}
+            >
+              <input
+                type="radio"
+                name={question.id}
+                value={opt}
+                checked={value === opt}
+                onChange={(e) => onChange(e.target.value)}
+                className="mt-0.5 accent-[#0a0a0a]"
+              />
+              <span className="text-[#0a0a0a]/85">{opt}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (question.type === "boolean") {
+    const v = typeof value === "boolean" ? value : value === "true";
+    return (
+      <div>
+        {labelEl}
+        <label className="flex items-center gap-2 px-3 py-2 rounded-md border border-[#e4e4dd] cursor-pointer text-[10.5px]">
+          <input
+            type="checkbox"
+            checked={v}
+            onChange={(e) => onChange(e.target.checked)}
+            className="accent-[#0a0a0a]"
+          />
+          <span className="text-[#0a0a0a]/85">Sí</span>
+        </label>
+      </div>
+    );
+  }
+
+  if (question.type === "date") {
+    return (
+      <div>
+        {labelEl}
+        <input
+          type="date"
+          value={typeof value === "string" ? value : ""}
+          onChange={(e) => onChange(e.target.value)}
+          className="w-full px-3 py-2 rounded-md border border-[#e4e4dd] text-[10.5px] focus:outline-none focus:border-[#0a0a0a]/40"
+        />
+      </div>
+    );
+  }
+
+  // text fallback
+  return (
+    <div>
+      {labelEl}
+      <textarea
+        value={typeof value === "string" ? value : ""}
+        onChange={(e) => onChange(e.target.value)}
+        rows={2}
+        className="w-full px-3 py-2 rounded-md border border-[#e4e4dd] text-[10.5px] focus:outline-none focus:border-[#0a0a0a]/40 resize-y"
+        placeholder="Tu respuesta..."
+      />
+    </div>
+  );
+}
 
 export function LibraryIngestPanel() {
   const [digestMode, setDigestMode] = useState<"quick" | "full">("quick");
@@ -48,6 +159,14 @@ export function LibraryIngestPanel() {
   const [error, setError] = useState("");
   const [deleting, setDeleting] = useState(false);
   const [proposalCopied, setProposalCopied] = useState(false);
+  const [answers, setAnswers] = useState<ProposalAnswers>({});
+  const [pushStatus, setPushStatus] = useState<PushStatus>("idle");
+  const [pushError, setPushError] = useState("");
+  const [pushResult, setPushResult] = useState<{
+    sourceUrl?: string;
+    evidenceCount?: number;
+    kaCount?: number;
+  } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   function reset() {
@@ -59,6 +178,61 @@ export function LibraryIngestPanel() {
     setDigestResult(null);
     setStatus("idle");
     setError("");
+    setAnswers({});
+    setPushStatus("idle");
+    setPushError("");
+    setPushResult(null);
+  }
+
+  function seedAnswersFromProposal(proposal: DigestProposal): ProposalAnswers {
+    const seeded: ProposalAnswers = {};
+    for (const q of proposal.questions ?? []) {
+      if (q.default_value !== undefined) {
+        seeded[q.id] = q.default_value;
+      } else if (q.type === "boolean") {
+        seeded[q.id] = false;
+      }
+    }
+    return seeded;
+  }
+
+  function isPushReady(proposal: DigestProposal | undefined, current: ProposalAnswers): boolean {
+    if (!proposal) return false;
+    for (const q of proposal.questions ?? []) {
+      if (q.required === false) continue;
+      const v = current[q.id];
+      if (v === undefined || v === null || v === "") return false;
+    }
+    return true;
+  }
+
+  async function handlePushToNotion() {
+    if (!digestResult) return;
+    setPushStatus("pushing");
+    setPushError("");
+    setPushResult(null);
+    try {
+      const res = await fetch("/api/ingest-library/digest/execute", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          proposal: digestResult.proposal,
+          answers,
+          storagePath: digestResult.storagePath,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+      setPushResult({
+        sourceUrl: data.sourceUrl,
+        evidenceCount: data.evidenceCount,
+        kaCount: data.kaCount,
+      });
+      setPushStatus("done");
+    } catch (err) {
+      setPushError(err instanceof Error ? err.message : "Push failed");
+      setPushStatus("error");
+    }
   }
 
   function setDigestModeAndReset(m: "quick" | "full") {
@@ -140,6 +314,9 @@ export function LibraryIngestPanel() {
         }
 
         setDigestResult(data as DigestResult);
+        if ((data as DigestResult).proposal) {
+          setAnswers(seedAnswersFromProposal((data as DigestResult).proposal));
+        }
         setStatus("done");
         setUploadPhase("");
       } catch (err) {
@@ -484,10 +661,27 @@ export function LibraryIngestPanel() {
               </pre>
             </details>
 
+            {/* Proposal contents summary */}
+            {digestResult.proposal && (
+              <div className="flex items-center gap-3 text-[10px] text-[#0a0a0a]/60 flex-wrap">
+                <span>
+                  <strong className="text-[#0a0a0a]">{digestResult.proposal.evidence?.length ?? 0}</strong> Evidence
+                </span>
+                <span>·</span>
+                <span>
+                  <strong className="text-[#0a0a0a]">{digestResult.proposal.knowledge_assets?.length ?? 0}</strong> Knowledge Assets
+                </span>
+                <span>·</span>
+                <span>
+                  <strong className="text-[#0a0a0a]">{digestResult.proposal.questions?.length ?? 0}</strong> preguntas pendientes
+                </span>
+              </div>
+            )}
+
             <div className="flex items-center gap-2 flex-wrap">
               <button
                 onClick={handleCopyProposal}
-                className="text-[10px] font-bold bg-[#0a0a0a] text-white px-3 py-1.5 rounded-lg hover:bg-[#0a0a0a]/80 transition-colors"
+                className="text-[10px] font-bold bg-[#0a0a0a]/10 text-[#0a0a0a] px-3 py-1.5 rounded-lg hover:bg-[#0a0a0a]/15 transition-colors"
               >
                 {proposalCopied ? "✓ Copiado" : "Copiar markdown"}
               </button>
@@ -497,10 +691,82 @@ export function LibraryIngestPanel() {
               >
                 Descargar .md
               </button>
-              <p className="text-[9px] text-[#0a0a0a]/35 ml-auto">
-                Próximo paso: el agente revisa y pushea Source + Evidence + KAs a Notion
-              </p>
             </div>
+
+            {/* Questions form */}
+            {digestResult.proposal?.questions && digestResult.proposal.questions.length > 0 && pushStatus !== "done" && (
+              <div className="bg-white border border-[#e4e4dd] rounded-lg px-4 py-4 flex flex-col gap-4">
+                <div>
+                  <p className="text-[8px] font-bold tracking-[2px] uppercase text-[#0a0a0a]/30 mb-1">Open questions</p>
+                  <p className="text-[10px] text-[#0a0a0a]/60 leading-relaxed">
+                    Respondé antes de pushear a Notion. Estas respuestas afectan campos del Source / Evidence / KAs.
+                  </p>
+                </div>
+                {digestResult.proposal.questions.map((q: ProposalQuestion) => (
+                  <QuestionInput
+                    key={q.id}
+                    question={q}
+                    value={answers[q.id]}
+                    onChange={(v) => setAnswers((prev) => ({ ...prev, [q.id]: v }))}
+                  />
+                ))}
+              </div>
+            )}
+
+            {/* Push to Notion */}
+            {pushStatus !== "done" && (
+              <div className="flex items-center gap-3 flex-wrap">
+                <button
+                  onClick={handlePushToNotion}
+                  disabled={pushStatus === "pushing" || !isPushReady(digestResult.proposal, answers)}
+                  className={`text-[11px] font-bold px-4 py-2 rounded-lg transition-all ${
+                    pushStatus === "pushing"
+                      ? "bg-[#0a0a0a]/40 text-white cursor-not-allowed"
+                      : isPushReady(digestResult.proposal, answers)
+                      ? "bg-[#c6f24a] text-[#0a0a0a] hover:bg-[#b8e636]"
+                      : "bg-[#e4e4dd] text-[#0a0a0a]/30 cursor-not-allowed"
+                  }`}
+                >
+                  {pushStatus === "pushing"
+                    ? "Pusheando a Notion... (~30-60s)"
+                    : isPushReady(digestResult.proposal, answers)
+                    ? "Pushear Source + Evidence + KAs a Notion →"
+                    : "Respondé las preguntas para activar"}
+                </button>
+                {pushStatus === "error" && (
+                  <span className="text-[10px] font-bold text-red-600">Error: {pushError}</span>
+                )}
+              </div>
+            )}
+
+            {/* Push success card */}
+            {pushStatus === "done" && (
+              <div className="bg-[#c6f24a]/20 border border-[#c6f24a] rounded-lg px-4 py-3 flex flex-col gap-2">
+                <p className="text-[11px] font-bold text-[#0a0a0a]">✓ Pusheado a Notion</p>
+                <div className="flex items-center gap-3 text-[10px] text-[#0a0a0a]/70 flex-wrap">
+                  <span>
+                    <strong>{pushResult?.evidenceCount ?? 0}</strong> Evidence
+                  </span>
+                  <span>·</span>
+                  <span>
+                    <strong>{pushResult?.kaCount ?? 0}</strong> KAs
+                  </span>
+                  {pushResult?.sourceUrl && (
+                    <>
+                      <span>·</span>
+                      <a
+                        href={pushResult.sourceUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="underline hover:text-[#0a0a0a] font-bold"
+                      >
+                        Ver Source en Notion ↗
+                      </a>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

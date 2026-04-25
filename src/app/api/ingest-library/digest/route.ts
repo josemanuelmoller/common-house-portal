@@ -198,8 +198,9 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       ok: true,
-      proposalMarkdown: result.proposalMarkdown,
-      proposalLengthChars: result.proposalMarkdown.length,
+      proposal: result.proposal,
+      proposalMarkdown: result.proposal.markdown,
+      proposalLengthChars: result.proposal.markdown.length,
       modelUsed: result.modelUsed,
       inputTokens: result.inputTokens,
       cachedTokens: result.cachedTokens,
