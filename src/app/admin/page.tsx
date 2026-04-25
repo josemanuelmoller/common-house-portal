@@ -28,6 +28,7 @@ import { ChiefOfStaffDesk, ParkedLoopsSection } from "@/components/ChiefOfStaffD
 import { DiscoverySection } from "@/components/DiscoverySection";
 import { MarketSignalsPanel } from "@/components/MarketSignalsPanel";
 import { CompetitiveIntelPanel } from "@/components/CompetitiveIntelPanel";
+import { CompetitiveIntelSummary } from "@/components/CompetitiveIntelSummary";
 import { HallOrgsColdRelations, HallOrgsClassMix } from "@/components/HallOrgsWidgets";
 import { HallOppFreshnessRadar } from "@/components/HallOppFreshnessRadar";
 import { HallPortfolioPulse } from "@/components/HallPortfolioPulse";
@@ -1097,6 +1098,17 @@ export default async function AdminPage() {
                   generatedAt={latestMarketSignals?.generatedAt ?? null}
                   briefs={marketSignalBriefs}
                 />
+              </HallSection>
+
+              {/* ── Competitive intel pulse ──────────────────────────────── */}
+              <HallSection
+                title="Competitive "
+                flourish="radar"
+                meta={competitiveIntel.filter(r => r.status === "New").length > 0
+                  ? `${competitiveIntel.filter(r => r.status === "New").length} NEW`
+                  : undefined}
+              >
+                <CompetitiveIntelSummary rows={competitiveIntel} />
               </HallSection>
 
               {/* ── Agents (system / ambient, last) ──────────────────────── */}
