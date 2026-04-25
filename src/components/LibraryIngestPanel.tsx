@@ -2,6 +2,14 @@
 
 import { useState, useRef } from "react";
 
+const FULL_DIGEST_EXTS = [".pdf", ".docx", ".pptx"];
+
+function isFullDigestAllowed(file: File | null): file is File {
+  if (!file) return false;
+  const lower = file.name.toLowerCase();
+  return FULL_DIGEST_EXTS.some((ext) => lower.endsWith(ext));
+}
+
 type QuickResult = {
   title: string;
   assetType: string;
@@ -57,7 +65,7 @@ export function LibraryIngestPanel() {
 
   async function handleIngest() {
     if (digestMode === "full") {
-      if (!file || file.type !== "application/pdf") return;
+      if (!isFullDigestAllowed(file)) return;
       setStatus("processing");
       setQuickResult(null);
       setDigestResult(null);
@@ -168,7 +176,7 @@ export function LibraryIngestPanel() {
 
   const canSubmit = status !== "processing" && (
     digestMode === "full"
-      ? file !== null && file.type === "application/pdf"
+      ? isFullDigestAllowed(file)
       : mode === "paste" ? text.trim().length > 0 : file !== null
   );
 
@@ -235,7 +243,7 @@ export function LibraryIngestPanel() {
           <div className="rounded-xl bg-[#FAFAF8] border border-[#e4e4dd] px-4 py-3">
             <p className="text-[10px] font-bold tracking-[1px] uppercase text-[#0a0a0a]/40 mb-1">Full digest mode</p>
             <p className="text-[11px] text-[#0a0a0a]/70 leading-relaxed">
-              Subí un PDF estratégico (paper, whitepaper, industry report). El sistema genera una <strong>propuesta de digestion completa</strong> (Source + ~50 Evidence + 6-8 Knowledge Assets). El push final a Notion lo hace el agente después de tu review. ~30 segundos.
+              Subí un documento estratégico (PDF, DOCX o PPTX). El sistema genera una <strong>propuesta de digestion completa</strong> (Source + ~50 Evidence + 6-8 Knowledge Assets). El push final a Notion lo hace el agente después de tu review. ~30 segundos. Para DOCX/PPTX: extraemos sólo texto (layout, slides, charts no llegan al modelo).
             </p>
           </div>
         )}
@@ -249,7 +257,7 @@ export function LibraryIngestPanel() {
             <input
               ref={fileRef}
               type="file"
-              accept={isFull ? ".pdf" : ".pdf,.txt,.md,.docx,.csv"}
+              accept={isFull ? ".pdf,.docx,.pptx" : ".pdf,.txt,.md,.docx,.csv"}
               className="hidden"
               onChange={e => setFile(e.target.files?.[0] ?? null)}
             />
@@ -259,8 +267,8 @@ export function LibraryIngestPanel() {
                 <p className="text-[10px] text-[#0a0a0a]/35 mt-1">
                   {(file.size / 1024).toFixed(0)} KB · {file.type || "unknown type"}
                 </p>
-                {isFull && file.type !== "application/pdf" && (
-                  <p className="text-[10px] text-red-500 mt-1 font-bold">Full Digest sólo acepta PDF</p>
+                {isFull && !isFullDigestAllowed(file) && (
+                  <p className="text-[10px] text-red-500 mt-1 font-bold">Full Digest acepta PDF, DOCX o PPTX</p>
                 )}
                 <button
                   onClick={e => { e.stopPropagation(); setFile(null); }}
@@ -274,7 +282,7 @@ export function LibraryIngestPanel() {
                 <p className="text-2xl mb-2 text-[#0a0a0a]/20">↑</p>
                 <p className="text-sm font-semibold text-[#0a0a0a]/50">Subir archivo</p>
                 <p className="text-[10px] text-[#0a0a0a]/25 mt-1">
-                  {isFull ? "Sólo PDF · máx 50 MB" : "PDF, TXT, MD, DOCX, CSV · máx 50 MB"}
+                  {isFull ? "PDF, DOCX, PPTX · máx 50 MB" : "PDF, TXT, MD, DOCX, CSV · máx 50 MB"}
                 </p>
               </>
             )}

@@ -1,8 +1,32 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminGuardApi } from "@/lib/require-admin";
-import { generateDigestionProposal } from "@/lib/digest-pipeline";
+import {
+  generateDigestionProposal,
+  generateDigestionProposalFromText,
+} from "@/lib/digest-pipeline";
+import { OfficeParser } from "officeparser";
 
 export const maxDuration = 120;
+
+const PDF_MIME = "application/pdf";
+const DOCX_MIME =
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+const PPTX_MIME =
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+
+type DigestKind = "pdf" | "docx" | "pptx";
+
+function detectKind(file: File): DigestKind | null {
+  // Some browsers report empty / wrong mime for office files. Trust extension first.
+  const lower = file.name.toLowerCase();
+  if (lower.endsWith(".pdf")) return "pdf";
+  if (lower.endsWith(".docx")) return "docx";
+  if (lower.endsWith(".pptx")) return "pptx";
+  if (file.type === PDF_MIME) return "pdf";
+  if (file.type === DOCX_MIME) return "docx";
+  if (file.type === PPTX_MIME) return "pptx";
+  return null;
+}
 
 /**
  * POST /api/ingest-library/digest
@@ -41,9 +65,12 @@ export async function POST(req: NextRequest) {
   if (!file) {
     return NextResponse.json({ error: "Missing 'file' in form data" }, { status: 400 });
   }
-  if (file.type !== "application/pdf") {
+  const kind = detectKind(file);
+  if (!kind) {
     return NextResponse.json(
-      { error: `Full Digest mode requires a PDF; got ${file.type || "unknown"}` },
+      {
+        error: `Full Digest mode accepts PDF / DOCX / PPTX; got "${file.name}" (${file.type || "unknown"})`,
+      },
       { status: 400 },
     );
   }
@@ -67,10 +94,42 @@ export async function POST(req: NextRequest) {
   }
 
   const arrayBuffer = await file.arrayBuffer();
-  const pdfBuffer = Buffer.from(arrayBuffer);
+  const fileBuffer = Buffer.from(arrayBuffer);
 
   try {
-    const result = await generateDigestionProposal(pdfBuffer, scopeHints);
+    let result;
+    let extractedChars: number | null = null;
+
+    if (kind === "pdf") {
+      result = await generateDigestionProposal(fileBuffer, scopeHints);
+    } else {
+      // DOCX or PPTX — extract text via officeparser, then route through the
+      // text variant. Layout / images are lost; flagged in scopeHints so the
+      // drafter knows it's working from text-only content.
+      const ast = await OfficeParser.parseOffice(fileBuffer);
+      const extractedText = ast.toText();
+      extractedChars = extractedText?.length ?? 0;
+      if (extractedChars < 100) {
+        return NextResponse.json(
+          {
+            error: `Extracted text too short (${extractedChars} chars). The ${kind.toUpperCase()} file may be empty, image-only, or corrupted. For image-heavy decks, save as PDF and re-upload.`,
+          },
+          { status: 422 },
+        );
+      }
+      const augmentedHints = {
+        ...scopeHints,
+        _ingest_format: kind,
+        _ingest_note:
+          "Source file was a non-PDF Office document. Text was extracted server-side; layout, slide imagery, and chart visuals are NOT available to the drafter.",
+      };
+      result = await generateDigestionProposalFromText(
+        extractedText,
+        file.name,
+        augmentedHints,
+      );
+    }
+
     return NextResponse.json({
       ok: true,
       proposalMarkdown: result.proposalMarkdown,
@@ -81,6 +140,8 @@ export async function POST(req: NextRequest) {
       outputTokens: result.outputTokens,
       fileName: file.name,
       fileSize: file.size,
+      sourceFormat: kind,
+      extractedTextChars: extractedChars,
     });
   } catch (err) {
     console.error("[ingest-library/digest] error:", err);

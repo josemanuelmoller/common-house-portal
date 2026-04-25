@@ -182,3 +182,64 @@ export async function generateDigestionProposal(
     modelUsed: model,
   };
 }
+
+/**
+ * Variant for non-PDF documents (DOCX / PPTX). The route extracts text
+ * server-side via officeparser and passes it here as plain text, since the
+ * Anthropic `type: "document"` content block only natively accepts PDF.
+ *
+ * Layout, embedded images, and charts are LOST in this path. For text-heavy
+ * decks and reports this is fine; for image-heavy slides, ask the user to
+ * "Save as PDF" and re-upload through the PDF path.
+ */
+export async function generateDigestionProposalFromText(
+  extractedText: string,
+  sourceLabel: string,
+  scopeHints: Record<string, unknown> = {},
+  options: {
+    model?: string;
+    maxTokens?: number;
+  } = {},
+): Promise<ProposalResult> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    throw new Error("ANTHROPIC_API_KEY not set in environment");
+  }
+
+  const client = new Anthropic({ apiKey });
+  const model = options.model ?? "claude-sonnet-4-6";
+  const maxTokens = options.maxTokens ?? 12000;
+
+  const userText = `## Scope hints from user / agent\n\n\`\`\`json\n${JSON.stringify(scopeHints, null, 2)}\n\`\`\`\n\n## Document source\n\nExtracted text from \`${sourceLabel}\` (Office document — text-only, layout/images discarded).\n\n---\n\n${extractedText}\n\n---\n\n## Now produce the proposal markdown per the system instructions.`;
+
+  const resp = await client.messages.create({
+    model,
+    max_tokens: maxTokens,
+    system: [
+      {
+        type: "text",
+        text: buildSystemPrompt(),
+        cache_control: { type: "ephemeral" },
+      },
+    ],
+    messages: [
+      {
+        role: "user",
+        content: [{ type: "text", text: userText }],
+      },
+    ],
+  });
+
+  const proposalMarkdown = resp.content
+    .filter((b): b is Anthropic.TextBlock => b.type === "text")
+    .map((b) => b.text)
+    .join("");
+
+  return {
+    proposalMarkdown,
+    inputTokens: resp.usage.input_tokens,
+    cachedTokens: (resp.usage as { cache_read_input_tokens?: number }).cache_read_input_tokens ?? 0,
+    outputTokens: resp.usage.output_tokens,
+    modelUsed: model,
+  };
+}
