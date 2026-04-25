@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react"; // used by SignalList + MarketSignalsPanel
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 export type MarketSignalBrief = {
@@ -265,7 +265,6 @@ function parseSignals(raw: string): Signal[] {
 function SignalList({ raw }: { raw: string }) {
   const signals = parseSignals(raw);
   const structured = signals.some(s => s.tag);
-  const [expanded, setExpanded] = useState<Set<number>>(new Set());
 
   // Plain fallback: if nothing parsed with a tag, render as readable paragraph(s)
   if (!structured) {
@@ -276,22 +275,12 @@ function SignalList({ raw }: { raw: string }) {
     );
   }
 
-  const toggle = (i: number) => {
-    setExpanded(prev => {
-      const next = new Set(prev);
-      if (next.has(i)) next.delete(i); else next.add(i);
-      return next;
-    });
-  };
-
   return (
-    <ul className="flex flex-col gap-2">
+    <ul className="flex flex-col gap-2.5">
       {signals.map((s, i) => {
         const color = s.tag && TAG_COLOR[s.tag]
           ? TAG_COLOR[s.tag]
           : "bg-[#f4f4ef] text-[#0a0a0a]/55 border-[#e4e4dd]";
-        const isOpen = expanded.has(i);
-        const hasRelevance = !!s.relevance;
         return (
           <li key={i} className="flex gap-3">
             <span
@@ -302,23 +291,11 @@ function SignalList({ raw }: { raw: string }) {
               {s.tag ?? "—"}
             </span>
             <div className="flex-1 min-w-0">
-              <button
-                type="button"
-                onClick={() => hasRelevance && toggle(i)}
-                className={`text-left w-full ${hasRelevance ? "cursor-pointer" : "cursor-default"} group`}
-                disabled={!hasRelevance}
-              >
-                <p className="text-[11.5px] font-semibold text-[#0a0a0a] leading-snug group-hover:text-[#0a0a0a]/70 transition-colors">
-                  {s.headline}
-                  {hasRelevance && (
-                    <span className="ml-1 text-[9px] font-normal text-[#0a0a0a]/30">
-                      {isOpen ? "▾" : "▸"}
-                    </span>
-                  )}
-                </p>
-              </button>
-              {hasRelevance && isOpen && (
-                <p className="text-[10px] text-[#0a0a0a]/55 leading-snug mt-1">
+              <p className="text-[11.5px] font-semibold text-[#0a0a0a] leading-snug">
+                {s.headline}
+              </p>
+              {s.relevance && (
+                <p className="text-[10px] text-[#0a0a0a]/50 leading-snug mt-0.5">
                   {s.relevance}
                 </p>
               )}

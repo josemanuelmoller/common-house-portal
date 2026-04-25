@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 export type CompetitiveIntelRow = {
@@ -94,6 +94,7 @@ export function CompetitiveIntelPanel({ rows, lastScanAt }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
+  const [selected, setSelected] = useState<CompetitiveIntelRow | null>(null);
 
   // Group by entityType: Competitor Pulse vs Sector Signal vs Other
   const buckets = {
@@ -165,29 +166,228 @@ export function CompetitiveIntelPanel({ rows, lastScanAt }: Props) {
       ) : (
         <div className="flex flex-col gap-4">
           {buckets.Competitor.length > 0 && (
-            <Bucket label="Competitor pulse" rows={buckets.Competitor} />
+            <Bucket label="Competitor pulse" rows={buckets.Competitor} onSelect={setSelected} />
           )}
           {buckets.Sector.length > 0 && (
-            <Bucket label="Sector signal" rows={buckets.Sector} />
+            <Bucket label="Sector signal" rows={buckets.Sector} onSelect={setSelected} />
           )}
           {buckets.Other.length > 0 && (
-            <Bucket label="Other watchlist" rows={buckets.Other} />
+            <Bucket label="Other watchlist" rows={buckets.Other} onSelect={setSelected} />
           )}
         </div>
+      )}
+      {selected && (
+        <SignalSlidePanel signal={selected} onClose={() => setSelected(null)} />
       )}
     </div>
   );
 }
 
-function Bucket({ label, rows }: { label: string; rows: CompetitiveIntelRow[] }) {
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const toggle = (id: string) =>
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
+// ── Signal detail slide panel ────────────────────────────────────────────────
 
+function SignalSlidePanel({ signal, onClose }: { signal: CompetitiveIntelRow; onClose: () => void }) {
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [onClose]);
+
+  const age = relativeAge(signal.dateCaptured);
+  const dom = domainHint(signal.sourceUrl);
+
+  const RELEVANCE_BG: Record<string, string> = {
+    Alta: "var(--hall-danger-soft)", Media: "var(--hall-warn-soft)", Baja: "var(--hall-fill-soft)",
+  };
+  const RELEVANCE_FG: Record<string, string> = {
+    Alta: "var(--hall-danger)", Media: "var(--hall-warn)", Baja: "var(--hall-muted-3)",
+  };
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        className="fixed inset-0 z-40 bg-black/20"
+        onClick={onClose}
+        aria-hidden="true"
+      />
+      {/* Panel */}
+      <div
+        className="fixed top-0 right-0 h-full z-50 flex flex-col overflow-hidden"
+        style={{
+          width: "min(380px, 90vw)",
+          background: "var(--hall-paper-0)",
+          borderLeft: "1px solid var(--hall-stroke-0)",
+          boxShadow: "-8px 0 32px rgba(0,0,0,0.08)",
+        }}
+      >
+        {/* Header */}
+        <div
+          className="flex items-center justify-between px-5 py-4 shrink-0"
+          style={{ borderBottom: "1px solid var(--hall-stroke-0)" }}
+        >
+          <div className="flex items-center gap-2 min-w-0">
+            {signal.relevance && (
+              <span
+                className="px-1.5 py-0.5 rounded-full shrink-0"
+                style={{
+                  fontFamily: "var(--font-hall-mono)",
+                  fontSize: 9,
+                  fontWeight: 700,
+                  color: RELEVANCE_FG[signal.relevance] ?? "var(--hall-muted-3)",
+                  background: RELEVANCE_BG[signal.relevance] ?? "var(--hall-fill-soft)",
+                }}
+              >
+                {signal.relevance.toUpperCase()}
+              </span>
+            )}
+            {signal.signalType && (
+              <span
+                className="px-1.5 py-0.5 rounded-full shrink-0"
+                style={{
+                  fontFamily: "var(--font-hall-mono)",
+                  fontSize: 9,
+                  fontWeight: 700,
+                  color: "var(--hall-muted-2)",
+                  border: "1px solid var(--hall-line)",
+                }}
+              >
+                {signal.signalType.toUpperCase()}
+              </span>
+            )}
+          </div>
+          <button
+            onClick={onClose}
+            className="text-[13px] w-7 h-7 flex items-center justify-center rounded-full shrink-0 hover:bg-black/5 transition-colors"
+            style={{ color: "var(--hall-muted-2)" }}
+            aria-label="Close"
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+          {/* Entity */}
+          {signal.entityName && (
+            <div>
+              <p
+                className="text-[8px] font-bold uppercase tracking-widest mb-0.5"
+                style={{ color: "var(--hall-muted-3)", fontFamily: "var(--font-hall-mono)" }}
+              >
+                {signal.entityType ?? "Entity"}
+              </p>
+              <p
+                className="text-[13px] font-bold"
+                style={{ color: "var(--hall-ink-0)" }}
+              >
+                {signal.entityName}
+              </p>
+            </div>
+          )}
+
+          {/* Title */}
+          <div>
+            <p
+              className="text-[8px] font-bold uppercase tracking-widest mb-1"
+              style={{ color: "var(--hall-muted-3)", fontFamily: "var(--font-hall-mono)" }}
+            >
+              Signal
+            </p>
+            <p
+              className="text-[14px] font-semibold leading-snug"
+              style={{ color: "var(--hall-ink-0)" }}
+            >
+              {signal.title}
+            </p>
+          </div>
+
+          {/* Summary */}
+          {signal.summary?.trim() && (
+            <div>
+              <p
+                className="text-[8px] font-bold uppercase tracking-widest mb-1"
+                style={{ color: "var(--hall-muted-3)", fontFamily: "var(--font-hall-mono)" }}
+              >
+                Summary
+              </p>
+              <p
+                className="text-[12px] leading-relaxed"
+                style={{ color: "var(--hall-ink-0)", opacity: 0.7 }}
+              >
+                {signal.summary}
+              </p>
+            </div>
+          )}
+
+          {/* Meta strip */}
+          <div
+            className="rounded-xl px-3 py-2.5 flex flex-col gap-1.5"
+            style={{ background: "var(--hall-fill-soft)", border: "1px solid var(--hall-line-soft)" }}
+          >
+            {age && (
+              <div className="flex items-center justify-between">
+                <span className="text-[9px] font-bold uppercase tracking-wide" style={{ color: "var(--hall-muted-3)", fontFamily: "var(--font-hall-mono)" }}>Captured</span>
+                <span className="text-[10px] font-semibold" style={{ color: "var(--hall-muted-2)" }}>{age}</span>
+              </div>
+            )}
+            {signal.status && (
+              <div className="flex items-center justify-between">
+                <span className="text-[9px] font-bold uppercase tracking-wide" style={{ color: "var(--hall-muted-3)", fontFamily: "var(--font-hall-mono)" }}>Status</span>
+                <span className="text-[10px] font-semibold" style={{ color: "var(--hall-muted-2)" }}>{signal.status}</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Footer links */}
+        <div
+          className="px-5 py-3 flex items-center gap-3 shrink-0"
+          style={{ borderTop: "1px solid var(--hall-stroke-0)" }}
+        >
+          {signal.sourceUrl && (
+            <a
+              href={signal.sourceUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1 text-center py-2 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-opacity hover:opacity-70"
+              style={{
+                background: "var(--hall-ink-0)",
+                color: "var(--hall-paper-0)",
+              }}
+            >
+              {dom ?? "Source"} ↗
+            </a>
+          )}
+          <a
+            href={signal.notionUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex-1 text-center py-2 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-opacity hover:opacity-70"
+            style={{
+              background: "var(--hall-fill-soft)",
+              color: "var(--hall-muted-2)",
+              border: "1px solid var(--hall-line)",
+            }}
+          >
+            Notion ↗
+          </a>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ── Bucket list ───────────────────────────────────────────────────────────────
+
+function Bucket({
+  label,
+  rows,
+  onSelect,
+}: {
+  label: string;
+  rows: CompetitiveIntelRow[];
+  onSelect: (r: CompetitiveIntelRow) => void;
+}) {
   return (
     <div>
       <p
@@ -198,16 +398,13 @@ function Bucket({ label, rows }: { label: string; rows: CompetitiveIntelRow[] })
       </p>
       <ul className="flex flex-col">
         {rows.slice(0, 10).map((r) => {
-          const isOpen = expanded.has(r.id);
-          const hasSummary = !!r.summary?.trim();
-          const href = r.sourceUrl ?? r.notionUrl;
           const age = relativeAge(r.dateCaptured);
-          const dom = domainHint(r.sourceUrl);
           return (
             <li
               key={r.id}
-              className="py-2"
+              className="py-2 cursor-pointer group"
               style={{ borderTop: "1px solid var(--hall-line-soft)" }}
+              onClick={() => onSelect(r)}
             >
               <div className="flex items-center gap-2 mb-1 flex-wrap">
                 <RelevancePill r={r.relevance} />
@@ -227,49 +424,13 @@ function Bucket({ label, rows }: { label: string; rows: CompetitiveIntelRow[] })
                   {age ?? "—"}
                 </span>
               </div>
-              <button
-                type="button"
-                onClick={() => hasSummary && toggle(r.id)}
-                className={`text-left w-full ${hasSummary ? "cursor-pointer" : "cursor-default"}`}
-                disabled={!hasSummary}
+              <p
+                className="text-[11.5px] font-semibold leading-snug group-hover:opacity-70 transition-opacity"
+                style={{ color: "var(--hall-ink-0)" }}
               >
-                <p className="text-[11.5px] font-semibold leading-snug" style={{ color: "var(--hall-ink-0)" }}>
-                  {r.title}
-                  {hasSummary && (
-                    <span className="ml-1 text-[9px] font-normal" style={{ color: "var(--hall-muted-3)" }}>
-                      {isOpen ? "▾" : "▸"}
-                    </span>
-                  )}
-                </p>
-              </button>
-              {hasSummary && isOpen && (
-                <p className="text-[10px] leading-snug mt-1" style={{ color: "var(--hall-muted-2)" }}>
-                  {r.summary}
-                </p>
-              )}
-              <div className="flex items-center gap-3 mt-1.5">
-                {r.sourceUrl && (
-                  <a
-                    href={r.sourceUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[9.5px] font-semibold"
-                    style={{ color: "var(--hall-muted-2)", fontFamily: "var(--font-hall-mono)" }}
-                  >
-                    {dom ?? "source"} ↗
-                  </a>
-                )}
-                <a
-                  href={href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-[9.5px] font-semibold"
-                  style={{ color: "var(--hall-muted-3)", fontFamily: "var(--font-hall-mono)" }}
-                  title="Open in Notion"
-                >
-                  {r.sourceUrl ? "Notion ↗N" : "Open ↗N"}
-                </a>
-              </div>
+                {r.title}
+                <span className="ml-1 text-[9px] font-normal" style={{ color: "var(--hall-muted-3)", opacity: 0 }} aria-hidden>▸</span>
+              </p>
             </li>
           );
         })}
