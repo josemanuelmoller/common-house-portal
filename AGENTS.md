@@ -4,6 +4,32 @@
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
 <!-- END:nextjs-agent-rules -->
 
+<!-- BEGIN:portal-design-rules -->
+## Portal design — hard rule
+
+Every new admin page (anything under `src/app/admin/`) MUST scaffold from
+`<PortalShell>` (`src/components/PortalShell.tsx`). It mounts the Sidebar,
+applies the K-v2 thin 1-line header, handles mobile-aware margin
+(`md:ml-60`), and applies `px-4 sm:px-9` body padding.
+
+Sub-sections inside the page MUST use `<HallSection>` (`src/components/HallSection.tsx`)
+for the standard h2 + Instrument Serif flourish + ink-0 underline + mono meta.
+
+Never:
+- Build a page from `<div className="flex min-h-screen"><Sidebar /><main…>` by hand.
+- Hard-code `#131218`, `#c8f55a`, `#B2FF59`, `#EFEFEA`, `#E0E0D8`, `Space Grotesk`.
+  Use `--hall-*` tokens and `--font-hall-{sans,display,mono}` variables instead.
+- Put lime backgrounds on action buttons. Lime is RESERVED for Focus-of-day
+  + LIVE pulse + the brand logo. Use `.hall-btn-primary` (solid ink-0)
+  for primary actions.
+
+Every new page MUST be tested below 640px width before declaring done. The
+`<PortalShell>` API has a `metaMobile` prop for compact mobile stat strips;
+use it instead of overflowing a wide stat row.
+
+Full reference: `docs/PORTAL_DESIGN.md`. Read it before adding the page.
+<!-- END:portal-design-rules -->
+
 <!-- BEGIN:api-auth-rules -->
 ## API route auth — hard rule
 
