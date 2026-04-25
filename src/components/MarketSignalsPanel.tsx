@@ -161,64 +161,46 @@ export function MarketSignalsPanel({ text, date, generatedAt, briefs = [] }: Pro
         const usable = briefs.filter(b => b.title !== "Untitled" || !!b.sourceLink);
         if (usable.length === 0) return null;
         return (
-          <div className="mt-3 pt-3" style={{ borderTop: "1px solid var(--hall-line-soft)" }}>
-            <p
-              className="text-[8.5px] font-bold uppercase tracking-widest mb-2"
-              style={{ color: "var(--hall-muted-3)", fontFamily: "var(--font-hall-mono)" }}
-            >
-              Sources · {usable.length}
-            </p>
-            <ul className="flex flex-wrap gap-1.5">
+          <div className="mt-3 pt-2.5" style={{ borderTop: "1px solid var(--hall-line-soft)" }}>
+            <div className="flex items-center gap-2 overflow-x-auto pb-0.5" style={{ scrollbarWidth: "none" }}>
+              <span
+                className="text-[8px] font-bold uppercase tracking-widest shrink-0"
+                style={{ color: "var(--hall-muted-3)", fontFamily: "var(--font-hall-mono)" }}
+              >
+                {usable.length} src
+              </span>
               {usable.slice(0, 12).map(b => {
                 const href = b.sourceLink ?? b.notionUrl;
                 const isOriginal = !!b.sourceLink;
-                // Label precedence: real title → domain (if external) → "Notion brief"
-                const label =
-                  b.title !== "Untitled"
-                    ? b.title
-                    : (b.sourceLink && domainHint(b.sourceLink)) || "Notion brief";
+                const domain = b.sourceLink ? domainHint(b.sourceLink) : null;
                 const typeTag = sourceTypeShort(b.sourceType);
                 return (
-                  <li key={b.id}>
-                    <a
-                      href={href}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      title={
-                        (b.title !== "Untitled" ? b.title : "Untitled brief") +
-                        (isOriginal ? " · opens original source" : " · opens in Notion")
-                      }
-                      className="inline-flex items-center gap-1.5 text-[9.5px] font-semibold transition-colors px-2 py-0.5 rounded-full max-w-[240px]"
-                      style={{
-                        color: "var(--hall-muted-2)",
-                        background: "var(--hall-paper-0)",
-                        border: "1px solid var(--hall-line)",
-                      }}
-                    >
-                      {typeTag && (
-                        <span
-                          className="text-[8px] font-bold shrink-0 px-1 rounded"
-                          style={{
-                            color: "var(--hall-muted-3)",
-                            background: "var(--hall-fill-soft)",
-                            letterSpacing: "0.04em",
-                          }}
-                        >
-                          {typeTag}
-                        </span>
-                      )}
-                      <span className="truncate">{label}</span>
-                      <span
-                        className="text-[8px] opacity-60 shrink-0"
-                        aria-label={isOriginal ? "external" : "notion"}
-                      >
-                        {isOriginal ? "↗" : "↗N"}
+                  <a
+                    key={b.id}
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title={(b.title !== "Untitled" ? b.title : domain ?? "Notion brief") + (isOriginal ? " ↗" : "")}
+                    className="inline-flex items-center gap-1 shrink-0 px-1.5 py-px rounded transition-opacity hover:opacity-70"
+                    style={{
+                      color: "var(--hall-muted-2)",
+                      background: "var(--hall-fill-soft)",
+                      border: "1px solid var(--hall-line)",
+                      fontSize: 8.5,
+                      fontWeight: 600,
+                    }}
+                  >
+                    {typeTag && (
+                      <span style={{ color: "var(--hall-muted-3)", fontFamily: "var(--font-hall-mono)", fontSize: 7.5, fontWeight: 700 }}>
+                        {typeTag}
                       </span>
-                    </a>
-                  </li>
+                    )}
+                    <span className="max-w-[90px] truncate">{domain ?? (b.title !== "Untitled" ? b.title : "Notion")}</span>
+                    <span style={{ fontSize: 7, opacity: 0.5 }}>{isOriginal ? "↗" : "N"}</span>
+                  </a>
                 );
               })}
-            </ul>
+            </div>
           </div>
         );
       })()}
