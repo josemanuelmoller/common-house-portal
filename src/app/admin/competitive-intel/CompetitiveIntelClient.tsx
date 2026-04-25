@@ -291,9 +291,49 @@ function TabActividad({ entityStats, onSelectEntity }: { entityStats: EntityStat
     return labels;
   })();
 
+  // Group by priority: Competitor → Partner → everything else, sorted by activity within each group
+  const GROUP_ORDER = ["Competitor", "Partner", "Referente", "Sector", "Cliente potencial"];
+  const groups = GROUP_ORDER.map((groupType) => ({
+    type: groupType,
+    items: entityStats
+      .filter((e) => (e.type ?? "Sector") === groupType)
+      .sort((a, b) => b.totalSignals - a.totalSignals),
+  })).filter((g) => g.items.length > 0);
+
+  // Also catch any types not in GROUP_ORDER
+  const knownTypes = new Set(GROUP_ORDER);
+  const overflow = entityStats.filter((e) => !knownTypes.has(e.type ?? "")).sort((a, b) => b.totalSignals - a.totalSignals);
+  if (overflow.length > 0) groups.push({ type: "Otros", items: overflow });
+
+  const GROUP_LABEL: Record<string, string> = {
+    Competitor:          "Competidores directos",
+    Partner:             "Partners",
+    Referente:           "Referentes",
+    Sector:              "Sector",
+    "Cliente potencial": "Clientes potenciales",
+    Otros:               "Otros",
+  };
+
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-      {entityStats.map((e) => (
+    <div className="space-y-6">
+      {groups.map((group) => (
+        <div key={group.type}>
+          {/* Section header */}
+          <div className="flex items-center gap-3 mb-3">
+            <span
+              className="text-[9px] font-bold tracking-[1.8px] uppercase"
+              style={{ color: "var(--hall-muted-2)", fontFamily: "var(--font-hall-mono)" }}
+            >
+              {GROUP_LABEL[group.type] ?? group.type}
+            </span>
+            <div className="flex-1 h-px" style={{ background: "var(--hall-paper-2, #e2e2da)" }} />
+            <span className="text-[9px] font-mono" style={{ color: "var(--hall-muted-2)" }}>
+              {group.items.length}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            {group.items.map((e) => (
         <button
           key={e.id}
           onClick={() => onSelectEntity(e)}
@@ -355,6 +395,9 @@ function TabActividad({ entityStats, onSelectEntity }: { entityStats: EntityStat
             </div>
           </div>
         </button>
+            ))}
+          </div>
+        </div>
       ))}
     </div>
   );
