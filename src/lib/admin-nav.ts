@@ -38,4 +38,7 @@ export const ADMIN_NAV = [
   { label: "Curate Living Room",  href: "/admin/living-room",    icon: "◑", section: "House Layers" },
   { label: "My Rooms",            href: "/admin/my-rooms",       icon: "◫", section: "House Layers" },
   { label: "The Library",         href: "/library",              icon: "▤", section: "House Layers" },
+
+  // ── Settings ──────────────────────────────────────────────────────────────
+  { label: "Project Roles",       href: "/admin/settings/project-roles", icon: "⚙", section: "Settings" },
 ];
