@@ -10,6 +10,9 @@ export type PersonRecord = {
   email: string;
   classification: "Internal" | "External" | "";
   roles: string[];
+  /** "Rol interno" single-select. Source of truth for EIR / Core Team / Advisor /
+   *  Contractor / Extended Network / Alumni distinction. Empty when unset. */
+  rolInterno: "" | "Core Team" | "EIR" | "Advisor" | "Contractor" | "Extended Network" | "Alumni";
   linkedin?: string;   // populated by getAllPeople() — not always set
   location?: string;   // "City, Country" from People DB — not always set
 };
@@ -63,6 +66,7 @@ async function resolvePerson(id: string): Promise<PersonRecord | null> {
       email: page.properties?.["Email"]?.email ?? "",
       classification: (select(prop(page, "Person Classification")) as PersonRecord["classification"]) ?? "",
       roles: multiSelect(prop(page, "Relationship Roles")),
+      rolInterno: (select(prop(page, "Rol interno")) as PersonRecord["rolInterno"]) ?? "",
     };
   } catch {
     return null;
@@ -148,6 +152,7 @@ export async function getAllPeople(): Promise<PersonRecord[]> {
           email:          page.properties?.["Email"]?.email ?? "",
           classification: (select(prop(page, "Person Classification")) as PersonRecord["classification"]) ?? "",
           roles:          multiSelect(prop(page, "Relationship Roles")),
+          rolInterno:     (select(prop(page, "Rol interno")) as PersonRecord["rolInterno"]) ?? "",
           linkedin:       page.properties?.["LinkedIn"]?.url ?? undefined,
           location:       location || undefined,
         };

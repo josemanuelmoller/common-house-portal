@@ -12,16 +12,19 @@ export default async function ResidentsPage() {
   const people = await getAllPeople();
 
   // ── Human sections ─────────────────────────────────────────────────────────
+  // Source of truth for EIR / Core Team distinction is the `Rol interno`
+  // single-select on each Person record in Notion. Co-founders are still
+  // derived from Internal + Founder role since there's no explicit value.
   const coFounders = people
     .filter((p) => p.classification === "Internal" && p.roles.includes("Founder"))
     .sort((a, b) => a.name.localeCompare(b.name));
 
   const coreTeam = people
-    .filter((p) => p.classification === "Internal" && !p.roles.includes("Founder"))
+    .filter((p) => p.classification === "Internal" && p.rolInterno === "Core Team")
     .sort((a, b) => a.name.localeCompare(b.name));
 
   const eirs = people
-    .filter((p) => p.classification === "External" && p.roles.includes("EIR"))
+    .filter((p) => p.rolInterno === "EIR")
     .sort((a, b) => a.name.localeCompare(b.name));
 
   const humanCount = coFounders.length + coreTeam.length + eirs.length;
