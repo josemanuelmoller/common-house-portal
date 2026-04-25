@@ -1035,6 +1035,11 @@ export default async function AdminPage() {
             <InboxTriage initialItems={inboxData.items} initialScanned={inboxData.total_scanned} />
           </HallSection>
 
+          {/* ── Commitments — left col, below inbox ──────────────────────── */}
+          <HallSection title="Commitments">
+            <HallCommitmentLedger />
+          </HallSection>
+
             </div>{/* /hall-today-col-left */}
 
             <div className="hall-today-col-right">
@@ -1080,11 +1085,6 @@ export default async function AdminPage() {
                   ))}
                 </HallSection>
               )}
-
-              {/* ── Upcoming commitments ─────────────────────────────────── */}
-              <HallSection title="Commitments">
-                <HallCommitmentLedger />
-              </HallSection>
 
               {/* ── Open decisions (compact right-col peek) ──────────────── */}
               {deskDecisions.length > 0 && (() => {

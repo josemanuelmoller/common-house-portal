@@ -328,62 +328,81 @@ export async function HallTodayAgenda() {
         )}
       </div>
 
-      {/* ── Rest of today — compact timeline ──────────────────────────── */}
-      {rest.length > 0 && (
-        <div>
-          <p
-            className="text-[8.5px] font-bold uppercase tracking-widest mb-2"
-            style={{ color: "var(--hall-muted-3)", fontFamily: "var(--font-hall-mono)" }}
-          >
-            Later today · {rest.length}
-          </p>
-          <ul className="flex flex-col">
-            {rest.map(m => (
-              <li
-                key={m.eventId}
-                className="flex items-start gap-3 py-2"
-                style={{ borderTop: "1px solid var(--hall-line-soft)" }}
-              >
-                <span
-                  className="shrink-0 pt-0.5"
-                  style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10, fontWeight: 700, color: "var(--hall-muted-3)", minWidth: 36 }}
+      {/* ── Rest — compact timeline grouped by day ────────────────────── */}
+      {rest.length > 0 && (() => {
+        // Group by calendar date string
+        const groups: { dateLabel: string; meetings: CompactMeeting[] }[] = [];
+        for (const m of rest) {
+          const d = new Date(m.startMs);
+          const label = d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
+          const last = groups[groups.length - 1];
+          if (last && last.dateLabel === label) last.meetings.push(m);
+          else groups.push({ dateLabel: label, meetings: [m] });
+        }
+        return (
+          <div className="mt-1">
+            {groups.map(g => (
+              <div key={g.dateLabel} className="mb-3">
+                <p
+                  className="text-[8px] font-bold uppercase tracking-widest py-1.5 mb-0"
+                  style={{
+                    color: "var(--hall-muted-3)",
+                    fontFamily: "var(--font-hall-mono)",
+                    borderBottom: "1px solid var(--hall-line-soft)",
+                  }}
                 >
-                  {m.timeLabel}
-                </span>
-                <div className="flex-1 min-w-0">
-                  {m.htmlLink ? (
-                    <a
-                      href={m.htmlLink}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-[11.5px] font-semibold leading-snug hover:opacity-70 transition-opacity line-clamp-1"
-                      style={{ color: "var(--hall-ink-0)" }}
+                  {g.dateLabel}
+                </p>
+                <ul className="flex flex-col">
+                  {g.meetings.map(m => (
+                    <li
+                      key={m.eventId}
+                      className="flex items-start gap-3 py-2"
+                      style={{ borderBottom: "1px solid var(--hall-line-soft)" }}
                     >
-                      {m.title}
-                    </a>
-                  ) : (
-                    <p className="text-[11.5px] font-semibold leading-snug line-clamp-1" style={{ color: "var(--hall-ink-0)" }}>
-                      {m.title}
-                    </p>
-                  )}
-                  {m.attendeeNames.length > 0 && (
-                    <p className="text-[10px] mt-0.5 truncate" style={{ color: "var(--hall-muted-3)" }}>
-                      {m.attendeeNames.join(", ")}
-                      {m.attendeeCount > 3 && ` +${m.attendeeCount - 3}`}
-                    </p>
-                  )}
-                </div>
-                <span
-                  className="shrink-0 text-[9px]"
-                  style={{ color: "var(--hall-muted-3)", fontFamily: "var(--font-hall-mono)" }}
-                >
-                  {formatAway(m.startMs)}
-                </span>
-              </li>
+                      <span
+                        className="shrink-0 pt-0.5"
+                        style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10, fontWeight: 700, color: "var(--hall-muted-3)", minWidth: 36 }}
+                      >
+                        {m.timeLabel}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        {m.htmlLink ? (
+                          <a
+                            href={m.htmlLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[11.5px] font-semibold leading-snug hover:opacity-70 transition-opacity line-clamp-1"
+                            style={{ color: "var(--hall-ink-0)" }}
+                          >
+                            {m.title}
+                          </a>
+                        ) : (
+                          <p className="text-[11.5px] font-semibold leading-snug line-clamp-1" style={{ color: "var(--hall-ink-0)" }}>
+                            {m.title}
+                          </p>
+                        )}
+                        {m.attendeeNames.length > 0 && (
+                          <p className="text-[10px] mt-0.5 truncate" style={{ color: "var(--hall-muted-3)" }}>
+                            {m.attendeeNames.join(", ")}
+                            {m.attendeeCount > 3 && ` +${m.attendeeCount - 3}`}
+                          </p>
+                        )}
+                      </div>
+                      <span
+                        className="shrink-0 text-[9px]"
+                        style={{ color: "var(--hall-muted-3)", fontFamily: "var(--font-hall-mono)" }}
+                      >
+                        {formatAway(m.startMs)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             ))}
-          </ul>
-        </div>
-      )}
+          </div>
+        );
+      })()}
     </div>
   );
 }
