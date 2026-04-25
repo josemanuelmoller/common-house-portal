@@ -21,7 +21,7 @@ export default async function ResidentsPage() {
     .sort((a, b) => a.name.localeCompare(b.name));
 
   const eirs = people
-    .filter((p) => p.classification === "External" && p.roles.includes("Startup Founder"))
+    .filter((p) => p.classification === "External" && p.roles.includes("EIR"))
     .sort((a, b) => a.name.localeCompare(b.name));
 
   const humanCount = coFounders.length + coreTeam.length + eirs.length;
