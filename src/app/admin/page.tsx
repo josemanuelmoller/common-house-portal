@@ -157,9 +157,22 @@ const FOUNDER_VERBS = [
 function isObservationShaped(task: CoSTask): boolean {
   const text = `${task.taskTitle ?? ""} ${task.pendingAction ?? ""}`.trim().toLowerCase();
   if (!text) return false;
-  // No counterparty + no specific link = no concrete actor
-  const hasContext = !!task.orgName?.trim() || !!task.reviewUrl;
+
+  // What counts as REAL context (not self-referential):
+  //   - orgName = a non-empty counterparty name distinct from the title.
+  //   - reviewUrl pointing to an EXTERNAL source (Gmail/Drive). A Notion
+  //     URL back to the loop itself isn't context — it just links to the
+  //     same record we're already looking at.
+  const hasOrg = !!task.orgName?.trim() && task.orgName.trim().toLowerCase() !== text;
+  const url = task.reviewUrl ?? "";
+  const isExternalLink =
+    url.includes("mail.google.com") ||
+    url.includes("drive.google.com") ||
+    url.includes("docs.google.com") ||
+    url.includes("fireflies.ai");
+  const hasContext = hasOrg || isExternalLink;
   if (hasContext) return false;
+
   return OBSERVATION_VERBS.some(v => text.includes(v));
 }
 
