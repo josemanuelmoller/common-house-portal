@@ -1039,6 +1039,11 @@ export default async function AdminPage() {
 
             <div className="hall-today-col-right">
 
+              {/* ── Manual triggers — top of right col ───────────────────── */}
+              <HallSection title="Manual " flourish="triggers">
+                <HallManualTriggers />
+              </HallSection>
+
               {/* ── Today's agenda — next meeting rich + rest compact ────── */}
               <HallSection title="Today's " flourish="agenda">
                 <HallTodayAgenda />
@@ -1143,11 +1148,6 @@ export default async function AdminPage() {
                   </HallSection>
                 );
               })()}
-
-              {/* ── Manual triggers ───────────────────────────────────────── */}
-              <HallSection title="Manual " flourish="triggers">
-                <HallManualTriggers />
-              </HallSection>
 
             </div>{/* /hall-today-col-right */}
           </div>{/* /hall-today-grid */}

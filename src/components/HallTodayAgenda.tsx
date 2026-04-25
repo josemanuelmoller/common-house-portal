@@ -89,7 +89,8 @@ export async function HallTodayAgenda() {
   const todayEnd = new Date(now);
   todayEnd.setHours(23, 59, 59, 999);
 
-  const { data } = await sb
+  // First: try today
+  const { data: todayData } = await sb
     .from("hall_calendar_events")
     .select("event_id, event_title, event_start, attendee_emails, html_link")
     .gte("event_start", now.toISOString())
@@ -98,24 +99,41 @@ export async function HallTodayAgenda() {
     .order("event_start", { ascending: true })
     .limit(20);
 
-  const rows = (data ?? []) as CalRow[];
-
-  // Filter to meetings with external attendees only
-  const withOthers = rows.filter(r =>
+  const todayRows = ((todayData ?? []) as CalRow[]).filter(r =>
     (r.attendee_emails ?? []).some(e => e && !selfSet.has(e.toLowerCase()))
   );
 
-  if (withOthers.length === 0) {
+  // If nothing today, fetch next upcoming meeting (up to 14 days ahead)
+  let rows = todayRows;
+  let isFallback = false;
+  if (todayRows.length === 0) {
+    const futureEnd = new Date(now);
+    futureEnd.setDate(futureEnd.getDate() + 14);
+    const { data: futureData } = await sb
+      .from("hall_calendar_events")
+      .select("event_id, event_title, event_start, attendee_emails, html_link")
+      .gt("event_start", todayEnd.toISOString())
+      .lte("event_start", futureEnd.toISOString())
+      .eq("is_cancelled", false)
+      .order("event_start", { ascending: true })
+      .limit(20);
+    rows = ((futureData ?? []) as CalRow[]).filter(r =>
+      (r.attendee_emails ?? []).some(e => e && !selfSet.has(e.toLowerCase()))
+    );
+    isFallback = rows.length > 0;
+  }
+
+  if (rows.length === 0) {
     return (
       <p className="text-[11px]" style={{ color: "var(--hall-muted-3)" }}>
-        No meetings with others today.
+        No upcoming meetings in the next 14 days.
       </p>
     );
   }
 
   // ── Rich prep for the NEXT meeting only ──────────────────────────────────
-  const nextRow = withOthers[0];
-  const restRows = withOthers.slice(1);
+  const nextRow = rows[0];
+  const restRows = rows.slice(1);
 
   const nextAttendeeEmails = (nextRow.attendee_emails ?? []).filter(e => e && !selfSet.has(e.toLowerCase()));
   const contactMap = await getContactsByEmails(nextAttendeeEmails);
@@ -188,6 +206,14 @@ export async function HallTodayAgenda() {
   return (
     <div>
       {/* ── Next meeting rich card ─────────────────────────────────────── */}
+      {isFallback && (
+        <p
+          className="text-[8.5px] font-bold uppercase tracking-widest mb-2"
+          style={{ color: "var(--hall-muted-3)", fontFamily: "var(--font-hall-mono)" }}
+        >
+          Next · {new Date(nextRow.event_start).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}
+        </p>
+      )}
       <div
         className="rounded-xl p-4 mb-4"
         style={{ background: "var(--hall-paper-0)", border: "1px solid var(--hall-stroke-0)" }}
