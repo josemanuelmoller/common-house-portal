@@ -100,3 +100,58 @@ export function buildDedupKey(params: {
   ].join("|");
   return createHash("sha256").update(payload).digest("hex").slice(0, 32);
 }
+
+// ─── Fuzzy dedup helpers (paraphrase-resistant) ───────────────────────────────
+// Used as a second-line check after exact dedup_key match fails. Catches the
+// case where two ingestors describe the same commitment with different words:
+//   "Follow up with Carlos on Istanbul Initiative status report"
+//   "Chase Carlos on Istanbul Initiative briefing document completion"
+// Same intent, same counterparty, paraphrased subject → should collapse.
+
+const STOP_GENERIC = new Set([
+  "the","a","an","of","to","for","and","or","but","on","in","at","by",
+  "is","are","was","were","be","been","being","this","that","these","those",
+  "we","i","you","they","them","our","my","your","it","its","as","from","with",
+  "about","regarding","re",
+  // phrasal verb particles — left over after "follow", "reach", "circle" etc strip
+  "up","out","back","over","off","through","along","around","into","onto",
+]);
+
+const STOP_ACTION_VERBS = new Set([
+  "follow","followup","chase","ping","check","ask","send","share","prepare",
+  "complete","completion","finish","deliver","review","confirm","schedule",
+  "set","make","do","get","give","have","has","had","need","needs","please",
+  "remind","update","reach","reachout","loop","circle","touch","base",
+]);
+
+/**
+ * Normalize an action_item subject for fuzzy similarity. Stricter than
+ * normalizeSubject — strips action verbs and generic stopwords so that what
+ * remains is the topic substance (entities + nouns).
+ */
+export function actionItemFingerprint(subject: string | null | undefined): string {
+  if (!subject) return "";
+  let s = stripDiacritics(subject).toLowerCase();
+  s = s.replace(/^\s*(re|fwd|fw|rv|resp|reply)\s*[:\-]\s*/gi, " ");
+  s = s.replace(URL_RE, " ");
+  s = s.replace(/[^\p{L}\p{N}\s]/gu, " ");
+  s = s.replace(/\s+/g, " ").trim();
+  return s.split(" ")
+    .filter(w => w && !STOP_GENERIC.has(w) && !STOP_ACTION_VERBS.has(w))
+    .join(" ");
+}
+
+/**
+ * Overlap coefficient: |A ∩ B| / min(|A|, |B|).
+ * Better than Jaccard when one fingerprint is much shorter — it doesn't
+ * penalize the longer one for adding context the shorter one omits.
+ */
+export function overlapCoefficient(a: string, b: string): number {
+  const A = new Set(a.split(" ").filter(Boolean));
+  const B = new Set(b.split(" ").filter(Boolean));
+  const minSize = Math.min(A.size, B.size);
+  if (minSize === 0) return 0;
+  let inter = 0;
+  for (const t of A) if (B.has(t)) inter++;
+  return inter / minSize;
+}

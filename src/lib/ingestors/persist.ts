@@ -9,7 +9,7 @@
 
 import { randomUUID } from "node:crypto";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
-import { buildDedupKey } from "@/lib/normalize";
+import { buildDedupKey, actionItemFingerprint, overlapCoefficient, normalizeCounterparty } from "@/lib/normalize";
 import { computePriorityScore } from "./priority";
 import type {
   ActionSignal,
@@ -246,6 +246,71 @@ export async function persistActionSignal(signal: ActionSignal): Promise<{
       return { action: "reopened", id: closed.id as string };
     }
     // Closed row exists but is too old / explicitly done / not newer → fall through to insert
+  }
+
+  // ─── Fuzzy dedup (paraphrase-resistant) ────────────────────────────────
+  // Catches duplicates where intent + counterparty match but subject is
+  // worded differently (different ingestor, different speaker phrasing).
+  // Example:
+  //   "Follow up with Carlos on Istanbul Initiative status report"
+  //   "Chase Carlos on Istanbul Initiative briefing document completion"
+  // Threshold 0.5 on overlap coefficient + same intent + same counterparty.
+  const FUZZY_THRESHOLD = 0.5;
+  let fuzzyMatchQuery = sb
+    .from("action_items")
+    .select("id, subject, last_motion_at")
+    .eq("status", "open")
+    .eq("intent", signal.payload.intent)
+    .limit(20);
+  if (signal.related_ids?.contact_id) {
+    fuzzyMatchQuery = fuzzyMatchQuery.eq("counterparty_contact_id", signal.related_ids.contact_id);
+  } else if (signal.payload.counterparty) {
+    // Fall back to normalized counterparty string match. This is fuzzier than
+    // contact_id but still scopes us to plausible candidates.
+    const normCp = normalizeCounterparty(signal.payload.counterparty);
+    if (normCp) fuzzyMatchQuery = fuzzyMatchQuery.ilike("counterparty", `%${normCp.split(" ")[0]}%`);
+    else fuzzyMatchQuery = fuzzyMatchQuery.eq("counterparty", signal.payload.counterparty);
+  }
+  const { data: fuzzyCandidates } = await fuzzyMatchQuery;
+
+  if (fuzzyCandidates && fuzzyCandidates.length > 0) {
+    const incomingFp = actionItemFingerprint(signal.payload.subject);
+    if (incomingFp) {
+      let bestMatch: { id: string; lastMotion: string; similarity: number } | null = null;
+      for (const c of fuzzyCandidates) {
+        const sim = overlapCoefficient(incomingFp, actionItemFingerprint(c.subject as string));
+        if (sim >= FUZZY_THRESHOLD && (!bestMatch || sim > bestMatch.similarity)) {
+          bestMatch = {
+            id:         c.id as string,
+            lastMotion: c.last_motion_at as string,
+            similarity: sim,
+          };
+        }
+      }
+      if (bestMatch) {
+        const existingT = new Date(bestMatch.lastMotion).getTime();
+        const incomingT = new Date(signal.payload.last_motion_at).getTime();
+        if (incomingT <= existingT) return { action: "skipped", id: bestMatch.id };
+        const { error: updErr } = await sb
+          .from("action_items")
+          .update({
+            last_motion_at:   signal.payload.last_motion_at,
+            next_action:      signal.payload.next_action,
+            priority_factors: signal.payload.priority_factors,
+            priority_score,
+            source_type:      signal.source_type,
+            source_id:        signal.source_id,
+            source_url:       signal.source_url ?? null,
+            ingestor_version: signal.ingestor_version,
+            ingested_at:      signal.emitted_at,
+            deadline:         signal.payload.deadline,
+            consequence:      signal.payload.consequence,
+          })
+          .eq("id", bestMatch.id);
+        if (updErr) throw new Error(`persistActionSignal fuzzy-update: ${updErr.message}`);
+        return { action: "updated", id: bestMatch.id };
+      }
+    }
   }
 
   // New row
