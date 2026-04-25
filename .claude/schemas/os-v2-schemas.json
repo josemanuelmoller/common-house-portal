@@ -1,0 +1,197 @@
+{
+  "_meta": {
+    "exported_at": "2026-04-25",
+    "source": "Notion via mcp__notion-fetch on each database",
+    "purpose": "Authoritative reference for OS v2 multi-select valid values, select valid values, field types, relation targets. All ingestion skills must read from this file before pushing to Notion. Re-export weekly via hygiene-agent.",
+    "format_notes": "Fields with type='multi_select' or 'select' have an 'options' array of valid values. Fields with type='relation' have 'target_data_source_id'. Multi-select values for Notion API must be passed as JSON-stringified arrays of valid option names."
+  },
+
+  "ch_sources_os_v2": {
+    "database_id": "d88aff1b-019d-4110-bcef-ab7f5bfbd0ae",
+    "data_source_id": "6f804e20-834c-4de2-a746-f6343fc75451",
+    "title_field": "Source Title",
+    "fields": {
+      "Source Title": { "type": "title" },
+      "Source Type": {
+        "type": "select",
+        "options": ["Meeting", "Email Thread", "Document", "Note", "Email", "Clipping", "Conversation", "Research Report", "Industry Report", "Whitepaper", "Standard"]
+      },
+      "Source Platform": {
+        "type": "select",
+        "options": ["Fireflies", "Gmail", "Google Drive", "Upload", "Manual", "Web", "WhatsApp"]
+      },
+      "Source Date": { "type": "date" },
+      "Last Source Update": { "type": "date" },
+      "Source URL": { "type": "url" },
+      "Thread ID / Doc ID": { "type": "text" },
+      "Source External ID": { "type": "text" },
+      "Dedup Key": { "type": "text" },
+      "Processing Status": {
+        "type": "select",
+        "options": ["New", "Ingested", "Processed", "Blocked"]
+      },
+      "Relevance Status": {
+        "type": "select",
+        "options": ["New", "Relevant", "Ignore", "Needs Review"]
+      },
+      "Access Level": {
+        "type": "select",
+        "options": ["Team", "Project Team", "Leadership Only"]
+      },
+      "Sensitivity": {
+        "type": "select",
+        "options": ["Internal", "Client Confidential", "Leadership Only"]
+      },
+      "Knowledge Relevant?": { "type": "checkbox" },
+      "Evidence Extracted?": { "type": "checkbox" },
+      "Native Source Record?": { "type": "checkbox" },
+      "Group Chat": { "type": "checkbox" },
+      "Attachments Present?": { "type": "checkbox" },
+      "Attachment Notes": { "type": "text" },
+      "Processed Summary": { "type": "text" },
+      "Sanitized Notes": { "type": "text" },
+      "Ignore Reason": { "type": "text" },
+      "Linked Organizations": { "type": "relation", "target_data_source_id": "a0410f76-1f3e-4ec1-adc4-e47eb4132c3d" },
+      "Linked People": { "type": "relation", "target_data_source_id": "6f4197dd-3597-4b00-a711-86d6fcf819ad" },
+      "Linked Projects": { "type": "relation", "target_data_source_id": "5ef16ab9-e762-4548-b6c9-f386da4f6b29" }
+    }
+  },
+
+  "ch_evidence_os_v2": {
+    "database_id": "fa281249-78d0-4303-9d89-32ac9964ccf5",
+    "data_source_id": "ed78f965-d6e5-47ee-b60c-d7056d381454",
+    "title_field": "Evidence Title",
+    "fields": {
+      "Evidence Title": { "type": "title" },
+      "Evidence Statement": { "type": "text" },
+      "Evidence Type": {
+        "type": "select",
+        "options": ["Approval", "Blocker", "Process Step", "Stakeholder", "Risk", "Objection", "Decision", "Requirement", "Dependency", "Outcome", "Assumption", "Contradiction", "Insight Candidate", "Milestone", "Traction"]
+      },
+      "Reusability Level": {
+        "type": "select",
+        "options": ["Project-Specific", "Possibly Reusable", "Reusable", "Canonical"]
+      },
+      "Validation Status": {
+        "type": "select",
+        "options": ["New", "Reviewed", "Validated", "Rejected", "Superseded"]
+      },
+      "Confidence Level": {
+        "type": "select",
+        "options": ["Low", "Medium", "High"]
+      },
+      "Sensitivity Level": {
+        "type": "select",
+        "options": ["Restricted", "Client Confidential", "Internal", "Shareable"]
+      },
+      "Topics / Themes": {
+        "type": "multi_select",
+        "options": ["Refill", "Reuse", "Zero Waste", "Policy", "Retail", "Organics", "Packaging", "Cities", "Behaviour Change", "Equity / Inclusion", "Investment / Finance", "Industry / Government"]
+      },
+      "Geography": {
+        "type": "multi_select",
+        "options": ["UK", "EU", "LATAM", "North America", "Africa / MENA", "Asia", "Global"]
+      },
+      "Affected Theme": {
+        "type": "multi_select",
+        "options": ["Approvals", "Stakeholders", "Operations", "Training", "Tech", "Legal", "Procurement", "Communications", "Rollout", "Metrics", "Budget", "Commercial", "Governance"]
+      },
+      "Migration Status": {
+        "type": "select",
+        "options": ["Not Migrated", "Draft Migrated", "Verified", "Needs Review"]
+      },
+      "Legacy Source DB": {
+        "type": "select",
+        "options": ["Meetings [master]", "Document Hub [master]", "Other", "CH Sources [OS v2]"]
+      },
+      "Date Captured": { "type": "date" },
+      "Review Due Date": { "type": "date" },
+      "Reviewed At": { "type": "date" },
+      "Created Date": { "type": "created_time" },
+      "Source Excerpt": { "type": "text" },
+      "Legacy Record ID": { "type": "text" },
+      "Legacy Record URL": { "type": "url" },
+      "Source Record": { "type": "relation", "target_data_source_id": "6f804e20-834c-4de2-a746-f6343fc75451" },
+      "Source Conversation": { "type": "relation", "target_data_source_id": "826253a3-2ab5-4305-8701-e7fd1cc6a52f" },
+      "Project": { "type": "relation", "target_data_source_id": "5ef16ab9-e762-4548-b6c9-f386da4f6b29" },
+      "Organization": { "type": "relation", "target_data_source_id": "a0410f76-1f3e-4ec1-adc4-e47eb4132c3d" },
+      "Owner / Reviewer": { "type": "relation", "target_data_source_id": "6f4197dd-3597-4b00-a711-86d6fcf819ad" },
+      "People Involved": { "type": "relation", "target_data_source_id": "6f4197dd-3597-4b00-a711-86d6fcf819ad" },
+      "Reviewed By": { "type": "relation", "target_data_source_id": "6f4197dd-3597-4b00-a711-86d6fcf819ad" },
+      "Knowledge Assets Linked": { "type": "relation", "target_data_source_id": "e7d711a5-f441-4cc8-96c1-bd33151c09b8" },
+      "Linked Strategic Objectives": { "type": "text" }
+    }
+  },
+
+  "ch_knowledge_assets_os_v2": {
+    "database_id": "0f4bfe95-549d-4710-a3a9-ab6e119a9b04",
+    "data_source_id": "e7d711a5-f441-4cc8-96c1-bd33151c09b8",
+    "title_field": "Asset Name",
+    "fields": {
+      "Asset Name": { "type": "title" },
+      "Asset Type": {
+        "type": "select",
+        "options": ["Playbook", "Pattern Library", "Method", "Checklist", "Template", "Benchmark", "Insight Memo", "Market Research", "Model Validation", "Sector Insight", "Framework"]
+      },
+      "Status": {
+        "type": "select",
+        "options": ["Draft", "Active", "In Review", "Deprecated", "Archived"]
+      },
+      "Sensitivity Level": {
+        "type": "select",
+        "options": ["Internal Core", "Restricted Internal", "Client Derived", "Public-Facing"]
+      },
+      "Portal Visibility": {
+        "type": "select",
+        "options": ["admin-only", "portfolio", "public"]
+      },
+      "Migration Status": {
+        "type": "select",
+        "options": ["Not Migrated", "Draft Migrated", "Verified", "Needs Review"]
+      },
+      "Legacy Source DB": {
+        "type": "select",
+        "options": ["Document Hub [master]", "Projects [master]", "Other"]
+      },
+      "Domain / Theme": {
+        "type": "multi_select",
+        "options": ["Refill", "Reuse", "Zero Waste", "Retail", "Policy", "Organics", "Packaging", "Cities", "Latam", "FMCG", "Market Structure", "Competitive Landscape", "Refillable", "Wild", "Benchmark", "Global Analogues", "Gen Z", "Consumer Insight", "Sustainability", "Water Tech", "Circular Economy", "Digital Platform", "Beverage", "Commercial Model", "Pilot Structure", "Revenue Model", "Conversion Incentive", "Digital Transformation", "Water-as-a-Service", "Recurring Revenue", "Data Platform", "pricing", "Argentina", "deodorant", "LCA", "CO2", "impact", "unit economics", "capex", "gross margin", "format selection", "California", "North America", "USA"]
+      },
+      "Subthemes": {
+        "type": "multi_select",
+        "options": ["Approvals", "Training", "Operations", "Stakeholders", "Rollout", "Procurement", "Legal", "Metrics"]
+      },
+      "Operationally Active?": { "type": "checkbox" },
+      "Living Room Theme": { "type": "checkbox" },
+      "Knowledge Update Needed?": { "type": "checkbox" },
+      "Source File URL": { "type": "url" },
+      "Version": { "type": "text" },
+      "Summary": { "type": "text" },
+      "Canonical Guidance / Main Body": { "type": "text" },
+      "Draft Update Proposal": { "type": "text" },
+      "Legacy Record ID": { "type": "text" },
+      "Legacy Record URL": { "type": "url" },
+      "Next Review Date": { "type": "date" },
+      "Created Date": { "type": "created_time" },
+      "Last Updated": { "type": "last_edited_time" },
+      "Owner": { "type": "relation", "target_data_source_id": "6f4197dd-3597-4b00-a711-86d6fcf819ad" },
+      "Reviewer": { "type": "relation", "target_data_source_id": "6f4197dd-3597-4b00-a711-86d6fcf819ad" },
+      "Evidence Used as Sources": { "type": "relation", "target_data_source_id": "ed78f965-d6e5-47ee-b60c-d7056d381454" },
+      "Conversations Used as Sources": { "type": "relation", "target_data_source_id": "826253a3-2ab5-4305-8701-e7fd1cc6a52f" },
+      "Organizations Used as Sources": { "type": "relation", "target_data_source_id": "a0410f76-1f3e-4ec1-adc4-e47eb4132c3d" },
+      "Projects Used as Sources": { "type": "relation", "target_data_source_id": "5ef16ab9-e762-4548-b6c9-f386da4f6b29" },
+      "Parent / Supersedes": { "type": "relation", "target_data_source_id": "e7d711a5-f441-4cc8-96c1-bd33151c09b8" },
+      "Child / Superseded By": { "type": "relation", "target_data_source_id": "e7d711a5-f441-4cc8-96c1-bd33151c09b8" },
+      "Related Knowledge Assets": { "type": "relation", "target_data_source_id": "e7d711a5-f441-4cc8-96c1-bd33151c09b8" },
+      "Linked Strategic Objectives": { "type": "text" }
+    }
+  },
+
+  "_relation_targets": {
+    "comment": "Quick lookup of frequently-relation'd data source IDs",
+    "ch_organizations_os_v2": "a0410f76-1f3e-4ec1-adc4-e47eb4132c3d",
+    "ch_people_os_v2": "6f4197dd-3597-4b00-a711-86d6fcf819ad",
+    "ch_projects_os_v2": "5ef16ab9-e762-4548-b6c9-f386da4f6b29",
+    "ch_conversations_os_v2": "826253a3-2ab5-4305-8701-e7fd1cc6a52f"
+  }
+}
