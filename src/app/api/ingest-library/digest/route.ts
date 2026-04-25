@@ -5,7 +5,7 @@ import {
   generateDigestionProposal,
   generateDigestionProposalFromText,
 } from "@/lib/digest-pipeline";
-import { OfficeParser } from "officeparser";
+import { extractDocxText, extractPptxText } from "@/lib/office-text-extract";
 
 export const maxDuration = 300;
 
@@ -170,8 +170,10 @@ export async function POST(req: NextRequest) {
     if (kind === "pdf") {
       result = await generateDigestionProposal(fileBuffer, scopeHints);
     } else {
-      const ast = await OfficeParser.parseOffice(fileBuffer);
-      const extractedText = ast.toText();
+      const extractedText =
+        kind === "docx"
+          ? await extractDocxText(fileBuffer)
+          : await extractPptxText(fileBuffer);
       extractedChars = extractedText?.length ?? 0;
       if (extractedChars < 100) {
         return NextResponse.json(
