@@ -152,7 +152,10 @@ export async function getCommitmentActions(limit = 60): Promise<CommitmentAction
   // Calendar is excluded: its follow_up emission ("meeting happened, no
   // transcript yet") is a data-quality prompt, not a personal commitment.
   // Calendar only contributes to the CoS desk via `prep` intents.
-  const COMMITMENT_SOURCES = ["gmail", "fireflies", "whatsapp", "loops", "drive", "evidence_derived"];
+  // WhatsApp excluded: Phase 13.1 retired its ActionSignal emission. The
+  // clipper can't see Jose's replies, so DMs would surface as perpetual
+  // follow-ups even after he responded on the phone.
+  const COMMITMENT_SOURCES = ["gmail", "fireflies", "loops", "drive", "evidence_derived"];
   const { data, error } = await sb
     .from("action_items")
     .select(
@@ -260,6 +263,9 @@ function intentToIntervention(intent: string, score: number): CoSTaskLike["inter
 
 export async function getCoSActions(limit = 40): Promise<CoSTaskLike[]> {
   const sb = getSupabaseServerClient();
+  // WhatsApp excluded from CoS desk per Phase 13.1 (relationship-only
+  // emission — see whatsapp.ts header).
+  const COS_SOURCES = ["gmail", "fireflies", "loops", "calendar", "drive", "evidence_derived"];
   const { data, error } = await sb
     .from("action_items")
     .select(
@@ -267,6 +273,7 @@ export async function getCoSActions(limit = 40): Promise<CoSTaskLike[]> {
       "intent, priority_score, last_motion_at, deadline, founder_owned, owner_person_id, ball_in_court"
     )
     .eq("status", "open")
+    .in("source_type", COS_SOURCES)
     .gte("priority_score", 40)
     .order("priority_score", { ascending: false })
     .order("last_motion_at", { ascending: false })
