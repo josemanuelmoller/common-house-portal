@@ -30,6 +30,8 @@ import {
   persistSignals,
   setWatermark,
   summarizeResult,
+  hasFatalErrors,
+  flushPerRowErrorsToDlq,
 } from "./persist";
 import type {
   ActionSignal,
@@ -139,9 +141,12 @@ export async function runDriveIngestor(input: IngestInput): Promise<IngestResult
             });
             processed++;
 
-            // ActionSignal(intent=review) when: shared with Jose recently, not viewed yet
+            // ActionSignal(intent=review) when: shared with Jose recently, not viewed yet.
+            // Strict equality against false: Drive omits viewedByMe for some
+            // file types, which would make `!undefined` evaluate true and
+            // emit a false-positive review action.
             const sharedMs = f.sharedWithMeTime ? Date.parse(f.sharedWithMeTime) : 0;
-            if (sharedMs && !f.viewedByMe) {
+            if (sharedMs && f.viewedByMe === false) {
               const factors = buildFactors({
                 intent: "review",
                 deadline: null,
@@ -235,7 +240,16 @@ export async function runDriveIngestor(input: IngestInput): Promise<IngestResult
     dryRun: input.dryRun ?? false,
   });
 
-  if (!input.dryRun && input.mode === "delta" && toWatermark && errors.length === 0) {
+  if (!input.dryRun) {
+    await flushPerRowErrorsToDlq({
+      sourceType: SOURCE_TYPE,
+      ingestorVersion: INGESTOR_VERSION,
+      runId,
+      errors,
+    });
+  }
+
+  if (!input.dryRun && input.mode === "delta" && toWatermark && !hasFatalErrors(errors)) {
     await setWatermark({
       sourceType: SOURCE_TYPE,
       watermark: toWatermark,

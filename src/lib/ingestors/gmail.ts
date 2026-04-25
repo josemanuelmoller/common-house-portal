@@ -24,12 +24,20 @@ import { getSelfEmails } from "@/lib/hall-self";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { buildFactors } from "./priority";
 import {
+  loadProjectRoles,
+  loadPersonProjectMap,
+  effectiveProjectFor,
+  passesManagementGate,
+} from "./project-roles";
+import {
   getWatermark,
   startIngestorRun,
   finishIngestorRun,
   persistSignals,
   setWatermark,
   summarizeResult,
+  hasFatalErrors,
+  flushPerRowErrorsToDlq,
 } from "./persist";
 import type {
   ActionSignal,
@@ -40,7 +48,7 @@ import type {
   Signal,
 } from "./types";
 
-const INGESTOR_VERSION = "gmail@1.1.0";
+const INGESTOR_VERSION = "gmail@1.2.0";
 const SOURCE_TYPE = "gmail" as const;
 const DEFAULT_MAX_ITEMS = 100;
 const DEFAULT_BACKFILL_DAYS = 7;
@@ -195,12 +203,40 @@ export async function runGmailIngestor(input: IngestInput): Promise<IngestResult
       ? await resolveContacts(allEmails)
       : new Map<string, ResolvedContact>();
 
+    // ─── Phase 11 — load Management Level + person→projects map ────────
+    // Only fetched when there are actionable threads (saves Notion calls
+    // when there's nothing to gate).
+    const [projectRoles, peopleProjectMap] = actionableThreads.length > 0
+      ? await Promise.all([loadProjectRoles(), loadPersonProjectMap()])
+      : [new Map(), new Map()];
+
     // ─── Build ActionSignals ────────────────────────────────────────────
     for (const t of actionableThreads) {
       // Haiku SKIP = drop. If next_action is null the LLM decided this isn't
       // actionable — respect it rather than emitting a null-action row.
       const nextAction = nextActions.get(t.threadId);
       if (!nextAction) { skipped++; continue; }
+
+      // Phase 11 — Management gate via counterparty's Projects relation.
+      // If the sender is on a mentorship/observer-only set of projects,
+      // this email is project-scoped advisory work — skip ActionSignal.
+      // Senders with no project context (cold contacts, unrelated people)
+      // pass through unchanged.
+      const inferredProject = effectiveProjectFor({
+        email:      t.fromEmail,
+        peopleMap:  peopleProjectMap,
+        roles:      projectRoles,
+      });
+      const gate = passesManagementGate({
+        projectNotionId: inferredProject,
+        roles:           projectRoles,
+        // For Gmail there's no per-thread "actor=Jose" classification;
+        // the user being on To: AND last sender is not self already implies
+        // Jose owes a reply. Treat as actor=self for the gate so mentorship
+        // emails where Jose IS the addressee still pass.
+        actorIsSelf: true,
+      });
+      if (!gate.pass) { skipped++; continue; }
 
       const contact = contactMap.get(t.fromEmail.toLowerCase());
       // Relationship Tier lives in Notion; not yet mirrored to Supabase people.
@@ -302,8 +338,20 @@ export async function runGmailIngestor(input: IngestInput): Promise<IngestResult
     dryRun: input.dryRun ?? false,
   });
 
+  if (!input.dryRun) {
+    await flushPerRowErrorsToDlq({
+      sourceType: SOURCE_TYPE,
+      ingestorVersion: INGESTOR_VERSION,
+      runId,
+      errors,
+    });
+  }
+
   // Only advance the watermark on non-dryRun delta runs with no fatal errors
-  if (!input.dryRun && input.mode === "delta" && toWatermark && errors.length === 0) {
+  // Watermark advances when there are NO fatal errors. Per-row errors
+  // (e.g. one malformed thread) are routed to the DLQ via flushPerRowErrorsToDlq
+  // so the pipeline doesn't stall on a single poison row.
+  if (!input.dryRun && input.mode === "delta" && toWatermark && !hasFatalErrors(errors)) {
     await setWatermark({
       sourceType: SOURCE_TYPE,
       watermark: toWatermark,

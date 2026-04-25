@@ -178,6 +178,10 @@
       "schedule": "0 6 * * *"
     },
     {
+      "path": "/api/maintenance/stale-decay",
+      "schedule": "0 4 * * *"
+    },
+    {
       "path": "/api/competitive-monitor",
       "schedule": "0 7 * * 1"
     }

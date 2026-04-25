@@ -21,6 +21,8 @@ import {
   persistSignals,
   setWatermark,
   summarizeResult,
+  hasFatalErrors,
+  flushPerRowErrorsToDlq,
 } from "./persist";
 import type {
   ActionSignal,
@@ -160,12 +162,14 @@ export async function runLoopsIngestor(input: IngestInput): Promise<IngestResult
       if (r.founder_interest === "dropped") { skipped++; continue; }
 
       // Phase 11 — Management-level gate. For loops attached to mentorship
-      // projects, only emit if founder_owned=true (Jose explicitly
-      // claimed ownership). Observer projects emit nothing.
+      // projects, emit if Jose claimed ownership EITHER via founder_owned=true
+      // OR by marking founder_interest='interested'. Both signals indicate
+      // explicit personal engagement vs. passive coverage.
+      const actorIsSelf = !!r.founder_owned || r.founder_interest === "interested";
       const gate = passesManagementGate({
         projectNotionId: r.parent_project_id,
         roles: projectRoles,
-        actorIsSelf: !!r.founder_owned,
+        actorIsSelf,
       });
       if (!gate.pass) { skipped++; continue; }
 
@@ -261,7 +265,16 @@ export async function runLoopsIngestor(input: IngestInput): Promise<IngestResult
     dryRun: input.dryRun ?? false,
   });
 
-  if (!input.dryRun && input.mode === "delta" && toWatermark && errors.length === 0) {
+  if (!input.dryRun) {
+    await flushPerRowErrorsToDlq({
+      sourceType: SOURCE_TYPE,
+      ingestorVersion: INGESTOR_VERSION,
+      runId,
+      errors,
+    });
+  }
+
+  if (!input.dryRun && input.mode === "delta" && toWatermark && !hasFatalErrors(errors)) {
     await setWatermark({
       sourceType: SOURCE_TYPE,
       watermark: toWatermark,

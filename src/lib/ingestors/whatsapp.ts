@@ -23,12 +23,20 @@
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { buildFactors } from "./priority";
 import {
+  loadProjectRoles,
+  loadPersonProjectMap,
+  effectiveProjectFor,
+  passesManagementGate,
+} from "./project-roles";
+import {
   getWatermark,
   startIngestorRun,
   finishIngestorRun,
   persistSignals,
   setWatermark,
   summarizeResult,
+  hasFatalErrors,
+  flushPerRowErrorsToDlq,
 } from "./persist";
 import type {
   ActionSignal,
@@ -39,7 +47,7 @@ import type {
   Signal,
 } from "./types";
 
-const INGESTOR_VERSION = "whatsapp@1.0.0";
+const INGESTOR_VERSION = "whatsapp@1.1.0";
 const SOURCE_TYPE = "whatsapp" as const;
 const DEFAULT_MAX_SOURCES = 50;
 const DEFAULT_BACKFILL_DAYS = 14;
@@ -143,6 +151,18 @@ export async function runWhatsAppIngestor(input: IngestInput): Promise<IngestRes
       const sourceIds = Array.from(perSource.keys());
       const srcMeta = await fetchSources(sourceIds);
 
+      // Phase 11 — Management Level + person→projects map.
+      // Resolve each sender_person_id → email so we can lookup the
+      // project map (keyed by email).
+      const senderIds = Array.from(new Set(
+        messages.map(m => m.sender_person_id).filter((x): x is string => !!x)
+      ));
+      const [projectRoles, peopleProjectMap, emailByPersonId] = await Promise.all([
+        loadProjectRoles(),
+        loadPersonProjectMap(),
+        fetchEmailsByPersonIds(senderIds),
+      ]);
+
       let latestTs = new Date(since ?? 0);
 
       for (const [sourceId, group] of perSource.entries()) {
@@ -178,6 +198,20 @@ export async function runWhatsAppIngestor(input: IngestInput): Promise<IngestRes
         if (last.sender_is_self || last.direction === "out") { skipped++; continue; }
         if (!isSubstantive(last.text)) { skipped++; continue; }
         if (!last.sender_person_id) { skipped++; continue; } // skip unresolved senders
+
+        // Phase 11 — derive project context from sender's projects relation
+        const senderEmail = emailByPersonId.get(last.sender_person_id);
+        const inferredProject = effectiveProjectFor({
+          email:     senderEmail ?? null,
+          peopleMap: peopleProjectMap,
+          roles:     projectRoles,
+        });
+        const gate = passesManagementGate({
+          projectNotionId: inferredProject,
+          roles:           projectRoles,
+          actorIsSelf:     true, // they messaged Jose directly = explicit ask
+        });
+        if (!gate.pass) { skipped++; continue; }
 
         const meta = srcMeta.get(sourceId);
         const chatName = meta?.title ?? "(unknown chat)";
@@ -257,7 +291,16 @@ export async function runWhatsAppIngestor(input: IngestInput): Promise<IngestRes
     dryRun: input.dryRun ?? false,
   });
 
-  if (!input.dryRun && input.mode === "delta" && toWatermark && errors.length === 0) {
+  if (!input.dryRun) {
+    await flushPerRowErrorsToDlq({
+      sourceType: SOURCE_TYPE,
+      ingestorVersion: INGESTOR_VERSION,
+      runId,
+      errors,
+    });
+  }
+
+  if (!input.dryRun && input.mode === "delta" && toWatermark && !hasFatalErrors(errors)) {
     await setWatermark({
       sourceType: SOURCE_TYPE,
       watermark: toWatermark,
@@ -267,6 +310,17 @@ export async function runWhatsAppIngestor(input: IngestInput): Promise<IngestRes
   }
 
   return result;
+}
+
+async function fetchEmailsByPersonIds(personIds: string[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  if (personIds.length === 0) return out;
+  const sb = getSupabaseServerClient();
+  const { data } = await sb.from("people").select("id, email").in("id", personIds);
+  for (const r of (data ?? []) as Array<{ id: string; email: string | null }>) {
+    if (r.email) out.set(r.id, r.email);
+  }
+  return out;
 }
 
 async function fetchSources(sourceIds: string[]): Promise<Map<string, SourceMeta>> {

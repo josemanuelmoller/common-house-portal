@@ -54,6 +54,7 @@ Used by: `/hall`, `/workroom`, `/garage`, `/admin`, `/living-room`, all project-
 | `Milestone Type` | Only for Living Room | `/living-room` | Select — type of milestone shown in community view | Milestone type blank in Living Room |
 | `Community Theme` | Only for Living Room | `/living-room` | Text shown as community theme in Living Room | Theme text blank |
 | `Drive Folder ID` | Only for Drive ingestor | Future Drive ingestor (Phase 9, `docs/NORMALIZATION_ARCHITECTURE.md`) | Rich text — the Google Drive folder ID the ingestor watches for this project. Empty means the project is not watched; ingestor reports it in `diagnostics.skipped_unconfigured_projects`. | Drive artifacts + `review` action_items never emitted for this project |
+| `Management Level` | Recommended | Fireflies + Loops ingestors (Phase 11, project-roles gate) | Select: `"operational"` \| `"mentorship"` \| `"observer"`. Drives whether a project's evidence/loops emit ActionSignals to Jose's desk. **Default when empty: `operational`.** Closed / Archived / Completed projects are forced to `observer` regardless of this value. | Mentorship projects without explicit Jose-actor evidence pollute the desk; observer projects' items never surface |
 
 ---
 

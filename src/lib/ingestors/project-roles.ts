@@ -50,11 +50,17 @@ export async function loadProjectRoles(): Promise<Map<string, ManagementLevel>> 
       database_id: DB.projects,
       page_size: 100,
       start_cursor: cursor,
-      // Include Proposed + Active + Paused — items with non-active projects
-      // might still appear in evidence/loops and we want deterministic filtering.
     });
     for (const p of res.results) {
       const props = p.properties as Record<string, unknown>;
+      const status = extractSelect(props["Project Status"]);
+      // Closed / Archived projects are forced to "observer" — their
+      // evidence + loops should not surface actions, regardless of any
+      // explicit management_level still on the row. Active surfaces only.
+      if (status === "Closed" || status === "Archived" || status === "Completed") {
+        out.set(p.id, "observer");
+        continue;
+      }
       const level = extractSelect(props["Management Level"]);
       out.set(p.id, normalizeLevel(level));
     }
@@ -72,6 +78,89 @@ function extractSelect(prop: unknown): string | null {
 function normalizeLevel(s: string | null): ManagementLevel {
   if (s === "operational" || s === "mentorship" || s === "observer") return s;
   return DEFAULT_MANAGEMENT_LEVEL;
+}
+
+// ─── Person → Projects resolution ────────────────────────────────────────
+/**
+ * Load a map of email → linked project notion_ids from CH People [OS v2].
+ * Used by ingestors that don't have explicit project context (Gmail,
+ * Calendar, WhatsApp) to derive Management Level from the counterparty.
+ */
+export type PersonProjectMap = Map<string, string[]>;
+
+export async function loadPersonProjectMap(): Promise<PersonProjectMap> {
+  const out: PersonProjectMap = new Map();
+  let cursor: string | undefined;
+  do {
+    const res: {
+      results: Array<{ id: string; properties: Record<string, unknown> }>;
+      has_more: boolean;
+      next_cursor: string | null;
+    } = await (notion.databases as unknown as {
+      query: (args: unknown) => Promise<{
+        results: Array<{ id: string; properties: Record<string, unknown> }>;
+        has_more: boolean;
+        next_cursor: string | null;
+      }>;
+    }).query({
+      database_id: DB.people,
+      page_size: 100,
+      start_cursor: cursor,
+    });
+    for (const p of res.results) {
+      const props = p.properties as Record<string, unknown>;
+      const email = extractEmail(props["Email"]);
+      const projectIds = extractRelationIds(props["Projects"]);
+      if (email && projectIds.length > 0) {
+        out.set(email.toLowerCase(), projectIds);
+      }
+    }
+    cursor = res.has_more ? (res.next_cursor ?? undefined) : undefined;
+  } while (cursor);
+  return out;
+}
+
+function extractEmail(prop: unknown): string | null {
+  if (!prop || typeof prop !== "object") return null;
+  const p = prop as { email?: string | null };
+  return p.email ?? null;
+}
+
+function extractRelationIds(prop: unknown): string[] {
+  if (!prop || typeof prop !== "object") return [];
+  const p = prop as { relation?: Array<{ id: string }> };
+  return (p.relation ?? []).map(r => r.id).filter(Boolean);
+}
+
+/**
+ * For an email + person→projects map + role map, return the SINGLE most
+ * permissive project_notion_id (operational > mentorship > observer).
+ * Used to pick a representative project to gate on.
+ *
+ * Returns null when the email is unknown (no project context). Callers
+ * should pass null through to passesManagementGate, which lets the item
+ * through (default operational).
+ */
+export function effectiveProjectFor(params: {
+  email: string | null | undefined;
+  peopleMap: PersonProjectMap;
+  roles: Map<string, ManagementLevel>;
+}): string | null {
+  if (!params.email) return null;
+  const projectIds = params.peopleMap.get(params.email.toLowerCase()) ?? [];
+  if (projectIds.length === 0) return null;
+  const rank: Record<ManagementLevel, number> = {
+    operational: 3,
+    mentorship:  2,
+    observer:    1,
+  };
+  let best: { id: string; rank: number } | null = null;
+  for (const id of projectIds) {
+    const level = params.roles.get(id) ?? DEFAULT_MANAGEMENT_LEVEL;
+    const r = rank[level];
+    if (!best || r > best.rank) best = { id, rank: r };
+  }
+  return best?.id ?? null;
 }
 
 /**

@@ -24,12 +24,20 @@ import { getSelfEmails } from "@/lib/hall-self";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { buildFactors } from "./priority";
 import {
+  loadProjectRoles,
+  loadPersonProjectMap,
+  effectiveProjectFor,
+  passesManagementGate,
+} from "./project-roles";
+import {
   getWatermark,
   startIngestorRun,
   finishIngestorRun,
   persistSignals,
   setWatermark,
   summarizeResult,
+  hasFatalErrors,
+  flushPerRowErrorsToDlq,
 } from "./persist";
 import type {
   ActionSignal,
@@ -40,7 +48,7 @@ import type {
   Signal,
 } from "./types";
 
-const INGESTOR_VERSION = "calendar@1.1.0";
+const INGESTOR_VERSION = "calendar@1.2.0";
 const SOURCE_TYPE = "calendar" as const;
 const DEFAULT_MAX_ITEMS = 80;
 const PREP_WINDOW_HOURS = 48;
@@ -107,6 +115,12 @@ export async function runCalendarIngestor(input: IngestInput): Promise<IngestRes
     const allEmails = Array.from(new Set(events.flatMap(e => e.attendees).map(s => s.toLowerCase())));
     const contactByEmail = await resolveContactsByEmail(allEmails);
 
+    // Phase 11 — Management Level + person→projects map
+    const [projectRoles, peopleProjectMap] = await Promise.all([
+      loadProjectRoles(),
+      loadPersonProjectMap(),
+    ]);
+
     for (const e of events) {
       try {
         if (!e.startMs) { skipped++; continue; }
@@ -116,6 +130,24 @@ export async function runCalendarIngestor(input: IngestInput): Promise<IngestRes
           skipped++;
           continue;
         }
+
+        // Phase 11 — derive effective management level from attendees.
+        // Most permissive level wins (operational > mentorship > observer).
+        // No-context attendees → null project → defaults to operational pass.
+        const externalAttendee = e.attendees.find(a => !selfSet.has(a.toLowerCase()));
+        const inferredProject = effectiveProjectFor({
+          email:     externalAttendee ?? null,
+          peopleMap: peopleProjectMap,
+          roles:     projectRoles,
+        });
+        const gate = passesManagementGate({
+          projectNotionId: inferredProject,
+          roles:           projectRoles,
+          // Calendar prep: Jose needs to prep — actor=self by default.
+          // Mentorship-project meetings still pass when Jose is attending.
+          actorIsSelf: true,
+        });
+        if (!gate.pass) { skipped++; continue; }
 
         // (1) Upcoming meeting within prep window, no agenda → prep
         if (e.startMs > now && e.startMs <= prepCutoff) {
@@ -221,7 +253,16 @@ export async function runCalendarIngestor(input: IngestInput): Promise<IngestRes
     dryRun: input.dryRun ?? false,
   });
 
-  if (!input.dryRun && input.mode === "delta" && toWatermark && errors.length === 0) {
+  if (!input.dryRun) {
+    await flushPerRowErrorsToDlq({
+      sourceType: SOURCE_TYPE,
+      ingestorVersion: INGESTOR_VERSION,
+      runId,
+      errors,
+    });
+  }
+
+  if (!input.dryRun && input.mode === "delta" && toWatermark && !hasFatalErrors(errors)) {
     await setWatermark({
       sourceType: SOURCE_TYPE,
       watermark: toWatermark,

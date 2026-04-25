@@ -34,6 +34,8 @@ import {
   persistSignals,
   setWatermark,
   summarizeResult,
+  hasFatalErrors,
+  flushPerRowErrorsToDlq,
 } from "./persist";
 import type {
   ActionSignal,
@@ -261,7 +263,16 @@ export async function runFirefliesIngestor(input: IngestInput): Promise<IngestRe
     dryRun: input.dryRun ?? false,
   });
 
-  if (!input.dryRun && input.mode === "delta" && toWatermark && errors.length === 0) {
+  if (!input.dryRun) {
+    await flushPerRowErrorsToDlq({
+      sourceType: SOURCE_TYPE,
+      ingestorVersion: INGESTOR_VERSION,
+      runId,
+      errors,
+    });
+  }
+
+  if (!input.dryRun && input.mode === "delta" && toWatermark && !hasFatalErrors(errors)) {
     await setWatermark({
       sourceType: SOURCE_TYPE,
       watermark: toWatermark,

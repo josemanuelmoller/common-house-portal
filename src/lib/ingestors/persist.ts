@@ -20,6 +20,35 @@ import type {
   SourceType,
 } from "./types";
 
+// ─── DLQ ──────────────────────────────────────────────────────────────────
+/**
+ * Record a per-row error in the dead-letter queue. Fail-soft: never throws
+ * — DLQ is a logging facility, it must not break the parent ingestor.
+ * Lets the watermark advance past poison rows so the pipeline doesn't stall.
+ */
+export async function recordDlqEntry(params: {
+  sourceType: SourceType;
+  sourceId?: string;
+  ingestorVersion: string;
+  runId: string | null;
+  errorMessage: string;
+  context?: Record<string, unknown>;
+}): Promise<void> {
+  try {
+    const sb = getSupabaseServerClient();
+    await sb.from("ingestor_dlq").insert({
+      source_type:      params.sourceType,
+      source_id:        params.sourceId ?? null,
+      ingestor_version: params.ingestorVersion,
+      run_id:           params.runId,
+      error_message:    params.errorMessage.slice(0, 4000),
+      context:          params.context ?? null,
+    });
+  } catch {
+    // Swallow — DLQ failure should never bubble up to ingestor.
+  }
+}
+
 // ─── Watermark ────────────────────────────────────────────────────────────
 export async function getWatermark(sourceType: SourceType): Promise<string | null> {
   const sb = getSupabaseServerClient();
@@ -115,7 +144,7 @@ export async function finishIngestorRun(params: {
  * SELECT+INSERT/UPDATE pattern is explicit and safe.
  */
 export async function persistActionSignal(signal: ActionSignal): Promise<{
-  action: "inserted" | "updated" | "skipped";
+  action: "inserted" | "updated" | "skipped" | "reopened";
   id: string | null;
 }> {
   const sb = getSupabaseServerClient();
@@ -160,6 +189,63 @@ export async function persistActionSignal(signal: ActionSignal): Promise<{
       .eq("id", existing.id as string);
     if (updErr) throw new Error(`persistActionSignal update: ${updErr.message}`);
     return { action: "updated", id: existing.id as string };
+  }
+
+  // No OPEN row matched. Before inserting, check for a recently-closed row
+  // with the same dedup_key. If it exists and the incoming motion is fresher
+  // by a meaningful margin, REOPEN it — preserves user's prior dismissal/
+  // resolution audit and prevents an infinite "dismiss → re-emit" loop.
+  // Reopen gate (mirrors docs/loop-lifecycle.md §Reopen gate + §10 of
+  // NORMALIZATION_ARCHITECTURE.md):
+  //   1. Closed row exists with same dedup_key
+  //   2. Closed less than 90 days ago (older than 90d → create fresh row)
+  //   3. New motion is at least 1 minute newer than the closed row's
+  //      last_motion_at (so a re-run with the same data doesn't reopen)
+  //   4. NOT manual_done — if Jose explicitly marked it done, don't
+  //      resurrect; only auto-closures (stale_decay, deadline_passed) and
+  //      manual_dismiss are eligible
+  const { data: closed } = await sb
+    .from("action_items")
+    .select("id, status, resolved_at, resolved_reason, last_motion_at")
+    .eq("dedup_key", dedup_key)
+    .in("status", ["resolved", "dismissed", "stale"])
+    .order("resolved_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (closed) {
+    const resolvedAt = closed.resolved_at ? new Date(closed.resolved_at as string).getTime() : 0;
+    const ninetyDaysAgo = Date.now() - 90 * 86_400_000;
+    const incomingT = new Date(signal.payload.last_motion_at).getTime();
+    const closedMotionT = new Date(closed.last_motion_at as string).getTime();
+    const meaningfullyNewer = incomingT > closedMotionT + 60_000;
+    const reason = closed.resolved_reason as string | null;
+    const reopenable = reason !== "manual_done";
+
+    if (resolvedAt > ninetyDaysAgo && meaningfullyNewer && reopenable) {
+      const { error: reErr } = await sb
+        .from("action_items")
+        .update({
+          status:           "open",
+          resolved_at:      null,
+          resolved_reason:  null,
+          last_motion_at:   signal.payload.last_motion_at,
+          next_action:      signal.payload.next_action,
+          priority_factors: signal.payload.priority_factors,
+          priority_score,
+          source_type:      signal.source_type,
+          source_id:        signal.source_id,
+          source_url:       signal.source_url ?? null,
+          ingestor_version: signal.ingestor_version,
+          ingested_at:      signal.emitted_at,
+          deadline:         signal.payload.deadline,
+          consequence:      signal.payload.consequence,
+        })
+        .eq("id", closed.id as string);
+      if (reErr) throw new Error(`persistActionSignal reopen: ${reErr.message}`);
+      return { action: "reopened", id: closed.id as string };
+    }
+    // Closed row exists but is too old / explicitly done / not newer → fall through to insert
   }
 
   // New row
@@ -268,6 +354,40 @@ export async function persistSignals(
     }
   }
   return { counts, errors };
+}
+
+// ─── Watermark policy ─────────────────────────────────────────────────────
+/**
+ * A "fatal" error blocks watermark advance — typically auth/network
+ * issues or anything without a `source_id`. Per-row errors (with source_id)
+ * are recoverable: they go to the DLQ and we let the watermark move past
+ * the poison row so the pipeline doesn't stall on a single bad input.
+ */
+export function hasFatalErrors(errors: IngestError[]): boolean {
+  return errors.some(e => !e.source_id);
+}
+
+/**
+ * Push every per-row error in `errors` to the DLQ. Top-level errors
+ * (no source_id) are kept in ingestor_runs only — they're already
+ * blocking the watermark.
+ */
+export async function flushPerRowErrorsToDlq(params: {
+  sourceType: SourceType;
+  ingestorVersion: string;
+  runId: string | null;
+  errors: IngestError[];
+}): Promise<void> {
+  for (const e of params.errors) {
+    if (!e.source_id) continue;
+    await recordDlqEntry({
+      sourceType:      params.sourceType,
+      sourceId:        e.source_id,
+      ingestorVersion: params.ingestorVersion,
+      runId:           params.runId,
+      errorMessage:    e.message,
+    });
+  }
 }
 
 // ─── Utility: turn IngestResult into a final run log entry ─────────────────
