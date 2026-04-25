@@ -35,7 +35,7 @@ import { HallPortfolioPulse } from "@/components/HallPortfolioPulse";
 import { HallAskQueue } from "@/components/HallAskQueue";
 import { HallTimeAllocation } from "@/components/HallTimeAllocation";
 import { HallCommitmentLedger } from "@/components/HallCommitmentLedger";
-import { HallNextMeeting } from "@/components/HallNextMeeting";
+import { HallTodayAgenda } from "@/components/HallTodayAgenda";
 import { HallAutopilotLog } from "@/components/HallAutopilotLog";
 import { HallTabs } from "@/components/HallTabs";
 import { HallSection } from "@/components/HallSection";
@@ -1035,38 +1035,13 @@ export default async function AdminPage() {
             <InboxTriage initialItems={inboxData.items} initialScanned={inboxData.total_scanned} />
           </HallSection>
 
-          {/* ── Market signals — K-v2 left col (informational / reading) ─── */}
-          <HallSection
-            title="Market "
-            flourish="signals"
-            meta={marketSignalBriefs.length > 0 ? `${marketSignalBriefs.length} NEW` : undefined}
-          >
-            <MarketSignalsPanel
-              text={latestMarketSignals?.text ?? null}
-              date={latestMarketSignals?.date ?? null}
-              generatedAt={latestMarketSignals?.generatedAt ?? null}
-              briefs={marketSignalBriefs}
-            />
-          </HallSection>
-
-          {/* ── Competitive intel pulse — K-v2 left col ──────────────────── */}
-          <HallSection
-            title="Competitive "
-            flourish="radar"
-            meta={competitiveIntel.filter(r => r.status === "New").length > 0
-              ? `${competitiveIntel.filter(r => r.status === "New").length} NEW`
-              : undefined}
-          >
-            <CompetitiveIntelSummary rows={competitiveIntel} />
-          </HallSection>
-
             </div>{/* /hall-today-col-left */}
 
             <div className="hall-today-col-right">
 
-              {/* ── Next meeting — K-v2 right col ────────────────────────── */}
-              <HallSection title="Next " flourish="meeting">
-                <HallNextMeeting />
+              {/* ── Today's agenda — next meeting rich + rest compact ────── */}
+              <HallSection title="Today's " flourish="agenda">
+                <HallTodayAgenda />
               </HallSection>
 
               {/* ── This week — Deadline card (replaces old P1 Banner) ────
@@ -1169,9 +1144,9 @@ export default async function AdminPage() {
                 );
               })()}
 
-              {/* ── Agents (system / ambient, last) ──────────────────────── */}
-              <HallSection title="Agents" meta="24H · SYSTEM">
-                <HallAutopilotLog />
+              {/* ── Manual triggers ───────────────────────────────────────── */}
+              <HallSection title="Manual " flourish="triggers">
+                <HallManualTriggers />
               </HallSection>
 
             </div>{/* /hall-today-col-right */}
@@ -1238,10 +1213,6 @@ export default async function AdminPage() {
             </div>
 
             <div className="hall-today-col-right">
-              <HallSection title="Manual " flourish="triggers">
-                <HallManualTriggers />
-              </HallSection>
-
               {dailyBriefing?.meetingPrep && (
                 <HallSection title="Meeting " flourish="prep">
                   <pre
