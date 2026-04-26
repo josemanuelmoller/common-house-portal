@@ -12,6 +12,8 @@ import { getSupabaseServerClient } from "@/lib/supabase-server";
 import type { DecisionItem } from "@/lib/notion/decisions";
 import type { DailyBriefing, MarketSignalBrief } from "@/lib/notion/briefings";
 import type { CompetitiveIntelRow } from "@/lib/notion/competitive";
+import type { AgentDraft } from "@/lib/notion/drafts";
+import { OUTBOX_DRAFT_TYPES } from "@/lib/notion/drafts";
 
 // ─── Decision items ───────────────────────────────────────────────────────────
 
@@ -218,4 +220,35 @@ export async function getRecentCompetitiveIntel(lookbackDays = 30): Promise<Comp
     entityName:   (r.entity_name as string | null) ?? null,
     entityType:   (r.entity_type as string | null) ?? null,
   }));
+}
+
+// ─── Agent drafts ─────────────────────────────────────────────────────────────
+
+export async function getAgentDrafts(statusFilter = "Pending Review"): Promise<AgentDraft[]> {
+  const sb = getSupabaseServerClient();
+  const { data, error } = await sb
+    .from("notion_agent_drafts")
+    .select("*")
+    .eq("status", statusFilter)
+    .order("created_date", { ascending: false })
+    .limit(20);
+  if (error || !data) return [];
+  return data.map((r: Record<string, unknown>) => ({
+    id:              r.id as string,
+    title:           (r.title as string) || "Untitled",
+    draftType:       (r.draft_type as string) ?? "",
+    status:          (r.status as string) ?? "",
+    voice:           (r.voice as string) ?? "",
+    platform:        (r.platform as string) ?? "",
+    draftText:       (r.draft_text as string) ?? "",
+    relatedEntityId: (r.related_entity_id as string | null) ?? null,
+    opportunityId:   (r.opportunity_id as string | null) ?? null,
+    createdDate:     (r.created_date as string | null) ?? null,
+    notionUrl:       (r.notion_url as string) ?? "",
+  }));
+}
+
+export async function getOutboxDrafts(): Promise<AgentDraft[]> {
+  const all = await getAgentDrafts("Pending Review");
+  return all.filter(d => OUTBOX_DRAFT_TYPES.has(d.draftType));
 }

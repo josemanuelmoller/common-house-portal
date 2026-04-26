@@ -13,11 +13,10 @@ import { adminGuardApi } from "@/lib/require-admin";
 import { Client } from "@notionhq/client";
 import Anthropic from "@anthropic-ai/sdk";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
+import { createPageWithMirror } from "@/lib/notion-mirror-push";
 
 const notion = new Client({ auth: process.env.NOTION_API_KEY });
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
-const AGENT_DRAFTS_DB = "9844ece875ea4c618f616e8cc97d5a90";
 
 export async function POST(req: NextRequest) {
   const guard = await adminGuardApi();
@@ -122,28 +121,34 @@ Output ONLY the email (Subject + body). Nothing else.`;
     return NextResponse.json({ error: "Anthropic API error", detail: String(e) }, { status: 500 });
   }
 
-  // 3. Save to Agent Drafts [OS v2]
-  let draftPage;
-  try {
-    draftPage = await notion.pages.create({
-      parent: { database_id: AGENT_DRAFTS_DB },
-      properties: {
-        "Draft Title":      { title: [{ text: { content: `Check-in: ${name} — ${today}` } }] },
-        "Type":             { select: { name: "Check-in Email" } },
-        "Status":           { select: { name: "Pending Review" } },
-        "Source Reference": { rich_text: [{ text: { content: `${name}${email ? ` <${email}>` : ""}` } }] },
-        "Content":          { rich_text: [{ text: { content: draftText.slice(0, 2000) } }] },
-        "Related Entity":   { relation: [{ id: personId }] },
-      },
-    });
-  } catch (e) {
-    return NextResponse.json({ error: "Notion write error", detail: String(e) }, { status: 500 });
+  // 3. Save to Agent Drafts via the mirror helper — creates the Notion page
+  //    AND inserts into notion_agent_drafts in one call. Hall reads pick it
+  //    up immediately on next render, no wait for forward sync.
+  const titleStr = `Check-in: ${name} — ${today}`;
+  const created = await createPageWithMirror({
+    table: "notion_agent_drafts",
+    fields: {
+      title:       titleStr,
+      draft_type:  "Check-in Email",
+      status:      "Pending Review",
+      draft_text:  draftText.slice(0, 2000),
+    },
+    mirrorOnly: {
+      related_entity_id: personId,
+      created_date:      today,
+    },
+    extraNotionProperties: {
+      "Source Reference": { rich_text: [{ text: { content: `${name}${email ? ` <${email}>` : ""}` } }] },
+      "Related Entity":   { relation: [{ id: personId }] },
+    },
+  });
+  if (!created.ok) {
+    return NextResponse.json({ error: "Draft create failed", detail: created.error }, { status: 500 });
   }
 
   return NextResponse.json({
     ok: true,
-    draftId: draftPage.id,
-    notionUrl: (draftPage as { url?: string }).url ?? "",
+    draftId:    created.id!,
     personName: name,
   });
 }

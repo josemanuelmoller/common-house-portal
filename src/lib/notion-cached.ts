@@ -32,8 +32,9 @@ import {
   getLatestMarketSignals as _getLatestMarketSignals,
   getRecentCompetitiveIntel as _getRecentCompetitiveIntel,
   getDecisionItems as _getDecisionItems,
+  getAgentDrafts as _getAgentDrafts,
+  getOutboxDrafts as _getOutboxDrafts,
 } from "@/lib/notion-mirror";
-import { getAgentDrafts as _getAgentDrafts, getOutboxDrafts as _getOutboxDrafts } from "@/lib/notion/drafts";
 import { getColdRelationships as _getColdRelationships } from "@/lib/notion/people";
 
 const TTL = 300; // 5 minutes

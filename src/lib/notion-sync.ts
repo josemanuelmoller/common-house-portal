@@ -11,7 +11,7 @@
  * call them in parallel and partial failures are isolated.
  */
 
-import { notion, DB, prop, text, select, checkbox, date } from "@/lib/notion/core";
+import { notion, DB, prop, text, select, checkbox, date, relationFirst } from "@/lib/notion/core";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 
 type SyncResult = {
@@ -206,6 +206,58 @@ export async function syncInsightBriefs(): Promise<SyncResult> {
   return out;
 }
 
+// ─── Agent Drafts ─────────────────────────────────────────────────────────────
+
+export async function syncAgentDrafts(): Promise<SyncResult> {
+  const t0 = Date.now();
+  const out: SyncResult = { table: "notion_agent_drafts", rows_seen: 0, rows_upserted: 0, duration_ms: 0 };
+  try {
+    const sb = getSupabaseServerClient();
+    const skip = await pendingIds("notion_agent_drafts");
+    // Last 60 days — older drafts are noise; status changes happen on recent ones.
+    const since = new Date(Date.now() - 60 * 86400_000).toISOString();
+    const res = await notion.databases.query({
+      database_id: DB.agentDrafts,
+      filter: { timestamp: "last_edited_time", last_edited_time: { on_or_after: since } },
+      sorts: [{ timestamp: "last_edited_time", direction: "descending" }],
+      page_size: 100,
+    });
+    out.rows_seen = res.results.length;
+    const batch: Record<string, unknown>[] = [];
+    for (const page of res.results as { id: string; url?: string; created_time?: string; last_edited_time?: string; properties: Record<string, unknown> }[]) {
+      if (skip.has(page.id)) continue;
+      // Content is rich_text; concat all parts (mirrors getAgentDrafts behavior)
+      const contentParts = (page.properties?.["Content"] as { rich_text?: { plain_text: string }[] } | undefined)?.rich_text ?? [];
+      const draftText = contentParts.map(p => p.plain_text).join("");
+      batch.push({
+        id:                 page.id,
+        title:              text(prop(page, "Draft Title")) || "Untitled",
+        draft_type:         select(prop(page, "Type")) || null,
+        status:             select(prop(page, "Status")) || null,
+        voice:              select(prop(page, "Voice")) || null,
+        platform:           select(prop(page, "Platform")) || null,
+        draft_text:         draftText || null,
+        related_entity_id:  relationFirst(prop(page, "Related Entity")),
+        opportunity_id:     relationFirst(prop(page, "Opportunity")),
+        created_date:       date(prop(page, "Created Date")) ?? page.created_time?.slice(0, 10) ?? null,
+        notion_url:         page.url ?? null,
+        last_edited_at:     page.last_edited_time ?? null,
+        synced_at:          new Date().toISOString(),
+      });
+    }
+    if (batch.length > 0) {
+      const { error } = await sb.from("notion_agent_drafts").upsert(batch, { onConflict: "id" });
+      if (error) throw new Error(error.message);
+      out.rows_upserted = batch.length;
+    }
+  } catch (e) {
+    out.error = e instanceof Error ? e.message : String(e);
+  }
+  out.duration_ms = Date.now() - t0;
+  await logRun(out);
+  return out;
+}
+
 // ─── Watchlist (referenced by competitive_intel) ──────────────────────────────
 
 export async function syncWatchlist(): Promise<SyncResult> {
@@ -321,6 +373,7 @@ export async function syncAllNotionMirrors(): Promise<SyncResult[]> {
     syncDailyBriefings(),
     syncInsightBriefs(),
     syncCompetitiveIntel(),
+    syncAgentDrafts(),
   ]);
   return [wl, ...rest];
 }

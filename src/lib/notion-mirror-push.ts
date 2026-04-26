@@ -19,11 +19,13 @@ type MirrorTable =
   | "notion_decision_items"
   | "notion_daily_briefings"
   | "notion_insight_briefs"
-  | "notion_competitive_intel";
+  | "notion_competitive_intel"
+  | "notion_agent_drafts";
 
 type FieldDef =
   | { kind: "select"; notionName: string }
   | { kind: "rich_text"; notionName: string }
+  | { kind: "title"; notionName: string }
   | { kind: "checkbox"; notionName: string }
   | { kind: "date"; notionName: string };
 
@@ -42,6 +44,14 @@ const FIELD_MAP: Record<MirrorTable, Record<string, FieldDef>> = {
     status:           { kind: "select",    notionName: "Status" },
     relevance:        { kind: "select",    notionName: "Relevance" },
   },
+  notion_agent_drafts: {
+    status:           { kind: "select",    notionName: "Status" },
+    draft_text:       { kind: "rich_text", notionName: "Content" },
+    title:            { kind: "title",     notionName: "Draft Title" },
+    draft_type:       { kind: "select",    notionName: "Type" },
+    voice:            { kind: "select",    notionName: "Voice" },
+    platform:         { kind: "select",    notionName: "Platform" },
+  },
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -49,11 +59,13 @@ function buildNotionProperty(def: FieldDef, value: unknown): any {
   if (value === null || value === undefined) {
     if (def.kind === "select")    return { select: null };
     if (def.kind === "rich_text") return { rich_text: [] };
+    if (def.kind === "title")     return { title: [] };
     if (def.kind === "checkbox")  return { checkbox: false };
     if (def.kind === "date")      return { date: null };
   }
   if (def.kind === "select")    return { select: { name: String(value) } };
   if (def.kind === "rich_text") return { rich_text: [{ text: { content: String(value).slice(0, 2000) } }] };
+  if (def.kind === "title")     return { title: [{ text: { content: String(value).slice(0, 2000) } }] };
   if (def.kind === "checkbox")  return { checkbox: Boolean(value) };
   if (def.kind === "date")      return { date: { start: String(value) } };
   return null;
@@ -145,6 +157,84 @@ export async function pushPending(table: MirrorTable, id: string): Promise<{ ok:
     }).eq("id", id);
     return { ok: false, error: msg };
   }
+}
+
+// ─── Phase 3 — CREATE pattern for agents / skills ────────────────────────────
+// Notion is still the canonical source of truth, so creates go Notion-first:
+//   1. Create the page in Notion (gets the canonical page id back).
+//   2. Insert the same data into the Supabase mirror with that id.
+// Agents call this helper instead of the Notion SDK directly. The Hall reads
+// the mirror, so the new row is visible on next page render with no extra
+// sync wait.
+//
+// A future-state Supabase-first variant (mirror_uuid + nullable notion_id +
+// reverse-create cron) is the architecturally cleaner model but requires a
+// schema change on every mirror table. Tracked as future work.
+
+type DatabaseId = string; // Notion database id
+
+const TABLE_TO_DB: Record<MirrorTable, DatabaseId> = {
+  notion_decision_items:    "6b801204c4de49c7b6179e04761a285a",
+  notion_daily_briefings:   "d206d6cdb09040d3ac2f34a977ad9f2a",
+  notion_insight_briefs:    "04bed3a3fd1a4b3a99643cd21562e08a",
+  notion_competitive_intel: "af8d7edb750b4131b3b55ef5ee83556a",
+  notion_agent_drafts:      "9844ece875ea4c618f616e8cc97d5a90",
+};
+
+/**
+ * Create a Notion page AND mirror it into Supabase in one call.
+ *
+ * `fields` is the same column-keyed shape as applyMirrorEdit's `changes` —
+ * lets the same FIELD_MAP drive both edits and creates. Caller supplies
+ * any extra Supabase columns via `mirrorOnly` (e.g. denormalized fields
+ * that don't have a Notion property like entity_name).
+ */
+export async function createPageWithMirror(params: {
+  table:      MirrorTable;
+  fields:     Record<string, unknown>;        // mapped through FIELD_MAP → Notion properties + mirror columns
+  mirrorOnly?: Record<string, unknown>;       // extra Supabase columns (no Notion equivalent)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  extraNotionProperties?: Record<string, any>; // Notion property payloads that don't map cleanly (relations, multi_select, etc.)
+}): Promise<{ ok: boolean; id?: string; error?: string }> {
+  const allowed = FIELD_MAP[params.table];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const properties: Record<string, any> = { ...(params.extraNotionProperties ?? {}) };
+  const mirrorRow: Record<string, unknown> = { ...(params.mirrorOnly ?? {}) };
+
+  for (const [col, val] of Object.entries(params.fields)) {
+    const def = allowed[col];
+    if (!def) return { ok: false, error: `Unknown field for ${params.table}: ${col}` };
+    properties[def.notionName] = buildNotionProperty(def, val);
+    mirrorRow[col] = val;
+  }
+
+  // 1) Create in Notion — canonical id source.
+  let pageId: string;
+  let pageUrl: string | null = null;
+  try {
+    const created = await notion.pages.create({
+      parent: { database_id: TABLE_TO_DB[params.table] },
+      properties,
+    });
+    pageId = (created as { id: string }).id;
+    pageUrl = (created as { url?: string }).url ?? null;
+  } catch (e) {
+    return { ok: false, error: `Notion create failed: ${e instanceof Error ? e.message : String(e)}` };
+  }
+
+  // 2) Insert into mirror with the real id. last_edited_at left null until
+  //    next forward sync stamps it from Notion.
+  const sb = getSupabaseServerClient();
+  mirrorRow.id          = pageId;
+  mirrorRow.notion_url  = pageUrl;
+  mirrorRow.synced_at   = new Date().toISOString();
+  const { error } = await sb.from(params.table).insert(mirrorRow);
+  if (error) {
+    // Notion create already succeeded; surface the mirror failure but the
+    // forward sync will eventually pick the row up. Don't fail the caller.
+    return { ok: true, id: pageId, error: `Mirror insert warning: ${error.message}` };
+  }
+  return { ok: true, id: pageId };
 }
 
 /**
