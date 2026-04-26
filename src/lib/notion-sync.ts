@@ -258,6 +258,60 @@ export async function syncAgentDrafts(): Promise<SyncResult> {
   return out;
 }
 
+// ─── Content Pipeline ─────────────────────────────────────────────────────────
+
+export async function syncContentPipeline(): Promise<SyncResult> {
+  const t0 = Date.now();
+  const out: SyncResult = { table: "notion_content_pipeline", rows_seen: 0, rows_upserted: 0, duration_ms: 0 };
+  try {
+    const sb = getSupabaseServerClient();
+    const skip = await pendingIds("notion_content_pipeline");
+    // Last 90 days — content moves through "Ready to Publish" reasonably fast.
+    const since = new Date(Date.now() - 90 * 86400_000).toISOString();
+    let cursor: string | undefined = undefined;
+    const batch: Record<string, unknown>[] = [];
+
+    do {
+      const res = await notion.databases.query({
+        database_id: "3bf5cf81f45c4db2840590f3878bfdc0",
+        filter: { timestamp: "last_edited_time", last_edited_time: { on_or_after: since } },
+        sorts: [{ timestamp: "last_edited_time", direction: "descending" }],
+        page_size: 100,
+        start_cursor: cursor,
+      });
+      out.rows_seen += res.results.length;
+      for (const page of res.results as { id: string; url?: string; last_edited_time?: string; properties: Record<string, unknown> }[]) {
+        if (skip.has(page.id)) continue;
+        batch.push({
+          id:              page.id,
+          title:           text(prop(page, "Title")) || text(prop(page, "Name")) || "Untitled",
+          platform:        select(prop(page, "Platform")) || null,
+          channel:         select(prop(page, "Channel")) || null,
+          content_type:    select(prop(page, "Content Type")) || null,
+          status:          select(prop(page, "Status")) || null,
+          publish_window:  text(prop(page, "Publish Window")) || null,
+          publish_date:    date(prop(page, "Publish Date")),
+          notion_url:      page.url ?? null,
+          last_edited_at:  page.last_edited_time ?? null,
+          synced_at:       new Date().toISOString(),
+        });
+      }
+      cursor = (res as { next_cursor?: string }).next_cursor ?? undefined;
+    } while (cursor);
+
+    if (batch.length > 0) {
+      const { error } = await sb.from("notion_content_pipeline").upsert(batch, { onConflict: "id" });
+      if (error) throw new Error(error.message);
+      out.rows_upserted = batch.length;
+    }
+  } catch (e) {
+    out.error = e instanceof Error ? e.message : String(e);
+  }
+  out.duration_ms = Date.now() - t0;
+  await logRun(out);
+  return out;
+}
+
 // ─── Watchlist (referenced by competitive_intel) ──────────────────────────────
 
 export async function syncWatchlist(): Promise<SyncResult> {
@@ -374,6 +428,7 @@ export async function syncAllNotionMirrors(): Promise<SyncResult[]> {
     syncInsightBriefs(),
     syncCompetitiveIntel(),
     syncAgentDrafts(),
+    syncContentPipeline(),
   ]);
   return [wl, ...rest];
 }

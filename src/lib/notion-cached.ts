@@ -14,18 +14,14 @@
  */
 
 import { unstable_cache } from "next/cache";
+// Loop-engine reads — already Supabase-native in @/lib/notion (no migration needed).
 import {
-  getProjectsOverview as _getProjectsOverview,
-  getOpportunitiesByScope as _getOpportunitiesByScope,
   getRadarLoops as _getRadarLoops,
   getParkedLoops as _getParkedLoops,
   getCoSTasks as _getCoSTasks,
-  getCandidateOpportunities as _getCandidateOpportunities,
-  getReadyContent as _getReadyContent,
 } from "@/lib/notion";
-// Phase 1: these 5 read paths now go through Supabase mirrors (synced
-// from Notion every 5 min via /api/cron/sync-notion-mirror). Originals
-// in @/lib/notion/* stay intact for write paths and non-Hall callers.
+// All Hall read paths now go through Supabase mirrors (synced from Notion).
+// Originals in @/lib/notion/* stay intact for write paths and non-Hall callers.
 import {
   getDailyBriefing as _getDailyBriefing,
   getRecentInsightBriefBriefs as _getRecentInsightBriefBriefs,
@@ -34,8 +30,13 @@ import {
   getDecisionItems as _getDecisionItems,
   getAgentDrafts as _getAgentDrafts,
   getOutboxDrafts as _getOutboxDrafts,
+  getProjectsOverview as _getProjectsOverview,
+  getOpportunitiesByScope as _getOpportunitiesByScope,
+  getCandidateOpportunities as _getCandidateOpportunities,
+  getReadyContent as _getReadyContent,
+  getColdRelationships as _getColdRelationships,
 } from "@/lib/notion-mirror";
-import { getColdRelationships as _getColdRelationships } from "@/lib/notion/people";
+// getColdRelationships now sourced from @/lib/notion-mirror above.
 
 const TTL = 300; // 5 minutes
 
