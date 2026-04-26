@@ -12,6 +12,7 @@ import { adminGuardApi } from "@/lib/require-admin";
 import { Client } from "@notionhq/client";
 import Anthropic from "@anthropic-ai/sdk";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
+import { createPageWithMirror } from "@/lib/notion-mirror-push";
 
 const notion = new Client({ auth: process.env.NOTION_API_KEY });
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -169,19 +170,14 @@ Output ONLY the full message (Subject + body). Nothing else.`;
     );
   }
 
-  // 4. Save to Agent Drafts [OS v2]
+  // 4. Save to Agent Drafts via mirror.
   const taskShort = task.slice(0, 55);
   const draftTitle = resolvedAssignee
     ? `Delegation: ${taskShort} → ${resolvedAssignee} — ${today}`
     : `Delegation: ${taskShort} — ${today}`;
 
-  // Build properties — only include Related Entity if we resolved a page ID
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const properties: Record<string, any> = {
-    "Draft Title": { title: [{ text: { content: draftTitle } }] },
-    "Type":        { select: { name: "Delegation Brief" } },
-    "Status":      { select: { name: "Pending Review" } },
-    "Content":     { rich_text: [{ text: { content: draftText.slice(0, 2000) } }] },
+  const extraNotion: Record<string, any> = {
     "Source Reference": {
       rich_text: [{
         text: {
@@ -193,23 +189,28 @@ Output ONLY the full message (Subject + body). Nothing else.`;
       }],
     },
   };
-
   if (assigneePageId) {
-    properties["Related Entity"] = { relation: [{ id: assigneePageId }] };
+    extraNotion["Related Entity"] = { relation: [{ id: assigneePageId }] };
   }
 
-  let draftPage;
-  try {
-    draftPage = await notion.pages.create({
-      parent: { database_id: AGENT_DRAFTS_DB },
-      properties,
-    });
-  } catch (e) {
-    return NextResponse.json(
-      { error: "Notion write error", detail: String(e) },
-      { status: 500, headers: corsHeaders() }
-    );
+  const created = await createPageWithMirror({
+    table: "notion_agent_drafts",
+    fields: {
+      title:      draftTitle,
+      draft_type: "Delegation Brief",
+      status:     "Pending Review",
+      draft_text: draftText.slice(0, 2000),
+    },
+    mirrorOnly: {
+      related_entity_id: assigneePageId ?? null,
+      created_date:      today,
+    },
+    extraNotionProperties: extraNotion,
+  });
+  if (!created.ok) {
+    return NextResponse.json({ error: "Draft create failed", detail: created.error }, { status: 500, headers: corsHeaders() });
   }
+  const draftPage = { id: created.id!, url: "" };
 
   return NextResponse.json(
     {

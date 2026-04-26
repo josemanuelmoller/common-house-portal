@@ -27,27 +27,58 @@ type FieldDef =
   | { kind: "rich_text"; notionName: string }
   | { kind: "title"; notionName: string }
   | { kind: "checkbox"; notionName: string }
-  | { kind: "date"; notionName: string };
+  | { kind: "date"; notionName: string }
+  | { kind: "url"; notionName: string }
+  | { kind: "number"; notionName: string }
+  | { kind: "multi_select"; notionName: string };
 
 // Per-table allowed columns + how to render them as Notion properties.
-// Add columns here as we onboard more edit flows. Keys = Supabase column.
+// Add columns here as we onboard more edit/create flows. Keys = Supabase column.
 const FIELD_MAP: Record<MirrorTable, Record<string, FieldDef>> = {
   notion_decision_items: {
+    title:            { kind: "title",     notionName: "Decision Title" },
     status:           { kind: "select",    notionName: "Status" },
     resolution_note:  { kind: "rich_text", notionName: "Resolution Note" },
+    decision_type:    { kind: "select",    notionName: "Decision Type" },
+    priority:         { kind: "select",    notionName: "Priority" },
+    source_agent:     { kind: "select",    notionName: "Source Agent" },
+    requires_execute: { kind: "checkbox",  notionName: "Requires Execute" },
+    execute_approved: { kind: "checkbox",  notionName: "Execute Approved" },
+    due_date:         { kind: "date",      notionName: "Decision Due Date" },
+    notes_raw:        { kind: "rich_text", notionName: "Proposed Action" },
+    category:         { kind: "select",    notionName: "Decision Category" },
   },
   notion_daily_briefings: {
     status:           { kind: "select",    notionName: "Status" },
+    brief_date:       { kind: "date",      notionName: "Date" },
+    focus_of_day:     { kind: "rich_text", notionName: "Focus of the Day" },
+    meeting_prep:     { kind: "rich_text", notionName: "Meeting Prep" },
+    my_commitments:   { kind: "rich_text", notionName: "My Commitments" },
+    follow_up_queue:  { kind: "rich_text", notionName: "Follow-up Queue" },
+    agent_queue:      { kind: "rich_text", notionName: "Agent Queue" },
+    market_signals:   { kind: "rich_text", notionName: "Market Signals" },
+    ready_to_publish: { kind: "rich_text", notionName: "Ready to Publish" },
+    generated_at:     { kind: "date",      notionName: "Generated At" },
   },
-  notion_insight_briefs: {},
+  notion_insight_briefs: {
+    title:            { kind: "title",     notionName: "Title" },
+    source_link:      { kind: "url",       notionName: "Source Link" },
+    theme:            { kind: "select",    notionName: "Theme" },
+    source_type:      { kind: "select",    notionName: "Source Type" },
+  },
   notion_competitive_intel: {
-    status:           { kind: "select",    notionName: "Status" },
+    title:            { kind: "title",     notionName: "Title" },
+    summary:          { kind: "rich_text", notionName: "Summary" },
+    signal_type:      { kind: "select",    notionName: "Signal Type" },
     relevance:        { kind: "select",    notionName: "Relevance" },
+    status:           { kind: "select",    notionName: "Status" },
+    source_url:       { kind: "url",       notionName: "Source URL" },
+    date_captured:    { kind: "date",      notionName: "Date Captured" },
   },
   notion_agent_drafts: {
+    title:            { kind: "title",     notionName: "Draft Title" },
     status:           { kind: "select",    notionName: "Status" },
     draft_text:       { kind: "rich_text", notionName: "Content" },
-    title:            { kind: "title",     notionName: "Draft Title" },
     draft_type:       { kind: "select",    notionName: "Type" },
     voice:            { kind: "select",    notionName: "Voice" },
     platform:         { kind: "select",    notionName: "Platform" },
@@ -57,17 +88,26 @@ const FIELD_MAP: Record<MirrorTable, Record<string, FieldDef>> = {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function buildNotionProperty(def: FieldDef, value: unknown): any {
   if (value === null || value === undefined) {
-    if (def.kind === "select")    return { select: null };
-    if (def.kind === "rich_text") return { rich_text: [] };
-    if (def.kind === "title")     return { title: [] };
-    if (def.kind === "checkbox")  return { checkbox: false };
-    if (def.kind === "date")      return { date: null };
+    if (def.kind === "select")       return { select: null };
+    if (def.kind === "rich_text")    return { rich_text: [] };
+    if (def.kind === "title")        return { title: [] };
+    if (def.kind === "checkbox")     return { checkbox: false };
+    if (def.kind === "date")         return { date: null };
+    if (def.kind === "url")          return { url: null };
+    if (def.kind === "number")       return { number: null };
+    if (def.kind === "multi_select") return { multi_select: [] };
   }
   if (def.kind === "select")    return { select: { name: String(value) } };
   if (def.kind === "rich_text") return { rich_text: [{ text: { content: String(value).slice(0, 2000) } }] };
   if (def.kind === "title")     return { title: [{ text: { content: String(value).slice(0, 2000) } }] };
   if (def.kind === "checkbox")  return { checkbox: Boolean(value) };
   if (def.kind === "date")      return { date: { start: String(value) } };
+  if (def.kind === "url")       return { url: String(value) };
+  if (def.kind === "number")    return { number: Number(value) };
+  if (def.kind === "multi_select") {
+    const arr = Array.isArray(value) ? value : [value];
+    return { multi_select: arr.map(v => ({ name: String(v) })) };
+  }
   return null;
 }
 

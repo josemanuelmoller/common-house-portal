@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminGuardApi } from "@/lib/require-admin";
 import { Client } from "@notionhq/client";
 import Anthropic from "@anthropic-ai/sdk";
+import { createPageWithMirror } from "@/lib/notion-mirror-push";
 
 const notion = new Client({ auth: process.env.NOTION_API_KEY });
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-const AGENT_DRAFTS_DB = "9844ece875ea4c618f616e8cc97d5a90";
+// AGENT_DRAFTS_DB removed — createPageWithMirror knows the DB from the table name.
 const INSIGHT_BRIEFS_DB = "04bed3a3fd1a4b3a99643cd21562e08a";
 const KNOWLEDGE_DB = "0f4bfe95549d4710a3a9ab6e119a9b04";
 
@@ -109,31 +110,32 @@ Output ONLY the post text. Nothing else.`;
     );
   }
 
-  // 3. Save to Agent Drafts [OS v2]
-  let draftPage;
+  // 3. Save to Agent Drafts via mirror.
   const draftTitle = topicHint
     ? `LinkedIn post: ${topicHint.slice(0, 60)} — ${today}`
     : `LinkedIn post — ${today}`;
 
-  try {
-    draftPage = await notion.pages.create({
-      parent: { database_id: AGENT_DRAFTS_DB },
-      properties: {
-        "Draft Title": { title: [{ text: { content: draftTitle } }] },
-        "Type":        { select: { name: "LinkedIn Post" } },
-        "Status":      { select: { name: "Pending Review" } },
-        "Content":     { rich_text: [{ text: { content: draftText.slice(0, 2000) } }] },
-        "Source Reference": {
-          rich_text: [{ text: { content: topicHint ? `Topic hint: ${topicHint}` : "Auto-generated from Insight Briefs + Knowledge Assets" } }],
-        },
+  const created = await createPageWithMirror({
+    table: "notion_agent_drafts",
+    fields: {
+      title:      draftTitle,
+      draft_type: "LinkedIn Post",
+      status:     "Pending Review",
+      draft_text: draftText.slice(0, 2000),
+    },
+    mirrorOnly: {
+      created_date: today,
+    },
+    extraNotionProperties: {
+      "Source Reference": {
+        rich_text: [{ text: { content: topicHint ? `Topic hint: ${topicHint}` : "Auto-generated from Insight Briefs + Knowledge Assets" } }],
       },
-    });
-  } catch (e) {
-    return NextResponse.json(
-      { error: "Notion write error", detail: String(e) },
-      { status: 500, headers: corsHeaders() }
-    );
+    },
+  });
+  if (!created.ok) {
+    return NextResponse.json({ error: "Draft create failed", detail: created.error }, { status: 500, headers: corsHeaders() });
   }
+  const draftPage = { id: created.id!, url: "" };
 
   return NextResponse.json(
     {

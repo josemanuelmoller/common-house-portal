@@ -26,6 +26,7 @@ import { Client } from "@notionhq/client";
 import { auth } from "@clerk/nextjs/server";
 import { isAdminUser } from "@/lib/clients";
 import { withRoutineLog } from "@/lib/routine-log";
+import { createPageWithMirror } from "@/lib/notion-mirror-push";
 
 export const maxDuration = 300;
 export const dynamic = "force-dynamic";
@@ -131,25 +132,31 @@ interface IntelSignal {
 }
 
 async function createIntelRecord(signal: IntelSignal): Promise<string | null> {
-  try {
-    const page = await notion.pages.create({
-      parent: { database_id: DB_INTEL },
-      properties: {
-        "Title":           { title: [{ text: { content: signal.title.slice(0, 120) } }] },
-        "Watchlist Entry": { relation: [{ id: signal.watchlistId }] },
-        "Signal Type":     { select: { name: signal.signalType } },
-        "Relevance":       { select: { name: signal.relevance } },
-        "Status":          { select: { name: "New" } },
-        "Source URL":      { url: signal.sourceUrl || null },
-        "Date Captured":   { date: { start: new Date().toISOString().slice(0, 10) } },
-        "Summary":         { rich_text: [{ text: { content: signal.summary.slice(0, 2000) } }] },
-      },
-    });
-    return page.id;
-  } catch (err) {
-    console.error("[competitive-monitor] create intel record failed:", err);
+  const created = await createPageWithMirror({
+    table: "notion_competitive_intel",
+    fields: {
+      title:         signal.title.slice(0, 120),
+      summary:       signal.summary.slice(0, 2000),
+      signal_type:   signal.signalType,
+      relevance:     signal.relevance,
+      status:        "New",
+      source_url:    signal.sourceUrl || null,
+      date_captured: new Date().toISOString().slice(0, 10),
+    },
+    mirrorOnly: {
+      entity_id: signal.watchlistId,
+      // entity_name + entity_type get filled by the next forward sync; not
+      // critical for the immediate write — Hall reads tolerate nulls.
+    },
+    extraNotionProperties: {
+      "Watchlist Entry": { relation: [{ id: signal.watchlistId }] },
+    },
+  });
+  if (!created.ok) {
+    console.error("[competitive-monitor] create intel record failed:", created.error);
     return null;
   }
+  return created.id ?? null;
 }
 
 // ─── Claude + web search ──────────────────────────────────────────────────────

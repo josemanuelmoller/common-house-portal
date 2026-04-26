@@ -13,6 +13,7 @@ import { adminGuardApi } from "@/lib/require-admin";
 import { Client } from "@notionhq/client";
 import Anthropic from "@anthropic-ai/sdk";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
+import { createPageWithMirror } from "@/lib/notion-mirror-push";
 
 const notion = new Client({ auth: process.env.NOTION_API_KEY });
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -168,31 +169,32 @@ Order by urgency (most urgent first). Output ONLY the quick wins list. Nothing e
     );
   }
 
-  // 4. Save to Agent Drafts [OS v2]
-  let draftPage;
-  try {
-    draftPage = await notion.pages.create({
-      parent: { database_id: AGENT_DRAFTS_DB },
-      properties: {
-        "Draft Title": { title: [{ text: { content: `Quick Wins — ${today}` } }] },
-        "Type":        { select: { name: "Quick Wins Report" } },
-        "Status":      { select: { name: "Pending Review" } },
-        "Content":     { rich_text: [{ text: { content: draftText.slice(0, 2000) } }] },
-        "Source Reference": {
-          rich_text: [{
-            text: {
-              content: `Scanned: ${decisions.length} decisions · ${opportunities.length} opps · ${content.length} content · ${hotContacts.length} hot contacts`,
-            },
-          }],
-        },
+  // 4. Save to Agent Drafts via mirror.
+  const created = await createPageWithMirror({
+    table: "notion_agent_drafts",
+    fields: {
+      title:      `Quick Wins — ${today}`,
+      draft_type: "Quick Wins Report",
+      status:     "Pending Review",
+      draft_text: draftText.slice(0, 2000),
+    },
+    mirrorOnly: {
+      created_date: today,
+    },
+    extraNotionProperties: {
+      "Source Reference": {
+        rich_text: [{
+          text: {
+            content: `Scanned: ${decisions.length} decisions · ${opportunities.length} opps · ${content.length} content · ${hotContacts.length} hot contacts`,
+          },
+        }],
       },
-    });
-  } catch (e) {
-    return NextResponse.json(
-      { error: "Notion write error", detail: String(e) },
-      { status: 500, headers: corsHeaders() }
-    );
+    },
+  });
+  if (!created.ok) {
+    return NextResponse.json({ error: "Draft create failed", detail: created.error }, { status: 500, headers: corsHeaders() });
   }
+  const draftPage = { id: created.id!, url: "" };
 
   // 5. Parse quick wins from the draft text for inline display
   const quickWins: { action: string; category: string; effort: string; whyNow: string }[] = [];

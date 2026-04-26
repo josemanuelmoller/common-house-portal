@@ -28,6 +28,7 @@ import { Client } from "@notionhq/client";
 import { currentUser } from "@clerk/nextjs/server";
 import { isAdminUser, isAdminEmail } from "@/lib/clients";
 import { withRoutineLog } from "@/lib/routine-log";
+import { applyMirrorEdit, pushPending, createPageWithMirror } from "@/lib/notion-mirror-push";
 
 export const maxDuration = 120;
 
@@ -325,32 +326,44 @@ Return EXACTLY this JSON (no extra keys, no markdown):
     return NextResponse.json({ error: "Failed to parse Claude response", raw }, { status: 500 });
   }
 
-  // Upsert: update if exists, create if not
+  // Upsert: update if exists, create if not. Both paths go through the
+  // Supabase mirror first; Notion gets the same payload async.
   const existingId = await findExistingBriefing(today);
   const now = new Date().toISOString();
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const properties: Record<string, any> = {
-    "Focus of the Day": { rich_text: [{ text: { content: sections.focus_of_day ?? "" } }] },
-    "Meeting Prep":     { rich_text: [{ text: { content: sections.meeting_prep ?? "" } }] },
-    "My Commitments":   { rich_text: [{ text: { content: sections.my_commitments ?? "" } }] },
-    "Follow-up Queue":  { rich_text: [{ text: { content: sections.follow_up_queue ?? "" } }] },
-    "Agent Queue":      { rich_text: [{ text: { content: sections.agent_queue ?? "" } }] },
-    "Market Signals":   { rich_text: [{ text: { content: sections.market_signals ?? "" } }] },
-    "Ready to Publish": { rich_text: [{ text: { content: sections.ready_to_publish ?? "" } }] },
-    "Generated At":     { date: { start: now } },
-    "Status":           { select: { name: "Fresh" } },
+  const briefingFields = {
+    focus_of_day:     sections.focus_of_day ?? "",
+    meeting_prep:     sections.meeting_prep ?? "",
+    my_commitments:   sections.my_commitments ?? "",
+    follow_up_queue:  sections.follow_up_queue ?? "",
+    agent_queue:      sections.agent_queue ?? "",
+    market_signals:   sections.market_signals ?? "",
+    ready_to_publish: sections.ready_to_publish ?? "",
+    generated_at:     now,
+    status:           "Fresh",
   };
 
   if (existingId) {
-    await notion.pages.update({ page_id: existingId, properties });
-  } else {
-    properties["Date"] = { date: { start: today } };
-    properties["Name"] = { title: [{ text: { content: `Daily Briefing — ${today}` } }] };
-    await notion.pages.create({
-      parent: { database_id: DB.dailyBriefings },
-      properties,
+    const apply = await applyMirrorEdit({
+      table: "notion_daily_briefings",
+      id:    existingId,
+      changes: briefingFields,
     });
+    if (!apply.ok) {
+      return NextResponse.json({ error: "Mirror update failed", detail: apply.error }, { status: 500 });
+    }
+    await pushPending("notion_daily_briefings", existingId);
+  } else {
+    const created = await createPageWithMirror({
+      table: "notion_daily_briefings",
+      fields: { ...briefingFields, brief_date: today },
+      extraNotionProperties: {
+        "Name": { title: [{ text: { content: `Daily Briefing — ${today}` } }] },
+      },
+    });
+    if (!created.ok) {
+      return NextResponse.json({ error: "Briefing create failed", detail: created.error }, { status: 500 });
+    }
   }
 
   return NextResponse.json({

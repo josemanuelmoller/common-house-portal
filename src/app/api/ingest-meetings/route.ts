@@ -26,13 +26,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { Client } from "@notionhq/client";
 import Anthropic from "@anthropic-ai/sdk";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
+import { createPageWithMirror } from "@/lib/notion-mirror-push";
 
 const notion    = new Client({ auth: process.env.NOTION_API_KEY });
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 const FIREFLIES_API   = "https://api.fireflies.ai/graphql";
-const AGENT_DRAFTS_DB = "9844ece875ea4c618f616e8cc97d5a90";
 const PEOPLE_DB       = "1bc0f96f33ca4a9e9ff26844377e81de";
+// AGENT_DRAFTS_DB removed — createPageWithMirror knows the DB from the table.
 
 // ─── Fireflies GraphQL ────────────────────────────────────────────────────────
 
@@ -212,18 +213,23 @@ async function writeAgentDraft(
   today: string,
   windowLabel: string,
 ): Promise<string> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const page = await notion.pages.create({
-    parent: { database_id: AGENT_DRAFTS_DB },
-    properties: {
-      "Draft Title":      { title: [{ text: { content: `Meeting Intel (${windowLabel}): ${meetingCount} meeting${meetingCount !== 1 ? "s" : ""} — ${today}` } }] },
-      "Type":             { select: { name: "Market Signal" } },
-      "Status":           { select: { name: "Pending Review" } },
+  const titleStr = `Meeting Intel (${windowLabel}): ${meetingCount} meeting${meetingCount !== 1 ? "s" : ""} — ${today}`;
+  const created = await createPageWithMirror({
+    table: "notion_agent_drafts",
+    fields: {
+      title:      titleStr,
+      draft_type: "Market Signal",
+      status:     "Pending Review",
+      draft_text: intelligenceText.slice(0, 2000),
+    },
+    mirrorOnly: {
+      created_date: today,
+    },
+    extraNotionProperties: {
       "Source Reference": { rich_text: [{ text: { content: `Fireflies — ${meetingCount} meetings` } }] },
-      "Content":          { rich_text: [{ text: { content: intelligenceText.slice(0, 2000) } }] },
-    } as any,
+    },
   });
-  return (page as { url?: string }).url ?? "";
+  return created.id ?? "";
 }
 
 // ─── Main handler ─────────────────────────────────────────────────────────────

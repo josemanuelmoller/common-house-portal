@@ -2,11 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminGuardApi } from "@/lib/require-admin";
 import { Client } from "@notionhq/client";
 import Anthropic from "@anthropic-ai/sdk";
+import { createPageWithMirror } from "@/lib/notion-mirror-push";
 
 const notion = new Client({ auth: process.env.NOTION_API_KEY });
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
-const AGENT_DRAFTS_DB = "9844ece875ea4c618f616e8cc97d5a90";
 
 export async function POST(req: NextRequest) {
   const guard = await adminGuardApi();
@@ -94,24 +93,31 @@ Output ONLY the email (Subject + body). Nothing else.`;
     return NextResponse.json({ error: "Anthropic API error", detail: String(e) }, { status: 500 });
   }
 
-  // 4. Save to Agent Drafts [OS v2]
-  let draftPage;
-  try {
-    draftPage = await notion.pages.create({
-      parent: { database_id: AGENT_DRAFTS_DB },
-      properties: {
-        "Draft Title":      { title: [{ text: { content: `Follow-up: ${oppName} — ${today}` } }] },
-        "Type":             { select: { name: "Follow-up Email" } },
-        "Status":           { select: { name: "Pending Review" } },
-        "Source Reference": { rich_text: [{ text: { content: `${oppName}${orgName ? ` · ${orgName}` : ""}` } }] },
-        "Content":          { rich_text: [{ text: { content: draftText.slice(0, 2000) } }] },
-        "Related Entity":   { relation: contactId ? [{ id: contactId }] : [] },
-        "Opportunity":      { relation: [{ id: opportunityId }] },
-      },
-    });
-  } catch (e) {
-    return NextResponse.json({ error: "Notion write error", detail: String(e) }, { status: 500 });
+  // 4. Save to Agent Drafts via mirror — Notion + Supabase in one call.
+  const titleStr = `Follow-up: ${oppName} — ${today}`;
+  const created = await createPageWithMirror({
+    table: "notion_agent_drafts",
+    fields: {
+      title:      titleStr,
+      draft_type: "Follow-up Email",
+      status:     "Pending Review",
+      draft_text: draftText.slice(0, 2000),
+    },
+    mirrorOnly: {
+      related_entity_id: contactId ?? null,
+      opportunity_id:    opportunityId,
+      created_date:      today,
+    },
+    extraNotionProperties: {
+      "Source Reference": { rich_text: [{ text: { content: `${oppName}${orgName ? ` · ${orgName}` : ""}` } }] },
+      "Related Entity":   { relation: contactId ? [{ id: contactId }] : [] },
+      "Opportunity":      { relation: [{ id: opportunityId }] },
+    },
+  });
+  if (!created.ok) {
+    return NextResponse.json({ error: "Draft create failed", detail: created.error }, { status: 500 });
   }
+  const draftPage = { id: created.id!, url: "" };
 
   return NextResponse.json({
     ok: true,

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { adminGuardApi } from "@/lib/require-admin";
 import { notion, DB, createKnowledgeAssetDraft } from "@/lib/notion";
+import { createPageWithMirror } from "@/lib/notion-mirror-push";
 import { isAdminUser, isAdminEmail } from "@/lib/clients";
 import * as XLSX from "xlsx";
 import mammoth from "mammoth";
@@ -569,24 +570,23 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // 6. Insight Briefs
+  // 6. Insight Briefs — go through the mirror so the Hall sees them immediately.
   const insightItems = (extraction.insight_briefs ?? []).slice(0, 2);
   for (const ib of insightItems) {
     try {
-      const ibProps: Record<string, unknown> = {
-        "Name": notionTitle(ib.title),
-      };
-      if (ib.theme?.length) ibProps["Theme"] = notionSelect(ib.theme[0]);
+      const fields: Record<string, unknown> = { title: ib.title };
+      if (ib.theme?.length) fields.theme = ib.theme[0];
 
-      const page = await notion.pages.create({
-        parent: { database_id: DB.insightBriefs },
-        properties: ibProps as Parameters<typeof notion.pages.create>[0]["properties"],
+      const created = await createPageWithMirror({
+        table: "notion_insight_briefs",
+        fields,
       });
+      if (!created.ok) throw new Error(created.error ?? "create failed");
 
-      // Add summary as page body paragraph
-      if (ib.summary) {
+      // Summary still goes as a page body block (not a property — needs separate call).
+      if (ib.summary && created.id) {
         await notion.blocks.children.append({
-          block_id: page.id,
+          block_id: created.id,
           children: [
             {
               object: "block",
@@ -602,22 +602,23 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // 7. Decision Items
+  // 7. Decision Items — go through the mirror.
   const decisionItems = (extraction.decision_items ?? []).slice(0, 3);
   for (const di of decisionItems) {
     try {
-      const props: Record<string, unknown> = {
-        "Name":   notionTitle(di.title),
-        "Status": notionSelect("Open"),
+      const fields: Record<string, unknown> = {
+        title:  di.title,
+        status: "Open",
       };
-      if (di.category) props["Decision Category"] = notionSelect(di.category);
-      if (di.priority) props["Priority"]           = notionSelect(di.priority);
-      if (di.notes)    props["Notes"]              = notionRichText(di.notes);
+      if (di.category) fields.category  = di.category;
+      if (di.priority) fields.priority  = di.priority;
+      if (di.notes)    fields.notes_raw = di.notes;
 
-      await notion.pages.create({
-        parent: { database_id: DB.decisions },
-        properties: props as Parameters<typeof notion.pages.create>[0]["properties"],
+      const created = await createPageWithMirror({
+        table: "notion_decision_items",
+        fields,
       });
+      if (!created.ok) throw new Error(created.error ?? "create failed");
       decisionItemsCount++;
     } catch (err) {
       errors.push(`Decision "${di.title}": ${err instanceof Error ? err.message : String(err)}`);
