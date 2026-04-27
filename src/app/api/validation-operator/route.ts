@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { notion, getAllEvidence } from "@/lib/notion";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { withRoutineLog } from "@/lib/routine-log";
+import { applyMirrorEdit, pushPending } from "@/lib/notion-mirror-push";
 
 export const maxDuration = 180;
 
@@ -152,15 +153,13 @@ async function _POST(req: NextRequest) {
   };
 
   async function writeStatus(id: string, status: "Validated" | "Reviewed" | "Superseded") {
-    await notion.pages.update({
-      page_id: id,
-      properties: { "Validation Status": { select: { name: status } } },
+    // Mirror first (instant), Notion async via cron retry on failure
+    const apply = await applyMirrorEdit({
+      table: "evidence",
+      id,
+      changes: { validation_status: status },
     });
-    try {
-      await sb.from("evidence")
-        .update({ validation_status: status, updated_at: new Date().toISOString() })
-        .eq("notion_id", id);
-    } catch { /* non-critical */ }
+    if (apply.ok) await pushPending("evidence", id);
   }
 
   // Pass 1 — New items

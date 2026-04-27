@@ -20,6 +20,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { google } from "googleapis";
 import { adminGuardApi } from "@/lib/require-admin";
 import { notion, DB } from "@/lib/notion";
+import { applyMirrorEdit, pushPending } from "@/lib/notion-mirror-push";
 
 // ─── Gmail auth ───────────────────────────────────────────────────────────────
 
@@ -140,13 +141,14 @@ export async function POST(req: NextRequest) {
       gmailId = created.data.id ?? "";
     }
 
-    // Update Notion draft status
-    await notion.pages.update({
-      page_id: draftId,
-      properties: {
-        "Status": { select: { name: sendMode === "direct" ? "Sent" : "Draft Created" } },
-      } as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+    // Update draft status via mirror (instant Hall reflect + async Notion push)
+    const newStatus = sendMode === "direct" ? "Sent" : "Draft Created";
+    const apply = await applyMirrorEdit({
+      table: "notion_agent_drafts",
+      id: draftId,
+      changes: { status: newStatus },
     });
+    if (apply.ok) await pushPending("notion_agent_drafts", draftId);
 
     return NextResponse.json({
       ok: true,
