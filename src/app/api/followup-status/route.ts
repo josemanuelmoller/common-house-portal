@@ -22,12 +22,10 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { Client } from "@notionhq/client";
 import { adminGuardApi } from "@/lib/require-admin";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
+import { applyMirrorEdit, pushPending } from "@/lib/notion-mirror-push";
 import type { ActionType, LoopStatus } from "@/lib/loops";
-
-const notion = new Client({ auth: process.env.NOTION_API_KEY });
 const VALID_STATUSES = ["Needed", "In Progress", "Waiting", "Done", "Dropped", "Sent", "None"] as const;
 type FollowUpStatus = (typeof VALID_STATUSES)[number];
 
@@ -134,43 +132,34 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: `status must be one of: ${VALID_STATUSES.join(", ")}` }, { status: 400 });
   }
 
-  try {
-    await notion.pages.update({
-      page_id: opportunityId,
-      properties: {
-        "Follow-up Status": { select: { name: status } },
-      },
-    });
-
-    // Dual-write to Supabase opportunities — makes follow_up_status live immediately
-    try {
-      const sb = getSupabaseServerClient();
-      await sb.from("opportunities")
-        .update({ follow_up_status: status, updated_at: new Date().toISOString() })
-        .eq("notion_id", opportunityId);
-    } catch (err) {
-      console.warn("[followup-status] opportunities update failed (non-critical):", err);
-    }
-
-    // AWAIT the Loop Engine sync. Previously fire-and-forget, which led to
-    // partial-persistence bugs in the Hall. If the loop part fails we still
-    // return 200 (Notion write succeeded) but include a warning so the UI
-    // can surface the partial state instead of pretending it's fully done.
-    const loopSync = await syncLoopAction(opportunityId, status);
-
-    return NextResponse.json({
-      ok: true,
-      opportunityId,
-      status,
-      loops_touched: loopSync.loopsTouched,
-      loop_sync_ok:  loopSync.ok,
-      ...(loopSync.warning ? { warning: loopSync.warning } : {}),
-    });
-  } catch (err) {
-    console.error("[followup-status] Notion update failed:", err);
+  // 1) Update Supabase mirror immediately (instant UI feedback) — makes
+  //    follow_up_status live for the Hall on next render.
+  const apply = await applyMirrorEdit({
+    table:   "opportunities",
+    id:      opportunityId,
+    changes: { follow_up_status: status },
+  });
+  if (!apply.ok) {
     return NextResponse.json(
-      { error: "Failed to update Notion record", detail: err instanceof Error ? err.message : String(err) },
-      { status: 502 }
+      { error: "Mirror update failed", detail: apply.error },
+      { status: 500 }
     );
   }
+
+  // 2) Best-effort push to Notion. Cron retry will pick up failures.
+  const push = await pushPending("opportunities", opportunityId);
+
+  // 3) AWAIT the Loop Engine sync (Supabase-only, fast).
+  const loopSync = await syncLoopAction(opportunityId, status);
+
+  return NextResponse.json({
+    ok: true,
+    opportunityId,
+    status,
+    notion_push:    push.ok ? "ok" : "pending_retry",
+    notion_error:   push.ok ? undefined : push.error,
+    loops_touched:  loopSync.loopsTouched,
+    loop_sync_ok:   loopSync.ok,
+    ...(loopSync.warning ? { warning: loopSync.warning } : {}),
+  });
 }

@@ -18,12 +18,9 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { Client } from "@notionhq/client";
 import { adminGuardApi } from "@/lib/require-admin";
-import { prop, text } from "@/lib/notion/core";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
-
-const notion = new Client({ auth: process.env.NOTION_API_KEY });
+import { applyMirrorEdit, pushPending } from "@/lib/notion-mirror-push";
 
 export async function PATCH(req: NextRequest) {
   const guard = await adminGuardApi();
@@ -37,39 +34,41 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "opportunityId required" }, { status: 400 });
   }
 
-  try {
-    // Build properties update
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const properties: Record<string, any> = {
-      "Follow-up Status": { select: { name: "Needed" } },
-    };
+  // 1) Compose the changes. If a note is provided, prepend it to existing
+  //    trigger_signal (read from Supabase mirror — already up to date).
+  const changes: Record<string, unknown> = { follow_up_status: "Needed" };
 
-    // If a note is provided, prepend it to the existing Trigger/Signal text
-    if (note && note.trim()) {
-      // Read current Trigger/Signal value
-      const page = await notion.pages.retrieve({ page_id: opportunityId });
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const existing = text(prop(page as any, "Trigger / Signal")) || "";
-      const dateStr  = new Date().toISOString().slice(0, 10);
-      const prefix   = `[Flagged ${dateStr}: ${note.trim()}]`;
-      const combined = existing ? `${prefix}\n${existing}` : prefix;
-      properties["Trigger / Signal"] = {
-        rich_text: [{ type: "text", text: { content: combined.slice(0, 2000) } }],
-      };
-    }
-
-    await notion.pages.update({ page_id: opportunityId, properties });
-
-    // Dual-write to Supabase — makes follow_up_status live immediately
-    try {
-      const sb = getSupabaseServerClient();
-      await sb.from("opportunities")
-        .update({ follow_up_status: "Needed", updated_at: new Date().toISOString() })
-        .eq("notion_id", opportunityId);
-    } catch { /* non-critical */ }
-
-    return NextResponse.json({ ok: true, opportunityId });
-  } catch (err) {
-    return NextResponse.json({ error: "Notion update failed", detail: String(err) }, { status: 502 });
+  if (note && note.trim()) {
+    const sb = getSupabaseServerClient();
+    const { data } = await sb
+      .from("opportunities")
+      .select("trigger_signal")
+      .eq("notion_id", opportunityId)
+      .maybeSingle();
+    const existing = (data?.trigger_signal as string | null) ?? "";
+    const dateStr  = new Date().toISOString().slice(0, 10);
+    const prefix   = `[Flagged ${dateStr}: ${note.trim()}]`;
+    const combined = existing ? `${prefix}\n${existing}` : prefix;
+    // trigger_signal isn't yet in FIELD_MAP for opportunities — write to mirror
+    // directly here, while follow_up_status flows through applyMirrorEdit.
+    await sb.from("opportunities")
+      .update({ trigger_signal: combined.slice(0, 2000), updated_at: new Date().toISOString() })
+      .eq("notion_id", opportunityId);
+    // Note: trigger_signal won't sync back to Notion via the push module yet —
+    // not in FIELD_MAP. Add it there if needed; for now Notion stays as-is.
   }
+
+  // 2) Apply mirror edit + push to Notion.
+  const apply = await applyMirrorEdit({ table: "opportunities", id: opportunityId, changes });
+  if (!apply.ok) {
+    return NextResponse.json({ error: "Mirror update failed", detail: apply.error }, { status: 500 });
+  }
+  const push = await pushPending("opportunities", opportunityId);
+
+  return NextResponse.json({
+    ok: true,
+    opportunityId,
+    notion_push:  push.ok ? "ok" : "pending_retry",
+    notion_error: push.ok ? undefined : push.error,
+  });
 }

@@ -16,11 +16,36 @@ import { notion } from "@/lib/notion/core";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 
 type MirrorTable =
+  // Pattern A: id IS the Notion page id (Wave 6+ tables)
   | "notion_decision_items"
   | "notion_daily_briefings"
   | "notion_insight_briefs"
   | "notion_competitive_intel"
-  | "notion_agent_drafts";
+  | "notion_agent_drafts"
+  | "notion_content_pipeline"
+  // Pattern B: separate uuid id + notion_id text column (Wave 1-5 tables)
+  | "people"
+  | "projects"
+  | "opportunities"
+  | "organizations"
+  | "evidence"
+  | "sources";
+
+// Pattern A tables look up rows by `id`. Pattern B tables look up by `notion_id`.
+const ID_COLUMN: Record<MirrorTable, "id" | "notion_id"> = {
+  notion_decision_items:    "id",
+  notion_daily_briefings:   "id",
+  notion_insight_briefs:    "id",
+  notion_competitive_intel: "id",
+  notion_agent_drafts:      "id",
+  notion_content_pipeline:  "id",
+  people:                   "notion_id",
+  projects:                 "notion_id",
+  opportunities:            "notion_id",
+  organizations:            "notion_id",
+  evidence:                 "notion_id",
+  sources:                  "notion_id",
+};
 
 type FieldDef =
   | { kind: "select"; notionName: string }
@@ -83,6 +108,73 @@ const FIELD_MAP: Record<MirrorTable, Record<string, FieldDef>> = {
     voice:            { kind: "select",    notionName: "Voice" },
     platform:         { kind: "select",    notionName: "Platform" },
   },
+  notion_content_pipeline: {
+    title:            { kind: "title",     notionName: "Title" },
+    platform:         { kind: "select",    notionName: "Platform" },
+    channel:          { kind: "select",    notionName: "Channel" },
+    content_type:     { kind: "select",    notionName: "Content Type" },
+    status:           { kind: "select",    notionName: "Status" },
+    publish_window:   { kind: "select",    notionName: "Publish Window" },
+    publish_date:     { kind: "date",      notionName: "Publish Date" },
+  },
+  // ─── Pattern B tables (Wave 1-5) ────────────────────────────────────────
+  people: {
+    full_name:        { kind: "title",     notionName: "Full Name" },
+    job_title:        { kind: "rich_text", notionName: "Job Title" },
+    email:            { kind: "rich_text", notionName: "Email" },
+    phone:            { kind: "rich_text", notionName: "Phone" },
+    linkedin:         { kind: "url",       notionName: "LinkedIn" },
+    contact_warmth:   { kind: "select",    notionName: "Contact Warmth" },
+    last_contact_date:{ kind: "date",      notionName: "Last Contact Date" },
+    person_classification: { kind: "select", notionName: "Person Classification" },
+    notes:            { kind: "rich_text", notionName: "Notes" },
+  },
+  projects: {
+    name:             { kind: "title",     notionName: "Name" },
+    project_status:   { kind: "select",    notionName: "Project Status" },
+    current_stage:    { kind: "select",    notionName: "Current Stage" },
+    status_summary:   { kind: "rich_text", notionName: "Status Summary" },
+    draft_status_update: { kind: "rich_text", notionName: "Draft Status Update" },
+    update_needed:    { kind: "checkbox",  notionName: "Project Update Needed?" },
+    last_status_update: { kind: "date",    notionName: "Last Status Update" },
+  },
+  opportunities: {
+    title:            { kind: "title",     notionName: "Name" },
+    status:           { kind: "select",    notionName: "Status" },
+    follow_up_status: { kind: "select",    notionName: "Follow-up Status" },
+    priority:         { kind: "select",    notionName: "Priority" },
+    qualification_status: { kind: "select", notionName: "Qualification Status" },
+    pending_action:   { kind: "rich_text", notionName: "Pending Action" },
+    notes:            { kind: "rich_text", notionName: "Notes" },
+    suggested_next_step: { kind: "rich_text", notionName: "Suggested Next Step" },
+    is_archived:      { kind: "checkbox",  notionName: "Archived" },
+  },
+  organizations: {
+    name:             { kind: "title",     notionName: "Name" },
+    relationship_stage:{ kind: "select",   notionName: "Relationship Stage" },
+    org_category:     { kind: "select",    notionName: "Category" },
+    notes:            { kind: "rich_text", notionName: "Notes" },
+    website:          { kind: "url",       notionName: "Website" },
+    country:          { kind: "rich_text", notionName: "Country" },
+    city:             { kind: "rich_text", notionName: "City" },
+  },
+  evidence: {
+    title:            { kind: "title",     notionName: "Name" },
+    evidence_type:    { kind: "select",    notionName: "Evidence Type" },
+    validation_status:{ kind: "select",    notionName: "Validation Status" },
+    confidence_level: { kind: "select",    notionName: "Confidence Level" },
+    evidence_statement:{ kind: "rich_text", notionName: "Evidence Statement" },
+    resolution_status:{ kind: "select",    notionName: "Resolution Status" },
+  },
+  sources: {
+    title:            { kind: "title",     notionName: "Name" },
+    processing_status:{ kind: "select",    notionName: "Processing Status" },
+    relevance_status: { kind: "select",    notionName: "Relevance Status" },
+    sensitivity:      { kind: "select",    notionName: "Sensitivity" },
+    processed_summary:{ kind: "rich_text", notionName: "Processed Summary" },
+    evidence_extracted:{ kind: "checkbox", notionName: "Evidence Extracted" },
+    knowledge_relevant:{ kind: "checkbox", notionName: "Knowledge Relevant" },
+  },
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -113,15 +205,17 @@ function buildNotionProperty(def: FieldDef, value: unknown): any {
 
 /**
  * Apply a portal edit to a mirror row + record what fields are owed to Notion.
- * Caller should follow with pushPending() best-effort, or rely on the cron retry.
+ * `id` is always the Notion page id — this helper translates to the right
+ * Supabase column (id vs notion_id) based on the table's pattern.
  */
 export async function applyMirrorEdit(params: {
   table: MirrorTable;
-  id: string;
+  id: string; // Notion page id (always)
   changes: Record<string, unknown>;
 }): Promise<{ ok: boolean; error?: string }> {
   const sb = getSupabaseServerClient();
   const allowed = FIELD_MAP[params.table];
+  const idCol = ID_COLUMN[params.table];
 
   const filtered: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(params.changes)) {
@@ -132,10 +226,9 @@ export async function applyMirrorEdit(params: {
   const { data: existing } = await sb
     .from(params.table)
     .select("pending_notion_push")
-    .eq("id", params.id)
+    .eq(idCol, params.id)
     .maybeSingle();
 
-  // Merge with prior unpushed pending so we don't lose an earlier edit.
   const mergedPending = {
     ...(existing?.pending_notion_push as Record<string, unknown> | null ?? {}),
     ...filtered,
@@ -149,7 +242,7 @@ export async function applyMirrorEdit(params: {
       pending_set_at:      new Date().toISOString(),
       last_push_error:     null,
     })
-    .eq("id", params.id);
+    .eq(idCol, params.id);
 
   if (error) return { ok: false, error: error.message };
   return { ok: true };
@@ -161,10 +254,11 @@ export async function applyMirrorEdit(params: {
  */
 export async function pushPending(table: MirrorTable, id: string): Promise<{ ok: boolean; error?: string }> {
   const sb = getSupabaseServerClient();
+  const idCol = ID_COLUMN[table];
   const { data, error } = await sb
     .from(table)
     .select("pending_notion_push")
-    .eq("id", id)
+    .eq(idCol, id)
     .maybeSingle();
 
   if (error) return { ok: false, error: error.message };
@@ -187,14 +281,14 @@ export async function pushPending(table: MirrorTable, id: string): Promise<{ ok:
       pending_set_at:      null,
       last_push_at:        new Date().toISOString(),
       last_push_error:     null,
-    }).eq("id", id);
+    }).eq(idCol, id);
     return { ok: true };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     await sb.from(table).update({
       last_push_error: msg.slice(0, 1000),
       last_push_at:    new Date().toISOString(),
-    }).eq("id", id);
+    }).eq(idCol, id);
     return { ok: false, error: msg };
   }
 }
@@ -219,6 +313,14 @@ const TABLE_TO_DB: Record<MirrorTable, DatabaseId> = {
   notion_insight_briefs:    "04bed3a3fd1a4b3a99643cd21562e08a",
   notion_competitive_intel: "af8d7edb750b4131b3b55ef5ee83556a",
   notion_agent_drafts:      "9844ece875ea4c618f616e8cc97d5a90",
+  notion_content_pipeline:  "3bf5cf81f45c4db2840590f3878bfdc0",
+  // Pattern B — used for create paths that need a Notion DB target.
+  people:                   "1bc0f96f33ca4a9e9ff26844377e81de",
+  projects:                 "49d59b18095f46588960f2e717832c5f",
+  opportunities:            "687caa98594a41b595c9960c141be0c0",
+  organizations:            "bef1bb86ab2b4cd280b6b33f9034b96c",
+  evidence:                 "fa28124978d043039d8932ac9964ccf5",
+  sources:                  "d88aff1b019d4110bcefab7f5bfbd0ae",
 };
 
 /**
@@ -262,12 +364,20 @@ export async function createPageWithMirror(params: {
     return { ok: false, error: `Notion create failed: ${e instanceof Error ? e.message : String(e)}` };
   }
 
-  // 2) Insert into mirror with the real id. last_edited_at left null until
-  //    next forward sync stamps it from Notion.
+  // 2) Insert into mirror. For Pattern A tables `id` IS the Notion page id;
+  //    for Pattern B (people/projects/etc), `notion_id` holds it and `id` is
+  //    a Supabase-generated uuid. last_edited_at left null until next forward
+  //    sync stamps it from Notion.
   const sb = getSupabaseServerClient();
-  mirrorRow.id          = pageId;
-  mirrorRow.notion_url  = pageUrl;
-  mirrorRow.synced_at   = new Date().toISOString();
+  const idCol = ID_COLUMN[params.table];
+  if (idCol === "id") {
+    mirrorRow.id          = pageId;
+    mirrorRow.notion_url  = pageUrl;
+    mirrorRow.synced_at   = new Date().toISOString();
+  } else {
+    mirrorRow.notion_id   = pageId;
+    mirrorRow.notion_url  = pageUrl;
+  }
   const { error } = await sb.from(params.table).insert(mirrorRow);
   if (error) {
     // Notion create already succeeded; surface the mirror failure but the
@@ -288,19 +398,28 @@ export async function pushAllPending(): Promise<{ table: string; pushed: number;
     "notion_daily_briefings",
     "notion_insight_briefs",
     "notion_competitive_intel",
+    "notion_agent_drafts",
+    "notion_content_pipeline",
+    "people",
+    "projects",
+    "opportunities",
+    "organizations",
+    "evidence",
+    "sources",
   ];
   const summary: { table: string; pushed: number; failed: number }[] = [];
 
   for (const t of tables) {
+    const idCol = ID_COLUMN[t];
     const { data } = await sb
       .from(t)
-      .select("id")
+      .select(idCol)
       .not("pending_notion_push", "is", null)
       .order("pending_set_at", { ascending: true })
       .limit(50);
     let pushed = 0, failed = 0;
-    for (const row of (data ?? []) as { id: string }[]) {
-      const r = await pushPending(t, row.id);
+    for (const row of (data ?? []) as Record<string, string>[]) {
+      const r = await pushPending(t, row[idCol]);
       if (r.ok) pushed++; else failed++;
     }
     summary.push({ table: t, pushed, failed });

@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminGuardApi } from "@/lib/require-admin";
-import { notion } from "@/lib/notion";
+import { applyMirrorEdit, pushPending } from "@/lib/notion-mirror-push";
 
 /**
  * PATCH /api/content/[id]
+ *
+ * Updates a row in the Content Pipeline mirror first (instant UI),
+ * then pushes the change to Notion async.
  *
  * Actions:
  *   { action: "archive" } → sets Status to "Archived"
@@ -26,28 +29,25 @@ export async function PATCH(
   const { action, status } = body;
   const { id: pageId } = await params;
 
-  try {
-    if (action === "archive") {
-      await notion.pages.update({
-        page_id: pageId,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        properties: { Status: { select: { name: "Archived" } } } as any,
-      });
-      return NextResponse.json({ ok: true, status: "Archived" });
-    }
+  let newStatus: string | null = null;
+  if (action === "archive") newStatus = "Archived";
+  else if (action === "status" && status) newStatus = status;
+  else return NextResponse.json({ error: "Unknown action" }, { status: 400 });
 
-    if (action === "status" && status) {
-      await notion.pages.update({
-        page_id: pageId,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        properties: { Status: { select: { name: status } } } as any,
-      });
-      return NextResponse.json({ ok: true, status });
-    }
-
-    return NextResponse.json({ error: "Unknown action" }, { status: 400 });
-  } catch (err) {
-    console.error("[content PATCH]", err);
-    return NextResponse.json({ error: "Failed to update" }, { status: 500 });
+  const apply = await applyMirrorEdit({
+    table: "notion_content_pipeline",
+    id: pageId,
+    changes: { status: newStatus },
+  });
+  if (!apply.ok) {
+    return NextResponse.json({ error: "Mirror update failed", detail: apply.error }, { status: 500 });
   }
+  const push = await pushPending("notion_content_pipeline", pageId);
+
+  return NextResponse.json({
+    ok: true,
+    status: newStatus,
+    notion_push:  push.ok ? "ok" : "pending_retry",
+    notion_error: push.ok ? undefined : push.error,
+  });
 }

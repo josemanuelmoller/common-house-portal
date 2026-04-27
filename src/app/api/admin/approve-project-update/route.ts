@@ -13,10 +13,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { Client } from "@notionhq/client";
 import { isAdminUser } from "@/lib/clients";
-
-const notion = new Client({ auth: process.env.NOTION_API_KEY });
+import { applyMirrorEdit, pushPending } from "@/lib/notion-mirror-push";
 
 export async function POST(req: NextRequest) {
   const { userId } = await auth();
@@ -34,25 +32,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
 
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const properties: Record<string, any> = {
-      "Project Update Needed?": { checkbox: false },
-    };
-
-    if (action === "approve" && draftText) {
-      properties["Status Summary"] = {
-        rich_text: [{ type: "text", text: { content: draftText.slice(0, 2000) } }],
-      };
-      properties["Draft Status Update"] = {
-        rich_text: [],
-      };
-    }
-
-    await notion.pages.update({ page_id: projectId, properties });
-
-    return NextResponse.json({ ok: true, action });
-  } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+  const changes: Record<string, unknown> = { update_needed: false };
+  if (action === "approve" && draftText) {
+    changes.status_summary      = draftText.slice(0, 2000);
+    changes.draft_status_update = "";
+    changes.last_status_update  = new Date().toISOString().slice(0, 10);
   }
+
+  const apply = await applyMirrorEdit({ table: "projects", id: projectId, changes });
+  if (!apply.ok) {
+    return NextResponse.json({ error: "Mirror update failed", detail: apply.error }, { status: 500 });
+  }
+  const push = await pushPending("projects", projectId);
+
+  return NextResponse.json({
+    ok: true,
+    action,
+    notion_push:  push.ok ? "ok" : "pending_retry",
+    notion_error: push.ok ? undefined : push.error,
+  });
 }
