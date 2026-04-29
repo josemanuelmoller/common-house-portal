@@ -208,12 +208,42 @@ export function SuggestedTimeBlocks() {
         {items.map(item => (
           <div
             key={item.id}
-            className={`group py-3.5 px-2.5 -mx-2.5 transition-colors hover:bg-[var(--hall-paper-1)] ${acting === item.id ? "opacity-50" : ""}`}
+            className={`group py-3 sm:py-3.5 px-2.5 -mx-2.5 transition-colors hover:bg-[var(--hall-paper-1)] ${acting === item.id ? "opacity-50" : ""}`}
             style={{ borderTop: "1px solid var(--hall-line-soft)" }}
           >
-            <div className="flex items-start gap-4">
-              {/* Time window column */}
-              <div className="shrink-0 w-[100px]">
+            {/* Mobile: compact meta strip (slot · duration · task type) */}
+            <div className="flex items-center gap-2 flex-wrap sm:hidden mb-1.5">
+              <span
+                className="font-bold"
+                style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--hall-ink-0)" }}
+              >
+                {item.slot_label}
+              </span>
+              <span style={{ color: "var(--hall-muted-3)", fontSize: 10 }}>·</span>
+              <span
+                style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--hall-muted-2)" }}
+              >
+                {item.duration_min} min
+              </span>
+              <span
+                style={{
+                  fontFamily: "var(--font-hall-mono)",
+                  fontSize: 8.5,
+                  letterSpacing: "0.1em",
+                  textTransform: "uppercase",
+                  color: "var(--hall-muted-2)",
+                  background: "var(--hall-fill-soft)",
+                  padding: "1px 5px",
+                  borderRadius: 2,
+                }}
+              >
+                {TASK_TYPE_LABEL[item.task_type] ?? item.task_type}
+              </span>
+            </div>
+
+            <div className="flex flex-col sm:flex-row sm:items-start sm:gap-4">
+              {/* Time window column — desktop only */}
+              <div className="hidden sm:block shrink-0 w-[100px]">
                 <p
                   className="font-bold leading-snug"
                   style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10.5, color: "var(--hall-ink-0)" }}
@@ -246,33 +276,33 @@ export function SuggestedTimeBlocks() {
               {/* Content column */}
               <div className="flex-1 min-w-0">
                 <p
-                  className="text-[13px] font-semibold leading-snug"
+                  className="text-[12px] sm:text-[13px] font-semibold leading-snug"
                   style={{ color: "var(--hall-ink-0)" }}
                 >
                   {item.title}
                 </p>
                 <p
-                  className="text-[11px] mt-0.5 truncate"
+                  className="text-[10.5px] sm:text-[11px] mt-0.5 truncate"
                   style={{ color: "var(--hall-muted-2)" }}
                 >
                   {item.entity_label}
                 </p>
                 <p
-                  className="text-[11px] mt-1.5 leading-[1.5]"
+                  className="text-[10.5px] sm:text-[11px] mt-1.5 leading-[1.5]"
                   style={{ color: "var(--hall-muted-2)" }}
                 >
                   <span className="font-semibold" style={{ color: "var(--hall-ink-3)" }}>Why now: </span>{item.why_now}
                 </p>
                 <p
-                  className="text-[11px] mt-0.5 leading-[1.5]"
+                  className="text-[10.5px] sm:text-[11px] mt-0.5 leading-[1.5]"
                   style={{ color: "var(--hall-muted-2)" }}
                 >
                   <span className="font-semibold" style={{ color: "var(--hall-ink-3)" }}>Outcome: </span>{item.expected_outcome}
                 </p>
               </div>
 
-              {/* Actions column — K-v2 hover-reveal pattern */}
-              <div className="flex flex-col items-end gap-1.5 shrink-0 opacity-50 group-hover:opacity-100 transition-opacity">
+              {/* Actions — stacked row on mobile, hover-reveal column on desktop */}
+              <div className="flex flex-row items-center gap-3 mt-2.5 sm:mt-0 sm:flex-col sm:items-end sm:gap-1.5 shrink-0 sm:opacity-50 sm:group-hover:opacity-100 sm:transition-opacity">
                 <button
                   onClick={() => act(item.id, "accept")}
                   disabled={acting === item.id}
@@ -290,7 +320,7 @@ export function SuggestedTimeBlocks() {
                     Open brief →
                   </button>
                 )}
-                <div className="flex items-center gap-1.5 mt-0.5">
+                <div className="flex items-center gap-1.5 sm:mt-0.5">
                   <button
                     onClick={() => act(item.id, "snooze", 24)}
                     disabled={acting === item.id}
