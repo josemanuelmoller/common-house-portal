@@ -4,15 +4,15 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="theme-color" content="#0b0b0d" />
-<title>Diario · v2</title>
+<title>Diario · v3 lobby</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700;9..144,900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,700;9..144,900;9..144,900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
 <style>
   :root {
     --bg: #0b0b0d; --bg-2: #131318; --bg-3: #1c1c22;
     --line: #26262e; --ink: #f4f4f0; --ink-2: #b9b9b3; --ink-3: #7a7a77;
-    --accent: #c8f55a; --red: #ff5b3a; --blue: #6ab7ff;
+    --accent: #c8f55a; --red: #ff5b3a; --blue: #6ab7ff; --amber: #f5a524;
     --serif: "Fraunces", Georgia, serif;
     --sans: "Inter", system-ui, sans-serif;
     --mono: "JetBrains Mono", ui-monospace, monospace;
@@ -21,7 +21,7 @@
     :root {
       --bg: #f6f5f0; --bg-2: #ffffff; --bg-3: #ecebe4;
       --line: #d9d8cf; --ink: #14140f; --ink-2: #4a4a44; --ink-3: #8a8a82;
-      --accent: #6b8f0f; --blue: #1d6cc7;
+      --accent: #6b8f0f; --blue: #1d6cc7; --amber: #b3760e;
     }
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -29,195 +29,155 @@
   body { min-height: 100vh; padding-bottom: env(safe-area-inset-bottom); -webkit-font-smoothing: antialiased; }
   .app { max-width: 720px; margin: 0 auto; padding-bottom: 100px; }
 
+  /* Subtle lobby texture */
+  body::before {
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    background-image:
+      radial-gradient(circle at 20% 10%, color-mix(in oklab, var(--accent) 6%, transparent), transparent 40%),
+      radial-gradient(circle at 80% 80%, color-mix(in oklab, var(--blue) 8%, transparent), transparent 50%);
+  }
+  .app { position: relative; z-index: 1; }
+
   /* Header */
   header.top {
-    position: sticky; top: 0; z-index: 30;
-    background: color-mix(in oklab, var(--bg) 92%, transparent);
-    backdrop-filter: blur(10px);
-    border-bottom: 1px solid var(--line);
-    padding: 12px 16px 0; padding-top: max(12px, env(safe-area-inset-top));
+    padding: 16px 16px 0; padding-top: max(16px, env(safe-area-inset-top));
   }
-  .brand { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-  .brand h1 { font-family: var(--serif); font-weight: 900; font-style: italic; font-size: 26px; letter-spacing: -0.02em; margin: 0; }
-  .brand .meta { font-family: var(--mono); font-size: 10px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.08em; margin-top: 2px; }
+  .brand { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+  .brand h1 { font-family: var(--serif); font-weight: 900; font-style: italic; font-size: 32px; letter-spacing: -0.02em; margin: 0; line-height: 1; }
+  .brand .meta { font-family: var(--mono); font-size: 10px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.1em; margin-top: 6px; }
   .brand .icons { display: flex; gap: 6px; }
   .icon-btn { width: 36px; height: 36px; display: grid; place-items: center; background: transparent; border: 1px solid var(--line); color: var(--ink); border-radius: 999px; cursor: pointer; }
-  .icon-btn:active { background: var(--bg-3); }
 
-  /* Briefing audio strip */
-  .briefing {
-    margin: 12px -16px 0; padding: 12px 16px;
-    background: linear-gradient(135deg, color-mix(in oklab, var(--accent) 18%, var(--bg)) 0%, var(--bg) 100%);
-    border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+  /* Lobby greeting */
+  .greet {
+    margin: 18px 16px 0;
+    font-family: var(--serif); font-style: italic; font-weight: 500;
+    font-size: 17px; line-height: 1.4; color: var(--ink-2);
+  }
+  .greet b { color: var(--ink); font-style: normal; font-weight: 700; }
+
+  /* Agent strip */
+  .agent {
+    margin: 16px 16px 0; padding: 12px 14px;
+    background: var(--bg-2); border: 1px solid var(--line); border-radius: 14px;
     display: flex; align-items: center; gap: 12px; cursor: pointer;
   }
-  .briefing .play {
-    width: 38px; height: 38px; border-radius: 999px;
-    background: var(--accent); color: #0b0b0d;
-    display: grid; place-items: center; flex-shrink: 0;
-  }
-  .briefing .text { flex: 1; min-width: 0; }
-  .briefing .label { font-family: var(--mono); font-size: 10px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.1em; }
-  .briefing .title { font-family: var(--serif); font-weight: 700; font-size: 15px; line-height: 1.2; margin-top: 2px; }
-  .briefing .dur { font-family: var(--mono); font-size: 11px; color: var(--ink-2); flex-shrink: 0; }
-
-  /* Status bar (anti-doomscroll) */
-  .status {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 10px 16px; margin: 0 -16px;
-    border-bottom: 1px solid var(--line);
-    font-family: var(--mono); font-size: 11px;
-    color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.06em;
-  }
-  .status .new { color: var(--ink); }
-  .status .new::before { content: "●"; color: var(--accent); margin-right: 6px; }
-
-  /* Topic chips */
-  .chips { display: flex; gap: 8px; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; margin: 0 -16px; padding: 12px 16px; }
-  .chips::-webkit-scrollbar { display: none; }
-  .chip { flex: 0 0 auto; padding: 6px 12px; border: 1px solid var(--line); border-radius: 999px; font-size: 13px; font-weight: 500; color: var(--ink-2); background: transparent; white-space: nowrap; cursor: pointer; }
-  .chip.active { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .agent .dot { width: 8px; height: 8px; background: var(--accent); border-radius: 999px; flex-shrink: 0; box-shadow: 0 0 10px var(--accent); animation: glow 2s infinite; }
+  @keyframes glow { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+  .agent .text { flex: 1; min-width: 0; font-size: 13px; line-height: 1.4; color: var(--ink); }
+  .agent .text b { font-weight: 600; }
+  .agent .arr { color: var(--ink-3); }
 
   /* Section header */
-  .section-h { display: flex; align-items: baseline; justify-content: space-between; padding: 22px 16px 10px; }
-  .section-h h3 { font-family: var(--serif); font-weight: 700; font-size: 13px; text-transform: uppercase; letter-spacing: 0.14em; margin: 0; }
+  .section-h { display: flex; align-items: baseline; justify-content: space-between; padding: 28px 16px 12px; }
+  .section-h h3 { font-family: var(--serif); font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.18em; margin: 0; color: var(--ink-3); }
   .section-h .more { font-family: var(--mono); font-size: 10px; color: var(--ink-3); text-decoration: none; letter-spacing: 0.06em; }
 
-  /* Event card (cluster-first hero) */
-  .event-hero {
-    margin: 8px 16px 0; border: 1px solid var(--line); border-radius: 18px; overflow: hidden; background: var(--bg-2);
+  /* Rooms grid */
+  .rooms { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 0 16px; }
+  .room {
+    aspect-ratio: 1 / 1.05;
+    border: 1px solid var(--line); border-radius: 16px;
+    padding: 14px; cursor: pointer;
+    display: flex; flex-direction: column; justify-content: space-between;
+    position: relative; overflow: hidden;
+    transition: transform 0.15s;
   }
-  .event-hero .img {
-    aspect-ratio: 16 / 9;
-    background: radial-gradient(120% 90% at 30% 20%, #2a2a35 0%, #0e0e12 60%);
+  .room:active { transform: scale(0.98); }
+  .room .label { font-family: var(--mono); font-size: 9px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.1em; }
+  .room h4 { font-family: var(--serif); font-weight: 700; font-size: 22px; line-height: 1.05; letter-spacing: -0.02em; margin: 6px 0 0; color: var(--ink); }
+  .room .teaser { font-size: 11px; color: var(--ink-2); line-height: 1.4; margin-top: auto; }
+  .room .pulse { font-family: var(--mono); font-size: 10px; color: var(--ink); margin-top: 8px; display: flex; align-items: center; gap: 6px; }
+  .room .pulse::before { content: ""; width: 5px; height: 5px; border-radius: 999px; background: currentColor; }
+
+  /* Room textures */
+  .r-brief { background: linear-gradient(160deg, color-mix(in oklab, var(--accent) 14%, var(--bg-2)) 0%, var(--bg-2) 70%); }
+  .r-brief .pulse { color: var(--accent); }
+  .r-read  { background: linear-gradient(160deg, #2a221a 0%, var(--bg-2) 70%); }
+  .r-read h4 { font-family: var(--serif); font-style: italic; }
+  .r-hojeo { background: var(--bg-2); background-image: linear-gradient(0deg, var(--line) 1px, transparent 1px); background-size: 100% 12px; background-position: 0 14px; }
+  .r-disc  { background: linear-gradient(135deg, color-mix(in oklab, var(--blue) 16%, var(--bg-2)) 0%, var(--bg-2) 70%); }
+  .r-disc .pulse { color: var(--blue); }
+
+  /* Tema rooms (smaller / horizontal scroll) */
+  .temas { display: flex; gap: 10px; overflow-x: auto; scrollbar-width: none; padding: 0 16px 4px; -webkit-overflow-scrolling: touch; }
+  .temas::-webkit-scrollbar { display: none; }
+  .tema {
+    flex: 0 0 168px; min-height: 130px;
+    border: 1px solid var(--line); border-radius: 14px;
+    padding: 12px; cursor: pointer; position: relative; overflow: hidden;
+    display: flex; flex-direction: column; justify-content: space-between;
+  }
+  .tema .ico { font-size: 22px; line-height: 1; }
+  .tema .name { font-family: var(--serif); font-weight: 700; font-size: 16px; letter-spacing: -0.01em; margin-top: 8px; }
+  .tema .live { font-family: var(--mono); font-size: 9px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.1em; margin-top: 4px; display: flex; align-items: center; gap: 5px; }
+  .tema .live i { width: 5px; height: 5px; border-radius: 999px; background: var(--accent); }
+  .t-deport { background: linear-gradient(135deg, #1a3a2a, var(--bg-2) 70%); }
+  .t-geo    { background: linear-gradient(135deg, #1a2a3a, var(--bg-2) 70%); }
+  .t-clima  { background: linear-gradient(135deg, #2a1a3a, var(--bg-2) 70%); }
+  .t-pol-cl { background: linear-gradient(135deg, #3a1a1a, var(--bg-2) 70%); }
+  .t-cult   { background: linear-gradient(135deg, #3a2a1a, var(--bg-2) 70%); }
+  .t-cien   { background: linear-gradient(135deg, #1a3a3a, var(--bg-2) 70%); }
+
+  /* Featured long-read */
+  .longread {
+    margin: 0 16px; padding: 0;
+    border: 1px solid var(--line); border-radius: 18px; overflow: hidden;
+    background: var(--bg-2);
+    cursor: pointer;
+  }
+  .longread .cover {
+    aspect-ratio: 16 / 10;
+    background:
+      radial-gradient(ellipse at 30% 30%, #5c4a1a 0%, #1a1408 70%);
     position: relative;
+    display: flex; align-items: flex-end; padding: 16px;
   }
-  .event-hero .badge {
-    position: absolute; top: 10px; left: 10px;
-    background: var(--red); color: white; font-family: var(--mono); font-size: 10px; font-weight: 600; letter-spacing: 0.1em;
-    padding: 4px 8px; border-radius: 4px; display: inline-flex; align-items: center; gap: 6px; text-transform: uppercase;
+  .longread .cover::after {
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(180deg, transparent 50%, rgba(0,0,0,0.5));
   }
-  .event-hero .badge::before { content: ""; width: 6px; height: 6px; background: white; border-radius: 999px; animation: pulse 1.4s infinite; }
-  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+  .longread .kicker {
+    position: relative; z-index: 1;
+    font-family: var(--mono); font-size: 10px; color: var(--accent);
+    text-transform: uppercase; letter-spacing: 0.14em;
+  }
+  .longread .body { padding: 18px; }
+  .longread h2 {
+    font-family: var(--serif); font-style: italic; font-weight: 500;
+    font-size: 24px; line-height: 1.18; letter-spacing: -0.015em; margin: 0 0 10px;
+  }
+  .longread .deck {
+    font-family: var(--serif); font-weight: 400; font-size: 15px;
+    line-height: 1.5; color: var(--ink-2); margin: 0 0 14px;
+  }
+  .longread .meta { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 10px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.06em; }
 
-  .event-hero .body { padding: 16px; }
-  .event-hero .src-row {
-    display: flex; align-items: center; gap: 10px;
-    font-family: var(--mono); font-size: 11px; color: var(--ink-3);
-    text-transform: uppercase; letter-spacing: 0.06em;
+  /* Marginalia (people you follow) */
+  .voices { padding: 0 16px; display: grid; gap: 10px; }
+  .voice {
+    border: 1px solid var(--line); border-radius: 12px;
+    padding: 12px 14px; background: var(--bg-2);
+    display: grid; grid-template-columns: 36px 1fr; gap: 12px; cursor: pointer;
   }
-  .src-pile { display: inline-flex; }
-  .src-pile span {
-    width: 18px; height: 18px; border-radius: 999px;
-    border: 2px solid var(--bg-2);
-    display: inline-grid; place-items: center;
-    font-size: 8px; font-weight: 700; color: white;
-    margin-left: -6px;
-  }
-  .src-pile span:first-child { margin-left: 0; }
-  .s-bbc { background: #bb1919; }
-  .s-grd { background: #052962; }
-  .s-rtr { background: #ff8000; }
-  .s-nyt { background: #14140f; }
-  .s-ft  { background: #fff1e5; color: #14140f !important; }
-  .s-emo { background: #e30613; }
-  .s-lat { background: #003a70; }
-  .s-bbo { background: #009639; }
-  .s-cpr { background: #6b1f7a; }
+  .voice .av { width: 36px; height: 36px; border-radius: 999px; background: var(--bg-3); display: grid; place-items: center; font-family: var(--serif); font-weight: 700; font-size: 14px; color: var(--ink); border: 1px solid var(--line); }
+  .voice .who { font-family: var(--mono); font-size: 10px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.06em; }
+  .voice .what { font-family: var(--serif); font-style: italic; font-weight: 400; font-size: 14px; line-height: 1.4; color: var(--ink); margin-top: 3px; }
+  .voice .src { font-family: var(--mono); font-size: 9px; color: var(--ink-3); margin-top: 6px; text-transform: uppercase; letter-spacing: 0.08em; }
 
-  .event-hero h2 {
-    font-family: var(--serif); font-weight: 700; font-size: 24px; line-height: 1.15; letter-spacing: -0.02em;
-    margin: 10px 0 6px;
+  /* Anti-doomscroll quiet card */
+  .quiet {
+    margin: 28px 16px 0; padding: 22px 16px; text-align: center;
+    border: 1px dashed var(--line); border-radius: 16px;
   }
-  .event-hero .lead { color: var(--ink-2); font-size: 14px; line-height: 1.55; margin: 0 0 12px; }
-
-  .ai-tag {
-    display: inline-flex; align-items: center; gap: 6px;
-    font-family: var(--mono); font-size: 9px; color: var(--accent);
-    text-transform: uppercase; letter-spacing: 0.1em;
-    border: 1px solid color-mix(in oklab, var(--accent) 50%, var(--line));
-    padding: 3px 7px; border-radius: 4px;
-  }
-  .ai-tag::before { content: "✦"; }
-
-  /* Depth slider */
-  .depth {
-    display: flex; gap: 6px; padding: 4px;
-    background: var(--bg-3); border-radius: 999px; margin: 12px 0 14px;
-  }
-  .depth button {
-    flex: 1; padding: 7px 6px; border: 0; background: transparent;
-    color: var(--ink-2); font-family: var(--mono); font-size: 10px; font-weight: 500;
-    text-transform: uppercase; letter-spacing: 0.05em; border-radius: 999px; cursor: pointer;
-    display: flex; align-items: center; justify-content: center; gap: 4px;
-  }
-  .depth button.on { background: var(--ink); color: var(--bg); }
-
-  /* Frame diff */
-  .frames-h { font-family: var(--mono); font-size: 10px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.1em; margin: 4px 0 8px; }
-  .frames { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-  .frame { padding: 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); }
-  .frame .who { font-family: var(--mono); font-size: 9px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px; }
-  .frame .angle { font-size: 11px; line-height: 1.35; color: var(--ink); font-weight: 500; }
-
-  /* Action row */
-  .actions { display: flex; gap: 8px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
-  .act { flex: 1; padding: 10px; border: 1px solid var(--line); background: transparent; color: var(--ink); border-radius: 10px; font-family: var(--sans); font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; }
-  .act svg { width: 14px; height: 14px; }
-
-  /* Cluster card (in feed) */
-  ul.feed { list-style: none; margin: 0; padding: 0 16px; }
-  li.cluster {
-    padding: 16px 0; border-bottom: 1px solid var(--line); cursor: pointer;
-  }
-  li.cluster:last-child { border-bottom: 0; }
-  .c-srcrow { display: flex; align-items: center; justify-content: space-between; font-family: var(--mono); font-size: 10px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.06em; }
-  .c-srcrow .left { display: flex; align-items: center; gap: 8px; }
-  .c-count { color: var(--ink); font-weight: 600; }
-  .c-thread { color: var(--blue); display: inline-flex; align-items: center; gap: 4px; }
-  .c-thread::before { content: "↻"; }
-  .c-title { font-family: var(--serif); font-weight: 700; font-size: 18px; line-height: 1.22; letter-spacing: -0.01em; margin: 8px 0 6px; color: var(--ink); }
-  .c-lead { font-size: 13px; line-height: 1.5; color: var(--ink-2); margin: 0 0 10px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-  .c-meta { display: flex; gap: 14px; font-family: var(--mono); font-size: 10px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.06em; }
-  .c-meta span { display: inline-flex; align-items: center; gap: 4px; }
-
-  /* Hilos (persistent threads) */
-  .threads { padding: 0 16px; display: grid; gap: 10px; }
-  .thread {
-    border: 1px solid var(--line); border-radius: 14px; padding: 14px;
-    background: var(--bg-2); cursor: pointer;
-  }
-  .thread .t-row { display: flex; align-items: center; justify-content: space-between; }
-  .thread .t-tag { font-family: var(--mono); font-size: 10px; color: var(--blue); text-transform: uppercase; letter-spacing: 0.08em; }
-  .thread .t-new { font-family: var(--mono); font-size: 10px; color: var(--accent); font-weight: 600; }
-  .thread .t-title { font-family: var(--serif); font-weight: 700; font-size: 16px; line-height: 1.25; margin: 8px 0 4px; }
-  .thread .t-progress { display: flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 10px; color: var(--ink-3); margin-top: 8px; }
-  .thread .bar { flex: 1; height: 3px; background: var(--bg-3); border-radius: 999px; overflow: hidden; }
-  .thread .bar i { display: block; height: 100%; background: var(--blue); }
-
-  /* Memory / time machine */
-  .memory {
-    margin: 0 16px; padding: 16px; border: 1px dashed var(--line); border-radius: 14px; background: transparent;
-  }
-  .memory .label { font-family: var(--mono); font-size: 10px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.1em; }
-  .memory .title { font-family: var(--serif); font-weight: 700; font-size: 16px; line-height: 1.3; margin: 6px 0 4px; }
-  .memory .sub { font-size: 12px; color: var(--ink-2); line-height: 1.5; }
-
-  /* Anti-doomscroll bottom */
-  .stop {
-    margin: 30px 16px 0; padding: 24px 16px; text-align: center;
-    border: 1px solid var(--line); border-radius: 14px; background: var(--bg-2);
-  }
-  .stop .ico { font-size: 28px; margin-bottom: 10px; }
-  .stop .title { font-family: var(--serif); font-weight: 700; font-size: 18px; line-height: 1.3; }
-  .stop .sub { font-size: 13px; color: var(--ink-2); margin-top: 6px; line-height: 1.5; }
-  .stop .when { font-family: var(--mono); font-size: 10px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.1em; margin-top: 10px; }
+  .quiet .title { font-family: var(--serif); font-style: italic; font-weight: 500; font-size: 17px; line-height: 1.3; }
+  .quiet .sub { font-size: 12px; color: var(--ink-3); margin-top: 6px; line-height: 1.5; font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.08em; }
 
   /* Bottom nav */
   nav.bottom {
     position: fixed; bottom: 0; left: 0; right: 0; z-index: 30;
     background: color-mix(in oklab, var(--bg) 92%, transparent);
-    backdrop-filter: blur(10px); border-top: 1px solid var(--line);
+    backdrop-filter: blur(12px); border-top: 1px solid var(--line);
     padding: 8px 0 max(8px, env(safe-area-inset-bottom));
     display: grid; grid-template-columns: repeat(5, 1fr); max-width: 720px; margin: 0 auto;
   }
@@ -225,8 +185,8 @@
   nav.bottom button.active { color: var(--ink); }
 
   @media (min-width: 720px) {
-    .event-hero h2 { font-size: 30px; }
-    .c-title { font-size: 20px; }
+    .rooms { grid-template-columns: repeat(4, 1fr); }
+    .longread h2 { font-size: 30px; }
   }
 </style>
 </head>
@@ -237,230 +197,179 @@
     <div class="brand">
       <div>
         <h1>Diario</h1>
-        <div class="meta">JUE 30 ABR · 12 fuentes · 4 idiomas</div>
+        <div class="meta">JUE 30 ABR · 14:36 · LOBBY</div>
       </div>
       <div class="icons">
         <button class="icon-btn" aria-label="Buscar"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></button>
-        <button class="icon-btn" aria-label="Memoria"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></button>
+        <button class="icon-btn" aria-label="Biblioteca"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V2H6.5A2.5 2.5 0 0 0 4 4.5z"/></svg></button>
       </div>
     </div>
 
-    <div class="briefing" onclick="alert('Briefing matinal generado a las 6:00 con tus temas: Chile política, IA, mercados.')">
-      <div class="play"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></div>
-      <div class="text">
-        <div class="label">Tu briefing matinal · listo</div>
-        <div class="title">8 historias que importan hoy</div>
-      </div>
-      <div class="dur">4:32</div>
-    </div>
+    <div class="greet">Buenas tardes, José. <b>Hoy hay calma</b> — 3 cosas urgentes y mucho para leer sin prisa.</div>
 
-    <div class="status">
-      <span class="new">3 nuevas desde las 12:14</span>
-      <span>estás al día</span>
-    </div>
-
-    <div class="chips" role="tablist">
-      <button class="chip active">Todo</button>
-      <button class="chip">Chile</button>
-      <button class="chip">Mundo</button>
-      <button class="chip">Tecnología</button>
-      <button class="chip">Economía</button>
-      <button class="chip">Cultura</button>
-      <button class="chip">Ciencia</button>
+    <div class="agent" onclick="alert('Tu agente: nada que requiera tu atención inmediata. El briefing matinal sigue disponible.')">
+      <span class="dot"></span>
+      <span class="text"><b>Tu agente:</b> nada que necesite tu atención ahora. Recordá que tenés reunión con A. mañana — su industria estuvo movida.</span>
+      <span class="arr">›</span>
     </div>
   </header>
 
-  <!-- Hero event -->
-  <section class="event-hero">
-    <div class="img"><span class="badge">en desarrollo</span></div>
+  <!-- Salas principales -->
+  <div class="section-h"><h3>Salas</h3><a class="more" href="#">PERSONALIZAR →</a></div>
+
+  <div class="rooms">
+    <div class="room r-brief">
+      <div>
+        <div class="label">⚡ Operacional</div>
+        <h4>Briefing</h4>
+      </div>
+      <div>
+        <div class="teaser">8 historias que importan hoy. Audio listo.</div>
+        <div class="pulse">4:32 · listo</div>
+      </div>
+    </div>
+
+    <div class="room r-read">
+      <div>
+        <div class="label">📖 Lectura</div>
+        <h4>Reading<br>Room</h4>
+      </div>
+      <div>
+        <div class="teaser">3 ensayos largos sintetizados de los hilos de la semana.</div>
+        <div class="pulse" style="color: var(--amber)">~ 42 min</div>
+      </div>
+    </div>
+
+    <div class="room r-hojeo">
+      <div>
+        <div class="label">📰 Hojeo</div>
+        <h4>Portadas</h4>
+      </div>
+      <div>
+        <div class="teaser">12 portadas del día. Vagar sin objetivo.</div>
+        <div class="pulse" style="color: var(--ink-2)">CL · UK · FR · DE · US</div>
+      </div>
+    </div>
+
+    <div class="room r-disc">
+      <div>
+        <div class="label">✦ Serendipia</div>
+        <h4>Discovery</h4>
+      </div>
+      <div>
+        <div class="teaser">5 cosas fuera de tus temas que el agente cree que te van a gustar.</div>
+        <div class="pulse">5 nuevas</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tus salas temáticas -->
+  <div class="section-h"><h3>Tus temas</h3><a class="more" href="#">+ AGREGAR</a></div>
+  <div class="temas">
+    <div class="tema t-deport">
+      <div>
+        <div class="ico">⚽</div>
+        <div class="name">Deportes</div>
+      </div>
+      <div class="live"><i></i> 2 partidos en vivo</div>
+    </div>
+    <div class="tema t-geo">
+      <div>
+        <div class="ico">🌐</div>
+        <div class="name">Geopolítica</div>
+      </div>
+      <div class="live">3 hilos en curso</div>
+    </div>
+    <div class="tema t-clima">
+      <div>
+        <div class="ico">🌦️</div>
+        <div class="name">Clima</div>
+      </div>
+      <div class="live"><i></i> COP en final</div>
+    </div>
+    <div class="tema t-pol-cl">
+      <div>
+        <div class="ico">🇨🇱</div>
+        <div class="name">Política CL</div>
+      </div>
+      <div class="live">4 nuevas hoy</div>
+    </div>
+    <div class="tema t-cult">
+      <div>
+        <div class="ico">🎭</div>
+        <div class="name">Cultura</div>
+      </div>
+      <div class="live">12 reviews semana</div>
+    </div>
+    <div class="tema t-cien">
+      <div>
+        <div class="ico">🔬</div>
+        <div class="name">Ciencia</div>
+      </div>
+      <div class="live">1 paper destacado</div>
+    </div>
+  </div>
+
+  <!-- Long-read del día -->
+  <div class="section-h"><h3>Lectura del día</h3><a class="more" href="#">SALA LECTURA →</a></div>
+  <article class="longread">
+    <div class="cover">
+      <div class="kicker">ENSAYO · 14 MIN · GEOPOLÍTICA</div>
+    </div>
     <div class="body">
-      <div class="src-row">
-        <span class="src-pile">
-          <span class="s-grd">G</span>
-          <span class="s-bbc">B</span>
-          <span class="s-rtr">R</span>
-          <span class="s-nyt">N</span>
-          <span class="s-ft">FT</span>
-        </span>
-        <span class="c-count">12 medios</span>
-        <span>·</span>
-        <span>actualizado hace 8 min</span>
-      </div>
-
-      <h2>Las negociaciones del clima entran en su fase final mientras los delegados luchan por un acuerdo de transición</h2>
-      <p class="lead">Más de 190 países permanecen reunidos en sesiones nocturnas para acordar el lenguaje sobre combustibles fósiles. El bloque insular y la UE empujan por compromiso vinculante; los productores de petróleo resisten plazos firmes.</p>
-
-      <span class="ai-tag">Síntesis · 12 fuentes</span>
-
-      <div class="depth">
-        <button>15s</button>
-        <button class="on">2 min</button>
-        <button>10 min</button>
-        <button>Profundo</button>
-      </div>
-
-      <div class="frames-h">Cómo lo enmarca cada uno</div>
-      <div class="frames">
-        <div class="frame"><div class="who">Guardian</div><div class="angle">Urgencia climática, foco en países insulares</div></div>
-        <div class="frame"><div class="who">FT</div><div class="angle">Impacto en mercados energéticos</div></div>
-        <div class="frame"><div class="who">Reuters</div><div class="angle">Posiciones técnicas de cada bloque</div></div>
-      </div>
-
-      <div class="actions">
-        <button class="act"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Conversar</button>
-        <button class="act"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>Seguir hilo</button>
+      <h2>El cobre, el clima, y la nueva geometría del poder en el Pacífico Sur</h2>
+      <p class="deck">Tres semanas de movimientos en mercados, cumbres y sismos políticos dibujan un patrón que ningún titular suelto deja ver. Una lectura larga, tejida desde 24 fuentes, sobre cómo Chile dejó de ser periferia.</p>
+      <div class="meta">
+        <span>Sintetizado · 24 fuentes · 6 idiomas</span>
+        <span>↻ Hilo</span>
       </div>
     </div>
-  </section>
+  </article>
 
-  <!-- Cluster feed -->
-  <div class="section-h"><h3>Eventos de hoy</h3><a class="more" href="#">VER TODO →</a></div>
-
-  <ul class="feed">
-    <li class="cluster">
-      <div class="c-srcrow">
-        <div class="left">
-          <span class="src-pile"><span class="s-emo">E</span><span class="s-lat">L</span><span class="s-bbo">B</span></span>
-          <span class="c-count">8 medios</span>
-          <span>· Chile · hace 14 min</span>
-        </div>
-        <span class="c-thread">Hilo en curso</span>
-      </div>
-      <h3 class="c-title">Hacienda anuncia ajuste al gasto público tras revisión de proyección de cobre</h3>
-      <p class="c-lead">El nuevo precio promedio implicará una reducción de 0,3 puntos en la regla fiscal estructural. Oficialismo se divide sobre el alcance del recorte.</p>
-      <div class="c-meta">
-        <span>✦ síntesis</span>
-        <span>3 frames</span>
-        <span>↻ 4ª actualización</span>
-      </div>
-    </li>
-
-    <li class="cluster">
-      <div class="c-srcrow">
-        <div class="left">
-          <span class="src-pile"><span class="s-bbc">B</span><span class="s-rtr">R</span><span class="s-ft">FT</span></span>
-          <span class="c-count">11 medios</span>
-          <span>· Mundo · hace 22 min</span>
-        </div>
-      </div>
-      <h3 class="c-title">UK firma acuerdo comercial con India tras tres años de negociación</h3>
-      <p class="c-lead">Reducción de aranceles en whisky, autos y servicios. Proyección bilateral: £25.000 millones/año. India retiene control sobre datos digitales.</p>
-      <div class="c-meta">
-        <span>✦ síntesis</span>
-        <span>3 frames</span>
-        <span>2 idiomas</span>
-      </div>
-    </li>
-
-    <li class="cluster">
-      <div class="c-srcrow">
-        <div class="left">
-          <span class="src-pile"><span class="s-rtr">R</span><span class="s-ft">FT</span><span class="s-nyt">N</span></span>
-          <span class="c-count">9 medios</span>
-          <span>· Economía · hace 1 h</span>
-        </div>
-      </div>
-      <h3 class="c-title">Cobre en máximos de tres meses tras nuevos datos de inventario en Shanghái</h3>
-      <p class="c-lead">Inventarios cayeron 14% semana a semana. Demanda china más fuerte de lo previsto en Q2 alimenta expectativas en metales industriales.</p>
-      <div class="c-meta">
-        <span>✦ síntesis</span>
-        <span>relacionado a "Hacienda"</span>
-      </div>
-    </li>
-
-    <li class="cluster">
-      <div class="c-srcrow">
-        <div class="left">
-          <span class="src-pile"><span class="s-nyt">N</span><span class="s-grd">G</span></span>
-          <span class="c-count">6 medios</span>
-          <span>· Tech · hace 2 h</span>
-        </div>
-      </div>
-      <h3 class="c-title">Nuevos modelos de IA prometen razonamiento en tiempo real, costos energéticos siguen siendo cuello de botella</h3>
-      <p class="c-lead">Tres laboratorios reportan avances independientes. Coinciden: escalar inferencia depende de cómputo no disponible aún a escala industrial.</p>
-      <div class="c-meta">
-        <span>✦ síntesis</span>
-        <span>2 frames opuestos</span>
-      </div>
-    </li>
-  </ul>
-
-  <!-- Hilos en curso -->
-  <div class="section-h"><h3>Hilos que sigues</h3><a class="more" href="#">GESTIONAR →</a></div>
-  <div class="threads">
-    <div class="thread">
-      <div class="t-row">
-        <span class="t-tag">↻ Hilo · Chile</span>
-        <span class="t-new">3 nuevas</span>
-      </div>
-      <div class="t-title">Reforma previsional 2026</div>
-      <div class="t-progress">
-        <span>iniciado mar 2024</span>
-        <div class="bar"><i style="width:78%"></i></div>
-        <span>78%</span>
+  <!-- Voces que sigues -->
+  <div class="section-h"><h3>Voces que sigues</h3><a class="more" href="#">VER TODAS →</a></div>
+  <div class="voices">
+    <div class="voice">
+      <div class="av">DR</div>
+      <div>
+        <div class="who">Daniel Matamala · subrayó</div>
+        <div class="what">"La narrativa fiscal del oficialismo se quebró cuando el cobre dejó de cooperar."</div>
+        <div class="src">en columna La Tercera · hace 2h</div>
       </div>
     </div>
-    <div class="thread">
-      <div class="t-row">
-        <span class="t-tag">↻ Hilo · Mundo</span>
-        <span class="t-new">1 nueva</span>
-      </div>
-      <div class="t-title">Negociaciones COP — fase final</div>
-      <div class="t-progress">
-        <span>iniciado abr 2026</span>
-        <div class="bar"><i style="width:92%"></i></div>
-        <span>92%</span>
+    <div class="voice">
+      <div class="av">EK</div>
+      <div>
+        <div class="who">Ezra Klein · publicó</div>
+        <div class="what">"Why the climate negotiations are now a story about insurance, not about emissions."</div>
+        <div class="src">NYT podcast · hace 6h · 38 min</div>
       </div>
     </div>
-    <div class="thread">
-      <div class="t-row">
-        <span class="t-tag">↻ Hilo · Tech</span>
-        <span class="t-new" style="color:var(--ink-3)">sin novedades</span>
-      </div>
-      <div class="t-title">Regulación europea de IA — implementación</div>
-      <div class="t-progress">
-        <span>iniciado feb 2025</span>
-        <div class="bar"><i style="width:45%"></i></div>
-        <span>45%</span>
+    <div class="voice">
+      <div class="av">MW</div>
+      <div>
+        <div class="who">Martin Wolf · anotó</div>
+        <div class="what">"Central banks are quietly running the same playbook of 2019. It didn't work then."</div>
+        <div class="src">FT · hace 1d</div>
       </div>
     </div>
   </div>
 
-  <!-- Time machine / memory -->
-  <div class="section-h"><h3>Memoria</h3><a class="more" href="#">EXPLORAR →</a></div>
-  <div class="memory">
-    <div class="label">HACE 3 SEMANAS · 9 ABR</div>
-    <div class="title">"El cobre podría caer si China desacelera importaciones de manufactura"</div>
-    <div class="sub">Predicción de FT · <strong style="color:var(--accent)">resultó incorrecta</strong> — el cobre subió 6% en el período. Trust score FT en metales: 72%.</div>
-  </div>
-
-  <!-- Anti-doomscroll -->
-  <div class="stop">
-    <div class="ico">✓</div>
-    <div class="title">Leíste lo que importa hoy</div>
-    <div class="sub">Cubriste 4 historias clave + 3 hilos. El resto es repetición o ruido bajo.</div>
-    <div class="when">VOLVÉ A LAS 18:00 · 5 NUEVAS ESPERADAS</div>
+  <!-- Quiet card -->
+  <div class="quiet">
+    <div class="title">"El silencio entre noticias es donde se piensa."</div>
+    <div class="sub">VOLVÉ CUANDO TENGAS TIEMPO · NADA URGENTE</div>
   </div>
 
 </div>
 
 <nav class="bottom">
-  <button class="active"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Feed</button>
-  <button><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12c0-5 4-9 9-9s9 4 9 9-4 9-9 9-9-4-9-9z M12 7v5l3 2"/></svg>Hilos</button>
+  <button class="active"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9 M5 10v11h14V10"/></svg>Lobby</button>
+  <button><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 19V6a2 2 0 0 1 2-2h6v15H4a2 2 0 0 0-2 0z M22 19V6a2 2 0 0 0-2-2h-6v15h6a2 2 0 0 1 2 0z"/></svg>Lectura</button>
   <button><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Conversar</button>
   <button><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 18v-6a9 9 0 0 1 18 0v6 M21 19a2 2 0 0 1-2 2h-1v-6h3z M3 19a2 2 0 0 0 2 2h1v-6H3z"/></svg>Briefing</button>
-  <button><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8M12 3v3M12 18v3M3 12h3M18 12h3"/></svg>Ajustes</button>
+  <button><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg>Ajustes</button>
 </nav>
 
-<script>
-  document.querySelectorAll('.chip').forEach(c => c.addEventListener('click', () => {
-    document.querySelectorAll('.chip').forEach(x => x.classList.remove('active'));
-    c.classList.add('active');
-  }));
-  document.querySelectorAll('.depth button').forEach(b => b.addEventListener('click', () => {
-    document.querySelectorAll('.depth button').forEach(x => x.classList.remove('on'));
-    b.classList.add('on');
-  }));
-</script>
 </body>
 </html>
