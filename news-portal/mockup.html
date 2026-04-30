@@ -4,512 +4,463 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="theme-color" content="#0b0b0d" />
-<title>Diario · maqueta</title>
+<title>Diario · v2</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700;9..144,900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
 <style>
   :root {
-    --bg: #0b0b0d;
-    --bg-2: #131318;
-    --bg-3: #1c1c22;
-    --line: #26262e;
-    --ink: #f4f4f0;
-    --ink-2: #b9b9b3;
-    --ink-3: #7a7a77;
-    --accent: #c8f55a;
-    --red: #ff5b3a;
+    --bg: #0b0b0d; --bg-2: #131318; --bg-3: #1c1c22;
+    --line: #26262e; --ink: #f4f4f0; --ink-2: #b9b9b3; --ink-3: #7a7a77;
+    --accent: #c8f55a; --red: #ff5b3a; --blue: #6ab7ff;
     --serif: "Fraunces", Georgia, serif;
     --sans: "Inter", system-ui, sans-serif;
     --mono: "JetBrains Mono", ui-monospace, monospace;
   }
   @media (prefers-color-scheme: light) {
     :root {
-      --bg: #f6f5f0;
-      --bg-2: #ffffff;
-      --bg-3: #ecebe4;
-      --line: #d9d8cf;
-      --ink: #14140f;
-      --ink-2: #4a4a44;
-      --ink-3: #8a8a82;
-      --accent: #6b8f0f;
+      --bg: #f6f5f0; --bg-2: #ffffff; --bg-3: #ecebe4;
+      --line: #d9d8cf; --ink: #14140f; --ink-2: #4a4a44; --ink-3: #8a8a82;
+      --accent: #6b8f0f; --blue: #1d6cc7;
     }
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink); font-family: var(--sans); }
-  body {
-    min-height: 100vh;
-    padding-bottom: env(safe-area-inset-bottom);
-    -webkit-font-smoothing: antialiased;
-  }
-  .app { max-width: 720px; margin: 0 auto; }
+  body { min-height: 100vh; padding-bottom: env(safe-area-inset-bottom); -webkit-font-smoothing: antialiased; }
+  .app { max-width: 720px; margin: 0 auto; padding-bottom: 100px; }
 
-  /* ── Header ─────────────────────────────────────────── */
+  /* Header */
   header.top {
     position: sticky; top: 0; z-index: 30;
     background: color-mix(in oklab, var(--bg) 92%, transparent);
     backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
     border-bottom: 1px solid var(--line);
-    padding: 12px 16px 8px;
-    padding-top: max(12px, env(safe-area-inset-top));
+    padding: 12px 16px 0; padding-top: max(12px, env(safe-area-inset-top));
   }
   .brand { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-  .brand h1 {
-    font-family: var(--serif);
-    font-weight: 900;
-    font-style: italic;
-    font-size: 28px;
-    letter-spacing: -0.02em;
-    margin: 0;
-  }
-  .brand .meta {
-    font-family: var(--mono);
-    font-size: 10px;
-    color: var(--ink-3);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-  }
+  .brand h1 { font-family: var(--serif); font-weight: 900; font-style: italic; font-size: 26px; letter-spacing: -0.02em; margin: 0; }
+  .brand .meta { font-family: var(--mono); font-size: 10px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.08em; margin-top: 2px; }
   .brand .icons { display: flex; gap: 6px; }
-  .icon-btn {
-    width: 36px; height: 36px;
-    display: grid; place-items: center;
-    background: transparent; border: 1px solid var(--line);
-    color: var(--ink); border-radius: 999px; cursor: pointer;
-  }
+  .icon-btn { width: 36px; height: 36px; display: grid; place-items: center; background: transparent; border: 1px solid var(--line); color: var(--ink); border-radius: 999px; cursor: pointer; }
   .icon-btn:active { background: var(--bg-3); }
 
-  /* Filter chips */
-  .chips {
-    display: flex; gap: 8px;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-    margin: 10px -16px 0;
-    padding: 4px 16px 6px;
+  /* Briefing audio strip */
+  .briefing {
+    margin: 12px -16px 0; padding: 12px 16px;
+    background: linear-gradient(135deg, color-mix(in oklab, var(--accent) 18%, var(--bg)) 0%, var(--bg) 100%);
+    border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+    display: flex; align-items: center; gap: 12px; cursor: pointer;
   }
-  .chips::-webkit-scrollbar { display: none; }
-  .chip {
-    flex: 0 0 auto;
-    padding: 6px 12px;
-    border: 1px solid var(--line);
-    border-radius: 999px;
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--ink-2);
-    background: transparent;
-    white-space: nowrap;
-    cursor: pointer;
+  .briefing .play {
+    width: 38px; height: 38px; border-radius: 999px;
+    background: var(--accent); color: #0b0b0d;
+    display: grid; place-items: center; flex-shrink: 0;
   }
-  .chip.active {
-    background: var(--ink);
-    color: var(--bg);
-    border-color: var(--ink);
-  }
-  .chip .dot {
-    display: inline-block;
-    width: 6px; height: 6px;
-    border-radius: 999px;
-    background: var(--accent);
-    margin-right: 6px;
-    vertical-align: middle;
-  }
+  .briefing .text { flex: 1; min-width: 0; }
+  .briefing .label { font-family: var(--mono); font-size: 10px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.1em; }
+  .briefing .title { font-family: var(--serif); font-weight: 700; font-size: 15px; line-height: 1.2; margin-top: 2px; }
+  .briefing .dur { font-family: var(--mono); font-size: 11px; color: var(--ink-2); flex-shrink: 0; }
 
-  /* ── Featured ───────────────────────────────────────── */
-  section.featured {
-    margin: 16px 16px 8px;
-    border: 1px solid var(--line);
-    border-radius: 16px;
-    overflow: hidden;
-    background: var(--bg-2);
-  }
-  .featured .img {
-    aspect-ratio: 16 / 9;
-    background:
-      radial-gradient(120% 90% at 30% 20%, #2a2a35 0%, #0e0e12 60%),
-      linear-gradient(135deg, #1a1a22, #0a0a0d);
-    position: relative;
-  }
-  .featured .img::after {
-    content: ""; position: absolute; inset: 0;
-    background: linear-gradient(180deg, transparent 50%, rgba(0,0,0,0.6));
-  }
-  .featured .live {
-    position: absolute; top: 10px; left: 10px;
-    background: var(--red); color: white;
-    font-family: var(--mono); font-size: 10px;
-    font-weight: 600; letter-spacing: 0.1em;
-    padding: 4px 8px; border-radius: 4px;
-    display: inline-flex; align-items: center; gap: 6px;
-    text-transform: uppercase;
-  }
-  .featured .live::before {
-    content: ""; width: 6px; height: 6px; background: white; border-radius: 999px;
-    animation: pulse 1.4s infinite;
-  }
-  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
-  .featured .body { padding: 14px 16px 18px; }
-  .featured .source-row {
-    display: flex; align-items: center; gap: 8px;
+  /* Status bar (anti-doomscroll) */
+  .status {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 16px; margin: 0 -16px;
+    border-bottom: 1px solid var(--line);
     font-family: var(--mono); font-size: 11px;
     color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.06em;
   }
-  .source-row .src { color: var(--ink); font-weight: 600; }
-  .featured h2 {
-    font-family: var(--serif);
-    font-weight: 700;
-    font-size: 22px;
-    line-height: 1.15;
-    letter-spacing: -0.02em;
-    margin: 8px 0 6px;
-  }
-  .featured p {
-    color: var(--ink-2);
-    font-size: 14px;
-    line-height: 1.5;
-    margin: 0;
-  }
+  .status .new { color: var(--ink); }
+  .status .new::before { content: "●"; color: var(--accent); margin-right: 6px; }
 
-  /* ── Section header ─────────────────────────────────── */
-  .section-h {
-    display: flex; align-items: baseline; justify-content: space-between;
-    padding: 18px 16px 8px;
-  }
-  .section-h h3 {
-    font-family: var(--serif);
-    font-weight: 700;
-    font-size: 14px;
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-    margin: 0;
-    color: var(--ink);
-  }
-  .section-h .more {
-    font-family: var(--mono);
-    font-size: 11px;
-    color: var(--ink-3);
-    text-decoration: none;
-  }
+  /* Topic chips */
+  .chips { display: flex; gap: 8px; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; margin: 0 -16px; padding: 12px 16px; }
+  .chips::-webkit-scrollbar { display: none; }
+  .chip { flex: 0 0 auto; padding: 6px 12px; border: 1px solid var(--line); border-radius: 999px; font-size: 13px; font-weight: 500; color: var(--ink-2); background: transparent; white-space: nowrap; cursor: pointer; }
+  .chip.active { background: var(--ink); color: var(--bg); border-color: var(--ink); }
 
-  /* ── Feed list ──────────────────────────────────────── */
+  /* Section header */
+  .section-h { display: flex; align-items: baseline; justify-content: space-between; padding: 22px 16px 10px; }
+  .section-h h3 { font-family: var(--serif); font-weight: 700; font-size: 13px; text-transform: uppercase; letter-spacing: 0.14em; margin: 0; }
+  .section-h .more { font-family: var(--mono); font-size: 10px; color: var(--ink-3); text-decoration: none; letter-spacing: 0.06em; }
+
+  /* Event card (cluster-first hero) */
+  .event-hero {
+    margin: 8px 16px 0; border: 1px solid var(--line); border-radius: 18px; overflow: hidden; background: var(--bg-2);
+  }
+  .event-hero .img {
+    aspect-ratio: 16 / 9;
+    background: radial-gradient(120% 90% at 30% 20%, #2a2a35 0%, #0e0e12 60%);
+    position: relative;
+  }
+  .event-hero .badge {
+    position: absolute; top: 10px; left: 10px;
+    background: var(--red); color: white; font-family: var(--mono); font-size: 10px; font-weight: 600; letter-spacing: 0.1em;
+    padding: 4px 8px; border-radius: 4px; display: inline-flex; align-items: center; gap: 6px; text-transform: uppercase;
+  }
+  .event-hero .badge::before { content: ""; width: 6px; height: 6px; background: white; border-radius: 999px; animation: pulse 1.4s infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+  .event-hero .body { padding: 16px; }
+  .event-hero .src-row {
+    display: flex; align-items: center; gap: 10px;
+    font-family: var(--mono); font-size: 11px; color: var(--ink-3);
+    text-transform: uppercase; letter-spacing: 0.06em;
+  }
+  .src-pile { display: inline-flex; }
+  .src-pile span {
+    width: 18px; height: 18px; border-radius: 999px;
+    border: 2px solid var(--bg-2);
+    display: inline-grid; place-items: center;
+    font-size: 8px; font-weight: 700; color: white;
+    margin-left: -6px;
+  }
+  .src-pile span:first-child { margin-left: 0; }
+  .s-bbc { background: #bb1919; }
+  .s-grd { background: #052962; }
+  .s-rtr { background: #ff8000; }
+  .s-nyt { background: #14140f; }
+  .s-ft  { background: #fff1e5; color: #14140f !important; }
+  .s-emo { background: #e30613; }
+  .s-lat { background: #003a70; }
+  .s-bbo { background: #009639; }
+  .s-cpr { background: #6b1f7a; }
+
+  .event-hero h2 {
+    font-family: var(--serif); font-weight: 700; font-size: 24px; line-height: 1.15; letter-spacing: -0.02em;
+    margin: 10px 0 6px;
+  }
+  .event-hero .lead { color: var(--ink-2); font-size: 14px; line-height: 1.55; margin: 0 0 12px; }
+
+  .ai-tag {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-family: var(--mono); font-size: 9px; color: var(--accent);
+    text-transform: uppercase; letter-spacing: 0.1em;
+    border: 1px solid color-mix(in oklab, var(--accent) 50%, var(--line));
+    padding: 3px 7px; border-radius: 4px;
+  }
+  .ai-tag::before { content: "✦"; }
+
+  /* Depth slider */
+  .depth {
+    display: flex; gap: 6px; padding: 4px;
+    background: var(--bg-3); border-radius: 999px; margin: 12px 0 14px;
+  }
+  .depth button {
+    flex: 1; padding: 7px 6px; border: 0; background: transparent;
+    color: var(--ink-2); font-family: var(--mono); font-size: 10px; font-weight: 500;
+    text-transform: uppercase; letter-spacing: 0.05em; border-radius: 999px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 4px;
+  }
+  .depth button.on { background: var(--ink); color: var(--bg); }
+
+  /* Frame diff */
+  .frames-h { font-family: var(--mono); font-size: 10px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.1em; margin: 4px 0 8px; }
+  .frames { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .frame { padding: 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); }
+  .frame .who { font-family: var(--mono); font-size: 9px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px; }
+  .frame .angle { font-size: 11px; line-height: 1.35; color: var(--ink); font-weight: 500; }
+
+  /* Action row */
+  .actions { display: flex; gap: 8px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
+  .act { flex: 1; padding: 10px; border: 1px solid var(--line); background: transparent; color: var(--ink); border-radius: 10px; font-family: var(--sans); font-size: 12px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; }
+  .act svg { width: 14px; height: 14px; }
+
+  /* Cluster card (in feed) */
   ul.feed { list-style: none; margin: 0; padding: 0 16px; }
-  li.item {
-    display: grid;
-    grid-template-columns: 1fr 88px;
-    gap: 12px;
-    padding: 14px 0;
-    border-bottom: 1px solid var(--line);
-    cursor: pointer;
+  li.cluster {
+    padding: 16px 0; border-bottom: 1px solid var(--line); cursor: pointer;
   }
-  li.item:last-child { border-bottom: 0; }
-  li.item:active { background: var(--bg-2); margin: 0 -16px; padding-left: 16px; padding-right: 16px; }
-  .item .src-row {
-    display: flex; align-items: center; gap: 8px;
-    font-family: var(--mono); font-size: 11px;
-    color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.05em;
-  }
-  .item .src-row .src { color: var(--ink); font-weight: 600; }
-  .item .src-row .cat {
-    padding: 2px 6px; border: 1px solid var(--line); border-radius: 4px;
-    font-size: 9px; color: var(--ink-2);
-  }
-  .item h4 {
-    font-family: var(--serif);
-    font-weight: 700;
-    font-size: 17px;
-    line-height: 1.25;
-    letter-spacing: -0.01em;
-    margin: 6px 0 4px;
-    color: var(--ink);
-  }
-  .item p {
-    font-size: 13px;
-    line-height: 1.45;
-    color: var(--ink-2);
-    margin: 0;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
-  .item .thumb {
-    width: 88px; height: 88px;
-    border-radius: 10px;
-    background: var(--bg-3);
-    background-size: cover; background-position: center;
-    border: 1px solid var(--line);
-    flex-shrink: 0;
-  }
-  .item.read h4, .item.read p { color: var(--ink-3); }
-  .item.read .src-row .src { color: var(--ink-2); }
+  li.cluster:last-child { border-bottom: 0; }
+  .c-srcrow { display: flex; align-items: center; justify-content: space-between; font-family: var(--mono); font-size: 10px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.06em; }
+  .c-srcrow .left { display: flex; align-items: center; gap: 8px; }
+  .c-count { color: var(--ink); font-weight: 600; }
+  .c-thread { color: var(--blue); display: inline-flex; align-items: center; gap: 4px; }
+  .c-thread::before { content: "↻"; }
+  .c-title { font-family: var(--serif); font-weight: 700; font-size: 18px; line-height: 1.22; letter-spacing: -0.01em; margin: 8px 0 6px; color: var(--ink); }
+  .c-lead { font-size: 13px; line-height: 1.5; color: var(--ink-2); margin: 0 0 10px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .c-meta { display: flex; gap: 14px; font-family: var(--mono); font-size: 10px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.06em; }
+  .c-meta span { display: inline-flex; align-items: center; gap: 4px; }
 
-  /* Thumbnails as gradient placeholders */
-  .t1 { background: linear-gradient(135deg, #5d4037, #1c1c22); }
-  .t2 { background: linear-gradient(135deg, #1a3a5c, #0b1722); }
-  .t3 { background: linear-gradient(135deg, #4a2548, #1a0f1a); }
-  .t4 { background: linear-gradient(135deg, #2d4a2d, #0f1a0f); }
-  .t5 { background: linear-gradient(135deg, #5c4a1a, #1f1a0a); }
-  .t6 { background: linear-gradient(135deg, #4a1a2d, #1f0a14); }
-  .t7 { background: linear-gradient(135deg, #1a4a4a, #0a1f1f); }
-  .t8 { background: linear-gradient(135deg, #3a3a5c, #14141f); }
+  /* Hilos (persistent threads) */
+  .threads { padding: 0 16px; display: grid; gap: 10px; }
+  .thread {
+    border: 1px solid var(--line); border-radius: 14px; padding: 14px;
+    background: var(--bg-2); cursor: pointer;
+  }
+  .thread .t-row { display: flex; align-items: center; justify-content: space-between; }
+  .thread .t-tag { font-family: var(--mono); font-size: 10px; color: var(--blue); text-transform: uppercase; letter-spacing: 0.08em; }
+  .thread .t-new { font-family: var(--mono); font-size: 10px; color: var(--accent); font-weight: 600; }
+  .thread .t-title { font-family: var(--serif); font-weight: 700; font-size: 16px; line-height: 1.25; margin: 8px 0 4px; }
+  .thread .t-progress { display: flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 10px; color: var(--ink-3); margin-top: 8px; }
+  .thread .bar { flex: 1; height: 3px; background: var(--bg-3); border-radius: 999px; overflow: hidden; }
+  .thread .bar i { display: block; height: 100%; background: var(--blue); }
 
-  /* ── Bottom nav ─────────────────────────────────────── */
+  /* Memory / time machine */
+  .memory {
+    margin: 0 16px; padding: 16px; border: 1px dashed var(--line); border-radius: 14px; background: transparent;
+  }
+  .memory .label { font-family: var(--mono); font-size: 10px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.1em; }
+  .memory .title { font-family: var(--serif); font-weight: 700; font-size: 16px; line-height: 1.3; margin: 6px 0 4px; }
+  .memory .sub { font-size: 12px; color: var(--ink-2); line-height: 1.5; }
+
+  /* Anti-doomscroll bottom */
+  .stop {
+    margin: 30px 16px 0; padding: 24px 16px; text-align: center;
+    border: 1px solid var(--line); border-radius: 14px; background: var(--bg-2);
+  }
+  .stop .ico { font-size: 28px; margin-bottom: 10px; }
+  .stop .title { font-family: var(--serif); font-weight: 700; font-size: 18px; line-height: 1.3; }
+  .stop .sub { font-size: 13px; color: var(--ink-2); margin-top: 6px; line-height: 1.5; }
+  .stop .when { font-family: var(--mono); font-size: 10px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.1em; margin-top: 10px; }
+
+  /* Bottom nav */
   nav.bottom {
-    position: sticky; bottom: 0; z-index: 30;
-    margin-top: 24px;
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 30;
     background: color-mix(in oklab, var(--bg) 92%, transparent);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border-top: 1px solid var(--line);
+    backdrop-filter: blur(10px); border-top: 1px solid var(--line);
     padding: 8px 0 max(8px, env(safe-area-inset-bottom));
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    display: grid; grid-template-columns: repeat(5, 1fr); max-width: 720px; margin: 0 auto;
   }
-  nav.bottom button {
-    background: transparent; border: 0; color: var(--ink-3);
-    padding: 8px 4px; font-family: var(--sans); font-size: 11px;
-    font-weight: 500; cursor: pointer;
-    display: flex; flex-direction: column; align-items: center; gap: 4px;
-  }
+  nav.bottom button { background: transparent; border: 0; color: var(--ink-3); padding: 6px 4px; font-family: var(--sans); font-size: 10px; font-weight: 500; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 3px; }
   nav.bottom button.active { color: var(--ink); }
-  nav.bottom svg { display: block; }
 
-  /* ── Layout helpers for ≥720 desktop preview ──────── */
   @media (min-width: 720px) {
-    .featured h2 { font-size: 28px; }
-    li.item { grid-template-columns: 1fr 120px; }
-    .item .thumb { width: 120px; height: 100px; }
-    .item h4 { font-size: 19px; }
+    .event-hero h2 { font-size: 30px; }
+    .c-title { font-size: 20px; }
   }
 </style>
 </head>
 <body>
 <div class="app">
 
-  <!-- ── Header ── -->
   <header class="top">
     <div class="brand">
       <div>
         <h1>Diario</h1>
-        <div class="meta">JUEVES, 30 ABRIL · 12 fuentes activas</div>
+        <div class="meta">JUE 30 ABR · 12 fuentes · 4 idiomas</div>
       </div>
       <div class="icons">
-        <button class="icon-btn" aria-label="Buscar">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-        </button>
-        <button class="icon-btn" aria-label="Filtros">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M6 12h12M10 18h4"/></svg>
-        </button>
+        <button class="icon-btn" aria-label="Buscar"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></button>
+        <button class="icon-btn" aria-label="Memoria"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></button>
       </div>
     </div>
+
+    <div class="briefing" onclick="alert('Briefing matinal generado a las 6:00 con tus temas: Chile política, IA, mercados.')">
+      <div class="play"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></div>
+      <div class="text">
+        <div class="label">Tu briefing matinal · listo</div>
+        <div class="title">8 historias que importan hoy</div>
+      </div>
+      <div class="dur">4:32</div>
+    </div>
+
+    <div class="status">
+      <span class="new">3 nuevas desde las 12:14</span>
+      <span>estás al día</span>
+    </div>
+
     <div class="chips" role="tablist">
-      <button class="chip active"><span class="dot"></span>Todo</button>
+      <button class="chip active">Todo</button>
       <button class="chip">Chile</button>
       <button class="chip">Mundo</button>
       <button class="chip">Tecnología</button>
-      <button class="chip">Política</button>
       <button class="chip">Economía</button>
       <button class="chip">Cultura</button>
       <button class="chip">Ciencia</button>
     </div>
   </header>
 
-  <!-- ── Featured ── -->
-  <section class="featured" onclick="window.open('https://www.theguardian.com', '_blank')">
-    <div class="img">
-      <span class="live">en directo</span>
-    </div>
+  <!-- Hero event -->
+  <section class="event-hero">
+    <div class="img"><span class="badge">en desarrollo</span></div>
     <div class="body">
-      <div class="source-row">
-        <span class="src">The Guardian</span>
+      <div class="src-row">
+        <span class="src-pile">
+          <span class="s-grd">G</span>
+          <span class="s-bbc">B</span>
+          <span class="s-rtr">R</span>
+          <span class="s-nyt">N</span>
+          <span class="s-ft">FT</span>
+        </span>
+        <span class="c-count">12 medios</span>
         <span>·</span>
-        <span>hace 8 min</span>
-        <span>·</span>
-        <span>Mundo</span>
+        <span>actualizado hace 8 min</span>
       </div>
+
       <h2>Las negociaciones del clima entran en su fase final mientras los delegados luchan por un acuerdo de transición</h2>
-      <p>Los representantes de más de 190 países permanecieron despiertos toda la noche en un último intento por consensuar el lenguaje sobre combustibles fósiles antes del cierre de la cumbre.</p>
+      <p class="lead">Más de 190 países permanecen reunidos en sesiones nocturnas para acordar el lenguaje sobre combustibles fósiles. El bloque insular y la UE empujan por compromiso vinculante; los productores de petróleo resisten plazos firmes.</p>
+
+      <span class="ai-tag">Síntesis · 12 fuentes</span>
+
+      <div class="depth">
+        <button>15s</button>
+        <button class="on">2 min</button>
+        <button>10 min</button>
+        <button>Profundo</button>
+      </div>
+
+      <div class="frames-h">Cómo lo enmarca cada uno</div>
+      <div class="frames">
+        <div class="frame"><div class="who">Guardian</div><div class="angle">Urgencia climática, foco en países insulares</div></div>
+        <div class="frame"><div class="who">FT</div><div class="angle">Impacto en mercados energéticos</div></div>
+        <div class="frame"><div class="who">Reuters</div><div class="angle">Posiciones técnicas de cada bloque</div></div>
+      </div>
+
+      <div class="actions">
+        <button class="act"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Conversar</button>
+        <button class="act"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>Seguir hilo</button>
+      </div>
     </div>
   </section>
 
-  <!-- ── Top stories ── -->
-  <div class="section-h">
-    <h3>Lo último</h3>
-    <a class="more" href="#">VER TODO →</a>
-  </div>
+  <!-- Cluster feed -->
+  <div class="section-h"><h3>Eventos de hoy</h3><a class="more" href="#">VER TODO →</a></div>
 
   <ul class="feed">
-    <li class="item" onclick="window.open('https://www.emol.com', '_blank')">
-      <div>
-        <div class="src-row">
-          <span class="src">Emol</span>
-          <span class="cat">Chile</span>
-          <span>hace 14 min</span>
+    <li class="cluster">
+      <div class="c-srcrow">
+        <div class="left">
+          <span class="src-pile"><span class="s-emo">E</span><span class="s-lat">L</span><span class="s-bbo">B</span></span>
+          <span class="c-count">8 medios</span>
+          <span>· Chile · hace 14 min</span>
         </div>
-        <h4>Hacienda anuncia ajuste al gasto público para el segundo semestre tras revisión de proyección de cobre</h4>
-        <p>El ministro detalló que la nueva estimación del precio promedio implicará una reducción de 0,3 puntos en la regla fiscal estructural.</p>
+        <span class="c-thread">Hilo en curso</span>
       </div>
-      <div class="thumb t1"></div>
+      <h3 class="c-title">Hacienda anuncia ajuste al gasto público tras revisión de proyección de cobre</h3>
+      <p class="c-lead">El nuevo precio promedio implicará una reducción de 0,3 puntos en la regla fiscal estructural. Oficialismo se divide sobre el alcance del recorte.</p>
+      <div class="c-meta">
+        <span>✦ síntesis</span>
+        <span>3 frames</span>
+        <span>↻ 4ª actualización</span>
+      </div>
     </li>
 
-    <li class="item" onclick="window.open('https://www.bbc.com', '_blank')">
-      <div>
-        <div class="src-row">
-          <span class="src">BBC</span>
-          <span class="cat">Mundo</span>
-          <span>hace 22 min</span>
+    <li class="cluster">
+      <div class="c-srcrow">
+        <div class="left">
+          <span class="src-pile"><span class="s-bbc">B</span><span class="s-rtr">R</span><span class="s-ft">FT</span></span>
+          <span class="c-count">11 medios</span>
+          <span>· Mundo · hace 22 min</span>
         </div>
-        <h4>El Reino Unido firma un nuevo acuerdo comercial con la India tras tres años de negociación</h4>
-        <p>El pacto reducirá aranceles en whisky, autos y servicios profesionales, y se proyecta un aumento bilateral de £25.000 millones anuales.</p>
       </div>
-      <div class="thumb t2"></div>
+      <h3 class="c-title">UK firma acuerdo comercial con India tras tres años de negociación</h3>
+      <p class="c-lead">Reducción de aranceles en whisky, autos y servicios. Proyección bilateral: £25.000 millones/año. India retiene control sobre datos digitales.</p>
+      <div class="c-meta">
+        <span>✦ síntesis</span>
+        <span>3 frames</span>
+        <span>2 idiomas</span>
+      </div>
     </li>
 
-    <li class="item read" onclick="window.open('https://www.latercera.com', '_blank')">
-      <div>
-        <div class="src-row">
-          <span class="src">La Tercera</span>
-          <span class="cat">Política</span>
-          <span>hace 38 min</span>
+    <li class="cluster">
+      <div class="c-srcrow">
+        <div class="left">
+          <span class="src-pile"><span class="s-rtr">R</span><span class="s-ft">FT</span><span class="s-nyt">N</span></span>
+          <span class="c-count">9 medios</span>
+          <span>· Economía · hace 1 h</span>
         </div>
-        <h4>Comisión Mixta destraba reforma previsional con votación dividida en el oficialismo</h4>
-        <p>El acuerdo final contempla un 6% de cotización adicional, dividido entre cuenta individual y un componente solidario.</p>
       </div>
-      <div class="thumb t3"></div>
+      <h3 class="c-title">Cobre en máximos de tres meses tras nuevos datos de inventario en Shanghái</h3>
+      <p class="c-lead">Inventarios cayeron 14% semana a semana. Demanda china más fuerte de lo previsto en Q2 alimenta expectativas en metales industriales.</p>
+      <div class="c-meta">
+        <span>✦ síntesis</span>
+        <span>relacionado a "Hacienda"</span>
+      </div>
     </li>
 
-    <li class="item" onclick="window.open('https://www.reuters.com', '_blank')">
-      <div>
-        <div class="src-row">
-          <span class="src">Reuters</span>
-          <span class="cat">Economía</span>
-          <span>hace 1 h</span>
+    <li class="cluster">
+      <div class="c-srcrow">
+        <div class="left">
+          <span class="src-pile"><span class="s-nyt">N</span><span class="s-grd">G</span></span>
+          <span class="c-count">6 medios</span>
+          <span>· Tech · hace 2 h</span>
         </div>
-        <h4>El precio del cobre toca máximos de tres meses tras nuevos datos de inventario en Shanghái</h4>
-        <p>Los inventarios cayeron 14% semana a semana, alimentando expectativas de una demanda china más fuerte de lo previsto en el segundo trimestre.</p>
       </div>
-      <div class="thumb t4"></div>
-    </li>
-
-    <li class="item" onclick="window.open('https://www.biobiochile.cl', '_blank')">
-      <div>
-        <div class="src-row">
-          <span class="src">BíoBío</span>
-          <span class="cat">Chile</span>
-          <span>hace 1 h</span>
-        </div>
-        <h4>Sismo 5.4 se percibió esta madrugada en la zona central; descartan daños estructurales</h4>
-        <p>El epicentro fue ubicado a 64 km al noroeste de Valparaíso. SHOA descartó condiciones para tsunami en las costas chilenas.</p>
+      <h3 class="c-title">Nuevos modelos de IA prometen razonamiento en tiempo real, costos energéticos siguen siendo cuello de botella</h3>
+      <p class="c-lead">Tres laboratorios reportan avances independientes. Coinciden: escalar inferencia depende de cómputo no disponible aún a escala industrial.</p>
+      <div class="c-meta">
+        <span>✦ síntesis</span>
+        <span>2 frames opuestos</span>
       </div>
-      <div class="thumb t5"></div>
-    </li>
-
-    <li class="item" onclick="window.open('https://www.nytimes.com', '_blank')">
-      <div>
-        <div class="src-row">
-          <span class="src">NYT</span>
-          <span class="cat">Tech</span>
-          <span>hace 2 h</span>
-        </div>
-        <h4>Los nuevos modelos de IA prometen razonamiento en tiempo real, pero los costos energéticos siguen siendo el cuello de botella</h4>
-        <p>Tres laboratorios reportan avances independientes pero coinciden en que escalar la inferencia sigue dependiendo de capacidad de cómputo no disponible aún a escala.</p>
-      </div>
-      <div class="thumb t6"></div>
-    </li>
-
-    <li class="item read" onclick="window.open('https://ciperchile.cl', '_blank')">
-      <div>
-        <div class="src-row">
-          <span class="src">CIPER</span>
-          <span class="cat">Investigación</span>
-          <span>hace 3 h</span>
-        </div>
-        <h4>Documentos revelan red de licitaciones direccionadas en municipios de la Región Metropolitana</h4>
-        <p>Un cruce de 412 contratos muestra coincidencias entre proveedores y miembros de comisiones evaluadoras durante los últimos cuatro años.</p>
-      </div>
-      <div class="thumb t7"></div>
-    </li>
-
-    <li class="item" onclick="window.open('https://www.ft.com', '_blank')">
-      <div>
-        <div class="src-row">
-          <span class="src">Financial Times</span>
-          <span class="cat">Mundo</span>
-          <span>hace 4 h</span>
-        </div>
-        <h4>Los bancos centrales europeos preparan recortes coordinados ante señales de desaceleración manufacturera</h4>
-        <p>El BCE, BoE y SNB habrían iniciado conversaciones técnicas la semana pasada en Basilea, según fuentes presentes.</p>
-      </div>
-      <div class="thumb t8"></div>
     </li>
   </ul>
 
-  <!-- ── Section: por fuente ── -->
-  <div class="section-h">
-    <h3>Por fuente</h3>
-    <a class="more" href="#">GESTIONAR →</a>
+  <!-- Hilos en curso -->
+  <div class="section-h"><h3>Hilos que sigues</h3><a class="more" href="#">GESTIONAR →</a></div>
+  <div class="threads">
+    <div class="thread">
+      <div class="t-row">
+        <span class="t-tag">↻ Hilo · Chile</span>
+        <span class="t-new">3 nuevas</span>
+      </div>
+      <div class="t-title">Reforma previsional 2026</div>
+      <div class="t-progress">
+        <span>iniciado mar 2024</span>
+        <div class="bar"><i style="width:78%"></i></div>
+        <span>78%</span>
+      </div>
+    </div>
+    <div class="thread">
+      <div class="t-row">
+        <span class="t-tag">↻ Hilo · Mundo</span>
+        <span class="t-new">1 nueva</span>
+      </div>
+      <div class="t-title">Negociaciones COP — fase final</div>
+      <div class="t-progress">
+        <span>iniciado abr 2026</span>
+        <div class="bar"><i style="width:92%"></i></div>
+        <span>92%</span>
+      </div>
+    </div>
+    <div class="thread">
+      <div class="t-row">
+        <span class="t-tag">↻ Hilo · Tech</span>
+        <span class="t-new" style="color:var(--ink-3)">sin novedades</span>
+      </div>
+      <div class="t-title">Regulación europea de IA — implementación</div>
+      <div class="t-progress">
+        <span>iniciado feb 2025</span>
+        <div class="bar"><i style="width:45%"></i></div>
+        <span>45%</span>
+      </div>
+    </div>
   </div>
-  <ul class="feed">
-    <li class="item">
-      <div>
-        <div class="src-row">
-          <span class="src">El Mostrador</span>
-          <span class="cat">Chile</span>
-          <span>hace 5 h</span>
-        </div>
-        <h4>Análisis: las tres tensiones internas del oficialismo de cara al ciclo electoral 2025</h4>
-        <p>Las diferencias programáticas se entrecruzan con disputas sobre liderazgo y narrativa post-rechazo, complicando el ordenamiento del bloque.</p>
-      </div>
-      <div class="thumb t3"></div>
-    </li>
-    <li class="item">
-      <div>
-        <div class="src-row">
-          <span class="src">AP</span>
-          <span class="cat">Mundo</span>
-          <span>hace 6 h</span>
-        </div>
-        <h4>Argentina cierra acuerdo preliminar con el FMI para reestructurar pagos del próximo trimestre</h4>
-        <p>El staff técnico envió hoy el reporte favorable; el directorio del Fondo deberá ratificar el acuerdo en su sesión del 14 de mayo.</p>
-      </div>
-      <div class="thumb t1"></div>
-    </li>
-  </ul>
+
+  <!-- Time machine / memory -->
+  <div class="section-h"><h3>Memoria</h3><a class="more" href="#">EXPLORAR →</a></div>
+  <div class="memory">
+    <div class="label">HACE 3 SEMANAS · 9 ABR</div>
+    <div class="title">"El cobre podría caer si China desacelera importaciones de manufactura"</div>
+    <div class="sub">Predicción de FT · <strong style="color:var(--accent)">resultó incorrecta</strong> — el cobre subió 6% en el período. Trust score FT en metales: 72%.</div>
+  </div>
+
+  <!-- Anti-doomscroll -->
+  <div class="stop">
+    <div class="ico">✓</div>
+    <div class="title">Leíste lo que importa hoy</div>
+    <div class="sub">Cubriste 4 historias clave + 3 hilos. El resto es repetición o ruido bajo.</div>
+    <div class="when">VOLVÉ A LAS 18:00 · 5 NUEVAS ESPERADAS</div>
+  </div>
 
 </div>
 
-<!-- ── Bottom nav ── -->
 <nav class="bottom">
-  <button class="active" type="button">
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
-    Feed
-  </button>
-  <button type="button">
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
-    Guardados
-  </button>
-  <button type="button">
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>
-    Fuentes
-  </button>
-  <button type="button">
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3 1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8 1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
-    Ajustes
-  </button>
+  <button class="active"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Feed</button>
+  <button><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12c0-5 4-9 9-9s9 4 9 9-4 9-9 9-9-4-9-9z M12 7v5l3 2"/></svg>Hilos</button>
+  <button><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Conversar</button>
+  <button><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 18v-6a9 9 0 0 1 18 0v6 M21 19a2 2 0 0 1-2 2h-1v-6h3z M3 19a2 2 0 0 0 2 2h1v-6H3z"/></svg>Briefing</button>
+  <button><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8M12 3v3M12 18v3M3 12h3M18 12h3"/></svg>Ajustes</button>
 </nav>
 
 <script>
-  // Light interaction: chips toggle
-  document.querySelectorAll('.chip').forEach(c => {
-    c.addEventListener('click', () => {
-      document.querySelectorAll('.chip').forEach(x => x.classList.remove('active'));
-      c.classList.add('active');
-    });
-  });
-  // Mark item as read on tap (visual only)
-  document.querySelectorAll('li.item').forEach(li => {
-    li.addEventListener('click', () => li.classList.add('read'));
-  });
+  document.querySelectorAll('.chip').forEach(c => c.addEventListener('click', () => {
+    document.querySelectorAll('.chip').forEach(x => x.classList.remove('active'));
+    c.classList.add('active');
+  }));
+  document.querySelectorAll('.depth button').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('.depth button').forEach(x => x.classList.remove('on'));
+    b.classList.add('on');
+  }));
 </script>
 </body>
 </html>
