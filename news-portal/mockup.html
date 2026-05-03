@@ -4,10 +4,10 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="theme-color" content="#0b0b0d" />
-<title>Diario · v3 lobby</title>
+<title>Diario · v4 portada</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,700;9..144,900;9..144,900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,700;9..144,900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
 <style>
   :root {
     --bg: #0b0b0d; --bg-2: #131318; --bg-3: #1c1c22;
@@ -21,95 +21,141 @@
     :root {
       --bg: #f6f5f0; --bg-2: #ffffff; --bg-3: #ecebe4;
       --line: #d9d8cf; --ink: #14140f; --ink-2: #4a4a44; --ink-3: #8a8a82;
-      --accent: #6b8f0f; --blue: #1d6cc7; --amber: #b3760e;
+      --blue: #1d6cc7;
     }
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink); font-family: var(--sans); }
   body { min-height: 100vh; padding-bottom: env(safe-area-inset-bottom); -webkit-font-smoothing: antialiased; }
   .app { max-width: 720px; margin: 0 auto; padding-bottom: 100px; }
-
-  /* Subtle lobby texture */
-  body::before {
-    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0;
-    background-image:
-      radial-gradient(circle at 20% 10%, color-mix(in oklab, var(--accent) 6%, transparent), transparent 40%),
-      radial-gradient(circle at 80% 80%, color-mix(in oklab, var(--blue) 8%, transparent), transparent 50%);
-  }
-  .app { position: relative; z-index: 1; }
+  img { display: block; max-width: 100%; height: auto; }
 
   /* Header */
-  header.top {
-    padding: 16px 16px 0; padding-top: max(16px, env(safe-area-inset-top));
-  }
-  .brand { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-  .brand h1 { font-family: var(--serif); font-weight: 900; font-style: italic; font-size: 32px; letter-spacing: -0.02em; margin: 0; line-height: 1; }
-  .brand .meta { font-family: var(--mono); font-size: 10px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.1em; margin-top: 6px; }
-  .brand .icons { display: flex; gap: 6px; }
+  header.top { padding: 14px 16px 10px; padding-top: max(14px, env(safe-area-inset-top)); display: flex; align-items: center; justify-content: space-between; gap: 10px; border-bottom: 1px solid var(--line); }
+  .brand h1 { font-family: var(--serif); font-weight: 900; font-style: italic; font-size: 26px; letter-spacing: -0.02em; margin: 0; line-height: 1; }
+  .brand .meta { font-family: var(--mono); font-size: 9px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.12em; margin-top: 4px; }
+  .icons { display: flex; gap: 6px; }
   .icon-btn { width: 36px; height: 36px; display: grid; place-items: center; background: transparent; border: 1px solid var(--line); color: var(--ink); border-radius: 999px; cursor: pointer; }
 
-  /* Lobby greeting */
-  .greet {
-    margin: 18px 16px 0;
-    font-family: var(--serif); font-style: italic; font-weight: 500;
-    font-size: 17px; line-height: 1.4; color: var(--ink-2);
-  }
-  .greet b { color: var(--ink); font-style: normal; font-weight: 700; }
-
-  /* Agent strip */
+  /* Agent slim bar */
   .agent {
-    margin: 16px 16px 0; padding: 12px 14px;
-    background: var(--bg-2); border: 1px solid var(--line); border-radius: 14px;
-    display: flex; align-items: center; gap: 12px; cursor: pointer;
+    padding: 10px 16px; display: flex; align-items: center; gap: 10px;
+    font-family: var(--mono); font-size: 11px; color: var(--ink-2);
+    border-bottom: 1px solid var(--line);
+    background: color-mix(in oklab, var(--accent) 6%, var(--bg));
   }
-  .agent .dot { width: 8px; height: 8px; background: var(--accent); border-radius: 999px; flex-shrink: 0; box-shadow: 0 0 10px var(--accent); animation: glow 2s infinite; }
+  .agent .dot { width: 7px; height: 7px; background: var(--accent); border-radius: 999px; box-shadow: 0 0 8px var(--accent); flex-shrink: 0; animation: glow 2s infinite; }
   @keyframes glow { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
-  .agent .text { flex: 1; min-width: 0; font-size: 13px; line-height: 1.4; color: var(--ink); }
-  .agent .text b { font-weight: 600; }
-  .agent .arr { color: var(--ink-3); }
+  .agent .text { flex: 1; }
+  .agent .text b { color: var(--ink); font-weight: 600; }
+
+  /* PORTADA hero */
+  .portada {
+    position: relative; cursor: pointer; overflow: hidden;
+    aspect-ratio: 4 / 5;
+    max-height: 560px;
+  }
+  .portada img.bg {
+    position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+  }
+  .portada::after {
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(180deg, rgba(0,0,0,0.0) 0%, rgba(0,0,0,0.35) 45%, rgba(0,0,0,0.92) 100%);
+  }
+  .portada .body {
+    position: absolute; inset: auto 0 0 0; padding: 18px 16px 22px;
+    color: #fff; z-index: 1;
+  }
+  .portada .kicker {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--red); color: #fff;
+    font-family: var(--mono); font-size: 10px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.14em;
+    padding: 5px 8px; border-radius: 4px; margin-bottom: 12px;
+  }
+  .portada .kicker::before { content: ""; width: 6px; height: 6px; border-radius: 999px; background: #fff; animation: pulse 1.4s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+  .portada h2 {
+    font-family: var(--serif); font-weight: 900; font-style: italic;
+    font-size: 30px; line-height: 1.05; letter-spacing: -0.025em;
+    margin: 0 0 10px; color: #fff;
+    text-shadow: 0 2px 12px rgba(0,0,0,0.4);
+  }
+  .portada .deck {
+    font-family: var(--serif); font-weight: 400; font-size: 14px;
+    line-height: 1.45; color: rgba(255,255,255,0.92); margin: 0 0 12px;
+    text-shadow: 0 1px 6px rgba(0,0,0,0.4);
+  }
+  .portada .meta {
+    display: flex; align-items: center; gap: 10px;
+    font-family: var(--mono); font-size: 10px;
+    color: rgba(255,255,255,0.78); text-transform: uppercase; letter-spacing: 0.08em;
+  }
+
+  /* 3-up secondary stories with photos */
+  .featured { padding: 16px; display: grid; gap: 14px; }
+  .feat {
+    display: grid; grid-template-columns: 1fr 110px; gap: 12px;
+    cursor: pointer;
+  }
+  .feat .img-wrap { width: 110px; height: 110px; border-radius: 12px; overflow: hidden; background: var(--bg-3); border: 1px solid var(--line); }
+  .feat img { width: 100%; height: 100%; object-fit: cover; }
+  .feat .kicker {
+    display: inline-block; font-family: var(--mono); font-size: 9px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.12em;
+    padding: 3px 6px; border-radius: 3px;
+    margin-bottom: 6px;
+  }
+  .k-red { background: var(--red); color: #fff; }
+  .k-amber { background: var(--amber); color: #14140f; }
+  .k-blue { background: var(--blue); color: #14140f; }
+  .feat h3 {
+    font-family: var(--serif); font-weight: 700; font-size: 17px; line-height: 1.18;
+    letter-spacing: -0.015em; margin: 0 0 4px; color: var(--ink);
+  }
+  .feat .src { font-family: var(--mono); font-size: 10px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.06em; }
+  .feat .src b { color: var(--ink); font-weight: 600; }
 
   /* Section header */
-  .section-h { display: flex; align-items: baseline; justify-content: space-between; padding: 28px 16px 12px; }
+  .section-h { display: flex; align-items: baseline; justify-content: space-between; padding: 24px 16px 10px; }
   .section-h h3 { font-family: var(--serif); font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.18em; margin: 0; color: var(--ink-3); }
   .section-h .more { font-family: var(--mono); font-size: 10px; color: var(--ink-3); text-decoration: none; letter-spacing: 0.06em; }
 
-  /* Rooms grid */
-  .rooms { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 0 16px; }
-  .room {
-    aspect-ratio: 1 / 1.05;
-    border: 1px solid var(--line); border-radius: 16px;
-    padding: 14px; cursor: pointer;
+  /* Salas — strip horizontal compacto */
+  .salas {
+    display: flex; gap: 10px; overflow-x: auto; scrollbar-width: none;
+    padding: 0 16px 4px; -webkit-overflow-scrolling: touch;
+  }
+  .salas::-webkit-scrollbar { display: none; }
+  .sala {
+    flex: 0 0 130px; aspect-ratio: 1 / 1.1;
+    border: 1px solid var(--line); border-radius: 14px;
+    padding: 12px; cursor: pointer;
     display: flex; flex-direction: column; justify-content: space-between;
     position: relative; overflow: hidden;
-    transition: transform 0.15s;
   }
-  .room:active { transform: scale(0.98); }
-  .room .label { font-family: var(--mono); font-size: 9px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.1em; }
-  .room h4 { font-family: var(--serif); font-weight: 700; font-size: 22px; line-height: 1.05; letter-spacing: -0.02em; margin: 6px 0 0; color: var(--ink); }
-  .room .teaser { font-size: 11px; color: var(--ink-2); line-height: 1.4; margin-top: auto; }
-  .room .pulse { font-family: var(--mono); font-size: 10px; color: var(--ink); margin-top: 8px; display: flex; align-items: center; gap: 6px; }
-  .room .pulse::before { content: ""; width: 5px; height: 5px; border-radius: 999px; background: currentColor; }
+  .sala .label { font-family: var(--mono); font-size: 9px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.1em; }
+  .sala h4 { font-family: var(--serif); font-weight: 700; font-size: 17px; line-height: 1.05; letter-spacing: -0.01em; margin: 6px 0 0; }
+  .sala .pulse { font-family: var(--mono); font-size: 9px; color: var(--ink-2); margin-top: 6px; }
+  .s-brief { background: linear-gradient(160deg, color-mix(in oklab, var(--accent) 18%, var(--bg-2)), var(--bg-2) 70%); }
+  .s-brief .pulse { color: var(--accent); }
+  .s-read { background: linear-gradient(160deg, #2a221a, var(--bg-2) 70%); }
+  .s-read h4 { font-style: italic; }
+  .s-hojeo { background: var(--bg-2); background-image: linear-gradient(0deg, var(--line) 1px, transparent 1px); background-size: 100% 10px; background-position: 0 60%; }
+  .s-disc { background: linear-gradient(135deg, color-mix(in oklab, var(--blue) 18%, var(--bg-2)), var(--bg-2) 70%); }
+  .s-disc .pulse { color: var(--blue); }
 
-  /* Room textures */
-  .r-brief { background: linear-gradient(160deg, color-mix(in oklab, var(--accent) 14%, var(--bg-2)) 0%, var(--bg-2) 70%); }
-  .r-brief .pulse { color: var(--accent); }
-  .r-read  { background: linear-gradient(160deg, #2a221a 0%, var(--bg-2) 70%); }
-  .r-read h4 { font-family: var(--serif); font-style: italic; }
-  .r-hojeo { background: var(--bg-2); background-image: linear-gradient(0deg, var(--line) 1px, transparent 1px); background-size: 100% 12px; background-position: 0 14px; }
-  .r-disc  { background: linear-gradient(135deg, color-mix(in oklab, var(--blue) 16%, var(--bg-2)) 0%, var(--bg-2) 70%); }
-  .r-disc .pulse { color: var(--blue); }
-
-  /* Tema rooms (smaller / horizontal scroll) */
+  /* Temas */
   .temas { display: flex; gap: 10px; overflow-x: auto; scrollbar-width: none; padding: 0 16px 4px; -webkit-overflow-scrolling: touch; }
   .temas::-webkit-scrollbar { display: none; }
   .tema {
-    flex: 0 0 168px; min-height: 130px;
+    flex: 0 0 168px; min-height: 100px;
     border: 1px solid var(--line); border-radius: 14px;
     padding: 12px; cursor: pointer; position: relative; overflow: hidden;
     display: flex; flex-direction: column; justify-content: space-between;
   }
-  .tema .ico { font-size: 22px; line-height: 1; }
-  .tema .name { font-family: var(--serif); font-weight: 700; font-size: 16px; letter-spacing: -0.01em; margin-top: 8px; }
+  .tema .ico { font-size: 20px; line-height: 1; }
+  .tema .name { font-family: var(--serif); font-weight: 700; font-size: 15px; letter-spacing: -0.01em; margin-top: 8px; }
   .tema .live { font-family: var(--mono); font-size: 9px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.1em; margin-top: 4px; display: flex; align-items: center; gap: 5px; }
   .tema .live i { width: 5px; height: 5px; border-radius: 999px; background: var(--accent); }
   .t-deport { background: linear-gradient(135deg, #1a3a2a, var(--bg-2) 70%); }
@@ -119,28 +165,18 @@
   .t-cult   { background: linear-gradient(135deg, #3a2a1a, var(--bg-2) 70%); }
   .t-cien   { background: linear-gradient(135deg, #1a3a3a, var(--bg-2) 70%); }
 
-  /* Featured long-read */
-  .longread {
-    margin: 0 16px; padding: 0;
-    border: 1px solid var(--line); border-radius: 18px; overflow: hidden;
-    background: var(--bg-2);
-    cursor: pointer;
-  }
-  .longread .cover {
-    aspect-ratio: 16 / 10;
-    background:
-      radial-gradient(ellipse at 30% 30%, #5c4a1a 0%, #1a1408 70%);
-    position: relative;
-    display: flex; align-items: flex-end; padding: 16px;
-  }
+  /* Long-read magazine */
+  .longread { margin: 0 16px; border: 1px solid var(--line); border-radius: 18px; overflow: hidden; background: var(--bg-2); cursor: pointer; }
+  .longread .cover { aspect-ratio: 16 / 11; position: relative; overflow: hidden; }
+  .longread .cover img { width: 100%; height: 100%; object-fit: cover; }
   .longread .cover::after {
     content: ""; position: absolute; inset: 0;
-    background: linear-gradient(180deg, transparent 50%, rgba(0,0,0,0.5));
+    background: linear-gradient(180deg, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.55) 100%);
   }
-  .longread .kicker {
-    position: relative; z-index: 1;
+  .longread .cover-overlay {
+    position: absolute; bottom: 14px; left: 14px;
     font-family: var(--mono); font-size: 10px; color: var(--accent);
-    text-transform: uppercase; letter-spacing: 0.14em;
+    text-transform: uppercase; letter-spacing: 0.16em; z-index: 1;
   }
   .longread .body { padding: 18px; }
   .longread h2 {
@@ -153,25 +189,18 @@
   }
   .longread .meta { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 10px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.06em; }
 
-  /* Marginalia (people you follow) */
+  /* Voces */
   .voices { padding: 0 16px; display: grid; gap: 10px; }
-  .voice {
-    border: 1px solid var(--line); border-radius: 12px;
-    padding: 12px 14px; background: var(--bg-2);
-    display: grid; grid-template-columns: 36px 1fr; gap: 12px; cursor: pointer;
-  }
+  .voice { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; background: var(--bg-2); display: grid; grid-template-columns: 36px 1fr; gap: 12px; cursor: pointer; }
   .voice .av { width: 36px; height: 36px; border-radius: 999px; background: var(--bg-3); display: grid; place-items: center; font-family: var(--serif); font-weight: 700; font-size: 14px; color: var(--ink); border: 1px solid var(--line); }
   .voice .who { font-family: var(--mono); font-size: 10px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.06em; }
   .voice .what { font-family: var(--serif); font-style: italic; font-weight: 400; font-size: 14px; line-height: 1.4; color: var(--ink); margin-top: 3px; }
   .voice .src { font-family: var(--mono); font-size: 9px; color: var(--ink-3); margin-top: 6px; text-transform: uppercase; letter-spacing: 0.08em; }
 
-  /* Anti-doomscroll quiet card */
-  .quiet {
-    margin: 28px 16px 0; padding: 22px 16px; text-align: center;
-    border: 1px dashed var(--line); border-radius: 16px;
-  }
+  /* Quiet */
+  .quiet { margin: 28px 16px 0; padding: 22px 16px; text-align: center; border: 1px dashed var(--line); border-radius: 16px; }
   .quiet .title { font-family: var(--serif); font-style: italic; font-weight: 500; font-size: 17px; line-height: 1.3; }
-  .quiet .sub { font-size: 12px; color: var(--ink-3); margin-top: 6px; line-height: 1.5; font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.08em; }
+  .quiet .sub { font-size: 10px; color: var(--ink-3); margin-top: 8px; line-height: 1.5; font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.1em; }
 
   /* Bottom nav */
   nav.bottom {
@@ -185,8 +214,8 @@
   nav.bottom button.active { color: var(--ink); }
 
   @media (min-width: 720px) {
-    .rooms { grid-template-columns: repeat(4, 1fr); }
-    .longread h2 { font-size: 30px; }
+    .portada h2 { font-size: 42px; }
+    .portada { aspect-ratio: 16 / 9; }
   }
 </style>
 </head>
@@ -195,130 +224,109 @@
 
   <header class="top">
     <div class="brand">
-      <div>
-        <h1>Diario</h1>
-        <div class="meta">JUE 30 ABR · 14:36 · LOBBY</div>
-      </div>
-      <div class="icons">
-        <button class="icon-btn" aria-label="Buscar"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></button>
-        <button class="icon-btn" aria-label="Biblioteca"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V2H6.5A2.5 2.5 0 0 0 4 4.5z"/></svg></button>
-      </div>
+      <h1>Diario</h1>
+      <div class="meta">JUE 30 ABR · 23:49 · 12 FUENTES</div>
     </div>
-
-    <div class="greet">Buenas tardes, José. <b>Hoy hay calma</b> — 3 cosas urgentes y mucho para leer sin prisa.</div>
-
-    <div class="agent" onclick="alert('Tu agente: nada que requiera tu atención inmediata. El briefing matinal sigue disponible.')">
-      <span class="dot"></span>
-      <span class="text"><b>Tu agente:</b> nada que necesite tu atención ahora. Recordá que tenés reunión con A. mañana — su industria estuvo movida.</span>
-      <span class="arr">›</span>
+    <div class="icons">
+      <button class="icon-btn" aria-label="Buscar"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></button>
+      <button class="icon-btn" aria-label="Biblioteca"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V2H6.5A2.5 2.5 0 0 0 4 4.5z"/></svg></button>
     </div>
   </header>
 
-  <!-- Salas principales -->
+  <div class="agent">
+    <span class="dot"></span>
+    <span class="text"><b>Tu agente:</b> mañana tenés con A. — su industria estuvo movida hoy.</span>
+  </div>
+
+  <!-- PORTADA hero -->
+  <section class="portada" onclick="window.open('#','_self')">
+    <img class="bg" src="https://images.unsplash.com/photo-1573225342350-16731dd9bf3d?w=1200&q=80&auto=format&fit=crop" alt="" referrerpolicy="no-referrer" />
+    <div class="body">
+      <span class="kicker">en desarrollo · cop</span>
+      <h2>El día que el cobre dejó de mentir</h2>
+      <p class="deck">Tres semanas de sismos en mercados, cumbres y política dibujan un patrón que ningún titular suelto deja ver. La hora más larga de Hacienda comenzó al amanecer.</p>
+      <div class="meta">
+        <span>✦ síntesis · 24 fuentes</span>
+        <span>·</span>
+        <span>14 min</span>
+        <span>·</span>
+        <span>↻ hilo en curso</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Featured -->
+  <div class="featured">
+    <article class="feat">
+      <div>
+        <span class="kicker k-red">exclusivo</span>
+        <h3>"Esto no estaba en el plan": la conversación interna que destrabó la previsional</h3>
+        <div class="src"><b>CIPER</b> · hace 2 h · 8 medios</div>
+      </div>
+      <div class="img-wrap"><img src="https://images.unsplash.com/photo-1532375672259-d2f7ed42c2c1?w=400&q=80&auto=format&fit=crop" alt="" referrerpolicy="no-referrer" /></div>
+    </article>
+
+    <article class="feat">
+      <div>
+        <span class="kicker k-amber">análisis</span>
+        <h3>Por qué el SHOA tardó 19 minutos: lo que pasó dentro del centro de monitoreo</h3>
+        <div class="src"><b>BíoBío</b> + <b>La Tercera</b> · hace 3 h</div>
+      </div>
+      <div class="img-wrap"><img src="https://images.unsplash.com/photo-1527482937786-6608f6e14c15?w=400&q=80&auto=format&fit=crop" alt="" referrerpolicy="no-referrer" /></div>
+    </article>
+
+    <article class="feat">
+      <div>
+        <span class="kicker k-blue">retrato</span>
+        <h3>El perfil del nuevo CEO que dejó a Wall Street sin libreto en 36 horas</h3>
+        <div class="src"><b>FT</b> · <b>NYT</b> · hace 5 h</div>
+      </div>
+      <div class="img-wrap"><img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&q=80&auto=format&fit=crop" alt="" referrerpolicy="no-referrer" /></div>
+    </article>
+  </div>
+
+  <!-- Salas -->
   <div class="section-h"><h3>Salas</h3><a class="more" href="#">PERSONALIZAR →</a></div>
-
-  <div class="rooms">
-    <div class="room r-brief">
-      <div>
-        <div class="label">⚡ Operacional</div>
-        <h4>Briefing</h4>
-      </div>
-      <div>
-        <div class="teaser">8 historias que importan hoy. Audio listo.</div>
-        <div class="pulse">4:32 · listo</div>
-      </div>
+  <div class="salas">
+    <div class="sala s-brief">
+      <div><div class="label">⚡ operacional</div><h4>Briefing</h4></div>
+      <div class="pulse">4:32 · listo</div>
     </div>
-
-    <div class="room r-read">
-      <div>
-        <div class="label">📖 Lectura</div>
-        <h4>Reading<br>Room</h4>
-      </div>
-      <div>
-        <div class="teaser">3 ensayos largos sintetizados de los hilos de la semana.</div>
-        <div class="pulse" style="color: var(--amber)">~ 42 min</div>
-      </div>
+    <div class="sala s-read">
+      <div><div class="label">📖 lectura</div><h4>Reading<br>Room</h4></div>
+      <div class="pulse">3 ensayos · 42 min</div>
     </div>
-
-    <div class="room r-hojeo">
-      <div>
-        <div class="label">📰 Hojeo</div>
-        <h4>Portadas</h4>
-      </div>
-      <div>
-        <div class="teaser">12 portadas del día. Vagar sin objetivo.</div>
-        <div class="pulse" style="color: var(--ink-2)">CL · UK · FR · DE · US</div>
-      </div>
+    <div class="sala s-hojeo">
+      <div><div class="label">📰 hojeo</div><h4>Portadas</h4></div>
+      <div class="pulse">12 portadas · 5 países</div>
     </div>
-
-    <div class="room r-disc">
-      <div>
-        <div class="label">✦ Serendipia</div>
-        <h4>Discovery</h4>
-      </div>
-      <div>
-        <div class="teaser">5 cosas fuera de tus temas que el agente cree que te van a gustar.</div>
-        <div class="pulse">5 nuevas</div>
-      </div>
+    <div class="sala s-disc">
+      <div><div class="label">✦ serendipia</div><h4>Discovery</h4></div>
+      <div class="pulse">5 nuevas</div>
     </div>
   </div>
 
-  <!-- Tus salas temáticas -->
+  <!-- Temas -->
   <div class="section-h"><h3>Tus temas</h3><a class="more" href="#">+ AGREGAR</a></div>
   <div class="temas">
-    <div class="tema t-deport">
-      <div>
-        <div class="ico">⚽</div>
-        <div class="name">Deportes</div>
-      </div>
-      <div class="live"><i></i> 2 partidos en vivo</div>
-    </div>
-    <div class="tema t-geo">
-      <div>
-        <div class="ico">🌐</div>
-        <div class="name">Geopolítica</div>
-      </div>
-      <div class="live">3 hilos en curso</div>
-    </div>
-    <div class="tema t-clima">
-      <div>
-        <div class="ico">🌦️</div>
-        <div class="name">Clima</div>
-      </div>
-      <div class="live"><i></i> COP en final</div>
-    </div>
-    <div class="tema t-pol-cl">
-      <div>
-        <div class="ico">🇨🇱</div>
-        <div class="name">Política CL</div>
-      </div>
-      <div class="live">4 nuevas hoy</div>
-    </div>
-    <div class="tema t-cult">
-      <div>
-        <div class="ico">🎭</div>
-        <div class="name">Cultura</div>
-      </div>
-      <div class="live">12 reviews semana</div>
-    </div>
-    <div class="tema t-cien">
-      <div>
-        <div class="ico">🔬</div>
-        <div class="name">Ciencia</div>
-      </div>
-      <div class="live">1 paper destacado</div>
-    </div>
+    <div class="tema t-deport"><div><div class="ico">⚽</div><div class="name">Deportes</div></div><div class="live"><i></i> 2 partidos en vivo</div></div>
+    <div class="tema t-geo"><div><div class="ico">🌐</div><div class="name">Geopolítica</div></div><div class="live">3 hilos en curso</div></div>
+    <div class="tema t-clima"><div><div class="ico">🌦️</div><div class="name">Clima</div></div><div class="live"><i></i> COP en final</div></div>
+    <div class="tema t-pol-cl"><div><div class="ico">🇨🇱</div><div class="name">Política CL</div></div><div class="live">4 nuevas hoy</div></div>
+    <div class="tema t-cult"><div><div class="ico">🎭</div><div class="name">Cultura</div></div><div class="live">12 reviews semana</div></div>
+    <div class="tema t-cien"><div><div class="ico">🔬</div><div class="name">Ciencia</div></div><div class="live">1 paper destacado</div></div>
   </div>
 
-  <!-- Long-read del día -->
+  <!-- Long-read -->
   <div class="section-h"><h3>Lectura del día</h3><a class="more" href="#">SALA LECTURA →</a></div>
   <article class="longread">
     <div class="cover">
-      <div class="kicker">ENSAYO · 14 MIN · GEOPOLÍTICA</div>
+      <img src="https://images.unsplash.com/photo-1486325212027-8081e485255e?w=1200&q=80&auto=format&fit=crop" alt="" referrerpolicy="no-referrer" />
+      <div class="cover-overlay">ENSAYO · 14 MIN · GEOPOLÍTICA</div>
     </div>
     <div class="body">
-      <h2>El cobre, el clima, y la nueva geometría del poder en el Pacífico Sur</h2>
-      <p class="deck">Tres semanas de movimientos en mercados, cumbres y sismos políticos dibujan un patrón que ningún titular suelto deja ver. Una lectura larga, tejida desde 24 fuentes, sobre cómo Chile dejó de ser periferia.</p>
+      <h2>El mapa del nuevo Pacífico Sur: cinco semanas que cambiaron la geometría regional</h2>
+      <p class="deck">Movimientos en mercados, cumbres y sismos políticos dibujan un patrón. Una lectura larga, tejida desde 24 fuentes, sobre cómo Chile dejó de ser periferia.</p>
       <div class="meta">
         <span>Sintetizado · 24 fuentes · 6 idiomas</span>
         <span>↻ Hilo</span>
@@ -326,23 +334,23 @@
     </div>
   </article>
 
-  <!-- Voces que sigues -->
+  <!-- Voces -->
   <div class="section-h"><h3>Voces que sigues</h3><a class="more" href="#">VER TODAS →</a></div>
   <div class="voices">
     <div class="voice">
-      <div class="av">DR</div>
+      <div class="av">DM</div>
       <div>
         <div class="who">Daniel Matamala · subrayó</div>
         <div class="what">"La narrativa fiscal del oficialismo se quebró cuando el cobre dejó de cooperar."</div>
-        <div class="src">en columna La Tercera · hace 2h</div>
+        <div class="src">columna La Tercera · hace 2h</div>
       </div>
     </div>
     <div class="voice">
       <div class="av">EK</div>
       <div>
         <div class="who">Ezra Klein · publicó</div>
-        <div class="what">"Why the climate negotiations are now a story about insurance, not about emissions."</div>
-        <div class="src">NYT podcast · hace 6h · 38 min</div>
+        <div class="what">"Why the climate negotiations are now a story about insurance, not emissions."</div>
+        <div class="src">NYT podcast · 38 min · hace 6h</div>
       </div>
     </div>
     <div class="voice">
@@ -355,7 +363,7 @@
     </div>
   </div>
 
-  <!-- Quiet card -->
+  <!-- Quiet -->
   <div class="quiet">
     <div class="title">"El silencio entre noticias es donde se piensa."</div>
     <div class="sub">VOLVÉ CUANDO TENGAS TIEMPO · NADA URGENTE</div>
@@ -365,7 +373,7 @@
 
 <nav class="bottom">
   <button class="active"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9 M5 10v11h14V10"/></svg>Lobby</button>
-  <button><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 19V6a2 2 0 0 1 2-2h6v15H4a2 2 0 0 0-2 0z M22 19V6a2 2 0 0 0-2-2h-6v15h6a2 2 0 0 1 2 0z"/></svg>Lectura</button>
+  <button><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 19V6a2 2 0 0 1 2-2h6v15H4 M22 19V6a2 2 0 0 0-2-2h-6v15h6"/></svg>Lectura</button>
   <button><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Conversar</button>
   <button><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 18v-6a9 9 0 0 1 18 0v6 M21 19a2 2 0 0 1-2 2h-1v-6h3z M3 19a2 2 0 0 0 2 2h1v-6H3z"/></svg>Briefing</button>
   <button><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg>Ajustes</button>
