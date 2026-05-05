@@ -15,6 +15,10 @@ import { revalidatePath } from "next/cache";
 import { currentUser } from "@clerk/nextjs/server";
 import { requireAdmin } from "@/lib/require-admin";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
+import {
+  promotePeopleFromObservations,
+  type RelationshipClass,
+} from "@/lib/promote-people-from-observations";
 
 type ClassificationLabel = "Active Client" | "Partner" | "Investor" | "Funder";
 
@@ -24,6 +28,9 @@ type Result = {
   org_updated?: boolean;
   hall_org_updated?: boolean;
   decision_resolved?: boolean;
+  people_promoted?: number;
+  people_updated?: number;
+  whatsapp_messages_linked?: number;
 };
 
 export async function approveRelationshipClassification(
@@ -107,7 +114,32 @@ export async function approveRelationshipClassification(
       }
     }
 
-    // 4. Resolve the decision_item.
+    // 4. Backfill people rows from observations for this domain — closes the
+    //    "Engatel pattern" systemic gap (see docs/migration/REJECTED_PATTERNS.md
+    //    R-003). Best-effort: failures here don't block the approval.
+    let promotionResult: Awaited<ReturnType<typeof promotePeopleFromObservations>> | null = null;
+    if (orgNotionId) {
+      try {
+        const { data: orgRow } = await sb
+          .from("organizations")
+          .select("org_domains")
+          .eq("id", orgId)
+          .maybeSingle();
+        const domain = pickPrimaryDomain(orgRow?.org_domains ?? null);
+        if (domain) {
+          const cls = proposedClass === "Active Client" ? "Client" : (proposedClass as RelationshipClass);
+          promotionResult = await promotePeopleFromObservations(
+            { domain, orgNotionId, relationshipClass: cls, actor },
+            sb,
+          );
+        }
+      } catch (e) {
+        // Don't fail the approval if backfill has trouble — log and continue.
+        console.warn("[approveRelationshipClassification] promote-people failed:", e);
+      }
+    }
+
+    // 5. Resolve the decision_item.
     const { error: resolveErr } = await sb
       .from("decision_items")
       .update({
@@ -120,13 +152,19 @@ export async function approveRelationshipClassification(
       .eq("id", decisionId);
     if (resolveErr) return { ok: false, error: `resolve failed: ${resolveErr.message}` };
 
-    // 5. Refresh anywhere the change is visible.
+    // 6. Refresh anywhere the change is visible.
     revalidatePath("/admin/os");
     revalidatePath("/admin/clients");
     revalidatePath("/admin/hall/organizations");
     revalidatePath("/admin");
 
-    return { ok: true, org_updated: true, hall_org_updated: hallUpdated, decision_resolved: true };
+    return {
+      ok: true,
+      org_updated: true,
+      hall_org_updated: hallUpdated,
+      decision_resolved: true,
+      ...(promotionResult ? { people_promoted: promotionResult.people_inserted, people_updated: promotionResult.people_updated, whatsapp_messages_linked: promotionResult.whatsapp_messages_linked } : {}),
+    };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }

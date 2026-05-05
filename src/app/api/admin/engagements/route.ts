@@ -111,9 +111,53 @@ export async function POST(req: NextRequest) {
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
-    return NextResponse.json({ ok: true, row: data }, { status: 201 });
+
+    // Backfill people from observations for the engagement's org. Closes the
+    // "Engatel pattern" gap (see docs/migration/REJECTED_PATTERNS.md R-003):
+    // creating an engagement should ripple to the contacts of that org so
+    // the Hall doesn't show "0 contacts" when the engagement starts.
+    let observationBackfill: Awaited<ReturnType<typeof import("@/lib/promote-people-from-observations").promotePeopleFromObservations>> | null = null;
+    const orgNotionId = (data?.org_notion_id as string | null) ?? null;
+    const engagementType = (data?.engagement_type as string | null) ?? null;
+    if (orgNotionId && engagementType) {
+      try {
+        const { data: orgRow } = await sb
+          .from("organizations")
+          .select("org_domains")
+          .eq("notion_id", orgNotionId)
+          .maybeSingle();
+        const domain = pickPrimaryDomain(orgRow?.org_domains ?? null);
+        if (domain) {
+          const { promotePeopleFromObservations } = await import("@/lib/promote-people-from-observations");
+          observationBackfill = await promotePeopleFromObservations(
+            { domain, orgNotionId, relationshipClass: engagementType as "Client" | "Partner" | "Investor" | "Funder" | "Vendor", actor: "engagement-create" },
+            sb,
+          );
+        }
+      } catch (e) {
+        console.warn("[engagements POST] observation backfill failed:", e);
+      }
+    }
+
+    return NextResponse.json(
+      { ok: true, row: data, observation_backfill: observationBackfill },
+      { status: 201 },
+    );
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
+}
+
+function pickPrimaryDomain(orgDomainsText: string | null): string | null {
+  if (!orgDomainsText) return null;
+  try {
+    const arr = JSON.parse(orgDomainsText) as unknown;
+    if (Array.isArray(arr) && arr.length > 0 && typeof arr[0] === "string") {
+      return (arr[0] as string).trim().toLowerCase().replace(/^@/, "").replace(/^www\./, "");
+    }
+  } catch {
+    // not json — fall through
+  }
+  return null;
 }
