@@ -1,39 +1,25 @@
 /**
  * Cron route: drain pending pushes from Supabase mirror tables back to Notion.
  *
- * Runs daily; also callable manually with CRON_SECRET for diagnostics. Reads
- * rows where pending_notion_push is set, pushes each to Notion, clears the
- * pending payload on success or stamps last_push_error on failure.
- *
- * Auth: CRON_SECRET bearer (or x-agent-key).
+ * DEPRECATED (2026-05-05): the mirror layer this route drained is scheduled
+ * for `DROP` at Phase 6 cutoff (2026-06-02). The route is now a no-op that
+ * returns 200 OK with `deprecated: true` so existing cron schedules don't
+ * raise alerts. The route file itself is slated for deletion at cutoff per
+ * docs/SUPABASE_CONSOLIDATION_FREEZE.md §3.7.
  */
 
-import { NextRequest, NextResponse } from "next/server";
-import { pushAllPending } from "@/lib/notion-mirror-push";
+import { NextResponse } from "next/server";
 
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 
-function isAuthorized(req: NextRequest): boolean {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return false;
-  const auth = req.headers.get("authorization") ?? "";
-  const xAgent = req.headers.get("x-agent-key") ?? "";
-  return auth === `Bearer ${secret}` || xAgent === secret;
-}
-
-async function handle(req: NextRequest) {
-  if (!isAuthorized(req)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-  const t0 = Date.now();
-  const results = await pushAllPending();
+async function handle() {
   return NextResponse.json({
     ok: true,
-    duration_ms: Date.now() - t0,
-    results,
+    deprecated: true,
+    message: "scheduled for removal at cutoff 2026-06-02",
   });
 }
 
-export async function GET(req: NextRequest)  { return handle(req); }
-export async function POST(req: NextRequest) { return handle(req); }
+export async function GET()  { return handle(); }
+export async function POST() { return handle(); }
