@@ -23,6 +23,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { withRoutineLog } from "@/lib/routine-log";
 import { Client } from "@notionhq/client";
 import Anthropic from "@anthropic-ai/sdk";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
@@ -234,7 +235,7 @@ async function writeAgentDraft(
 
 // ─── Main handler ─────────────────────────────────────────────────────────────
 
-export async function POST(req: NextRequest) {
+async function _POST(req: NextRequest) {
   // Auth: agent key or Vercel cron secret
   const agentKey = req.headers.get("x-agent-key");
   const cronSecret = req.headers.get("authorization");
@@ -287,11 +288,13 @@ export async function POST(req: NextRequest) {
     );
 
     return NextResponse.json({
-      ok:             true,
-      meetings:       transcripts.length,
-      people_updated: peopleUpdated,
-      draft_url:      draftUrl,
-      window:         `${fromDate.toISOString()} → ${now.toISOString()}`,
+      ok:              true,
+      meetings:        transcripts.length,
+      records_read:    transcripts.length,
+      records_written: peopleUpdated,
+      people_updated:  peopleUpdated,
+      draft_url:       draftUrl,
+      window:          `${fromDate.toISOString()} → ${now.toISOString()}`,
     });
   } catch (e) {
     console.error("ingest-meetings error:", e);
@@ -302,7 +305,6 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// Allow Vercel cron (GET) to trigger
-export async function GET(req: NextRequest) {
-  return POST(req);
-}
+export const POST = withRoutineLog("ingest-meetings", _POST);
+// Allow Vercel cron (GET) to trigger — delegate to the wrapped handler
+export const GET = POST;
