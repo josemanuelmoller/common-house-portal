@@ -14,6 +14,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { google } from "googleapis";
 import Anthropic from "@anthropic-ai/sdk";
 import { adminGuardApi } from "@/lib/require-admin";
+import { createPageWithMirror } from "@/lib/notion-mirror-push";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -140,9 +141,39 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "Gmail did not return a draft id" }, { status: 502 });
   }
 
+  // Phase 2.0: also persist to notion_agent_drafts with gmail_thread_id so the
+  // /admin cross-view can show "this thread has a draft". Best-effort —
+  // failure does not block the Gmail draft creation that already succeeded.
+  const today = new Date().toISOString().slice(0, 10);
+  const draftTitle = subjectLine.replace(/^Re:\s*/i, "").slice(0, 200);
+  let mirrorDraftId: string | null = null;
+  try {
+    const created = await createPageWithMirror({
+      table: "notion_agent_drafts",
+      fields: {
+        title:      `Reply: ${draftTitle}`,
+        draft_type: "Follow-up Email",
+        status:     "Pending Review",
+        draft_text: draftBody.slice(0, 2000),
+      },
+      mirrorOnly: {
+        gmail_thread_id: threadId,
+        created_date:    today,
+      },
+      extraNotionProperties: {
+        "Source Reference": { rich_text: [{ text: { content: `Gmail thread ${threadId} · ${toEmail}` } }] },
+      },
+    });
+    if (created.ok) mirrorDraftId = created.id ?? null;
+    else console.warn(`[nudge-draft] mirror create failed: ${created.error}`);
+  } catch (e) {
+    console.warn(`[nudge-draft] mirror create threw: ${e instanceof Error ? e.message : String(e)}`);
+  }
+
   return NextResponse.json({
     ok: true,
     draftId,
+    mirrorDraftId,
     gmailUrl: `https://mail.google.com/mail/u/0/#drafts/${draftId}`,
   });
 }
