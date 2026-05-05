@@ -53,37 +53,46 @@ export async function POST(req: NextRequest) {
       folder
     );
 
-    // Create Source record in Notion
-    await notion.pages.create({
-      parent: { database_id: DB.sources },
-      properties: {
-        "Source Title": {
-          title: [{ text: { content: file.name } }],
-        },
-        "Source Type": {
-          select: { name: "Document" },
-        },
-        "Source Platform": {
-          select: { name: "Google Drive" },
-        },
-        "Source URL": {
-          url: result.webViewLink,
-        },
-        "Linked Projects": {
-          relation: [{ id: projectId }],
-        },
-        // Set to Ingested (not Processed) so the OS engine's finalize-source-processing skill
-        // can validate this record through its 9-condition hygiene check before marking it
-        // Processed. Setting Processed directly would create hygiene-skipped source records
-        // with no Processed Summary, Dedup Key, or Sensitivity set.
-        "Processing Status": {
-          select: { name: "Ingested" },
-        },
-        "Source Date": {
-          date: { start: new Date().toISOString().split("T")[0] },
-        },
-      },
-    });
+    // notion-cutoff-2026-06-02: replaced by canonical write to sources (Supabase).
+    // Notion → Supabase (sources) column mapping:
+    //   "Source Title"      → title
+    //   "Source Type"       → source_type
+    //   "Source Platform"   → source_platform
+    //   "Source URL"        → source_url
+    //   "Processing Status" → processing_status (kept as "Ingested" so the
+    //                                            engine's finalize-source-processing skill
+    //                                            can run its 9-condition hygiene check)
+    //   "Source Date"       → source_date
+    //   "Linked Projects"   → project_notion_id (string FK to projects.notion_id)
+    //
+    // await notion.pages.create({
+    //   parent: { database_id: DB.sources },
+    //   properties: {
+    //     "Source Title":      { title: [{ text: { content: file.name } }] },
+    //     "Source Type":       { select: { name: "Document" } },
+    //     "Source Platform":   { select: { name: "Google Drive" } },
+    //     "Source URL":        { url: result.webViewLink },
+    //     "Linked Projects":   { relation: [{ id: projectId }] },
+    //     "Processing Status": { select: { name: "Ingested" } },
+    //     "Source Date":       { date: { start: new Date().toISOString().split("T")[0] } },
+    //   },
+    // });
+    const sb = getSupabaseServerClient();
+    const { error: srcErr } = await sb
+      .from("sources")
+      .insert({
+        title:             file.name,
+        source_type:       "Document",
+        source_platform:   "Google Drive",
+        source_url:        result.webViewLink,
+        processing_status: "Ingested",
+        source_date:       new Date().toISOString().split("T")[0],
+        project_notion_id: projectId,
+      });
+    if (srcErr) {
+      console.error("[upload] sources insert failed:", srcErr.message);
+      // Drive upload already succeeded; surface a soft failure but keep the upload result.
+    }
 
     return NextResponse.json({
       success: true,

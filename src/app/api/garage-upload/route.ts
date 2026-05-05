@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { adminGuardApi } from "@/lib/require-admin";
-import { notion, DB } from "@/lib/notion";
+// notion-cutoff-2026-06-02: Notion `Data Room` archive removed; canonical delete is now on `data_room_documents` (Supabase).
+// import { notion, DB } from "@/lib/notion";
+import { getSupabaseServerClient } from "@/lib/supabase-server";
 
 function getSupabase() {
   return createClient(
@@ -55,9 +57,22 @@ export async function DELETE(req: NextRequest) {
   const errs: string[] = [];
 
   if (notionId) {
+    // notion-cutoff-2026-06-02: replaced by canonical delete on data_room_documents (Supabase).
+    // notionId is matched against either uuid `id` or the `notion_id` backref column.
+    // try { await notion.pages.update({ page_id: notionId, archived: true }); }
+    // catch { errs.push("Failed to archive Notion record"); }
     try {
-      await notion.pages.update({ page_id: notionId, archived: true });
-    } catch { errs.push("Failed to archive Notion record"); }
+      const sb = getSupabaseServerClient();
+      const isUuid = /^[0-9a-f-]{36}$/i.test(notionId);
+      const matchColumn = isUuid ? "id" : "notion_id";
+      const { error } = await sb
+        .from("data_room_documents")
+        .delete()
+        .eq(matchColumn, notionId);
+      if (error) errs.push(`Failed to delete data_room_documents row: ${error.message}`);
+    } catch (e) {
+      errs.push(`Failed to delete data_room_documents row: ${e instanceof Error ? e.message : String(e)}`);
+    }
   }
 
   if (storagePath) {
