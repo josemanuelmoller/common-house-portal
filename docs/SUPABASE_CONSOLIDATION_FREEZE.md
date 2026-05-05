@@ -1,9 +1,12 @@
 # Supabase Consolidation — Freeze Decisions (Phase 0)
 
-**Status:** APPROVED — frozen on 2026-05-05
+**Status:** APPROVED — frozen on 2026-05-05 — **REAFFIRMED 2026-05-05** after a parallel session attempted a write-through approach (see §11).
 **Cutoff Date:** **2026-06-02** (4 weeks from approval)
 **Owner:** Jose Manuel Moller
 **Scope:** Decommission Notion as a write target across the Common House OS v2. Make Supabase the single source of truth.
+
+> **⚠️ FUTURE SESSIONS — READ THIS FIRST.**
+> If you are reading this and you are about to extend `notion-mirror-push.ts`, `notion-push.ts`, or otherwise increase the surface area of code that writes to Notion: **STOP**. Read §11. The write-through-mirror direction was explicitly rejected on 2026-05-05 by the owner. The only valid direction is reducing Notion writes to zero by 2026-06-02. If you believe a Notion write is unavoidable, it must carry a `// notion-cutoff-exempt: <reason>` comment AND be defended against §6 acceptance criteria.
 
 ---
 
@@ -12,6 +15,7 @@
 After cutoff, **only Supabase accepts writes** for OS v2 entities. Notion becomes a read-only archive of pre-cutoff state. No bidirectional sync. No mirror tables. One field, one place, one writer.
 
 This decision is binding. Any future PR that imports `@notionhq/client` for a write operation must be rejected.
+
 
 ## 2. Cutoff date
 
@@ -245,3 +249,68 @@ Phase 1.5 also added these columns based on agent-rewrite analysis:
 
 No design decisions; mechanical additions to support 1:1 contract
 preservation in the agent rewrites.
+
+---
+
+## 11. REAFFIRMATION — write-through-mirror was rejected (2026-05-05)
+
+A parallel Claude session running on `main` between 2026-05-05 morning
+and 2026-05-05 evening attempted a different direction:
+
+- Pattern: "agents/skills write Supabase **first**, then mirror-push the
+  same row to Notion via an extended `notion-mirror-push.ts` and
+  `notion-push.ts`."
+- Commits: `8b4ad52` "all Hall reads served from Supabase",
+  `d9d844d` "all skills/agents write to Supabase first",
+  `6431c64` "extend mirror push to Pattern B + 4 endpoints",
+  `f0b86c5` "agent operators write through mirror".
+- Effect: `notion-mirror-push.ts` grew by **+527 lines**, `notion-push.ts`
+  by **+653 lines**. The Phase 1 migration SQL files in
+  `supabase/migrations/2026050512*.sql` were **deleted** from the repo
+  (the schema is still applied in Supabase prod — only the artifacts
+  vanished). `WatchlistEditor.tsx` and `decision-items.ts` were also
+  deleted.
+
+**Owner decision (2026-05-05 evening):** rejected. The freeze direction
+stands. Specifically:
+
+1. Notion is read-only after 2026-06-02. There is no version of "the
+   mirror keeps Notion in sync forever." Building more code that writes
+   Notion delays the cutoff and accumulates a debt that will be 10x
+   harder to remove later.
+2. Any Hall surface that today reads through `notion-mirror-push` /
+   `notion-push` must be migrated to read directly from canonical
+   Supabase tables before cutoff. The mirror-push helpers themselves
+   are deletion targets at Phase 6.
+3. The deleted Phase 1 migration files must be **restored** in the
+   branch that ships to main. They are the audit trail for the schema
+   that is currently live in Supabase prod (`commonhouse` project,
+   ref `rjcsasbaxihaubkkkxrt`). A schema with no migration files in the
+   repo is a schema you cannot reproduce on a fresh environment.
+4. Future sessions: see the warning at the top of this document. Read
+   it before you touch `notion-mirror-push.ts`, `notion-push.ts`,
+   `notion-mirror.ts`, or any new file under `src/lib/notion/`. If
+   `git grep "@notionhq/client"` is going UP in your diff, you are
+   going the wrong way.
+
+### Concrete guards in place
+
+- `AGENTS.md` carries the Notion deprecation hard-rule (see
+  `<!-- BEGIN:notion-deprecation-rules -->`).
+- `docs/migration/REJECTED_PATTERNS.md` enumerates the rejected
+  approach (write-through mirror) with rationale, so a future session
+  asking "should we go write-through?" can answer in 30 seconds.
+- A pre-commit / pre-push grep guard at `scripts/check-notion-cutoff.sh`
+  fails if the count of `@notionhq/client` write call sites goes up
+  compared to the baseline at HEAD~1. CI gate to be added before
+  cutoff.
+
+### What this means for the mid-flight branch
+
+The owner's branch (`claude/fix-engatel-entity-client-ncJh2`) is the
+canonical freeze branch. When it merges to main, conflicts in
+`notion-mirror-push.ts`, `notion-push.ts`, `notion-mirror.ts`, and
+related files resolve in favor of the freeze branch (i.e. the no-op'd
+versions). The deleted Phase 1 migration files are restored from the
+freeze branch in the merge commit. The `WatchlistEditor.tsx` and
+`decision-items.ts` files are restored from the freeze branch.

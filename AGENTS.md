@@ -230,6 +230,15 @@ Before declaring any coding task complete, mentally run every applicable item be
 Supabase is the only source of truth. See `docs/SUPABASE_CONSOLIDATION_FREEZE.md`
 for the full freeze decisions and Notion → Supabase mapping.
 
+> **READ FIRST IF YOU ARE A NEW SESSION.** A parallel session attempted a
+> "write-through mirror" pattern on 2026-05-05 (extending
+> `notion-mirror-push.ts` and `notion-push.ts` so agents wrote Supabase +
+> Notion in sync). That direction was **explicitly rejected by the owner**
+> the same day. See `docs/migration/REJECTED_PATTERNS.md` R-001 before you
+> spend time on anything that adds, extends, or "improves" code that writes
+> to Notion. The only valid direction is reducing Notion writes to zero by
+> 2026-06-02.
+
 Until cutoff:
 
 1. **No new write paths to Notion may be added.** Any PR that introduces
@@ -248,8 +257,17 @@ Until cutoff:
    `notion_agent_drafts`, `notion_content_pipeline`, `notion_sync_runs`) are
    slated for `DROP` at Phase 6. New code MUST read/write the canonical
    replacement (`decision_items`, `daily_briefings`, etc.) — see freeze §3.
+5. **Mirror-push helpers** (`src/lib/notion-mirror-push.ts`, `src/lib/notion-push.ts`,
+   `src/lib/notion-mirror.ts`) are deletion targets at Phase 6. Do NOT
+   extend them. Do NOT add new exports to them. Do NOT restore deleted
+   exports without owner approval.
+6. **Phase 1 migration SQL files** under `supabase/migrations/2026050512*.sql`
+   are the canonical record of how Supabase prod got to its current shape.
+   They MUST stay in the repo even after the schema is applied. Deleting
+   them destroys audit trail and breaks fresh-environment reproduction.
 
 After cutoff: `git grep "@notionhq/client"` returning zero hits in non-archive
 code paths is part of the Phase 6 acceptance criteria. CI will gate merges on
-this.
+this. Run `bash scripts/check-notion-cutoff.sh` locally to see the current
+count and direction; the guard fails if the count goes up.
 <!-- END:notion-deprecation-rules -->
