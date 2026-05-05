@@ -36,6 +36,7 @@ import {
   type ChangelogStatus,
 } from "@/lib/knowledge-nodes";
 import { withRoutineLog } from "@/lib/routine-log";
+import { computeAnthropicCost, makeUsageAccumulator } from "@/lib/anthropic-cost";
 
 export const maxDuration = 300;
 
@@ -163,6 +164,7 @@ function buildLeafBodyPreview(node: KnowledgeNode | undefined): string {
 async function classifyEvidence(
   ev: EvidenceRow,
   tree: KnowledgeNode[],
+  usageAcc?: import("@/lib/anthropic-cost").AnthropicUsage,
 ): Promise<Classification> {
   const treeSummary = buildTreeSummary(tree);
   const facetsGuide = buildFacetsGuide(tree);
@@ -249,6 +251,16 @@ Respond with JSON:
     system: sys,
     messages: [{ role: "user", content: user }],
   });
+
+  if (usageAcc) {
+    const u = res.usage;
+    usageAcc.input_tokens = (usageAcc.input_tokens ?? 0) + (u?.input_tokens ?? 0);
+    usageAcc.output_tokens = (usageAcc.output_tokens ?? 0) + (u?.output_tokens ?? 0);
+    usageAcc.cache_creation_input_tokens =
+      (usageAcc.cache_creation_input_tokens ?? 0) + (u?.cache_creation_input_tokens ?? 0);
+    usageAcc.cache_read_input_tokens =
+      (usageAcc.cache_read_input_tokens ?? 0) + (u?.cache_read_input_tokens ?? 0);
+  }
 
   const textBlock = res.content.find(b => b.type === "text");
   if (!textBlock || textBlock.type !== "text") {
@@ -340,9 +352,11 @@ async function _POST(req: NextRequest) {
     items: [],
   };
 
+  const usageAcc = makeUsageAccumulator();
+
   for (const ev of evidence) {
     try {
-      const c = await classifyEvidence(ev, tree);
+      const c = await classifyEvidence(ev, tree, usageAcc);
 
       const item: RunResult["items"][number] = {
         evidence_id: ev.notion_id,
@@ -558,6 +572,8 @@ async function _POST(req: NextRequest) {
     }
   }
 
+  const cost_usd = computeAnthropicCost(usageAcc, MODEL);
+
   console.log("[knowledge-curator]", {
     total: result.total,
     applied_append: result.applied_append,
@@ -565,10 +581,11 @@ async function _POST(req: NextRequest) {
     proposed_split: result.proposed_split,
     ignored: result.ignored,
     errors: result.errors,
+    cost_usd,
     dry_run: dryRun,
   });
 
-  return NextResponse.json(result);
+  return NextResponse.json({ ...result, cost_usd });
 }
 
 export const POST = withRoutineLog("knowledge-curator", _POST);

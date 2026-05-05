@@ -21,6 +21,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { Client } from "@notionhq/client";
 import { adminGuardApi } from "@/lib/require-admin";
 import { withRoutineLog } from "@/lib/routine-log";
+import { computeAnthropicCost } from "@/lib/anthropic-cost";
 import {
   getActivePillars,
   getActiveAudiences,
@@ -194,14 +195,17 @@ Return a JSON array of exactly ${cadence} objects. Each object must have:
 
 Respond ONLY with the JSON array. Nothing else.`;
 
+  const PITCH_MODEL = "claude-haiku-4-5-20251001";
   let pitchesRaw = "";
+  let pitchUsage: import("@/lib/anthropic-cost").AnthropicUsage | undefined;
   try {
     const message = await anthropic.messages.create({
-      model:      "claude-haiku-4-5-20251001",
+      model:      PITCH_MODEL,
       max_tokens: 2500,
       messages:   [{ role: "user", content: systemPrompt }],
     });
     pitchesRaw = message.content[0].type === "text" ? message.content[0].text : "";
+    pitchUsage = message.usage;
   } catch (e) {
     return NextResponse.json({ error: "Anthropic error", detail: String(e) }, { status: 500 });
   }
@@ -254,7 +258,12 @@ Respond ONLY with the JSON array. Nothing else.`;
       channel_name:  p.channel_id  ? channelById.get(p.channel_id)?.name   ?? null : null,
     }));
 
-    return NextResponse.json({ ok: true, mode: "dry_run", pitches: hydrated });
+    return NextResponse.json({
+      ok: true,
+      mode: "dry_run",
+      pitches: hydrated,
+      cost_usd: computeAnthropicCost(pitchUsage, PITCH_MODEL),
+    });
   }
 
   let written = 0;
@@ -271,6 +280,7 @@ Respond ONLY with the JSON array. Nothing else.`;
     ok: true,
     records_written: written,
     records_read: pillars.length + audiences.length + channels.length,
+    cost_usd: computeAnthropicCost(pitchUsage, PITCH_MODEL),
     notes: `Generated ${written} pitches for ${primaryChannel.name}`,
   });
 }

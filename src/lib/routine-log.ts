@@ -23,6 +23,7 @@ import { getSupabaseServerClient } from "./supabase-server";
 export type RoutineStats = {
   records_read?: number;
   records_written?: number;
+  cost_usd?: number;
   notes?: string;
 };
 
@@ -91,6 +92,7 @@ export function withRoutineLog(name: string, handler: Handler): Handler {
         http_status: httpStatus,
         records_read: stats.records_read ?? null,
         records_written: stats.records_written ?? null,
+        cost_usd: stats.cost_usd ?? null,
         error_message: errorMessage,
         notes: stats.notes ?? null,
       });
@@ -147,9 +149,18 @@ function extractStats(body: any): RoutineStats {
     if (sum > 0) written = sum;
   }
 
+  // Cost — Anthropic-powered routes can expose cost_usd at top level or under
+  // stats/results. Routes that do not use paid APIs simply omit this field.
+  const COST_KEYS = ["cost_usd", "cost"];
+  const cost =
+    pickNumber(body, COST_KEYS) ??
+    pickNumber(body.stats, COST_KEYS) ??
+    pickNumber(body.results, COST_KEYS);
+
   return {
     records_read: read,
     records_written: written,
+    cost_usd: cost,
   };
 }
 

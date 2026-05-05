@@ -28,6 +28,7 @@ import { Client } from "@notionhq/client";
 import { currentUser } from "@clerk/nextjs/server";
 import { isAdminUser, isAdminEmail } from "@/lib/clients";
 import { withRoutineLog } from "@/lib/routine-log";
+import { computeAnthropicCost } from "@/lib/anthropic-cost";
 import { applyMirrorEdit, pushPending, createPageWithMirror } from "@/lib/notion-mirror-push";
 
 export const maxDuration = 120;
@@ -291,8 +292,9 @@ ${recentBriefs.map(b =>
 `.trim();
 
   // Claude Haiku generates the briefing sections
+  const BRIEFING_MODEL = "claude-haiku-4-5-20251001";
   const response = await anthropic.messages.create({
-    model: "claude-haiku-4-5-20251001",
+    model: BRIEFING_MODEL,
     max_tokens: 1200,
     system: `You are the daily briefing writer for Common House (CH), a circular economy accelerator.
 Write concise, actionable text for each section. No headers. No markdown. Plain text only.
@@ -371,6 +373,7 @@ Return EXACTLY this JSON (no extra keys, no markdown):
     date: today,
     action: existingId ? "updated" : "created",
     sections: Object.keys(sections),
+    cost_usd: computeAnthropicCost(response.usage, BRIEFING_MODEL),
     stats: {
       projects: projects.length,
       followUps: followUps.length,
