@@ -121,6 +121,105 @@ export async function getInboxActions(limit = DEFAULT_INBOX_LIMIT): Promise<Inbo
   });
 }
 
+// ─── Inbox + Drafts cross-view ─────────────────────────────────────────────
+
+/**
+ * Same as getInboxActions but joins notion_agent_drafts via gmail_thread_id
+ * so the UI can render a per-thread badge:
+ *   ✓ Draft ready  | ⏰ Stale draft | ✓ Sent | ✗ No draft
+ *
+ * The thread→draft join is left-outer so threads without drafts still show.
+ */
+export type DraftStatus =
+  | "none"            // no draft for this thread
+  | "ready"           // Pending Review or Draft Created, fresh (<48h)
+  | "stale"           // staled_at set OR last_edited_at > 48h
+  | "approved"        // status = Approved (waiting for send)
+  | "sent"            // status = Sent or Draft Created (Gmail draft exists)
+  | "auto_archived";  // status = Auto-archived
+
+export type InboxActionWithDraftView = InboxActionView & {
+  draft: {
+    draftId: string;
+    status: DraftStatus;
+    title: string | null;
+    lastEditedAt: string | null;
+    staledAt: string | null;
+    ageHours: number | null;
+  } | null;
+};
+
+export async function getInboxActionsWithDrafts(limit = DEFAULT_INBOX_LIMIT): Promise<InboxActionWithDraftView[]> {
+  const inbox = await getInboxActions(limit);
+  if (inbox.length === 0) return [];
+
+  const sb = getSupabaseServerClient();
+  const threadIds = inbox.map(i => i.threadId).filter(Boolean);
+  if (threadIds.length === 0) return inbox.map(i => ({ ...i, draft: null }));
+
+  const { data, error } = await sb
+    .from("notion_agent_drafts")
+    .select("id, gmail_thread_id, title, status, last_edited_at, staled_at")
+    .in("gmail_thread_id", threadIds);
+
+  if (error) {
+    console.error("[getInboxActionsWithDrafts] draft lookup error:", error.message);
+    return inbox.map(i => ({ ...i, draft: null }));
+  }
+
+  type DraftRow = {
+    id: string;
+    gmail_thread_id: string;
+    title: string | null;
+    status: string | null;
+    last_edited_at: string | null;
+    staled_at: string | null;
+  };
+  // For each thread, pick the most recent draft.
+  const byThread = new Map<string, DraftRow>();
+  for (const r of (data ?? []) as DraftRow[]) {
+    const existing = byThread.get(r.gmail_thread_id);
+    if (!existing) {
+      byThread.set(r.gmail_thread_id, r);
+      continue;
+    }
+    const aTs = r.last_edited_at ? new Date(r.last_edited_at).getTime() : 0;
+    const bTs = existing.last_edited_at ? new Date(existing.last_edited_at).getTime() : 0;
+    if (aTs > bTs) byThread.set(r.gmail_thread_id, r);
+  }
+
+  const now = Date.now();
+  return inbox.map(i => {
+    const row = byThread.get(i.threadId);
+    if (!row) return { ...i, draft: null };
+
+    const ageMs = row.last_edited_at ? now - new Date(row.last_edited_at).getTime() : null;
+    const ageHours = ageMs != null ? Math.floor(ageMs / 3_600_000) : null;
+    const status: DraftStatus = (() => {
+      const s = (row.status ?? "").toLowerCase();
+      if (s === "auto-archived") return "auto_archived";
+      if (s === "sent") return "sent";
+      if (s === "draft created") return "sent"; // Gmail draft created — equivalent to "ready in Gmail"
+      if (s === "approved") return "approved";
+      if (row.staled_at != null) return "stale";
+      if (ageHours != null && ageHours > 48) return "stale";
+      return "ready";
+    })();
+
+    return {
+      ...i,
+      draft: {
+        draftId: row.id,
+        status,
+        title: row.title,
+        lastEditedAt: row.last_edited_at,
+        staledAt: row.staled_at,
+        ageHours,
+      },
+    };
+  });
+}
+
 /**
  * Items for the Hall Commitments surface (I OWE / OWED TO ME).
  *
