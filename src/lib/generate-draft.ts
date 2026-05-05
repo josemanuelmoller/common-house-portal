@@ -414,14 +414,24 @@ export async function generateDraft(pageId: string, audience?: string, outputMod
       // Also create a text summary for Draft Text
       const summary = `[HTML Deck — ${contentType}]\n\nBrief: ${brief}\n\nThis item contains an HTML slide deck. Open the preview to view it.`;
 
-      await notion.pages.update({
-        page_id: pageId,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        properties: {
-          Status: { select: { name: "Briefed" } },
-          "Draft Text": { rich_text: toRichText(summary) },
-          "Slide HTML": { rich_text: toRichText(html) },
-        } as any,
+      // notion-cutoff-2026-06-02: replaced by canonical write to content_pipeline_items (Supabase).
+      // Notion → Supabase column mapping:
+      //   "Status"     → status
+      //   "Draft Text" → body_md
+      //   "Slide HTML" → payload.slide_html (jsonb escape hatch)
+      // await notion.pages.update({
+      //   page_id: pageId,
+      //   properties: {
+      //     Status:       { select: { name: "Briefed" } },
+      //     "Draft Text": { rich_text: toRichText(summary) },
+      //     "Slide HTML": { rich_text: toRichText(html) },
+      //   } as any,
+      // });
+      void toRichText; // legacy helper kept for backward-compat; canonical body_md is plain text.
+      await writeDraftToContentPipeline(pageId, {
+        status:     "Briefed",
+        body_md:    summary,
+        slide_html: html,
       });
 
     } else {
@@ -438,13 +448,20 @@ export async function generateDraft(pageId: string, audience?: string, outputMod
 
       const draft = (msg.content[0] as { type: string; text: string }).text;
 
-      await notion.pages.update({
-        page_id: pageId,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        properties: {
-          Status: { select: { name: "Briefed" } },
-          "Draft Text": { rich_text: toRichText(draft) },
-        } as any,
+      // notion-cutoff-2026-06-02: replaced by canonical write to content_pipeline_items (Supabase).
+      // Notion → Supabase column mapping:
+      //   "Status"     → status
+      //   "Draft Text" → body_md
+      // await notion.pages.update({
+      //   page_id: pageId,
+      //   properties: {
+      //     Status:       { select: { name: "Briefed" } },
+      //     "Draft Text": { rich_text: toRichText(draft) },
+      //   } as any,
+      // });
+      await writeDraftToContentPipeline(pageId, {
+        status:  "Briefed",
+        body_md: draft,
       });
     }
 

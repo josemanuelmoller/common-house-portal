@@ -1,6 +1,11 @@
 import { notion, DB, prop, text, select, multiSelect, date } from "./core";
+import { getSupabaseServerClient } from "@/lib/supabase-server";
 
 // ─── Living Room — community-safe queries ─────────────────────────────────────
+//
+// Reads still flow through Notion until the Living Room read paths are migrated.
+// All four write helpers below now hit canonical Supabase tables per the
+// 2026-06-02 cutoff (docs/SUPABASE_CONSOLIDATION_FREEZE.md §3).
 
 export type LivingRoomPerson = {
   id: string;
@@ -115,46 +120,116 @@ export async function getLivingRoomThemes(): Promise<LivingRoomTheme[]> {
 }
 
 // ─── Living Room admin writes ─────────────────────────────────────────────────
+//
+// Each helper below historically wrote to a Notion page; per the 2026-06-02
+// cutoff each now writes to its canonical Supabase row. The `*Id` argument was
+// historically a Notion page id; the canonical row is matched by either uuid
+// `id` or the `notion_id` backref column.
+
+function pickMatchColumn(id: string): "id" | "notion_id" {
+  return /^[0-9a-f-]{36}$/i.test(id) ? "id" : "notion_id";
+}
 
 export async function updatePersonVisibility(
   personId: string,
-  visibility: "public-safe" | "community" | "private"
+  visibility: "public-safe" | "community" | "private",
 ): Promise<void> {
-  await notion.pages.update({
-    page_id: personId,
-    properties: { Visibility: { select: { name: visibility } } },
-  });
+  // notion-cutoff-2026-06-02: replaced by canonical write to people (Supabase).
+  // Notion → Supabase column mapping:
+  //   "Visibility" select → visibility
+  // await notion.pages.update({
+  //   page_id: personId,
+  //   properties: { Visibility: { select: { name: visibility } } },
+  // });
+  const sb = getSupabaseServerClient();
+  const { error } = await sb
+    .from("people")
+    .update({ visibility, updated_at: new Date().toISOString() })
+    .eq(pickMatchColumn(personId), personId);
+  if (error) throw new Error(`people update failed: ${error.message}`);
 }
 
 export async function updateProjectLivingRoom(
   projectId: string,
-  share: boolean
+  share: boolean,
 ): Promise<void> {
-  await notion.pages.update({
-    page_id: projectId,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    properties: { "Share to Living Room": { checkbox: share } } as any,
-  });
+  // notion-cutoff-2026-06-02: replaced by canonical write to projects (Supabase).
+  // Notion → Supabase column mapping:
+  //   "Share to Living Room" checkbox → share_to_living_room
+  // await notion.pages.update({
+  //   page_id: projectId,
+  //   properties: { "Share to Living Room": { checkbox: share } } as any,
+  // });
+  const sb = getSupabaseServerClient();
+  const { error } = await sb
+    .from("projects")
+    .update({ share_to_living_room: share, updated_at: new Date().toISOString() })
+    .eq(pickMatchColumn(projectId), projectId);
+  if (error) throw new Error(`projects update failed: ${error.message}`);
 }
 
 export async function updateInsightBriefCommunityFlag(
   briefId: string,
-  communityRelevant: boolean
+  communityRelevant: boolean,
 ): Promise<void> {
-  await notion.pages.update({
-    page_id: briefId,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    properties: { "Community Relevant": { checkbox: communityRelevant } } as any,
-  });
+  // notion-cutoff-2026-06-02: replaced by canonical write to insight_briefs (Supabase).
+  // Notion → Supabase column mapping:
+  //   "Community Relevant" checkbox → payload.community_relevant
+  //                                   (no dedicated column yet; jsonb escape hatch)
+  // await notion.pages.update({
+  //   page_id: briefId,
+  //   properties: { "Community Relevant": { checkbox: communityRelevant } } as any,
+  // });
+  const sb = getSupabaseServerClient();
+  const matchColumn = pickMatchColumn(briefId);
+
+  const { data: existing } = await sb
+    .from("insight_briefs")
+    .select("payload")
+    .eq(matchColumn, briefId)
+    .maybeSingle();
+  const existingPayload =
+    (existing?.payload as Record<string, unknown> | null | undefined) ?? {};
+
+  const { error } = await sb
+    .from("insight_briefs")
+    .update({
+      payload:    { ...existingPayload, community_relevant: communityRelevant },
+      updated_at: new Date().toISOString(),
+    })
+    .eq(matchColumn, briefId);
+  if (error) throw new Error(`insight_briefs update failed: ${error.message}`);
 }
 
 export async function updateKnowledgeAssetTheme(
   assetId: string,
-  active: boolean
+  active: boolean,
 ): Promise<void> {
-  await notion.pages.update({
-    page_id: assetId,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    properties: { "Living Room Theme": { checkbox: active } } as any,
-  });
+  // notion-cutoff-2026-06-02: replaced by canonical write to knowledge_assets (Supabase).
+  // Notion → Supabase column mapping:
+  //   "Living Room Theme" checkbox → payload.living_room_theme
+  //                                  (no dedicated column yet; jsonb escape hatch)
+  // await notion.pages.update({
+  //   page_id: assetId,
+  //   properties: { "Living Room Theme": { checkbox: active } } as any,
+  // });
+  const sb = getSupabaseServerClient();
+  const matchColumn = pickMatchColumn(assetId);
+
+  const { data: existing } = await sb
+    .from("knowledge_assets")
+    .select("payload")
+    .eq(matchColumn, assetId)
+    .maybeSingle();
+  const existingPayload =
+    (existing?.payload as Record<string, unknown> | null | undefined) ?? {};
+
+  const { error } = await sb
+    .from("knowledge_assets")
+    .update({
+      payload:    { ...existingPayload, living_room_theme: active },
+      updated_at: new Date().toISOString(),
+    })
+    .eq(matchColumn, assetId);
+  if (error) throw new Error(`knowledge_assets update failed: ${error.message}`);
 }
