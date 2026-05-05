@@ -496,20 +496,38 @@ async function generateNextActions(
     snippet: t.snippet,
   }));
 
-  const prompt = `You are helping Jose decide the next concrete action for each email thread below.
+  const prompt = `You are filtering Jose's inbox. Most emails do NOT need a reply — be SKEPTICAL by default.
 
-For EACH thread, output one short imperative sentence that tells Jose what to DO next.
-Rules:
-- Start with an imperative verb (Reply, Confirm, Send, Decide, Approve, Share, Decline, Schedule, Ask, Forward).
-- Mention the counterparty or subject only if essential.
-- Maximum 12 words.
-- No quotes, no markdown, no trailing period.
-- If the thread is truly not actionable, output exactly: SKIP
+For EACH thread, decide first: does this REQUIRE Jose to do something? Then output the next action OR skip.
+
+Output "SKIP" (with no next_action) when ANY of these apply:
+- Pure FYI / sharing info / heads-up with no question or ask
+- Thank-you reply, "great, thanks", "perfect", "received" — courtesy closers
+- Confirmation acknowledging something Jose already did
+- Newsletter / digest / report / summary email
+- Notification from a tool (calendar invite already filtered, but also: shared doc, mentioned in comment, "X commented on", "X replied in")
+- Forwarded thread with no explicit ask of Jose
+- Mass announcement / company update / product release note
+- Auto-generated invoice / receipt / payment confirmation
+- Scheduling tool email already resolved (Calendly confirmed, etc.)
+- Update where Jose is informed but action is on someone else
+- Reply chain where the LAST action is on the counterparty (they said "I'll send X by Friday")
+
+Output an imperative ONLY when Jose genuinely needs to act:
+- Direct question to Jose he hasn't answered
+- Explicit ask for decision, approval, intro, document, or info
+- Counterparty waiting on Jose (last message ends with a question or request)
+- Time-sensitive item with deadline in body
+
+Imperative format:
+- Start with verb: Reply, Confirm, Send, Decide, Approve, Share, Decline, Schedule, Ask, Review, Forward.
+- Mention counterparty or subject only if essential.
+- Maximum 12 words. No quotes, no markdown, no trailing period.
 
 Threads:
 ${JSON.stringify(items, null, 2)}
 
-Return a JSON array: [{"index": <int>, "next_action": "<imperative line or SKIP>"}]. Only the JSON, no prose.`;
+Return a JSON array: [{"index": <int>, "next_action": "<imperative line or SKIP>"}]. Only the JSON, no prose. When in doubt, SKIP.`;
 
   try {
     const res = await anthropic.messages.create({

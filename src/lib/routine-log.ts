@@ -365,4 +365,12 @@ export const ROUTINE_CATALOG: Record<string, RoutineCatalogEntry> = {
     visible_in_product: true,
     priority: 2,
   },
+  "sweep-replied-threads": {
+    schedule: ":15 hourly Mon-Fri",
+    reads: "Gmail API (open action_item threads)",
+    writes: "Supabase action_items (status=resolved when archived/replied/stale)",
+    output_surface: "/admin/inbox (auto-clears already-handled threads)",
+    visible_in_product: true,
+    priority: 1,
+  },
 };
