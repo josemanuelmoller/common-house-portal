@@ -5,7 +5,12 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { MetricCard } from "@/components/MetricCard";
 import { EvidenceQueueTable, EvidenceQueueReadOnlyTable } from "@/components/EvidenceQueueTable";
 import { DecisionActions } from "@/components/DecisionActions";
+import { ClassifyRelationshipActions } from "@/components/ClassifyRelationshipActions";
 import { getAllEvidence, getAllSources, getAllProjects, getDecisionItems, type DecisionItem } from "@/lib/notion";
+import {
+  getRelationshipClassificationProposals,
+  type ClassifyRelationshipProposal,
+} from "@/lib/decision-items";
 import { NAV } from "../page";
 import { requireAdmin } from "@/lib/require-admin";
 
@@ -132,14 +137,115 @@ function DecisionCard({ d }: { d: DecisionItem }) {
   );
 }
 
+function ClassifyRelationshipCard({ p }: { p: ClassifyRelationshipProposal }) {
+  const payload = p.entity_payload ?? {};
+  const orgName       = payload.org_name ?? "Unknown organization";
+  const proposedClass = payload.proposed_class ?? "Active Client";
+  const proposedStage = payload.proposed_stage ?? proposedClass;
+  const currentStage  = payload.current_stage ?? "Prospect";
+  const score         = typeof payload.score === "number" ? payload.score : null;
+  const signals       = Array.isArray(payload.signals) ? payload.signals : [];
+
+  return (
+    <div className="px-6 py-4 flex items-start gap-4">
+      <div className="mt-1 shrink-0">
+        <span
+          className="w-2 h-2 rounded-full inline-block"
+          style={{ background: "var(--hall-info)" }}
+        />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-start gap-2 flex-wrap">
+          <p
+            className="text-sm font-semibold leading-snug"
+            style={{ color: "var(--hall-ink-0)" }}
+          >
+            {orgName}
+          </p>
+          <span
+            className="text-[10px] font-medium"
+            style={{
+              fontFamily: "var(--font-hall-mono)",
+              color: "var(--hall-muted-2)",
+            }}
+          >
+            {currentStage} → {proposedStage}
+          </span>
+        </div>
+        <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+          {score !== null && (
+            <span
+              className="text-[10px] font-medium"
+              style={{
+                fontFamily: "var(--font-hall-mono)",
+                color: "var(--hall-muted-2)",
+              }}
+            >
+              score {score}
+            </span>
+          )}
+          {p.source_agent && (
+            <span
+              className="text-[10px] font-medium"
+              style={{
+                fontFamily: "var(--font-hall-mono)",
+                color: "var(--hall-muted-3)",
+              }}
+            >
+              via {p.source_agent}
+            </span>
+          )}
+          {p.priority && (
+            <span
+              className="text-[10px] font-medium"
+              style={{
+                fontFamily: "var(--font-hall-mono)",
+                color: "var(--hall-muted-3)",
+              }}
+            >
+              {p.priority}
+            </span>
+          )}
+        </div>
+        {signals.length > 0 && (
+          <ul className="mt-2 flex flex-col gap-0.5">
+            {signals.map((s, i) => (
+              <li
+                key={`${p.id}-signal-${i}`}
+                className="text-[12px] leading-relaxed"
+                style={{ color: "var(--hall-ink-3)" }}
+              >
+                · {s}
+              </li>
+            ))}
+          </ul>
+        )}
+        {signals.length === 0 && p.notes_raw && (
+          <p
+            className="text-[12px] mt-2 leading-relaxed"
+            style={{ color: "var(--hall-ink-3)" }}
+          >
+            {p.notes_raw}
+          </p>
+        )}
+        <ClassifyRelationshipActions
+          decisionId={p.id}
+          proposedClass={proposedClass}
+        />
+      </div>
+    </div>
+  );
+}
+
 export default async function OSPage() {
   await requireAdmin();
 
-  const [allEvidence, sources, projects, allDecisions] = await Promise.all([
+  const [allEvidence, sources, projects, allDecisions, classifyProposals] = await Promise.all([
     getAllEvidence(),
     getAllSources(),
     getAllProjects(),
     getDecisionItems(),
+    getRelationshipClassificationProposals(),
   ]);
 
   // Build project name lookup
@@ -290,6 +396,49 @@ export default async function OSPage() {
                   ))}
                 </tbody>
               </table>
+            </HallSection>
+          )}
+
+          {/* Relationship classifications — Supabase decision_items proposals */}
+          {(classifyProposals.length > 0 || openDecisions.length > 0) && (
+            <HallSection
+              title="Relationship " flourish="classifications"
+              meta={
+                classifyProposals.length > 0
+                  ? `${classifyProposals.length} PROPOSED`
+                  : "ALL CLEAR"
+              }
+            >
+              <p className="text-xs mb-3" style={{ color: "var(--hall-muted-2)" }}>
+                Promotions proposed by the relationship-promotion-operator. Approve to
+                reclassify the organization in Supabase + Hall.
+              </p>
+              {classifyProposals.length > 0 ? (
+                <div style={{ border: "1px solid var(--hall-line)" }}>
+                  {classifyProposals.map((p, i) => (
+                    <div
+                      key={p.id}
+                      style={
+                        i < classifyProposals.length - 1
+                          ? { borderBottom: "1px solid var(--hall-line-soft)" }
+                          : undefined
+                      }
+                    >
+                      <ClassifyRelationshipCard p={p} />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p
+                  className="text-[11px] italic"
+                  style={{
+                    fontFamily: "var(--font-hall-mono)",
+                    color: "var(--hall-muted-3)",
+                  }}
+                >
+                  No relationship classifications pending — operator finds none.
+                </p>
+              )}
             </HallSection>
           )}
 

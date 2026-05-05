@@ -13,6 +13,8 @@ import { DocumentsSection } from "@/components/DocumentsSection";
 import { ActivityBar } from "@/components/ActivityBar";
 import { MeetingsSection } from "@/components/MeetingsSection";
 import { CollapsibleSection } from "@/components/CollapsibleSection";
+import { ProjectStatusEditor } from "@/components/ProjectStatusEditor";
+import { getSupabaseServerClient } from "@/lib/supabase-server";
 
 export default async function ProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
   await requireAdmin();
@@ -30,6 +32,17 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
   ]);
 
   if (!project) redirect("/admin");
+
+  // Supabase status read — keyed by notion_id (Phase 4 will move all reads here).
+  const sbProject = await (async () => {
+    const sb = getSupabaseServerClient();
+    const { data } = await sb
+      .from("projects")
+      .select("id, project_status, current_stage, engagement_stage, engagement_model, status_summary, draft_status_update")
+      .eq("notion_id", project.id)
+      .maybeSingle();
+    return data;
+  })();
 
   const blockers     = evidence.filter(e => e.type === "Blocker"     && e.validationStatus === "Validated");
   const decisions    = evidence.filter(e => e.type === "Decision"    && e.validationStatus === "Validated");
@@ -281,6 +294,31 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
                 </span>
               </div>
             </div>
+          </HallSection>
+
+          {/* Status — Supabase canonical write (Phase 4 moves the read here too) */}
+          <HallSection
+            title="Status"
+            flourish="canonical"
+            meta="WRITES TO SUPABASE · NO NOTION"
+          >
+            {sbProject ? (
+              <ProjectStatusEditor
+                projectId={sbProject.id}
+                initial={{
+                  project_status:      sbProject.project_status      ?? null,
+                  current_stage:       sbProject.current_stage       ?? null,
+                  engagement_stage:    sbProject.engagement_stage    ?? null,
+                  engagement_model:    sbProject.engagement_model    ?? null,
+                  status_summary:      sbProject.status_summary      ?? null,
+                  draft_status_update: sbProject.draft_status_update ?? null,
+                }}
+              />
+            ) : (
+              <p className="text-[11px]" style={{ color: "var(--hall-muted-3)", fontFamily: "var(--font-hall-mono)" }}>
+                NO SUPABASE ROW · backfill pending
+              </p>
+            )}
           </HallSection>
 
           {/* Blockers alert */}
