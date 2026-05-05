@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminGuardApi } from "@/lib/require-admin";
-import { Client } from "@notionhq/client";
-
-const notion = new Client({ auth: process.env.NOTION_API_KEY });
+// notion-cutoff-2026-06-02: removed; canonical write is now to agent_drafts (Supabase).
+// import { Client } from "@notionhq/client";
+// const notion = new Client({ auth: process.env.NOTION_API_KEY });
+import { getSupabaseServerClient } from "@/lib/supabase-server";
 
 export async function POST(req: NextRequest) {
   const guard = await adminGuardApi();
@@ -24,15 +25,33 @@ export async function POST(req: NextRequest) {
     revision: "Revision Requested",
   } as const;
 
+  const newStatus = statusMap[action as keyof typeof statusMap];
+
   try {
-    await notion.pages.update({
-      page_id: draftId,
-      properties: {
-        "Status": { select: { name: statusMap[action as keyof typeof statusMap] } },
-      },
-    });
-    return NextResponse.json({ ok: true, status: statusMap[action as keyof typeof statusMap] });
+    // notion-cutoff-2026-06-02: removed; canonical write is now to agent_drafts (Supabase).
+    // await notion.pages.update({
+    //   page_id: draftId,
+    //   properties: {
+    //     "Status": { select: { name: newStatus } },
+    //   },
+    // });
+    const sb = getSupabaseServerClient();
+    const nowIso = new Date().toISOString();
+    // draftId here was historically the Notion page_id. Match against notion_id
+    // (the canonical backref column) so existing UI references continue to work.
+    const updates: Record<string, unknown> = { status: newStatus, updated_at: nowIso };
+    if (newStatus === "Approved") {
+      updates.approved_at = nowIso;
+    }
+    const { error } = await sb
+      .from("agent_drafts")
+      .update(updates)
+      .eq("notion_id", draftId);
+    if (error) {
+      return NextResponse.json({ error: "Supabase update error", detail: error.message }, { status: 500 });
+    }
+    return NextResponse.json({ ok: true, status: newStatus });
   } catch (e) {
-    return NextResponse.json({ error: "Notion update error", detail: String(e) }, { status: 500 });
+    return NextResponse.json({ error: "agent_drafts update error", detail: String(e) }, { status: 500 });
   }
 }

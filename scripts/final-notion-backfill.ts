@@ -583,7 +583,7 @@ async function backfillTable(cfg: TableConfig) {
         seen.set(k, arr);
       }
     }
-    for (const [k, ids] of seen) {
+    for (const [k, ids] of Array.from(seen.entries())) {
       if (ids.length > 1) {
         record({
           table: cfg.table,
@@ -624,7 +624,7 @@ async function backfillTable(cfg: TableConfig) {
       legacyByKey.set(k, arr);
     }
 
-    for (const [k, group] of legacyByKey) {
+    for (const [k, group] of Array.from(legacyByKey.entries())) {
       group.sort((a, b) => (b.updated_at ?? "").localeCompare(a.updated_at ?? ""));
       const rep = group[0];
       const otherIds = group.slice(1).map((r) => r.notion_id);

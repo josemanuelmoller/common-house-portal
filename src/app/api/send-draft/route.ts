@@ -20,6 +20,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { google } from "googleapis";
 import { adminGuardApi } from "@/lib/require-admin";
 import { notion, DB } from "@/lib/notion";
+import { getSupabaseServerClient } from "@/lib/supabase-server";
 
 // ─── Gmail auth ───────────────────────────────────────────────────────────────
 
@@ -140,13 +141,26 @@ export async function POST(req: NextRequest) {
       gmailId = created.data.id ?? "";
     }
 
-    // Update Notion draft status
-    await notion.pages.update({
-      page_id: draftId,
-      properties: {
-        "Status": { select: { name: sendMode === "direct" ? "Sent" : "Draft Created" } },
-      } as any, // eslint-disable-line @typescript-eslint/no-explicit-any
-    });
+    // notion-cutoff-2026-06-02: removed; canonical write is now to agent_drafts (Supabase).
+    // await notion.pages.update({
+    //   page_id: draftId,
+    //   properties: {
+    //     "Status": { select: { name: sendMode === "direct" ? "Sent" : "Draft Created" } },
+    //   } as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+    // });
+    const sb = getSupabaseServerClient();
+    const newStatus = sendMode === "direct" ? "Sent" : "Draft Created";
+    const { error: sbErr } = await sb
+      .from("agent_drafts")
+      .update({
+        status: newStatus,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("notion_id", draftId);
+    if (sbErr) {
+      // Log but don't fail the user — the email already left the building.
+      console.warn("[send-draft] agent_drafts status update failed:", sbErr.message);
+    }
 
     return NextResponse.json({
       ok: true,

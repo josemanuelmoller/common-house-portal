@@ -52,6 +52,7 @@ export const ADMIN_NAV_V2: NavEntry[] = [
   {
     kind: "group", label: "Commercial", icon: "◉",
     items: [
+      { label: "Clients",        href: "/admin/clients" },
       { label: "Opportunities",  href: "/admin/opportunities" },
       { label: "Pipeline",       href: "/admin/pipeline" },
       { label: "Grants",         href: "/admin/grants" },

@@ -26,6 +26,7 @@ import { Client } from "@notionhq/client";
 import { auth } from "@clerk/nextjs/server";
 import { isAdminUser } from "@/lib/clients";
 import { withRoutineLog } from "@/lib/routine-log";
+import { getSupabaseServerClient } from "@/lib/supabase-server";
 
 export const maxDuration = 300;
 export const dynamic = "force-dynamic";
@@ -132,20 +133,55 @@ interface IntelSignal {
 
 async function createIntelRecord(signal: IntelSignal): Promise<string | null> {
   try {
-    const page = await notion.pages.create({
-      parent: { database_id: DB_INTEL },
-      properties: {
-        "Title":           { title: [{ text: { content: signal.title.slice(0, 120) } }] },
-        "Watchlist Entry": { relation: [{ id: signal.watchlistId }] },
-        "Signal Type":     { select: { name: signal.signalType } },
-        "Relevance":       { select: { name: signal.relevance } },
-        "Status":          { select: { name: "New" } },
-        "Source URL":      { url: signal.sourceUrl || null },
-        "Date Captured":   { date: { start: new Date().toISOString().slice(0, 10) } },
-        "Summary":         { rich_text: [{ text: { content: signal.summary.slice(0, 2000) } }] },
-      },
-    });
-    return page.id;
+    // notion-cutoff-2026-06-02: removed; canonical write is now to competitive_intel (Supabase).
+    // const page = await notion.pages.create({
+    //   parent: { database_id: DB_INTEL },
+    //   properties: {
+    //     "Title":           { title: [{ text: { content: signal.title.slice(0, 120) } }] },
+    //     "Watchlist Entry": { relation: [{ id: signal.watchlistId }] },
+    //     "Signal Type":     { select: { name: signal.signalType } },
+    //     "Relevance":       { select: { name: signal.relevance } },
+    //     "Status":          { select: { name: "New" } },
+    //     "Source URL":      { url: signal.sourceUrl || null },
+    //     "Date Captured":   { date: { start: new Date().toISOString().slice(0, 10) } },
+    //     "Summary":         { rich_text: [{ text: { content: signal.summary.slice(0, 2000) } }] },
+    //   },
+    // });
+    // return page.id;
+    const sb = getSupabaseServerClient();
+    const todayDate = new Date().toISOString().slice(0, 10);
+    // Notion → Supabase (competitive_intel) column mapping:
+    //   Title           → title
+    //   Watchlist Entry → watchlist_entity_notion_id (string FK to watchlist_entities.notion_id)
+    //   Signal Type     → signal_type
+    //   Date Captured   → signal_date (date)
+    //   Summary         → body_md
+    //   Source URL      → url
+    // Anything not bound to a column (Relevance, Status="New") goes to payload jsonb
+    // until Phase 6 binds it to dedicated columns or drops payload.
+    const { data, error } = await sb
+      .from("competitive_intel")
+      .insert({
+        title:                       signal.title.slice(0, 120),
+        watchlist_entity_notion_id:  signal.watchlistId,
+        signal_type:                 signal.signalType,
+        signal_date:                 signal.dateSignal || todayDate,
+        body_md:                     signal.summary.slice(0, 2000),
+        url:                         signal.sourceUrl || null,
+        source_agent:                "competitive-monitor",
+        payload:                     {
+          relevance: signal.relevance,
+          status:    "New",
+          watchlist_name: signal.watchlistName,
+        },
+      })
+      .select("id")
+      .single();
+    if (error) {
+      console.error("[competitive-monitor] create intel record failed:", error.message);
+      return null;
+    }
+    return (data?.id as string) ?? null;
   } catch (err) {
     console.error("[competitive-monitor] create intel record failed:", err);
     return null;
@@ -336,13 +372,37 @@ async function _POST(req: NextRequest): Promise<Response> {
   // 4. Update Last Scan dates (execute only)
   if (mode === "execute") {
     const allEntries = [...competitors, ...sectorOrgs];
+    // notion-cutoff-2026-06-02: removed; canonical write is now to watchlist_entities (Supabase).
+    // await Promise.allSettled(
+    //   allEntries.map(e =>
+    //     notion.pages.update({
+    //       page_id: e.id,
+    //       properties: { "Last Scan": { date: { start: new Date().toISOString().slice(0, 10) } } },
+    //     })
+    //   )
+    // );
+    const sb = getSupabaseServerClient();
+    const todayIso = new Date().toISOString();
+    const todayDate = todayIso.slice(0, 10);
+    // watchlist_entities has no native last_scan column yet (Phase 1 schema).
+    // Stash it in payload.last_scan until Phase 6 binds a column.
     await Promise.allSettled(
-      allEntries.map(e =>
-        notion.pages.update({
-          page_id: e.id,
-          properties: { "Last Scan": { date: { start: new Date().toISOString().slice(0, 10) } } },
-        })
-      )
+      allEntries.map(async e => {
+        // Read existing payload to merge non-destructively.
+        const { data: existing } = await sb
+          .from("watchlist_entities")
+          .select("payload")
+          .eq("notion_id", e.id)
+          .maybeSingle();
+        const mergedPayload = {
+          ...(existing?.payload as Record<string, unknown> | null ?? {}),
+          last_scan: todayDate,
+        };
+        await sb
+          .from("watchlist_entities")
+          .update({ payload: mergedPayload, updated_at: todayIso })
+          .eq("notion_id", e.id);
+      })
     );
   }
 
