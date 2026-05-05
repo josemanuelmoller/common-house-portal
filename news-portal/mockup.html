@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="theme-color" content="#0b0b0d" />
-<title>Diario · v4 portada</title>
+<title>Diario · v5 hoy</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,700;9..144,900&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
@@ -12,7 +12,7 @@
   :root {
     --bg: #0b0b0d; --bg-2: #131318; --bg-3: #1c1c22;
     --line: #26262e; --ink: #f4f4f0; --ink-2: #b9b9b3; --ink-3: #7a7a77;
-    --accent: #c8f55a; --red: #ff5b3a; --blue: #6ab7ff; --amber: #f5a524;
+    --accent: #c8f55a; --red: #ff5b3a; --blue: #6ab7ff; --amber: #f5a524; --pink: #ff8ec7;
     --serif: "Fraunces", Georgia, serif;
     --sans: "Inter", system-ui, sans-serif;
     --mono: "JetBrains Mono", ui-monospace, monospace;
@@ -31,176 +31,121 @@
   img { display: block; max-width: 100%; height: auto; }
 
   /* Header */
-  header.top { padding: 14px 16px 10px; padding-top: max(14px, env(safe-area-inset-top)); display: flex; align-items: center; justify-content: space-between; gap: 10px; border-bottom: 1px solid var(--line); }
+  header.top { padding: 14px 16px 0; padding-top: max(14px, env(safe-area-inset-top)); }
+  .brand-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
   .brand h1 { font-family: var(--serif); font-weight: 900; font-style: italic; font-size: 26px; letter-spacing: -0.02em; margin: 0; line-height: 1; }
   .brand .meta { font-family: var(--mono); font-size: 9px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.12em; margin-top: 4px; }
   .icons { display: flex; gap: 6px; }
   .icon-btn { width: 36px; height: 36px; display: grid; place-items: center; background: transparent; border: 1px solid var(--line); color: var(--ink); border-radius: 999px; cursor: pointer; }
 
-  /* Agent slim bar */
-  .agent {
-    padding: 10px 16px; display: flex; align-items: center; gap: 10px;
-    font-family: var(--mono); font-size: 11px; color: var(--ink-2);
-    border-bottom: 1px solid var(--line);
-    background: color-mix(in oklab, var(--accent) 6%, var(--bg));
-  }
-  .agent .dot { width: 7px; height: 7px; background: var(--accent); border-radius: 999px; box-shadow: 0 0 8px var(--accent); flex-shrink: 0; animation: glow 2s infinite; }
-  @keyframes glow { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
-  .agent .text { flex: 1; }
-  .agent .text b { color: var(--ink); font-weight: 600; }
+  /* Status line */
+  .status { padding: 12px 0 6px; font-family: var(--serif); font-style: italic; font-weight: 500; font-size: 14px; color: var(--ink-2); line-height: 1.45; }
+  .status b { color: var(--ink); font-style: normal; font-weight: 700; }
 
-  /* PORTADA hero */
-  .portada {
-    position: relative; cursor: pointer; overflow: hidden;
-    aspect-ratio: 4 / 5;
-    max-height: 560px;
-  }
-  .portada img.bg {
-    position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
-  }
-  .portada::after {
-    content: ""; position: absolute; inset: 0;
-    background: linear-gradient(180deg, rgba(0,0,0,0.0) 0%, rgba(0,0,0,0.35) 45%, rgba(0,0,0,0.92) 100%);
-  }
-  .portada .body {
-    position: absolute; inset: auto 0 0 0; padding: 18px 16px 22px;
-    color: #fff; z-index: 1;
-  }
-  .portada .kicker {
-    display: inline-flex; align-items: center; gap: 6px;
-    background: var(--red); color: #fff;
-    font-family: var(--mono); font-size: 10px; font-weight: 700;
-    text-transform: uppercase; letter-spacing: 0.14em;
-    padding: 5px 8px; border-radius: 4px; margin-bottom: 12px;
-  }
-  .portada .kicker::before { content: ""; width: 6px; height: 6px; border-radius: 999px; background: #fff; animation: pulse 1.4s infinite; }
-  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
-  .portada h2 {
-    font-family: var(--serif); font-weight: 900; font-style: italic;
-    font-size: 30px; line-height: 1.05; letter-spacing: -0.025em;
-    margin: 0 0 10px; color: #fff;
-    text-shadow: 0 2px 12px rgba(0,0,0,0.4);
-  }
-  .portada .deck {
-    font-family: var(--serif); font-weight: 400; font-size: 14px;
-    line-height: 1.45; color: rgba(255,255,255,0.92); margin: 0 0 12px;
-    text-shadow: 0 1px 6px rgba(0,0,0,0.4);
-  }
-  .portada .meta {
-    display: flex; align-items: center; gap: 10px;
-    font-family: var(--mono); font-size: 10px;
-    color: rgba(255,255,255,0.78); text-transform: uppercase; letter-spacing: 0.08em;
-  }
+  /* Filter row */
+  .filters { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding: 6px 0 12px; -webkit-overflow-scrolling: touch; }
+  .filters::-webkit-scrollbar { display: none; }
+  .fil { flex: 0 0 auto; padding: 5px 11px; border: 1px solid var(--line); border-radius: 999px; font-size: 12px; font-weight: 500; color: var(--ink-2); background: transparent; white-space: nowrap; cursor: pointer; }
+  .fil.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
 
-  /* 3-up secondary stories with photos */
-  .featured { padding: 16px; display: grid; gap: 14px; }
-  .feat {
-    display: grid; grid-template-columns: 1fr 110px; gap: 12px;
-    cursor: pointer;
-  }
-  .feat .img-wrap { width: 110px; height: 110px; border-radius: 12px; overflow: hidden; background: var(--bg-3); border: 1px solid var(--line); }
-  .feat img { width: 100%; height: 100%; object-fit: cover; }
-  .feat .kicker {
-    display: inline-block; font-family: var(--mono); font-size: 9px; font-weight: 700;
-    text-transform: uppercase; letter-spacing: 0.12em;
-    padding: 3px 6px; border-radius: 3px;
-    margin-bottom: 6px;
-  }
+  /* Generic kicker */
+  .kicker { display: inline-flex; align-items: center; gap: 5px; font-family: var(--mono); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; padding: 3px 7px; border-radius: 3px; }
   .k-red { background: var(--red); color: #fff; }
   .k-amber { background: var(--amber); color: #14140f; }
   .k-blue { background: var(--blue); color: #14140f; }
-  .feat h3 {
-    font-family: var(--serif); font-weight: 700; font-size: 17px; line-height: 1.18;
-    letter-spacing: -0.015em; margin: 0 0 4px; color: var(--ink);
-  }
-  .feat .src { font-family: var(--mono); font-size: 10px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.06em; }
-  .feat .src b { color: var(--ink); font-weight: 600; }
+  .k-pink { background: var(--pink); color: #14140f; }
+  .k-lime { background: var(--accent); color: #14140f; }
+  .k-ink { background: var(--ink); color: var(--bg); }
+  .k-out { background: transparent; color: var(--ink-2); border: 1px solid var(--line); }
 
-  /* Section header */
-  .section-h { display: flex; align-items: baseline; justify-content: space-between; padding: 24px 16px 10px; }
-  .section-h h3 { font-family: var(--serif); font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.18em; margin: 0; color: var(--ink-3); }
-  .section-h .more { font-family: var(--mono); font-size: 10px; color: var(--ink-3); text-decoration: none; letter-spacing: 0.06em; }
+  /* Frame diff card (HERO) */
+  .frame-diff { margin: 10px 16px 0; border: 1px solid var(--line); border-radius: 18px; overflow: hidden; background: var(--bg-2); }
+  .frame-diff .head { padding: 14px 16px 0; }
+  .frame-diff h2 { font-family: var(--serif); font-style: italic; font-weight: 900; font-size: 24px; line-height: 1.1; letter-spacing: -0.02em; margin: 8px 0 6px; }
+  .frame-diff .deck { font-family: var(--serif); font-weight: 400; font-size: 14px; line-height: 1.5; color: var(--ink-2); margin: 0 0 12px; }
+  .frame-diff .verify { display: inline-flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 10px; color: var(--accent); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 10px; }
+  .frame-diff .verify::before { content: "✓"; font-size: 12px; }
+  .angles-h { font-family: var(--mono); font-size: 10px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.1em; padding: 14px 16px 6px; border-top: 1px solid var(--line); }
+  .angles { display: grid; grid-template-columns: 1fr; gap: 0; padding: 0 16px 16px; }
+  .angle { display: grid; grid-template-columns: 32px 1fr; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--bg-3); }
+  .angle:last-child { border-bottom: 0; }
+  .angle .av { width: 32px; height: 32px; border-radius: 8px; background: var(--bg-3); display: grid; place-items: center; font-family: var(--mono); font-size: 11px; font-weight: 700; color: var(--ink); border: 1px solid var(--line); }
+  .a-grd { background: #052962; color: #fff !important; }
+  .a-emo { background: #e30613; color: #fff !important; }
+  .a-rzk { background: linear-gradient(135deg, #4ec3ff, #2c8b6e); color: #fff !important; }
+  .a-twt { background: linear-gradient(135deg, #1d9bf0, #15202b); color: #fff !important; }
+  .angle .who { font-family: var(--mono); font-size: 10px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.06em; }
+  .angle .who b { color: var(--ink); font-weight: 700; }
+  .angle .take { font-family: var(--serif); font-style: italic; font-weight: 400; font-size: 14px; line-height: 1.4; color: var(--ink); margin-top: 3px; }
 
-  /* Salas — strip horizontal compacto */
-  .salas {
-    display: flex; gap: 10px; overflow-x: auto; scrollbar-width: none;
-    padding: 0 16px 4px; -webkit-overflow-scrolling: touch;
-  }
-  .salas::-webkit-scrollbar { display: none; }
-  .sala {
-    flex: 0 0 130px; aspect-ratio: 1 / 1.1;
-    border: 1px solid var(--line); border-radius: 14px;
-    padding: 12px; cursor: pointer;
-    display: flex; flex-direction: column; justify-content: space-between;
-    position: relative; overflow: hidden;
-  }
-  .sala .label { font-family: var(--mono); font-size: 9px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.1em; }
-  .sala h4 { font-family: var(--serif); font-weight: 700; font-size: 17px; line-height: 1.05; letter-spacing: -0.01em; margin: 6px 0 0; }
-  .sala .pulse { font-family: var(--mono); font-size: 9px; color: var(--ink-2); margin-top: 6px; }
-  .s-brief { background: linear-gradient(160deg, color-mix(in oklab, var(--accent) 18%, var(--bg-2)), var(--bg-2) 70%); }
-  .s-brief .pulse { color: var(--accent); }
-  .s-read { background: linear-gradient(160deg, #2a221a, var(--bg-2) 70%); }
-  .s-read h4 { font-style: italic; }
-  .s-hojeo { background: var(--bg-2); background-image: linear-gradient(0deg, var(--line) 1px, transparent 1px); background-size: 100% 10px; background-position: 0 60%; }
-  .s-disc { background: linear-gradient(135deg, color-mix(in oklab, var(--blue) 18%, var(--bg-2)), var(--bg-2) 70%); }
-  .s-disc .pulse { color: var(--blue); }
+  /* Twitter thread card */
+  .thread { margin: 14px 16px 0; border: 1px solid var(--line); border-radius: 16px; padding: 14px; background: var(--bg-2); cursor: pointer; }
+  .thread .head { display: grid; grid-template-columns: 36px 1fr auto; gap: 10px; align-items: center; }
+  .thread .av { width: 36px; height: 36px; border-radius: 999px; background: var(--bg-3); border: 1px solid var(--line); display: grid; place-items: center; font-family: var(--serif); font-weight: 700; font-size: 14px; }
+  .thread .who { font-family: var(--mono); font-size: 11px; color: var(--ink); font-weight: 600; }
+  .thread .handle { font-family: var(--mono); font-size: 10px; color: var(--ink-3); margin-top: 2px; }
+  .thread .badge-thread { font-family: var(--mono); font-size: 9px; color: var(--ink-3); text-align: right; text-transform: uppercase; letter-spacing: 0.08em; }
+  .thread .badge-thread b { color: var(--ink); display: block; }
+  .thread h3 { font-family: var(--serif); font-style: italic; font-weight: 700; font-size: 17px; line-height: 1.2; letter-spacing: -0.01em; margin: 12px 0 6px; }
+  .thread .preview { font-size: 13px; line-height: 1.5; color: var(--ink-2); margin: 0 0 10px; }
+  .thread .preview::before { content: "“"; font-family: var(--serif); font-size: 24px; color: var(--ink-3); margin-right: 4px; vertical-align: -8px; }
+  .thread .meta { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 10px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.06em; }
 
-  /* Temas */
-  .temas { display: flex; gap: 10px; overflow-x: auto; scrollbar-width: none; padding: 0 16px 4px; -webkit-overflow-scrolling: touch; }
-  .temas::-webkit-scrollbar { display: none; }
-  .tema {
-    flex: 0 0 168px; min-height: 100px;
-    border: 1px solid var(--line); border-radius: 14px;
-    padding: 12px; cursor: pointer; position: relative; overflow: hidden;
-    display: flex; flex-direction: column; justify-content: space-between;
-  }
-  .tema .ico { font-size: 20px; line-height: 1; }
-  .tema .name { font-family: var(--serif); font-weight: 700; font-size: 15px; letter-spacing: -0.01em; margin-top: 8px; }
-  .tema .live { font-family: var(--mono); font-size: 9px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.1em; margin-top: 4px; display: flex; align-items: center; gap: 5px; }
-  .tema .live i { width: 5px; height: 5px; border-radius: 999px; background: var(--accent); }
-  .t-deport { background: linear-gradient(135deg, #1a3a2a, var(--bg-2) 70%); }
-  .t-geo    { background: linear-gradient(135deg, #1a2a3a, var(--bg-2) 70%); }
-  .t-clima  { background: linear-gradient(135deg, #2a1a3a, var(--bg-2) 70%); }
-  .t-pol-cl { background: linear-gradient(135deg, #3a1a1a, var(--bg-2) 70%); }
-  .t-cult   { background: linear-gradient(135deg, #3a2a1a, var(--bg-2) 70%); }
-  .t-cien   { background: linear-gradient(135deg, #1a3a3a, var(--bg-2) 70%); }
+  /* Voz con postura */
+  .voz { margin: 14px 16px 0; border: 1px solid var(--line); border-radius: 16px; padding: 14px; background: var(--bg-2); cursor: pointer; }
+  .voz .head { display: grid; grid-template-columns: 44px 1fr; gap: 12px; align-items: center; }
+  .voz .av { width: 44px; height: 44px; border-radius: 999px; border: 2px solid var(--line); display: grid; place-items: center; font-family: var(--serif); font-style: italic; font-weight: 700; font-size: 16px; }
+  .v-mat { background: linear-gradient(135deg, #2a3a5c, #1a2a3a); color: #fff; }
+  .v-rzk { background: linear-gradient(135deg, #2c8b6e, #14140f); color: #fff; }
+  .v-kar { background: linear-gradient(135deg, #c8f55a, #6b8f0f); color: #14140f; }
+  .voz .name { font-family: var(--serif); font-weight: 700; font-size: 15px; }
+  .voz .role { font-family: var(--mono); font-size: 10px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.06em; margin-top: 2px; }
+  .voz .stance { display: inline-block; margin-top: 6px; }
+  .voz .quote { font-family: var(--serif); font-style: italic; font-weight: 500; font-size: 17px; line-height: 1.35; margin: 12px 0 8px; color: var(--ink); }
+  .voz .quote::before { content: "“"; font-family: var(--serif); font-size: 32px; color: var(--ink-3); line-height: 0; vertical-align: -10px; margin-right: 4px; }
+  .voz .src { font-family: var(--mono); font-size: 10px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.06em; }
+
+  /* Cluster prensa */
+  .cluster { margin: 14px 16px 0; padding: 14px 16px; border-bottom: 1px solid var(--line); cursor: pointer; }
+  .cluster .row { display: flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 10px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+  .pile { display: inline-flex; }
+  .pile span { width: 18px; height: 18px; border-radius: 999px; border: 2px solid var(--bg); display: inline-grid; place-items: center; font-size: 8px; font-weight: 700; color: white; margin-left: -6px; }
+  .pile span:first-child { margin-left: 0; }
+  .s-emo { background: #e30613; }
+  .s-lat { background: #003a70; }
+  .s-bbo { background: #009639; }
+  .s-cpr { background: #6b1f7a; }
+  .s-mos { background: #232323; }
+  .cluster h3 { font-family: var(--serif); font-weight: 700; font-size: 18px; line-height: 1.2; letter-spacing: -0.015em; margin: 0 0 6px; }
+  .cluster p { font-size: 13px; line-height: 1.5; color: var(--ink-2); margin: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+  /* Meme / humor */
+  .meme { margin: 14px 16px 0; border: 1px solid var(--line); border-radius: 16px; overflow: hidden; background: var(--bg-2); cursor: pointer; }
+  .meme .top-row { padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; font-family: var(--mono); font-size: 10px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.06em; }
+  .meme .top-row b { color: var(--ink); font-weight: 600; }
+  .meme .img-frame { aspect-ratio: 4 / 3; overflow: hidden; }
+  .meme .img-frame img { width: 100%; height: 100%; object-fit: cover; }
+  .meme .cap { padding: 10px 14px; font-family: var(--serif); font-style: italic; font-size: 13px; color: var(--ink-2); line-height: 1.4; }
 
   /* Long-read magazine */
-  .longread { margin: 0 16px; border: 1px solid var(--line); border-radius: 18px; overflow: hidden; background: var(--bg-2); cursor: pointer; }
-  .longread .cover { aspect-ratio: 16 / 11; position: relative; overflow: hidden; }
+  .longread { margin: 14px 16px 0; border: 1px solid var(--line); border-radius: 18px; overflow: hidden; background: var(--bg-2); cursor: pointer; }
+  .longread .cover { aspect-ratio: 16/9; position: relative; overflow: hidden; }
   .longread .cover img { width: 100%; height: 100%; object-fit: cover; }
-  .longread .cover::after {
-    content: ""; position: absolute; inset: 0;
-    background: linear-gradient(180deg, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.55) 100%);
-  }
-  .longread .cover-overlay {
-    position: absolute; bottom: 14px; left: 14px;
-    font-family: var(--mono); font-size: 10px; color: var(--accent);
-    text-transform: uppercase; letter-spacing: 0.16em; z-index: 1;
-  }
-  .longread .body { padding: 18px; }
-  .longread h2 {
-    font-family: var(--serif); font-style: italic; font-weight: 500;
-    font-size: 24px; line-height: 1.18; letter-spacing: -0.015em; margin: 0 0 10px;
-  }
-  .longread .deck {
-    font-family: var(--serif); font-weight: 400; font-size: 15px;
-    line-height: 1.5; color: var(--ink-2); margin: 0 0 14px;
-  }
+  .longread .cover::after { content:""; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 50%, rgba(0,0,0,0.55)); }
+  .longread .cover-overlay { position: absolute; bottom: 12px; left: 14px; font-family: var(--mono); font-size: 10px; color: var(--accent); text-transform: uppercase; letter-spacing: 0.16em; z-index: 1; }
+  .longread .body { padding: 16px; }
+  .longread h2 { font-family: var(--serif); font-style: italic; font-weight: 500; font-size: 22px; line-height: 1.18; letter-spacing: -0.015em; margin: 0 0 8px; }
+  .longread .deck { font-family: var(--serif); font-size: 14px; line-height: 1.5; color: var(--ink-2); margin: 0 0 10px; }
   .longread .meta { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 10px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.06em; }
 
-  /* Voces */
-  .voices { padding: 0 16px; display: grid; gap: 10px; }
-  .voice { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; background: var(--bg-2); display: grid; grid-template-columns: 36px 1fr; gap: 12px; cursor: pointer; }
-  .voice .av { width: 36px; height: 36px; border-radius: 999px; background: var(--bg-3); display: grid; place-items: center; font-family: var(--serif); font-weight: 700; font-size: 14px; color: var(--ink); border: 1px solid var(--line); }
-  .voice .who { font-family: var(--mono); font-size: 10px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.06em; }
-  .voice .what { font-family: var(--serif); font-style: italic; font-weight: 400; font-size: 14px; line-height: 1.4; color: var(--ink); margin-top: 3px; }
-  .voice .src { font-family: var(--mono); font-size: 9px; color: var(--ink-3); margin-top: 6px; text-transform: uppercase; letter-spacing: 0.08em; }
+  /* Discovery card */
+  .disc { margin: 14px 16px 0; border: 1px dashed var(--line); border-radius: 16px; padding: 14px; cursor: pointer; }
+  .disc .why { font-family: var(--mono); font-size: 10px; color: var(--blue); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px; }
+  .disc h3 { font-family: var(--serif); font-weight: 700; font-size: 16px; line-height: 1.25; margin: 0 0 4px; }
+  .disc .src { font-family: var(--mono); font-size: 10px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.06em; margin-top: 6px; }
 
-  /* Quiet */
-  .quiet { margin: 28px 16px 0; padding: 22px 16px; text-align: center; border: 1px dashed var(--line); border-radius: 16px; }
-  .quiet .title { font-family: var(--serif); font-style: italic; font-weight: 500; font-size: 17px; line-height: 1.3; }
-  .quiet .sub { font-size: 10px; color: var(--ink-3); margin-top: 8px; line-height: 1.5; font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.1em; }
+  /* Section divider */
+  .div-h { padding: 24px 16px 8px; font-family: var(--serif); font-style: italic; font-weight: 500; font-size: 18px; color: var(--ink-2); border-top: 1px solid var(--line); margin-top: 14px; }
 
   /* Bottom nav */
   nav.bottom {
@@ -208,14 +153,15 @@
     background: color-mix(in oklab, var(--bg) 92%, transparent);
     backdrop-filter: blur(12px); border-top: 1px solid var(--line);
     padding: 8px 0 max(8px, env(safe-area-inset-bottom));
-    display: grid; grid-template-columns: repeat(5, 1fr); max-width: 720px; margin: 0 auto;
+    display: grid; grid-template-columns: repeat(3, 1fr); max-width: 720px; margin: 0 auto;
   }
-  nav.bottom button { background: transparent; border: 0; color: var(--ink-3); padding: 6px 4px; font-family: var(--sans); font-size: 10px; font-weight: 500; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 3px; }
+  nav.bottom button { background: transparent; border: 0; color: var(--ink-3); padding: 6px 4px; font-family: var(--sans); font-size: 11px; font-weight: 500; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px; }
   nav.bottom button.active { color: var(--ink); }
+  nav.bottom .bn-label { font-family: var(--serif); font-style: italic; font-size: 13px; }
 
   @media (min-width: 720px) {
-    .portada h2 { font-size: 42px; }
-    .portada { aspect-ratio: 16 / 9; }
+    .frame-diff h2 { font-size: 30px; }
+    .voz .quote { font-size: 19px; }
   }
 </style>
 </head>
@@ -223,160 +169,213 @@
 <div class="app">
 
   <header class="top">
-    <div class="brand">
-      <h1>Diario</h1>
-      <div class="meta">JUE 30 ABR · 23:49 · 12 FUENTES</div>
+    <div class="brand-row">
+      <div>
+        <h1>Diario</h1>
+        <div class="meta">VIE 1 MAY · HOY · 47 PARA VOS</div>
+      </div>
+      <div class="icons">
+        <button class="icon-btn" aria-label="Buscar"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></button>
+        <button class="icon-btn" aria-label="Bookmarks"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></button>
+      </div>
     </div>
-    <div class="icons">
-      <button class="icon-btn" aria-label="Buscar"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></button>
-      <button class="icon-btn" aria-label="Biblioteca"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V2H6.5A2.5 2.5 0 0 0 4 4.5z"/></svg></button>
+    <div class="status">
+      <b>Hoy:</b> 12 hilos buenos de tu Twitter, 4 ángulos de Razzouk vs IPCC, 3 ensayos Karpathy renderizados, política CL en 3 medios, dos memes argentos y un perfil del Guardian que te va a gustar.
+    </div>
+    <div class="filters">
+      <button class="fil on">Todo</button>
+      <button class="fil">Hilos</button>
+      <button class="fil">Voces</button>
+      <button class="fil">Frame diff</button>
+      <button class="fil">Prensa</button>
+      <button class="fil">Memes</button>
+      <button class="fil">AI</button>
+      <button class="fil">Clima</button>
+      <button class="fil">Chile</button>
     </div>
   </header>
 
-  <div class="agent">
-    <span class="dot"></span>
-    <span class="text"><b>Tu agente:</b> mañana tenés con A. — su industria estuvo movida hoy.</span>
-  </div>
-
-  <!-- PORTADA hero -->
-  <section class="portada" onclick="window.open('#','_self')">
-    <img class="bg" src="https://images.unsplash.com/photo-1573225342350-16731dd9bf3d?w=1200&q=80&auto=format&fit=crop" alt="" referrerpolicy="no-referrer" />
-    <div class="body">
-      <span class="kicker">en desarrollo · cop</span>
-      <h2>El día que el cobre dejó de mentir</h2>
-      <p class="deck">Tres semanas de sismos en mercados, cumbres y política dibujan un patrón que ningún titular suelto deja ver. La hora más larga de Hacienda comenzó al amanecer.</p>
-      <div class="meta">
-        <span>✦ síntesis · 24 fuentes</span>
-        <span>·</span>
-        <span>14 min</span>
-        <span>·</span>
-        <span>↻ hilo en curso</span>
+  <!-- ── Frame diff hero ── -->
+  <article class="frame-diff">
+    <div class="head">
+      <span class="kicker k-red">frame diff · 4 ángulos</span>
+      <h2>El acuerdo COP que celebraron los gobiernos y enfureció a los que saben</h2>
+      <p class="deck">Texto final aprobado anoche. Los titulares lo llaman "histórico". Razzouk lo llama "greenwashing con membrete".</p>
+      <div class="verify">verificado · 14 fuentes · sin manipulación detectada</div>
+    </div>
+    <div class="angles-h">cómo lo cuentan</div>
+    <div class="angles">
+      <div class="angle">
+        <div class="av a-grd">G</div>
+        <div>
+          <div class="who"><b>The Guardian</b> · Mundo</div>
+          <div class="take">"Histórico acuerdo de transición — la primera mención explícita de fósiles en 30 años de cumbres."</div>
+        </div>
       </div>
-    </div>
-  </section>
-
-  <!-- Featured -->
-  <div class="featured">
-    <article class="feat">
-      <div>
-        <span class="kicker k-red">exclusivo</span>
-        <h3>"Esto no estaba en el plan": la conversación interna que destrabó la previsional</h3>
-        <div class="src"><b>CIPER</b> · hace 2 h · 8 medios</div>
+      <div class="angle">
+        <div class="av a-emo">E</div>
+        <div>
+          <div class="who"><b>Emol</b> · Internacional</div>
+          <div class="take">"Chile firma. Mantención del 1,5°C como meta principal pese a presión saudí."</div>
+        </div>
       </div>
-      <div class="img-wrap"><img src="https://images.unsplash.com/photo-1532375672259-d2f7ed42c2c1?w=400&q=80&auto=format&fit=crop" alt="" referrerpolicy="no-referrer" /></div>
-    </article>
-
-    <article class="feat">
-      <div>
-        <span class="kicker k-amber">análisis</span>
-        <h3>Por qué el SHOA tardó 19 minutos: lo que pasó dentro del centro de monitoreo</h3>
-        <div class="src"><b>BíoBío</b> + <b>La Tercera</b> · hace 3 h</div>
+      <div class="angle">
+        <div class="av a-rzk">R</div>
+        <div>
+          <div class="who"><b>Assaad Razzouk</b> · voz · postura crítica</div>
+          <div class="take">"Another COP, another greenwashing exercise. 'Transition' is the new 'phase down' is the new 'phase out' that never happens."</div>
+        </div>
       </div>
-      <div class="img-wrap"><img src="https://images.unsplash.com/photo-1527482937786-6608f6e14c15?w=400&q=80&auto=format&fit=crop" alt="" referrerpolicy="no-referrer" /></div>
-    </article>
-
-    <article class="feat">
-      <div>
-        <span class="kicker k-blue">retrato</span>
-        <h3>El perfil del nuevo CEO que dejó a Wall Street sin libreto en 36 horas</h3>
-        <div class="src"><b>FT</b> · <b>NYT</b> · hace 5 h</div>
-      </div>
-      <div class="img-wrap"><img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&q=80&auto=format&fit=crop" alt="" referrerpolicy="no-referrer" /></div>
-    </article>
-  </div>
-
-  <!-- Salas -->
-  <div class="section-h"><h3>Salas</h3><a class="more" href="#">PERSONALIZAR →</a></div>
-  <div class="salas">
-    <div class="sala s-brief">
-      <div><div class="label">⚡ operacional</div><h4>Briefing</h4></div>
-      <div class="pulse">4:32 · listo</div>
-    </div>
-    <div class="sala s-read">
-      <div><div class="label">📖 lectura</div><h4>Reading<br>Room</h4></div>
-      <div class="pulse">3 ensayos · 42 min</div>
-    </div>
-    <div class="sala s-hojeo">
-      <div><div class="label">📰 hojeo</div><h4>Portadas</h4></div>
-      <div class="pulse">12 portadas · 5 países</div>
-    </div>
-    <div class="sala s-disc">
-      <div><div class="label">✦ serendipia</div><h4>Discovery</h4></div>
-      <div class="pulse">5 nuevas</div>
-    </div>
-  </div>
-
-  <!-- Temas -->
-  <div class="section-h"><h3>Tus temas</h3><a class="more" href="#">+ AGREGAR</a></div>
-  <div class="temas">
-    <div class="tema t-deport"><div><div class="ico">⚽</div><div class="name">Deportes</div></div><div class="live"><i></i> 2 partidos en vivo</div></div>
-    <div class="tema t-geo"><div><div class="ico">🌐</div><div class="name">Geopolítica</div></div><div class="live">3 hilos en curso</div></div>
-    <div class="tema t-clima"><div><div class="ico">🌦️</div><div class="name">Clima</div></div><div class="live"><i></i> COP en final</div></div>
-    <div class="tema t-pol-cl"><div><div class="ico">🇨🇱</div><div class="name">Política CL</div></div><div class="live">4 nuevas hoy</div></div>
-    <div class="tema t-cult"><div><div class="ico">🎭</div><div class="name">Cultura</div></div><div class="live">12 reviews semana</div></div>
-    <div class="tema t-cien"><div><div class="ico">🔬</div><div class="name">Ciencia</div></div><div class="live">1 paper destacado</div></div>
-  </div>
-
-  <!-- Long-read -->
-  <div class="section-h"><h3>Lectura del día</h3><a class="more" href="#">SALA LECTURA →</a></div>
-  <article class="longread">
-    <div class="cover">
-      <img src="https://images.unsplash.com/photo-1486325212027-8081e485255e?w=1200&q=80&auto=format&fit=crop" alt="" referrerpolicy="no-referrer" />
-      <div class="cover-overlay">ENSAYO · 14 MIN · GEOPOLÍTICA</div>
-    </div>
-    <div class="body">
-      <h2>El mapa del nuevo Pacífico Sur: cinco semanas que cambiaron la geometría regional</h2>
-      <p class="deck">Movimientos en mercados, cumbres y sismos políticos dibujan un patrón. Una lectura larga, tejida desde 24 fuentes, sobre cómo Chile dejó de ser periferia.</p>
-      <div class="meta">
-        <span>Sintetizado · 24 fuentes · 6 idiomas</span>
-        <span>↻ Hilo</span>
+      <div class="angle">
+        <div class="av a-twt">T</div>
+        <div>
+          <div class="who"><b>Hilo Twitter</b> · @climateaction · 28 tweets · 2K likes</div>
+          <div class="take">"Aquí los 7 puntos del acuerdo, lo que significan en plazos reales, y por qué el lobby del gas natural ganó esta ronda."</div>
+        </div>
       </div>
     </div>
   </article>
 
-  <!-- Voces -->
-  <div class="section-h"><h3>Voces que sigues</h3><a class="more" href="#">VER TODAS →</a></div>
-  <div class="voices">
-    <div class="voice">
-      <div class="av">DM</div>
+  <!-- ── Twitter thread renderizado ── -->
+  <article class="thread">
+    <div class="head">
+      <div class="av" style="background: linear-gradient(135deg,#c8f55a,#6b8f0f); color:#14140f">AK</div>
       <div>
-        <div class="who">Daniel Matamala · subrayó</div>
-        <div class="what">"La narrativa fiscal del oficialismo se quebró cuando el cobre dejó de cooperar."</div>
-        <div class="src">columna La Tercera · hace 2h</div>
+        <div class="who">Andrej Karpathy</div>
+        <div class="handle">@karpathy</div>
+      </div>
+      <div class="badge-thread"><b>HILO</b>32 tweets · 9 min</div>
+    </div>
+    <h3>Por qué los modelos pequeños están ganando la carrera silenciosa de 2026</h3>
+    <p class="preview">No es lo que ves en titulares. Mientras todos miran benchmarks de frontier, lo que cambia el mercado son tres cosas: latencia de inferencia, costo por token útil, y la manera en que pequeños se especializan…</p>
+    <div class="meta">
+      <span>✦ renderizado como ensayo</span>
+      <span>guardar · leer</span>
+    </div>
+  </article>
+
+  <!-- ── Voz con postura: Razzouk ── -->
+  <article class="voz">
+    <div class="head">
+      <div class="av v-rzk">AR</div>
+      <div>
+        <div class="name">Assaad Razzouk</div>
+        <div class="role">Angry Clean Energy Guy · Singapur</div>
+        <div class="stance"><span class="kicker k-out">postura · crítica</span> <span class="kicker k-lime" style="margin-left:4px">anti-greenwashing</span></div>
       </div>
     </div>
-    <div class="voice">
-      <div class="av">EK</div>
-      <div>
-        <div class="who">Ezra Klein · publicó</div>
-        <div class="what">"Why the climate negotiations are now a story about insurance, not emissions."</div>
-        <div class="src">NYT podcast · 38 min · hace 6h</div>
-      </div>
+    <p class="quote">El "transition away" del acuerdo COP es lenguaje que ya escuchamos en 2009, 2015 y 2021. Cambió la palabra; las emisiones siguen subiendo. La diferencia esta vez es que ya no podemos fingir que no lo sabemos.</p>
+    <div class="src">post sustack · 4 min · publicado hace 2h</div>
+  </article>
+
+  <!-- ── Cluster prensa CL ── -->
+  <div class="cluster">
+    <div class="row">
+      <span class="pile"><span class="s-emo">E</span><span class="s-lat">L</span><span class="s-bbo">B</span><span class="s-cpr">C</span></span>
+      <span style="color:var(--ink); font-weight:700">8 medios CL</span>
+      <span>· Política · hace 1 h</span>
     </div>
-    <div class="voice">
-      <div class="av">MW</div>
-      <div>
-        <div class="who">Martin Wolf · anotó</div>
-        <div class="what">"Central banks are quietly running the same playbook of 2019. It didn't work then."</div>
-        <div class="src">FT · hace 1d</div>
-      </div>
-    </div>
+    <h3>"Esto no estaba en el plan": la conversación interna que destrabó la previsional</h3>
+    <p>El acuerdo final contempla 6% adicional. Oficialismo se divide. CIPER reconstruye las 36 horas que cambiaron la posición de Hacienda.</p>
   </div>
 
-  <!-- Quiet -->
-  <div class="quiet">
-    <div class="title">"El silencio entre noticias es donde se piensa."</div>
-    <div class="sub">VOLVÉ CUANDO TENGAS TIEMPO · NADA URGENTE</div>
+  <!-- ── Voz con postura: Matamala ── -->
+  <article class="voz">
+    <div class="head">
+      <div class="av v-mat">DM</div>
+      <div>
+        <div class="name">Daniel Matamala</div>
+        <div class="role">columnista · La Tercera · Chile</div>
+        <div class="stance"><span class="kicker k-out">postura · escéptica</span></div>
+      </div>
+    </div>
+    <p class="quote">La narrativa fiscal del oficialismo se quebró cuando el cobre dejó de cooperar. Lo que viene es la mejor prueba de que el discurso económico estaba sostenido por un solo dato.</p>
+    <div class="src">columna La Tercera · 6 min · hace 4h</div>
+  </article>
+
+  <!-- ── Hilo del día (analítico CL) ── -->
+  <article class="thread">
+    <div class="head">
+      <div class="av" style="background: linear-gradient(135deg,#3a1a1a,#1a0a0a); color:#fff">AS</div>
+      <div>
+        <div class="who">Andrés Scherman</div>
+        <div class="handle">@ascherman · Chile</div>
+      </div>
+      <div class="badge-thread"><b>HILO</b>14 tweets · 5 min</div>
+    </div>
+    <h3>Por qué la "asimetría entre delitos y percepción" es el dato más importante de 2025</h3>
+    <p class="preview">Desde que se hace Paz Ciudadana, nunca hubo tanta brecha. Contra los pronósticos, la victimización bajó 9,9 ptos respecto al 2019. Pero el miedo subió. ¿Qué explica el gap?…</p>
+    <div class="meta">
+      <span>✦ datos verificados · INE + Paz Ciudadana</span>
+      <span>guardar · leer</span>
+    </div>
+  </article>
+
+  <!-- ── Meme / humor ── -->
+  <article class="meme">
+    <div class="top-row">
+      <span><span class="kicker k-pink">humor</span> · meme arg</span>
+      <span><b>Facundo Land</b> · 23 mil ❤</span>
+    </div>
+    <div class="img-frame">
+      <img src="https://images.unsplash.com/photo-1535637603896-07c179d71f96?w=800&q=80&auto=format&fit=crop" alt="" referrerpolicy="no-referrer" />
+    </div>
+    <div class="cap">"Sale el hilo definitivo del mejor meme de la historia de Twitter — Te cambié las bujías / Gracias a Bosch."</div>
+  </article>
+
+  <!-- ── Long-read del Guardian ── -->
+  <article class="longread">
+    <div class="cover">
+      <img src="https://images.unsplash.com/photo-1486325212027-8081e485255e?w=1200&q=80&auto=format&fit=crop" alt="" referrerpolicy="no-referrer" />
+      <div class="cover-overlay">PERFIL · GUARDIAN · 14 MIN · INGLÉS</div>
+    </div>
+    <div class="body">
+      <h2>The man who made McDonald's $1B a year: a psychology of the self-order kiosk</h2>
+      <p class="deck">No es por conveniencia para vos. Es porque la pantalla manipula tu cerebro para gastar más. Adaptado y verificado contra el hilo original de Alex Penun.</p>
+      <div class="meta">
+        <span>✦ síntesis · Guardian + thread Penun + estudios MIT</span>
+        <span>guardar</span>
+      </div>
+    </div>
+  </article>
+
+  <!-- ── Discovery / Serendipia ── -->
+  <article class="disc">
+    <div class="why">✦ serendipia · fuera de tu burbuja</div>
+    <h3>Sistema Hidrométrico en Línea: la API pública chilena que casi nadie usa pero monitorea cada río del país</h3>
+    <p style="font-size:13px; line-height:1.5; color:var(--ink-2); margin:6px 0 0">Rodrigo Vega lo explicó en un thread de respuesta. Te puede interesar porque seguís a Tren Valparaíso y otros temas de infra pública.</p>
+    <div class="src">thread @rodrigovega · DGA · CL · 8 min</div>
+  </article>
+
+  <!-- ── Cluster geopolítico EN inglés ── -->
+  <div class="cluster">
+    <div class="row">
+      <span class="pile"><span class="s-mos" style="background:#bb1919">B</span><span class="s-mos" style="background:#052962">G</span><span class="s-mos" style="background:#ff8000">R</span></span>
+      <span style="color:var(--ink); font-weight:700">11 medios</span>
+      <span>· Mundo · EN · hace 22 min</span>
+    </div>
+    <h3>UK signs trade deal with India after three years of stalled talks</h3>
+    <p>Tariff cuts on whisky, autos, services. £25bn projected bilateral. India retains data sovereignty clauses.</p>
   </div>
+
+  <!-- ── Divider de cierre ── -->
+  <div class="div-h">"El silencio entre noticias es donde se piensa." Volvé cuando quieras.</div>
 
 </div>
 
 <nav class="bottom">
-  <button class="active"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9 M5 10v11h14V10"/></svg>Lobby</button>
-  <button><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 19V6a2 2 0 0 1 2-2h6v15H4 M22 19V6a2 2 0 0 0-2-2h-6v15h6"/></svg>Lectura</button>
-  <button><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Conversar</button>
-  <button><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 18v-6a9 9 0 0 1 18 0v6 M21 19a2 2 0 0 1-2 2h-1v-6h3z M3 19a2 2 0 0 0 2 2h1v-6H3z"/></svg>Briefing</button>
-  <button><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg>Ajustes</button>
+  <button class="active">
+    <span class="bn-label">Hoy</span>
+    <span style="font-family:var(--mono); font-size:9px; letter-spacing:0.08em">EL FEED</span>
+  </button>
+  <button>
+    <span class="bn-label">Para volver</span>
+    <span style="font-family:var(--mono); font-size:9px; letter-spacing:0.08em">BOOKMARKS · 47</span>
+  </button>
+  <button>
+    <span class="bn-label">Profundidad</span>
+    <span style="font-family:var(--mono); font-size:9px; letter-spacing:0.08em">LONG-READS</span>
+  </button>
 </nav>
 
 </body>
