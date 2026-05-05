@@ -187,3 +187,64 @@ Explicitly not changing in this consolidation:
 
 - [x] Jose Manuel Moller — 2026-05-05
 - [x] Pancho Cerda — informed and aligned, 2026-05-05
+
+## 10. Addenda — design decisions surfaced post-Phase 0
+
+These were not in the original freeze but emerged from Phase 1 schema
+implementation and Phase 3 agent-rewrite drafts. Captured here so the
+contract stays in one place.
+
+### 10.1 source-intake entity proposals: structured columns (decided 2026-05-05)
+
+Original `source-intake` agent encoded entity-creation proposals as marker
+tokens (`[ENTITY_ACTION:create_org][ORG_NAME:…]`) embedded in a Notion
+rich-text field, parsed by the Decision Center.
+
+**Decision: structured columns, no markers.** Phase 1.5 migration adds:
+- `decision_items.entity_action text` — e.g. `create_org`, `classify_relationship`
+- `decision_items.entity_payload jsonb` — typed payload per action
+- `decision_items.entity_id text`, `entity_table text` — generic FK ref
+- `decision_items.resolution_field text`, `resolution_type text`,
+  `resolution_target_table text` — what a decision writes when approved
+
+Decision Center UI reads these columns directly. No more text parsing.
+The `source-intake` rewrite in `docs/migration/agent-drafts/source-intake.md`
+uses this contract.
+
+### 10.2 hygiene-agent — `automations` table (DECISION PENDING)
+
+`hygiene-agent` originally writes to `automations.human_override_needed`
+and appends to `automations.notes`. The `automations` table does **not**
+exist in Supabase as of 2026-05-05.
+
+**Open decision:** pick one before Phase 3 lands.
+- **Option A:** add a new `automations` table to Phase 1 scope (migration
+  `20260505120500_phase1_automations.sql`). Mirrors the Notion DB shape.
+- **Option B:** redirect hygiene-agent writes to `agent_health_diagnoses`
+  (already exists, 8 rows) — extend its schema to carry the override flag.
+- **Option C:** redirect to `agent_runs` (already exists) with a JSONB
+  `health_override` column.
+
+Recommendation: **Option B**. `agent_health_diagnoses` already exists
+with the right shape; one column add suffices.
+
+Awaiting decision before Phase 3 hygiene-agent rewrite is finalised.
+
+### 10.3 `payload jsonb` escape hatch on the 18 new tables
+
+Phase 1.4 migration adds `payload jsonb` to every new canonical table.
+Used by Phase 2 backfill's generic mapper for tables whose column-bound
+schema isn't yet stable. Phase 4 work binds proper columns; Phase 6
+**drops** `payload`. Acceptance criterion #2 is updated to also require:
+
+> `payload` column does not exist on any table in `public.*` after cutoff.
+
+### 10.4 Column gaps surfaced by Phase 3 (added 2026-05-05)
+
+Phase 1.5 also added these columns based on agent-rewrite analysis:
+- `evidence.people_involved uuid[]` (with GIN index)
+- `organizations.legacy_record_url text`
+- `people.legacy_record_url text`
+
+No design decisions; mechanical additions to support 1:1 contract
+preservation in the agent rewrites.
