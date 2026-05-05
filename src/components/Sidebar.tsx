@@ -73,6 +73,7 @@ export const ADMIN_NAV_V2: NavEntry[] = [
   {
     kind: "group", label: "Control Room", icon: "◫",
     items: [
+      { label: "Control plane",   href: "/admin/control-plane" },
       { label: "Agents",          href: "/admin/agents" },
       { label: "Intake / Decisions", href: "/admin/os" },
       { label: "Prep Briefs",     href: "/admin/prep" },
