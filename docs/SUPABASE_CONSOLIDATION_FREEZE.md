@@ -211,24 +211,21 @@ Decision Center UI reads these columns directly. No more text parsing.
 The `source-intake` rewrite in `docs/migration/agent-drafts/source-intake.md`
 uses this contract.
 
-### 10.2 hygiene-agent — `automations` table (DECISION PENDING)
+### 10.2 hygiene-agent — `automations` redirect (DECIDED 2026-05-05: Option B)
 
-`hygiene-agent` originally writes to `automations.human_override_needed`
-and appends to `automations.notes`. The `automations` table does **not**
-exist in Supabase as of 2026-05-05.
+The Notion-era `hygiene-agent` wrote to a non-existent `automations`
+table. Resolved by:
+- **Read source:** `routine_latest_runs` (already exists; 10 columns, one
+  row per routine with status, finished_at, error_message, notes).
+- **Write target:** `agent_health_diagnoses` (already exists; 17 columns)
+  extended by migration `20260505120500_phase1_hygiene_override_columns`
+  with: `human_override_needed boolean default false`, `override_notes text`,
+  `override_set_at timestamptz`, `override_set_by text`.
 
-**Open decision:** pick one before Phase 3 lands.
-- **Option A:** add a new `automations` table to Phase 1 scope (migration
-  `20260505120500_phase1_automations.sql`). Mirrors the Notion DB shape.
-- **Option B:** redirect hygiene-agent writes to `agent_health_diagnoses`
-  (already exists, 8 rows) — extend its schema to carry the override flag.
-- **Option C:** redirect to `agent_runs` (already exists) with a JSONB
-  `health_override` column.
-
-Recommendation: **Option B**. `agent_health_diagnoses` already exists
-with the right shape; one column add suffices.
-
-Awaiting decision before Phase 3 hygiene-agent rewrite is finalised.
+The hygiene-agent now upserts rows keyed by `(cluster_key, routine_name)`.
+Pure override-flag rows use `classification='override_flag'` to distinguish
+from error-cluster diagnoses. Updated draft at
+`docs/migration/agent-drafts/hygiene-agent.md`.
 
 ### 10.3 `payload jsonb` escape hatch on the 18 new tables
 
