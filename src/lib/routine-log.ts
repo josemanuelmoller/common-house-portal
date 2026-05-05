@@ -357,4 +357,12 @@ export const ROUTINE_CATALOG: Record<string, RoutineCatalogEntry> = {
     visible_in_product: true,
     priority: 2,
   },
+  "reap-stale-drafts": {
+    schedule: "03:30 daily",
+    reads: "Supabase notion_agent_drafts",
+    writes: "Supabase notion_agent_drafts (staled_at + Auto-archived)",
+    output_surface: "/admin/inbox (clean queue)",
+    visible_in_product: true,
+    priority: 2,
+  },
 };
