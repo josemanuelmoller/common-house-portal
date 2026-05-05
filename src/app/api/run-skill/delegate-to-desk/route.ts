@@ -175,38 +175,59 @@ Output ONLY the full message (Subject + body). Nothing else.`;
     ? `Delegation: ${taskShort} → ${resolvedAssignee} — ${today}`
     : `Delegation: ${taskShort} — ${today}`;
 
-  // Build properties — only include Related Entity if we resolved a page ID
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const properties: Record<string, any> = {
-    "Draft Title": { title: [{ text: { content: draftTitle } }] },
-    "Type":        { select: { name: "Delegation Brief" } },
-    "Status":      { select: { name: "Pending Review" } },
-    "Content":     { rich_text: [{ text: { content: draftText.slice(0, 2000) } }] },
-    "Source Reference": {
-      rich_text: [{
-        text: {
-          content: [
+  // notion-cutoff-2026-06-02: legacy Notion property bag removed; field-level
+  // mapping is documented inline below at the canonical insert site.
+  // Old Notion shape (for reference):
+  //   "Draft Title": { title: [...] }, "Type": { select: { name: "Delegation Brief" } },
+  //   "Status": { select: { name: "Pending Review" } }, "Content": { rich_text: [...] },
+  //   "Source Reference": { rich_text: [...] }, optionally "Related Entity": { relation: [...] }.
+
+  // notion-cutoff-2026-06-02: replaced by canonical write to agent_drafts (Supabase).
+  // Notion → Supabase (agent_drafts) column mapping:
+  //   "Draft Title"      → title
+  //   "Type"             → draft_type
+  //   "Status"           → status
+  //   "Content"          → body_md
+  //   "Related Entity"   → target_person_notion_id
+  //   "Source Reference" → payload.source_reference
+  //
+  // let draftPage;
+  // try {
+  //   draftPage = await notion.pages.create({ parent: { database_id: AGENT_DRAFTS_DB }, properties });
+  // } catch (e) {
+  //   return NextResponse.json({ error: "Notion write error", detail: String(e) }, { status: 500, headers: corsHeaders() });
+  // }
+  void AGENT_DRAFTS_DB; // legacy id retained for traceability; no longer used as a write target.
+
+  const sb = getSupabaseServerClient();
+  const { data: insertedRow, error: insertErr } = await sb
+    .from("agent_drafts")
+    .insert({
+      title:      draftTitle,
+      draft_type: "Delegation Brief",
+      status:     "Pending Review",
+      body_md:    draftText.slice(0, 2000),
+      target_person_notion_id: assigneePageId || null,
+      source_agent: "delegate-to-desk",
+      payload: {
+        source_reference:
+          [
             resolvedAssignee && `Assignee: ${resolvedAssignee}`,
             dueDate && `Due: ${dueDate}`,
           ].filter(Boolean).join(" · ") || task.slice(0, 100),
-        },
-      }],
-    },
-  };
+        assignee_name:  resolvedAssignee || null,
+        assignee_role:  assigneeRole     || null,
+        assignee_email: assigneeEmail    || null,
+        due_date:       dueDate          || null,
+        task,
+      },
+    })
+    .select("id")
+    .single();
 
-  if (assigneePageId) {
-    properties["Related Entity"] = { relation: [{ id: assigneePageId }] };
-  }
-
-  let draftPage;
-  try {
-    draftPage = await notion.pages.create({
-      parent: { database_id: AGENT_DRAFTS_DB },
-      properties,
-    });
-  } catch (e) {
+  if (insertErr || !insertedRow) {
     return NextResponse.json(
-      { error: "Notion write error", detail: String(e) },
+      { error: "agent_drafts insert error", detail: insertErr?.message ?? "no row returned" },
       { status: 500, headers: corsHeaders() }
     );
   }
@@ -214,8 +235,8 @@ Output ONLY the full message (Subject + body). Nothing else.`;
   return NextResponse.json(
     {
       ok: true,
-      draftId: draftPage.id,
-      notionUrl: (draftPage as { url?: string }).url ?? "",
+      draftId: insertedRow.id,
+      notionUrl: "",
       assigneeResolved: !!assigneePageId,
       assigneeName: resolvedAssignee || null,
     },

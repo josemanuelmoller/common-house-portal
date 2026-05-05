@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { currentUser } from "@clerk/nextjs/server";
 import { uploadFileToDrive, FolderName } from "@/lib/drive";
-import { notion, DB } from "@/lib/notion";
+// notion-cutoff-2026-06-02: Notion `Sources` write removed; canonical write is now to `sources` (Supabase).
+// import { notion, DB } from "@/lib/notion";
 import { getProjectIdForUser, getClientConfig, isAdminUser, isAdminEmail } from "@/lib/clients";
+import { getSupabaseServerClient } from "@/lib/supabase-server";
 
 const MAX_SIZE_MB = 20;
 const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;

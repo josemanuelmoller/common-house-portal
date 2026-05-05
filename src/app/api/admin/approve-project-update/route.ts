@@ -13,10 +13,11 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { Client } from "@notionhq/client";
+// notion-cutoff-2026-06-02: removed; canonical write is now to projects (Supabase).
+// import { Client } from "@notionhq/client";
+// const notion = new Client({ auth: process.env.NOTION_API_KEY });
 import { isAdminUser } from "@/lib/clients";
-
-const notion = new Client({ auth: process.env.NOTION_API_KEY });
+import { getSupabaseServerClient } from "@/lib/supabase-server";
 
 export async function POST(req: NextRequest) {
   const { userId } = await auth();
@@ -35,21 +36,39 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const properties: Record<string, any> = {
-      "Project Update Needed?": { checkbox: false },
+    // notion-cutoff-2026-06-02: replaced by canonical write to projects (Supabase).
+    // Notion → Supabase column mapping:
+    //   "Status Summary"         → status_summary
+    //   "Draft Status Update"    → draft_status_update
+    //   "Project Update Needed?" → update_needed
+    //
+    // const properties: Record<string, any> = { "Project Update Needed?": { checkbox: false } };
+    // if (action === "approve" && draftText) {
+    //   properties["Status Summary"] = { rich_text: [{ type: "text", text: { content: draftText.slice(0, 2000) } }] };
+    //   properties["Draft Status Update"] = { rich_text: [] };
+    // }
+    // await notion.pages.update({ page_id: projectId, properties });
+    const sb = getSupabaseServerClient();
+    const update: Record<string, unknown> = {
+      update_needed: false,
+      updated_at: new Date().toISOString(),
     };
-
     if (action === "approve" && draftText) {
-      properties["Status Summary"] = {
-        rich_text: [{ type: "text", text: { content: draftText.slice(0, 2000) } }],
-      };
-      properties["Draft Status Update"] = {
-        rich_text: [],
-      };
+      update.status_summary      = draftText.slice(0, 2000);
+      update.draft_status_update = null;
     }
 
-    await notion.pages.update({ page_id: projectId, properties });
+    // projectId here is historically the Notion page id; match the row by either
+    // canonical uuid `id` or the `notion_id` backref column.
+    const isUuid = /^[0-9a-f-]{36}$/i.test(projectId);
+    const matchColumn = isUuid ? "id" : "notion_id";
+    const { error } = await sb
+      .from("projects")
+      .update(update)
+      .eq(matchColumn, projectId);
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 502 });
+    }
 
     return NextResponse.json({ ok: true, action });
   } catch (err) {

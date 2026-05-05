@@ -2,23 +2,21 @@
  * PATCH /api/promote-candidate
  *
  * Promotes or ignores an Opportunity Candidate (Opportunity Status = "New").
- *   action "promote" → Opportunity Status = "Qualifying", Follow-up Status = "Needed"
- *   action "ignore"  → Opportunity Status = "Stalled",   Follow-up Status = "None"
- *                      If reason provided, prepends "[Ignored {date}: {reason}]" to Trigger/Signal
+ *   action "promote" → status = "Qualifying", follow_up_status = "Needed"
+ *   action "ignore"  → status = "Stalled",   follow_up_status = "None"
+ *                      If reason provided, prepends "[Ignored {date}: {reason}]" to trigger_signal.
  *
  * Body: { candidateId: string, action: "promote" | "ignore", reason?: string }
  * Auth: adminGuardApi()
  *
- * Field names verified against Notion schema 2026-04-13.
+ * notion-cutoff-2026-06-02: replaced by canonical write to opportunities (Supabase).
+ * Per docs/SUPABASE_CONSOLIDATION_FREEZE.md §3.2 the canonical store is `public.opportunities`;
+ * `candidateId` is the legacy Notion page id, used as the upsert key on `notion_id`.
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { Client } from "@notionhq/client";
 import { adminGuardApi } from "@/lib/require-admin";
-import { prop, text } from "@/lib/notion/core";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
-
-const notion = new Client({ auth: process.env.NOTION_API_KEY });
 
 export async function PATCH(req: NextRequest) {
   const guard = await adminGuardApi();
@@ -31,39 +29,50 @@ export async function PATCH(req: NextRequest) {
   if (!candidateId) return NextResponse.json({ error: "candidateId required" }, { status: 400 });
   if (action !== "promote" && action !== "ignore") return NextResponse.json({ error: "action must be promote or ignore" }, { status: 400 });
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const properties: Record<string, any> = action === "promote"
-    ? { "Opportunity Status": { select: { name: "Qualifying" } }, "Follow-up Status": { select: { name: "Needed" } } }
-    : { "Opportunity Status": { select: { name: "Stalled" } },   "Follow-up Status": { select: { name: "None" } } };
-
-  // For ignore actions, record the reason in Trigger/Signal
-  if (action === "ignore" && reason && reason.trim()) {
-    const page = await notion.pages.retrieve({ page_id: candidateId });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const existing = text(prop(page as any, "Trigger / Signal")) || "";
-    const dateStr  = new Date().toISOString().slice(0, 10);
-    const prefix   = `[Ignored ${dateStr}: ${reason.trim()}]`;
-    const combined = existing ? `${prefix}\n${existing}` : prefix;
-    properties["Trigger / Signal"] = {
-      rich_text: [{ type: "text", text: { content: combined.slice(0, 2000) } }],
-    };
-  }
+  const sbStatus    = action === "promote" ? "Qualifying" : "Stalled";
+  const sbFollowUp  = action === "promote" ? "Needed"     : "None";
+  const updatePayload: Record<string, unknown> = {
+    status:           sbStatus,
+    follow_up_status: sbFollowUp,
+    updated_at:       new Date().toISOString(),
+  };
 
   try {
-    await notion.pages.update({ page_id: candidateId, properties });
+    const sb = getSupabaseServerClient();
 
-    // Dual-write to Supabase — makes status / follow_up_status live immediately
-    try {
-      const sb = getSupabaseServerClient();
-      const sbStatus    = action === "promote" ? "Qualifying" : "Stalled";
-      const sbFollowUp  = action === "promote" ? "Needed"     : "None";
-      await sb.from("opportunities")
-        .update({ status: sbStatus, follow_up_status: sbFollowUp, updated_at: new Date().toISOString() })
-        .eq("notion_id", candidateId);
-    } catch { /* non-critical */ }
+    // For ignore actions, prepend the reason to trigger_signal.
+    if (action === "ignore" && reason && reason.trim()) {
+      const { data: existingRow } = await sb
+        .from("opportunities")
+        .select("trigger_signal")
+        .eq("notion_id", candidateId)
+        .maybeSingle();
+
+      const existing = (existingRow?.trigger_signal ?? "") as string;
+      const dateStr  = new Date().toISOString().slice(0, 10);
+      const prefix   = `[Ignored ${dateStr}: ${reason.trim()}]`;
+      const combined = existing ? `${prefix}\n${existing}` : prefix;
+      updatePayload.trigger_signal = combined.slice(0, 2000);
+      updatePayload.pending_action = combined.slice(0, 2000);
+    }
+
+    // notion-cutoff-2026-06-02: replaced by canonical write to opportunities
+    // const properties = action === "promote"
+    //   ? { "Opportunity Status": { select: { name: "Qualifying" } }, "Follow-up Status": { select: { name: "Needed" } } }
+    //   : { "Opportunity Status": { select: { name: "Stalled" } },   "Follow-up Status": { select: { name: "None" } } };
+    // if (ignore && reason) properties["Trigger / Signal"] = { rich_text: [{ text: { content: combined } }] };
+    // await notion.pages.update({ page_id: candidateId, properties });
+    const { error } = await sb
+      .from("opportunities")
+      .update(updatePayload)
+      .eq("notion_id", candidateId);
+
+    if (error) {
+      return NextResponse.json({ error: "Supabase update failed", detail: error.message }, { status: 502 });
+    }
 
     return NextResponse.json({ ok: true, candidateId, action });
   } catch (err) {
-    return NextResponse.json({ error: "Notion update failed", detail: String(err) }, { status: 502 });
+    return NextResponse.json({ error: "Update failed", detail: String(err) }, { status: 502 });
   }
 }

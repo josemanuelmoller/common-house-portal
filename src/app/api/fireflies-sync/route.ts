@@ -19,12 +19,16 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+// notion-cutoff-2026-06-02: Notion client retained for read-only project list +
+// dedup fallback. Project Last Meeting Date and Sources creation are now
+// canonical Supabase writes (projects, sources).
 import { Client } from "@notionhq/client";
 import { currentUser } from "@clerk/nextjs/server";
 import { isAdminUser, isAdminEmail } from "@/lib/clients";
 import { withRoutineLog } from "@/lib/routine-log";
 import { observeTranscript } from "@/lib/hall-contact-observers";
 import { getSelfEmails } from "@/lib/hall-self";
+import { getSupabaseServerClient } from "@/lib/supabase-server";
 
 export const maxDuration = 90;
 
@@ -163,8 +167,24 @@ function matchesProject(project: ProjectRecord, transcript: FirefliesTranscript)
 // ─── Deduplication: CH Sources URLs already in DB ────────────────────────────
 
 async function getExistingSourceUrls(fromDate: string): Promise<Set<string>> {
+  const existing = new Set<string>();
+
+  // Supabase-first (canonical post-cutoff)
   try {
-    const existing = new Set<string>();
+    const sb = getSupabaseServerClient();
+    const { data } = await sb
+      .from("sources")
+      .select("source_url")
+      .eq("source_platform", "Fireflies")
+      .gte("source_date", fromDate)
+      .limit(1000);
+    for (const row of (data ?? []) as { source_url: string | null }[]) {
+      if (row.source_url) existing.add(row.source_url);
+    }
+  } catch { /* non-fatal — continue with Notion fallback */ }
+
+  // Notion fallback retained until cutoff so pre-Phase-2 rows still de-dup.
+  try {
     let cursor: string | undefined;
     do {
       const res = await notion.databases.query({
@@ -185,10 +205,9 @@ async function getExistingSourceUrls(fromDate: string): Promise<Set<string>> {
       }
       cursor = res.has_more ? (res.next_cursor ?? undefined) : undefined;
     } while (cursor);
-    return existing;
-  } catch {
-    return new Set();
-  }
+  } catch { /* non-fatal */ }
+
+  return existing;
 }
 
 // ─── People: update Last Contact Date ────────────────────────────────────────
@@ -303,16 +322,29 @@ async function _POST(req: NextRequest) {
   // ── 5. Update CH Projects "Last Meeting Date" ────────────────────────────────
   let projectsUpdated = 0;
   const projectErrors: string[] = [];
+  const sb = getSupabaseServerClient();
 
   for (const [projectId, meetingDate] of latestByProject) {
     const project = projects.find(p => p.id === projectId)!;
     if (project.currentMeetingDate && project.currentMeetingDate >= meetingDate) continue;
     try {
-      await notion.pages.update({
-        page_id: projectId,
-        properties: { "Last Meeting Date": { date: { start: meetingDate } } } as any, // eslint-disable-line @typescript-eslint/no-explicit-any
-      });
-      projectsUpdated++;
+      // notion-cutoff-2026-06-02: replaced by canonical write to projects
+      // await notion.pages.update({
+      //   page_id: projectId,
+      //   properties: { "Last Meeting Date": { date: { start: meetingDate } } } as any,
+      // });
+      //
+      // Notion → Supabase (projects) column mapping:
+      //   Last Meeting Date → last_meeting_date
+      const { error: upErr } = await sb
+        .from("projects")
+        .update({ last_meeting_date: meetingDate, updated_at: new Date().toISOString() })
+        .eq("notion_id", projectId);
+      if (upErr) {
+        projectErrors.push(`${project.name}: ${upErr.message}`);
+      } else {
+        projectsUpdated++;
+      }
     } catch (err) {
       projectErrors.push(`${project.name}: ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -330,23 +362,46 @@ async function _POST(req: NextRequest) {
     const summary     = t.summary?.overview || t.summary?.shorthand_bullet || "";
 
     try {
-      const props: Record<string, unknown> = {
-        "Source Title":      { title: [{ text: { content: t.title.slice(0, 200) } }] },
-        "Source Type":       { select: { name: "Meeting" } },
-        "Source Platform":   { select: { name: "Fireflies" } },
-        "Processing Status": { select: { name: "Processed" } },
-        "Source Date":       { date:   { start: meetingDate } },
-        "Source URL":        { url: viewerUrl },
-        "Linked Projects":   { relation: [{ id: projectId }] },
-      };
-      if (summary) {
-        props["Processed Summary"] = { rich_text: [{ text: { content: summary.slice(0, 2000) } }] };
+      // notion-cutoff-2026-06-02: replaced by canonical write to sources
+      // const props: Record<string, unknown> = {
+      //   "Source Title":      { title: [{ text: { content: t.title.slice(0, 200) } }] },
+      //   "Source Type":       { select: { name: "Meeting" } },
+      //   "Source Platform":   { select: { name: "Fireflies" } },
+      //   "Processing Status": { select: { name: "Processed" } },
+      //   "Source Date":       { date:   { start: meetingDate } },
+      //   "Source URL":        { url: viewerUrl },
+      //   "Linked Projects":   { relation: [{ id: projectId }] },
+      // };
+      // if (summary) props["Processed Summary"] = { rich_text: [{ text: { content: summary.slice(0, 2000) } }] };
+      // await notion.pages.create({ parent: { database_id: SOURCES_DB }, properties: props as ... });
+      //
+      // Notion → Supabase (sources) column mapping:
+      //   Source Title       → title
+      //   Source Type        → source_type
+      //   Source Platform    → source_platform
+      //   Processing Status  → processing_status
+      //   Source Date        → source_date
+      //   Source URL         → source_url
+      //   Linked Projects    → project_notion_id
+      //   Processed Summary  → processed_summary
+      const { error: insertErr } = await sb
+        .from("sources")
+        .insert({
+          title:             t.title.slice(0, 200),
+          source_type:       "Meeting",
+          source_platform:   "Fireflies",
+          processing_status: "Processed",
+          source_date:       meetingDate,
+          source_url:        viewerUrl,
+          project_notion_id: projectId,
+          processed_summary: summary ? summary.slice(0, 2000) : null,
+          dedup_key:         `fireflies:${t.id}`,
+          source_external_id: t.id,
+        });
+      if (insertErr) {
+        sourceErrors.push(`${t.title}: ${insertErr.message}`);
+        continue;
       }
-
-      await notion.pages.create({
-        parent:     { database_id: SOURCES_DB },
-        properties: props as Parameters<typeof notion.pages.create>[0]["properties"],
-      });
 
       alreadyIngested.add(viewerUrl); // prevent duplicate within same run
       sourcesCreated++;

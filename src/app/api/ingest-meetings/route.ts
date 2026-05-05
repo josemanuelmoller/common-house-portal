@@ -23,6 +23,9 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+// notion-cutoff-2026-06-02: Notion client retained for read-only fallback on
+// people email lookup. Agent Drafts + People last-contact writes are now
+// canonical Supabase writes (agent_drafts, people).
 import { Client } from "@notionhq/client";
 import Anthropic from "@anthropic-ai/sdk";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
@@ -31,7 +34,6 @@ const notion    = new Client({ auth: process.env.NOTION_API_KEY });
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 const FIREFLIES_API   = "https://api.fireflies.ai/graphql";
-const AGENT_DRAFTS_DB = "9844ece875ea4c618f616e8cc97d5a90";
 const PEOPLE_DB       = "1bc0f96f33ca4a9e9ff26844377e81de";
 
 // ─── Fireflies GraphQL ────────────────────────────────────────────────────────
@@ -156,21 +158,23 @@ async function updatePeopleLastContact(
   for (const email of emails.slice(0, 20)) {
     try {
       let pageId: string | null = null;
+      let personRowId: string | null = null;
 
-      // Supabase lookup — faster than Notion DB query per email
+      // Supabase lookup — canonical post-cutoff
       try {
         const { data: sbPerson } = await sb
           .from("people")
-          .select("notion_id")
+          .select("id, notion_id")
           .eq("email", email)
           .single();
         if (sbPerson?.notion_id) pageId = sbPerson.notion_id;
+        if (sbPerson?.id) personRowId = sbPerson.id as string;
       } catch {
         // PGRST116 (no rows) or network error — fall through to Notion
       }
 
-      // Notion fallback: person not yet synced to Supabase
-      if (!pageId) {
+      // Notion fallback (read only): person not yet synced to Supabase
+      if (!pageId && !personRowId) {
         const res = await notion.databases.query({
           database_id: PEOPLE_DB,
           filter: { property: "Email", email: { equals: email } },
@@ -179,24 +183,24 @@ async function updatePeopleLastContact(
         if (res.results.length > 0) pageId = res.results[0].id;
       }
 
-      if (!pageId) continue;
+      if (!pageId && !personRowId) continue;
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await notion.pages.update({
-        page_id: pageId,
-        properties: {
-          "Last Contact Date": { date: { start: dateStr } },
-        } as any,
-      });
+      // notion-cutoff-2026-06-02: replaced by canonical write to people
+      // await notion.pages.update({
+      //   page_id: pageId,
+      //   properties: { "Last Contact Date": { date: { start: dateStr } } } as any,
+      // });
 
-      // Dual-write to Supabase — makes last_contact_date live immediately
+      // Notion → Supabase (people) column mapping:
+      //   Last Contact Date → last_contact_date
       try {
-        await sb.from("people")
-          .update({ last_contact_date: dateStr, updated_at: new Date().toISOString() })
-          .eq("notion_id", pageId);
+        const updatePayload = { last_contact_date: dateStr, updated_at: new Date().toISOString() };
+        const q = personRowId
+          ? sb.from("people").update(updatePayload).eq("id", personRowId)
+          : sb.from("people").update(updatePayload).eq("notion_id", pageId!);
+        const { error } = await q;
+        if (!error) updated++;
       } catch { /* non-critical */ }
-
-      updated++;
     } catch {
       // skip on error — non-critical
     }
@@ -212,18 +216,49 @@ async function writeAgentDraft(
   today: string,
   windowLabel: string,
 ): Promise<string> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const page = await notion.pages.create({
-    parent: { database_id: AGENT_DRAFTS_DB },
-    properties: {
-      "Draft Title":      { title: [{ text: { content: `Meeting Intel (${windowLabel}): ${meetingCount} meeting${meetingCount !== 1 ? "s" : ""} — ${today}` } }] },
-      "Type":             { select: { name: "Market Signal" } },
-      "Status":           { select: { name: "Pending Review" } },
-      "Source Reference": { rich_text: [{ text: { content: `Fireflies — ${meetingCount} meetings` } }] },
-      "Content":          { rich_text: [{ text: { content: intelligenceText.slice(0, 2000) } }] },
-    } as any,
-  });
-  return (page as { url?: string }).url ?? "";
+  // notion-cutoff-2026-06-02: replaced by canonical write to agent_drafts
+  // const page = await notion.pages.create({
+  //   parent: { database_id: AGENT_DRAFTS_DB },
+  //   properties: {
+  //     "Draft Title":      { title: [{ text: { content: `Meeting Intel (${windowLabel}): ${meetingCount} meeting${meetingCount !== 1 ? "s" : ""} — ${today}` } }] },
+  //     "Type":             { select: { name: "Market Signal" } },
+  //     "Status":           { select: { name: "Pending Review" } },
+  //     "Source Reference": { rich_text: [{ text: { content: `Fireflies — ${meetingCount} meetings` } }] },
+  //     "Content":          { rich_text: [{ text: { content: intelligenceText.slice(0, 2000) } }] },
+  //   } as any,
+  // });
+  // return (page as { url?: string }).url ?? "";
+
+  // Notion → Supabase (agent_drafts) column mapping:
+  //   Draft Title      → title
+  //   Type             → draft_type
+  //   Status           → status
+  //   Source Reference → payload.source_reference (no dedicated column yet)
+  //   Content          → body_md
+  const sb = getSupabaseServerClient();
+  const title = `Meeting Intel (${windowLabel}): ${meetingCount} meeting${meetingCount !== 1 ? "s" : ""} — ${today}`;
+  const { data, error } = await sb
+    .from("agent_drafts")
+    .insert({
+      draft_type:    "Market Signal",
+      status:        "Pending Review",
+      title,
+      body_md:       intelligenceText.slice(0, 8000),
+      source_agent:  "ingest-meetings",
+      payload:       {
+        source_reference: `Fireflies — ${meetingCount} meetings`,
+        window:           windowLabel,
+        meeting_count:    meetingCount,
+        date:             today,
+      },
+    })
+    .select("id")
+    .single();
+  if (error) {
+    console.error("[ingest-meetings] agent_drafts insert failed:", error.message);
+    return "";
+  }
+  return (data?.id as string) ?? "";
 }
 
 // ─── Main handler ─────────────────────────────────────────────────────────────

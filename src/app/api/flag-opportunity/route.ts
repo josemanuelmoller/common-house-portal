@@ -14,16 +14,18 @@
  *   - Follow-up Status → "Needed"
  *   - If note provided: prepends "[Flagged {date}: {note}]" to Trigger/Signal
  *
+ * notion-cutoff-2026-06-02: replaced by canonical write to opportunities (Supabase).
+ * Per docs/SUPABASE_CONSOLIDATION_FREEZE.md §3.2 the canonical store for opportunities
+ * is `public.opportunities`. The opportunityId received in the body is the
+ * legacy Notion page id, which is also the upsert key (`notion_id`) on the
+ * Supabase row.
+ *
  * Auth: adminGuardApi()
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { Client } from "@notionhq/client";
 import { adminGuardApi } from "@/lib/require-admin";
-import { prop, text } from "@/lib/notion/core";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
-
-const notion = new Client({ auth: process.env.NOTION_API_KEY });
 
 export async function PATCH(req: NextRequest) {
   const guard = await adminGuardApi();
@@ -38,38 +40,46 @@ export async function PATCH(req: NextRequest) {
   }
 
   try {
-    // Build properties update
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const properties: Record<string, any> = {
-      "Follow-up Status": { select: { name: "Needed" } },
+    const sb = getSupabaseServerClient();
+
+    // Build update payload — always set follow_up_status; optionally prepend a
+    // dated flag prefix to the trigger_signal column.
+    const updatePayload: Record<string, unknown> = {
+      follow_up_status: "Needed",
+      updated_at:       new Date().toISOString(),
     };
 
-    // If a note is provided, prepend it to the existing Trigger/Signal text
     if (note && note.trim()) {
-      // Read current Trigger/Signal value
-      const page = await notion.pages.retrieve({ page_id: opportunityId });
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const existing = text(prop(page as any, "Trigger / Signal")) || "";
+      // Read existing trigger_signal so we can prepend the new flag prefix.
+      const { data: existingRow } = await sb
+        .from("opportunities")
+        .select("trigger_signal")
+        .eq("notion_id", opportunityId)
+        .maybeSingle();
+
+      const existing = (existingRow?.trigger_signal ?? "") as string;
       const dateStr  = new Date().toISOString().slice(0, 10);
       const prefix   = `[Flagged ${dateStr}: ${note.trim()}]`;
       const combined = existing ? `${prefix}\n${existing}` : prefix;
-      properties["Trigger / Signal"] = {
-        rich_text: [{ type: "text", text: { content: combined.slice(0, 2000) } }],
-      };
+      updatePayload.trigger_signal = combined.slice(0, 2000);
+      updatePayload.pending_action = combined.slice(0, 2000);
     }
 
-    await notion.pages.update({ page_id: opportunityId, properties });
+    // notion-cutoff-2026-06-02: replaced by canonical write to opportunities
+    // const properties: Record<string, any> = { "Follow-up Status": { select: { name: "Needed" } } };
+    // if (note) properties["Trigger / Signal"] = { rich_text: [{ text: { content: combined.slice(0, 2000) } }] };
+    // await notion.pages.update({ page_id: opportunityId, properties });
+    const { error } = await sb
+      .from("opportunities")
+      .update(updatePayload)
+      .eq("notion_id", opportunityId);
 
-    // Dual-write to Supabase — makes follow_up_status live immediately
-    try {
-      const sb = getSupabaseServerClient();
-      await sb.from("opportunities")
-        .update({ follow_up_status: "Needed", updated_at: new Date().toISOString() })
-        .eq("notion_id", opportunityId);
-    } catch { /* non-critical */ }
+    if (error) {
+      return NextResponse.json({ error: "Supabase update failed", detail: error.message }, { status: 502 });
+    }
 
     return NextResponse.json({ ok: true, opportunityId });
   } catch (err) {
-    return NextResponse.json({ error: "Notion update failed", detail: String(err) }, { status: 502 });
+    return NextResponse.json({ error: "Update failed", detail: String(err) }, { status: 502 });
   }
 }

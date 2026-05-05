@@ -288,7 +288,7 @@ function buildSignalPrefix(
   return `SIGNALS:${origins.join(",")}|REF:${ref.slice(0, 120)}|DATE:${date}|${context.slice(0, 500)}`;
 }
 
-// ─── Notion writes ────────────────────────────────────────────────────────────
+// ─── Supabase writes ──────────────────────────────────────────────────────────
 
 async function createCandidate(
   c: Classification,
@@ -301,23 +301,57 @@ async function createCandidate(
     signal.meetingDate ?? today,
     c.reason + (signal.fromName ? ` — ${signal.source} from ${signal.fromName}` : ` — ${signal.source}`),
   );
+
+  // notion-cutoff-2026-06-02: replaced by canonical write to opportunities (Supabase).
+  // const page = await notion.pages.create({
+  //   parent: { database_id: DB_OPPORTUNITIES },
+  //   properties: {
+  //     "Opportunity Name":   { title:  [{ text: { content: c.name.slice(0, 100) } }] },
+  //     "Opportunity Status": { select: { name: "New" } },
+  //     "Follow-up Status":   { select: { name: "Needed" } },
+  //     "Scope":              { select: { name: "CH" } },
+  //     "Opportunity Type":   { select: { name: c.type } },
+  //     "Trigger / Signal":   { rich_text: [{ text: { content: pendingAction } }] },
+  //     "Source URL":         { url: signal.gmailUrl ?? signal.meetingUrl },
+  //   },
+  // });
   try {
-    // Verified field names — schema 2026-04-13
-    const page = await notion.pages.create({
-      parent: { database_id: DB_OPPORTUNITIES },
-      properties: {
-        "Opportunity Name":   { title:  [{ text: { content: c.name.slice(0, 100) } }] },
-        "Opportunity Status": { select: { name: "New" } },
-        "Follow-up Status":   { select: { name: "Needed" } },
-        "Scope":              { select: { name: "CH" } },
-        "Opportunity Type":   { select: { name: c.type } },
-        // "Account / Organization" is a relation — org context encoded in Trigger / Signal
-        "Trigger / Signal":   { rich_text: [{ text: { content: pendingAction } }] },
-        ...(signal.gmailUrl   ? { "Source URL": { url: signal.gmailUrl   } } : {}),
-        ...(signal.meetingUrl ? { "Source URL": { url: signal.meetingUrl } } : {}),
-      },
-    });
-    return page.id;
+    const sb = getSupabaseServerClient();
+    const nowIso = new Date().toISOString();
+    const sourceUrl = signal.gmailUrl ?? signal.meetingUrl ?? null;
+    const { data, error } = await sb
+      .from("opportunities")
+      .insert({
+        title:            c.name.slice(0, 100),
+        status:           "New",
+        follow_up_status: "Needed",
+        scope:            "CH",
+        opportunity_type: c.type,
+        trigger_signal:   pendingAction.slice(0, 2000),
+        pending_action:   pendingAction.slice(0, 2000),
+        source_url:       sourceUrl,
+        is_active:        true,
+        is_archived:      false,
+        is_legacy:        false,
+        notion_created_at: nowIso,
+        created_at:       nowIso,
+        updated_at:       nowIso,
+        payload: {
+          source:        "scan-opportunity-candidates",
+          signal_origin: signal.source,
+          signal_ref:    signal.ref,
+          from_name:     signal.fromName ?? null,
+          from:          signal.from ?? null,
+        },
+      })
+      .select("id")
+      .single();
+
+    if (error) {
+      console.error("[scan-candidates] create failed:", error.message);
+      return null;
+    }
+    return (data?.id as string | null) ?? null;
   } catch (err) {
     console.error("[scan-candidates] create failed:", err);
     return null;
@@ -352,14 +386,23 @@ async function enrichCandidate(
   newReason: string,
 ): Promise<boolean> {
   const newPendingAction = buildEnrichedPendingAction(existingPendingAction, existingOrigins, newOrigin, newRef, newDate, newReason);
+  // notion-cutoff-2026-06-02: replaced by canonical write to opportunities (Supabase).
+  // await notion.pages.update({ page_id: candidateId, properties: { "Trigger / Signal": { rich_text: [{ text: { content: newPendingAction.slice(0, 2000) } }] } } });
   try {
-    await notion.pages.update({
-      page_id: candidateId,
-      properties: {
-        // Verified field name: "Trigger / Signal" (not "Pending Action") — schema 2026-04-13
-        "Trigger / Signal": { rich_text: [{ text: { content: newPendingAction.slice(0, 2000) } }] },
-      },
-    });
+    const sb = getSupabaseServerClient();
+    const trimmed = newPendingAction.slice(0, 2000);
+    const { error } = await sb
+      .from("opportunities")
+      .update({
+        trigger_signal: trimmed,
+        pending_action: trimmed,
+        updated_at:     new Date().toISOString(),
+      })
+      .eq("notion_id", candidateId);
+    if (error) {
+      console.error("[scan-candidates] enrich failed:", error.message);
+      return false;
+    }
     return true;
   } catch (err) {
     console.error("[scan-candidates] enrich failed:", err);
@@ -382,16 +425,27 @@ async function enrichActiveOpportunity(
   newReason: string,
 ): Promise<boolean> {
   const newPendingAction = buildEnrichedPendingAction(existingPendingAction, existingOrigins, newOrigin, newRef, newDate, newReason);
+  // notion-cutoff-2026-06-02: replaced by canonical write to opportunities (Supabase).
+  // await notion.pages.update({ page_id: oppId, properties: { "Trigger / Signal": { rich_text: [{ text: { content: newPendingAction.slice(0, 2000) } }] }, "Follow-up Status": { select: { name: "Needed" } } } });
   try {
-    await notion.pages.update({
-      page_id: oppId,
-      properties: {
-        "Trigger / Signal": { rich_text: [{ text: { content: newPendingAction.slice(0, 2000) } }] },
-        // KEY: set Follow-up Status = Needed so the opp passes the CoS signal gate automatically.
-        // This is what makes Neil/COP/Zero Waste Districts surface without a manual Flag click.
-        "Follow-up Status": { select: { name: "Needed" } },
-      },
-    });
+    const sb = getSupabaseServerClient();
+    const trimmed = newPendingAction.slice(0, 2000);
+    const { error } = await sb
+      .from("opportunities")
+      .update({
+        trigger_signal:   trimmed,
+        pending_action:   trimmed,
+        // KEY: set follow_up_status = "Needed" so the opp passes the CoS signal gate
+        // automatically. This is what makes Neil/COP/Zero Waste Districts surface
+        // without a manual Flag click.
+        follow_up_status: "Needed",
+        updated_at:       new Date().toISOString(),
+      })
+      .eq("notion_id", oppId);
+    if (error) {
+      console.error("[scan-candidates] enrich-active failed:", error.message);
+      return false;
+    }
     return true;
   } catch (err) {
     console.error("[scan-candidates] enrich-active failed:", err);

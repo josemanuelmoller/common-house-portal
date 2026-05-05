@@ -22,12 +22,10 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { Client } from "@notionhq/client";
 import { adminGuardApi } from "@/lib/require-admin";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import type { ActionType, LoopStatus } from "@/lib/loops";
 
-const notion = new Client({ auth: process.env.NOTION_API_KEY });
 const VALID_STATUSES = ["Needed", "In Progress", "Waiting", "Done", "Dropped", "Sent", "None"] as const;
 type FollowUpStatus = (typeof VALID_STATUSES)[number];
 
@@ -135,26 +133,27 @@ export async function PATCH(req: NextRequest) {
   }
 
   try {
-    await notion.pages.update({
-      page_id: opportunityId,
-      properties: {
-        "Follow-up Status": { select: { name: status } },
-      },
-    });
+    // notion-cutoff-2026-06-02: replaced by canonical write to opportunities (Supabase).
+    // await notion.pages.update({
+    //   page_id: opportunityId,
+    //   properties: { "Follow-up Status": { select: { name: status } } },
+    // });
+    const sb = getSupabaseServerClient();
+    const { error: updErr } = await sb.from("opportunities")
+      .update({ follow_up_status: status, updated_at: new Date().toISOString() })
+      .eq("notion_id", opportunityId);
 
-    // Dual-write to Supabase opportunities — makes follow_up_status live immediately
-    try {
-      const sb = getSupabaseServerClient();
-      await sb.from("opportunities")
-        .update({ follow_up_status: status, updated_at: new Date().toISOString() })
-        .eq("notion_id", opportunityId);
-    } catch (err) {
-      console.warn("[followup-status] opportunities update failed (non-critical):", err);
+    if (updErr) {
+      console.error("[followup-status] opportunities update failed:", updErr);
+      return NextResponse.json(
+        { error: "Failed to update opportunity", detail: updErr.message },
+        { status: 502 }
+      );
     }
 
     // AWAIT the Loop Engine sync. Previously fire-and-forget, which led to
     // partial-persistence bugs in the Hall. If the loop part fails we still
-    // return 200 (Notion write succeeded) but include a warning so the UI
+    // return 200 (canonical write succeeded) but include a warning so the UI
     // can surface the partial state instead of pretending it's fully done.
     const loopSync = await syncLoopAction(opportunityId, status);
 
@@ -167,9 +166,9 @@ export async function PATCH(req: NextRequest) {
       ...(loopSync.warning ? { warning: loopSync.warning } : {}),
     });
   } catch (err) {
-    console.error("[followup-status] Notion update failed:", err);
+    console.error("[followup-status] update failed:", err);
     return NextResponse.json(
-      { error: "Failed to update Notion record", detail: err instanceof Error ? err.message : String(err) },
+      { error: "Failed to update opportunity", detail: err instanceof Error ? err.message : String(err) },
       { status: 502 }
     );
   }
