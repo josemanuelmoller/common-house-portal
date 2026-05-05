@@ -149,11 +149,13 @@ const DB = {
   dailyBriefings: "d206d6cdb09040d3ac2f34a977ad9f2a",
   watchlist: "d5fad9978ed0436baae4964a0ad0e211",
   competitiveIntel: "af8d7edb750b4131b3b55ef5ee83556a",
-  // CH Engagements / Startup Relationships (per freeze §3.1)
-  engagements: "289f7075XXXXXXXXXXXXXXXXXXXXX1ae9", // TODO: replace placeholder with verified DB ID
-  // Conversations [OS v2] — freeze §3.1 says "(no constant)"
-  // TODO: confirm DB ID before running. If not yet provisioned, the conversations table
-  // import is skipped automatically.
+  // CH Startup Relationships [OS v2] — Engagements live as a data source under
+  // this database. Verified id from Notion ancestor-path on 2026-05-05.
+  engagements: "289f7075acc8448b81ca3dab27f71ae9",
+  // Conversations [OS v2] — Notion does not expose a clean per-thread DB.
+  // Conversations are reconstructed from `conversation_messages` (5988 rows
+  // already in Supabase) + `sources` (Gmail/Fireflies/WhatsApp threads) at
+  // Phase 5. This backfill auto-skips when the id is empty.
   conversations: "" as string,
 } as const;
 

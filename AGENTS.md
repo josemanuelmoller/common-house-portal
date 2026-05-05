@@ -222,3 +222,34 @@ Before declaring any coding task complete, mentally run every applicable item be
 - Treating `200 OK` with empty Supabase data as a healthy result
 - Silent fallback masking a degraded primary data path
 <!-- END:pre-merge-sanity-checklist -->
+
+<!-- BEGIN:notion-deprecation-rules -->
+## Notion deprecation — hard rule
+
+**Cutoff: 2026-06-02 23:59 UTC.** After this date Notion is read-only and
+Supabase is the only source of truth. See `docs/SUPABASE_CONSOLIDATION_FREEZE.md`
+for the full freeze decisions and Notion → Supabase mapping.
+
+Until cutoff:
+
+1. **No new write paths to Notion may be added.** Any PR that introduces
+   `notion.pages.create`, `notion.pages.update`, `notion.databases.update`,
+   or `notion.blocks.children.append` in `src/app/api/**`, `src/lib/**`, or
+   `.claude/agents/**` must be rejected unless it carries a `// notion-cutoff-exempt:
+   <reason>` comment AND the author can defend the exemption against §6 of the
+   freeze doc.
+2. **Existing Notion writes are migrating, not multiplying.** Phase 4 is the
+   tracked migration. See `docs/migration/PHASE_4_5_INVENTORY.md` for the
+   inventory and target Supabase tables.
+3. **`@notionhq/client` imports** in non-archive code paths are tolerated only
+   for read operations and only until the corresponding Phase 4 row ships.
+4. **Mirror tables** (`notion_decision_items`, `notion_daily_briefings`,
+   `notion_insight_briefs`, `notion_watchlist`, `notion_competitive_intel`,
+   `notion_agent_drafts`, `notion_content_pipeline`, `notion_sync_runs`) are
+   slated for `DROP` at Phase 6. New code MUST read/write the canonical
+   replacement (`decision_items`, `daily_briefings`, etc.) — see freeze §3.
+
+After cutoff: `git grep "@notionhq/client"` returning zero hits in non-archive
+code paths is part of the Phase 6 acceptance criteria. CI will gate merges on
+this.
+<!-- END:notion-deprecation-rules -->
