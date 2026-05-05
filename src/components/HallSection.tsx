@@ -19,8 +19,10 @@ type Props = {
   title: string;
   /** Italic Instrument Serif word(s) that follow the title (e.g. "blocks"). */
   flourish?: string;
-  /** Right-aligned mono meta (e.g. "3 PROPOSED · TODAY & TOMORROW"). */
-  meta?: string;
+  /** Right-aligned mono meta (e.g. "3 PROPOSED · TODAY & TOMORROW").
+   *  Accepts ReactNode so callers can render small action buttons / links
+   *  in the meta slot (e.g. an "Open full ↗" link beside the section head). */
+  meta?: ReactNode;
   /** Pass data-hall-tab through so the whole section is tab-scoped. */
   tab?: string;
   children: ReactNode;
