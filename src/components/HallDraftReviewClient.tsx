@@ -137,9 +137,12 @@ export function HallDraftReviewClient({
     const next = { ...draft, quote: { ...draft.quote.candidates[idx], candidates: draft.quote.candidates } };
     setDraft(next);
   }
-  function setQuoteText(text: string) {
+  function setQuoteField<K extends "text" | "speaker_name" | "speaker_role">(
+    field: K,
+    value: string,
+  ) {
     if (!draft || !draft.quote) return;
-    setDraft({ ...draft, quote: { ...draft.quote, text } });
+    setDraft({ ...draft, quote: { ...draft.quote, [field]: value || null } });
   }
   function setAngle(idx: number, patch: Partial<HallDraftAngle>) {
     if (!draft) return;
@@ -256,56 +259,118 @@ export function HallDraftReviewClient({
       <section className="space-y-3">
         <SectionHeader label="QUOTE — pulled-quote hero" />
         <p style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--hall-muted-3)" }}>
-          Verbatim from the counterpart. Pick the one that hits hardest, or edit inline.
+          Verbatim from the counterpart. Edit text + attribution below; Claude&apos;s candidates
+          are listed underneath as one-click loads.
         </p>
-        <div className="space-y-2">
-          {candidates.map((c, i) => {
-            const isPicked = draft.quote?.text === c.text && draft.quote?.speaker_name === c.speaker_name;
-            return (
-              <label
-                key={i}
-                className="flex items-start gap-3 px-4 py-3 cursor-pointer transition-colors"
+
+        {/* Always-editable current quote — what actually goes to the hero */}
+        <div
+          className="p-4 space-y-3"
+          style={{
+            border: "1px solid var(--hall-ink-0)",
+            background: "var(--hall-fill-soft)",
+          }}
+        >
+          <textarea
+            value={draft.quote?.text ?? ""}
+            onChange={e => setQuoteField("text", e.target.value)}
+            placeholder="Quote text…"
+            rows={3}
+            className="w-full bg-transparent resize-none font-serif italic text-[20px] leading-snug focus:outline-none"
+            style={{ color: "var(--hall-ink-0)", fontFamily: "var(--font-hall-display, serif)" }}
+          />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 pt-2" style={{ borderTop: "1px solid var(--hall-line)" }}>
+            <label className="block">
+              <span
                 style={{
-                  border: "1px solid var(--hall-line)",
-                  background: isPicked ? "var(--hall-fill-soft)" : "var(--hall-paper-0)",
+                  fontFamily: "var(--font-hall-mono)", fontSize: 9,
+                  letterSpacing: "0.08em", textTransform: "uppercase",
+                  color: "var(--hall-muted-2)", fontWeight: 700,
                 }}
               >
-                <input
-                  type="radio"
-                  className="mt-1"
-                  checked={isPicked}
-                  onChange={() => pickQuoteCandidate(i)}
-                />
-                <div className="flex-1 min-w-0">
-                  {isPicked ? (
-                    <textarea
-                      value={draft.quote?.text ?? ""}
-                      onChange={e => setQuoteText(e.target.value)}
-                      rows={3}
-                      className="w-full bg-transparent resize-none font-serif italic text-[20px] leading-snug"
-                      style={{ color: "var(--hall-ink-0)", fontFamily: "var(--font-hall-display, serif)" }}
-                    />
-                  ) : (
-                    <p className="font-serif italic text-[20px] leading-snug" style={{ color: "var(--hall-ink-0)" }}>
+                Speaker name
+              </span>
+              <input
+                value={draft.quote?.speaker_name ?? ""}
+                onChange={e => setQuoteField("speaker_name", e.target.value)}
+                placeholder="e.g. Liesbeth van der Meer"
+                className="w-full mt-1 px-2 py-1 text-[12px]"
+                style={{ border: "1px solid var(--hall-line)", color: "var(--hall-ink-0)" }}
+              />
+            </label>
+            <label className="block">
+              <span
+                style={{
+                  fontFamily: "var(--font-hall-mono)", fontSize: 9,
+                  letterSpacing: "0.08em", textTransform: "uppercase",
+                  color: "var(--hall-muted-2)", fontWeight: 700,
+                }}
+              >
+                Speaker role
+              </span>
+              <input
+                value={draft.quote?.speaker_role ?? ""}
+                onChange={e => setQuoteField("speaker_role", e.target.value)}
+                placeholder="e.g. CFO Oceana Global"
+                className="w-full mt-1 px-2 py-1 text-[12px]"
+                style={{ border: "1px solid var(--hall-line)", color: "var(--hall-ink-0)" }}
+              />
+            </label>
+          </div>
+          {draft.quote?.timestamp_seconds != null && (
+            <p style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--hall-muted-3)" }}>
+              transcript timestamp · {Math.floor(draft.quote.timestamp_seconds / 60)}:
+              {String(Math.floor(draft.quote.timestamp_seconds % 60)).padStart(2, "0")}
+            </p>
+          )}
+        </div>
+
+        {/* Claude-generated candidates — one-click load into current */}
+        {candidates.length > 0 && (
+          <div className="space-y-2 pt-2">
+            <p style={{ fontFamily: "var(--font-hall-mono)", fontSize: 9, color: "var(--hall-muted-3)", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+              Other candidates from the transcript ({candidates.length})
+            </p>
+            {candidates.map((c, i) => {
+              const isCurrent = draft.quote?.text === c.text;
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => pickQuoteCandidate(i)}
+                  disabled={isCurrent}
+                  className="w-full text-left flex items-start gap-3 px-4 py-3 transition-colors"
+                  style={{
+                    border: "1px solid var(--hall-line)",
+                    background: "var(--hall-paper-0)",
+                    opacity: isCurrent ? 0.45 : 1,
+                    cursor: isCurrent ? "default" : "pointer",
+                  }}
+                >
+                  <span style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--hall-muted-3)", fontWeight: 700, marginTop: 2 }}>
+                    {String.fromCharCode(65 + i)}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[13px] leading-snug" style={{ color: "var(--hall-ink-3)" }}>
                       &ldquo;{c.text}&rdquo;
                     </p>
-                  )}
-                  <p
-                    className="mt-2"
-                    style={{
-                      fontFamily: "var(--font-hall-mono)",
-                      fontSize: 10,
-                      color: "var(--hall-muted-2)",
-                    }}
-                  >
-                    — {c.speaker_name}{c.speaker_role ? ` · ${c.speaker_role}` : ""}
-                    {c.timestamp_seconds != null ? ` · ${Math.floor(c.timestamp_seconds / 60)}:${String(Math.floor(c.timestamp_seconds % 60)).padStart(2,"0")}` : ""}
-                  </p>
-                </div>
-              </label>
-            );
-          })}
-        </div>
+                    <p
+                      className="mt-1.5"
+                      style={{
+                        fontFamily: "var(--font-hall-mono)", fontSize: 9,
+                        color: "var(--hall-muted-3)",
+                      }}
+                    >
+                      — {c.speaker_name}{c.speaker_role ? ` · ${c.speaker_role}` : ""}
+                      {c.timestamp_seconds != null ? ` · ${Math.floor(c.timestamp_seconds / 60)}:${String(Math.floor(c.timestamp_seconds % 60)).padStart(2,"0")}` : ""}
+                      {isCurrent ? " · current" : " · click to load"}
+                    </p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </section>
 
       {/* ─── Angles ────────────────────────────────────────────────────── */}
