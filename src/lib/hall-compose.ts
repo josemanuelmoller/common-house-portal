@@ -288,11 +288,12 @@ ANGLES: exactly 3, each is a 2-4 word title (uppercase) + 1-2 sentence body. Anc
 
 TIMELINE: include past meetings (from any source) as 'past', the PRIMARY meeting as 'today', and 1-3 'future' milestones derived from action items in the PRIMARY source.
 
-HALL_TEXT: one or two sentences each.
-- challenge = the strategic block they want to overcome (positive framing — "they want to..." not "they fail at...")
-- matters_most = what success looks like for THEM
-- current_focus = the next concrete piece of work the partnership will tackle
-- next_milestone = the next dated event we're driving toward
+HALL_TEXT: one or two sentences each. The Hall page is read BY THE COUNTERPART. So:
+- welcome_note: address the counterpart by FIRST NAME in second person. Frame this as THEIR space (not a meta-description of "both organizations"). Anchor to the actual event/meeting that triggered this Hall (date, format). Avoid third-person blurbs about "the partnership" or "the two orgs" — that reads as press-release copy. Tone: warm but operational. Max 2 sentences. Example shape: "<Name> — este es tu espacio para la conversación con <CH/us>. Acá voy estructurando <what>, <what>, <what> a medida que avanzamos."
+- challenge = the strategic block they want to overcome, in their own framing (positive — "they want to..." not "they fail at..."). Speak in third person here (this field is internal-coloured even if rendered).
+- matters_most = what success looks like for THEM, from their perspective. Third person.
+- current_focus = the next concrete piece of work the partnership will tackle. Third person.
+- next_milestone = the next dated event we are driving toward (with the actual date if known).
 
 Be concise. Overshooting any field hurts the design.`;
 }
