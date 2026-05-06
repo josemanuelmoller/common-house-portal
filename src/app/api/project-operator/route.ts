@@ -20,7 +20,7 @@ import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { Client } from "@notionhq/client";
 import { withRoutineLog } from "@/lib/routine-log";
-import { applyMirrorEdit, pushPending } from "@/lib/notion-mirror-push";
+import { getSupabaseServerClient } from "@/lib/supabase-server";
 
 const notion    = new Client({ auth: process.env.NOTION_API_KEY });
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -182,17 +182,34 @@ async function _POST(req: NextRequest) {
       const draft = await generateDraftUpdate(project.name, project.stage, evidence);
       if (!draft) { errors.push(`Claude generation failed: ${project.name}`); continue; }
 
-      const apply = await applyMirrorEdit({
-        table: "projects",
-        id: project.id,
-        changes: {
+      // notion-cutoff-2026-06-02: replaced by canonical write to projects (Supabase).
+      // Notion → Supabase column mapping:
+      //   "Status Summary"         → status_summary
+      //   "Draft Status Update"    → draft_status_update
+      //   "Project Update Needed?" → update_needed
+      //
+      // await notion.pages.update({
+      //   page_id: project.id,
+      //   properties: {
+      //     "Status Summary":         { rich_text: [{ text: { content: draft } }] },
+      //     "Draft Status Update":    { rich_text: [] },
+      //     "Project Update Needed?": { checkbox: false },
+      //   } as any,
+      // });
+      const sb = getSupabaseServerClient();
+      const { error: updErr } = await sb
+        .from("projects")
+        .update({
           status_summary:      draft,
-          draft_status_update: "",
+          draft_status_update: null,
           update_needed:       false,
-          last_status_update:  new Date().toISOString().slice(0, 10),
-        },
-      });
-      if (apply.ok) await pushPending("projects", project.id);
+          updated_at:          new Date().toISOString(),
+        })
+        .eq("notion_id", project.id);
+      if (updErr) {
+        errors.push(`${project.name}: ${updErr.message}`);
+        continue;
+      }
 
       updated++;
     } catch (err) {

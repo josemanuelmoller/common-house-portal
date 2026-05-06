@@ -2,21 +2,23 @@ import { NextRequest, NextResponse } from "next/server";
 import crypto from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 import { adminGuardApi } from "@/lib/require-admin";
-import { notion, DB } from "@/lib/notion";
 import { buildPersonIndex, resolvePerson, type PersonIndex, type ResolutionReason } from "@/lib/person-resolver";
 
 // Clipper API — receives clippings from the Chrome extension.
 //
 // Two flavours on the same endpoint:
 //  1. Web clip    — body: { url, title, selection, notes, projectId? }
-//                   Creates a CH Sources [OS v2] record with
-//                   Source Type=Clipping, Platform=Web.
+//                   Creates a `sources` (Source Type=Clipping, Platform=Web) row.
 //  2. WhatsApp    — body: { url, chat_name, messages[], raw_content, notes,
 //                           source_type: "whatsapp" }
-//                   Creates a Source (Type=Conversation, Platform=WhatsApp),
+//                   Creates a `sources` (Source Type=Conversation, Platform=WhatsApp) row,
 //                   writes full raw to Supabase, splits messages into the
 //                   conversation_messages table, fuzzy-matches senders against
 //                   people (name + aliases), auto-links mentioned projects.
+//
+// notion-cutoff-2026-06-02: replaced by canonical writes to `sources` (Supabase).
+// Per docs/SUPABASE_CONSOLIDATION_FREEZE.md §3.1 sources is already canonical
+// in Supabase; the Notion CH Sources [OS v2] DB becomes a read-only archive.
 //
 // Auth:
 //  - Bearer token:   Authorization: Bearer <CLIPPER_TOKEN>  (Chrome extension)
@@ -119,20 +121,27 @@ function detectProjects(
 
 // ─── Dedup ────────────────────────────────────────────────────────────────────
 
-async function findExistingByDedupKey(dedupKey: string): Promise<string | null> {
+async function findExistingByDedupKey(
+  sb: ReturnType<typeof getSupabase>,
+  dedupKey: string,
+): Promise<{ id: string; notion_id: string | null } | null> {
+  // notion-cutoff-2026-06-02: replaced by canonical read from sources (Supabase)
+  // const res = await notion.databases.query({ database_id: DB.sources, filter: { property: "Dedup Key", rich_text: { equals: dedupKey } }, page_size: 1 });
   try {
-    const res = await notion.databases.query({
-      database_id: DB.sources,
-      filter: { property: "Dedup Key", rich_text: { equals: dedupKey } },
-      page_size: 1,
-    });
-    return res.results[0]?.id ?? null;
+    const { data } = await sb
+      .from("sources")
+      .select("id, notion_id")
+      .eq("dedup_key", dedupKey)
+      .limit(1)
+      .maybeSingle();
+    if (!data) return null;
+    return { id: data.id as string, notion_id: (data.notion_id as string | null) ?? null };
   } catch {
     return null;
   }
 }
 
-// ─── Web clip handler (existing behaviour, kept stable) ──────────────────────
+// ─── Web clip handler ────────────────────────────────────────────────────────
 
 async function handleWebClip(body: ClipBody) {
   const { url, title, selection, notes, projectId } = body;
@@ -145,62 +154,61 @@ async function handleWebClip(body: ClipBody) {
   const dedupSeed = `${url}::${selectionText.slice(0, 500)}`;
   const dedupKey  = `clipping:${crypto.createHash("sha256").update(dedupSeed).digest("hex").slice(0, 32)}`;
 
-  const existingId = await findExistingByDedupKey(dedupKey);
-  if (existingId) return corsJson({ ok: true, id: existingId, deduped: true });
+  const sb = getSupabase();
+  const existing = await findExistingByDedupKey(sb, dedupKey);
+  if (existing) return corsJson({ ok: true, id: existing.notion_id ?? existing.id, deduped: true });
 
   const summaryParts: string[] = [];
   if (selectionText) summaryParts.push(selectionText);
   if (notesText)     summaryParts.push(`\n— Notes —\n${notesText}`);
   const processedSummary = summaryParts.join("\n").slice(0, 1900);
 
-  const properties: Record<string, unknown> = {
-    "Source Title":      { title: [{ text: { content: pageTitle } }] },
-    "Source Type":       { select: { name: "Clipping" } },
-    "Source Platform":   { select: { name: "Web" } },
-    "Source URL":        { url },
-    "Processing Status": { select: { name: "Ingested" } },
-    "Source Date":       { date: { start: today } },
-    "Dedup Key":         { rich_text: [{ text: { content: dedupKey } }] },
-  };
-  if (processedSummary) properties["Processed Summary"] = { rich_text: [{ text: { content: processedSummary } }] };
-  if (projectId)        properties["Linked Projects"]   = { relation: [{ id: projectId }] };
-
+  // notion-cutoff-2026-06-02: replaced by canonical write to sources (Supabase)
+  // const properties: Record<string, unknown> = {
+  //   "Source Title":      { title: [{ text: { content: pageTitle } }] },
+  //   "Source Type":       { select: { name: "Clipping" } },
+  //   "Source Platform":   { select: { name: "Web" } },
+  //   "Source URL":        { url },
+  //   "Processing Status": { select: { name: "Ingested" } },
+  //   "Source Date":       { date: { start: today } },
+  //   "Dedup Key":         { rich_text: [{ text: { content: dedupKey } }] },
+  //   "Processed Summary": { rich_text: [{ text: { content: processedSummary } }] },
+  //   "Linked Projects":   { relation: [{ id: projectId }] },
+  // };
+  // const page = await notion.pages.create({ parent: { database_id: DB.sources }, properties });
+  const nowIso = new Date().toISOString();
   try {
-    const page = await notion.pages.create({
-      parent: { database_id: DB.sources },
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      properties: properties as any,
-    });
+    const insertRow: Record<string, unknown> = {
+      title:              pageTitle,
+      source_type:        "Clipping",
+      source_platform:    "Web",
+      processing_status:  "Ingested",
+      processed_summary:  processedSummary,
+      dedup_key:          dedupKey,
+      source_url:         url,
+      source_date:        today,
+      notion_created_at:  nowIso,
+      created_at:         nowIso,
+      updated_at:         nowIso,
+      raw_content:        selectionText.length > 1500 ? selectionText : null,
+      raw_content_size:   selectionText.length,
+      project_notion_id:  projectId ?? null,
+    };
 
-    // Also persist the full selection to Supabase so a long clip isn't lost to
-    // Notion's 2000-char rich_text cap. Best-effort — doesn't block the response.
-    if (selectionText.length > 1500) {
-      try {
-        const sb = getSupabase();
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const createdTime = (page as any).created_time as string | undefined;
-        await sb.from("sources").upsert({
-          notion_id:          page.id,
-          title:              pageTitle,
-          source_type:        "Clipping",
-          source_platform:    "Web",
-          processing_status:  "Ingested",
-          processed_summary:  processedSummary,
-          dedup_key:          dedupKey,
-          source_url:         url,
-          source_date:        today,
-          notion_created_at:  createdTime ?? new Date().toISOString(),
-          raw_content:        selectionText,
-          raw_content_size:   selectionText.length,
-        }, { onConflict: "notion_id" });
-      } catch (e) {
-        console.warn("[clipper] web clip Supabase persist failed:", e);
-      }
+    const { data, error } = await sb
+      .from("sources")
+      .insert(insertRow)
+      .select("id, notion_id")
+      .single();
+
+    if (error || !data) {
+      const message = error?.message ?? "Unknown Supabase error";
+      return corsJson({ error: message }, 500);
     }
 
-    return corsJson({ ok: true, id: page.id, deduped: false });
+    return corsJson({ ok: true, id: data.notion_id ?? data.id, deduped: false });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown Notion error";
+    const message = err instanceof Error ? err.message : "Unknown Supabase error";
     return corsJson({ error: message }, 500);
   }
 }
@@ -221,10 +229,11 @@ async function handleWhatsappClip(body: ClipBody, req: NextRequest) {
   const dedupSeed = `${url}::${chatTitle}::${first.ts ?? ""}::${last.ts ?? ""}::${messages.length}`;
   const dedupKey  = `whatsapp:${crypto.createHash("sha256").update(dedupSeed).digest("hex").slice(0, 32)}`;
 
-  const existingId = await findExistingByDedupKey(dedupKey);
-  if (existingId) return corsJson({ ok: true, id: existingId, deduped: true });
+  const sb = getSupabase();
+  const existing = await findExistingByDedupKey(sb, dedupKey);
+  if (existing) return corsJson({ ok: true, id: existing.notion_id ?? existing.id, deduped: true });
 
-  // Build the compact Notion summary (fits in 1900 chars)
+  // Build the compact summary (fits in 1900 chars)
   const rangeStr = `${first.date} ${first.time} — ${last.date} ${last.time}`;
   const summaryLines: string[] = [
     `Chat: ${chatTitle} (WhatsApp)`,
@@ -238,51 +247,30 @@ async function handleWhatsappClip(body: ClipBody, req: NextRequest) {
   }
   const processedSummary = summaryLines.join("\n").slice(0, 1900);
 
-  // source_date = last message timestamp. This matches the pattern used for
-  // meetings (meeting date) and email threads (last message date). Full-history
-  // clips that span months still surface in "recent activity" views that way.
+  // source_date = last message timestamp.
   const today      = new Date().toISOString().slice(0, 10);
   const sourceDate = last.ts ? new Date(last.ts).toISOString().slice(0, 10)
                     : first.ts ? new Date(first.ts).toISOString().slice(0, 10)
                     : today;
 
-  // 1. Notion page
-  const notionProps: Record<string, unknown> = {
-    "Source Title":      { title: [{ text: { content: chatTitle } }] },
-    "Source Type":       { select: { name: "Conversation" } },
-    "Source Platform":   { select: { name: "WhatsApp" } },
-    "Source URL":        { url },
-    "Processing Status": { select: { name: "Ingested" } },
-    "Source Date":       { date: { start: sourceDate } },
-    "Dedup Key":         { rich_text: [{ text: { content: dedupKey } }] },
-    "Processed Summary": { rich_text: [{ text: { content: processedSummary } }] },
-  };
-
-  let notionId: string;
-  let notionCreatedAt: string | undefined;
-  try {
-    const page = await notion.pages.create({
-      parent: { database_id: DB.sources },
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      properties: notionProps as any,
-    });
-    notionId        = page.id;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    notionCreatedAt = (page as any).created_time as string | undefined;
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Notion error";
-    return corsJson({ error: "Failed to create Notion page: " + message }, 500);
-  }
-
-  // 2. Supabase: upsert sources row (so we have source_id for FK), then write
-  //    raw + normalized messages
-  const sb = getSupabase();
-  const rawText = raw_content ?? "";
+  // notion-cutoff-2026-06-02: replaced by canonical write to sources (Supabase)
+  // const notionProps: Record<string, unknown> = {
+  //   "Source Title":      { title: [{ text: { content: chatTitle } }] },
+  //   "Source Type":       { select: { name: "Conversation" } },
+  //   "Source Platform":   { select: { name: "WhatsApp" } },
+  //   "Source URL":        { url },
+  //   "Processing Status": { select: { name: "Ingested" } },
+  //   "Source Date":       { date: { start: sourceDate } },
+  //   "Dedup Key":         { rich_text: [{ text: { content: dedupKey } }] },
+  //   "Processed Summary": { rich_text: [{ text: { content: processedSummary } }] },
+  // };
+  // const page = await notion.pages.create({ parent: { database_id: DB.sources }, properties: notionProps });
+  const rawText  = raw_content ?? "";
+  const nowIso   = new Date().toISOString();
 
   const { data: srcRow, error: srcErr } = await sb
     .from("sources")
-    .upsert({
-      notion_id:         notionId,
+    .insert({
       title:             chatTitle,
       source_type:       "Conversation",
       source_platform:   "WhatsApp",
@@ -291,40 +279,33 @@ async function handleWhatsappClip(body: ClipBody, req: NextRequest) {
       dedup_key:         dedupKey,
       source_url:        url,
       source_date:       sourceDate,
-      notion_created_at: notionCreatedAt ?? new Date().toISOString(),
+      notion_created_at: nowIso,
+      created_at:        nowIso,
+      updated_at:        nowIso,
       raw_content:       rawText,
       raw_content_size:  rawText.length,
-    }, { onConflict: "notion_id" })
-    .select("id")
+    })
+    .select("id, notion_id")
     .single();
 
   if (srcErr || !srcRow) {
-    console.error("[clipper] WA sources upsert failed:", srcErr);
-    return corsJson({
-      ok: true,
-      id: notionId,
-      deduped: false,
-      messages_stored: 0,
-      warning: "Supabase source upsert failed — messages not persisted",
-    });
+    console.error("[clipper] WA sources insert failed:", srcErr);
+    return corsJson({ error: "Failed to create source: " + (srcErr?.message ?? "unknown") }, 500);
   }
 
   const sourceId = srcRow.id as string;
+  const sourceExternalId = (srcRow.notion_id as string | null) ?? sourceId;
 
   // 3. Build matcher indexes
   const [peopleIdx, projectIdx] = await Promise.all([
     buildPersonIndex(sb),
     fetchProjectIndex(sb),
   ]);
+  void (peopleIdx as PersonIndex);
 
-  // 4. Transform + match. Every message is resolved through the shared
-  // person-resolver so strategy + confidence can be surfaced later in
-  // orphan_match_candidates when sender_person_id lands null at write time.
+  // 4. Transform + match.
   const matchedProjects = new Set<string>();
   let matchedPeopleCount = 0;
-  // Track per-sender state — count, resolver result, original-case name, and
-  // first/last message timestamps. The first/last ts lets us stamp the
-  // newly-created `people` rows with first_seen_at / last_seen_at accurately.
   const bySender: Map<string, {
     count: number;
     match: ReturnType<typeof resolvePerson>;
@@ -354,7 +335,7 @@ async function handleWhatsappClip(body: ClipBody, req: NextRequest) {
     for (const pid of detectProjects(m.text, projectIdx)) matchedProjects.add(pid);
     return {
       source_id:        sourceId,
-      notion_id:        notionId,
+      notion_id:        sourceExternalId,
       ts,
       sender_name:      m.sender || "(unknown)",
       sender_person_id: match.person_id,
@@ -385,52 +366,38 @@ async function handleWhatsappClip(body: ClipBody, req: NextRequest) {
   }
 
   // 6a. New senders with NO match — create a "suggested" people row.
-  // This closes the gap where a WA-first contact would otherwise stay
-  // invisible until they appeared in Calendar/Gmail/Fireflies. The row is
-  // marked auto_suggested="whatsapp_clipper" so the admin can review / classify
-  // it at /admin/hall/contacts. Until classified, the person is not yet in
-  // the person-resolver index (buildPersonIndex re-reads each clip).
   try {
     const newPeopleRows: Array<Record<string, unknown>> = [];
-    const nowIso = new Date().toISOString();
+    const suggestedAt = new Date().toISOString();
     for (const [senderKey, info] of bySender) {
       if (!senderKey || info.match.is_self) continue;
-      if (info.match.person_id) continue;           // matched or orphan candidate → skip
-      if (senderKey.length < 2) continue;            // skip "?" and other placeholders
+      if (info.match.person_id) continue;
+      if (senderKey.length < 2) continue;
       newPeopleRows.push({
         email:             null,
         full_name:         info.displayName,
         display_name:      info.displayName,
         aliases:           [senderKey],
         auto_suggested:    "whatsapp_clipper",
-        auto_suggested_at: nowIso,
-        first_seen_at:     info.first_ts ?? nowIso,
-        last_seen_at:      info.last_ts  ?? nowIso,
-        created_at:        nowIso,
-        updated_at:        nowIso,
+        auto_suggested_at: suggestedAt,
+        first_seen_at:     info.first_ts ?? suggestedAt,
+        last_seen_at:      info.last_ts  ?? suggestedAt,
+        created_at:        suggestedAt,
+        updated_at:        suggestedAt,
       });
     }
     if (newPeopleRows.length) {
-      // Best-effort. Dupes (same sender clipped twice) are handled at review
-      // time by the admin / orphan-match flow.
       await sb.from("people").insert(newPeopleRows);
     }
   } catch (e) {
     console.warn("[clipper] people suggest (whatsapp_clipper) failed:", e);
   }
 
-  // 6b. For any sender that resolved with medium confidence (< 0.8),
-  // file an orphan_match_candidate so it can be reviewed and approved later
-  // without blocking the clip. Exact-email matches (conf 1) skip this.
+  // 6b. Medium-confidence matches → orphan_match_candidate
   try {
     const rows: Array<Record<string, unknown>> = [];
     for (const [senderKey, info] of bySender) {
       if (!senderKey || info.match.is_self) continue;
-      // Only file candidates for LOW-to-MEDIUM confidence matches (0.6-0.8).
-      // Higher confidence (email=1.0, exact_full_name=0.95, alias=0.85) are
-      // trusted → no admin review needed. On approve, the system adds the
-      // sender_name as an alias so the next clip resolves at higher confidence
-      // and skips this path entirely (the "learning" loop).
       if (info.match.confidence >= 0.8) continue;
       if (!info.match.person_id) continue;
       rows.push({
@@ -453,27 +420,25 @@ async function handleWhatsappClip(body: ClipBody, req: NextRequest) {
     console.warn("[clipper] orphan_match_candidates file failed:", e);
   }
 
-  // 7. Update Linked Projects on the Notion page with everything we matched
+  // 7. Persist matched projects.
+  // notion-cutoff-2026-06-02: replaced by canonical write to sources.project_notion_id (Supabase)
+  // await notion.pages.update({ page_id: notionId, properties: { "Linked Projects": { relation: [...matchedProjects].map(id => ({ id })) } } });
+  // Note: sources currently models Linked Projects as a single FK column
+  // (project_notion_id). When multiple projects match, we keep the first match
+  // here; full multi-project linking awaits a junction table.
   if (matchedProjects.size) {
     try {
-      await notion.pages.update({
-        page_id: notionId,
-        properties: {
-          "Linked Projects": {
-            relation: [...matchedProjects].map(id => ({ id })),
-          },
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } as any,
-      });
+      const projectArr = [...matchedProjects];
+      await sb.from("sources").update({
+        project_notion_id: projectArr[0],
+        updated_at:        new Date().toISOString(),
+      }).eq("id", sourceId);
     } catch (e) {
-      console.warn("[clipper] Linked Projects update failed:", e);
+      console.warn("[clipper] sources project link update failed:", e);
     }
   }
 
-  // 8. Fire-and-forget AI distill — Haiku extracts Evidence (Decisions,
-  // Blockers, Outcomes, Commitments, etc.) from raw_content in the background.
-  // Not awaited: the user sees "Saved" immediately, Evidence lands in Notion
-  // in ~30-60s via the extraction endpoint.
+  // 8. Fire-and-forget AI distill.
   try {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL
       ?? `${req.nextUrl.protocol}//${req.nextUrl.host}`;
@@ -483,7 +448,7 @@ async function handleWhatsappClip(body: ClipBody, req: NextRequest) {
         method:  "POST",
         headers: { "Content-Type": "application/json", "x-agent-key": agentKey },
         body:    JSON.stringify({ source_id: sourceId }),
-      }).catch(() => { /* silence — extraction failure shouldn't break the clip */ });
+      }).catch(() => { /* silence */ });
     }
   } catch (e) {
     console.warn("[clipper] AI distill trigger failed:", e);
@@ -491,7 +456,7 @@ async function handleWhatsappClip(body: ClipBody, req: NextRequest) {
 
   return corsJson({
     ok:               true,
-    id:               notionId,
+    id:               sourceExternalId,
     deduped:          false,
     messages_stored:  messagesStored,
     people_matched:   matchedPeopleCount,

@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@supabase/supabase-js";
 import { adminGuardApi } from "@/lib/require-admin";
-import { createKnowledgeAssetDraft, notion } from "@/lib/notion";
+// notion-cutoff-2026-06-02: createKnowledgeAssetDraft + notion archive write
+// replaced by canonical writes to `knowledge_assets`. Imports retained as
+// commented references; will be deleted at Phase 6.
+// import { createKnowledgeAssetDraft, notion } from "@/lib/notion";
 
 export const maxDuration = 120;
 
@@ -169,26 +172,72 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Create Knowledge Asset draft in Notion
+  // notion-cutoff-2026-06-02: replaced by canonical write to knowledge_assets
+  // Previously: notionId = await createKnowledgeAssetDraft({ ... }) which
+  // called notion.pages.create against DB.knowledge with properties
+  //   "Asset Name" → title, "Asset Type" → asset_type, "Domain / Theme" → tags,
+  //   "Status" → status, "Portal Visibility" → payload, "Source File URL" → payload.
+  //
+  // Notion → Supabase (knowledge_assets) column mapping:
+  //   Asset Name        → title
+  //   Asset Type        → asset_type
+  //   Status            → status (always "Draft" for ingestion)
+  //   summary text      → summary
+  //   keyPoints + body  → body_md
+  //   Domain/Theme tags → payload.tags (until Phase 6 binds a column)
+  //   Source File URL   → payload.source_file_url
+  //   Portal Visibility → payload.portal_visibility
   let notionId: string | null = null;
   try {
-    notionId = await createKnowledgeAssetDraft({
-      title: parsed.title,
-      summary: parsed.summary,
-      keyPoints: parsed.keyPoints ?? [],
-      assetType: parsed.assetType ?? "Reference",
-      tags: parsed.tags ?? [],
-      sourceNote,
-      sourceFileUrl,
-      storagePath,
-    });
+    const sb = getSupabase();
+    const bodyParts: string[] = [parsed.summary || ""];
+    if ((parsed.keyPoints ?? []).length > 0) {
+      bodyParts.push("");
+      bodyParts.push("Key points:");
+      for (const pt of (parsed.keyPoints ?? []).slice(0, 8)) {
+        bodyParts.push(`- ${pt}`);
+      }
+    }
+    if (sourceNote || storagePath) {
+      bodyParts.push("");
+      bodyParts.push([
+        sourceNote   ? `Source: ${sourceNote}`     : null,
+        storagePath  ? `storage: ${storagePath}`   : null,
+      ].filter(Boolean).join("  ·  "));
+    }
+    const bodyMd = bodyParts.join("\n");
+
+    const { data: row, error: insertErr } = await sb
+      .from("knowledge_assets")
+      .insert({
+        title:        parsed.title,
+        asset_type:   parsed.assetType ?? "Reference",
+        status:       "Draft",
+        summary:      parsed.summary,
+        body_md:      bodyMd,
+        payload:      {
+          tags:               (parsed.tags ?? []).slice(0, 5),
+          source_file_url:    sourceFileUrl ?? null,
+          source_note:        sourceNote || null,
+          storage_path:       storagePath ?? null,
+          portal_visibility:  "admin-only",
+          is_external:        parsed.isExternal ?? false,
+          source_agent:       "ingest-library",
+        },
+      })
+      .select("id")
+      .single();
+    if (insertErr) {
+      throw new Error(insertErr.message);
+    }
+    notionId = (row?.id as string) ?? null;
   } catch (err) {
-    console.error("[ingest-library] Notion create error:", err);
-    // If Notion fails but we uploaded the file, clean it up
+    console.error("[ingest-library] Knowledge asset insert error:", err);
+    // If insert fails but we uploaded the file, clean it up
     if (storagePath) {
       await getSupabase().storage.from(BUCKET).remove([storagePath]);
     }
-    return NextResponse.json({ error: "Notion create failed" }, { status: 500 });
+    return NextResponse.json({ error: "Knowledge asset insert failed" }, { status: 500 });
   }
 
   return NextResponse.json({
@@ -213,10 +262,30 @@ export async function DELETE(req: NextRequest) {
   const errs: string[] = [];
 
   if (notionId) {
+    // notion-cutoff-2026-06-02: replaced by canonical write to knowledge_assets
+    // await notion.pages.update({ page_id: notionId, archived: true });
+    //
+    // Notion → Supabase mapping: archived → status="Archived". The DELETE
+    // handler accepts either the new Supabase row id (uuid) or a legacy
+    // Notion page id; try both keys.
     try {
-      await notion.pages.update({ page_id: notionId, archived: true });
-    } catch {
-      errs.push("Failed to archive Notion record");
+      const sb = getSupabase();
+      const nowIso = new Date().toISOString();
+      // Match by Supabase uuid first (current contract), then fall back to
+      // legacy notion_id string for rows still keyed off Notion.
+      let { error } = await sb
+        .from("knowledge_assets")
+        .update({ status: "Archived", updated_at: nowIso })
+        .eq("id", notionId);
+      if (error) {
+        ({ error } = await sb
+          .from("knowledge_assets")
+          .update({ status: "Archived", updated_at: nowIso })
+          .eq("notion_id", notionId));
+      }
+      if (error) errs.push(`Failed to archive knowledge asset: ${error.message}`);
+    } catch (e) {
+      errs.push(`Failed to archive knowledge asset: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
 

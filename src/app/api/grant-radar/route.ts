@@ -21,15 +21,17 @@ import { Client } from "@notionhq/client";
 import { auth } from "@clerk/nextjs/server";
 import { isAdminUser } from "@/lib/clients";
 import { withRoutineLog } from "@/lib/routine-log";
+import { getSupabaseServerClient } from "@/lib/supabase-server";
 
 export const maxDuration = 300;
 export const dynamic = "force-dynamic";
 
+// Notion read client retained for project read-path until Phase 4 read migration
+// (active projects are read-only here; writes are no longer Notion-bound).
 const notion    = new Client({ auth: process.env.NOTION_API_KEY });
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 const DB_PROJECTS      = "49d59b18095f46588960f2e717832c5f";
-const DB_OPPORTUNITIES = "687caa98594a41b595c9960c141be0c0";
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
@@ -89,18 +91,17 @@ async function fetchActiveProjects(): Promise<{ ch: ProjectSummary[]; startups: 
 }
 
 async function dedupeGrantCheck(grantName: string): Promise<boolean> {
+  // notion-cutoff-2026-06-02: replaced by canonical read from opportunities (Supabase)
+  // const res = await notion.databases.query({ database_id: DB_OPPORTUNITIES, filter: { and: [{ property: "Opportunity Type", select: { equals: "Grant" } }, { property: "Opportunity Name", title: { contains: grantName.slice(0, 40) } }] }, page_size: 1 });
   try {
-    const res = await notion.databases.query({
-      database_id: DB_OPPORTUNITIES,
-      filter: {
-        and: [
-          { property: "Opportunity Type", select: { equals: "Grant" } },
-          { property: "Opportunity Name", title: { contains: grantName.slice(0, 40) } },
-        ],
-      },
-      page_size: 1,
-    });
-    return res.results.length > 0;
+    const sb = getSupabaseServerClient();
+    const { data } = await sb
+      .from("opportunities")
+      .select("id")
+      .eq("opportunity_type", "Grant")
+      .ilike("title", `%${grantName.slice(0, 40)}%`)
+      .limit(1);
+    return !!(data && data.length > 0);
   } catch {
     return false;
   }
@@ -123,30 +124,52 @@ interface GrantOpportunity {
 }
 
 async function createGrantOpportunity(opp: GrantOpportunity): Promise<string | null> {
+  // notion-cutoff-2026-06-02: replaced by canonical write to opportunities (Supabase).
+  // const page = await notion.pages.create({ parent: { database_id: DB_OPPORTUNITIES }, properties: { "Opportunity Name": ..., "Opportunity Type": ..., "Opportunity Status": ..., "Scope": ..., "Priority": ..., "Source URL": ..., "Why There Is Fit": ..., "Notes": ..., "Trigger / Signal": ..., "Expected Close Date": ... } });
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const properties: Record<string, any> = {
-      "Opportunity Name":  { title: [{ text: { content: opp.name.slice(0, 200) } }] },
-      "Opportunity Type":  { select: { name: "Grant" } },
-      "Opportunity Status":{ select: { name: "New" } },
-      "Scope":             { select: { name: opp.scope === "Common House" ? "CH" : "Portfolio" } },
-      "Priority":          { select: { name: urgencyToPriority(opp.urgency) } },
-      "Source URL":        { url: opp.sourceUrl || null },
-      "Why There Is Fit":  { rich_text: [{ text: { content: opp.summary.slice(0, 2000) } }] },
-      "Notes":             { rich_text: [{ text: { content: buildNotes(opp) } }] },
-      "Trigger / Signal":  { rich_text: [{ text: { content: `Grant Radar — fit score ${opp.fitScore}/100${opp.amount ? ` · ${opp.amount}` : ""}` } }] },
+    const sb = getSupabaseServerClient();
+    const nowIso = new Date().toISOString();
+    const triggerSignal = `Grant Radar — fit score ${opp.fitScore}/100${opp.amount ? ` · ${opp.amount}` : ""}`;
+    const insertPayload: Record<string, unknown> = {
+      title:               opp.name.slice(0, 200),
+      opportunity_type:    "Grant",
+      status:              "New",
+      scope:               opp.scope === "Common House" ? "CH" : "Portfolio",
+      priority:            urgencyToPriority(opp.urgency),
+      source_url:          opp.sourceUrl || null,
+      why_there_is_fit:    opp.summary.slice(0, 2000),
+      notes:               buildNotes(opp),
+      trigger_signal:      triggerSignal,
+      pending_action:      triggerSignal,
+      expected_close_date: opp.deadline || null,
+      is_active:           true,
+      is_archived:         false,
+      is_legacy:           false,
+      notion_created_at:   nowIso,
+      created_at:          nowIso,
+      updated_at:          nowIso,
+      payload: {
+        funder:    opp.funder,
+        program:   opp.program,
+        amount:    opp.amount,
+        fit_score: opp.fitScore,
+        urgency:   opp.urgency,
+        startup:   opp.startup ?? null,
+        source:    "grant-radar",
+      },
     };
 
-    // Correct field name is "Expected Close Date", not "Deadline"
-    if (opp.deadline) {
-      properties["Expected Close Date"] = { date: { start: opp.deadline } };
-    }
+    const { data, error } = await sb
+      .from("opportunities")
+      .insert(insertPayload)
+      .select("id")
+      .single();
 
-    const page = await notion.pages.create({
-      parent: { database_id: DB_OPPORTUNITIES },
-      properties,
-    });
-    return page.id;
+    if (error) {
+      console.error("[grant-radar] create opportunity failed:", error.message);
+      return null;
+    }
+    return (data?.id as string | null) ?? null;
   } catch (err) {
     console.error("[grant-radar] create opportunity failed:", err);
     return null;
@@ -329,7 +352,7 @@ async function _POST(req: NextRequest) {
     errors:           0,
   };
 
-  // 4. Write to Notion (execute mode only)
+  // 4. Write to Supabase (execute mode only). notion-cutoff-2026-06-02: was Notion.
   if (mode === "execute") {
     const allTop = [...chOpps, ...startupOpps];
     for (const opp of allTop) {

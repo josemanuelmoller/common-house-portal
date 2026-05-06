@@ -4,8 +4,11 @@ import { Sidebar } from "@/components/Sidebar";
 import { requireAdmin } from "@/lib/require-admin";
 import { getOrganizationDetail, type TimelineEntry } from "@/lib/contacts";
 import { getOrgCrossRef, getOrgStrongestRelationships } from "@/lib/contact-profile";
+import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { HallOrganizationTagEditor } from "@/components/HallOrganizationTagEditor";
 import { HallContactRow } from "@/components/HallContactRow";
+import { OrganizationEditor } from "@/components/OrganizationEditor";
+import { HallSection } from "@/components/HallSection";
 
 export const dynamic = "force-dynamic";
 
@@ -48,6 +51,35 @@ export default async function OrganizationDrawer({ params }: Props) {
     getOrgCrossRef(org?.notion_id ?? null),
     getOrgStrongestRelationships(domain),
   ]);
+
+  // Read canonical organizations row (Phase 1 freeze: Supabase = source of truth).
+  // Embedded in the Hall org page so admins can edit the full row from here
+  // without going through Notion.
+  type OrgFullRow = {
+    id: string;
+    notion_id: string | null;
+    name: string | null;
+    relationship_stage: string | null;
+    org_category: string | null;
+    country: string | null;
+    city: string | null;
+    website: string | null;
+    notes: string | null;
+    engagement_type: string | null;
+    engagement_value: number | null;
+  };
+  let orgFullRow: OrgFullRow | null = null;
+  if (org?.notion_id) {
+    const sb = getSupabaseServerClient();
+    const { data } = await sb
+      .from("organizations")
+      .select(
+        "id, notion_id, name, relationship_stage, org_category, country, city, website, notes, engagement_type, engagement_value"
+      )
+      .eq("notion_id", org.notion_id)
+      .maybeSingle();
+    orgFullRow = (data as OrgFullRow | null) ?? null;
+  }
 
   // Warmth + role breakdown from contacts list
   const warmthBreakdown = contacts.reduce((acc, c) => {
@@ -354,6 +386,26 @@ export default async function OrganizationDrawer({ params }: Props) {
                 ))}
               </ul>
             </section>
+          )}
+
+          {/* Organization record (canonical Supabase row) — full editor */}
+          {orgFullRow && (
+            <HallSection title="Organization" flourish="record" meta={`${orgFullRow.relationship_stage ?? "—"} · ${orgFullRow.org_category ?? "—"}`}>
+              <OrganizationEditor
+                id={orgFullRow.id}
+                initial={{
+                  name: orgFullRow.name ?? "",
+                  relationship_stage: orgFullRow.relationship_stage,
+                  org_category: orgFullRow.org_category,
+                  country: orgFullRow.country,
+                  city: orgFullRow.city,
+                  website: orgFullRow.website,
+                  notes: orgFullRow.notes,
+                  engagement_type: orgFullRow.engagement_type,
+                  engagement_value: orgFullRow.engagement_value,
+                }}
+              />
+            </HallSection>
           )}
 
           {/* Classification editor (server-side data, client-side chips) */}

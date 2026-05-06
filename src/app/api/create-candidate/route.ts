@@ -7,27 +7,23 @@
  * Body:
  *   { fromName: string, from: string, subject: string, snippet?: string, gmailUrl?: string }
  *
- * Creates Opportunity Status="New" in Opportunities [OS v2] with:
- *   - Opportunity Name: derived from subject + fromName
- *   - Trigger / Signal: inbox context (fromName, email, snippet)
- *   - Source URL: Gmail thread URL
- *   - Opportunity Status: New, Follow-up Status: Needed, Scope: CH
+ * Creates status="New" in `public.opportunities` with:
+ *   - title:            derived from subject + fromName
+ *   - trigger_signal:   inbox context (fromName, email, snippet)
+ *   - source_url:       Gmail thread URL
+ *   - status:           "New"
+ *   - follow_up_status: "Needed"
+ *   - scope:            "CH"
  *
- * Field names verified against Notion schema 2026-04-13:
- *   "Opportunity Status" (select: New|Qualifying|Active|Stalled|Closed Won|Closed Lost)
- *   "Opportunity Type"   (select)
- *   "Trigger / Signal"   (rich_text) — replaces old "Pending Action"
- *   "Source URL"         (url)       — replaces old "Review URL"
+ * notion-cutoff-2026-06-02: replaced by canonical write to opportunities (Supabase).
+ * Per docs/SUPABASE_CONSOLIDATION_FREEZE.md §3.2 the canonical store is `public.opportunities`.
  *
  * Auth: adminGuardApi()
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { Client } from "@notionhq/client";
 import { adminGuardApi } from "@/lib/require-admin";
-
-const notion = new Client({ auth: process.env.NOTION_API_KEY });
-const DB_OPPORTUNITIES = "687caa98594a41b595c9960c141be0c0";
+import { getSupabaseServerClient } from "@/lib/supabase-server";
 
 export async function POST(req: NextRequest) {
   const guard = await adminGuardApi();
@@ -45,23 +41,53 @@ export async function POST(req: NextRequest) {
     ? `Inbox signal: email from ${fromName}${from ? ` <${from}>` : ""}. Preview: ${snippet.slice(0, 300)}`
     : `Inbox signal: email from ${fromName}${from ? ` <${from}>` : ""}. Subject: ${subject}`;
 
+  const nowIso = new Date().toISOString();
+
   try {
-    const page = await notion.pages.create({
-      parent: { database_id: DB_OPPORTUNITIES },
-      properties: {
-        "Opportunity Name":   { title:  [{ text: { content: oppName } }] },
-        "Opportunity Status": { select: { name: "New" } },
-        "Follow-up Status":   { select: { name: "Needed" } },
-        "Scope":              { select: { name: "CH" } },
-        // "Account / Organization" is a relation — cannot set as free text from inbox signal.
-        // Org context is encoded in Trigger / Signal instead.
-        ...(signalContext ? { "Trigger / Signal": { rich_text: [{ text: { content: signalContext.slice(0, 2000) } }] } } : {}),
-        ...(gmailUrl ? { "Source URL": { url: gmailUrl } } : {}),
-      },
-    });
-    return NextResponse.json({ ok: true, candidateId: page.id, notionUrl: (page as { url?: string }).url ?? "" });
+    // notion-cutoff-2026-06-02: replaced by canonical write to opportunities
+    // const page = await notion.pages.create({
+    //   parent: { database_id: DB_OPPORTUNITIES },
+    //   properties: {
+    //     "Opportunity Name":   { title:  [{ text: { content: oppName } }] },
+    //     "Opportunity Status": { select: { name: "New" } },
+    //     "Follow-up Status":   { select: { name: "Needed" } },
+    //     "Scope":              { select: { name: "CH" } },
+    //     "Trigger / Signal":   { rich_text: [{ text: { content: signalContext } }] },
+    //     "Source URL":         { url: gmailUrl },
+    //   },
+    // });
+    const sb = getSupabaseServerClient();
+    const trigger = signalContext.slice(0, 2000);
+
+    const { data, error } = await sb
+      .from("opportunities")
+      .insert({
+        title:            oppName,
+        status:           "New",
+        follow_up_status: "Needed",
+        scope:            "CH",
+        trigger_signal:   trigger,
+        pending_action:   trigger,
+        source_url:       gmailUrl ?? null,
+        is_active:        true,
+        is_archived:      false,
+        is_legacy:        false,
+        notion_created_at: nowIso,
+        created_at:       nowIso,
+        updated_at:       nowIso,
+        // legacy_notion_id intentionally null — net-new candidate created post-cutoff.
+      })
+      .select("id")
+      .single();
+
+    if (error) {
+      console.error("[create-candidate] Supabase insert failed:", error.message);
+      return NextResponse.json({ error: "Failed to create candidate", detail: error.message }, { status: 502 });
+    }
+
+    return NextResponse.json({ ok: true, candidateId: data?.id ?? "", notionUrl: "" });
   } catch (err) {
-    console.error("[create-candidate] Notion create failed:", err);
+    console.error("[create-candidate] insert failed:", err);
     return NextResponse.json({ error: "Failed to create candidate", detail: String(err) }, { status: 502 });
   }
 }

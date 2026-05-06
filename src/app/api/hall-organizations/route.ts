@@ -151,6 +151,35 @@ export async function POST(req: NextRequest) {
     .maybeSingle();
   if (upErr) return NextResponse.json({ error: upErr.message }, { status: 500 });
 
+  // ── Backfill people from observations for this domain ────────────────────
+  // Closes the "Engatel pattern" systemic gap: when a domain becomes
+  // classified, historical email/WA observations should retroactively
+  // promote to people rows. See docs/migration/REJECTED_PATTERNS.md R-003.
+  // Best-effort; failures don't block the upsert.
+  let observationBackfill: Awaited<ReturnType<typeof import("@/lib/promote-people-from-observations").promotePeopleFromObservations>> | null = null;
+  if (uniqClasses.length > 0) {
+    try {
+      const { promotePeopleFromObservations } = await import("@/lib/promote-people-from-observations");
+      // Pick the strongest class to associate (Client > Partner > Investor > Funder > Vendor).
+      const PRIORITY = ["Client", "Partner", "Investor", "Funder", "Vendor"] as const;
+      type Cls = typeof PRIORITY[number];
+      const primaryClass = PRIORITY.find((c) => uniqClasses.includes(c)) as Cls | undefined;
+      if (primaryClass) {
+        observationBackfill = await promotePeopleFromObservations(
+          {
+            domain,
+            orgNotionId: (org?.notion_id as string | null) ?? null,
+            relationshipClass: primaryClass,
+            actor,
+          },
+          sb,
+        );
+      }
+    } catch (e) {
+      console.warn("[hall-organizations POST] observation backfill failed:", e);
+    }
+  }
+
   // ── Cascade to contacts ───────────────────────────────────────────────────
   let cascadeReport: {
     matched: number;
@@ -229,5 +258,17 @@ export async function POST(req: NextRequest) {
     cascadeReport = tally;
   }
 
-  return NextResponse.json({ ok: true, org, cascade: cascadeReport });
+  return NextResponse.json({
+    ok: true,
+    org,
+    cascade: cascadeReport,
+    observation_backfill: observationBackfill
+      ? {
+          emails_observed: observationBackfill.emails_observed,
+          people_inserted: observationBackfill.people_inserted,
+          people_updated:  observationBackfill.people_updated,
+          whatsapp_messages_linked: observationBackfill.whatsapp_messages_linked,
+        }
+      : null,
+  });
 }

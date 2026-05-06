@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { adminGuardApi } from "@/lib/require-admin";
+// notion-cutoff-2026-06-02: Notion `Data Room` write removed; canonical write is now to `data_room_documents` (Supabase).
+// `notion` and `DB.organizations` are still used for the read-only org-resolution
+// fallback (Primary Organization relation on the Notion project page) until that
+// read source is migrated to Supabase organizations.
 import { notion, DB } from "@/lib/notion";
+import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { classifyFile } from "../classify";
 
 function getSupabase() {
@@ -88,24 +93,64 @@ export async function POST(req: NextRequest) {
       const itemName = `${projectName} — ${category} — ${documentType}`;
 
       let notionId: string | undefined;
+      // notion-cutoff-2026-06-02: replaced by canonical write to data_room_documents (Supabase).
+      // Notion → Supabase (data_room_documents) column mapping:
+      //   "Item Name"     → doc_name
+      //   "Document Type" → doc_type
+      //   "File URL"      → drive_url
+      //   "Startup"       → org_notion_id (string FK to organizations.notion_id)
+      //   "Category"      → payload.category
+      //   "Status"        → payload.status   (default "Complete")
+      //   "Priority"      → payload.priority
+      //   "Notes"         → payload.notes
+      //
+      // try {
+      //   const properties: Record<string, unknown> = {
+      //     "Item Name":     { title: [{ text: { content: itemName } }] },
+      //     "Category":      { select: { name: category } },
+      //     "Document Type": { select: { name: documentType } },
+      //     "Status":        { select: { name: "Complete" } },
+      //     "Priority":      { select: { name: priority } },
+      //     "File URL":      { url: fileUrl || null },
+      //     "Notes":         { rich_text: [{ text: { content: `Uploaded via portal. ...` } }] },
+      //   };
+      //   if (resolvedOrgId) properties["Startup"] = { relation: [{ id: resolvedOrgId }] };
+      //   const page = await notion.pages.create({ parent: { database_id: DB.dataRoom }, properties });
+      //   notionId = page.id;
+      // } catch (notionErr) { ... }
       try {
-        const properties: Record<string, unknown> = {
-          "Item Name":     { title: [{ text: { content: itemName } }] },
-          "Category":      { select: { name: category } },
-          "Document Type": { select: { name: documentType } },
-          "Status":        { select: { name: "Complete" } },
-          "Priority":      { select: { name: priority } },
-          "File URL":      { url: fileUrl || null },
-          "Notes":         { rich_text: [{ text: { content: `Uploaded via portal. Project: ${projectName}${projectId ? ` (${projectId})` : ""}. Storage path: ${upload.storagePath}` } }] },
-        };
-        if (resolvedOrgId) properties["Startup"] = { relation: [{ id: resolvedOrgId }] };
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const page = await notion.pages.create({ parent: { database_id: DB.dataRoom }, properties: properties as any });
-        notionId = page.id;
-      } catch (notionErr) {
-        console.error("[finalize] Notion create failed:", notionErr instanceof Error ? notionErr.message : notionErr);
-        errors.push(`Notion: ${notionErr instanceof Error ? notionErr.message : "unknown error"}`);
+        const sb = getSupabaseServerClient();
+        const { data: row, error: insertErr } = await sb
+          .from("data_room_documents")
+          .insert({
+            doc_name:      itemName,
+            doc_type:      documentType,
+            drive_url:     fileUrl || null,
+            org_notion_id: resolvedOrgId ?? null,
+            uploaded_at:   new Date().toISOString(),
+            payload: {
+              category,
+              status:       "Complete",
+              priority,
+              notes:        `Uploaded via portal. Project: ${projectName}${projectId ? ` (${projectId})` : ""}. Storage path: ${upload.storagePath}`,
+              project_notion_id: projectId ?? null,
+              storage_path: upload.storagePath,
+              file_name:    upload.name,
+            },
+          })
+          .select("id")
+          .single();
+        if (insertErr) {
+          console.error("[finalize] data_room_documents insert failed:", insertErr.message);
+          errors.push(`data_room_documents: ${insertErr.message}`);
+        } else {
+          // Preserve the legacy `notionId` field name in the response so callers
+          // (including auto-ingest below) keep working until they migrate.
+          notionId = row?.id as string | undefined;
+        }
+      } catch (dbErr) {
+        console.error("[finalize] data_room_documents create failed:", dbErr instanceof Error ? dbErr.message : dbErr);
+        errors.push(`data_room_documents: ${dbErr instanceof Error ? dbErr.message : "unknown error"}`);
       }
 
       results.push({ name: upload.name, url: fileUrl, category, documentType, storagePath: upload.storagePath, notionId });

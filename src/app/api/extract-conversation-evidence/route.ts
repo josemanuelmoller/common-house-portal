@@ -19,6 +19,9 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+// notion-cutoff-2026-06-02: Notion client retained for read-only dedup
+// fallback only. Evidence rows + sources.evidence_extracted now write
+// canonically to Supabase.
 import { Client } from "@notionhq/client";
 import { createClient } from "@supabase/supabase-js";
 import Anthropic from "@anthropic-ai/sdk";
@@ -207,6 +210,22 @@ Return ONLY a JSON array (no markdown, no code fences):
 
 async function loadExistingTitles(dateStr: string): Promise<Set<string>> {
   const out = new Set<string>();
+
+  // Supabase-first (canonical post-cutoff)
+  try {
+    const sb = getSupabase();
+    const { data } = await sb
+      .from("evidence")
+      .select("title")
+      .eq("legacy_source_db", "CH Sources [OS v2]")
+      .eq("date_captured", dateStr)
+      .limit(500);
+    for (const row of (data ?? []) as { title: string | null }[]) {
+      if (row.title) out.add(row.title.toLowerCase());
+    }
+  } catch { /* non-fatal — fall through to Notion */ }
+
+  // Notion fallback retained until cutoff so pre-Phase-2 rows still de-dup.
   try {
     const res = await notion.databases.query({
       database_id: EVIDENCE_DB,
@@ -248,42 +267,68 @@ async function writeEvidence(
     ? `${item.excerpt.slice(0, 360)}\n\n— from WhatsApp clip: https://www.notion.so/${sourceNotionId.replace(/-/g, "")}`
     : item.excerpt;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const properties: Record<string, any> = {
-    "Evidence Title":     { title:     [{ text: { content: item.title.slice(0, 100) } }] },
-    "Evidence Type":      { select:    { name: type } },
-    "Evidence Statement": { rich_text: [{ text: { content: item.statement.slice(0, 2000) } }] },
-    "Source Excerpt":     { rich_text: [{ text: { content: excerptWithTrace.slice(0, 500) } }] },
-    "Validation Status":  { select:    { name: "New" } },
-    "Confidence Level":   { select:    { name: confidence } },
-    "Sensitivity Level":  { select:    { name: "Internal" } },
-    "Legacy Source DB":   { select:    { name: "CH Sources [OS v2]" } },
-    "Date Captured":      { date:      { start: dateStr } },
-  };
-  if (theme)       properties["Affected Theme"]  = { multi_select: [{ name: theme }] };
-  if (geo)         properties["Geography"]       = { multi_select: [{ name: geo }] };
-  if (topics.length) properties["Topics / Themes"] = { multi_select: topics.map(t => ({ name: t })) };
-  if (orgId)       properties["Organization"]    = { relation: [{ id: orgId }] };
-  if (projectId)   properties["Project"]         = { relation: [{ id: projectId }] };
-
-  const page = await notion.pages.create({ parent: { database_id: EVIDENCE_DB }, properties });
-  return page.id;
+  // notion-cutoff-2026-06-02: replaced by canonical write to evidence
+  // const properties = { ... };
+  // const page = await notion.pages.create({ parent: { database_id: EVIDENCE_DB }, properties });
+  // return page.id;
+  //
+  // Notion → Supabase (evidence) column mapping:
+  //   Evidence Title     → title
+  //   Evidence Type      → evidence_type
+  //   Evidence Statement → evidence_statement
+  //   Source Excerpt     → source_excerpt (with trace appended)
+  //   Validation Status  → validation_status
+  //   Confidence Level   → confidence_level
+  //   Sensitivity Level  → sensitivity_level
+  //   Legacy Source DB   → legacy_source_db
+  //   Date Captured      → date_captured
+  //   Affected Theme     → affected_theme
+  //   Geography          → geography
+  //   Topics / Themes    → topics (text-comma-joined)
+  //   Organization       → org_notion_id
+  //   Project            → project_notion_id
+  //   (source_notion_id traces back to the originating WhatsApp source)
+  const sb = getSupabase();
+  const { data, error } = await sb
+    .from("evidence")
+    .insert({
+      title:               item.title.slice(0, 100),
+      evidence_type:       type,
+      evidence_statement:  item.statement.slice(0, 2000),
+      source_excerpt:      excerptWithTrace.slice(0, 500),
+      validation_status:   "New",
+      confidence_level:    confidence,
+      sensitivity_level:   "Internal",
+      legacy_source_db:    "CH Sources [OS v2]",
+      date_captured:       dateStr,
+      affected_theme:      theme,
+      geography:           geo,
+      topics:              topics.length > 0 ? topics.join(", ") : null,
+      org_notion_id:       orgId,
+      project_notion_id:   projectId,
+      source_notion_id:    sourceNotionId,
+    })
+    .select("id")
+    .single();
+  if (error) {
+    throw new Error(`evidence insert failed: ${error.message}`);
+  }
+  return (data?.id as string) ?? "";
 }
 
 async function markSourceExtracted(sourceId: string, notionId: string | null) {
+  // notion-cutoff-2026-06-02: replaced by canonical write to sources
+  // The previous Notion update (`Evidence Extracted? = true` on the source
+  // page) is removed — `sources.evidence_extracted` in Supabase is now the
+  // single source of truth.
+  // if (notionId) {
+  //   try { await notion.pages.update({ page_id: notionId, properties: { "Evidence Extracted?": { checkbox: true } } as any }); } catch {}
+  // }
+  void notionId;
   const sb = getSupabase();
   try {
-    await sb.from("sources").update({ evidence_extracted: true }).eq("id", sourceId);
+    await sb.from("sources").update({ evidence_extracted: true, updated_at: new Date().toISOString() }).eq("id", sourceId);
   } catch { /* non-fatal */ }
-  if (notionId) {
-    try {
-      await notion.pages.update({
-        page_id: notionId,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        properties: { "Evidence Extracted?": { checkbox: true } } as any,
-      });
-    } catch { /* field may not exist in every schema revision */ }
-  }
 }
 
 // ─── Main handler ───────────────────────────────────────────────────────────

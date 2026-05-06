@@ -1,24 +1,16 @@
-/**
- * POST /api/approve-draft
- *
- * Approves or requests revision on an Agent Draft.
- * Phase 2 pattern: Supabase mirror first (instant UI), best-effort push to Notion.
- *
- * Records the decision into proposal_outcomes for control-plane analytics.
- */
-
 import { NextRequest, NextResponse } from "next/server";
 import { adminGuardApi } from "@/lib/require-admin";
-import { applyMirrorEdit, pushPending } from "@/lib/notion-mirror-push";
+// notion-cutoff-2026-06-02: removed; canonical write is now to agent_drafts (Supabase).
+// import { Client } from "@notionhq/client";
+// const notion = new Client({ auth: process.env.NOTION_API_KEY });
 import { getSupabaseServerClient } from "@/lib/supabase-server";
-import { recordProposalOutcome, type ProposalAction } from "@/lib/proposal-outcomes";
-import { currentUser } from "@clerk/nextjs/server";
 
 export async function POST(req: NextRequest) {
   const guard = await adminGuardApi();
   if (guard) return guard;
 
   const { draftId, action } = await req.json();
+
   if (!draftId || !action) {
     return NextResponse.json({ error: "draftId and action required" }, { status: 400 });
   }
@@ -32,50 +24,34 @@ export async function POST(req: NextRequest) {
     approve:  "Approved",
     revision: "Revision Requested",
   } as const;
+
   const newStatus = statusMap[action as keyof typeof statusMap];
 
-  // Snapshot draft metadata BEFORE mutation so we capture the title and the
-  // generator that produced it (draft_type acts as our agent_name proxy).
-  let draftTitle: string | null = null;
-  let draftType: string | null = null;
   try {
+    // notion-cutoff-2026-06-02: removed; canonical write is now to agent_drafts (Supabase).
+    // await notion.pages.update({
+    //   page_id: draftId,
+    //   properties: {
+    //     "Status": { select: { name: newStatus } },
+    //   },
+    // });
     const sb = getSupabaseServerClient();
-    const { data } = await sb
-      .from("notion_agent_drafts")
-      .select("title, draft_type")
-      .eq("id", draftId)
-      .maybeSingle();
-    draftTitle = data?.title ?? null;
-    draftType = data?.draft_type ?? null;
-  } catch { /* best-effort snapshot */ }
-
-  const apply = await applyMirrorEdit({
-    table:   "notion_agent_drafts",
-    id:      draftId,
-    changes: { status: newStatus },
-  });
-  if (!apply.ok) {
-    return NextResponse.json({ error: "Mirror update failed", detail: apply.error }, { status: 500 });
+    const nowIso = new Date().toISOString();
+    // draftId here was historically the Notion page_id. Match against notion_id
+    // (the canonical backref column) so existing UI references continue to work.
+    const updates: Record<string, unknown> = { status: newStatus, updated_at: nowIso };
+    if (newStatus === "Approved") {
+      updates.approved_at = nowIso;
+    }
+    const { error } = await sb
+      .from("agent_drafts")
+      .update(updates)
+      .eq("notion_id", draftId);
+    if (error) {
+      return NextResponse.json({ error: "Supabase update error", detail: error.message }, { status: 500 });
+    }
+    return NextResponse.json({ ok: true, status: newStatus });
+  } catch (e) {
+    return NextResponse.json({ error: "agent_drafts update error", detail: String(e) }, { status: 500 });
   }
-
-  const push = await pushPending("notion_agent_drafts", draftId);
-
-  // Record human feedback — fire-and-forget, never blocks the response.
-  const outcomeAction: ProposalAction = action === "approve" ? "approved" : "revision_requested";
-  const user = await currentUser();
-  void recordProposalOutcome({
-    proposal_type: "agent_draft",
-    proposal_id:   draftId,
-    action:        outcomeAction,
-    agent_name:    draftType, // e.g. "linkedin-post" / "draft-followup" / "draft-checkin"
-    actor_email:   user?.primaryEmailAddress?.emailAddress ?? null,
-    proposal_title: draftTitle,
-  });
-
-  return NextResponse.json({
-    ok: true,
-    status: newStatus,
-    notion_push: push.ok ? "ok" : "pending_retry",
-    notion_error: push.ok ? undefined : push.error,
-  });
 }

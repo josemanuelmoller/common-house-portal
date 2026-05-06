@@ -18,8 +18,11 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+// notion-cutoff-2026-06-02: Notion client retained for read-only dedup
+// fallback. Evidence rows are now canonically written to Supabase `evidence`.
 import { Client } from "@notionhq/client";
 import Anthropic from "@anthropic-ai/sdk";
+import { getSupabaseServerClient } from "@/lib/supabase-server";
 
 export const maxDuration = 90;
 
@@ -211,6 +214,22 @@ function resolveProject(transcriptTitle: string, participants: string[]): string
 
 async function loadExistingEvidenceKeys(fromDateStr: string): Promise<Set<string>> {
   const existing = new Set<string>();
+
+  // Supabase-first (canonical post-cutoff)
+  try {
+    const sb = getSupabaseServerClient();
+    const { data } = await sb
+      .from("evidence")
+      .select("title, date_captured")
+      .eq("legacy_source_db", "Meetings [master]")
+      .gte("date_captured", fromDateStr)
+      .limit(2000);
+    for (const row of (data ?? []) as { title: string | null; date_captured: string | null }[]) {
+      if (row.title && row.date_captured) existing.add(`${row.title.toLowerCase()}::${row.date_captured}`);
+    }
+  } catch { /* non-fatal — fall through to Notion */ }
+
+  // Notion fallback retained until cutoff so pre-Phase-2 rows still de-dup.
   try {
     let cursor: string | undefined;
     do {
@@ -332,41 +351,62 @@ async function writeEvidence(
   const theme        = THEME_ALIAS[item.affected_theme];
   const validTopics  = (item.topics ?? []).filter(t => VALID_TOPICS.has(t));
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const properties: Record<string, any> = {
-    "Evidence Title":     { title:     [{ text: { content: item.title.slice(0, 100) } }] },
-    "Evidence Type":      { select:    { name: evidenceType } },
-    "Evidence Statement": { rich_text: [{ text: { content: item.statement.slice(0, 2000) } }] },
-    "Source Excerpt":     { rich_text: [{ text: { content: item.excerpt.slice(0, 500) } }] },
-    "Validation Status":  { select:    { name: "New" } },
-    "Confidence Level":   { select:    { name: confidence } },
-    "Sensitivity Level":  { select:    { name: "Internal" } },
-    "Legacy Source DB":   { select:    { name: "Meetings [master]" } },
-    "Date Captured":      { date:      { start: dateStr } },
-  };
-
-  if (theme && VALID_THEMES.has(theme)) {
-    properties["Affected Theme"] = { multi_select: [{ name: theme }] };
+  // notion-cutoff-2026-06-02: replaced by canonical write to evidence
+  // const properties = {
+  //   "Evidence Title":     { title:     [{ text: { content: item.title.slice(0, 100) } }] },
+  //   "Evidence Type":      { select:    { name: evidenceType } },
+  //   "Evidence Statement": { rich_text: [{ text: { content: item.statement.slice(0, 2000) } }] },
+  //   "Source Excerpt":     { rich_text: [{ text: { content: item.excerpt.slice(0, 500) } }] },
+  //   "Validation Status":  { select:    { name: "New" } },
+  //   "Confidence Level":   { select:    { name: confidence } },
+  //   "Sensitivity Level":  { select:    { name: "Internal" } },
+  //   "Legacy Source DB":   { select:    { name: "Meetings [master]" } },
+  //   "Date Captured":      { date:      { start: dateStr } },
+  //   "Affected Theme" / "Geography" / "Topics / Themes" / "Organization" / "Project" — conditional
+  // };
+  // const page = await notion.pages.create({ parent: { database_id: EVIDENCE_DB }, properties });
+  // return page.id;
+  //
+  // Notion → Supabase (evidence) column mapping:
+  //   Evidence Title     → title
+  //   Evidence Type      → evidence_type
+  //   Evidence Statement → evidence_statement
+  //   Source Excerpt     → source_excerpt
+  //   Validation Status  → validation_status
+  //   Confidence Level   → confidence_level
+  //   Sensitivity Level  → sensitivity_level
+  //   Legacy Source DB   → legacy_source_db
+  //   Date Captured      → date_captured
+  //   Affected Theme     → affected_theme
+  //   Geography          → geography
+  //   Topics / Themes    → topics (text-comma-joined; existing column is text)
+  //   Organization       → org_notion_id
+  //   Project            → project_notion_id
+  const sb = getSupabaseServerClient();
+  const { data, error } = await sb
+    .from("evidence")
+    .insert({
+      title:               item.title.slice(0, 100),
+      evidence_type:       evidenceType,
+      evidence_statement:  item.statement.slice(0, 2000),
+      source_excerpt:      item.excerpt.slice(0, 500),
+      validation_status:   "New",
+      confidence_level:    confidence,
+      sensitivity_level:   "Internal",
+      legacy_source_db:    "Meetings [master]",
+      date_captured:       dateStr,
+      affected_theme:      (theme && VALID_THEMES.has(theme)) ? theme : null,
+      geography:           geo,
+      topics:              validTopics.length > 0 ? validTopics.join(", ") : null,
+      org_notion_id:       orgId,
+      project_notion_id:   projectId,
+    })
+    .select("id")
+    .single();
+  if (error) {
+    throw new Error(`evidence insert failed: ${error.message}`);
   }
-  if (geo) {
-    properties["Geography"] = { multi_select: [{ name: geo }] };
-  }
-  if (validTopics.length > 0) {
-    properties["Topics / Themes"] = { multi_select: validTopics.map(t => ({ name: t })) };
-  }
-  if (orgId) {
-    properties["Organization"] = { relation: [{ id: orgId }] };
-  }
-  if (projectId) {
-    properties["Project"] = { relation: [{ id: projectId }] };
-  }
-
-  const page = await notion.pages.create({
-    parent: { database_id: EVIDENCE_DB },
-    properties,
-  });
-
-  return page.id;
+  return (data?.id as string) ?? "";
 }
 
 // ─── Main handler ─────────────────────────────────────────────────────────────

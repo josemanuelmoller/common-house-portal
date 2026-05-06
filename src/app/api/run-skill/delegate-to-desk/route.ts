@@ -12,7 +12,6 @@ import { adminGuardApi } from "@/lib/require-admin";
 import { Client } from "@notionhq/client";
 import Anthropic from "@anthropic-ai/sdk";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
-import { createPageWithMirror } from "@/lib/notion-mirror-push";
 
 const notion = new Client({ auth: process.env.NOTION_API_KEY });
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -170,53 +169,74 @@ Output ONLY the full message (Subject + body). Nothing else.`;
     );
   }
 
-  // 4. Save to Agent Drafts via mirror.
+  // 4. Save to Agent Drafts [OS v2]
   const taskShort = task.slice(0, 55);
   const draftTitle = resolvedAssignee
     ? `Delegation: ${taskShort} → ${resolvedAssignee} — ${today}`
     : `Delegation: ${taskShort} — ${today}`;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const extraNotion: Record<string, any> = {
-    "Source Reference": {
-      rich_text: [{
-        text: {
-          content: [
-            resolvedAssignee && `Assignee: ${resolvedAssignee}`,
-            dueDate && `Due: ${dueDate}`,
-          ].filter(Boolean).join(" · ") || task.slice(0, 100),
-        },
-      }],
-    },
-  };
-  if (assigneePageId) {
-    extraNotion["Related Entity"] = { relation: [{ id: assigneePageId }] };
-  }
+  // notion-cutoff-2026-06-02: legacy Notion property bag removed; field-level
+  // mapping is documented inline below at the canonical insert site.
+  // Old Notion shape (for reference):
+  //   "Draft Title": { title: [...] }, "Type": { select: { name: "Delegation Brief" } },
+  //   "Status": { select: { name: "Pending Review" } }, "Content": { rich_text: [...] },
+  //   "Source Reference": { rich_text: [...] }, optionally "Related Entity": { relation: [...] }.
 
-  const created = await createPageWithMirror({
-    table: "notion_agent_drafts",
-    fields: {
+  // notion-cutoff-2026-06-02: replaced by canonical write to agent_drafts (Supabase).
+  // Notion → Supabase (agent_drafts) column mapping:
+  //   "Draft Title"      → title
+  //   "Type"             → draft_type
+  //   "Status"           → status
+  //   "Content"          → body_md
+  //   "Related Entity"   → target_person_notion_id
+  //   "Source Reference" → payload.source_reference
+  //
+  // let draftPage;
+  // try {
+  //   draftPage = await notion.pages.create({ parent: { database_id: AGENT_DRAFTS_DB }, properties });
+  // } catch (e) {
+  //   return NextResponse.json({ error: "Notion write error", detail: String(e) }, { status: 500, headers: corsHeaders() });
+  // }
+  void AGENT_DRAFTS_DB; // legacy id retained for traceability; no longer used as a write target.
+
+  const sb = getSupabaseServerClient();
+  const { data: insertedRow, error: insertErr } = await sb
+    .from("agent_drafts")
+    .insert({
       title:      draftTitle,
       draft_type: "Delegation Brief",
       status:     "Pending Review",
-      draft_text: draftText.slice(0, 2000),
-    },
-    mirrorOnly: {
-      related_entity_id: assigneePageId ?? null,
-      created_date:      today,
-    },
-    extraNotionProperties: extraNotion,
-  });
-  if (!created.ok) {
-    return NextResponse.json({ error: "Draft create failed", detail: created.error }, { status: 500, headers: corsHeaders() });
+      body_md:    draftText.slice(0, 2000),
+      target_person_notion_id: assigneePageId || null,
+      source_agent: "delegate-to-desk",
+      payload: {
+        source_reference:
+          [
+            resolvedAssignee && `Assignee: ${resolvedAssignee}`,
+            dueDate && `Due: ${dueDate}`,
+          ].filter(Boolean).join(" · ") || task.slice(0, 100),
+        assignee_name:  resolvedAssignee || null,
+        assignee_role:  assigneeRole     || null,
+        assignee_email: assigneeEmail    || null,
+        due_date:       dueDate          || null,
+        task,
+      },
+    })
+    .select("id")
+    .single();
+
+  if (insertErr || !insertedRow) {
+    return NextResponse.json(
+      { error: "agent_drafts insert error", detail: insertErr?.message ?? "no row returned" },
+      { status: 500, headers: corsHeaders() }
+    );
   }
-  const draftPage = { id: created.id!, url: "" };
 
   return NextResponse.json(
     {
       ok: true,
-      draftId: draftPage.id,
-      notionUrl: (draftPage as { url?: string }).url ?? "",
+      draftId: insertedRow.id,
+      notionUrl: "",
       assigneeResolved: !!assigneePageId,
       assigneeName: resolvedAssignee || null,
     },

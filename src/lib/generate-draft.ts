@@ -1,5 +1,10 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { notion, DB } from "@/lib/notion";
+// notion-cutoff-2026-06-02: write removed; canonical write is now to content_pipeline_items (Supabase).
+// `notion` is retained for the read of the source brief (Title/Content Type/Platform)
+// until that read source migrates. `DB.contentPipeline` constant removed alongside
+// the deprecated `ensureSlideHtmlProperty` shim.
+import { notion } from "@/lib/notion";
+import { getSupabaseServerClient } from "@/lib/supabase-server";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -308,19 +313,54 @@ function toRichText(text: string) {
 }
 
 // ─── Ensure Slide HTML property exists in Content Pipeline DB ─────────────────
-
-let slideHtmlPropertyEnsured = false;
+// notion-cutoff-2026-06-02: removed; the canonical `content_pipeline_items`
+// table stores slide HTML inside `payload.slide_html`, no schema mutation
+// needed. Function is kept as a no-op so existing call sites still type-check.
+//
+// Original implementation:
+//   await notion.databases.update({
+//     database_id: DB.contentPipeline,
+//     properties: { "Slide HTML": { rich_text: {} } } as any,
+//   });
 async function ensureSlideHtmlProperty() {
-  if (slideHtmlPropertyEnsured) return;
-  try {
-    await notion.databases.update({
-      database_id: DB.contentPipeline,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      properties: { "Slide HTML": { rich_text: {} } } as any,
-    });
-    slideHtmlPropertyEnsured = true;
-  } catch {
-    slideHtmlPropertyEnsured = true; // already exists or can't add — don't retry
+  return;
+}
+
+// ─── Canonical write helper ───────────────────────────────────────────────────
+// `pageId` was historically the Notion page id; the canonical row is matched
+// by either uuid `id` or the `notion_id` backref column.
+async function writeDraftToContentPipeline(
+  pageId: string,
+  fields: { status: string; body_md: string; slide_html?: string },
+): Promise<void> {
+  const sb = getSupabaseServerClient();
+  const isUuid = /^[0-9a-f-]{36}$/i.test(pageId);
+  const matchColumn = isUuid ? "id" : "notion_id";
+
+  // Read existing payload to preserve unrelated keys (e.g. desk-request fields).
+  const { data: existing } = await sb
+    .from("content_pipeline_items")
+    .select("payload")
+    .eq(matchColumn, pageId)
+    .maybeSingle();
+  const existingPayload =
+    (existing?.payload as Record<string, unknown> | null | undefined) ?? {};
+
+  const update: Record<string, unknown> = {
+    status:     fields.status,
+    body_md:    fields.body_md,
+    updated_at: new Date().toISOString(),
+  };
+  if (typeof fields.slide_html === "string") {
+    update.payload = { ...existingPayload, slide_html: fields.slide_html };
+  }
+
+  const { error } = await sb
+    .from("content_pipeline_items")
+    .update(update)
+    .eq(matchColumn, pageId);
+  if (error) {
+    throw new Error(`content_pipeline_items update failed: ${error.message}`);
   }
 }
 
@@ -374,14 +414,24 @@ export async function generateDraft(pageId: string, audience?: string, outputMod
       // Also create a text summary for Draft Text
       const summary = `[HTML Deck — ${contentType}]\n\nBrief: ${brief}\n\nThis item contains an HTML slide deck. Open the preview to view it.`;
 
-      await notion.pages.update({
-        page_id: pageId,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        properties: {
-          Status: { select: { name: "Briefed" } },
-          "Draft Text": { rich_text: toRichText(summary) },
-          "Slide HTML": { rich_text: toRichText(html) },
-        } as any,
+      // notion-cutoff-2026-06-02: replaced by canonical write to content_pipeline_items (Supabase).
+      // Notion → Supabase column mapping:
+      //   "Status"     → status
+      //   "Draft Text" → body_md
+      //   "Slide HTML" → payload.slide_html (jsonb escape hatch)
+      // await notion.pages.update({
+      //   page_id: pageId,
+      //   properties: {
+      //     Status:       { select: { name: "Briefed" } },
+      //     "Draft Text": { rich_text: toRichText(summary) },
+      //     "Slide HTML": { rich_text: toRichText(html) },
+      //   } as any,
+      // });
+      void toRichText; // legacy helper kept for backward-compat; canonical body_md is plain text.
+      await writeDraftToContentPipeline(pageId, {
+        status:     "Briefed",
+        body_md:    summary,
+        slide_html: html,
       });
 
     } else {
@@ -398,13 +448,20 @@ export async function generateDraft(pageId: string, audience?: string, outputMod
 
       const draft = (msg.content[0] as { type: string; text: string }).text;
 
-      await notion.pages.update({
-        page_id: pageId,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        properties: {
-          Status: { select: { name: "Briefed" } },
-          "Draft Text": { rich_text: toRichText(draft) },
-        } as any,
+      // notion-cutoff-2026-06-02: replaced by canonical write to content_pipeline_items (Supabase).
+      // Notion → Supabase column mapping:
+      //   "Status"     → status
+      //   "Draft Text" → body_md
+      // await notion.pages.update({
+      //   page_id: pageId,
+      //   properties: {
+      //     Status:       { select: { name: "Briefed" } },
+      //     "Draft Text": { rich_text: toRichText(draft) },
+      //   } as any,
+      // });
+      await writeDraftToContentPipeline(pageId, {
+        status:  "Briefed",
+        body_md: draft,
       });
     }
 

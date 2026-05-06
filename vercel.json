@@ -14,6 +14,18 @@
   ],
   "crons": [
     {
+      "path": "/api/cron/run-relationship-promotion-scan",
+      "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/cron/reconcile-classified-domains",
+      "schedule": "30 7 * * *"
+    },
+    {
+      "path": "/api/cron/auto-merge-orphan-people",
+      "schedule": "0 8 * * *"
+    },
+    {
       "path": "/api/cron/sync-notion-mirror",
       "schedule": "0 6 * * *"
     },

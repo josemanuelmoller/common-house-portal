@@ -16,11 +16,14 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { google } from "googleapis";
+// notion-cutoff-2026-06-02: Notion client retained for read-only dedup fallback
+// only. New Source rows are written to Supabase `sources`.
 import { Client } from "@notionhq/client";
 import { currentUser } from "@clerk/nextjs/server";
 import { isAdminUser, isAdminEmail } from "@/lib/clients";
 import { withRoutineLog } from "@/lib/routine-log";
 import { observeGmailThread } from "@/lib/hall-contact-observers";
+import { getSupabaseServerClient } from "@/lib/supabase-server";
 
 /** Parse "Name <email@domain.com>" or raw email → lowercased email. */
 function extractEmail(header: string): string {
@@ -71,8 +74,22 @@ function resolveProjectId(headers: { name?: string | null; value?: string | null
 }
 
 // ─── Dedup — check if a thread ID already exists as a source ─────────────────
+// Supabase-first: dedup_key is the canonical de-dup contract (`gmail:<threadId>`).
+// Notion fallback retained until cutoff so pre-Phase-2 rows still de-dup.
 
 async function threadAlreadyIngested(threadId: string): Promise<boolean> {
+  try {
+    const sb = getSupabaseServerClient();
+    const dedupKey = `gmail:${threadId}`;
+    const { data, error } = await sb
+      .from("sources")
+      .select("id")
+      .or(`dedup_key.eq.${dedupKey},thread_id.eq.${threadId}`)
+      .limit(1);
+    if (!error && data && data.length > 0) return true;
+  } catch {
+    /* fall through to Notion */
+  }
   try {
     const res = await notion.databases.query({
       database_id: SOURCES_DB,
@@ -179,24 +196,55 @@ async function _POST(req: NextRequest) {
         const threadUrl  = `https://mail.google.com/mail/u/0/#inbox/${threadId}`;
         const projectId  = resolveProjectId(headers);
 
-        const properties: Record<string, unknown> = {
-          "Source Title":     { title: [{ text: { content: subject.slice(0, 180) } }] },
-          "Source Type":      { select: { name: "Email" } },
-          "Source Platform":  { select: { name: "Gmail" } },
-          "Source URL":       { url: threadUrl },
-          "Processing Status":{ select: { name: "Ingested" } },
-          "Source Date":      { date: { start: sourceDate } },
-          "Dedup Key":        { rich_text: [{ text: { content: `gmail:${threadId}` } }] },
-        };
-        if (projectId) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (properties as any)["Linked Projects"] = { relation: [{ id: projectId }] };
-        }
+        // notion-cutoff-2026-06-02: replaced by canonical write to sources
+        // const properties: Record<string, unknown> = {
+        //   "Source Title":     { title: [{ text: { content: subject.slice(0, 180) } }] },
+        //   "Source Type":      { select: { name: "Email" } },
+        //   "Source Platform":  { select: { name: "Gmail" } },
+        //   "Source URL":       { url: threadUrl },
+        //   "Processing Status":{ select: { name: "Ingested" } },
+        //   "Source Date":      { date: { start: sourceDate } },
+        //   "Dedup Key":        { rich_text: [{ text: { content: `gmail:${threadId}` } }] },
+        // };
+        // if (projectId) (properties as any)["Linked Projects"] = { relation: [{ id: projectId }] };
+        // const createdPage = await notion.pages.create({ parent: { database_id: SOURCES_DB }, properties: properties as any });
+        // notionSourceId = createdPage.id;
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const createdPage = await notion.pages.create({ parent: { database_id: SOURCES_DB }, properties: properties as any });
-        notionSourceId = createdPage.id;
-        created++;
+        // Notion → Supabase (sources) column mapping:
+        //   Source Title      → title
+        //   Source Type       → source_type
+        //   Source Platform   → source_platform
+        //   Source URL        → source_url
+        //   Processing Status → processing_status
+        //   Source Date       → source_date
+        //   Dedup Key         → dedup_key (also thread_id for fast lookups)
+        //   Linked Projects   → project_notion_id (string FK to projects.notion_id)
+        try {
+          const sb = getSupabaseServerClient();
+          const { data: row, error: insertErr } = await sb
+            .from("sources")
+            .insert({
+              title:             subject.slice(0, 180),
+              source_type:       "Email",
+              source_platform:   "Gmail",
+              source_url:        threadUrl,
+              processing_status: "Ingested",
+              source_date:       sourceDate,
+              dedup_key:         `gmail:${threadId}`,
+              thread_id:         threadId,
+              project_notion_id: projectId,
+            })
+            .select("id")
+            .single();
+          if (insertErr) {
+            errors.push(`Thread ${threadId} (sources insert): ${insertErr.message}`);
+          } else {
+            notionSourceId = (row?.id as string) ?? null;
+            created++;
+          }
+        } catch (e) {
+          errors.push(`Thread ${threadId} (sources insert): ${e instanceof Error ? e.message : String(e)}`);
+        }
       } else {
         skipped++;
       }

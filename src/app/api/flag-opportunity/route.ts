@@ -14,13 +14,18 @@
  *   - Follow-up Status → "Needed"
  *   - If note provided: prepends "[Flagged {date}: {note}]" to Trigger/Signal
  *
+ * notion-cutoff-2026-06-02: replaced by canonical write to opportunities (Supabase).
+ * Per docs/SUPABASE_CONSOLIDATION_FREEZE.md §3.2 the canonical store for opportunities
+ * is `public.opportunities`. The opportunityId received in the body is the
+ * legacy Notion page id, which is also the upsert key (`notion_id`) on the
+ * Supabase row.
+ *
  * Auth: adminGuardApi()
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { adminGuardApi } from "@/lib/require-admin";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
-import { applyMirrorEdit, pushPending } from "@/lib/notion-mirror-push";
 
 export async function PATCH(req: NextRequest) {
   const guard = await adminGuardApi();
@@ -34,41 +39,47 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "opportunityId required" }, { status: 400 });
   }
 
-  // 1) Compose the changes. If a note is provided, prepend it to existing
-  //    trigger_signal (read from Supabase mirror — already up to date).
-  const changes: Record<string, unknown> = { follow_up_status: "Needed" };
-
-  if (note && note.trim()) {
+  try {
     const sb = getSupabaseServerClient();
-    const { data } = await sb
+
+    // Build update payload — always set follow_up_status; optionally prepend a
+    // dated flag prefix to the trigger_signal column.
+    const updatePayload: Record<string, unknown> = {
+      follow_up_status: "Needed",
+      updated_at:       new Date().toISOString(),
+    };
+
+    if (note && note.trim()) {
+      // Read existing trigger_signal so we can prepend the new flag prefix.
+      const { data: existingRow } = await sb
+        .from("opportunities")
+        .select("trigger_signal")
+        .eq("notion_id", opportunityId)
+        .maybeSingle();
+
+      const existing = (existingRow?.trigger_signal ?? "") as string;
+      const dateStr  = new Date().toISOString().slice(0, 10);
+      const prefix   = `[Flagged ${dateStr}: ${note.trim()}]`;
+      const combined = existing ? `${prefix}\n${existing}` : prefix;
+      updatePayload.trigger_signal = combined.slice(0, 2000);
+      updatePayload.pending_action = combined.slice(0, 2000);
+    }
+
+    // notion-cutoff-2026-06-02: replaced by canonical write to opportunities
+    // const properties: Record<string, any> = { "Follow-up Status": { select: { name: "Needed" } } };
+    // if (note) properties["Trigger / Signal"] = { rich_text: [{ text: { content: combined.slice(0, 2000) } }] };
+    // await notion.pages.update({ page_id: opportunityId, properties });
+    const { error } = await sb
       .from("opportunities")
-      .select("trigger_signal")
-      .eq("notion_id", opportunityId)
-      .maybeSingle();
-    const existing = (data?.trigger_signal as string | null) ?? "";
-    const dateStr  = new Date().toISOString().slice(0, 10);
-    const prefix   = `[Flagged ${dateStr}: ${note.trim()}]`;
-    const combined = existing ? `${prefix}\n${existing}` : prefix;
-    // trigger_signal isn't yet in FIELD_MAP for opportunities — write to mirror
-    // directly here, while follow_up_status flows through applyMirrorEdit.
-    await sb.from("opportunities")
-      .update({ trigger_signal: combined.slice(0, 2000), updated_at: new Date().toISOString() })
+      .update(updatePayload)
       .eq("notion_id", opportunityId);
-    // Note: trigger_signal won't sync back to Notion via the push module yet —
-    // not in FIELD_MAP. Add it there if needed; for now Notion stays as-is.
-  }
 
-  // 2) Apply mirror edit + push to Notion.
-  const apply = await applyMirrorEdit({ table: "opportunities", id: opportunityId, changes });
-  if (!apply.ok) {
-    return NextResponse.json({ error: "Mirror update failed", detail: apply.error }, { status: 500 });
-  }
-  const push = await pushPending("opportunities", opportunityId);
+    if (error) {
+      return NextResponse.json({ error: "Supabase update failed", detail: error.message }, { status: 502 });
+    }
 
-  return NextResponse.json({
-    ok: true,
-    opportunityId,
-    notion_push:  push.ok ? "ok" : "pending_retry",
-    notion_error: push.ok ? undefined : push.error,
-  });
+    return NextResponse.json({ ok: true, opportunityId });
+  } catch (err) {
+    return NextResponse.json({ error: "Update failed", detail: String(err) }, { status: 502 });
+  }
 }

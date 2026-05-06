@@ -14,7 +14,10 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
+// notion-cutoff-2026-06-02: write removed; canonical write is now to knowledge_assets (Supabase).
+// The Notion read path (Evidence DB query) is preserved until the read source is migrated.
 import { Client } from "@notionhq/client";
+import { getSupabaseServerClient } from "@/lib/supabase-server";
 
 const notion    = new Client({ auth: process.env.NOTION_API_KEY });
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -168,45 +171,65 @@ export async function POST(req: NextRequest) {
       const validTopics = ["Refill","Reuse","Zero Waste","Retail","Policy","Organics","Packaging","Cities"];
       const filteredTopics = allTopics.filter(t => validTopics.includes(t));
 
-      const evidenceRelations = items.map(i => ({ id: i.id }));
+      const evidenceNotionIds = items.map(i => i.id);
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const properties: Record<string, any> = {
-        "Asset Name":        { title: [{ text: { content: synthesis.title } }] },
-        "Asset Type":        { select: { name: synthesis.assetType } },
-        "Status":            { select: { name: "Draft" } },
-        "Portal Visibility": { select: { name: "admin-only" } },
-        "Sensitivity Level": { select: { name: "Internal Core" } },
-        "Summary":           { rich_text: [{ text: { content: synthesis.summary } }] },
-        "Evidence Used as Sources": { relation: evidenceRelations },
-      };
-      if (filteredTopics.length > 0) {
-        properties["Domain / Theme"] = { multi_select: filteredTopics.map(t => ({ name: t })) };
+      // notion-cutoff-2026-06-02: replaced by canonical write to knowledge_assets (Supabase).
+      // Notion → Supabase (knowledge_assets) column mapping:
+      //   "Asset Name"               → title
+      //   "Asset Type"               → asset_type
+      //   "Status"                   → status
+      //   "Summary"                  → summary
+      //   block children (body)      → body_md
+      //   "Evidence Used as Sources" → payload.evidence_used_notion_ids
+      //   "Portal Visibility"        → payload.portal_visibility
+      //   "Sensitivity Level"        → payload.sensitivity_level
+      //   "Domain / Theme"           → payload.domain_theme
+      // const properties: Record<string, any> = {
+      //   "Asset Name":        { title: [{ text: { content: synthesis.title } }] },
+      //   "Asset Type":        { select: { name: synthesis.assetType } },
+      //   "Status":            { select: { name: "Draft" } },
+      //   "Portal Visibility": { select: { name: "admin-only" } },
+      //   "Sensitivity Level": { select: { name: "Internal Core" } },
+      //   "Summary":           { rich_text: [{ text: { content: synthesis.summary } }] },
+      //   "Evidence Used as Sources": { relation: evidenceRelations },
+      // };
+      // if (filteredTopics.length > 0) {
+      //   properties["Domain / Theme"] = { multi_select: filteredTopics.map(t => ({ name: t })) };
+      // }
+      // await notion.pages.create({ parent: { database_id: KNOWLEDGE_DB }, properties, children: [...] });
+
+      const bodyMd = [
+        synthesis.summary,
+        "",
+        ...synthesis.keyPoints.map(pt => `- ${pt}`),
+        "",
+        `Auto-generated from ${items.length} Canonical evidence items (theme: ${theme}). Review before promoting to Active.`,
+      ].join("\n");
+
+      const sb = getSupabaseServerClient();
+      const { error: insertErr } = await sb
+        .from("knowledge_assets")
+        .insert({
+          title:      synthesis.title,
+          asset_type: synthesis.assetType,
+          status:     "Draft",
+          summary:    synthesis.summary,
+          body_md:    bodyMd,
+          evidence_count:   items.length,
+          last_evidence_at: new Date().toISOString(),
+          payload: {
+            portal_visibility:          "admin-only",
+            sensitivity_level:          "Internal Core",
+            domain_theme:               filteredTopics,
+            evidence_used_notion_ids:   evidenceNotionIds,
+            source_agent:               "evidence-to-knowledge",
+            theme,
+          },
+        });
+      if (insertErr) {
+        errors.push(`${theme}: knowledge_assets insert failed — ${insertErr.message}`);
+        continue;
       }
-
-      await notion.pages.create({
-        parent: { database_id: KNOWLEDGE_DB },
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        properties: properties as any,
-        children: [
-          {
-            object: "block" as const, type: "paragraph" as const,
-            paragraph: { rich_text: [{ type: "text" as const, text: { content: synthesis.summary } }] },
-          },
-          ...synthesis.keyPoints.map((pt: string) => ({
-            object: "block" as const, type: "bulleted_list_item" as const,
-            bulleted_list_item: { rich_text: [{ type: "text" as const, text: { content: pt } }] },
-          })),
-          {
-            object: "block" as const, type: "paragraph" as const,
-            paragraph: {
-              rich_text: [{ type: "text" as const, text: {
-                content: `🤖 Auto-generated from ${items.length} Canonical evidence items (theme: ${theme}). Review before promoting to Active.`,
-              }}],
-            },
-          },
-        ],
-      });
 
       created++;
     } catch (err) {

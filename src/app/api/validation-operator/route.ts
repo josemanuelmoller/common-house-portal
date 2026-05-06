@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { notion, getAllEvidence } from "@/lib/notion";
+// notion-cutoff-2026-06-02: write removed; canonical write is now to evidence (Supabase).
+// `notion` import is retained because `getAllEvidence` (read path) still touches Notion
+// until the validation-operator's read source is migrated. See PHASE_4_5_INVENTORY.md row 11.
+import { getAllEvidence } from "@/lib/notion";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { withRoutineLog } from "@/lib/routine-log";
-import { applyMirrorEdit, pushPending } from "@/lib/notion-mirror-push";
 
 export const maxDuration = 180;
 
@@ -153,13 +155,23 @@ async function _POST(req: NextRequest) {
   };
 
   async function writeStatus(id: string, status: "Validated" | "Reviewed" | "Superseded") {
-    // Mirror first (instant), Notion async via cron retry on failure
-    const apply = await applyMirrorEdit({
-      table: "evidence",
-      id,
-      changes: { validation_status: status },
-    });
-    if (apply.ok) await pushPending("evidence", id);
+    // notion-cutoff-2026-06-02: replaced by canonical write to evidence (Supabase).
+    // await notion.pages.update({
+    //   page_id: id,
+    //   properties: { "Validation Status": { select: { name: status } } },
+    // });
+    const nowIso = new Date().toISOString();
+    const update: Record<string, unknown> = {
+      validation_status: status,
+      updated_at:        nowIso,
+    };
+    if (status === "Reviewed" || status === "Validated") {
+      update.reviewed_at = nowIso.slice(0, 10);
+    }
+    const { error } = await sb.from("evidence")
+      .update(update)
+      .eq("notion_id", id);
+    if (error) throw new Error(`evidence update failed: ${error.message}`);
   }
 
   // Pass 1 — New items

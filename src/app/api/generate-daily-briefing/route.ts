@@ -28,8 +28,7 @@ import { Client } from "@notionhq/client";
 import { currentUser } from "@clerk/nextjs/server";
 import { isAdminUser, isAdminEmail } from "@/lib/clients";
 import { withRoutineLog } from "@/lib/routine-log";
-import { computeAnthropicCost } from "@/lib/anthropic-cost";
-import { applyMirrorEdit, pushPending, createPageWithMirror } from "@/lib/notion-mirror-push";
+import { getSupabaseServerClient } from "@/lib/supabase-server";
 
 export const maxDuration = 120;
 
@@ -292,9 +291,8 @@ ${recentBriefs.map(b =>
 `.trim();
 
   // Claude Haiku generates the briefing sections
-  const BRIEFING_MODEL = "claude-haiku-4-5-20251001";
   const response = await anthropic.messages.create({
-    model: BRIEFING_MODEL,
+    model: "claude-haiku-4-5-20251001",
     max_tokens: 1200,
     system: `You are the daily briefing writer for Common House (CH), a circular economy accelerator.
 Write concise, actionable text for each section. No headers. No markdown. Plain text only.
@@ -328,12 +326,54 @@ Return EXACTLY this JSON (no extra keys, no markdown):
     return NextResponse.json({ error: "Failed to parse Claude response", raw }, { status: 500 });
   }
 
-  // Upsert: update if exists, create if not. Both paths go through the
-  // Supabase mirror first; Notion gets the same payload async.
-  const existingId = await findExistingBriefing(today);
+  // Upsert: update if exists, create if not.
+  // Existence check now consults Supabase (canonical) first; the Notion
+  // read remains as a fallback observability hint until the Notion archive
+  // is taken read-only at cutoff.
   const now = new Date().toISOString();
+  const sb = getSupabaseServerClient();
+  let existingId: string | null = null;
+  try {
+    const { data: existingRow } = await sb
+      .from("daily_briefings")
+      .select("id")
+      .eq("briefing_date", today)
+      .maybeSingle();
+    existingId = (existingRow?.id as string | undefined) ?? null;
+  } catch { /* fall through to Notion read */ }
+  if (!existingId) {
+    existingId = await findExistingBriefing(today).catch(() => null);
+  }
 
-  const briefingFields = {
+  // notion-cutoff-2026-06-02: replaced by canonical write to daily_briefings
+  // The previous Notion write block (kept here for reference until Phase 6
+  // removes the file entirely) wrote 7 rich-text properties + Generated At + Status:
+  //   const properties = {
+  //     "Focus of the Day": { rich_text: [{ text: { content: sections.focus_of_day ?? "" } }] },
+  //     "Meeting Prep":     { rich_text: [{ text: { content: sections.meeting_prep ?? "" } }] },
+  //     "My Commitments":   { rich_text: [{ text: { content: sections.my_commitments ?? "" } }] },
+  //     "Follow-up Queue":  { rich_text: [{ text: { content: sections.follow_up_queue ?? "" } }] },
+  //     "Agent Queue":      { rich_text: [{ text: { content: sections.agent_queue ?? "" } }] },
+  //     "Market Signals":   { rich_text: [{ text: { content: sections.market_signals ?? "" } }] },
+  //     "Ready to Publish": { rich_text: [{ text: { content: sections.ready_to_publish ?? "" } }] },
+  //     "Generated At":     { date: { start: now } },
+  //     "Status":           { select: { name: "Fresh" } },
+  //   };
+  //   if (existingId) await notion.pages.update({ page_id: existingId, properties });
+  //   else await notion.pages.create({ parent: { database_id: DB.dailyBriefings }, properties: { ...properties, Date: { date: { start: today } }, Name: { title: [{ text: { content: `Daily Briefing — ${today}` } }] } } });
+
+  // Notion → Supabase (daily_briefings) column mapping:
+  //   Date              → briefing_date (date, upsert key)
+  //   Name              → title
+  //   Focus / Meeting Prep / Commitments / Follow-up / Agent Queue /
+  //   Market Signals / Ready to Publish → composed into body_md;
+  //                       also stashed structured into payload.sections so
+  //                       Phase 6 can bind dedicated columns without re-running
+  //                       Claude.
+  //   Generated At      → payload.generated_at (until Phase 6 binds a column)
+  //   Status            → payload.status
+  const briefingTitle = `Daily Briefing — ${today}`;
+  const sectionMap: Record<string, string> = {
     focus_of_day:     sections.focus_of_day ?? "",
     meeting_prep:     sections.meeting_prep ?? "",
     my_commitments:   sections.my_commitments ?? "",
@@ -341,31 +381,38 @@ Return EXACTLY this JSON (no extra keys, no markdown):
     agent_queue:      sections.agent_queue ?? "",
     market_signals:   sections.market_signals ?? "",
     ready_to_publish: sections.ready_to_publish ?? "",
-    generated_at:     now,
-    status:           "Fresh",
   };
+  const bodyMd = [
+    `## Focus of the Day\n${sectionMap.focus_of_day}`,
+    `## Meeting Prep\n${sectionMap.meeting_prep}`,
+    `## My Commitments\n${sectionMap.my_commitments}`,
+    `## Follow-up Queue\n${sectionMap.follow_up_queue}`,
+    `## Agent Queue\n${sectionMap.agent_queue}`,
+    `## Market Signals\n${sectionMap.market_signals}`,
+    `## Ready to Publish\n${sectionMap.ready_to_publish}`,
+  ].join("\n\n");
 
-  if (existingId) {
-    const apply = await applyMirrorEdit({
-      table: "notion_daily_briefings",
-      id:    existingId,
-      changes: briefingFields,
-    });
-    if (!apply.ok) {
-      return NextResponse.json({ error: "Mirror update failed", detail: apply.error }, { status: 500 });
-    }
-    await pushPending("notion_daily_briefings", existingId);
-  } else {
-    const created = await createPageWithMirror({
-      table: "notion_daily_briefings",
-      fields: { ...briefingFields, brief_date: today },
-      extraNotionProperties: {
-        "Name": { title: [{ text: { content: `Daily Briefing — ${today}` } }] },
+  // Upsert keyed on briefing_date — single row per day per freeze §3.4.
+  const { error: upsertErr } = await sb
+    .from("daily_briefings")
+    .upsert(
+      {
+        briefing_date: today,
+        title:         briefingTitle,
+        body_md:       bodyMd,
+        source_agent:  "generate-daily-briefing",
+        payload:       {
+          sections:     sectionMap,
+          generated_at: now,
+          status:       "Fresh",
+        },
+        updated_at:    now,
       },
-    });
-    if (!created.ok) {
-      return NextResponse.json({ error: "Briefing create failed", detail: created.error }, { status: 500 });
-    }
+      { onConflict: "briefing_date" },
+    );
+  if (upsertErr) {
+    console.error("[generate-daily-briefing] supabase upsert failed:", upsertErr.message);
+    return NextResponse.json({ error: "Supabase upsert failed", detail: upsertErr.message }, { status: 500 });
   }
 
   return NextResponse.json({
@@ -373,7 +420,6 @@ Return EXACTLY this JSON (no extra keys, no markdown):
     date: today,
     action: existingId ? "updated" : "created",
     sections: Object.keys(sections),
-    cost_usd: computeAnthropicCost(response.usage, BRIEFING_MODEL),
     stats: {
       projects: projects.length,
       followUps: followUps.length,

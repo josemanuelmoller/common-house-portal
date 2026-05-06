@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+import { randomUUID } from "node:crypto";
 import Anthropic from "@anthropic-ai/sdk";
 import { adminGuardApi } from "@/lib/require-admin";
-import { notion, DB, createKnowledgeAssetDraft } from "@/lib/notion";
-import { createPageWithMirror } from "@/lib/notion-mirror-push";
+// notion-cutoff-2026-06-02: Notion read kept only to resolve the project's Primary
+// Organization relation when an orgId is not supplied by the caller. All write
+// fan-outs in this route now target Supabase canonical tables.
+import { notion } from "@/lib/notion";
 import { isAdminUser, isAdminEmail } from "@/lib/clients";
+import { getSupabaseServerClient } from "@/lib/supabase-server";
 import * as XLSX from "xlsx";
 import mammoth from "mammoth";
 import { extractPptxText } from "@/lib/office-text-extract";
@@ -218,38 +222,20 @@ Valuation extraction guidance:
 - "post-money valuation", "pre-money valuation", "company valued at" → extract
 - If only one value is given (e.g. "£2m valuation"), put it in both pre_money_min and pre_money_max`;
 
-// ─── Notion write helpers ─────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function notionTitle(content: string) {
-  return { title: [{ text: { content: content.slice(0, 2000) } }] };
-}
-
-function notionRichText(content: string) {
-  return { rich_text: [{ text: { content: content.slice(0, 2000) } }] };
-}
-
-function notionSelect(name: string) {
-  return name ? { select: { name } } : undefined;
-}
-
-function notionMultiSelect(names: string[]) {
-  return { multi_select: names.filter(Boolean).map(n => ({ name: n })) };
-}
-
-function notionRelation(id: string) {
-  return { relation: [{ id }] };
-}
-
-function notionDate(dateStr: string | null) {
-  if (!dateStr) return undefined;
-  // Ensure it's a valid date-like string
-  const d = dateStr.length === 7 ? `${dateStr}-01` : dateStr;
-  return { date: { start: d } };
-}
-
-function notionNumber(n: number | null) {
-  if (n === null || n === undefined) return undefined;
-  return { number: n };
+/**
+ * Normalise a YYYY-MM(-DD) string to a YYYY-MM-DD date string.
+ * Returns null for empty or non-parseable strings.
+ */
+function toDateString(dateStr: string | null | undefined): string | null {
+  if (!dateStr) return null;
+  const trimmed = String(dateStr).trim();
+  if (!trimmed) return null;
+  // YYYY-MM → YYYY-MM-01
+  if (/^\d{4}-\d{2}$/.test(trimmed)) return `${trimmed}-01`;
+  // YYYY-MM-DD or anything Date can parse
+  return trimmed;
 }
 
 // ─── POST handler ─────────────────────────────────────────────────────────────
@@ -415,14 +401,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ mode: "dry_run", extraction });
   }
 
-  // ── execute: write to Notion ───────────────────────────────────────────────
+  // ── execute: write to Supabase canonical tables ────────────────────────────
+  // Per docs/SUPABASE_CONSOLIDATION_FREEZE.md §3, every Notion DB write below
+  // is replaced by a Supabase canonical-table write. Notion calls are kept as
+  // commented `notion-cutoff-2026-06-02` markers for traceability and removed
+  // wholesale at Phase 6.
+  const sb = getSupabaseServerClient();
   const errors: string[] = [];
-  const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+  const nowIso = new Date().toISOString();
+  const today = nowIso.split("T")[0]; // YYYY-MM-DD
 
   // Resolve orgId from project's Primary Organization relation if not passed in request.
-  // Cap Table and Valuations are linked to CH Organizations (not CH Projects), so we need
+  // Cap Table and Valuations are linked to organizations (not projects), so we need
   // orgId to both write and later read them back. If the project has no linked org, those
   // sections are skipped with a warning.
+  // NOTE: The lookup currently still hits Notion because `projects` rows in Supabase
+  //   do not yet expose the Primary Organization relation as a typed column. Once
+  //   Phase 4 binds it (or callers always pass orgId) this read can be deleted.
   let resolvedOrgId = orgId;
   if (!resolvedOrgId) {
     try {
@@ -445,202 +440,384 @@ export async function POST(req: NextRequest) {
   let orgUpdated = false;
   let projectUpdated = false;
 
-  // 1. Evidence
+  // 1. Evidence  → public.evidence
+  // notion-cutoff-2026-06-02: replaced by canonical write to evidence
+  // Notion → Supabase column mapping (see src/app/api/sync-evidence/route.ts):
+  //   Evidence Title     → title
+  //   Evidence Statement → evidence_statement
+  //   Source Excerpt     → source_excerpt   (we store the file name as the excerpt anchor)
+  //   Validation Status  → validation_status
+  //   Date Captured      → date_captured
+  //   Project relation   → project_notion_id
+  //   Evidence Type      → evidence_type
+  //   Confidence Level   → confidence_level
+  // Anything not bound to a column (e.g. evidence date YYYY-MM) goes to payload.
   const evidenceItems = (extraction.evidence ?? []).slice(0, 15);
   for (const ev of evidenceItems) {
     try {
-      const props: Record<string, unknown> = {
-        "Evidence Title":     notionTitle(ev.title || "Untitled"),
-        "Evidence Statement": notionRichText(ev.statement || ""),
-        "Source Excerpt":     notionRichText(fileName),
-        "Validation Status":  notionSelect("New"),
-        "Date Captured":      { date: { start: today } },
-        "Project":            notionRelation(projectId),
+      const evRow: Record<string, unknown> = {
+        notion_id:          `garage-ev-${randomUUID()}`,
+        title:              (ev.title || "Untitled").slice(0, 2000),
+        evidence_statement: (ev.statement || "").slice(0, 2000),
+        source_excerpt:     fileName.slice(0, 2000),
+        validation_status:  "New",
+        date_captured:      today,
+        project_notion_id:  projectId,
+        evidence_type:      ev.type || null,
+        confidence_level:   ev.confidence || null,
+        payload: {
+          evidence_date: ev.date ?? null,
+          source_file_url: fileUrl,
+          source_agent: "garage-ingest",
+        },
+        created_at:         nowIso,
+        updated_at:         nowIso,
       };
-      if (ev.type)       props["Evidence Type"]    = notionSelect(ev.type);
-      if (ev.confidence) props["Confidence Level"] = notionSelect(ev.confidence);
-
-      await notion.pages.create({
-        parent: { database_id: DB.evidence },
-        properties: props as Parameters<typeof notion.pages.create>[0]["properties"],
-      });
+      // notion-cutoff-2026-06-02: replaced by canonical write to evidence
+      // await notion.pages.create({
+      //   parent: { database_id: DB.evidence },
+      //   properties: { /* Notion property bag — see git history */ } as Parameters<typeof notion.pages.create>[0]["properties"],
+      // });
+      const { error } = await sb.from("evidence").insert(evRow);
+      if (error) throw new Error(error.message);
       evidenceCount++;
     } catch (err) {
       errors.push(`Evidence "${ev.title}": ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 
-  // 2. Financial Snapshots
+  // 2. Financial Snapshots  → public.financial_snapshots
+  // notion-cutoff-2026-06-02: replaced by canonical write to financial_snapshots
+  // Notion → Supabase column mapping:
+  //   Snapshot Name   → payload.snapshot_name (no native column)
+  //   Scope Project   → scope_project_notion_id
+  //   Period          → snapshot_date (date)
+  //   Revenue         → payload.revenue (no native column; stays in payload until Phase 6)
+  //   Burn            → burn_rate
+  //   Gross Margin    → payload.gross_margin_pct
+  //   Cash            → cash_balance
+  //   Runway          → runway_months
+  //   ARR             → arr
+  //   MRR             → mrr
   for (const fin of extraction.financials ?? []) {
     try {
-      const props: Record<string, unknown> = {
-        "Snapshot Name": notionTitle(`${projectName} — ${fin.period}`),
-        "Scope Project":  notionRelation(projectId),
+      const snapshotDate = toDateString(fin.period) ?? today;
+      const finRow: Record<string, unknown> = {
+        notion_id:                `garage-fin-${randomUUID()}`,
+        scope_project_notion_id:  projectId,
+        scope_org_notion_id:      resolvedOrgId ?? null,
+        snapshot_date:            snapshotDate,
+        mrr:                      fin.mrr,
+        arr:                      fin.arr,
+        cash_balance:             fin.cash,
+        burn_rate:                fin.burn,
+        runway_months:            fin.runway_months,
+        payload: {
+          snapshot_name:    `${projectName} — ${fin.period}`,
+          period_raw:       fin.period,
+          revenue:          fin.revenue,
+          gross_margin_pct: fin.gross_margin_pct,
+          confidence:       fin.confidence,
+          source_file_url:  fileUrl,
+          source_agent:     "garage-ingest",
+        },
+        created_at:               nowIso,
+        updated_at:               nowIso,
       };
-      const dateVal = notionDate(fin.period);
-      if (dateVal) props["Period"] = dateVal;
-      const revenue = notionNumber(fin.revenue);           if (revenue) props["Revenue"]      = revenue;
-      const burn    = notionNumber(fin.burn);              if (burn)    props["Burn"]          = burn;
-      const gm      = notionNumber(fin.gross_margin_pct); if (gm)      props["Gross Margin"]  = gm;
-      const cash    = notionNumber(fin.cash);              if (cash)    props["Cash"]          = cash;
-      const runway  = notionNumber(fin.runway_months);     if (runway)  props["Runway"]        = runway;
-      const arr     = notionNumber(fin.arr);               if (arr)     props["ARR"]           = arr;
-      const mrr     = notionNumber(fin.mrr);               if (mrr)     props["MRR"]           = mrr;
-
-      await notion.pages.create({
-        parent: { database_id: DB.financialSnapshots },
-        properties: props as Parameters<typeof notion.pages.create>[0]["properties"],
-      });
+      // notion-cutoff-2026-06-02: replaced by canonical write to financial_snapshots
+      // await notion.pages.create({
+      //   parent: { database_id: DB.financialSnapshots },
+      //   properties: { /* Notion property bag — see git history */ } as Parameters<typeof notion.pages.create>[0]["properties"],
+      // });
+      const { error } = await sb.from("financial_snapshots").insert(finRow);
+      if (error) throw new Error(error.message);
       financialsCount++;
     } catch (err) {
       errors.push(`Financial "${fin.period}": ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 
-  // 3. Cap Table
+  // 3. Cap Table  → public.cap_table_entries
+  // notion-cutoff-2026-06-02: replaced by canonical write to cap_table_entries
+  // Notion → Supabase column mapping:
+  //   Entry Name        → payload.entry_name (no native column)
+  //   Shareholder Name  → shareholder_name
+  //   Startup relation  → org_notion_id (NOT NULL)
+  //   Shareholder Type  → shareholder_type
+  //   Share Class       → share_class
+  //   Round             → payload.round (no native column)
+  //   Ownership Pct     → ownership_pct
+  //   Invested Amount   → payload.invested_amount (no native column)
   const capTableItems = extraction.cap_table ?? [];
   if (capTableItems.length > 0 && !resolvedOrgId) {
-    errors.push(`Cap Table: no CH Organization linked to this project — link a Primary Organization in Notion to enable Cap Table writes`);
+    errors.push(`Cap Table: no organization linked to this project — link a Primary Organization to enable Cap Table writes`);
   }
   for (const ct of capTableItems) {
-    if (!resolvedOrgId) break; // can't write without startup link (records would be unreadable)
+    if (!resolvedOrgId) break; // can't write without startup link (NOT NULL FK)
     try {
-      const props: Record<string, unknown> = {
-        "Entry Name":       notionTitle(`${ct.shareholder_name} — ${projectName}`),
-        "Shareholder Name": notionRichText(ct.shareholder_name),
-        "Startup":          notionRelation(resolvedOrgId),
+      const ctRow: Record<string, unknown> = {
+        notion_id:        `garage-ct-${randomUUID()}`,
+        org_notion_id:    resolvedOrgId,
+        shareholder_name: ct.shareholder_name,
+        shareholder_type: ct.type || null,
+        share_class:      ct.share_class || null,
+        ownership_pct:    ct.ownership_pct,
+        payload: {
+          entry_name:       `${ct.shareholder_name} — ${projectName}`,
+          round:            ct.round || null,
+          invested_amount:  ct.invested_amount,
+          confidence:       ct.confidence,
+          source_file_url:  fileUrl,
+          source_agent:     "garage-ingest",
+        },
+        created_at:       nowIso,
+        updated_at:       nowIso,
       };
-      if (ct.type)        props["Shareholder Type"] = notionSelect(ct.type);
-      if (ct.share_class) props["Share Class"]      = notionSelect(ct.share_class);
-      if (ct.round)       props["Round"]            = notionSelect(ct.round);
-      const own = notionNumber(ct.ownership_pct);   if (own) props["Ownership Pct"]       = own;
-      const inv = notionNumber(ct.invested_amount); if (inv) props["Invested Amount (£)"] = inv;
-
-      await notion.pages.create({
-        parent: { database_id: DB.capTable },
-        properties: props as Parameters<typeof notion.pages.create>[0]["properties"],
-      });
+      // notion-cutoff-2026-06-02: replaced by canonical write to cap_table_entries
+      // await notion.pages.create({
+      //   parent: { database_id: DB.capTable },
+      //   properties: { /* Notion property bag — see git history */ } as Parameters<typeof notion.pages.create>[0]["properties"],
+      // });
+      const { error } = await sb.from("cap_table_entries").insert(ctRow);
+      if (error) throw new Error(error.message);
       capTableCount++;
     } catch (err) {
       errors.push(`Cap table "${ct.shareholder_name}": ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 
-  // 4. Valuations
+  // 4. Valuations  → public.valuations
+  // notion-cutoff-2026-06-02: replaced by canonical write to valuations
+  // Notion → Supabase column mapping:
+  //   Valuation Name   → payload.valuation_name (no native column)
+  //   Startup relation → org_notion_id (NOT NULL)
+  //   Method           → source (free-form text on the canonical table)
+  //   Pre-money Min    → payload.pre_money_min  (canonical has a single `pre_money` column)
+  //   Pre-money Max    → payload.pre_money_max  (we also write the midpoint to `pre_money` if both are set)
   const valuationItems = extraction.valuations ?? [];
   if (valuationItems.length > 0 && !resolvedOrgId) {
-    errors.push(`Valuations: no CH Organization linked to this project — link a Primary Organization in Notion to enable Valuation writes`);
+    errors.push(`Valuations: no organization linked to this project — link a Primary Organization to enable Valuation writes`);
   }
   for (const val of valuationItems) {
-    if (!resolvedOrgId) break; // can't write without startup link (records would be unreadable)
+    if (!resolvedOrgId) break; // can't write without startup link (NOT NULL FK)
     try {
-      const props: Record<string, unknown> = {
-        "Valuation Name": notionTitle(`${projectName} — ${val.round}`),
-        "Startup":        notionRelation(resolvedOrgId),
-      };
-      if (val.method) props["Method"] = notionSelect(val.method);
-      const min = notionNumber(val.pre_money_min); if (min) props["Pre-money Min (£)"] = min;
-      const max = notionNumber(val.pre_money_max); if (max) props["Pre-money Max (£)"] = max;
+      const min = val.pre_money_min;
+      const max = val.pre_money_max;
+      const preMoney =
+        typeof min === "number" && typeof max === "number" ? (min + max) / 2 :
+        typeof min === "number" ? min :
+        typeof max === "number" ? max :
+        null;
 
-      await notion.pages.create({
-        parent: { database_id: DB.valuations },
-        properties: props as Parameters<typeof notion.pages.create>[0]["properties"],
-      });
+      const valRow: Record<string, unknown> = {
+        notion_id:       `garage-val-${randomUUID()}`,
+        org_notion_id:   resolvedOrgId,
+        valuation_date:  today,
+        pre_money:       preMoney,
+        source:          val.method || null,
+        payload: {
+          valuation_name:  `${projectName} — ${val.round}`,
+          round:           val.round || null,
+          pre_money_min:   min,
+          pre_money_max:   max,
+          method:          val.method,
+          confidence:      val.confidence,
+          source_file_url: fileUrl,
+          source_agent:    "garage-ingest",
+        },
+        created_at:      nowIso,
+        updated_at:      nowIso,
+      };
+      // notion-cutoff-2026-06-02: replaced by canonical write to valuations
+      // await notion.pages.create({
+      //   parent: { database_id: DB.valuations },
+      //   properties: { /* Notion property bag — see git history */ } as Parameters<typeof notion.pages.create>[0]["properties"],
+      // });
+      const { error } = await sb.from("valuations").insert(valRow);
+      if (error) throw new Error(error.message);
       valuationsCount++;
     } catch (err) {
       errors.push(`Valuation "${val.round}": ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 
-  // 5. Knowledge Assets — use existing helper
+  // 5. Knowledge Assets  → public.knowledge_assets
+  // notion-cutoff-2026-06-02: replaced by canonical write to knowledge_assets
+  // Previously called createKnowledgeAssetDraft() in src/lib/notion/knowledge.ts
+  // which created a Notion page in the Knowledge Assets DB; we now insert
+  // directly into the Supabase canonical table. The summary + bullet block body
+  // is collapsed into body_md until Phase 6 binds dedicated columns.
+  // Notion → Supabase column mapping:
+  //   Asset Name       → title
+  //   Asset Type       → asset_type
+  //   Domain / Theme   → payload.tags (no native multi-select column yet)
+  //   Status           → status ("Draft")
+  //   Summary block    → summary  (also embedded in body_md)
+  //   Key points block → body_md  (rendered as a markdown bullet list)
+  //   Source File URL  → payload.source_file_url
   const knowledgeItems = (extraction.knowledge_assets ?? []).slice(0, 3);
   for (const ka of knowledgeItems) {
     try {
-      await createKnowledgeAssetDraft({
-        title: ka.title,
-        summary: ka.summary,
-        keyPoints: ka.key_points ?? [],
-        assetType: ka.asset_type ?? "Sector Insight",
-        tags: ka.tags ?? [],
-        sourceNote: fileName,
-      });
+      const summary = ka.summary || "";
+      const keyPoints = ka.key_points ?? [];
+      const bodyMd = [
+        summary,
+        keyPoints.length > 0 ? "\n\n**Key points:**\n" + keyPoints.slice(0, 8).map(p => `- ${p}`).join("\n") : "",
+        fileName ? `\n\n_Source: ${fileName}_` : "",
+      ].join("").trim();
+
+      const kaRow: Record<string, unknown> = {
+        notion_id:  `garage-ka-${randomUUID()}`,
+        title:      ka.title || "Untitled",
+        asset_type: ka.asset_type || "Sector Insight",
+        status:     "Draft",
+        summary,
+        body_md:    bodyMd,
+        payload: {
+          tags:             ka.tags ?? [],
+          confidence:       ka.confidence,
+          source_note:      fileName,
+          source_file_url:  fileUrl,
+          source_agent:     "garage-ingest",
+          portal_visibility: "admin-only",
+        },
+        created_at: nowIso,
+        updated_at: nowIso,
+      };
+      // notion-cutoff-2026-06-02: replaced by canonical write to knowledge_assets
+      // await createKnowledgeAssetDraft({
+      //   title: ka.title,
+      //   summary: ka.summary,
+      //   keyPoints: ka.key_points ?? [],
+      //   assetType: ka.asset_type ?? "Sector Insight",
+      //   tags: ka.tags ?? [],
+      //   sourceNote: fileName,
+      // });
+      const { error } = await sb.from("knowledge_assets").insert(kaRow);
+      if (error) throw new Error(error.message);
       knowledgeAssetsCount++;
     } catch (err) {
       errors.push(`Knowledge asset "${ka.title}": ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 
-  // 6. Insight Briefs — go through the mirror so the Hall sees them immediately.
+  // 6. Insight Briefs  → public.insight_briefs
+  // notion-cutoff-2026-06-02: replaced by canonical write to insight_briefs
+  // The Notion path created a page (with Name + first Theme select) and then
+  // appended a paragraph block for the summary. The canonical table holds the
+  // full body in body_md, so the two-step write collapses to a single insert.
+  // Notion → Supabase column mapping:
+  //   Name            → title
+  //   Theme[0]        → payload.theme[0] (no native column; first theme also stored as `scope` for filterability)
+  //   Summary block   → body_md
+  //   Status          → status ("Draft" — Notion had no explicit value)
   const insightItems = (extraction.insight_briefs ?? []).slice(0, 2);
   for (const ib of insightItems) {
     try {
-      const fields: Record<string, unknown> = { title: ib.title };
-      if (ib.theme?.length) fields.theme = ib.theme[0];
-
-      const created = await createPageWithMirror({
-        table: "notion_insight_briefs",
-        fields,
-      });
-      if (!created.ok) throw new Error(created.error ?? "create failed");
-
-      // Summary still goes as a page body block (not a property — needs separate call).
-      if (ib.summary && created.id) {
-        await notion.blocks.children.append({
-          block_id: created.id,
-          children: [
-            {
-              object: "block",
-              type: "paragraph",
-              paragraph: { rich_text: [{ type: "text", text: { content: ib.summary.slice(0, 2000) } }] },
-            },
-          ],
-        });
-      }
+      const ibRow: Record<string, unknown> = {
+        notion_id:         `garage-ib-${randomUUID()}`,
+        title:             ib.title || "Untitled",
+        body_md:           (ib.summary || "").slice(0, 8000),
+        status:            "Draft",
+        scope:             ib.theme?.[0] ?? null,
+        org_notion_id:     resolvedOrgId ?? null,
+        project_notion_id: projectId,
+        payload: {
+          theme:           ib.theme ?? [],
+          confidence:      ib.confidence,
+          source_file_url: fileUrl,
+          source_agent:    "garage-ingest",
+        },
+        created_at:        nowIso,
+        updated_at:        nowIso,
+      };
+      // notion-cutoff-2026-06-02: replaced by canonical write to insight_briefs
+      // const page = await notion.pages.create({
+      //   parent: { database_id: DB.insightBriefs },
+      //   properties: { /* Notion property bag — see git history */ } as Parameters<typeof notion.pages.create>[0]["properties"],
+      // });
+      // await notion.blocks.children.append({
+      //   block_id: page.id,
+      //   children: [ /* paragraph block with summary */ ],
+      // });
+      const { error } = await sb.from("insight_briefs").insert(ibRow);
+      if (error) throw new Error(error.message);
       insightBriefsCount++;
     } catch (err) {
       errors.push(`Insight brief "${ib.title}": ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 
-  // 7. Decision Items — go through the mirror.
+  // 7. Decision Items  → public.decision_items
+  // notion-cutoff-2026-06-02: replaced by canonical write to decision_items
+  // Notion → Supabase column mapping:
+  //   Name              → title
+  //   Status            → status ("Open")
+  //   Decision Category → category
+  //   Priority          → priority
+  //   Notes             → notes_raw
   const decisionItems = (extraction.decision_items ?? []).slice(0, 3);
   for (const di of decisionItems) {
     try {
-      const fields: Record<string, unknown> = {
-        title:  di.title,
-        status: "Open",
+      const diRow: Record<string, unknown> = {
+        notion_id:         `garage-di-${randomUUID()}`,
+        title:             di.title || "Untitled",
+        status:            "Open",
+        category:          di.category || null,
+        priority:          di.priority || null,
+        notes_raw:         di.notes || null,
+        source_agent:      "garage-ingest",
+        org_notion_id:     resolvedOrgId ?? null,
+        project_notion_id: projectId,
+        payload: {
+          source_file_url: fileUrl,
+        },
+        created_at:        nowIso,
+        updated_at:        nowIso,
       };
-      if (di.category) fields.category  = di.category;
-      if (di.priority) fields.priority  = di.priority;
-      if (di.notes)    fields.notes_raw = di.notes;
-
-      const created = await createPageWithMirror({
-        table: "notion_decision_items",
-        fields,
-      });
-      if (!created.ok) throw new Error(created.error ?? "create failed");
+      // notion-cutoff-2026-06-02: replaced by canonical write to decision_items
+      // await notion.pages.create({
+      //   parent: { database_id: DB.decisions },
+      //   properties: { /* Notion property bag — see git history */ } as Parameters<typeof notion.pages.create>[0]["properties"],
+      // });
+      const { error } = await sb.from("decision_items").insert(diRow);
+      if (error) throw new Error(error.message);
       decisionItemsCount++;
     } catch (err) {
       errors.push(`Decision "${di.title}": ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 
-  // 8. Org profile update (if org is resolvable)
+  // 8. Org profile update  → public.organizations (UPDATE)
+  // notion-cutoff-2026-06-02: replaced by canonical update to organizations
+  // Notion → Supabase column mapping:
+  //   One-line Description → notes  (organizations has no `description` column;
+  //                                   `notes` is the existing free-text field)
+  //   Website              → website
+  //   Themes (multi)       → themes (stringified JSON array, matching sync-organizations)
   if (resolvedOrgId) {
     try {
-      const orgProps: Record<string, unknown> = {};
       const desc = extraction.organization?.description;
       const site = extraction.organization?.website;
       const tags = extraction.organization?.sector_tags;
-      if (desc) orgProps["One-line Description"] = notionRichText(desc);
-      if (site) orgProps["Website"]              = { url: site };
-      if (tags?.length) orgProps["Themes"]       = notionMultiSelect(tags);
 
-      if (Object.keys(orgProps).length > 0) {
-        await notion.pages.update({
-          page_id: resolvedOrgId,
-          properties: orgProps as Parameters<typeof notion.pages.update>[0]["properties"],
-        });
+      const orgUpdate: Record<string, unknown> = {};
+      if (desc) orgUpdate["notes"]   = desc;
+      if (site) orgUpdate["website"] = site;
+      if (tags?.length) orgUpdate["themes"] = JSON.stringify(tags);
+
+      if (Object.keys(orgUpdate).length > 0) {
+        orgUpdate["updated_at"] = nowIso;
+        // notion-cutoff-2026-06-02: replaced by canonical update to organizations
+        // await notion.pages.update({
+        //   page_id: resolvedOrgId,
+        //   properties: { /* "One-line Description", "Website", "Themes" */ } as Parameters<typeof notion.pages.update>[0]["properties"],
+        // });
+        const { error } = await sb
+          .from("organizations")
+          .update(orgUpdate)
+          .eq("notion_id", resolvedOrgId);
+        if (error) throw new Error(error.message);
         orgUpdated = true;
       }
     } catch (err) {
@@ -648,39 +825,67 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // 9. Project draft status update
+  // 9. Project draft status update  → public.projects (UPDATE)
+  // notion-cutoff-2026-06-02: replaced by canonical update to projects
+  // Notion → Supabase column mapping:
+  //   Draft Status Update → draft_status_update (added in Phase 1.1 / freeze §3.1)
   if (extraction.draft_status_update) {
     try {
-      await notion.pages.update({
-        page_id: projectId,
-        properties: {
-          "Draft Status Update": notionRichText(extraction.draft_status_update),
-        } as Parameters<typeof notion.pages.update>[0]["properties"],
-      });
+      // notion-cutoff-2026-06-02: replaced by canonical update to projects
+      // await notion.pages.update({
+      //   page_id: projectId,
+      //   properties: {
+      //     "Draft Status Update": notionRichText(extraction.draft_status_update),
+      //   } as Parameters<typeof notion.pages.update>[0]["properties"],
+      // });
+      const { error } = await sb
+        .from("projects")
+        .update({
+          draft_status_update: extraction.draft_status_update,
+          updated_at:          nowIso,
+        })
+        .eq("notion_id", projectId);
+      if (error) throw new Error(error.message);
       projectUpdated = true;
     } catch (err) {
       errors.push(`Project update: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 
-  // 10. Create CH Sources [OS v2] record so the file appears in the Sources panel
-  // This links the ingested document to the project for traceability.
+  // 10. Source record  → public.sources
+  // notion-cutoff-2026-06-02: replaced by canonical write to sources
+  // The previous Notion write created a CH Sources [OS v2] page so the file
+  // appeared in the Sources panel for traceability. The canonical sources
+  // table already drives that panel post-cutoff.
+  // Notion → Supabase column mapping:
+  //   Source Title       → title
+  //   Source Type        → source_type ("Document")
+  //   Processing Status  → processing_status ("Processed")
+  //   Linked Projects[0] → project_notion_id  (single FK; multi-project fan-out goes to payload)
+  //   Source URL         → source_url
   try {
-    const sourceProps: Record<string, unknown> = {
-      "Source Title":    { title: [{ text: { content: fileName } }] },
-      "Source Type":     notionSelect("Document"),
-      "Processing Status": notionSelect("Processed"),
-      "Linked Projects": { relation: [{ id: projectId }] },
+    const srcRow: Record<string, unknown> = {
+      notion_id:         `garage-src-${randomUUID()}`,
+      title:             fileName.slice(0, 200),
+      source_type:       "Document",
+      processing_status: "Processed",
+      project_notion_id: projectId,
+      source_url:        fileUrl || null,
+      source_date:       today,
+      notion_created_at: nowIso,
+      created_at:        nowIso,
+      updated_at:        nowIso,
     };
-    if (fileUrl) sourceProps["Source URL"] = { url: fileUrl };
-
-    await notion.pages.create({
-      parent: { database_id: DB.sources },
-      properties: sourceProps as Parameters<typeof notion.pages.create>[0]["properties"],
-    });
+    // notion-cutoff-2026-06-02: replaced by canonical write to sources
+    // await notion.pages.create({
+    //   parent: { database_id: DB.sources },
+    //   properties: { /* Notion property bag — see git history */ } as Parameters<typeof notion.pages.create>[0]["properties"],
+    // });
+    const { error } = await sb.from("sources").insert(srcRow);
+    if (error) throw new Error(error.message);
   } catch (err) {
     // Non-fatal — evidence and financials already written; don't fail the whole response
-    errors.push(`CH Sources record: ${err instanceof Error ? err.message : String(err)}`);
+    errors.push(`Sources record: ${err instanceof Error ? err.message : String(err)}`);
   }
 
   return NextResponse.json({
