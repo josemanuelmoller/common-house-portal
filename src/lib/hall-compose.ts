@@ -284,7 +284,7 @@ You will receive 1 PRIMARY source (the most recent conversation — explicitly m
 
 QUOTE candidates: return 3 verbatim lines from the counterpart (NOT from CH speakers), all from the PRIMARY source. Each must pass the no-embarrassment rule. If a transcript with timestamps is provided, include timestamp_seconds.
 
-ANGLES: exactly 3, each is a 2-4 word title (uppercase) + 1-2 sentence body. Anchor each angle's body to a specific evidence excerpt FROM THE PRIMARY SOURCE.
+ANGLES: exactly 3, each is a 2-4 word title (uppercase) + 1-2 sentence body. Anchor each angle's body to a specific evidence excerpt FROM THE PRIMARY SOURCE. Frame each angle as the COUNTERPART's strategic territory or diagnostic — what they need to solve, what their problem is, where they want to play. AVOID phrasing angles as Common House offerings or product names (e.g. do NOT name CH frameworks like "Zero Waste District", "the CH ecosystem", "our portfolio model" inside an angle, even if mentioned in the source). The hero is THEIR space — angles are how WE understand their problem, not how we sell to them.
 
 TIMELINE: include past meetings (from any source) as 'past', the PRIMARY meeting as 'today', and 1-3 'future' milestones derived from action items in the PRIMARY source.
 
