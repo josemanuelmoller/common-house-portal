@@ -35,7 +35,10 @@ export default async function WorkroomsPage() {
   await requireAdmin();
 
   const allProjects = await getProjectsOverview();
-  const projects    = allProjects.filter(p => p.primaryWorkspace === "workroom");
+  // Workroom = any active project whose engagement_model is a paid CH service
+  // (delivery / advisory / consulting / etc.) — i.e. anything that is NOT a startup.
+  // Source of truth lives on the project, not on `primary_workspace` (deprecated).
+  const projects    = allProjects.filter(p => p.engagementModel && p.engagementModel !== "startup");
 
   const withBlockers   = projects.filter(p => p.blockerCount > 0);
   const needsUpdate    = projects.filter(p => p.updateNeeded);

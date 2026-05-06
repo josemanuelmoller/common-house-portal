@@ -83,9 +83,11 @@ function transform(page: NotionPage): Record<string, unknown> {
     project_status:          sel(prop(page, "Project Status")),
     current_stage:           sel(prop(page, "Current Stage")),
     project_type:            sel(prop(page, "Project Type")),
-    engagement_model:        sel(prop(page, "Engagement Model")),
+    // engagement_model + primary_workspace are now Supabase-owned (workroom-vs-garage
+    // routing). They must not be overwritten from Notion — Notion's copy can be stale
+    // and re-NULLs the field, which then makes Workrooms / Garage filters drop the
+    // project. See CLAUDE.md sync-projects field-ownership note.
     engagement_stage:        sel(prop(page, "Engagement Stage")),
-    primary_workspace:       sel(prop(page, "Primary Workspace")),
     update_needed:           bool(prop(page, "Project Update Needed?")),
     status_summary:          text(prop(page, "Status Summary")),
     draft_status_update:     text(prop(page, "Draft Status Update")),
