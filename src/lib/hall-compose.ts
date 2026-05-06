@@ -260,19 +260,41 @@ async function gatherFirefliesTranscripts(
 // ─── Prompt + LLM call ────────────────────────────────────────────────────────
 
 function buildSystemPrompt(): string {
-  return `You are composing a Hall draft for a Common House project. The Hall is a per-project page that the external counterpart (client/prospect) will eventually see — its purpose is to demonstrate that we listened carefully and have a clear, actionable angle on what they need.
+  return `You are composing a Hall draft for a Common House project. The Hall is a per-project page that the external counterpart (client/prospect) WILL SEE — its purpose is to demonstrate that we listened carefully and have a clear, actionable, RESPECTFUL angle on what they want.
 
 Output must be JSON-only via the structured tool. Tone: confident, specific, evidence-based. Spanish if the source material is mostly Spanish, English otherwise. Avoid corporate buzzwords ("synergy", "leverage", "unlock"). No emojis.
 
-For QUOTE candidates: return 3 verbatim lines from the counterpart (NOT from CH speakers). Choose lines that are evocative, not just informative — something that, displayed in italic at 96px, would make them feel "they really listened". If a transcript with timestamps is provided, include timestamp_seconds.
+# CRITICAL: client-facing positioning (no-embarrassment rule)
 
-For ANGLES: 3 strategic angles for the proposal/relationship. Each is a 2-4 word title (uppercase) + 1-2 sentence body. Anchor each angle to specific evidence excerpt when possible.
+The counterpart will read this on their own Hall page. They will feel exposed if we surface their weaknesses verbatim. So:
+- REJECT any quote candidate that highlights what the counterpart's organization LACKS, FAILS at, or STRUGGLES with (e.g. "we have no funding", "no clear vision", "we're stuck").
+- PREFER quotes that show ambition, opportunity, strategic intent, or openness ("we want to break out of paralysis", "plastic is our lever", "I see this as the connector to our 2027 plan").
+- If the counterpart names a problem AND a solution in the same passage, choose the solution-side phrasing.
+- If only weakness-framed quotes exist, reformulate the LEAD quote toward aspiration WHILE STAYING VERBATIM (i.e. find a different sentence in the same passage that frames the opportunity).
 
-For TIMELINE: past meetings/events from the source material as 'past', the most recent meeting as 'today', and 1-3 'future' milestones derived from action items.
+# CRITICAL: scope discipline (no topic bleed)
 
-For HALL_TEXT (flat fields): one or two sentences each. challenge = what blocks them; matters_most = what success looks like for them; current_focus = the next concrete piece of work; next_milestone = the next dated event we're driving toward.
+You will receive 1 PRIMARY source (the most recent conversation — explicitly marked) plus 0-2 supporting sources (older context). Strict rules:
+- The QUOTE must come from the PRIMARY source.
+- The 3 ANGLES must reflect themes RAISED IN THE PRIMARY source. A theme that appears only in a supporting source does NOT qualify as a strategic angle for the proposal.
+- Supporting sources are background context only — they may inform body text or the timeline, but they do NOT generate net-new angles.
+- DO NOT mix unrelated counterparties or workstreams. If the primary source is a 1:1 with person X, do not surface angles from a completely separate meeting (e.g. lobby work, partnership ops with someone else) even if they share an org domain.
 
-Be concise. Each field has its own length budget — overshooting hurts the design.`;
+# Per-section guidance
+
+QUOTE candidates: return 3 verbatim lines from the counterpart (NOT from CH speakers), all from the PRIMARY source. Each must pass the no-embarrassment rule. If a transcript with timestamps is provided, include timestamp_seconds.
+
+ANGLES: exactly 3, each is a 2-4 word title (uppercase) + 1-2 sentence body. Anchor each angle's body to a specific evidence excerpt FROM THE PRIMARY SOURCE.
+
+TIMELINE: include past meetings (from any source) as 'past', the PRIMARY meeting as 'today', and 1-3 'future' milestones derived from action items in the PRIMARY source.
+
+HALL_TEXT: one or two sentences each.
+- challenge = the strategic block they want to overcome (positive framing — "they want to..." not "they fail at...")
+- matters_most = what success looks like for THEM
+- current_focus = the next concrete piece of work the partnership will tackle
+- next_milestone = the next dated event we're driving toward
+
+Be concise. Overshooting any field hurts the design.`;
 }
 
 const COMPOSE_TOOL = {
@@ -362,11 +384,12 @@ function buildUserMessage(ctx: ProjectContext, materials: SourceMaterial[]): str
   lines.push(`PROJECT: ${ctx.name}`);
   if (ctx.org_name) lines.push(`COUNTERPART ORG: ${ctx.org_name} (${ctx.org_domain ?? "—"})`);
   lines.push("");
-  lines.push("SOURCE MATERIAL (newest first):");
+  lines.push("SOURCE MATERIAL — first listed is the PRIMARY (newest). Others are SUPPORTING context only.");
 
-  for (const m of materials) {
+  materials.forEach((m, idx) => {
+    const role = idx === 0 ? "PRIMARY" : "SUPPORTING";
     lines.push("");
-    lines.push(`### ${m.title}  ·  ${m.date_iso.slice(0, 10)}  ·  origin=${m.origin}`);
+    lines.push(`### [${role}] ${m.title}  ·  ${m.date_iso.slice(0, 10)}  ·  origin=${m.origin}`);
     if (m.source_id) lines.push(`source_id: ${m.source_id}`);
     if (m.participants.length) lines.push(`participants: ${m.participants.join(", ")}`);
     if (m.summary) {
@@ -375,11 +398,13 @@ function buildUserMessage(ctx: ProjectContext, materials: SourceMaterial[]): str
     }
     if (m.transcript) {
       lines.push("--- TRANSCRIPT (truncated to fit) ---");
-      // Trim each transcript to 8k chars to stay within context
-      const trimmed = m.transcript.length > 8000 ? m.transcript.slice(0, 8000) + "…[truncated]" : m.transcript;
+      // Larger transcript budget for the PRIMARY (12k) so quote/angles get
+      // enough verbatim material; supporting sources get a tight 4k.
+      const limit = idx === 0 ? 12000 : 4000;
+      const trimmed = m.transcript.length > limit ? m.transcript.slice(0, limit) + "…[truncated]" : m.transcript;
       lines.push(trimmed);
     }
-  }
+  });
   return lines.join("\n");
 }
 
@@ -401,9 +426,14 @@ export async function composeHallDraft(
     supabaseSources.map(s => s.fireflies_id).filter((x): x is string => !!x),
   );
   const firefliesSources = await gatherFirefliesTranscripts(ctx.org_people_emails, haveIds);
+
+  // Tight scoping: only the most recent 3 sources cross-origin. The most
+  // recent (index 0) is marked as PRIMARY in the prompt; the rest are
+  // SUPPORTING context. This prevents Claude from blending unrelated
+  // workstreams (e.g. lobby meetings + CFO conversation) into the angles.
   const all = [...firefliesSources, ...supabaseSources]
     .sort((a, b) => b.date_iso.localeCompare(a.date_iso))
-    .slice(0, 6);
+    .slice(0, 3);
 
   if (all.length === 0) {
     return { ok: false, error: "no source material found for this project" };
