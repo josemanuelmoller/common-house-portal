@@ -2,6 +2,9 @@ import { currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { unstable_cache } from "next/cache";
 import { Sidebar } from "@/components/Sidebar";
+import { HallComposedHero } from "@/components/hall/HallComposedHero";
+import type { HallDraft } from "@/lib/hall-compose";
+import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { WhatsHappeningNow } from "@/components/hall/WhatsHappeningNow";
 import { WhatWeHeard } from "@/components/hall/WhatWeHeard";
 import { SharedMaterials } from "@/components/hall/SharedMaterials";
@@ -130,6 +133,23 @@ export default async function HallPage() {
   const { project, evidence, people, documents, activity } = await getHallData(projectId);
 
   if (!project) redirect("/sign-in");
+
+  // Composed hero (quote + angles + timeline) — only renders if a draft has
+  // been published via /admin/projects/[id]/hall-compose. Read directly from
+  // Supabase, NOT cached, so a publish reflects immediately on next page load.
+  const composedHero = await (async (): Promise<HallDraft | null> => {
+    try {
+      const sb = getSupabaseServerClient();
+      const { data } = await sb
+        .from("projects")
+        .select("hall_hero")
+        .eq("notion_id", projectId)
+        .maybeSingle();
+      return (data?.hall_hero as HallDraft | null) ?? null;
+    } catch {
+      return null;
+    }
+  })();
 
   // ── Navigation ───────────────────────────────────────────────────────────
   // Show workspace link only when this project's primary workspace is ready.
@@ -375,6 +395,10 @@ export default async function HallPage() {
             </span>
           </div>
         </header>
+
+        {/* Composed hero (quote + angles + timeline) — renders only when
+             hall_hero JSONB is published. Falls through to legacy welcome when null. */}
+        <HallComposedHero hero={composedHero} projectName={project.name} />
 
         {/* Welcome — narrative intro */}
         <section

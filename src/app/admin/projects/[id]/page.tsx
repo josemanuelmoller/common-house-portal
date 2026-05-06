@@ -96,6 +96,14 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
               <span style={{ color: "var(--hall-warn)" }}>! UPDATE NEEDED</span>
             )}
             <Link
+              href={`/admin/projects/${project.id}/hall-compose`}
+              className="uppercase tracking-widest"
+              style={{ color: "var(--hall-ink-0)", fontWeight: 700 }}
+              title="Compose Hall hero from conversations"
+            >
+              ✦ Hall Compose
+            </Link>
+            <Link
               href="/admin"
               className="uppercase tracking-widest"
               style={{ color: "var(--hall-muted-2)" }}
