@@ -10,11 +10,12 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { withRoutineLog } from "@/lib/routine-log";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-export async function GET(req: NextRequest) {
+async function _GET(req: NextRequest) {
   const cronSecret = process.env.CRON_SECRET;
   if (!cronSecret) {
     return NextResponse.json({ error: "CRON_SECRET not configured" }, { status: 500 });
@@ -43,3 +44,6 @@ export async function GET(req: NextRequest) {
     { status: upstream.ok ? 200 : 502 },
   );
 }
+
+export const GET = withRoutineLog("cron-run-relationship-promotion-scan", _GET);
+export const POST = GET;

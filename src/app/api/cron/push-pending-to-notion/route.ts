@@ -9,6 +9,7 @@
  */
 
 import { NextResponse } from "next/server";
+import { withRoutineLog } from "@/lib/routine-log";
 
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
@@ -21,5 +22,5 @@ async function handle() {
   });
 }
 
-export async function GET()  { return handle(); }
-export async function POST() { return handle(); }
+export const POST = withRoutineLog("cron-push-pending-to-notion", () => handle());
+export const GET  = POST;

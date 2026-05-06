@@ -17,6 +17,7 @@ import { currentUser } from "@clerk/nextjs/server";
 import { isAdminUser, isAdminEmail } from "@/lib/clients";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { resolvePhoto, type PhotoSource } from "@/lib/contact-photos";
+import { withRoutineLog } from "@/lib/routine-log";
 
 export const maxDuration = 300;
 export const dynamic     = "force-dynamic";
@@ -38,7 +39,7 @@ async function authCheck(req: NextRequest): Promise<boolean> {
   return false;
 }
 
-export async function POST(req: NextRequest) {
+async function _POST(req: NextRequest) {
   if (!(await authCheck(req))) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const { searchParams } = new URL(req.url);
@@ -104,4 +105,5 @@ export async function POST(req: NextRequest) {
 }
 
 // Vercel cron hits endpoints with GET. Alias.
-export { POST as GET };
+export const POST = withRoutineLog("contact-photos-sync", _POST);
+export const GET  = POST;

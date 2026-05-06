@@ -10,6 +10,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { syncAllNotionMirrors } from "@/lib/notion-sync";
+import { withRoutineLog } from "@/lib/routine-log";
 
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
@@ -35,5 +36,5 @@ async function handle(req: NextRequest) {
   });
 }
 
-export async function GET(req: NextRequest)  { return handle(req); }
-export async function POST(req: NextRequest) { return handle(req); }
+export const POST = withRoutineLog("cron-sync-notion-mirror", handle);
+export const GET  = POST;

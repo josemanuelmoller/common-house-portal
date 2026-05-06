@@ -26,6 +26,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
+import { withRoutineLog } from "@/lib/routine-log";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -33,7 +34,7 @@ export const maxDuration = 300;
 const CONFIDENCE_THRESHOLD = 0.92;
 const MAX_MERGES_PER_RUN = 50;
 
-export async function GET(req: NextRequest) {
+async function _GET(req: NextRequest) {
   const cronSecret = process.env.CRON_SECRET;
   if (!cronSecret) return NextResponse.json({ error: "CRON_SECRET not configured" }, { status: 500 });
   const auth = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
@@ -199,3 +200,6 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({ ok: true, ...summary });
 }
+
+export const GET = withRoutineLog("cron-auto-merge-orphan-people", _GET);
+export const POST = GET;

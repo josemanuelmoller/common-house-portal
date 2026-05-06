@@ -15,6 +15,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { currentUser } from "@clerk/nextjs/server";
 import { isAdminUser, isAdminEmail } from "@/lib/clients";
 import { syncCalendarDelta } from "@/lib/calendar-sync";
+import { withRoutineLog } from "@/lib/routine-log";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -49,5 +50,5 @@ async function handle(req: NextRequest) {
   }
 }
 
-export async function GET(req: NextRequest)  { return handle(req); }
-export async function POST(req: NextRequest) { return handle(req); }
+export const POST = withRoutineLog("cron-observe-calendar", handle);
+export const GET  = POST;

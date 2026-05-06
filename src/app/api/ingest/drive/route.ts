@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { runDriveIngestor } from "@/lib/ingestors/drive";
 import type { IngestInput } from "@/lib/ingestors/types";
+import { withRoutineLog } from "@/lib/routine-log";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -19,8 +20,8 @@ function authCheck(req: NextRequest): boolean {
   return false;
 }
 
-export async function POST(req: NextRequest) { return handle(req); }
-export async function GET(req: NextRequest) { return handle(req); }
+export const POST = withRoutineLog("ingest-drive", handle);
+export const GET  = POST;
 
 async function handle(req: NextRequest) {
   if (!authCheck(req)) {

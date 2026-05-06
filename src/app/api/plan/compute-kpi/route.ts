@@ -23,6 +23,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { withRoutineLog } from "@/lib/routine-log";
 
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
@@ -275,7 +276,7 @@ async function dispatch(
 
 // ─── Handler ─────────────────────────────────────────────────────────────────
 
-export async function POST(req: NextRequest) {
+async function _POST(req: NextRequest) {
   if (!authCheck(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -339,6 +340,5 @@ export async function POST(req: NextRequest) {
 }
 
 // Allow GET for easy cron-without-body triggers
-export async function GET(req: NextRequest) {
-  return POST(req);
-}
+export const POST = withRoutineLog("plan-compute-kpi", _POST);
+export const GET  = POST;

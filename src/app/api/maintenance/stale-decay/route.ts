@@ -17,6 +17,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
+import { withRoutineLog } from "@/lib/routine-log";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -33,8 +34,8 @@ function authCheck(req: NextRequest): boolean {
 const STALE_DAYS = 21;
 const DEADLINE_GRACE_DAYS = 7;
 
-export async function POST(req: NextRequest) { return handle(req); }
-export async function GET(req: NextRequest)  { return handle(req); }
+export const POST = withRoutineLog("maintenance-stale-decay", handle);
+export const GET  = POST;
 
 async function handle(req: NextRequest) {
   if (!authCheck(req)) {

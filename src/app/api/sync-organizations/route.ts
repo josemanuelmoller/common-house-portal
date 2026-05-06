@@ -22,6 +22,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Client } from "@notionhq/client";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
+import { withRoutineLog } from "@/lib/routine-log";
 
 export const maxDuration = 60;
 
@@ -118,7 +119,7 @@ async function fetchAllOrganizations(notion: Client): Promise<NotionPage[]> {
 
 // ─── Handler ──────────────────────────────────────────────────────────────────
 
-export async function POST(req: NextRequest) {
+async function _POST(req: NextRequest) {
   if (!authCheck(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -181,3 +182,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: String(err) }, { status: 500 });
   }
 }
+
+export const POST = withRoutineLog("sync-organizations", _POST);
+export const GET  = POST;

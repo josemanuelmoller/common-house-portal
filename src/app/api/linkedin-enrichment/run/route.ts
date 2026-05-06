@@ -35,6 +35,7 @@ import { currentUser } from "@clerk/nextjs/server";
 import { isAdminUser, isAdminEmail } from "@/lib/clients";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { findLinkedIn } from "@/lib/linkedin-enrichment";
+import { withRoutineLog } from "@/lib/routine-log";
 
 export const maxDuration = 300;
 export const dynamic = "force-dynamic";
@@ -77,7 +78,7 @@ type QueueRow = {
   linkedin_last_attempt_at: string | null;
 };
 
-export async function POST(req: NextRequest) {
+async function _POST(req: NextRequest) {
   const ok = await authCheck(req);
   if (!ok) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
@@ -280,4 +281,5 @@ export async function POST(req: NextRequest) {
 }
 
 // Vercel cron hits the endpoint with GET. Alias so the same handler runs.
-export { POST as GET };
+export const POST = withRoutineLog("linkedin-enrichment-run", _POST);
+export const GET  = POST;

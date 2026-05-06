@@ -27,6 +27,8 @@ import Anthropic from "@anthropic-ai/sdk";
 import { currentUser } from "@clerk/nextjs/server";
 import { isAdminUser, isAdminEmail } from "@/lib/clients";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
+import { buildPromptPrefix } from "@/lib/user-context";
+import { withRoutineLog } from "@/lib/routine-log";
 
 export const maxDuration = 300;
 export const dynamic     = "force-dynamic";
@@ -107,7 +109,7 @@ type ScanOutcome = {
   error?:      string;
 };
 
-export async function POST(req: NextRequest) {
+async function _POST(req: NextRequest) {
   if (!(await authCheck(req))) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const { searchParams } = new URL(req.url);
@@ -181,7 +183,7 @@ Find recent public activity (news, LinkedIn posts, blog posts, podcasts, org ann
         temperature: 0,
         betas:       ["web-search-2025-03-05"],
         tools:       [{ type: "web_search_20250305", name: "web_search", max_uses: 4 }],
-        system:      SYSTEM_PROMPT,
+        system:      (await buildPromptPrefix({ personId: p.id, context: "news" })) + SYSTEM_PROMPT,
         messages:    [{ role: "user", content: userPrompt }],
       });
 
@@ -262,4 +264,5 @@ Find recent public activity (news, LinkedIn posts, blog posts, podcasts, org ann
   });
 }
 
-export { POST as GET };
+export const POST = withRoutineLog("contact-news-scan", _POST);
+export const GET  = POST;
