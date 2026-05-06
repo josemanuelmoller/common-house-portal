@@ -16,6 +16,8 @@ import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { ProjectStatusEditor } from "@/components/ProjectStatusEditor";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 
+export const dynamic = "force-dynamic";
+
 export default async function ProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
   await requireAdmin();
 
