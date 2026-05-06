@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { HallComposedHero } from "@/components/hall/HallComposedHero";
 import type {
   HallDraft,
   HallDraftAngle,
@@ -223,6 +224,33 @@ export function HallDraftReviewClient({
           {draft.meta.fireflies_transcript_ids.length > 0 ? ` · ${draft.meta.fireflies_transcript_ids.length} fireflies` : ""}
         </p>
       )}
+
+      {/* ─── Live preview — what the published Hall hero will look like ──── */}
+      <section className="space-y-2">
+        <div className="flex items-baseline gap-3">
+          <h2
+            style={{
+              fontFamily: "var(--font-hall-mono)", fontSize: 10,
+              letterSpacing: "0.08em", textTransform: "uppercase",
+              color: "var(--hall-muted-2)", fontWeight: 700,
+            }}
+          >
+            Live preview
+          </h2>
+          <span style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--hall-muted-3)" }}>
+            (updates as you edit · not published until you hit Publish)
+          </span>
+          <div className="flex-1 h-px" style={{ background: "var(--hall-line)" }} />
+        </div>
+        <div
+          className="overflow-hidden"
+          style={{ border: "1px solid var(--hall-line)", background: "var(--hall-paper-0)" }}
+        >
+          <div style={{ transform: "scale(0.7)", transformOrigin: "top left", width: "142.857%" }}>
+            <HallComposedHero hero={draft} projectName="" />
+          </div>
+        </div>
+      </section>
 
       {/* ─── Quote ─────────────────────────────────────────────────────── */}
       <section className="space-y-3">
@@ -507,6 +535,21 @@ export function HallDraftReviewClient({
           {busy === "discard" ? "Discarding…" : "Discard"}
         </button>
         <div className="flex-1" />
+        {hasLiveHero && (
+          <a
+            href={`/hall?as=${projectId}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[12px] font-bold px-4 py-2"
+            style={{
+              border: "1px solid var(--hall-line)",
+              color: "var(--hall-ink-0)",
+              fontFamily: "var(--font-hall-mono)",
+            }}
+          >
+            ↗ Preview as client
+          </a>
+        )}
         <button
           type="button"
           onClick={publish}

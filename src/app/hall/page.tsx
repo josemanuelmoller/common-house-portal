@@ -100,12 +100,24 @@ function decisionStatus(confidence: string): HallDecision["status"] {
   return "pending";
 }
 
-export default async function HallPage() {
+export default async function HallPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ as?: string }>;
+}) {
   const user = await currentUser();
   if (!user) redirect("/sign-in");
   const email = user.primaryEmailAddress?.emailAddress ?? "";
-  if (isAdminUser(user.id) || isAdminEmail(email)) redirect("/admin");
-  const projectId = getProjectIdForUser(email);
+  const isAdmin = isAdminUser(user.id) || isAdminEmail(email);
+
+  // Admin override: /hall?as=<projectId> renders the Hall as the client would
+  // see it. Without the query param, admins still get redirected to /admin so
+  // they don't accidentally land here when they meant to be in the cockpit.
+  const search = (await searchParams) ?? {};
+  const adminViewAs = isAdmin ? (search.as ?? "").trim() || null : null;
+
+  if (isAdmin && !adminViewAs) redirect("/admin");
+  const projectId = adminViewAs ?? getProjectIdForUser(email);
 
   if (!projectId) {
     const fallbackNav = [{ label: "The Hall", href: "/hall", icon: "◈" }];
@@ -395,6 +407,35 @@ export default async function HallPage() {
             </span>
           </div>
         </header>
+
+        {/* Admin-preview banner — only shown when an admin viewing via ?as=<id> */}
+        {adminViewAs && (
+          <div
+            className="px-9 py-2 flex items-center justify-between gap-3"
+            style={{
+              background: "var(--hall-fill-soft)",
+              borderBottom: "1px solid var(--hall-line)",
+            }}
+          >
+            <span
+              style={{
+                fontFamily: "var(--font-hall-mono)", fontSize: 10,
+                letterSpacing: "0.06em", color: "var(--hall-muted-2)",
+              }}
+            >
+              ADMIN PREVIEW · viewing as the client would
+            </span>
+            <a
+              href={`/admin/projects/${adminViewAs}/hall-compose`}
+              style={{
+                fontFamily: "var(--font-hall-mono)", fontSize: 10,
+                fontWeight: 700, color: "var(--hall-ink-0)",
+              }}
+            >
+              ← back to compose
+            </a>
+          </div>
+        )}
 
         {/* Composed hero (quote + angles + timeline) — renders only when
              hall_hero JSONB is published. Falls through to legacy welcome when null. */}
