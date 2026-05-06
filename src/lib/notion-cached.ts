@@ -31,6 +31,7 @@ import {
   getAgentDrafts as _getAgentDrafts,
   getOutboxDrafts as _getOutboxDrafts,
   getProjectsOverview as _getProjectsOverview,
+  getWorkroomProjectsOverview as _getWorkroomProjectsOverview,
   getOpportunitiesByScope as _getOpportunitiesByScope,
   getCandidateOpportunities as _getCandidateOpportunities,
   getReadyContent as _getReadyContent,
@@ -43,6 +44,12 @@ const TTL = 300; // 5 minutes
 export const getProjectsOverview = unstable_cache(
   _getProjectsOverview,
   ["notion:projects-overview"],
+  { revalidate: TTL, tags: ["notion", "notion:projects"] }
+);
+
+export const getWorkroomProjectsOverview = unstable_cache(
+  _getWorkroomProjectsOverview,
+  ["notion:workroom-projects-overview"],
   { revalidate: TTL, tags: ["notion", "notion:projects"] }
 );
 

@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { Sidebar } from "@/components/Sidebar";
-import { getProjectsOverview } from "@/lib/notion";
+// IMPORTANT: read from notion-cached (Supabase mirror), NOT from @/lib/notion
+// (legacy Notion-direct). The legacy export ignores Supabase-owned fields like
+// engagement_model and silently returned wrong data here for months.
+import { getWorkroomProjectsOverview } from "@/lib/notion-cached";
 import { requireAdmin } from "@/lib/require-admin";
 
 function daysSince(dateStr: string | null): number {
@@ -34,16 +37,19 @@ const MODE_STYLES: Record<string, { bg: string; color: string }> = {
 export default async function WorkroomsPage() {
   await requireAdmin();
 
-  const allProjects = await getProjectsOverview();
-  // Workroom = any active project whose engagement_model is a paid CH service
-  // (delivery / advisory / consulting / etc.) — i.e. anything that is NOT a startup.
+  const allProjects = await getWorkroomProjectsOverview();
+  // Workroom = any project (Active or Proposed) whose engagement_model is a
+  // paid CH service (delivery / advisory / consulting / etc.) — i.e. anything
+  // that is NOT a startup. Active = current Clients. Proposed = Prospects.
   // Source of truth lives on the project, not on `primary_workspace` (deprecated).
   const projects    = allProjects.filter(p => p.engagementModel && p.engagementModel !== "startup");
+  const activeClients = projects.filter(p => p.status === "Active");
+  const prospects     = projects.filter(p => p.status === "Proposed");
 
-  const withBlockers   = projects.filter(p => p.blockerCount > 0);
-  const needsUpdate    = projects.filter(p => p.updateNeeded);
-  const staleCount     = projects.filter(p => daysSince(p.lastUpdate) > 30).length;
-  const executionCount = projects.filter(p => p.stage === "Execution").length;
+  const withBlockers   = activeClients.filter(p => p.blockerCount > 0);
+  const needsUpdate    = activeClients.filter(p => p.updateNeeded);
+  const staleCount     = activeClients.filter(p => daysSince(p.lastUpdate) > 30).length;
+  const executionCount = activeClients.filter(p => p.stage === "Execution").length;
 
   const todayLabel = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 
@@ -81,8 +87,16 @@ export default async function WorkroomsPage() {
             style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10.5, color: "var(--hall-muted-2)" }}
           >
             <span>
-              <b style={{ color: "var(--hall-ink-0)" }}>{projects.length}</b> ACTIVE
+              <b style={{ color: "var(--hall-ink-0)" }}>{activeClients.length}</b> ACTIVE
             </span>
+            {prospects.length > 0 && (
+              <>
+                <span style={{ color: "var(--hall-muted-3)" }}>·</span>
+                <span>
+                  <b style={{ color: "var(--hall-info)" }}>{prospects.length}</b> PROSPECT{prospects.length !== 1 ? "S" : ""}
+                </span>
+              </>
+            )}
             <span style={{ color: "var(--hall-muted-3)" }}>·</span>
             <span>
               <b style={{ color: "var(--hall-ok)" }}>{executionCount}</b> IN EXEC
@@ -140,10 +154,10 @@ export default async function WorkroomsPage() {
                   color: "var(--hall-muted-2)",
                 }}
               >
-                Workrooms
+                Active Clients
               </p>
-              <p className="text-3xl font-bold tracking-tight" style={{ color: "var(--hall-ink-0)" }}>{projects.length}</p>
-              <p style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--hall-muted-2)", marginTop: 6 }}>Active client engagements</p>
+              <p className="text-3xl font-bold tracking-tight" style={{ color: "var(--hall-ink-0)" }}>{activeClients.length}</p>
+              <p style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--hall-muted-2)", marginTop: 6 }}>{prospects.length > 0 ? `+ ${prospects.length} prospect${prospects.length !== 1 ? "s" : ""}` : "Delivering or about to"}</p>
             </div>
             <div className="px-5 py-4" style={{ border: "1px solid var(--hall-line)" }}>
               <p
@@ -203,10 +217,44 @@ export default async function WorkroomsPage() {
             </div>
           </div>
 
-          {/* Project cards grid */}
-          {projects.length > 0 ? (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {projects.map(p => {
+          {/* Project cards — split by status so Prospects don't blur into Clients */}
+          {projects.length === 0 ? (
+            <div
+              className="p-12 text-center"
+              style={{ border: "1px solid var(--hall-line)" }}
+            >
+              <p className="text-sm font-bold mb-2" style={{ color: "var(--hall-muted-3)" }}>No workroom projects yet</p>
+              <p className="text-xs" style={{ color: "var(--hall-muted-3)" }}>
+                Tag an organization as <strong>Client</strong> or <strong>Prospect</strong> in <Link href="/admin/hall/organizations" className="underline">Hall &rsaquo; Organizations</Link> and a workroom is created automatically.
+              </p>
+            </div>
+          ) : (
+            <>
+            {[
+              { key: "clients",   title: "Active Clients", items: activeClients, accent: "var(--hall-ok)" },
+              { key: "prospects", title: "Prospects",      items: prospects,     accent: "var(--hall-info)" },
+            ].filter(g => g.items.length > 0).map(group => (
+              <div key={group.key} className="space-y-3">
+                <div className="flex items-baseline gap-3">
+                  <h2
+                    style={{
+                      fontFamily: "var(--font-hall-mono)",
+                      fontSize: 10,
+                      letterSpacing: "0.08em",
+                      textTransform: "uppercase",
+                      color: "var(--hall-muted-2)",
+                      fontWeight: 700,
+                    }}
+                  >
+                    {group.title}
+                  </h2>
+                  <span style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10, color: group.accent, fontWeight: 700 }}>
+                    {group.items.length}
+                  </span>
+                  <div className="flex-1 h-px" style={{ background: "var(--hall-line)" }} />
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {group.items.map(p => {
                 const days   = daysSince(p.lastUpdate);
                 const warmth = warmthLabel(days);
                 const stageStyle = p.stage ? STAGE_STYLES[p.stage] : undefined;
@@ -216,7 +264,7 @@ export default async function WorkroomsPage() {
                   ? "var(--hall-danger)"
                   : p.updateNeeded
                   ? "var(--hall-warn)"
-                  : "var(--hall-ok)";
+                  : group.accent;
 
                 return (
                   <Link
@@ -378,17 +426,10 @@ export default async function WorkroomsPage() {
                   </Link>
                 );
               })}
-            </div>
-          ) : (
-            <div
-              className="p-12 text-center"
-              style={{ border: "1px solid var(--hall-line)" }}
-            >
-              <p className="text-sm font-bold mb-2" style={{ color: "var(--hall-muted-3)" }}>No workroom projects found</p>
-              <p className="text-xs" style={{ color: "var(--hall-muted-3)" }}>
-                Assign a project&apos;s <strong>Primary Workspace</strong> to <strong>workroom</strong> in Notion to see it here.
-              </p>
-            </div>
+                </div>
+              </div>
+            ))}
+            </>
           )}
 
         </div>

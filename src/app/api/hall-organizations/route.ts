@@ -27,6 +27,7 @@ import { adminGuardApi } from "@/lib/require-admin";
 export const dynamic = "force-dynamic";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { getSelfEmails } from "@/lib/hall-self";
+import { ensureWorkroomForOrg, type WorkroomBridgeResult } from "@/lib/workroom-bridge";
 import {
   CLASS_TO_LABEL,
   createContactFromEmail,
@@ -36,8 +37,10 @@ import {
 } from "@/lib/google-contacts";
 
 // Org class vocabulary — matches contacts minus personal.
+// "Prospect" is workroom-relevant (pre-sale state). Adding "Client" or
+// "Prospect" auto-creates a paid-engagement project via ensureWorkroomForOrg.
 const VALID_ORG_CLASSES = [
-  "Team", "Portfolio", "Client", "Partner",
+  "Team", "Portfolio", "Client", "Prospect", "Partner",
   "Investor", "Funder", "VIP", "Vendor", "External",
 ] as const;
 
@@ -134,6 +137,20 @@ export async function POST(req: NextRequest) {
       : rootHint.replace(/^[a-z]/, c => c.toUpperCase());
   }
 
+  // Snapshot existing classes BEFORE upsert so we can detect transitions
+  // (e.g. Client newly added → trigger workroom auto-creation).
+  const { data: prevOrg } = await sb
+    .from("hall_organizations")
+    .select("relationship_classes")
+    .eq("domain", domain)
+    .maybeSingle();
+  const prevClasses = (prevOrg?.relationship_classes as string[] | null) ?? [];
+  const newlyAddedClient   = uniqClasses.includes("Client")   && !prevClasses.includes("Client");
+  const newlyAddedProspect = uniqClasses.includes("Prospect") && !prevClasses.includes("Prospect");
+  // Client wins over Prospect when both flip in the same call.
+  const workroomIntent: "Client" | "Prospect" | null =
+    newlyAddedClient ? "Client" : newlyAddedProspect ? "Prospect" : null;
+
   const upsertPayload: Record<string, unknown> = {
     domain,
     name,
@@ -150,6 +167,27 @@ export async function POST(req: NextRequest) {
     .select("*")
     .maybeSingle();
   if (upErr) return NextResponse.json({ error: upErr.message }, { status: 500 });
+
+  // ── Workroom auto-creation ────────────────────────────────────────────────
+  // When a domain is freshly tagged as Client or Prospect, ensure there's a
+  // paid-engagement project to back the Workrooms surface. Best-effort —
+  // failures here don't roll back the org tag.
+  let workroomResult: WorkroomBridgeResult | null = null;
+  if (workroomIntent && org) {
+    try {
+      workroomResult = await ensureWorkroomForOrg(
+        sb,
+        {
+          domain: org.domain as string,
+          name:   org.name as string,
+          notion_id: (org.notion_id as string | null) ?? null,
+        },
+        workroomIntent,
+      );
+    } catch (e) {
+      console.warn("[hall-organizations POST] workroom bridge failed:", e);
+    }
+  }
 
   // ── Backfill people from observations for this domain ────────────────────
   // Closes the "Engatel pattern" systemic gap: when a domain becomes
@@ -262,6 +300,9 @@ export async function POST(req: NextRequest) {
     ok: true,
     org,
     cascade: cascadeReport,
+    workroom: workroomResult
+      ? { ...workroomResult, intent: workroomIntent }
+      : null,
     observation_backfill: observationBackfill
       ? {
           emails_observed: observationBackfill.emails_observed,

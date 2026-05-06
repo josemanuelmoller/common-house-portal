@@ -268,12 +268,18 @@ function notionUrlFromId(notionId: string | null): string {
   return NOTION_PAGE_BASE + notionId.replace(/-/g, "");
 }
 
-export async function getProjectsOverview(): Promise<ProjectCard[]> {
+// Statuses included by getProjectsOverview. Most surfaces only want Active;
+// the Workrooms surface also wants Proposed (used for Prospect engagements).
+type ProjectStatusFilter = readonly string[];
+const ACTIVE_ONLY: ProjectStatusFilter = ["Active"];
+const ACTIVE_AND_PROPOSED: ProjectStatusFilter = ["Active", "Proposed"];
+
+async function _projectsOverview(statuses: ProjectStatusFilter): Promise<ProjectCard[]> {
   const sb = getSupabaseServerClient();
   const [projRes, evRes, srcRes] = await Promise.all([
     sb.from("projects")
       .select("notion_id, name, project_status, current_stage, status_summary, draft_status_update, last_status_update, last_meeting_date, update_needed, geography, themes, hall_welcome_note, hall_current_focus, hall_next_milestone, hall_challenge, hall_matters_most, hall_obstacles, hall_success, primary_workspace, engagement_stage, engagement_model, workroom_mode, hall_mode, grant_eligible")
-      .eq("project_status", "Active")
+      .in("project_status", statuses as string[])
       .order("last_status_update", { ascending: false, nullsFirst: false }),
     sb.from("evidence")
       .select("project_notion_id, evidence_type, validation_status, reusability_level, date_captured"),
@@ -375,6 +381,16 @@ export async function getProjectsOverview(): Promise<ProjectCard[]> {
       lastEvidenceDate,
     } satisfies ProjectCard;
   });
+}
+
+/** Active projects only — the default for most admin surfaces. */
+export function getProjectsOverview(): Promise<ProjectCard[]> {
+  return _projectsOverview(ACTIVE_ONLY);
+}
+
+/** Active + Proposed — used by Workrooms to show Prospects alongside Clients. */
+export function getWorkroomProjectsOverview(): Promise<ProjectCard[]> {
+  return _projectsOverview(ACTIVE_AND_PROPOSED);
 }
 
 // ─── Opportunities ────────────────────────────────────────────────────────────

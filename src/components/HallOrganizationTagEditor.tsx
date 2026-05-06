@@ -15,6 +15,7 @@ type Props = {
 
 const TAG_OPTIONS = [
   { v: "Client",    kind: "work" as const },
+  { v: "Prospect",  kind: "work" as const },
   { v: "Partner",   kind: "work" as const },
   { v: "Portfolio", kind: "work" as const },
   { v: "Investor",  kind: "work" as const },
