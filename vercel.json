@@ -216,6 +216,18 @@
     {
       "path": "/api/sweep-replied-threads",
       "schedule": "15 * * * 1-5"
+    },
+    {
+      "path": "/api/portfolio-health",
+      "schedule": "30 6 * * 1"
+    },
+    {
+      "path": "/api/grant-monitor",
+      "schedule": "0 7 1 * *"
+    },
+    {
+      "path": "/api/agent-scorecard",
+      "schedule": "45 7 1 * *"
     }
   ]
 }
