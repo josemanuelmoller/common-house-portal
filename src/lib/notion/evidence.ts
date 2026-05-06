@@ -36,6 +36,8 @@ export type EvidenceItem = {
 };
 
 export async function getEvidenceForProject(projectPageId: string): Promise<EvidenceItem[]> {
+  // Supabase-only projects (local- prefix) have no Notion-side evidence yet.
+  if (projectPageId.startsWith("local-")) return [];
   const res = await notion.databases.query({
     database_id: DB.evidence,
     filter: { property: "Project", relation: { contains: projectPageId } },

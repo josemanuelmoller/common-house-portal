@@ -110,13 +110,56 @@ export async function getAllProjects(): Promise<Project[]> {
 }
 
 export async function getProjectById(id: string): Promise<Project | null> {
+  // Supabase-only projects (born from workroom-bridge auto-creation) carry a
+  // synthetic notion_id like `local-<uuid>`. Skip Notion entirely for those.
+  if (id.startsWith("local-")) {
+    return getProjectFromSupabase(id);
+  }
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const page: any = await notion.pages.retrieve({ page_id: id });
     return parseProject(page);
   } catch {
-    return null;
+    // Final fallback — if Notion errors, try Supabase mirror.
+    return getProjectFromSupabase(id);
   }
+}
+
+async function getProjectFromSupabase(notionId: string): Promise<Project | null> {
+  const { getSupabaseServerClient } = await import("../supabase-server");
+  const sb = getSupabaseServerClient();
+  const { data } = await sb
+    .from("projects")
+    .select("notion_id, name, project_status, current_stage, status_summary, draft_status_update, last_status_update, last_meeting_date, update_needed, geography, themes, hall_welcome_note, hall_current_focus, hall_next_milestone, hall_challenge, hall_matters_most, hall_obstacles, hall_success, primary_workspace, engagement_stage, engagement_model, workroom_mode, hall_mode, grant_eligible")
+    .eq("notion_id", notionId)
+    .maybeSingle();
+  if (!data) return null;
+  return {
+    id:                 data.notion_id as string,
+    name:               (data.name as string) ?? "",
+    status:             (data.project_status as string) ?? "",
+    stage:              (data.current_stage as string) ?? "",
+    statusSummary:      (data.status_summary as string) ?? "",
+    draftUpdate:        (data.draft_status_update as string) ?? "",
+    lastUpdate:         (data.last_status_update as string | null) ?? null,
+    lastMeetingDate:    (data.last_meeting_date as string | null) ?? null,
+    updateNeeded:       Boolean(data.update_needed),
+    geography:          data.geography ? [data.geography as string] : [],
+    themes:             data.themes ? [data.themes as string] : [],
+    hallWelcomeNote:    (data.hall_welcome_note as string) ?? "",
+    hallCurrentFocus:   (data.hall_current_focus as string) ?? "",
+    hallNextMilestone:  (data.hall_next_milestone as string) ?? "",
+    hallChallenge:      (data.hall_challenge as string) ?? "",
+    hallMattersMost:    (data.hall_matters_most as string) ?? "",
+    hallObstacles:      (data.hall_obstacles as string) ?? "",
+    hallSuccess:        (data.hall_success as string) ?? "",
+    primaryWorkspace:   (data.primary_workspace as string) ?? "hall",
+    engagementStage:    (data.engagement_stage as string) ?? "",
+    engagementModel:    (data.engagement_model as string) ?? "",
+    workroomMode:       (data.workroom_mode as string) ?? "",
+    hallMode:           (data.hall_mode as string | undefined) ?? "explore",
+    grantEligible:      Boolean(data.grant_eligible),
+  };
 }
 
 // Projects enriched with evidence + sources counts (for home cards)
@@ -184,6 +227,13 @@ export async function getProjectsOverview(): Promise<ProjectCard[]> {
 }
 
 export async function getDashboardStats(projectId?: string): Promise<DashboardStats> {
+  // Supabase-only project — no Notion stats to aggregate.
+  if (projectId?.startsWith("local-")) {
+    return {
+      totalProjects: 0, activeProjects: 0, totalEvidence: 0, validatedEvidence: 0,
+      pendingEvidence: 0, blockers: 0, dependencies: 0, knowledgeCandidates: 0,
+    };
+  }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const evidenceFilter: any = projectId
     ? { property: "Project", relation: { contains: projectId } }
