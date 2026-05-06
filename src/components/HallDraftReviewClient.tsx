@@ -153,6 +153,14 @@ export function HallDraftReviewClient({
     if (!draft) return;
     setDraft({ ...draft, angles: draft.angles.filter((_, i) => i !== idx) });
   }
+  function moveAngle(idx: number, dir: -1 | 1) {
+    if (!draft) return;
+    const target = idx + dir;
+    if (target < 0 || target >= draft.angles.length) return;
+    const next = [...draft.angles];
+    [next[idx], next[target]] = [next[target], next[idx]];
+    setDraft({ ...draft, angles: next });
+  }
   function addAngle() {
     if (!draft) return;
     setDraft({ ...draft, angles: [...draft.angles, { title: "", body: "", evidence_excerpt: null, source_id: null }] });
@@ -165,6 +173,14 @@ export function HallDraftReviewClient({
   function deleteTimelineItem(idx: number) {
     if (!draft) return;
     setDraft({ ...draft, timeline: draft.timeline.filter((_, i) => i !== idx) });
+  }
+  function moveTimelineItem(idx: number, dir: -1 | 1) {
+    if (!draft) return;
+    const target = idx + dir;
+    if (target < 0 || target >= draft.timeline.length) return;
+    const next = [...draft.timeline];
+    [next[idx], next[target]] = [next[target], next[idx]];
+    setDraft({ ...draft, timeline: next });
   }
   function addTimelineItem() {
     if (!draft) return;
@@ -396,17 +412,47 @@ export function HallDraftReviewClient({
               >
                 ANGLE {String(i + 1).padStart(2, "0")}
               </span>
-              <button
-                type="button"
-                onClick={() => deleteAngle(i)}
-                className="ml-auto"
-                style={{
-                  fontFamily: "var(--font-hall-mono)", fontSize: 10,
-                  color: "var(--hall-muted-3)",
-                }}
-              >
-                ✕ delete
-              </button>
+              <div className="ml-auto flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => moveAngle(i, -1)}
+                  disabled={i === 0}
+                  title="Move up"
+                  style={{
+                    fontFamily: "var(--font-hall-mono)", fontSize: 11,
+                    color: i === 0 ? "var(--hall-muted-4, #ccc)" : "var(--hall-muted-2)",
+                    cursor: i === 0 ? "default" : "pointer",
+                    padding: "0 6px",
+                  }}
+                >
+                  ↑
+                </button>
+                <button
+                  type="button"
+                  onClick={() => moveAngle(i, 1)}
+                  disabled={i === draft.angles.length - 1}
+                  title="Move down"
+                  style={{
+                    fontFamily: "var(--font-hall-mono)", fontSize: 11,
+                    color: i === draft.angles.length - 1 ? "var(--hall-muted-4, #ccc)" : "var(--hall-muted-2)",
+                    cursor: i === draft.angles.length - 1 ? "default" : "pointer",
+                    padding: "0 6px",
+                  }}
+                >
+                  ↓
+                </button>
+                <button
+                  type="button"
+                  onClick={() => deleteAngle(i)}
+                  style={{
+                    fontFamily: "var(--font-hall-mono)", fontSize: 10,
+                    color: "var(--hall-muted-3)",
+                    paddingLeft: 8,
+                  }}
+                >
+                  ✕ delete
+                </button>
+              </div>
             </div>
             <input
               value={a.title}
@@ -493,10 +539,39 @@ export function HallDraftReviewClient({
               />
               <button
                 type="button"
+                onClick={() => moveTimelineItem(i, -1)}
+                disabled={i === 0}
+                title="Move up"
+                style={{
+                  fontFamily: "var(--font-hall-mono)", fontSize: 11,
+                  color: i === 0 ? "var(--hall-muted-4, #ccc)" : "var(--hall-muted-2)",
+                  cursor: i === 0 ? "default" : "pointer",
+                  padding: "0 4px",
+                }}
+              >
+                ↑
+              </button>
+              <button
+                type="button"
+                onClick={() => moveTimelineItem(i, 1)}
+                disabled={i === draft.timeline.length - 1}
+                title="Move down"
+                style={{
+                  fontFamily: "var(--font-hall-mono)", fontSize: 11,
+                  color: i === draft.timeline.length - 1 ? "var(--hall-muted-4, #ccc)" : "var(--hall-muted-2)",
+                  cursor: i === draft.timeline.length - 1 ? "default" : "pointer",
+                  padding: "0 4px",
+                }}
+              >
+                ↓
+              </button>
+              <button
+                type="button"
                 onClick={() => deleteTimelineItem(i)}
                 style={{
                   fontFamily: "var(--font-hall-mono)", fontSize: 10,
                   color: "var(--hall-muted-3)",
+                  paddingLeft: 4,
                 }}
               >
                 ✕
