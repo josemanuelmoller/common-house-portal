@@ -1,9 +1,6 @@
 import { getSupabaseServerClient } from "@/lib/supabase-server";
-import {
-  approveOrphanCandidate,
-  rejectOrphanCandidate,
-  triggerOrphanScan,
-} from "@/app/admin/hall/orphans/actions";
+import { triggerOrphanScan } from "@/app/admin/hall/orphans/actions";
+import { OrphanCandidateRow } from "./OrphanCandidateRow";
 
 /**
  * Server component — renders the orphan candidates review queue. Used as a
@@ -63,16 +60,6 @@ async function loadData() {
   return { rows, people, sources, remainingOrphans: remainingOrphans ?? 0 };
 }
 
-async function approveAction(formData: FormData) {
-  "use server";
-  const id = formData.get("id");
-  if (typeof id === "string") await approveOrphanCandidate(id);
-}
-async function rejectAction(formData: FormData) {
-  "use server";
-  const id = formData.get("id");
-  if (typeof id === "string") await rejectOrphanCandidate(id);
-}
 async function rescanAction() {
   "use server";
   await triggerOrphanScan();
@@ -114,63 +101,19 @@ export async function OrphansReviewSection() {
             const confPct = Math.round(r.confidence * 100);
             const confColor = r.confidence >= 0.85 ? "bg-[#22c55e]" : r.confidence >= 0.65 ? "bg-[#f59e0b]" : "bg-[#9ca3af]";
             return (
-              <div key={r.id} className="px-5 py-4 hover:bg-[#f4f4ef]/40 transition-colors">
-                <div className="flex items-start gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-baseline gap-2 flex-wrap">
-                      <span className="text-[13px] font-bold text-[#0a0a0a]">
-                        &ldquo;{r.sender_name}&rdquo;
-                      </span>
-                      <span className="text-[11px] text-[#0a0a0a]/40">→</span>
-                      <span className="text-[13px] font-bold text-[#0a0a0a]">
-                        {person?.full_name ?? "(person not found)"}
-                      </span>
-                      {person?.email && (
-                        <span className="text-[10px] text-[#0a0a0a]/45">· {person.email}</span>
-                      )}
-                    </div>
-                    <div className="mt-1.5 flex items-center gap-3 text-[10px] text-[#0a0a0a]/55">
-                      <span className="uppercase tracking-wide font-bold">{r.candidate_reason.replace(/_/g, " ")}</span>
-                      <span>·</span>
-                      <span>{r.msg_count} message{r.msg_count === 1 ? "" : "s"}</span>
-                      <span>·</span>
-                      <span className="min-w-[90px] flex items-center gap-2">
-                        <span className="flex-1 h-1 rounded-full bg-[#f4f4ef] overflow-hidden inline-block max-w-[60px]">
-                          <span className={`block h-full ${confColor}`} style={{ width: `${confPct}%` }} />
-                        </span>
-                        <span className="font-bold tracking-wider">{confPct}%</span>
-                      </span>
-                      {source?.title && (
-                        <>
-                          <span>·</span>
-                          <span className="truncate max-w-[240px]">{source.title}</span>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <form action={approveAction}>
-                      <input type="hidden" name="id" value={r.id} />
-                      <button
-                        type="submit"
-                        className="bg-[#c6f24a] text-[#0a0a0a] text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded hover:bg-[#d4ff6a] transition-colors"
-                        title={`Backfill ${r.msg_count} messages → ${person?.full_name ?? r.candidate_person_id}`}
-                      >
-                        Approve
-                      </button>
-                    </form>
-                    <form action={rejectAction}>
-                      <input type="hidden" name="id" value={r.id} />
-                      <button
-                        type="submit"
-                        className="bg-white text-[#0a0a0a]/60 text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded border border-[#e4e4dd] hover:bg-[#f4f4ef]/60 transition-colors"
-                      >
-                        Reject
-                      </button>
-                    </form>
-                  </div>
-                </div>
-              </div>
+              <OrphanCandidateRow
+                key={r.id}
+                candidateId={r.id}
+                senderName={r.sender_name}
+                personName={person?.full_name ?? null}
+                personEmail={person?.email ?? null}
+                reasonLabel={r.candidate_reason.replace(/_/g, " ")}
+                msgCount={r.msg_count}
+                confPct={confPct}
+                confColor={confColor}
+                sourceTitle={source?.title ?? null}
+                msgBackfillHint={`Backfill ${r.msg_count} messages → ${person?.full_name ?? r.candidate_person_id}`}
+              />
             );
           })}
         </div>
