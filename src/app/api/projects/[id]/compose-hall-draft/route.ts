@@ -33,7 +33,17 @@ export async function POST(
   }
 
   const sb = getSupabaseServerClient();
-  const result = await composeHallDraft(sb, id);
+  let result;
+  try {
+    result = await composeHallDraft(sb, id);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error("[compose-hall-draft] uncaught:", e);
+    return NextResponse.json(
+      { ok: false, error: `compose threw: ${msg}` },
+      { status: 500 },
+    );
+  }
 
   if (!result.ok) {
     const status = result.error.includes("not found") ? 404
