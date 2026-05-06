@@ -215,7 +215,15 @@
     },
     {
       "path": "/api/sweep-replied-threads",
-      "schedule": "15 * * * 1-5"
+      "schedule": "15 9 * * 1-5"
+    },
+    {
+      "path": "/api/sweep-replied-threads",
+      "schedule": "15 13 * * 1-5"
+    },
+    {
+      "path": "/api/sweep-replied-threads",
+      "schedule": "15 17 * * 1-5"
     },
     {
       "path": "/api/portfolio-health",
