@@ -469,17 +469,30 @@ export function HallDraftReviewClient({
               className="w-full text-[13px] leading-relaxed resize-none"
               style={{ color: "var(--hall-ink-0)" }}
             />
-            {a.evidence_excerpt && (
-              <p
-                className="pt-2"
-                style={{
-                  fontFamily: "var(--font-hall-mono)", fontSize: 10,
-                  color: "var(--hall-muted-2)", borderTop: "1px solid var(--hall-line-soft)",
-                }}
-              >
-                EVIDENCE: &ldquo;{a.evidence_excerpt}&rdquo;
-              </p>
-            )}
+            <div className="pt-2" style={{ borderTop: "1px solid var(--hall-line-soft)" }}>
+              <label className="block">
+                <span
+                  style={{
+                    fontFamily: "var(--font-hall-mono)", fontSize: 9,
+                    letterSpacing: "0.08em", textTransform: "uppercase",
+                    color: "var(--hall-muted-3)", fontWeight: 700,
+                  }}
+                >
+                  Evidence excerpt {a.evidence_excerpt ? "" : "(optional)"}
+                </span>
+                <textarea
+                  value={a.evidence_excerpt ?? ""}
+                  onChange={e => setAngle(i, { evidence_excerpt: e.target.value || null })}
+                  placeholder="Verbatim quote from the source — anchors the angle to evidence."
+                  rows={2}
+                  className="w-full mt-1 text-[11px] leading-relaxed resize-y"
+                  style={{
+                    fontFamily: "var(--font-hall-mono)",
+                    color: "var(--hall-muted-2)",
+                  }}
+                />
+              </label>
+            </div>
           </div>
         ))}
         {draft.angles.length < 4 && (
