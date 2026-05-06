@@ -22,7 +22,10 @@ type MirrorTable =
   | "notion_decision_items"
   | "notion_daily_briefings"
   | "notion_insight_briefs"
-  | "notion_competitive_intel";
+  | "notion_competitive_intel"
+  | "notion_agent_drafts"
+  | "notion_content_pipeline"
+  | "notion_watchlist";
 
 /**
  * Apply a portal edit to a mirror row + record what fields are owed to Notion.
@@ -166,4 +169,59 @@ export async function pushAllPending(): Promise<{ table: string; pushed: number;
     { table: "notion_insight_briefs",   pushed: 0, failed: 0 },
     { table: "notion_competitive_intel", pushed: 0, failed: 0 },
   ];
+}
+
+/**
+ * Compatibility shim for callers introduced on the rejected write-through
+ * branch (see docs/migration/REJECTED_PATTERNS.md R-001). Routes that called
+ * `createPageWithMirror` to write Notion + mirror simultaneously now write
+ * ONLY to the canonical Supabase table corresponding to the mirror. No
+ * Notion write is performed.
+ *
+ * Phase 6 deletes both this shim and its callers (the calling routes will
+ * have been migrated to write canonical tables directly by then).
+ */
+export async function createPageWithMirror(params: {
+  table: MirrorTable;
+  fields: Record<string, unknown>;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  mirrorOnly?: Record<string, unknown>;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  extraNotionProperties?: Record<string, unknown>;
+}): Promise<{ ok: boolean; id?: string | null; error?: string }> {
+  const { getSupabaseServerClient } = await import("@/lib/supabase-server");
+  const sb = getSupabaseServerClient();
+
+  const CANONICAL: Record<MirrorTable, string> = {
+    notion_decision_items:    "decision_items",
+    notion_daily_briefings:   "daily_briefings",
+    notion_insight_briefs:    "insight_briefs",
+    notion_competitive_intel: "competitive_intel",
+    notion_agent_drafts:      "agent_drafts",
+    notion_content_pipeline:  "content_pipeline_items",
+    notion_watchlist:         "watchlist_entities",
+  };
+  const target = CANONICAL[params.table];
+
+  // Field name mapping where the legacy mirror-push API differed from the
+  // canonical table column names.
+  const f = { ...params.fields };
+  if ("draft_text" in f && !("body_md" in f)) {
+    f.body_md = f.draft_text;
+    delete f.draft_text;
+  }
+  // canonical agent_drafts requires body_md NOT NULL
+  if (target === "agent_drafts" && !f.body_md) f.body_md = "";
+
+  console.warn(
+    `[notion-mirror-deprecated] createPageWithMirror → canonical write to ${target} (no Notion write). Mirror is dropped at Phase 6 cutoff 2026-06-02.`,
+  );
+
+  try {
+    const { data, error } = await sb.from(target).insert(f).select("id").maybeSingle();
+    if (error) return { ok: false, error: error.message };
+    return { ok: true, id: (data?.id as string | null) ?? null };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
 }
