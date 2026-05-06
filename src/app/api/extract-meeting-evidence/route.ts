@@ -23,6 +23,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { Client } from "@notionhq/client";
 import Anthropic from "@anthropic-ai/sdk";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
+import { withRoutineLog } from "@/lib/routine-log";
+import { computeAnthropicCost, makeUsageAccumulator, addUsage, type AnthropicUsage } from "@/lib/anthropic-cost";
+
+const HAIKU_MODEL = "claude-haiku-4-5-20251001";
 
 export const maxDuration = 90;
 
@@ -284,7 +288,7 @@ async function fetchTranscripts(fromDate: Date): Promise<FirefliesTranscript[]> 
 
 // ─── Evidence extraction ──────────────────────────────────────────────────────
 
-async function extractEvidence(t: FirefliesTranscript): Promise<EvidenceItem[]> {
+async function extractEvidence(t: FirefliesTranscript, usageAcc?: AnthropicUsage): Promise<EvidenceItem[]> {
   const dateStr = new Date(t.date).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 
   const prompt = `Extract 3-6 atomic evidence records from this meeting for a portfolio management OS.
@@ -321,10 +325,11 @@ Return ONLY a JSON array:
 ]`;
 
   const msg = await anthropic.messages.create({
-    model:      "claude-haiku-4-5-20251001",
+    model:      HAIKU_MODEL,
     max_tokens: 1800,
     messages:   [{ role: "user", content: prompt }],
   });
+  if (usageAcc) addUsage(usageAcc, msg.usage);
 
   const rawText = msg.content[0].type === "text" ? msg.content[0].text : "[]";
   const match   = rawText.match(/\[[\s\S]*\]/);
@@ -411,7 +416,7 @@ async function writeEvidence(
 
 // ─── Main handler ─────────────────────────────────────────────────────────────
 
-export async function POST(req: NextRequest) {
+async function _POST(req: NextRequest) {
   if (!authCheck(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -432,16 +437,17 @@ export async function POST(req: NextRequest) {
     const transcripts = await fetchTranscripts(fromDate);
 
     if (transcripts.length === 0) {
-      return NextResponse.json({ ok: true, meetings: 0, evidence_written: 0, skipped: 0, message: "No new meetings in window" });
+      return NextResponse.json({ ok: true, meetings: 0, evidence_written: 0, skipped: 0, cost_usd: 0, message: "No new meetings in window" });
     }
 
+    const usageAcc = makeUsageAccumulator();
     const results: { meetingTitle: string; evidenceCount: number; skipped: number; ids: string[] }[] = [];
     const errors:  string[] = [];
 
     // 3. Process each transcript
     for (const t of transcripts) {
       try {
-        const items     = await extractEvidence(t);
+        const items     = await extractEvidence(t, usageAcc);
         const dateStr   = new Date(t.date).toISOString().slice(0, 10);
         const projectId = resolveProject(t.title, t.participants);
         const ids:      string[] = [];
@@ -471,11 +477,14 @@ export async function POST(req: NextRequest) {
     const totalEvidence = results.reduce((s, r) => s + r.evidenceCount, 0);
     const totalSkipped  = results.reduce((s, r) => s + r.skipped, 0);
 
+    const cost_usd = computeAnthropicCost(usageAcc, HAIKU_MODEL);
+
     return NextResponse.json({
       ok:               true,
       meetings:         transcripts.length,
       evidence_written: totalEvidence,
       skipped:          totalSkipped,
+      cost_usd,
       results,
       errors,
       window:           `${fromDate.toISOString()} → ${now.toISOString()}`,
@@ -488,7 +497,6 @@ export async function POST(req: NextRequest) {
   }
 }
 
+export const POST = withRoutineLog("extract-meeting-evidence", _POST);
 // Allow Vercel cron (GET) to trigger
-export async function GET(req: NextRequest) {
-  return POST(req);
-}
+export const GET = POST;

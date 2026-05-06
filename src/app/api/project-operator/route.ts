@@ -20,7 +20,10 @@ import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { Client } from "@notionhq/client";
 import { withRoutineLog } from "@/lib/routine-log";
+import { computeAnthropicCost, makeUsageAccumulator, addUsage, type AnthropicUsage } from "@/lib/anthropic-cost";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
+
+const HAIKU_MODEL = "claude-haiku-4-5";
 
 const notion    = new Client({ auth: process.env.NOTION_API_KEY });
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -118,7 +121,8 @@ async function fetchProjectEvidence(projectId: string, since: string | null): Pr
 async function generateDraftUpdate(
   projectName: string,
   stage: string,
-  evidence: EvidenceRow[]
+  evidence: EvidenceRow[],
+  usageAcc?: AnthropicUsage
 ): Promise<string | null> {
   const items = evidence.map((e, i) =>
     `${i + 1}. [${e.type}] ${e.title}: ${e.statement}`
@@ -143,10 +147,11 @@ Return only the paragraph text, no labels, no markdown.`;
 
   try {
     const msg = await anthropic.messages.create({
-      model: "claude-haiku-4-5",
+      model: HAIKU_MODEL,
       max_tokens: 200,
       messages: [{ role: "user", content: prompt }],
     });
+    if (usageAcc) addUsage(usageAcc, msg.usage);
     return msg.content[0].type === "text" ? msg.content[0].text.trim() : null;
   } catch {
     return null;
@@ -163,6 +168,7 @@ async function _POST(req: NextRequest) {
   if (!validKey) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const projects = await fetchActiveProjects();
+  const usageAcc = makeUsageAccumulator();
   let updated = 0;
   let skipped = 0;
   const errors: string[] = [];
@@ -179,7 +185,7 @@ async function _POST(req: NextRequest) {
       // Need ≥2 validated items to generate a meaningful update
       if (evidence.length < 2) { skipped++; continue; }
 
-      const draft = await generateDraftUpdate(project.name, project.stage, evidence);
+      const draft = await generateDraftUpdate(project.name, project.stage, evidence, usageAcc);
       if (!draft) { errors.push(`Claude generation failed: ${project.name}`); continue; }
 
       // notion-cutoff-2026-06-02: replaced by canonical write to projects (Supabase).
@@ -217,12 +223,15 @@ async function _POST(req: NextRequest) {
     }
   }
 
+  const cost_usd = computeAnthropicCost(usageAcc, HAIKU_MODEL);
+
   return NextResponse.json({
     ok: true,
     projectsChecked: projects.length,
     checked: projects.length,
     updated,
     skipped,
+    cost_usd,
     errors,
   });
 }

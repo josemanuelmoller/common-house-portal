@@ -25,6 +25,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { Client } from "@notionhq/client";
 import { createClient } from "@supabase/supabase-js";
 import Anthropic from "@anthropic-ai/sdk";
+import { withRoutineLog } from "@/lib/routine-log";
+import { computeAnthropicCost, makeUsageAccumulator, addUsage, type AnthropicUsage } from "@/lib/anthropic-cost";
+
+const HAIKU_MODEL = "claude-haiku-4-5-20251001";
 
 export const maxDuration = 120;
 
@@ -146,7 +150,7 @@ async function fetchWaSources(sourceId: string | null, hoursBack: number): Promi
 
 // ─── Evidence extraction prompt ─────────────────────────────────────────────
 
-async function extractConversationEvidence(src: WaSource): Promise<EvidenceItem[]> {
+async function extractConversationEvidence(src: WaSource, usageAcc?: AnthropicUsage): Promise<EvidenceItem[]> {
   // Trim raw_content — Haiku has 200k context but we want focused input.
   // The clipper already produced a nicely-formatted dump. Keep it whole when
   // possible, else cap at 25k chars.
@@ -189,10 +193,11 @@ Return ONLY a JSON array (no markdown, no code fences):
 ]`;
 
   const msg = await anthropic.messages.create({
-    model:      "claude-haiku-4-5-20251001",
+    model:      HAIKU_MODEL,
     max_tokens: 2200,
     messages:   [{ role: "user", content: prompt }],
   });
+  if (usageAcc) addUsage(usageAcc, msg.usage);
 
   const rawText = msg.content[0].type === "text" ? msg.content[0].text : "[]";
   const match   = rawText.match(/\[[\s\S]*\]/);
@@ -333,7 +338,7 @@ async function markSourceExtracted(sourceId: string, notionId: string | null) {
 
 // ─── Main handler ───────────────────────────────────────────────────────────
 
-export async function POST(req: NextRequest) {
+async function _POST(req: NextRequest) {
   if (!authCheck(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   try {
@@ -344,9 +349,10 @@ export async function POST(req: NextRequest) {
 
     const sources = await fetchWaSources(sourceId, hoursBack);
     if (sources.length === 0) {
-      return NextResponse.json({ ok: true, sources: 0, evidence_written: 0, message: "No pending WA sources in window" });
+      return NextResponse.json({ ok: true, sources: 0, evidence_written: 0, cost_usd: 0, message: "No pending WA sources in window" });
     }
 
+    const usageAcc = makeUsageAccumulator();
     const results: { title: string; evidenceCount: number; skipped: number; ids: string[] }[] = [];
     const errors:  string[] = [];
     let totalEvidence = 0;
@@ -354,7 +360,7 @@ export async function POST(req: NextRequest) {
 
     for (const src of sources) {
       try {
-        const items = await extractConversationEvidence(src);
+        const items = await extractConversationEvidence(src, usageAcc);
         const dateStr  = src.source_date ?? new Date().toISOString().slice(0, 10);
         const existing = await loadExistingTitles(dateStr);
 
@@ -391,11 +397,14 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    const cost_usd = computeAnthropicCost(usageAcc, HAIKU_MODEL);
+
     return NextResponse.json({
       ok:               true,
       sources:          sources.length,
       evidence_written: totalEvidence,
       skipped:          totalSkipped,
+      cost_usd,
       results,
       errors,
     });
@@ -405,4 +414,5 @@ export async function POST(req: NextRequest) {
   }
 }
 
-export async function GET(req: NextRequest) { return POST(req); }
+export const POST = withRoutineLog("extract-conversation-evidence", _POST);
+export const GET  = POST;

@@ -28,7 +28,10 @@ import { Client } from "@notionhq/client";
 import { currentUser } from "@clerk/nextjs/server";
 import { isAdminUser, isAdminEmail } from "@/lib/clients";
 import { withRoutineLog } from "@/lib/routine-log";
+import { computeAnthropicCost } from "@/lib/anthropic-cost";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
+
+const HAIKU_MODEL = "claude-haiku-4-5-20251001";
 
 export const maxDuration = 120;
 
@@ -292,7 +295,7 @@ ${recentBriefs.map(b =>
 
   // Claude Haiku generates the briefing sections
   const response = await anthropic.messages.create({
-    model: "claude-haiku-4-5-20251001",
+    model: HAIKU_MODEL,
     max_tokens: 1200,
     system: `You are the daily briefing writer for Common House (CH), a circular economy accelerator.
 Write concise, actionable text for each section. No headers. No markdown. Plain text only.
@@ -415,11 +418,14 @@ Return EXACTLY this JSON (no extra keys, no markdown):
     return NextResponse.json({ error: "Supabase upsert failed", detail: upsertErr.message }, { status: 500 });
   }
 
+  const cost_usd = computeAnthropicCost(response.usage, HAIKU_MODEL);
+
   return NextResponse.json({
     ok: true,
     date: today,
     action: existingId ? "updated" : "created",
     sections: Object.keys(sections),
+    cost_usd,
     stats: {
       projects: projects.length,
       followUps: followUps.length,

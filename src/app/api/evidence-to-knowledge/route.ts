@@ -18,6 +18,10 @@ import Anthropic from "@anthropic-ai/sdk";
 // The Notion read path (Evidence DB query) is preserved until the read source is migrated.
 import { Client } from "@notionhq/client";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
+import { withRoutineLog } from "@/lib/routine-log";
+import { computeAnthropicCost, makeUsageAccumulator, addUsage, type AnthropicUsage } from "@/lib/anthropic-cost";
+
+const HAIKU_MODEL = "claude-haiku-4-5";
 
 const notion    = new Client({ auth: process.env.NOTION_API_KEY });
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -82,7 +86,7 @@ async function fetchCanonicalEvidence(sinceDays = 7): Promise<RawEvidence[]> {
 
 // ─── Synthesize KA draft with Claude ─────────────────────────────────────────
 
-async function synthesizeKnowledgeAsset(items: RawEvidence[]): Promise<{
+async function synthesizeKnowledgeAsset(items: RawEvidence[], usageAcc?: AnthropicUsage): Promise<{
   title: string; summary: string; keyPoints: string[];
   assetType: string; tags: string[];
 } | null> {
@@ -118,10 +122,11 @@ Return ONLY the JSON object.`;
 
   try {
     const msg = await anthropic.messages.create({
-      model: "claude-haiku-4-5",
+      model: HAIKU_MODEL,
       max_tokens: 512,
       messages: [{ role: "user", content: prompt }],
     });
+    if (usageAcc) addUsage(usageAcc, msg.usage);
     const raw = msg.content[0].type === "text" ? msg.content[0].text : "";
     const match = raw.match(/\{[\s\S]*\}/);
     if (!match) return null;
@@ -135,7 +140,7 @@ Return ONLY the JSON object.`;
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
-export async function POST(req: NextRequest) {
+async function _POST(req: NextRequest) {
   const agentKey = req.headers.get("x-agent-key");
   const cronKey  = req.headers.get("authorization");
   const validKey = agentKey === process.env.CRON_SECRET ||
@@ -144,8 +149,10 @@ export async function POST(req: NextRequest) {
 
   const evidence = await fetchCanonicalEvidence(7);
   if (!evidence.length) {
-    return NextResponse.json({ ok: true, created: 0, message: "No new canonical evidence in last 7 days" });
+    return NextResponse.json({ ok: true, created: 0, cost_usd: 0, message: "No new canonical evidence in last 7 days" });
   }
+
+  const usageAcc = makeUsageAccumulator();
 
   // Group by theme
   const byTheme: Record<string, RawEvidence[]> = {};
@@ -163,7 +170,7 @@ export async function POST(req: NextRequest) {
     if (items.length < 2) continue;
 
     try {
-      const synthesis = await synthesizeKnowledgeAsset(items);
+      const synthesis = await synthesizeKnowledgeAsset(items, usageAcc);
       if (!synthesis) { errors.push(`Synthesis failed for theme: ${theme}`); continue; }
 
       // Collect all unique topics across items
@@ -237,11 +244,17 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  const cost_usd = computeAnthropicCost(usageAcc, HAIKU_MODEL);
+
   return NextResponse.json({
     ok: true,
     evidenceFound: evidence.length,
     themesProcessed: Object.keys(byTheme).length,
     created,
+    cost_usd,
     errors,
   });
 }
+
+export const POST = withRoutineLog("evidence-to-knowledge", _POST);
+export const GET  = POST;
