@@ -42,7 +42,7 @@ export function HallDraftReviewClient({
   );
   const [status, setStatus] = useState<string>(initialStatus);
   const [pending, startTransition] = useTransition();
-  const [busy,  setBusy]  = useState<null | "compose" | "save" | "publish" | "discard">(null);
+  const [busy,  setBusy]  = useState<null | "compose" | "save" | "publish" | "discard" | "upload">(null);
   const [error, setError] = useState<string | null>(null);
   const [info,  setInfo]  = useState<string | null>(null);
 
@@ -137,6 +137,54 @@ export function HallDraftReviewClient({
     } finally {
       setBusy(null);
     }
+  }
+
+  async function uploadProposalFile(file: File) {
+    if (!file) return;
+    setBusy("upload"); setError(null); setInfo(null);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch(`/api/projects/${projectId}/proposal-upload`, {
+        method: "POST",
+        body: fd,
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok || j?.ok === false) {
+        setError(j?.error ?? `HTTP ${res.status}`);
+        setBusy(null); return;
+      }
+      // Reflect the upload locally so the user sees it immediately. The
+      // endpoint already wrote to projects.hall_draft, so router.refresh()
+      // would also pull it; updating in-memory keeps the editor sticky.
+      if (draft) {
+        const cur = draft.proposal ?? {
+          status: "ready", summary: null, sent_at: null, file_url: null, file_name: null,
+        };
+        setDraft({
+          ...draft,
+          proposal: {
+            ...cur,
+            status: cur.status === "draft" ? "ready" : cur.status,
+            file_url: j.file_url,
+            file_name: j.file_name,
+          },
+        });
+      }
+      setInfo(`Uploaded ${j.file_name}.`);
+      setTimeout(() => setInfo(null), 5000);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  function clearProposalFile() {
+    if (!draft?.proposal) return;
+    if (!confirm("Remove the attached proposal file? You'll need to upload again to attach it back.")) return;
+    setProposalField("file_url", null);
+    setProposalField("file_name", null);
   }
 
   // ─── Local mutations on the draft ────────────────────────────────────────
@@ -722,18 +770,94 @@ export function HallDraftReviewClient({
             />
           </label>
           <div
-            className="p-3 text-[11px]"
+            className="p-3"
             style={{
               fontFamily: "var(--font-hall-mono)",
-              color: "var(--hall-muted-2)",
+              fontSize: 11,
               background: "var(--hall-fill-soft)",
               border: "1px dashed var(--hall-line)",
             }}
           >
-            FILE UPLOAD · coming next
-            {draft.proposal?.file_name && (
-              <span style={{ color: "var(--hall-ink-0)" }}> · current: {draft.proposal.file_name}</span>
+            <p
+              className="mb-2"
+              style={{
+                fontSize: 9, letterSpacing: "0.08em", textTransform: "uppercase",
+                color: "var(--hall-muted-2)", fontWeight: 700,
+              }}
+            >
+              File attachment
+            </p>
+            {draft.proposal?.file_name && draft.proposal?.file_url ? (
+              <div className="flex items-center gap-3 flex-wrap">
+                <a
+                  href={draft.proposal.file_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-1.5"
+                  style={{
+                    border: "1px solid var(--hall-ink-0)",
+                    color: "var(--hall-ink-0)", fontWeight: 700,
+                  }}
+                >
+                  ↓ {draft.proposal.file_name}
+                </a>
+                <label
+                  className="cursor-pointer"
+                  style={{ color: "var(--hall-muted-2)" }}
+                >
+                  ↺ replace
+                  <input
+                    type="file"
+                    accept=".pdf,.docx,.pptx,.doc,.ppt,.txt,.md"
+                    className="hidden"
+                    disabled={busy !== null}
+                    onChange={e => {
+                      const f = e.target.files?.[0];
+                      if (f) uploadProposalFile(f);
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={clearProposalFile}
+                  style={{ color: "var(--hall-muted-3)" }}
+                >
+                  ✕ remove
+                </button>
+              </div>
+            ) : (
+              <label
+                className="inline-flex items-center gap-2 px-3 py-1.5 cursor-pointer"
+                style={{
+                  border: "1px solid var(--hall-ink-0)",
+                  color: "var(--hall-ink-0)", fontWeight: 700,
+                  opacity: busy === "upload" ? 0.5 : 1,
+                  cursor: busy === "upload" ? "wait" : "pointer",
+                }}
+              >
+                {busy === "upload" ? "Uploading…" : "↑ Upload proposal"}
+                <input
+                  type="file"
+                  accept=".pdf,.docx,.pptx,.doc,.ppt,.txt,.md"
+                  className="hidden"
+                  disabled={busy !== null}
+                  onChange={e => {
+                    const f = e.target.files?.[0];
+                    if (f) uploadProposalFile(f);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
             )}
+            <p
+              className="mt-2"
+              style={{
+                fontSize: 9, color: "var(--hall-muted-3)",
+              }}
+            >
+              PDF · DOCX · PPTX · TXT · MD  ·  max 20 MB
+            </p>
           </div>
         </div>
       </section>
