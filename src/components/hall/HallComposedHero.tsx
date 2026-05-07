@@ -16,7 +16,9 @@
  * Distinct from the legacy `HallHero` component (welcome note + CTA), which
  * is still used by the old /hall layout.
  */
-import type { HallDraft, HallDraftAngle, HallDraftTimelineItem } from "@/lib/hall-compose";
+import type {
+  HallDraft, HallDraftAngle, HallDraftListeningPoint, HallDraftProposal, HallDraftTimelineItem,
+} from "@/lib/hall-compose";
 
 type Props = {
   hero:        HallDraft | null;
@@ -108,6 +110,16 @@ export function HallComposedHero({ hero, projectName }: Props) {
         </section>
       )}
 
+      {/* Listening Map renders BEFORE timeline so the narrative goes:
+            heard → needed → propuesta → timeline. */}
+      {(hero.listening?.heard.length ?? 0) > 0 || (hero.listening?.needed.length ?? 0) > 0 ? (
+        <ListeningMap listening={hero.listening!} />
+      ) : null}
+
+      {hero.proposal && hero.proposal.status !== "draft" ? (
+        <ProposalSection proposal={hero.proposal} />
+      ) : null}
+
       {timeline.length > 0 && (
         <section
           className="px-9 py-8"
@@ -131,6 +143,169 @@ export function HallComposedHero({ hero, projectName }: Props) {
         </section>
       )}
     </>
+  );
+}
+
+// ─── Listening Map ────────────────────────────────────────────────────────────
+
+function ListeningMap({ listening }: { listening: { heard: HallDraftListeningPoint[]; needed: HallDraftListeningPoint[] } }) {
+  return (
+    <section
+      className="px-9 py-12"
+      style={{ borderBottom: "1px solid var(--hall-line-soft)" }}
+    >
+      <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-10">
+        <ListeningColumn
+          label="Lo que escuchamos"
+          accent="var(--hall-muted-2)"
+          items={listening.heard}
+        />
+        <ListeningColumn
+          label="Lo que se necesita"
+          accent="var(--hall-ink-0)"
+          items={listening.needed}
+        />
+      </div>
+    </section>
+  );
+}
+
+function ListeningColumn({ label, accent, items }: { label: string; accent: string; items: HallDraftListeningPoint[] }) {
+  if (items.length === 0) return <div />;
+  return (
+    <div>
+      <p
+        className="mb-4"
+        style={{
+          fontFamily: "var(--font-hall-mono)",
+          fontSize: 10,
+          letterSpacing: "0.12em",
+          textTransform: "uppercase",
+          color: "var(--hall-muted-2)",
+        }}
+      >
+        · {label.toUpperCase()}
+      </p>
+      <ul className="space-y-3">
+        {items.map((p, i) => (
+          <li key={i} className="flex gap-3 items-start">
+            <span
+              className="mt-2 shrink-0"
+              style={{
+                width: 6, height: 6, borderRadius: 3,
+                background: accent,
+                opacity: 0.85,
+              }}
+            />
+            <div className="flex-1 min-w-0">
+              <p className="text-[14px] leading-relaxed" style={{ color: "var(--hall-ink-3)" }}>
+                {p.point}
+              </p>
+              {p.speaker_name && (
+                <p
+                  className="mt-1"
+                  style={{
+                    fontFamily: "var(--font-hall-mono)", fontSize: 9,
+                    color: "var(--hall-muted-3)", letterSpacing: "0.04em",
+                  }}
+                >
+                  — {p.speaker_name}
+                </p>
+              )}
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+// ─── Proposal section ─────────────────────────────────────────────────────────
+
+function ProposalSection({ proposal }: { proposal: HallDraftProposal }) {
+  const statusColor: Record<HallDraftProposal["status"], string> = {
+    draft:      "var(--hall-muted-3)",
+    preparing:  "var(--hall-info)",
+    ready:      "var(--hall-warn)",
+    sent:       "var(--hall-ok)",
+    accepted:   "var(--hall-ink-0)",
+  };
+  const statusLabel: Record<HallDraftProposal["status"], string> = {
+    draft:      "EN BORRADOR",
+    preparing:  "EN PREPARACIÓN",
+    ready:      "LISTA PARA REVISIÓN",
+    sent:       "ENVIADA",
+    accepted:   "ACEPTADA",
+  };
+
+  return (
+    <section
+      className="px-9 py-12"
+      style={{ borderBottom: "1px solid var(--hall-line-soft)", background: "var(--hall-fill-soft)" }}
+    >
+      <div className="max-w-5xl mx-auto">
+        <div className="flex items-center gap-3 mb-5">
+          <p
+            style={{
+              fontFamily: "var(--font-hall-mono)",
+              fontSize: 10,
+              letterSpacing: "0.12em",
+              textTransform: "uppercase",
+              color: "var(--hall-muted-2)",
+            }}
+          >
+            · PROPUESTA
+          </p>
+          <span
+            className="px-2 py-0.5"
+            style={{
+              fontFamily: "var(--font-hall-mono)", fontSize: 9,
+              letterSpacing: "0.08em", fontWeight: 700,
+              color: statusColor[proposal.status],
+              border: `1px solid ${statusColor[proposal.status]}`,
+            }}
+          >
+            {statusLabel[proposal.status]}
+          </span>
+        </div>
+        {proposal.summary && (
+          <p
+            className="text-[16px] leading-relaxed mb-5"
+            style={{ color: "var(--hall-ink-0)", maxWidth: 720 }}
+          >
+            {proposal.summary}
+          </p>
+        )}
+        {proposal.file_url && proposal.file_name && (
+          <a
+            href={proposal.file_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 px-4 py-2.5 transition-colors"
+            style={{
+              border: "1px solid var(--hall-ink-0)",
+              fontFamily: "var(--font-hall-mono)",
+              fontSize: 11,
+              fontWeight: 700,
+              color: "var(--hall-ink-0)",
+              background: "var(--hall-paper-0)",
+            }}
+          >
+            ↓ {proposal.file_name}
+          </a>
+        )}
+        {!proposal.file_url && proposal.status !== "sent" && proposal.status !== "accepted" && (
+          <p
+            style={{
+              fontFamily: "var(--font-hall-mono)", fontSize: 10,
+              color: "var(--hall-muted-3)",
+            }}
+          >
+            (archivo se sube cuando la propuesta esté lista)
+          </p>
+        )}
+      </div>
+    </section>
   );
 }
 

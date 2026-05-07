@@ -59,11 +59,38 @@ export type HallDraftHallText = {
   success:         string | null;
 };
 
+export type HallDraftListeningPoint = {
+  point:        string;
+  speaker_name: string | null;
+  source_id:    string | null;
+};
+
+export type HallDraftListening = {
+  heard:  HallDraftListeningPoint[];
+  needed: HallDraftListeningPoint[];
+};
+
+export type HallDraftProposalStatus =
+  | "draft" | "preparing" | "ready" | "sent" | "accepted";
+
+export type HallDraftProposal = {
+  status:    HallDraftProposalStatus;
+  summary:   string | null;
+  file_url:  string | null;
+  file_name: string | null;
+  sent_at:   string | null;
+};
+
 export type HallDraft = {
   quote: (HallDraftQuoteCandidate & { candidates?: HallDraftQuoteCandidate[] }) | null;
   angles:    HallDraftAngle[];
-  timeline:  HallDraftTimelineItem[];
-  hall_text: HallDraftHallText;
+  // listening + proposal added in v2 of the schema. Old drafts loaded from
+  // hall_draft / hall_hero may not have them — render code must defensively
+  // default via withDraftDefaults() before reading.
+  listening?: HallDraftListening;
+  timeline:   HallDraftTimelineItem[];
+  proposal?:  HallDraftProposal;
+  hall_text:  HallDraftHallText;
   meta: {
     generated_from_source_ids: string[];
     fireflies_transcript_ids:  string[];
@@ -72,6 +99,22 @@ export type HallDraft = {
     project_id:                string;
   };
 };
+
+/**
+ * Backfill defaults for fields added after v1. Use this when loading an
+ * existing hall_draft / hall_hero from Supabase before reading or editing —
+ * old persisted drafts won't have listening / proposal, and accessing them
+ * directly would throw.
+ */
+export function withDraftDefaults(d: HallDraft): Required<Pick<HallDraft, "listening" | "proposal">> & HallDraft {
+  return {
+    ...d,
+    listening: d.listening ?? { heard: [], needed: [] },
+    proposal:  d.proposal  ?? {
+      status: "draft", summary: null, file_url: null, file_name: null, sent_at: null,
+    },
+  };
+}
 
 export type HallComposeResult =
   | { ok: true; draft: HallDraft; sources_used: number }
@@ -286,6 +329,10 @@ QUOTE candidates: return 3 verbatim lines from the counterpart (NOT from CH spea
 
 ANGLES: exactly 3, each is a 2-4 word title (uppercase) + 1-2 sentence body. Anchor each angle's body to a specific evidence excerpt FROM THE PRIMARY SOURCE. Frame each angle as the COUNTERPART's strategic territory or diagnostic — what they need to solve, what their problem is, where they want to play. AVOID phrasing angles as Common House offerings or product names (e.g. do NOT name CH frameworks like "Zero Waste District", "the CH ecosystem", "our portfolio model" inside an angle, even if mentioned in the source). The hero is THEIR space — angles are how WE understand their problem, not how we sell to them.
 
+LISTENING_HEARD: 3-5 short bullets (one sentence each) of what the COUNTERPART said that defines the situation. These are observations, not interpretations. Speaker_name attribution if multiple speakers from the counterpart side. Source: PRIMARY source only.
+
+LISTENING_NEEDED: 3-5 short bullets of what the counterpart needs / asked for / signaled they would value, framed as needs not as our offerings. Examples: "una articulación que les permita re-entrar al tema plástico desde una nueva narrativa", "evidencia operativa antes que pelear nuevas leyes", "conexión con startups del eje marino". Avoid wording these as CH offerings. Source: PRIMARY source.
+
 TIMELINE: include past meetings (from any source) as 'past', the PRIMARY meeting as 'today', and 1-3 'future' milestones derived from action items in the PRIMARY source.
 
 HALL_TEXT: one or two sentences each. The Hall page is read BY THE COUNTERPART. So:
@@ -304,7 +351,7 @@ const COMPOSE_TOOL = {
   input_schema: {
     type: "object",
     additionalProperties: false,
-    required: ["quote_candidates", "angles", "timeline", "hall_text"],
+    required: ["quote_candidates", "angles", "timeline", "listening_heard", "listening_needed", "hall_text"],
     properties: {
       quote_candidates: {
         type: "array",
@@ -355,6 +402,36 @@ const COMPOSE_TOOL = {
           },
         },
       },
+      listening_heard: {
+        type: "array",
+        minItems: 2,
+        maxItems: 6,
+        items: {
+          type: "object",
+          additionalProperties: false,
+          required: ["point"],
+          properties: {
+            point:        { type: "string", maxLength: 220 },
+            speaker_name: { type: ["string", "null"] },
+            source_id:    { type: ["string", "null"] },
+          },
+        },
+      },
+      listening_needed: {
+        type: "array",
+        minItems: 2,
+        maxItems: 6,
+        items: {
+          type: "object",
+          additionalProperties: false,
+          required: ["point"],
+          properties: {
+            point:        { type: "string", maxLength: 220 },
+            speaker_name: { type: ["string", "null"] },
+            source_id:    { type: ["string", "null"] },
+          },
+        },
+      },
       hall_text: {
         type: "object",
         additionalProperties: false,
@@ -375,9 +452,11 @@ const COMPOSE_TOOL = {
 
 interface ToolInput {
   quote_candidates: HallDraftQuoteCandidate[];
-  angles:    HallDraftAngle[];
-  timeline:  HallDraftTimelineItem[];
-  hall_text: HallDraftHallText;
+  angles:           HallDraftAngle[];
+  timeline:         HallDraftTimelineItem[];
+  listening_heard:  HallDraftListeningPoint[];
+  listening_needed: HallDraftListeningPoint[];
+  hall_text:        HallDraftHallText;
 }
 
 function buildUserMessage(ctx: ProjectContext, materials: SourceMaterial[]): string {
@@ -461,7 +540,19 @@ export async function composeHallDraft(
       ? { ...out.quote_candidates[0], candidates: out.quote_candidates }
       : null,
     angles:    out.angles,
-    timeline:  out.timeline,
+    listening: {
+      heard:  out.listening_heard ?? [],
+      needed: out.listening_needed ?? [],
+    },
+    timeline: out.timeline,
+    proposal: {
+      // Compose generates the framing only — file upload is admin-only afterward.
+      status:    "draft",
+      summary:   null,
+      file_url:  null,
+      file_name: null,
+      sent_at:   null,
+    },
     hall_text: out.hall_text,
     meta: {
       generated_from_source_ids: all.map(s => s.source_id).filter((x): x is string => !!x),

@@ -6,9 +6,13 @@ import { HallComposedHero } from "@/components/hall/HallComposedHero";
 import type {
   HallDraft,
   HallDraftAngle,
+  HallDraftListeningPoint,
+  HallDraftProposal,
+  HallDraftProposalStatus,
   HallDraftQuoteCandidate,
   HallDraftTimelineItem,
 } from "@/lib/hall-compose";
+import { withDraftDefaults } from "@/lib/hall-compose";
 
 type Props = {
   projectId:     string;
@@ -30,7 +34,11 @@ export function HallDraftReviewClient({
   projectId, initialDraft, initialStatus, generatedAt, hasLiveHero,
 }: Props) {
   const router = useRouter();
-  const [draft,  setDraft]  = useState<HallDraft | null>(initialDraft);
+  // Backfill listening + proposal defaults so existing drafts (composed before
+  // v2 schema) have editable structures instead of undefined.
+  const [draft,  setDraft]  = useState<HallDraft | null>(
+    initialDraft ? withDraftDefaults(initialDraft) : null,
+  );
   const [status, setStatus] = useState<string>(initialStatus);
   const [pending, startTransition] = useTransition();
   const [busy,  setBusy]  = useState<null | "compose" | "save" | "publish" | "discard">(null);
@@ -181,6 +189,50 @@ export function HallDraftReviewClient({
     const next = [...draft.timeline];
     [next[idx], next[target]] = [next[target], next[idx]];
     setDraft({ ...draft, timeline: next });
+  }
+
+  // ─── Listening map ───────────────────────────────────────────────────────
+  function setListeningPoint(
+    bucket: "heard" | "needed",
+    idx: number,
+    patch: Partial<HallDraftListeningPoint>,
+  ) {
+    if (!draft?.listening) return;
+    const list = draft.listening[bucket].map((p, i) => i === idx ? { ...p, ...patch } : p);
+    setDraft({ ...draft, listening: { ...draft.listening, [bucket]: list } });
+  }
+  function deleteListeningPoint(bucket: "heard" | "needed", idx: number) {
+    if (!draft?.listening) return;
+    const list = draft.listening[bucket].filter((_, i) => i !== idx);
+    setDraft({ ...draft, listening: { ...draft.listening, [bucket]: list } });
+  }
+  function addListeningPoint(bucket: "heard" | "needed") {
+    if (!draft) return;
+    const cur = draft.listening ?? { heard: [], needed: [] };
+    const next = { ...cur, [bucket]: [...cur[bucket], { point: "", speaker_name: null, source_id: null }] };
+    setDraft({ ...draft, listening: next });
+  }
+  function moveListeningPoint(bucket: "heard" | "needed", idx: number, dir: -1 | 1) {
+    if (!draft?.listening) return;
+    const list = draft.listening[bucket];
+    const target = idx + dir;
+    if (target < 0 || target >= list.length) return;
+    const next = [...list];
+    [next[idx], next[target]] = [next[target], next[idx]];
+    setDraft({ ...draft, listening: { ...draft.listening, [bucket]: next } });
+  }
+
+  // ─── Proposal ────────────────────────────────────────────────────────────
+  function setProposalField<K extends keyof HallDraftProposal>(
+    field: K,
+    value: HallDraftProposal[K],
+  ) {
+    if (!draft) return;
+    const cur = draft.proposal ?? {
+      status: "draft" as HallDraftProposalStatus,
+      summary: null, file_url: null, file_name: null, sent_at: null,
+    };
+    setDraft({ ...draft, proposal: { ...cur, [field]: value } });
   }
   function addTimelineItem() {
     if (!draft) return;
@@ -507,6 +559,165 @@ export function HallDraftReviewClient({
             + add angle
           </button>
         )}
+      </section>
+
+      {/* ─── Listening Map (heard / needed) ──────────────────────────────── */}
+      <section className="space-y-3">
+        <SectionHeader label="LISTENING MAP — lo que escuchamos · lo que se necesita" />
+        <p style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--hall-muted-3)" }}>
+          Two short lists that bridge the hero (their words) to the proposal. Heard = what they said about the situation. Needed = what they signaled they need.
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {(["heard", "needed"] as const).map(bucket => {
+            const list = draft.listening?.[bucket] ?? [];
+            const headerLabel = bucket === "heard" ? "Lo que escuchamos" : "Lo que se necesita";
+            return (
+              <div key={bucket} className="space-y-2">
+                <p
+                  style={{
+                    fontFamily: "var(--font-hall-mono)", fontSize: 9,
+                    letterSpacing: "0.08em", textTransform: "uppercase",
+                    color: "var(--hall-muted-2)", fontWeight: 700,
+                  }}
+                >
+                  {headerLabel}  <span style={{ color: "var(--hall-muted-3)" }}>· {list.length}</span>
+                </p>
+                {list.map((p, i) => (
+                  <div
+                    key={i}
+                    className="px-3 py-2 space-y-1.5"
+                    style={{ border: "1px solid var(--hall-line)" }}
+                  >
+                    <textarea
+                      value={p.point}
+                      onChange={e => setListeningPoint(bucket, i, { point: e.target.value })}
+                      placeholder={bucket === "heard" ? "What did they say…" : "What do they need…"}
+                      rows={2}
+                      className="w-full text-[12px] leading-snug resize-none"
+                      style={{ color: "var(--hall-ink-0)" }}
+                    />
+                    <div className="flex items-center gap-1.5 pt-1" style={{ borderTop: "1px solid var(--hall-line-soft)" }}>
+                      <input
+                        value={p.speaker_name ?? ""}
+                        onChange={e => setListeningPoint(bucket, i, { speaker_name: e.target.value || null })}
+                        placeholder="speaker (opt)"
+                        className="flex-1 text-[10px] px-1 py-0.5"
+                        style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => moveListeningPoint(bucket, i, -1)}
+                        disabled={i === 0}
+                        title="Move up"
+                        style={{
+                          fontFamily: "var(--font-hall-mono)", fontSize: 11,
+                          color: i === 0 ? "var(--hall-muted-4, #ccc)" : "var(--hall-muted-2)",
+                          padding: "0 4px",
+                        }}
+                      >↑</button>
+                      <button
+                        type="button"
+                        onClick={() => moveListeningPoint(bucket, i, 1)}
+                        disabled={i === list.length - 1}
+                        title="Move down"
+                        style={{
+                          fontFamily: "var(--font-hall-mono)", fontSize: 11,
+                          color: i === list.length - 1 ? "var(--hall-muted-4, #ccc)" : "var(--hall-muted-2)",
+                          padding: "0 4px",
+                        }}
+                      >↓</button>
+                      <button
+                        type="button"
+                        onClick={() => deleteListeningPoint(bucket, i)}
+                        style={{
+                          fontFamily: "var(--font-hall-mono)", fontSize: 10,
+                          color: "var(--hall-muted-3)",
+                          paddingLeft: 4,
+                        }}
+                      >✕</button>
+                    </div>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => addListeningPoint(bucket)}
+                  style={{
+                    fontFamily: "var(--font-hall-mono)", fontSize: 10,
+                    color: "var(--hall-muted-2)",
+                  }}
+                >
+                  + add {bucket}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* ─── Proposal ─────────────────────────────────────────────────────── */}
+      <section className="space-y-3">
+        <SectionHeader label="PROPOSAL — sube tu propuesta" />
+        <p style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--hall-muted-3)" }}>
+          Status + short framing + (later) file upload. The Hall page will show this section after Listening Map.
+        </p>
+        <div className="p-4 space-y-3" style={{ border: "1px solid var(--hall-line)" }}>
+          <label className="block">
+            <span
+              style={{
+                fontFamily: "var(--font-hall-mono)", fontSize: 9,
+                letterSpacing: "0.08em", textTransform: "uppercase",
+                color: "var(--hall-muted-2)", fontWeight: 700,
+              }}
+            >
+              Status
+            </span>
+            <select
+              value={draft.proposal?.status ?? "draft"}
+              onChange={e => setProposalField("status", e.target.value as HallDraftProposalStatus)}
+              className="block mt-1 px-2 py-1 text-[12px]"
+              style={{ fontFamily: "var(--font-hall-mono)", border: "1px solid var(--hall-line)" }}
+            >
+              <option value="draft">draft</option>
+              <option value="preparing">preparing</option>
+              <option value="ready">ready</option>
+              <option value="sent">sent</option>
+              <option value="accepted">accepted</option>
+            </select>
+          </label>
+          <label className="block">
+            <span
+              style={{
+                fontFamily: "var(--font-hall-mono)", fontSize: 9,
+                letterSpacing: "0.08em", textTransform: "uppercase",
+                color: "var(--hall-muted-2)", fontWeight: 700,
+              }}
+            >
+              Summary
+            </span>
+            <textarea
+              value={draft.proposal?.summary ?? ""}
+              onChange={e => setProposalField("summary", e.target.value || null)}
+              placeholder="2-3 sentences explaining the proposal at a glance. Shown to the counterpart."
+              rows={3}
+              className="w-full mt-1 px-3 py-2 text-[13px] leading-relaxed resize-y"
+              style={{ border: "1px solid var(--hall-line)", color: "var(--hall-ink-0)" }}
+            />
+          </label>
+          <div
+            className="p-3 text-[11px]"
+            style={{
+              fontFamily: "var(--font-hall-mono)",
+              color: "var(--hall-muted-2)",
+              background: "var(--hall-fill-soft)",
+              border: "1px dashed var(--hall-line)",
+            }}
+          >
+            FILE UPLOAD · coming next
+            {draft.proposal?.file_name && (
+              <span style={{ color: "var(--hall-ink-0)" }}> · current: {draft.proposal.file_name}</span>
+            )}
+          </div>
+        </div>
       </section>
 
       {/* ─── Timeline ──────────────────────────────────────────────────── */}
