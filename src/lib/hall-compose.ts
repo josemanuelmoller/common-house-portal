@@ -81,15 +81,23 @@ export type HallDraftProposal = {
   sent_at:   string | null;
 };
 
+export type HallDraftTopic = {
+  /** 1-3 word category-like name. Examples: 'Plastic strategy', 'Coalition'. */
+  name:   string;
+  /** 0-100 relative emphasis in the primary conversation. Used to size radar areas. */
+  weight: number;
+};
+
 export type HallDraft = {
   quote: (HallDraftQuoteCandidate & { candidates?: HallDraftQuoteCandidate[] }) | null;
   angles:    HallDraftAngle[];
-  // listening + proposal added in v2 of the schema. Old drafts loaded from
-  // hall_draft / hall_hero may not have them — render code must defensively
-  // default via withDraftDefaults() before reading.
+  // listening / proposal / topics added after v1 of the schema. Old drafts
+  // loaded from hall_draft / hall_hero may not have them — render code must
+  // defensively default via withDraftDefaults() before reading.
   listening?: HallDraftListening;
   timeline:   HallDraftTimelineItem[];
   proposal?:  HallDraftProposal;
+  topics?:    HallDraftTopic[];
   hall_text:  HallDraftHallText;
   meta: {
     generated_from_source_ids: string[];
@@ -106,13 +114,14 @@ export type HallDraft = {
  * old persisted drafts won't have listening / proposal, and accessing them
  * directly would throw.
  */
-export function withDraftDefaults(d: HallDraft): Required<Pick<HallDraft, "listening" | "proposal">> & HallDraft {
+export function withDraftDefaults(d: HallDraft): Required<Pick<HallDraft, "listening" | "proposal" | "topics">> & HallDraft {
   return {
     ...d,
     listening: d.listening ?? { heard: [], needed: [] },
     proposal:  d.proposal  ?? {
       status: "draft", summary: null, file_url: null, file_name: null, sent_at: null,
     },
+    topics:    d.topics ?? [],
   };
 }
 
@@ -333,6 +342,8 @@ LISTENING_HEARD: 3-5 short bullets (one sentence each) of what the COUNTERPART s
 
 LISTENING_NEEDED: 3-5 short bullets of what the counterpart needs / asked for / signaled they would value, framed as needs not as our offerings. Examples: "una articulación que les permita re-entrar al tema plástico desde una nueva narrativa", "evidencia operativa antes que pelear nuevas leyes", "conexión con startups del eje marino". Avoid wording these as CH offerings. Source: PRIMARY source.
 
+TOPICS: 5-6 dominant topics from the PRIMARY conversation, each with a relative weight 0-100 reflecting how much emphasis they got. Topic names must be 1-3 words, abstract enough to read as categories (NOT full sentences). Weights should differentiate (don't make them all 80) — the largest topic should be 80-100, the smallest 25-50. Examples of good topic names: "Plastic strategy", "Coalition", "Funding model", "Innovation", "Influence". Used to render a radar visual on the Hall — so topics should be the kinds of axes that, taken together, sketch the strategic terrain of the conversation.
+
 TIMELINE: include past meetings (from any source) as 'past', the PRIMARY meeting as 'today', and 1-3 'future' milestones derived from action items in the PRIMARY source.
 
 HALL_TEXT: one or two sentences each. The Hall page is read BY THE COUNTERPART. So:
@@ -351,7 +362,7 @@ const COMPOSE_TOOL = {
   input_schema: {
     type: "object",
     additionalProperties: false,
-    required: ["quote_candidates", "angles", "timeline", "listening_heard", "listening_needed", "hall_text"],
+    required: ["quote_candidates", "angles", "timeline", "listening_heard", "listening_needed", "topics", "hall_text"],
     properties: {
       quote_candidates: {
         type: "array",
@@ -432,6 +443,20 @@ const COMPOSE_TOOL = {
           },
         },
       },
+      topics: {
+        type: "array",
+        minItems: 5,
+        maxItems: 6,
+        items: {
+          type: "object",
+          additionalProperties: false,
+          required: ["name", "weight"],
+          properties: {
+            name:   { type: "string", maxLength: 24 },
+            weight: { type: "number", minimum: 0, maximum: 100 },
+          },
+        },
+      },
       hall_text: {
         type: "object",
         additionalProperties: false,
@@ -456,6 +481,7 @@ interface ToolInput {
   timeline:         HallDraftTimelineItem[];
   listening_heard:  HallDraftListeningPoint[];
   listening_needed: HallDraftListeningPoint[];
+  topics:           HallDraftTopic[];
   hall_text:        HallDraftHallText;
 }
 
@@ -553,6 +579,7 @@ export async function composeHallDraft(
       file_name: null,
       sent_at:   null,
     },
+    topics:    out.topics ?? [],
     hall_text: out.hall_text,
     meta: {
       generated_from_source_ids: all.map(s => s.source_id).filter((x): x is string => !!x),

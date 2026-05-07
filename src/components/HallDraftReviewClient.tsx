@@ -11,6 +11,7 @@ import type {
   HallDraftProposalStatus,
   HallDraftQuoteCandidate,
   HallDraftTimelineItem,
+  HallDraftTopic,
 } from "@/lib/hall-compose";
 import { withDraftDefaults } from "@/lib/hall-compose";
 
@@ -233,6 +234,23 @@ export function HallDraftReviewClient({
       summary: null, file_url: null, file_name: null, sent_at: null,
     };
     setDraft({ ...draft, proposal: { ...cur, [field]: value } });
+  }
+
+  // ─── Topics ──────────────────────────────────────────────────────────────
+  function setTopic(idx: number, patch: Partial<HallDraftTopic>) {
+    if (!draft) return;
+    const list = (draft.topics ?? []).map((t, i) => i === idx ? { ...t, ...patch } : t);
+    setDraft({ ...draft, topics: list });
+  }
+  function deleteTopic(idx: number) {
+    if (!draft) return;
+    const list = (draft.topics ?? []).filter((_, i) => i !== idx);
+    setDraft({ ...draft, topics: list });
+  }
+  function addTopic() {
+    if (!draft) return;
+    const list = [...(draft.topics ?? []), { name: "", weight: 50 }];
+    setDraft({ ...draft, topics: list });
   }
   function addTimelineItem() {
     if (!draft) return;
@@ -718,6 +736,73 @@ export function HallDraftReviewClient({
             )}
           </div>
         </div>
+      </section>
+
+      {/* ─── Topics (drives the topic radar viz on /hall) ────────────────── */}
+      <section className="space-y-3">
+        <SectionHeader label="TOPICS — strategic terrain" />
+        <p style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--hall-muted-3)" }}>
+          5-6 axes that, taken together, sketch the strategic terrain of the conversation. Drive the radar visual on the published Hall.
+        </p>
+        <div className="space-y-2">
+          {(draft.topics ?? []).map((t, i) => (
+            <div
+              key={i}
+              className="flex items-center gap-3 px-3 py-2"
+              style={{ border: "1px solid var(--hall-line)" }}
+            >
+              <input
+                value={t.name}
+                onChange={e => setTopic(i, { name: e.target.value })}
+                placeholder="Topic name"
+                className="flex-1 text-[12px]"
+                style={{ color: "var(--hall-ink-0)", fontFamily: "var(--font-hall-mono)" }}
+              />
+              <input
+                type="range"
+                min={0}
+                max={100}
+                step={5}
+                value={t.weight}
+                onChange={e => setTopic(i, { weight: Number(e.target.value) })}
+                style={{ width: 120 }}
+                title={`weight: ${t.weight}`}
+              />
+              <span
+                className="w-8 text-right"
+                style={{
+                  fontFamily: "var(--font-hall-mono)", fontSize: 10,
+                  color: "var(--hall-muted-2)", fontWeight: 700,
+                }}
+              >
+                {t.weight}
+              </span>
+              <button
+                type="button"
+                onClick={() => deleteTopic(i)}
+                style={{
+                  fontFamily: "var(--font-hall-mono)", fontSize: 10,
+                  color: "var(--hall-muted-3)",
+                  paddingLeft: 4,
+                }}
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+        </div>
+        {(draft.topics?.length ?? 0) < 6 && (
+          <button
+            type="button"
+            onClick={addTopic}
+            style={{
+              fontFamily: "var(--font-hall-mono)", fontSize: 10,
+              color: "var(--hall-muted-2)",
+            }}
+          >
+            + add topic
+          </button>
+        )}
       </section>
 
       {/* ─── Timeline ──────────────────────────────────────────────────── */}
