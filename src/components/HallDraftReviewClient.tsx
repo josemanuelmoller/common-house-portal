@@ -570,7 +570,7 @@ export function HallDraftReviewClient({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {(["heard", "needed"] as const).map(bucket => {
             const list = draft.listening?.[bucket] ?? [];
-            const headerLabel = bucket === "heard" ? "Lo que escuchamos" : "Lo que se necesita";
+            const headerLabel = bucket === "heard" ? "What we heard" : "What's needed";
             return (
               <div key={bucket} className="space-y-2">
                 <p
@@ -656,7 +656,7 @@ export function HallDraftReviewClient({
 
       {/* ─── Proposal ─────────────────────────────────────────────────────── */}
       <section className="space-y-3">
-        <SectionHeader label="PROPOSAL — sube tu propuesta" />
+        <SectionHeader label="PROPOSAL — what you'll share with them" />
         <p style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--hall-muted-3)" }}>
           Status + short framing + (later) file upload. The Hall page will show this section after Listening Map.
         </p>

@@ -156,12 +156,12 @@ function ListeningMap({ listening }: { listening: { heard: HallDraftListeningPoi
     >
       <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-10">
         <ListeningColumn
-          label="Lo que escuchamos"
+          label="What we heard"
           accent="var(--hall-muted-2)"
           items={listening.heard}
         />
         <ListeningColumn
-          label="Lo que se necesita"
+          label="What's needed"
           accent="var(--hall-ink-0)"
           items={listening.needed}
         />
@@ -231,11 +231,11 @@ function ProposalSection({ proposal }: { proposal: HallDraftProposal }) {
     accepted:   "var(--hall-ink-0)",
   };
   const statusLabel: Record<HallDraftProposal["status"], string> = {
-    draft:      "EN BORRADOR",
-    preparing:  "EN PREPARACIÓN",
-    ready:      "LISTA PARA REVISIÓN",
-    sent:       "ENVIADA",
-    accepted:   "ACEPTADA",
+    draft:      "DRAFT",
+    preparing:  "IN PREPARATION",
+    ready:      "READY FOR REVIEW",
+    sent:       "SENT",
+    accepted:   "ACCEPTED",
   };
 
   return (
@@ -254,7 +254,7 @@ function ProposalSection({ proposal }: { proposal: HallDraftProposal }) {
               color: "var(--hall-muted-2)",
             }}
           >
-            · PROPUESTA
+            · PROPOSAL
           </p>
           <span
             className="px-2 py-0.5"
@@ -301,7 +301,7 @@ function ProposalSection({ proposal }: { proposal: HallDraftProposal }) {
               color: "var(--hall-muted-3)",
             }}
           >
-            (archivo se sube cuando la propuesta esté lista)
+            (file will be attached when the proposal is ready)
           </p>
         )}
       </div>
