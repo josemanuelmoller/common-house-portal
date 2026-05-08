@@ -18,6 +18,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { withRoutineLog } from "@/lib/routine-log";
+import { adminGuardApi } from "@/lib/require-admin";
 
 export const maxDuration = 600;
 export const dynamic = "force-dynamic";
@@ -30,12 +31,16 @@ type StepResult = {
   error?: string;
 };
 
-function isAuthorized(req: NextRequest): boolean {
+async function isAuthorized(req: NextRequest): Promise<boolean> {
   const secret = process.env.CRON_SECRET;
-  if (!secret) return false;
-  const auth = req.headers.get("authorization") ?? "";
-  const xAgent = req.headers.get("x-agent-key") ?? "";
-  return auth === `Bearer ${secret}` || xAgent === secret;
+  if (secret) {
+    const auth = req.headers.get("authorization") ?? "";
+    const xAgent = req.headers.get("x-agent-key") ?? "";
+    if (auth === `Bearer ${secret}` || xAgent === secret) return true;
+  }
+  // Allow admin-session trigger for the manual "Run pipeline" button.
+  const denied = await adminGuardApi();
+  return denied === null;
 }
 
 async function callOperator(path: string, body?: Record<string, unknown>): Promise<StepResult> {
@@ -71,7 +76,7 @@ async function callOperator(path: string, body?: Record<string, unknown>): Promi
 }
 
 async function handle(req: NextRequest) {
-  if (!isAuthorized(req)) {
+  if (!(await isAuthorized(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

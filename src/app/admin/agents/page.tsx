@@ -1,6 +1,7 @@
 import { requireAdmin } from "@/lib/require-admin";
 import { PortalShell } from "@/components/PortalShell";
 import { HallSection } from "@/components/HallSection";
+import { RunOsCycleButton } from "@/components/RunOsCycleButton";
 import { ROUTINE_CATALOG } from "@/lib/routine-log";
 
 // ── Live run data from the unified agent_latest_runs view ────────────────────
@@ -245,6 +246,23 @@ export default async function AgentsPage() {
       flourish="registry"
       meta={headerMeta}
     >
+      {/* Manual pipeline trigger */}
+      <HallSection
+        title="OS pipeline"
+        flourish="cadence"
+        meta={
+          <span style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--hall-muted-2)" }}>
+            cron · 03:00 UTC weekdays
+          </span>
+        }
+      >
+        <p className="mb-3 text-[12px]" style={{ color: "var(--hall-muted-2)" }}>
+          Runs the full OS v2 cadence (intake → evidence → validation → projects → knowledge_assets → knowledge_nodes) in one pass via{" "}
+          <code style={{ fontFamily: "var(--font-hall-mono)" }}>/api/cron/run-os-cycle</code>.
+        </p>
+        <RunOsCycleButton />
+      </HallSection>
+
       {/* Architecture diagram */}
       <HallSection
         title="Architecture"
