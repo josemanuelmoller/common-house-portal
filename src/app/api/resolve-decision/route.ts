@@ -1,15 +1,14 @@
 /**
  * Resolve a decision item from the portal.
  *
- * Phase 2 pattern: Supabase mirror is updated immediately (instant UI feedback);
- * the same change is queued as `pending_notion_push` and pushed to Notion
- * best-effort in the same request. If the Notion push fails, the cron retry
- * route (/api/cron/push-pending-to-notion) will retry it.
+ * Post-2026-05-08: writes directly to canonical `decision_items`. The legacy
+ * mirror-push pattern (Notion + Supabase mirror in one call) was retired
+ * ahead of the 2026-06-02 Notion freeze cutoff.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { adminGuardApi } from "@/lib/require-admin";
-import { applyMirrorEdit, pushPending } from "@/lib/notion-mirror-push";
+import { updateCanonicalRow } from "@/lib/canonical-write";
 
 function corsHeaders() {
   return {
@@ -44,34 +43,24 @@ export async function POST(req: NextRequest) {
   };
   const newStatus = statusMap[action] ?? "Resolved";
 
-  // 1) Update Supabase mirror — UI sees the new state instantly on refresh.
+  // Update canonical decision_items row. UI sees the new state on refresh.
   const changes: Record<string, unknown> = { status: newStatus };
-  if (note) changes.resolution_note = note;
+  if (note) changes.notes_raw = note;
 
-  const apply = await applyMirrorEdit({
+  const apply = await updateCanonicalRow({
     table:   "notion_decision_items",
     id,
     changes,
   });
   if (!apply.ok) {
     return NextResponse.json(
-      { error: "Mirror update failed", detail: apply.error },
+      { error: "Decision update failed", detail: apply.error },
       { status: 500, headers: corsHeaders() }
     );
   }
 
-  // 2) Best-effort push to Notion. Failure here is non-fatal — the cron retry
-  //    will pick it up. We surface the error in the response for visibility.
-  const push = await pushPending("notion_decision_items", id);
-
   return NextResponse.json(
-    {
-      ok: true,
-      id,
-      status: newStatus,
-      notion_push: push.ok ? "ok" : "pending_retry",
-      notion_error: push.ok ? undefined : push.error,
-    },
+    { ok: true, id, status: newStatus },
     { headers: corsHeaders() }
   );
 }

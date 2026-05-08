@@ -18,7 +18,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { google } from "googleapis";
 import { adminGuardApi } from "@/lib/require-admin";
 import { notion } from "@/lib/notion";
-import { applyMirrorEdit, pushPending } from "@/lib/notion-mirror-push";
+import { updateCanonicalRow } from "@/lib/canonical-write";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { recordProposalOutcome } from "@/lib/proposal-outcomes";
 import { currentUser } from "@clerk/nextjs/server";
@@ -108,15 +108,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, reason: "Draft text is empty." });
   }
 
-  // 2. Mark Approved (mirror first)
-  const approveResult = await applyMirrorEdit({
+  // 2. Mark Approved on canonical agent_drafts row.
+  const approveResult = await updateCanonicalRow({
     table:   "notion_agent_drafts",
     id:      draftId,
     changes: { status: "Approved" },
   });
   if (!approveResult.ok) {
     return NextResponse.json(
-      { ok: false, error: "Mirror approve failed", detail: approveResult.error },
+      { ok: false, error: "Draft approve failed", detail: approveResult.error },
       { status: 500 },
     );
   }
@@ -187,14 +187,13 @@ export async function POST(req: NextRequest) {
     }, { status: 502 });
   }
 
-  // 4. Mark Sent (or Draft Created)
+  // 4. Mark Sent (or Draft Created) on canonical agent_drafts row.
   const newStatus = sendMode === "direct" ? "Sent" : "Draft Created";
-  const sentResult = await applyMirrorEdit({
+  await updateCanonicalRow({
     table:   "notion_agent_drafts",
     id:      draftId,
     changes: { status: newStatus },
   });
-  if (sentResult.ok) await pushPending("notion_agent_drafts", draftId);
 
   // 5. Record proposal_outcome (fire-and-forget)
   const user = await currentUser();

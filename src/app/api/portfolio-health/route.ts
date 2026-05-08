@@ -27,7 +27,7 @@ import { auth } from "@clerk/nextjs/server";
 import { isAdminUser } from "@/lib/clients";
 import { withRoutineLog } from "@/lib/routine-log";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
-import { createPageWithMirror } from "@/lib/notion-mirror-push";
+import { createCanonicalRow } from "@/lib/canonical-write";
 
 export const maxDuration = 180;
 export const dynamic = "force-dynamic";
@@ -352,7 +352,7 @@ async function _POST(req: NextRequest) {
   let draftId: string | null = null;
   if (mode === "execute" && (startups.length > 0 || atRisk.length > 0)) {
     const today = new Date().toISOString().slice(0, 10);
-    const created = await createPageWithMirror({
+    const created = await createCanonicalRow({
       table: "notion_agent_drafts",
       fields: {
         title:      `Portfolio Health — ${today}`,
@@ -360,7 +360,6 @@ async function _POST(req: NextRequest) {
         status:     "Pending Review",
         draft_text: markdown.slice(0, 1990),
       },
-      mirrorOnly: { created_date: today },
     });
     if (created.ok) draftId = created.id ?? null;
     else console.error("[portfolio-health] draft create failed:", created.error);

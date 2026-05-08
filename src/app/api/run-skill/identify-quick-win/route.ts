@@ -13,7 +13,7 @@ import { adminGuardApi } from "@/lib/require-admin";
 import { Client } from "@notionhq/client";
 import Anthropic from "@anthropic-ai/sdk";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
-import { createPageWithMirror } from "@/lib/notion-mirror-push";
+import { createCanonicalRow } from "@/lib/canonical-write";
 
 const notion = new Client({ auth: process.env.NOTION_API_KEY });
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -169,26 +169,15 @@ Order by urgency (most urgent first). Output ONLY the quick wins list. Nothing e
     );
   }
 
-  // 4. Save to Agent Drafts via mirror.
-  const created = await createPageWithMirror({
+  // 4. Save to canonical agent_drafts.
+  const created = await createCanonicalRow({
     table: "notion_agent_drafts",
     fields: {
-      title:      `Quick Wins — ${today}`,
-      draft_type: "Quick Wins Report",
-      status:     "Pending Review",
-      draft_text: draftText.slice(0, 2000),
-    },
-    mirrorOnly: {
-      created_date: today,
-    },
-    extraNotionProperties: {
-      "Source Reference": {
-        rich_text: [{
-          text: {
-            content: `Scanned: ${decisions.length} decisions · ${opportunities.length} opps · ${content.length} content · ${hotContacts.length} hot contacts`,
-          },
-        }],
-      },
+      title:        `Quick Wins — ${today}`,
+      draft_type:   "Quick Wins Report",
+      status:       "Pending Review",
+      draft_text:   draftText.slice(0, 2000),
+      source_agent: "identify-quick-win",
     },
   });
   if (!created.ok) {

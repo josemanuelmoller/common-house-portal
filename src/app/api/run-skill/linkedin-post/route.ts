@@ -2,12 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminGuardApi } from "@/lib/require-admin";
 import { Client } from "@notionhq/client";
 import Anthropic from "@anthropic-ai/sdk";
-import { createPageWithMirror } from "@/lib/notion-mirror-push";
+import { createCanonicalRow } from "@/lib/canonical-write";
 
 const notion = new Client({ auth: process.env.NOTION_API_KEY });
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-// AGENT_DRAFTS_DB removed — createPageWithMirror knows the DB from the table name.
 const INSIGHT_BRIEFS_DB = "04bed3a3fd1a4b3a99643cd21562e08a";
 const KNOWLEDGE_DB = "0f4bfe95549d4710a3a9ab6e119a9b04";
 
@@ -110,26 +109,19 @@ Output ONLY the post text. Nothing else.`;
     );
   }
 
-  // 3. Save to Agent Drafts via mirror.
+  // 3. Save to canonical agent_drafts.
   const draftTitle = topicHint
     ? `LinkedIn post: ${topicHint.slice(0, 60)} — ${today}`
     : `LinkedIn post — ${today}`;
 
-  const created = await createPageWithMirror({
+  const created = await createCanonicalRow({
     table: "notion_agent_drafts",
     fields: {
-      title:      draftTitle,
-      draft_type: "LinkedIn Post",
-      status:     "Pending Review",
-      draft_text: draftText.slice(0, 2000),
-    },
-    mirrorOnly: {
-      created_date: today,
-    },
-    extraNotionProperties: {
-      "Source Reference": {
-        rich_text: [{ text: { content: topicHint ? `Topic hint: ${topicHint}` : "Auto-generated from Insight Briefs + Knowledge Assets" } }],
-      },
+      title:        draftTitle,
+      draft_type:   "LinkedIn Post",
+      status:       "Pending Review",
+      draft_text:   draftText.slice(0, 2000),
+      source_agent: "linkedin-post",
     },
   });
   if (!created.ok) {

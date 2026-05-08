@@ -13,7 +13,7 @@ import { adminGuardApi } from "@/lib/require-admin";
 import { Client } from "@notionhq/client";
 import Anthropic from "@anthropic-ai/sdk";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
-import { createPageWithMirror } from "@/lib/notion-mirror-push";
+import { createCanonicalRow } from "@/lib/canonical-write";
 
 const notion = new Client({ auth: process.env.NOTION_API_KEY });
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -121,25 +121,18 @@ Output ONLY the email (Subject + body). Nothing else.`;
     return NextResponse.json({ error: "Anthropic API error", detail: String(e) }, { status: 500 });
   }
 
-  // 3. Save to Agent Drafts via the mirror helper — creates the Notion page
-  //    AND inserts into notion_agent_drafts in one call. Hall reads pick it
-  //    up immediately on next render, no wait for forward sync.
+  // 3. Save to canonical agent_drafts (Supabase). Hall reads pick it up
+  //    immediately on next render.
   const titleStr = `Check-in: ${name} — ${today}`;
-  const created = await createPageWithMirror({
+  const created = await createCanonicalRow({
     table: "notion_agent_drafts",
     fields: {
-      title:       titleStr,
-      draft_type:  "Check-in Email",
-      status:      "Pending Review",
-      draft_text:  draftText.slice(0, 2000),
-    },
-    mirrorOnly: {
-      related_entity_id: personId,
-      created_date:      today,
-    },
-    extraNotionProperties: {
-      "Source Reference": { rich_text: [{ text: { content: `${name}${email ? ` <${email}>` : ""}` } }] },
-      "Related Entity":   { relation: [{ id: personId }] },
+      title:                   titleStr,
+      draft_type:              "Check-in Email",
+      status:                  "Pending Review",
+      draft_text:              draftText.slice(0, 2000),
+      target_person_notion_id: personId,
+      source_agent:            "draft-checkin",
     },
   });
   if (!created.ok) {

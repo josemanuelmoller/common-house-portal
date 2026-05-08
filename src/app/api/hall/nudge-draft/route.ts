@@ -14,7 +14,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { google } from "googleapis";
 import Anthropic from "@anthropic-ai/sdk";
 import { adminGuardApi } from "@/lib/require-admin";
-import { createPageWithMirror } from "@/lib/notion-mirror-push";
+import { createCanonicalRow } from "@/lib/canonical-write";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -148,20 +148,14 @@ export async function POST(req: NextRequest) {
   const draftTitle = subjectLine.replace(/^Re:\s*/i, "").slice(0, 200);
   let mirrorDraftId: string | null = null;
   try {
-    const created = await createPageWithMirror({
+    const created = await createCanonicalRow({
       table: "notion_agent_drafts",
       fields: {
-        title:      `Reply: ${draftTitle}`,
-        draft_type: "Follow-up Email",
-        status:     "Pending Review",
-        draft_text: draftBody.slice(0, 2000),
-      },
-      mirrorOnly: {
-        gmail_thread_id: threadId,
-        created_date:    today,
-      },
-      extraNotionProperties: {
-        "Source Reference": { rich_text: [{ text: { content: `Gmail thread ${threadId} · ${toEmail}` } }] },
+        title:        `Reply: ${draftTitle}`,
+        draft_type:   "Follow-up Email",
+        status:       "Pending Review",
+        draft_text:   draftBody.slice(0, 2000),
+        source_agent: "nudge-draft",
       },
     });
     if (created.ok) mirrorDraftId = created.id ?? null;

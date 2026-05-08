@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminGuardApi } from "@/lib/require-admin";
 import { Client } from "@notionhq/client";
 import Anthropic from "@anthropic-ai/sdk";
-import { createPageWithMirror } from "@/lib/notion-mirror-push";
+import { createCanonicalRow } from "@/lib/canonical-write";
 
 const notion = new Client({ auth: process.env.NOTION_API_KEY });
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -93,25 +93,18 @@ Output ONLY the email (Subject + body). Nothing else.`;
     return NextResponse.json({ error: "Anthropic API error", detail: String(e) }, { status: 500 });
   }
 
-  // 4. Save to Agent Drafts via mirror — Notion + Supabase in one call.
+  // 4. Save to canonical agent_drafts (Supabase). Notion writes are
+  //    decommissioned ahead of the 2026-06-02 freeze.
   const titleStr = `Follow-up: ${oppName} — ${today}`;
-  const created = await createPageWithMirror({
+  const created = await createCanonicalRow({
     table: "notion_agent_drafts",
     fields: {
-      title:      titleStr,
-      draft_type: "Follow-up Email",
-      status:     "Pending Review",
-      draft_text: draftText.slice(0, 2000),
-    },
-    mirrorOnly: {
-      related_entity_id: contactId ?? null,
-      opportunity_id:    opportunityId,
-      created_date:      today,
-    },
-    extraNotionProperties: {
-      "Source Reference": { rich_text: [{ text: { content: `${oppName}${orgName ? ` · ${orgName}` : ""}` } }] },
-      "Related Entity":   { relation: contactId ? [{ id: contactId }] : [] },
-      "Opportunity":      { relation: [{ id: opportunityId }] },
+      title:                   titleStr,
+      draft_type:              "Follow-up Email",
+      status:                  "Pending Review",
+      draft_text:              draftText.slice(0, 2000),
+      target_person_notion_id: contactId ?? null,
+      source_agent:            "draft-followup",
     },
   });
   if (!created.ok) {
