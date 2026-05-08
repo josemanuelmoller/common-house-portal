@@ -269,10 +269,12 @@ function notionUrlFromId(notionId: string | null): string {
 }
 
 // Statuses included by getProjectsOverview. Most surfaces only want Active;
-// the Workrooms surface also wants Proposed (used for Prospect engagements).
+// the Workrooms surface also wants pre-active prospects: "Proposed" (formal
+// proposal sent) AND "Not started" (still pre-sale / qualifying — no project
+// work yet, but already on the radar). Both buckets render under "Prospects".
 type ProjectStatusFilter = readonly string[];
 const ACTIVE_ONLY: ProjectStatusFilter = ["Active"];
-const ACTIVE_AND_PROPOSED: ProjectStatusFilter = ["Active", "Proposed"];
+const ACTIVE_AND_PROPOSED: ProjectStatusFilter = ["Active", "Proposed", "Not started"];
 
 async function _projectsOverview(statuses: ProjectStatusFilter): Promise<ProjectCard[]> {
   const sb = getSupabaseServerClient();

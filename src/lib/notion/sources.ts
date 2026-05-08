@@ -1,6 +1,16 @@
 import { notion, DB, prop, text, select, date, relationFirst } from "./core";
 
 // ─── Sources queries ──────────────────────────────────────────────────────────
+//
+// `local-*` projectIds: read from Supabase directly. These are projects born
+// outside the legacy Notion path (e.g. prospects created by the Hall pipeline,
+// workroom-bridge auto-creation, manual SQL inserts) and therefore have no
+// Notion mirror. Same routing pattern as `getProjectById` in projects.ts.
+
+async function getSupabase() {
+  const { getSupabaseServerClient } = await import("../supabase-server");
+  return getSupabaseServerClient();
+}
 
 export type SourceItem = {
   id: string;
@@ -51,7 +61,29 @@ function parseSource(page: any): SourceItem {
   };
 }
 
+async function getSourcesForProjectFromSupabase(projectId: string): Promise<SourceItem[]> {
+  const sb = await getSupabase();
+  const { data, error } = await sb
+    .from("sources")
+    .select("id, title, source_type, processing_status, source_date, project_notion_id, created_at")
+    .eq("project_notion_id", projectId)
+    .order("source_date", { ascending: false, nullsFirst: false })
+    .limit(50);
+  if (error || !data) return [];
+  return data.map(r => ({
+    id:           (r.id as string),
+    title:        (r.title as string) || "Untitled",
+    sourceType:   (r.source_type as string) || "",
+    status:       (r.processing_status as string) || "",
+    dateIngested: (r.source_date as string | null) ?? (r.created_at as string | null) ?? null,
+    projectId:    (r.project_notion_id as string | null) ?? null,
+  }));
+}
+
 export async function getSourcesForProject(projectPageId: string): Promise<SourceItem[]> {
+  if (projectPageId.startsWith("local-")) {
+    return getSourcesForProjectFromSupabase(projectPageId);
+  }
   try {
     const res = await notion.databases.query({
       database_id: DB.sources,
@@ -89,7 +121,33 @@ export async function getAllSources(): Promise<SourceItem[]> {
   }
 }
 
+async function getDocumentsForProjectFromSupabase(projectId: string): Promise<DocumentItem[]> {
+  const sb = await getSupabase();
+  // Fetch all sources for the project and filter client-side. Avoids fragile
+  // PostgREST .or() syntax with spaces in values like "Google Drive".
+  const { data, error } = await sb
+    .from("sources")
+    .select("id, title, source_url, source_platform, source_type, source_date")
+    .eq("project_notion_id", projectId)
+    .order("source_date", { ascending: false, nullsFirst: false })
+    .limit(100);
+  if (error || !data) return [];
+  return data
+    .filter(r => r.source_type === "Document" || r.source_platform === "Google Drive")
+    .map(r => ({
+      id:         (r.id as string),
+      title:      (r.title as string) || "Untitled document",
+      url:        (r.source_url as string) || "",
+      platform:   (r.source_platform as string) || "",
+      sourceDate: (r.source_date as string | null) ?? null,
+    }))
+    .filter(d => d.url);
+}
+
 export async function getDocumentsForProject(projectPageId: string): Promise<DocumentItem[]> {
+  if (projectPageId.startsWith("local-")) {
+    return getDocumentsForProjectFromSupabase(projectPageId);
+  }
   try {
     const res = await notion.databases.query({
       database_id: DB.sources,
@@ -173,7 +231,62 @@ export async function getRecentMeetingSources(lookbackDays: number): Promise<Mee
   }
 }
 
+async function getSourceActivityFromSupabase(projectId: string): Promise<SourceActivity> {
+  const sb = await getSupabase();
+  const { data, error } = await sb
+    .from("sources")
+    .select("id, title, source_type, source_platform, source_url, source_date, processed_summary")
+    .eq("project_notion_id", projectId)
+    .order("source_date", { ascending: false, nullsFirst: false })
+    .limit(100);
+  if (error || !data) {
+    return { meetings: [], emailCount: 0, documentCount: 0, otherCount: 0, totalCount: 0 };
+  }
+
+  const meetings: MeetingItem[] = [];
+  let emailCount = 0;
+  let documentCount = 0;
+  let otherCount = 0;
+
+  for (const r of data) {
+    const sourceType = (r.source_type as string | null) ?? "";
+    const platform   = (r.source_platform as string | null) ?? "";
+
+    const isMeeting  = sourceType.includes("Meeting") || platform === "Fireflies";
+    const isEmail    = sourceType.includes("Email")   || platform === "Gmail";
+    const isDocument = sourceType === "Document"      || platform === "Google Drive";
+
+    if (isMeeting) {
+      meetings.push({
+        id:               (r.id as string),
+        title:            (r.title as string) || "Untitled",
+        date:             (r.source_date as string | null) ?? null,
+        url:              (r.source_url as string) || "",
+        platform,
+        processedSummary: (r.processed_summary as string | null) || undefined,
+      });
+    } else if (isEmail) {
+      emailCount++;
+    } else if (isDocument) {
+      documentCount++;
+    } else {
+      otherCount++;
+    }
+  }
+
+  return {
+    meetings,
+    emailCount,
+    documentCount,
+    otherCount,
+    totalCount: data.length,
+  };
+}
+
 export async function getSourceActivity(projectId: string): Promise<SourceActivity> {
+  if (projectId.startsWith("local-")) {
+    return getSourceActivityFromSupabase(projectId);
+  }
   try {
     const res = await notion.databases.query({
       database_id: DB.sources,

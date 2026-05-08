@@ -38,13 +38,17 @@ export default async function WorkroomsPage() {
   await requireAdmin();
 
   const allProjects = await getWorkroomProjectsOverview();
-  // Workroom = any project (Active or Proposed) whose engagement_model is a
-  // paid CH service (delivery / advisory / consulting / etc.) — i.e. anything
-  // that is NOT a startup. Active = current Clients. Proposed = Prospects.
-  // Source of truth lives on the project, not on `primary_workspace` (deprecated).
+  // Workroom = any project whose engagement_model is a paid CH service
+  // (delivery / advisory / consulting / etc.) — i.e. anything that is NOT
+  // a startup. Active = current Clients. Prospects = anything earlier than
+  // Active, regardless of whether the manual `project_status` says
+  // "Proposed" (formal proposal sent) or "Not started" (still pre-sale /
+  // qualifying, no project work yet). Source of truth lives on the project,
+  // not on `primary_workspace` (deprecated).
+  const PROSPECT_STATUSES = new Set(["Proposed", "Not started"]);
   const projects    = allProjects.filter(p => p.engagementModel && p.engagementModel !== "startup");
   const activeClients = projects.filter(p => p.status === "Active");
-  const prospects     = projects.filter(p => p.status === "Proposed");
+  const prospects     = projects.filter(p => PROSPECT_STATUSES.has(p.status ?? ""));
 
   const withBlockers   = activeClients.filter(p => p.blockerCount > 0);
   const needsUpdate    = activeClients.filter(p => p.updateNeeded);

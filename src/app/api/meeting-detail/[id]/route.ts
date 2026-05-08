@@ -1,11 +1,57 @@
 import { NextRequest, NextResponse } from "next/server";
 import { currentUser } from "@clerk/nextjs/server";
 import { notion } from "@/lib/notion";
+import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { getProjectIdForUser, isAdminUser, isAdminEmail } from "@/lib/clients";
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+async function tryLoadFromSupabase(id: string) {
+  if (!UUID_RE.test(id)) return null;
+  const sb = getSupabaseServerClient();
+  const { data } = await sb
+    .from("sources")
+    .select("id, title, source_date, source_url, source_platform, processed_summary, sanitized_notes, project_notion_id, org_notion_id, source_external_id")
+    .eq("id", id)
+    .maybeSingle();
+  if (!data) return null;
+
+  // Build sections from processed_summary / sanitized_notes (no Notion blocks
+  // available — these sources never lived in Notion).
+  const sections: Array<{ type: "heading" | "paragraph" | "bullet"; text: string }> = [];
+  const sourceText =
+    (data.processed_summary as string | null) ||
+    (data.sanitized_notes  as string | null) ||
+    "";
+  if (sourceText.trim()) {
+    sourceText.split("\n").forEach((line) => {
+      const trimmed = line.trim();
+      if (!trimmed) return;
+      const isBullet = /^[-•*]\s/.test(trimmed);
+      sections.push({
+        type: isBullet ? "bullet" : "paragraph",
+        text: isBullet ? trimmed.replace(/^[-•*]\s/, "") : trimmed,
+      });
+    });
+  }
+
+  return {
+    id,
+    title:        (data.title as string) || "Untitled",
+    date:         (data.source_date as string | null) ?? null,
+    url:          (data.source_url as string | null) ?? null,
+    platform:     (data.source_platform as string | null) ?? "",
+    attendees:    [] as string[],
+    sections,
+    projectId:    (data.project_notion_id as string | null) ?? null,
+    externalId:   (data.source_external_id as string | null) ?? null,
+  };
+}
 
 /**
  * GET /api/meeting-detail/[id]
- * Returns meeting source detail: properties + parsed Notion block content.
+ * Returns meeting source detail. Supabase-first; falls back to Notion only if
+ * the id looks like a Notion page ID and isn't found in Supabase.
  */
 export async function GET(
   _req: NextRequest,
@@ -16,6 +62,18 @@ export async function GET(
   const email = user.primaryEmailAddress?.emailAddress ?? "";
 
   const { id } = await params;
+
+  // Supabase-first: covers all sources born in OS v2 (sources.id is uuid).
+  const sb = await tryLoadFromSupabase(id);
+  if (sb) {
+    if (!isAdminUser(user.id) && !isAdminEmail(email)) {
+      const userProjectId = getProjectIdForUser(email);
+      if (!userProjectId || sb.projectId !== userProjectId) {
+        return NextResponse.json({ error: "Access denied" }, { status: 403 });
+      }
+    }
+    return NextResponse.json(sb);
+  }
 
   try {
     // Get page properties

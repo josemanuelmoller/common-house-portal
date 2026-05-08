@@ -40,11 +40,21 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
     const sb = getSupabaseServerClient();
     const { data } = await sb
       .from("projects")
-      .select("id, project_status, current_stage, engagement_stage, engagement_model, status_summary, draft_status_update")
+      .select("id, project_status, current_stage, engagement_stage, engagement_model, status_summary, draft_status_update, hall_draft")
       .eq("notion_id", project.id)
       .maybeSingle();
     return data;
   })();
+
+  // Optional registered deck slug stored on the project's hall_draft.proposal.
+  // When present, render an "Open deck" link in the page header that opens the
+  // /proposal-viewer with that slug. Allowlist enforced inside the viewer.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const hallDraftAny = (sbProject?.hall_draft as any) ?? null;
+  const proposalDeckSlug: string | null =
+    typeof hallDraftAny?.proposal?.deck_slug === "string" && hallDraftAny.proposal.deck_slug.length > 0
+      ? hallDraftAny.proposal.deck_slug
+      : null;
 
   const blockers     = evidence.filter(e => e.type === "Blocker"     && e.validationStatus === "Validated");
   const decisions    = evidence.filter(e => e.type === "Decision"    && e.validationStatus === "Validated");
@@ -96,6 +106,16 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
             ))}
             {project.updateNeeded && (
               <span style={{ color: "var(--hall-warn)" }}>! UPDATE NEEDED</span>
+            )}
+            {proposalDeckSlug && (
+              <Link
+                href={`/admin/projects/${project.id}/proposal-viewer?deck=${encodeURIComponent(proposalDeckSlug)}`}
+                className="uppercase tracking-widest"
+                style={{ color: "var(--hall-ink-0)", fontWeight: 700 }}
+                title="Open the proposal deck"
+              >
+                ▤ Deck
+              </Link>
             )}
             <Link
               href={`/admin/projects/${project.id}/hall-compose`}

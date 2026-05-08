@@ -35,9 +35,33 @@ export type EvidenceItem = {
   projectName?: string;
 };
 
+async function getEvidenceForProjectFromSupabase(projectId: string): Promise<EvidenceItem[]> {
+  const { getSupabaseServerClient } = await import("../supabase-server");
+  const sb = getSupabaseServerClient();
+  const { data, error } = await sb
+    .from("evidence")
+    .select("id, title, evidence_statement, evidence_type, validation_status, confidence_level, reusability_level, date_captured, source_excerpt, project_notion_id")
+    .eq("project_notion_id", projectId)
+    .order("date_captured", { ascending: false, nullsFirst: false })
+    .limit(50);
+  if (error || !data) return [];
+  return data.map(r => ({
+    id:               (r.id as string),
+    title:            ((r.title as string | null) ?? (r.evidence_statement as string | null) ?? "") || "",
+    type:             (r.evidence_type as string | null) ?? "",
+    validationStatus: (r.validation_status as string | null) ?? "",
+    confidence:       (r.confidence_level as string | null) ?? "",
+    reusability:      (r.reusability_level as string | null) ?? "",
+    dateCaptured:     (r.date_captured as string | null) ?? null,
+    excerpt:          (r.source_excerpt as string | null) ?? "",
+    projectId:        (r.project_notion_id as string | null) ?? null,
+  }));
+}
+
 export async function getEvidenceForProject(projectPageId: string): Promise<EvidenceItem[]> {
-  // Supabase-only projects (local- prefix) have no Notion-side evidence yet.
-  if (projectPageId.startsWith("local-")) return [];
+  if (projectPageId.startsWith("local-")) {
+    return getEvidenceForProjectFromSupabase(projectPageId);
+  }
   const res = await notion.databases.query({
     database_id: DB.evidence,
     filter: { property: "Project", relation: { contains: projectPageId } },

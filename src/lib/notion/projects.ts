@@ -226,13 +226,37 @@ export async function getProjectsOverview(): Promise<ProjectCard[]> {
   });
 }
 
-export async function getDashboardStats(projectId?: string): Promise<DashboardStats> {
-  // Supabase-only project — no Notion stats to aggregate.
-  if (projectId?.startsWith("local-")) {
+async function getDashboardStatsFromSupabase(projectId: string): Promise<DashboardStats> {
+  const { getSupabaseServerClient } = await import("../supabase-server");
+  const sb = getSupabaseServerClient();
+  const { data, error } = await sb
+    .from("evidence")
+    .select("evidence_type, validation_status, reusability_level")
+    .eq("project_notion_id", projectId)
+    .limit(500);
+  if (error || !data) {
     return {
       totalProjects: 0, activeProjects: 0, totalEvidence: 0, validatedEvidence: 0,
       pendingEvidence: 0, blockers: 0, dependencies: 0, knowledgeCandidates: 0,
     };
+  }
+  const isValidated = (e: typeof data[number]) => e.validation_status === "Validated";
+  return {
+    totalProjects:       0,
+    activeProjects:      0,
+    totalEvidence:       data.length,
+    validatedEvidence:   data.filter(isValidated).length,
+    pendingEvidence:     data.filter(e => e.validation_status === "New").length,
+    blockers:            data.filter(e => e.evidence_type === "Blocker"    && isValidated(e)).length,
+    dependencies:        data.filter(e => e.evidence_type === "Dependency" && isValidated(e)).length,
+    knowledgeCandidates: data.filter(e => (e.reusability_level === "Reusable" || e.reusability_level === "Canonical") && isValidated(e)).length,
+  };
+}
+
+export async function getDashboardStats(projectId?: string): Promise<DashboardStats> {
+  // Supabase-only project — count from Supabase evidence.
+  if (projectId?.startsWith("local-")) {
+    return getDashboardStatsFromSupabase(projectId);
   }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const evidenceFilter: any = projectId

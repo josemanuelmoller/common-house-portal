@@ -334,7 +334,34 @@ You will receive 1 PRIMARY source (the most recent conversation — explicitly m
 
 # Per-section guidance
 
-QUOTE candidates: return 3 verbatim lines from the counterpart (NOT from CH speakers), all from the PRIMARY source. Each must pass the no-embarrassment rule. If a transcript with timestamps is provided, include timestamp_seconds.
+QUOTE candidates: return 3 verbatim lines from the counterpart (NOT from CH speakers), all from the PRIMARY source. The FIRST quote is rendered LARGE on the Hall page — it must do real work for the relationship and READ AS A SALES-SUPPORTING SIGNAL, not a side comment.
+
+# Sales-supporting hierarchy — apply STRICTLY when picking the LEAD quote (most preferred → least preferred)
+
+1. AMBITION / OPPORTUNITY — counterpart names a potential they see, a window they want to step into, or a future state they're working toward. Examples: "Creo que hay un potencial enorme en X", "Esta es la ventana para Y", "El próximo año arranca Z y nos abre A", "Veo cómo esto cambia el negocio".
+2. COMMITMENT — counterpart commits to a concrete next move tied to the project. Examples: "Voy a entrar a [categoría]", "Vamos a probar X en la tienda nueva", "Lo van a hacer".
+3. VALIDATION — counterpart explicitly endorses the value proposition or path. Examples: "Eso me hace mucho sentido", "Esto encaja perfecto con lo nuestro", "Es exactamente lo que estábamos buscando".
+
+# Reject as the LEAD quote (these may stay in candidates[] only if nothing better exists)
+
+- MID-SENTENCE FRAGMENTS — text that starts with "Y", "Pero", "Que", "Por eso", "Eso es", "Es que" — or ends with a comma / unfinished thought. These render as broken on the page.
+- NEGATION FRAMINGS — "no podéis", "no creo", "es difícil", "no se puede". Readers parse the literal wording first; the implicit nuance is lost on the page.
+- RISK-AVERSION FRAMINGS — "es lo de menor riesgo", "para no comprometerse", "para evitar X". These read as defensive, not buying.
+- PROCEDURAL ACKNOWLEDGMENTS — "Vale", "Hagamos eso", "Muy bien", "Está bien", "Sí, sí". These are agreement noise, not stance.
+- LOGISTICS / DESCRIPTION — counterpart describing their portfolio, locations, headcount, etc. without naming a forward-looking ambition.
+
+# Thin-transcript fallback — synthesized agreed-idea
+
+If the counterpart was a silent listener and NO verbatim line clears the sales-supporting bar, you MAY emit a SYNTHESIZED lead quote that captures an IDEA THE COUNTERPART AGREED TO during the meeting (e.g. they said "hagamos eso", "lo van a hacer", "creo que sí", or moved forward without rejecting after CH proposed approach X — synthesize an X-shaped statement that condenses what they actually committed to).
+
+Rules for synthesis (all must hold):
+- The idea must have been EXPLICITLY agreed to in the conversation (counterpart said yes, committed, or advanced the next step). Silence is NOT agreement.
+- The phrasing must be plausible coming from THEIR mouth (their context, geography, portfolio, role).
+- Set speaker_role = "idea acordada en la reunión" (Spanish) or "idea agreed upon" (English) to mark it as synthesized — this is non-negotiable so the admin can tell apart synthesis from verbatim.
+- Surface the verbatim alternatives in candidates[] with speaker_role = "verbatim" so the admin can swap easily.
+- DO NOT invent ideas the counterpart did not agree to. DO NOT attribute CH talking points to the counterpart wholesale — only ideas they explicitly endorsed.
+
+If a transcript with timestamps is provided, include timestamp_seconds.
 
 ANGLES: exactly 3, each is a 2-4 word title (uppercase) + 1-2 sentence body. Anchor each angle's body to a specific evidence excerpt FROM THE PRIMARY SOURCE. Frame each angle as the COUNTERPART's strategic territory or diagnostic — what they need to solve, what their problem is, where they want to play. AVOID phrasing angles as Common House offerings or product names (e.g. do NOT name CH frameworks like "Zero Waste District", "the CH ecosystem", "our portfolio model" inside an angle, even if mentioned in the source). The hero is THEIR space — angles are how WE understand their problem, not how we sell to them.
 

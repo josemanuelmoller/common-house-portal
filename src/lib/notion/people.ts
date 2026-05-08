@@ -95,7 +95,78 @@ async function resolveOrg(id: string): Promise<OrgRecord | null> {
 
 // ─── Public queries ───────────────────────────────────────────────────────────
 
+async function getProjectPeopleFromSupabase(projectId: string): Promise<ProjectPeople> {
+  const { getSupabaseServerClient } = await import("../supabase-server");
+  const sb = getSupabaseServerClient();
+
+  // 1. Resolve project → primary org notion_id + lead person notion_id
+  const { data: proj } = await sb
+    .from("projects")
+    .select("primary_org_notion_id, project_lead_notion_id")
+    .eq("notion_id", projectId)
+    .maybeSingle();
+  const primaryOrgId = (proj?.primary_org_notion_id as string | null) ?? null;
+  const leadId       = (proj?.project_lead_notion_id as string | null) ?? null;
+
+  // 2. People linked via people.org_notion_id = primary org
+  let people: Array<Record<string, unknown>> = [];
+  if (primaryOrgId) {
+    const { data } = await sb
+      .from("people")
+      .select("notion_id, full_name, email, job_title, person_classification, relationship_roles, rol_interno, country, city, linkedin, org_notion_id")
+      .eq("org_notion_id", primaryOrgId)
+      .is("dismissed_at", null)
+      .limit(50);
+    people = (data ?? []) as Array<Record<string, unknown>>;
+  }
+
+  // 3. Primary org row from hall_organizations
+  let primaryOrg: OrgRecord[] = [];
+  if (primaryOrgId) {
+    const { data } = await sb
+      .from("hall_organizations")
+      .select("notion_id, name, domain, relationship_classes, notes")
+      .eq("notion_id", primaryOrgId)
+      .maybeSingle();
+    if (data) {
+      primaryOrg = [{
+        id:                (data.notion_id as string) ?? "",
+        name:              (data.name as string) ?? "",
+        category:          "",
+        relationshipStage: Array.isArray(data.relationship_classes) ? (data.relationship_classes as string[]).join(" / ") : "",
+        website:           (data.domain as string) ? `https://${data.domain as string}` : "",
+        location:          "",
+      }];
+    }
+  }
+
+  const personOf = (r: Record<string, unknown>): PersonRecord => ({
+    id:             (r.notion_id as string) || "",
+    name:           (r.full_name as string) || (r.email as string) || "",
+    jobTitle:       (r.job_title as string) || "",
+    email:          (r.email as string) || "",
+    classification: ((r.person_classification as string) === "Internal" || (r.person_classification as string) === "External") ? (r.person_classification as PersonRecord["classification"]) : "",
+    roles:          (r.relationship_roles as string) ? [r.relationship_roles as string] : [],
+    rolInterno:     ((r.rol_interno as string) ?? "") as PersonRecord["rolInterno"],
+    linkedin:       (r.linkedin as string) || undefined,
+    location:       [r.city as string | null, r.country as string | null].filter(Boolean).join(", ") || undefined,
+  });
+
+  const lead = leadId
+    ? people.filter(p => p.notion_id === leadId).map(personOf)
+    : [];
+  const team = people
+    .filter(p => p.notion_id !== leadId)
+    .map(personOf)
+    .filter(p => p.name.trim() !== "");
+
+  return { lead, team, primaryOrg, otherOrgs: [] };
+}
+
 export async function getProjectPeople(projectId: string): Promise<ProjectPeople> {
+  if (projectId.startsWith("local-")) {
+    return getProjectPeopleFromSupabase(projectId);
+  }
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const page: any = await notion.pages.retrieve({ page_id: projectId });
