@@ -1,6 +1,7 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Inter_Tight, Instrument_Serif, JetBrains_Mono } from "next/font/google";
+import { RegisterServiceWorker } from "@/components/RegisterServiceWorker";
 import "./globals.css";
 
 // Hall (K-v2) typography. Loaded via next/font for self-hosting + zero CLS.
@@ -30,6 +31,35 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "Common House — Client Portal",
   description: "Project intelligence platform",
+  applicationName: "Common House",
+  appleWebApp: {
+    capable: true,
+    title: "Common House",
+    statusBarStyle: "black-translucent",
+  },
+  formatDetection: {
+    telephone: false,
+  },
+  icons: {
+    icon: [
+      { url: "/icons/favicon-16.png", sizes: "16x16", type: "image/png" },
+      { url: "/icons/favicon-32.png", sizes: "32x32", type: "image/png" },
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+    ],
+    apple: [
+      { url: "/icons/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+    ],
+  },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#FAFAF7" },
+    { media: "(prefers-color-scheme: dark)", color: "#0E0E10" },
+  ],
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -41,6 +71,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       >
         <body>
           {children}
+          <RegisterServiceWorker />
         </body>
       </html>
     </ClerkProvider>
