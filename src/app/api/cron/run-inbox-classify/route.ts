@@ -1,8 +1,13 @@
 /**
- * Cron — runs the inbox-classifier-agent.
+ * Cron — runs the inbox-classifier-agent as a safety net.
  *
  * Picks up to 20 inbox_items in status='new' and classifies them.
- * Schedule: every 15 minutes (vercel.json).
+ *
+ * Schedule: daily at 04:00 UTC (Vercel Hobby caps at one run per day per
+ * cron expression). Live classification is normally driven by the
+ * fire-and-forget `after()` call inside /api/inbox/quick-capture and
+ * /api/inbox/share-target — this cron only catches items that slipped
+ * through (e.g. the after() worker died, or env vars were missing).
  *
  * Auth: CRON_SECRET via Authorization: Bearer or x-agent-key.
  */
