@@ -1,5 +1,6 @@
 import { type ReactNode } from "react";
 import { Sidebar } from "./Sidebar";
+import { CaptureFAB } from "./capture/CaptureFAB";
 
 /**
  * PortalShell — canonical K-v2 page layout for every admin surface.
@@ -177,6 +178,7 @@ export function PortalShell({
           {children}
         </div>
       </main>
+      <CaptureFAB />
     </div>
   );
 }
