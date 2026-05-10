@@ -18,7 +18,7 @@
  * Phase 4 will wire the inbox-classifier-agent off the new row.
  */
 
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { currentUser } from "@clerk/nextjs/server";
 import { adminGuardApi } from "@/lib/require-admin";
 import {
@@ -27,6 +27,7 @@ import {
   isValidUserType,
   type InboxItemSource,
 } from "@/lib/inbox";
+import { classifyInboxItem } from "@/lib/inbox-classifier";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -120,6 +121,21 @@ export async function POST(req: Request) {
       { error: error || "Insert failed" },
       { status: 500 }
     );
+  }
+
+  // Fire-and-forget classification AFTER the response is sent.
+  // Next.js `after()` keeps the function alive until the work completes,
+  // so the user gets a fast capture response while Claude classifies in
+  // the background. Cron `/api/cron/run-inbox-classify` is the safety net
+  // for any items that don't get processed here.
+  if (!deduplicated) {
+    after(async () => {
+      try {
+        await classifyInboxItem(row);
+      } catch (e) {
+        console.warn("[quick-capture] post-response classify failed:", e);
+      }
+    });
   }
 
   return NextResponse.json(

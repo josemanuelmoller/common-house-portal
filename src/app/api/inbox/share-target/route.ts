@@ -11,10 +11,11 @@
  * user lands on the bandeja with their item visible.
  */
 
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { currentUser } from "@clerk/nextjs/server";
 import { adminGuardApi } from "@/lib/require-admin";
 import { createInboxItem, uploadInboxMedia } from "@/lib/inbox";
+import { classifyInboxItem } from "@/lib/inbox-classifier";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -66,16 +67,25 @@ export async function POST(req: Request) {
     );
   }
 
-  const { error } = await createInboxItem({
+  const { row, error } = await createInboxItem({
     source: "share_target",
     raw_text,
     photo_path,
     user_id: userId,
   });
 
-  if (error) {
-    return NextResponse.json({ error }, { status: 500 });
+  if (error || !row) {
+    return NextResponse.json({ error: error || "Insert failed" }, { status: 500 });
   }
+
+  // Background classification (see quick-capture for rationale).
+  after(async () => {
+    try {
+      await classifyInboxItem(row);
+    } catch (e) {
+      console.warn("[share-target] post-response classify failed:", e);
+    }
+  });
 
   // 303 forces GET on the redirect target.
   const redirectTo = new URL("/admin/capture", req.url);
