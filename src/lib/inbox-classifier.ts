@@ -26,6 +26,7 @@ import {
   type InboxItemUserType,
 } from "./inbox";
 import { routeClassifiedItem } from "./inbox-router";
+import { notifyP1 } from "./push-notify";
 
 const MODEL = "claude-sonnet-4-6";
 
@@ -219,6 +220,26 @@ export async function classifyInboxItem(
       // Routing failure isn't fatal — item stays as 'classified'
       // and user can act on it manually.
       console.warn("[inbox-classifier] routing failed:", err);
+    }
+  }
+
+  // P1 push (only for classified items the agent flagged P1)
+  if (status === "classified" && result.priority === "P1") {
+    try {
+      const title = "P1 — capturado";
+      const preview = (item.raw_text || item.transcript || "Item priorizado")
+        .replace(/\s+/g, " ")
+        .slice(0, 140);
+      await notifyP1(
+        {
+          title,
+          body: preview,
+          url: "/admin/capture",
+        },
+        item.user_id || undefined
+      );
+    } catch (err) {
+      console.warn("[inbox-classifier] P1 push failed:", err);
     }
   }
 

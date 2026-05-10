@@ -18,6 +18,10 @@
       "schedule": "*/15 * * * *"
     },
     {
+      "path": "/api/cron/morning-digest",
+      "schedule": "30 5 * * *"
+    },
+    {
       "path": "/api/cron/run-relationship-promotion-scan",
       "schedule": "0 7 * * *"
     },

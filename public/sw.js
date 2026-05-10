@@ -5,7 +5,7 @@
  *
  * Bump SW_VERSION when shipping a behavioral change so old SW is replaced.
  */
-const SW_VERSION = "ch-sw-v2";
+const SW_VERSION = "ch-sw-v3";
 const QUEUE_DB = "ch-inbox-queue";
 const QUEUE_STORE = "pending";
 const SYNC_TAG = "inbox-flush";
@@ -25,13 +25,87 @@ self.addEventListener("fetch", () => {
   // no-op: browser handles every request normally.
 });
 
-// --- Phase 5 scaffolds (no-op until VAPID + subscribe flow ships) ---
-self.addEventListener("push", () => {
-  // intentional no-op
+// ---------- Phase 5: Web Push ----------
+//
+// Server payload (see src/lib/push-notify.ts) is JSON:
+//   { title, body, url?, tag?, actions?, data? }
+//
+// We:
+//   - parse the payload
+//   - show a notification with default badge/icon
+//   - on click: focus an existing portal tab if open, else open a new one to `url`
+//   - on action click: route to action-specific URL (e.g. snooze posts to /api/push/action/...)
+
+const DEFAULT_BADGE = "/icons/icon-192.png";
+const DEFAULT_ICON = "/icons/icon-192.png";
+
+self.addEventListener("push", (event) => {
+  if (!event.data) return;
+
+  let payload;
+  try {
+    payload = event.data.json();
+  } catch {
+    payload = { title: "Common House", body: event.data.text() };
+  }
+
+  const options = {
+    body: payload.body || "",
+    icon: DEFAULT_ICON,
+    badge: DEFAULT_BADGE,
+    tag: payload.tag || "ch-default",
+    renotify: true,
+    requireInteraction: false,
+    data: { url: payload.url || "/admin", ...(payload.data || {}) },
+    actions: Array.isArray(payload.actions) ? payload.actions : undefined,
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(payload.title || "Common House", options)
+  );
 });
 
-self.addEventListener("notificationclick", () => {
-  // intentional no-op
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+
+  const action = event.action || "default";
+  const baseUrl = (event.notification.data && event.notification.data.url) || "/admin";
+
+  // Action-specific routing.
+  let target = baseUrl;
+  if (action.startsWith("snooze-")) {
+    // Fire-and-forget snooze, then keep tab closed.
+    const tag = event.notification.tag || "";
+    event.waitUntil(
+      fetch(`/api/push/action/snooze?action=${encodeURIComponent(action)}&tag=${encodeURIComponent(tag)}`, {
+        method: "POST",
+        credentials: "include",
+      }).catch(() => {})
+    );
+    return;
+  }
+  if (action === "open" || action === "default") {
+    target = baseUrl;
+  }
+
+  event.waitUntil(
+    (async () => {
+      const all = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+      // Try to focus an existing tab on the same origin.
+      for (const c of all) {
+        const u = new URL(c.url);
+        if (u.origin === self.location.origin) {
+          await c.focus();
+          // If it's not already on the target, navigate it.
+          if (u.pathname + u.search !== target) {
+            try { await c.navigate(target); } catch { /* some browsers block */ }
+          }
+          return;
+        }
+      }
+      await self.clients.openWindow(target);
+    })()
+  );
 });
 
 // ---------- Offline capture queue (Phase 2) ----------
