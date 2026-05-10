@@ -3,7 +3,10 @@ import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 const isPublicRoute = createRouteMatcher([
   "/sign-in(.*)",
   "/",
-  "/api/(.*)",   // API routes manejan su propia autenticación
+  "/api/(.*)",       // API routes manejan su propia autenticación
+  "/manifest.webmanifest", // PWA manifest must be reachable without auth
+  "/sw.js",          // Service worker file
+  "/icons/(.*)",     // PWA icons
 ]);
 
 export default clerkMiddleware(async (auth, req) => {
@@ -21,7 +24,7 @@ export default clerkMiddleware(async (auth, req) => {
 //                                      /admin/hall/contacts/foo@gmail.com.
 export const config = {
   matcher: [
-    "/((?!_next/|.*\\.(?:ico|png|jpe?g|gif|svg|webp|css|js|json|woff2?|ttf|otf|map|txt|xml|pdf|mp4|webm|html)$).*)",
+    "/((?!_next/|.*\\.(?:ico|png|jpe?g|gif|svg|webp|css|js|json|webmanifest|woff2?|ttf|otf|map|txt|xml|pdf|mp4|webm|html)$).*)",
     "/",
     "/(api|trpc)(.*)",
   ],
