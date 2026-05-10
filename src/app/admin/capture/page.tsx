@@ -3,6 +3,7 @@ import { requireAdmin } from "@/lib/require-admin";
 import { PortalShell } from "@/components/PortalShell";
 import { HallSection } from "@/components/HallSection";
 import { InboxList, type InboxRowForList } from "@/components/capture/InboxList";
+import { PushToggle } from "@/components/capture/PushToggle";
 import { listInboxItems, signInboxMediaUrl } from "@/lib/inbox";
 
 export const metadata = {
@@ -45,16 +46,19 @@ export default async function CapturePage() {
       title="Bandeja"
       flourish="capturada"
       meta={
-        <Link
-          href="/admin/capture/new"
-          className="text-[11px] underline tracking-[0.06em]"
-          style={{
-            fontFamily: "var(--font-hall-mono)",
-            color: "var(--hall-ink-0)",
-          }}
-        >
-          + NUEVA CAPTURA
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/admin/capture/new"
+            className="text-[11px] underline tracking-[0.06em] hidden sm:inline"
+            style={{
+              fontFamily: "var(--font-hall-mono)",
+              color: "var(--hall-ink-0)",
+            }}
+          >
+            + NUEVA CAPTURA
+          </Link>
+          <PushToggle />
+        </div>
       }
     >
       {needsReview.length > 0 && (
