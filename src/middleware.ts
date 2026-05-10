@@ -3,10 +3,7 @@ import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 const isPublicRoute = createRouteMatcher([
   "/sign-in(.*)",
   "/",
-  "/api/(.*)",       // API routes manejan su propia autenticación
-  "/manifest.webmanifest", // PWA manifest must be reachable without auth
-  "/sw.js",          // Service worker file
-  "/icons/(.*)",     // PWA icons
+  "/api/(.*)",   // API routes manejan su propia autenticación
 ]);
 
 export default clerkMiddleware(async (auth, req) => {
