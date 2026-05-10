@@ -31,6 +31,7 @@ export function QuickCaptureForm() {
   const [dueDate, setDueDate] = useState("");
   const [photo, setPhoto] = useState<File | null>(null);
   const [audio, setAudio] = useState<Blob | null>(null);
+  const [voiceTranscript, setVoiceTranscript] = useState("");
 
   const [status, setStatus] = useState<Status>("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -42,7 +43,18 @@ export function QuickCaptureForm() {
 
   const isReminder = typeOverride === "reminder";
   const canSubmit =
-    !!rawText.trim() || !!photo || !!audio;
+    !!rawText.trim() || !!voiceTranscript.trim() || !!photo || !!audio;
+
+  // Merge voice transcript into final raw_text on submit:
+  //   - both present → join with newline
+  //   - only one → use it
+  //   - neither → null (server constraint catches if no media either)
+  function mergedRawText(): string | undefined {
+    const a = rawText.trim();
+    const b = voiceTranscript.trim();
+    if (a && b) return `${a}\n\n${b}`;
+    return a || b || undefined;
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -54,7 +66,7 @@ export function QuickCaptureForm() {
     const captureId = newCaptureId();
     const fields: Record<string, string | undefined> = {
       source: "quick_capture",
-      raw_text: rawText.trim() || undefined,
+      raw_text: mergedRawText(),
       user_notes_to_agent: notesToAgent.trim() || undefined,
       user_type_override: typeOverride || undefined,
       user_due_date: isReminder && dueDate ? dueDate : undefined,
@@ -177,7 +189,33 @@ export function QuickCaptureForm() {
         >
           Voz (opcional)
         </label>
-        <VoiceRecorder onChange={setAudio} disabled={status === "submitting"} />
+        <VoiceRecorder
+          onChange={setAudio}
+          onTranscript={setVoiceTranscript}
+          disabled={status === "submitting"}
+        />
+        {voiceTranscript && (
+          <div
+            className="mt-2 p-2 text-[12.5px] rounded-sm leading-snug"
+            style={{
+              background: "var(--hall-paper-1)",
+              border: "1px solid var(--hall-line)",
+              color: "var(--hall-ink-3)",
+              fontFamily: "var(--font-hall-sans)",
+            }}
+          >
+            <div
+              className="text-[10px] mb-1 uppercase tracking-[0.06em]"
+              style={{
+                fontFamily: "var(--font-hall-mono)",
+                color: "var(--hall-muted-2)",
+              }}
+            >
+              Transcripción
+            </div>
+            {voiceTranscript}
+          </div>
+        )}
       </div>
 
       {/* Type override */}

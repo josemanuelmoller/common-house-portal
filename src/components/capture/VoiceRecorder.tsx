@@ -4,14 +4,51 @@ import { useEffect, useRef, useState } from "react";
 
 type Props = {
   onChange: (blob: Blob | null) => void;
+  /** Receives a live transcript while recording, plus the final transcript on stop. */
+  onTranscript?: (transcript: string) => void;
   disabled?: boolean;
 };
+
+// Minimal types for the SpeechRecognition browser API (not in lib.dom).
+type SpeechRecognitionResultLike = { transcript: string };
+type SpeechRecognitionResultListLike = {
+  length: number;
+  [i: number]: { isFinal: boolean; 0: SpeechRecognitionResultLike };
+};
+type SpeechRecognitionEventLike = {
+  resultIndex: number;
+  results: SpeechRecognitionResultListLike;
+};
+type SpeechRecognitionLike = {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  onresult: ((e: SpeechRecognitionEventLike) => void) | null;
+  onerror: ((e: { error?: string }) => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+  abort: () => void;
+};
+type SpeechRecognitionCtor = new () => SpeechRecognitionLike;
+
+function getSpeechRecognitionCtor(): SpeechRecognitionCtor | null {
+  if (typeof window === "undefined") return null;
+  const w = window as unknown as {
+    SpeechRecognition?: SpeechRecognitionCtor;
+    webkitSpeechRecognition?: SpeechRecognitionCtor;
+  };
+  return w.SpeechRecognition || w.webkitSpeechRecognition || null;
+}
 
 /**
  * VoiceRecorder — MediaRecorder-based voice capture for Quick Capture.
  * Records audio/webm. Caller receives the Blob via onChange.
+ *
+ * Also runs the browser SpeechRecognition API in parallel when supported
+ * (Chromium-based browsers) and emits transcripts via onTranscript.
  */
-export function VoiceRecorder({ onChange, disabled }: Props) {
+export function VoiceRecorder({ onChange, onTranscript, disabled }: Props) {
   const [state, setState] = useState<"idle" | "recording" | "recorded">("idle");
   const [seconds, setSeconds] = useState(0);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -21,12 +58,19 @@ export function VoiceRecorder({ onChange, disabled }: Props) {
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const finalTranscriptRef = useRef<string>("");
 
   useEffect(() => {
     return () => {
       // Cleanup on unmount: stop recorder + release mic
       if (recorderRef.current && recorderRef.current.state !== "inactive") {
         recorderRef.current.stop();
+      }
+      try {
+        recognitionRef.current?.abort();
+      } catch {
+        // ignore
       }
       streamRef.current?.getTracks().forEach((t) => t.stop());
       if (intervalRef.current) clearInterval(intervalRef.current);
@@ -65,6 +109,42 @@ export function VoiceRecorder({ onChange, disabled }: Props) {
       setState("recording");
       setSeconds(0);
       intervalRef.current = setInterval(() => setSeconds((s) => s + 1), 1000);
+
+      // Best-effort live transcription via browser SpeechRecognition.
+      // Independent of the audio recording — emits transcript on the fly.
+      const SR = getSpeechRecognitionCtor();
+      if (SR && onTranscript) {
+        try {
+          const sr = new SR();
+          sr.lang = navigator.language || "es-ES";
+          sr.continuous = true;
+          sr.interimResults = true;
+          finalTranscriptRef.current = "";
+          sr.onresult = (e) => {
+            let interim = "";
+            for (let i = e.resultIndex; i < e.results.length; i++) {
+              const res = e.results[i];
+              const text = res[0].transcript;
+              if (res.isFinal) finalTranscriptRef.current += text + " ";
+              else interim += text;
+            }
+            onTranscript((finalTranscriptRef.current + interim).trim());
+          };
+          sr.onerror = () => {
+            // SR errors are common (silence, network) — silently ignore.
+          };
+          sr.onend = () => {
+            // Auto-restart if still recording (continuous can drop)
+            if (recorderRef.current && recorderRef.current.state === "recording") {
+              try { sr.start(); } catch { /* ignore */ }
+            }
+          };
+          sr.start();
+          recognitionRef.current = sr;
+        } catch {
+          // SR not available or blocked — recording continues fine.
+        }
+      }
     } catch (e) {
       setError(
         e instanceof Error ? e.message : "No se pudo acceder al micrófono"
@@ -77,6 +157,12 @@ export function VoiceRecorder({ onChange, disabled }: Props) {
     if (recorderRef.current && recorderRef.current.state !== "inactive") {
       recorderRef.current.stop();
     }
+    try {
+      recognitionRef.current?.stop();
+    } catch {
+      // ignore
+    }
+    recognitionRef.current = null;
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
@@ -89,9 +175,11 @@ export function VoiceRecorder({ onChange, disabled }: Props) {
       setPreviewUrl(null);
     }
     chunksRef.current = [];
+    finalTranscriptRef.current = "";
     setState("idle");
     setSeconds(0);
     onChange(null);
+    onTranscript?.("");
   }
 
   return (
