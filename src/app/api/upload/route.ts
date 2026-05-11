@@ -120,6 +120,8 @@ export async function POST(req: NextRequest) {
         { status: 503 }
       );
     }
-    return NextResponse.json({ error: msg }, { status: 500 });
+    // err.message has already been classified above for the storage-quota case.
+    // For everything else, log server-side and return generic.
+    return NextResponse.json({ error: "Upload failed" }, { status: 500 });
   }
 }

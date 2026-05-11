@@ -47,7 +47,8 @@ export async function POST(req: NextRequest) {
       .createSignedUploadUrl(storagePath);
 
     if (error || !data) {
-      results.push({ name: file.name, storagePath, signedUrl: "", error: error?.message ?? "Failed to create upload URL" });
+      if (error) console.error("[garage-upload] createSignedUploadUrl failed:", error.message);
+      results.push({ name: file.name, storagePath, signedUrl: "", error: "Failed to create upload URL" });
     } else {
       results.push({ name: file.name, storagePath, signedUrl: data.signedUrl });
     }
@@ -77,15 +78,22 @@ export async function DELETE(req: NextRequest) {
         .from("data_room_documents")
         .delete()
         .eq(matchColumn, notionId);
-      if (error) errs.push(`Failed to delete data_room_documents row: ${error.message}`);
+      if (error) {
+        console.error("[garage-upload DELETE] data_room_documents delete failed:", error.message);
+        errs.push("Failed to delete data_room_documents row");
+      }
     } catch (e) {
-      errs.push(`Failed to delete data_room_documents row: ${e instanceof Error ? e.message : String(e)}`);
+      console.error("[garage-upload DELETE] data_room_documents threw:", e);
+      errs.push("Failed to delete data_room_documents row");
     }
   }
 
   if (storagePath) {
     const { error } = await getSupabase().storage.from("garage-docs").remove([storagePath]);
-    if (error) errs.push(`Storage delete failed: ${error.message}`);
+    if (error) {
+      console.error("[garage-upload DELETE] storage remove failed:", error.message);
+      errs.push("Storage delete failed");
+    }
   }
 
   return NextResponse.json({ ok: errs.length === 0, errors: errs });

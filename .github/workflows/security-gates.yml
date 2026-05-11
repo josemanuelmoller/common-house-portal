@@ -1,0 +1,91 @@
+name: security-gates
+
+# Wave 4.8: CI gates that block PRs from regressing audit-cleared findings.
+#
+# - check-secrets: pattern-based scan for accidentally committed secrets.
+# - check-api-auth: every mutating /api route must reference an auth helper.
+# - npm-audit: fail on new high/critical vulnerabilities.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  check-secrets:
+    name: secrets scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Fetch enough history that diff-based scans can compare to base.
+          fetch-depth: 0
+      - name: Run scripts/check-secrets.sh against PR diff
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            # Files changed in this PR
+            mapfile -t FILES < <(git diff --name-only --diff-filter=ACMR "$GITHUB_BASE_REF" "$GITHUB_SHA")
+            if [ "${#FILES[@]}" -gt 0 ]; then
+              bash scripts/check-secrets.sh "${FILES[@]}"
+            fi
+          else
+            # Push to main — scan the whole tree for safety.
+            mapfile -t FILES < <(git ls-files)
+            bash scripts/check-secrets.sh "${FILES[@]}"
+          fi
+
+  check-api-auth:
+    name: api auth coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify every mutating /api route references an auth helper
+        run: bash scripts/check-api-auth.sh
+
+  npm-audit:
+    name: npm audit (high+)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci --no-audit
+      - name: Fail on new high or critical CVEs
+        # `npm audit --audit-level=high` exits non-zero when high+ vulns exist.
+        # We accept the existing baseline (5 high d3-color/postcss transitive,
+        # tracked in docs/SECURITY_MODEL.md) and only fail on net-new ones.
+        run: |
+          set +e
+          npm audit --audit-level=high --json > audit.json
+          CRIT=$(jq '.metadata.vulnerabilities.critical' audit.json)
+          HIGH=$(jq '.metadata.vulnerabilities.high' audit.json)
+          echo "Critical: $CRIT  High: $HIGH"
+          # Baseline: 0 critical, 5 high are accepted today (transitive d3-color)
+          BASELINE_HIGH=5
+          BASELINE_CRIT=0
+          NET_HIGH=$(( HIGH - BASELINE_HIGH ))
+          NET_CRIT=$(( CRIT - BASELINE_CRIT ))
+          if [ "$NET_CRIT" -gt 0 ] || [ "$NET_HIGH" -gt 0 ]; then
+            echo "::error::New vulnerabilities introduced (delta crit=$NET_CRIT high=$NET_HIGH over baseline)"
+            jq '.vulnerabilities' audit.json | head -200
+            exit 1
+          fi
+          echo "OK — no net-new high/critical vulnerabilities."
+
+  typecheck:
+    name: tsc --noEmit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm ci --no-audit
+      - run: npx tsc --noEmit

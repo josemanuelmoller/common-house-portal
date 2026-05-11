@@ -19,7 +19,7 @@
 import type {
   HallDraft, HallDraftAngle, HallDraftListeningPoint, HallDraftProposal,
   HallDraftTimelineItem, HallDraftTopic,
-} from "@/lib/hall-compose";
+} from "@/lib/hall-compose-shared";
 
 type Props = {
   hero:        HallDraft | null;

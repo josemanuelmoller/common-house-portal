@@ -10,8 +10,8 @@ import type {
   ObjectiveStatus,
   ObjectiveMetricType,
   QuarterRevenueSummary,
-} from "@/lib/plan";
-import { areaLabel, typeLabel, groupObjectivesByArea } from "@/lib/plan";
+} from "@/lib/plan-shared";
+import { areaLabel, typeLabel, groupObjectivesByArea } from "@/lib/plan-shared";
 
 const AREAS: ObjectiveArea[] = ["commercial", "partnerships", "product", "brand", "ops", "funding"];
 const TYPES: ObjectiveType[] = ["revenue", "milestone", "asset", "client_goal", "event", "hiring"];

@@ -1,0 +1,59 @@
+version: 2
+
+# Wave 4.7: weekly dependency PRs for npm and GitHub Actions.
+# Security updates are also delivered out-of-band by Dependabot whenever a
+# vulnerability advisory is published — those land at any time of week.
+#
+# We restrict the dependency graph to the root package.json. Worktrees and
+# the chrome-extension subfolder don't have their own package.json yet.
+
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "07:00"
+      timezone: "Europe/London"
+    open-pull-requests-limit: 5
+    groups:
+      production-non-major:
+        dependency-type: "production"
+        update-types: ["minor", "patch"]
+      development-non-major:
+        dependency-type: "development"
+        update-types: ["minor", "patch"]
+    ignore:
+      # Pin to currently-vetted majors. Bumps require a manual review of the
+      # breaking changes — Dependabot still surfaces security advisories.
+      - dependency-name: "next"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-dom"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@clerk/nextjs"
+        update-types: ["version-update:semver-major"]
+      # xlsx is installed from the SheetJS CDN tarball, not the npm registry,
+      # so Dependabot cannot resolve it — silence the noise.
+      - dependency-name: "xlsx"
+    labels:
+      - "dependencies"
+      - "security"
+    commit-message:
+      prefix: "deps"
+      include: "scope"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "07:00"
+      timezone: "Europe/London"
+    labels:
+      - "dependencies"
+      - "ci"
+    commit-message:
+      prefix: "ci"
+      include: "scope"
