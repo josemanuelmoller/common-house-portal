@@ -56,8 +56,11 @@ async function authCheck(req: NextRequest): Promise<boolean> {
   const agentKey  = req.headers.get("x-agent-key");
   const cronToken = req.headers.get("authorization");
   const expected  = process.env.CRON_SECRET;
-  if (agentKey && agentKey === expected) return true;
-  if (cronToken === `Bearer ${expected}`) return true;
+  // Both cron paths require a non-empty CRON_SECRET — otherwise fail closed.
+  if (expected) {
+    if (agentKey && agentKey === expected) return true;
+    if (cronToken === `Bearer ${expected}`) return true;
+  }
   // Allow authenticated admin session (browser trigger) — match adminGuardApi
   // by checking BOTH ADMIN_USER_IDS and ADMIN_EMAILS so browser-triggered
   // refreshes work in prod where userIds can drift from dev.

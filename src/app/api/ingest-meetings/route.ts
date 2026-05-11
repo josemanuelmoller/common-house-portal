@@ -264,12 +264,14 @@ async function writeAgentDraft(
 // ─── Main handler ─────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
-  // Auth: agent key or Vercel cron secret
+  // Auth: agent key or Vercel cron secret. Both branches must fail closed when env unset.
   const agentKey = req.headers.get("x-agent-key");
   const cronSecret = req.headers.get("authorization");
+  const expectedAgentKey = process.env.AGENT_API_KEY;
+  const expectedCronSecret = process.env.CRON_SECRET;
 
-  const validAgentKey = agentKey === process.env.AGENT_API_KEY;
-  const validCron     = cronSecret === `Bearer ${process.env.CRON_SECRET}`;
+  const validAgentKey = !!expectedAgentKey && agentKey === expectedAgentKey;
+  const validCron     = !!expectedCronSecret && cronSecret === `Bearer ${expectedCronSecret}`;
 
   if (!validAgentKey && !validCron) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

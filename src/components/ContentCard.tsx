@@ -279,7 +279,13 @@ export function ContentCard({ item, onArchive }: { item: ContentCardItem; onArch
               <button onClick={() => setFullscreen(false)} className="text-[9px] font-bold px-3 py-1 rounded-md bg-white/10 text-white hover:bg-white/20 transition-all">✕</button>
             </div>
           </div>
-          <iframe srcDoc={item.slideHtml} className="flex-1 w-full border-0" sandbox="allow-scripts allow-same-origin" title={item.title} />
+          {/*
+            sandbox intentionally OMITS allow-same-origin. The slideHtml is
+            LLM-generated and is treated as untrusted. With both flags set,
+            scripts inside the frame run in the parent's origin and can drive
+            same-origin /api/* endpoints with the admin's Clerk cookie attached.
+          */}
+          <iframe srcDoc={item.slideHtml} className="flex-1 w-full border-0" sandbox="allow-scripts" title={item.title} />
         </div>
       )}
 
@@ -363,7 +369,7 @@ export function ContentCard({ item, onArchive }: { item: ContentCardItem; onArch
                       ref={iframeRef}
                       srcDoc={item.slideHtml}
                       className={`w-full border-0 ${isDocumentMode ? "h-[700px]" : "h-[480px]"}`}
-                      sandbox="allow-scripts allow-same-origin"
+                      sandbox="allow-scripts"
                       title={item.title}
                     />
                     {!isDocumentMode && (

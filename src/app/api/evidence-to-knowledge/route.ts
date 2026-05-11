@@ -18,6 +18,7 @@ import Anthropic from "@anthropic-ai/sdk";
 // The Notion read path (Evidence DB query) is preserved until the read source is migrated.
 import { Client } from "@notionhq/client";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
+import { requireCronAuth } from "@/lib/require-cron";
 import { withRoutineLog } from "@/lib/routine-log";
 import { computeAnthropicCost, makeUsageAccumulator, addUsage, type AnthropicUsage } from "@/lib/anthropic-cost";
 
@@ -141,11 +142,8 @@ Return ONLY the JSON object.`;
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 async function _POST(req: NextRequest) {
-  const agentKey = req.headers.get("x-agent-key");
-  const cronKey  = req.headers.get("authorization");
-  const validKey = agentKey === process.env.CRON_SECRET ||
-                   cronKey  === `Bearer ${process.env.CRON_SECRET}`;
-  if (!validKey) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const authFail = requireCronAuth(req);
+  if (authFail) return authFail;
 
   const evidence = await fetchCanonicalEvidence(7);
   if (!evidence.length) {

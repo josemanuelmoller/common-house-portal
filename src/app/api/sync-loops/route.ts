@@ -57,9 +57,9 @@ function authCheck(req: NextRequest): boolean {
   const agentKey  = req.headers.get("x-agent-key");
   const cronToken = req.headers.get("authorization");
   const expected  = process.env.CRON_SECRET;
-  if (expected && agentKey  === expected)              return true;
-  if (expected && cronToken === `Bearer ${expected}`)  return true;
-  if (agentKey === "ch-os-agent-2024-secure")          return true;
+  if (!expected) return false;
+  if (agentKey  === expected)              return true;
+  if (cronToken === `Bearer ${expected}`)  return true;
   return false;
 }
 

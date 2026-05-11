@@ -29,7 +29,15 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
-dev-*.log
+dev*.log
+*.log
+
+# Operational scripts containing internal commercial data should never be
+# committed. The audit found scripts/opps_temp.json and scripts/migration_upsert*.sql
+# contained the full deal pipeline (titles + values per organization).
+scripts/*.json
+scripts/migration_*.sql
+scripts/opps_*.json
 
 # env files (can opt-in for committing if needed)
 .env*
