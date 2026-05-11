@@ -1,0 +1,4 @@
+#!/usr/bin/env sh
+# Pre-commit hook: block secret-shaped strings from entering git.
+# Install: see package.json `prepare` script — `husky install` wires this up.
+bash scripts/check-secrets.sh

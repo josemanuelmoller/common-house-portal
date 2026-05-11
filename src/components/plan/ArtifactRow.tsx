@@ -10,8 +10,8 @@ import type {
   ArtifactVersion,
   ObjectiveArtifactWithObjective,
   QuestionStatus,
-} from "@/lib/plan";
-import { artifactStatusLabel, artifactTypeLabel, calendarEventUrl } from "@/lib/plan";
+} from "@/lib/plan-shared";
+import { artifactStatusLabel, artifactTypeLabel, calendarEventUrl } from "@/lib/plan-shared";
 
 const STATUS_OPTIONS: ArtifactStatus[] = [
   "draft",

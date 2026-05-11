@@ -103,20 +103,16 @@ export async function POST(
     .from(BUCKET)
     .upload(storagePath, buffer, { contentType: mime, upsert: false });
   if (upErr) {
-    return NextResponse.json(
-      { ok: false, error: `storage upload failed: ${upErr.message}` },
-      { status: 500 },
-    );
+    console.error("[proposal-upload] storage upload failed:", upErr.message);
+    return NextResponse.json({ ok: false, error: "storage upload failed" }, { status: 500 });
   }
 
   const { data: signedData, error: signErr } = await storage.storage
     .from(BUCKET)
     .createSignedUrl(storagePath, SIGNED_URL_EXPIRY);
   if (signErr || !signedData?.signedUrl) {
-    return NextResponse.json(
-      { ok: false, error: `signed URL failed: ${signErr?.message ?? "unknown"}` },
-      { status: 500 },
-    );
+    console.error("[proposal-upload] createSignedUrl failed:", signErr?.message ?? "no url");
+    return NextResponse.json({ ok: false, error: "signed URL failed" }, { status: 500 });
   }
 
   // Patch the project's hall_draft.proposal in place — keeps it pending_review,
@@ -177,10 +173,8 @@ export async function POST(
     })
     .eq("notion_id", projectId);
   if (updErr) {
-    return NextResponse.json(
-      { ok: false, error: `db update failed: ${updErr.message}` },
-      { status: 500 },
-    );
+    console.error("[proposal-upload] db update failed:", updErr.message);
+    return NextResponse.json({ ok: false, error: "db update failed" }, { status: 500 });
   }
 
   return NextResponse.json({

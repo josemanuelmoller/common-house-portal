@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import type { EligibleObjectiveForV1 } from "@/lib/plan";
+import type { EligibleObjectiveForV1 } from "@/lib/plan-shared";
 
 const TIER_PILL: Record<string, string> = {
   high: "bg-[#c6f24a] text-[#0a0a0a]",

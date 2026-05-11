@@ -12,8 +12,8 @@ import type {
   HallDraftQuoteCandidate,
   HallDraftTimelineItem,
   HallDraftTopic,
-} from "@/lib/hall-compose";
-import { withDraftDefaults } from "@/lib/hall-compose";
+} from "@/lib/hall-compose-shared";
+import { withDraftDefaults } from "@/lib/hall-compose-shared";
 
 type Props = {
   projectId:     string;
