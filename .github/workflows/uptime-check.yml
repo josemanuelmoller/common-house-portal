@@ -1,0 +1,148 @@
+name: uptime-check
+
+# Free uptime monitor: pings critical public endpoints every 10 minutes,
+# writes the result to public/status/uptime.json, and commits if changed.
+# Replaces a paid uptime service ($25-30/mo) using only GitHub Actions
+# free minutes (~3 minutes per run, well under the 2000/mo free tier).
+#
+# Endpoints monitored:
+#   - https://portal.wearecommonhouse.com           (root)
+#   - https://portal.wearecommonhouse.com/api/hall-data  (public API, read-only)
+#
+# Anti-flap: a run is "fail" only if BOTH consecutive checks fail. The
+# workflow does two probes 30s apart and reports the worst result, which
+# absorbs transient network errors.
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/uptime-check.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: uptime-check
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    name: probe public endpoints
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Probe twice, 30s apart
+        id: probe
+        shell: bash
+        run: |
+          set +e
+          probe() {
+            local url="$1"
+            local code
+            code=$(curl -s -o /dev/null -w "%{http_code}" -m 10 "$url")
+            echo "$code"
+          }
+
+          declare -A first
+          first[root]=$(probe "https://portal.wearecommonhouse.com")
+          first[api]=$(probe "https://portal.wearecommonhouse.com/api/hall-data")
+
+          sleep 30
+
+          declare -A second
+          second[root]=$(probe "https://portal.wearecommonhouse.com")
+          second[api]=$(probe "https://portal.wearecommonhouse.com/api/hall-data")
+
+          classify() {
+            local a="$1" b="$2"
+            # ok if at least one probe is 2xx/3xx
+            if [[ "$a" =~ ^[23] ]] || [[ "$b" =~ ^[23] ]]; then
+              echo "ok"
+            elif [[ "$a" =~ ^[45] ]] && [[ "$b" =~ ^[45] ]]; then
+              # 401 on the API root is expected for some paths;
+              # but here we only probe public endpoints, so 4xx = degraded
+              echo "degraded"
+            else
+              echo "down"
+            fi
+          }
+
+          ROOT_STATUS=$(classify "${first[root]}" "${second[root]}")
+          API_STATUS=$(classify "${first[api]}" "${second[api]}")
+
+          # Overall: down beats degraded beats ok
+          OVERALL=ok
+          for s in "$ROOT_STATUS" "$API_STATUS"; do
+            if [ "$s" = "down" ]; then OVERALL=down; break; fi
+            if [ "$s" = "degraded" ] && [ "$OVERALL" = "ok" ]; then OVERALL=degraded; fi
+          done
+
+          NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          echo "now=$NOW"        >> "$GITHUB_OUTPUT"
+          echo "overall=$OVERALL" >> "$GITHUB_OUTPUT"
+          echo "root=$ROOT_STATUS" >> "$GITHUB_OUTPUT"
+          echo "api=$API_STATUS"   >> "$GITHUB_OUTPUT"
+          echo "root_codes=${first[root]},${second[root]}" >> "$GITHUB_OUTPUT"
+          echo "api_codes=${first[api]},${second[api]}"   >> "$GITHUB_OUTPUT"
+
+      - name: Write status JSON
+        shell: bash
+        env:
+          OVERALL: ${{ steps.probe.outputs.overall }}
+          ROOT_STATUS: ${{ steps.probe.outputs.root }}
+          API_STATUS: ${{ steps.probe.outputs.api }}
+          ROOT_CODES: ${{ steps.probe.outputs.root_codes }}
+          API_CODES: ${{ steps.probe.outputs.api_codes }}
+          NOW: ${{ steps.probe.outputs.now }}
+        run: |
+          mkdir -p public/status
+          # Append to history (last 144 entries = 24h at 10-min interval)
+          HIST_FILE=public/status/history.json
+          if [ ! -f "$HIST_FILE" ]; then echo "[]" > "$HIST_FILE"; fi
+          jq --arg ts "$NOW" --arg ov "$OVERALL" \
+             '. + [{ts:$ts, overall:$ov}] | .[-144:]' \
+             "$HIST_FILE" > "$HIST_FILE.tmp" && mv "$HIST_FILE.tmp" "$HIST_FILE"
+
+          # Current snapshot
+          jq -n \
+            --arg ts "$NOW" \
+            --arg ov "$OVERALL" \
+            --arg rs "$ROOT_STATUS" --arg rc "$ROOT_CODES" \
+            --arg as "$API_STATUS"  --arg ac "$API_CODES" \
+            '{
+              checked_at: $ts,
+              overall: $ov,
+              services: [
+                { name: "Portal",   status: $rs, codes: ($rc | split(",")) },
+                { name: "Hall API", status: $as, codes: ($ac | split(",")) }
+              ],
+              note: "Auto-probed every 10 min by GitHub Actions. See .github/workflows/uptime-check.yml"
+            }' > public/status/uptime.json
+
+      - name: Commit if changed
+        shell: bash
+        run: |
+          git config user.name  "ch-uptime-bot"
+          git config user.email "ch-uptime-bot@users.noreply.github.com"
+          if git diff --quiet public/status/; then
+            echo "No status change."
+            exit 0
+          fi
+          git add public/status/
+          git commit -m "chore(status): uptime probe ${{ steps.probe.outputs.overall }} @ ${{ steps.probe.outputs.now }}"
+          # Retry-safe push: pull --rebase to absorb concurrent uptime commits
+          for i in 1 2 3; do
+            git pull --rebase --autostash origin main && git push origin HEAD:main && exit 0
+            sleep 5
+          done
+          echo "::error::push failed after 3 retries"
+          exit 1

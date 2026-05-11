@@ -23,6 +23,9 @@ Status tags used below:
 | `/garage` | live | Startup workspace. Built; no garage project assigned yet. Gated by `primaryWorkspace = garage`. | `src/app/garage/page.tsx` |
 | `/dashboard` | legacy | Older overview surface with upload zone and raw meeting list. Predates Hall/Workroom split. | `src/app/dashboard/page.tsx` |
 | `/vitrina` | live / public | Public marketing page. No auth required. Capabilities, team, desk entry points. | `src/app/vitrina/page.tsx` |
+| `/status` | live / public | Public uptime page. Reads `public/status/uptime.json` written by `.github/workflows/uptime-check.yml` every 10 min. No auth. | `src/app/status/page.tsx` |
+| `/trust` | live / public | Public trust pack. Sub-processors, security posture, compliance status, incident response. No auth. | `src/app/trust/page.tsx` |
+| `/security` | live / public | Responsible disclosure policy + hall of fame. No auth. Mirrored at `/.well-known/security.txt`. | `src/app/security/page.tsx` |
 | `/living-room` | partial | Community showcase. Members, milestones, themes from Notion. Auth required; admin sees curation link. | `src/app/living-room/page.tsx` |
 | `/residents` | admin-only | People directory (CH team + EIRs + Digital Residents). | `src/app/residents/page.tsx` |
 | `/library` | admin-only | Knowledge Assets browser. Cross-project intelligence layer. | `src/app/library/page.tsx` |

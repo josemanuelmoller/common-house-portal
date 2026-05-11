@@ -4,6 +4,10 @@ const isPublicRoute = createRouteMatcher([
   "/sign-in(.*)",
   "/",
   "/api/(.*)",   // API routes manejan su propia autenticación
+  "/status",     // public uptime/status page
+  "/trust",      // public trust / vendor / security info page
+  "/vitrina",    // public marketing landing
+  "/security(.*)", // responsible-disclosure / .well-known
 ]);
 
 export default clerkMiddleware(async (auth, req) => {

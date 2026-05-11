@@ -1,0 +1,9 @@
+{
+  "checked_at": "2026-05-11T00:00:00Z",
+  "overall": "ok",
+  "services": [
+    { "name": "Portal", "status": "ok", "codes": ["200", "200"] },
+    { "name": "Hall API", "status": "ok", "codes": ["200", "200"] }
+  ],
+  "note": "Seed file. First real probe will overwrite this within 10 min of workflow enable."
+}
