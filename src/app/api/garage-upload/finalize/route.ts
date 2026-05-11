@@ -9,6 +9,21 @@ import { notion, DB } from "@/lib/notion";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { classifyFile } from "../classify";
 
+// Storage path validation — admins POST the storagePath back from the client,
+// so without this check an attacker with an admin session could ask for a
+// signed read URL on any path in any bucket the service-role key can see
+// (e.g. ../inbox-captures/foo.png). Lock the path to garage/ prefix and
+// reject any traversal or NUL byte tricks.
+function assertGarageStoragePath(path: string): void {
+  if (typeof path !== "string" || !path) throw new Error("storagePath required");
+  if (path.length > 512) throw new Error("storagePath too long");
+  if (/[\x00-\x1f\x7f]/.test(path)) throw new Error("storagePath contains control characters");
+  if (path.includes("..")) throw new Error("storagePath contains traversal");
+  if (path.startsWith("/") || path.startsWith("\\")) throw new Error("storagePath must be relative");
+  // Bucket is `garage-docs`, conventional prefix is `garage/` per garage-upload route.
+  if (!path.startsWith("garage/")) throw new Error("storagePath must be under garage/");
+}
+
 function getSupabase() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -75,6 +90,7 @@ export async function POST(req: NextRequest) {
 
   for (const upload of uploads) {
     try {
+      assertGarageStoragePath(upload.storagePath);
       // Create a long-lived signed read URL
       const supabase = getSupabase();
       const { data: signedData, error: urlError } = await supabase.storage

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { currentUser } from "@clerk/nextjs/server";
 import { uploadFileToDrive, FolderName } from "@/lib/drive";
+import { requireSameOriginRequest } from "@/lib/require-same-origin";
 // notion-cutoff-2026-06-02: Notion `Sources` write removed; canonical write is now to `sources` (Supabase).
 // import { notion, DB } from "@/lib/notion";
 import { getProjectIdForUser, getClientConfig, isAdminUser, isAdminEmail } from "@/lib/clients";
@@ -11,6 +12,11 @@ const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
 
 export async function POST(req: NextRequest) {
   try {
+    // CSRF: multipart routes lack the implicit CORS preflight that JSON routes get,
+    // so reject any cross-origin POST.
+    const csrf = requireSameOriginRequest(req);
+    if (csrf) return csrf;
+
     const user = await currentUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const email = user.primaryEmailAddress?.emailAddress ?? "";

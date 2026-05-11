@@ -16,6 +16,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { adminGuardApi } from "@/lib/require-admin";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
+import { requireSameOriginRequest } from "@/lib/require-same-origin";
 import type { HallDraft } from "@/lib/hall-compose";
 
 export const dynamic = "force-dynamic";
@@ -50,12 +51,19 @@ export async function POST(
   req: NextRequest,
   ctx: { params: Promise<{ id: string }> },
 ) {
+  const csrf = requireSameOriginRequest(req);
+  if (csrf) return csrf;
   const guard = await adminGuardApi();
   if (guard) return guard;
 
   const { id: projectId } = await ctx.params;
   if (!projectId) {
     return NextResponse.json({ ok: false, error: "missing project id" }, { status: 400 });
+  }
+  // Path traversal hardening: projectId is interpolated into the storage path.
+  // Accept only uuid / Notion page id shapes.
+  if (!/^[0-9a-fA-F-]{32,36}$/.test(projectId)) {
+    return NextResponse.json({ ok: false, error: "invalid project id" }, { status: 400 });
   }
 
   let file: File | null = null;

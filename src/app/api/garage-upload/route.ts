@@ -27,13 +27,21 @@ export async function POST(req: NextRequest) {
   if (!projectId || !files?.length)
     return NextResponse.json({ error: "projectId and files required" }, { status: 400 });
 
+  // projectId is interpolated into the storage path — without shape validation an
+  // admin could pass "../something/" and write into a sibling bucket prefix.
+  // Notion page IDs are 32 hex chars (with or without dashes); allow both.
+  if (!/^[0-9a-fA-F-]{32,36}$/.test(projectId)) {
+    return NextResponse.json({ error: "projectId must be a valid uuid or notion page id" }, { status: 400 });
+  }
+
   const supabase = getSupabase();
   const results: { name: string; storagePath: string; signedUrl: string; error?: string }[] = [];
 
   for (const file of files) {
     // Sanitize filename — spaces and special chars break Supabase storage paths
     const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, "_");
-    const storagePath = `${projectId}/${Date.now()}-${Math.random().toString(36).slice(2, 6)}-${safeName}`;
+    // Prefix `garage/` so the finalize route's allowlist check holds.
+    const storagePath = `garage/${projectId}/${Date.now()}-${Math.random().toString(36).slice(2, 6)}-${safeName}`;
     const { data, error } = await supabase.storage
       .from("garage-docs")
       .createSignedUploadUrl(storagePath);

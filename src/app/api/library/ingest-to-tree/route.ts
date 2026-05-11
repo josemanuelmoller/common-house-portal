@@ -35,6 +35,9 @@ import mammoth from "mammoth";
 import { randomUUID } from "node:crypto";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { adminGuardApi } from "@/lib/require-admin";
+import { safeFetch } from "@/lib/safe-fetch";
+import { requireSameOriginRequest } from "@/lib/require-same-origin";
+import { isValidCronRequest } from "@/lib/require-cron";
 import {
   canonicaliseCaseCode,
   generateTypedCaseCode,
@@ -137,7 +140,8 @@ async function extractText(file: File): Promise<{ text: string; pdfBase64?: stri
 }
 
 async function fetchUrlAsText(url: string): Promise<string> {
-  const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0 CommonHouse-Ingest" } });
+  // safeFetch enforces SSRF allowlist (no loopback / RFC1918 / metadata).
+  const res = await safeFetch(url, { headers: { "User-Agent": "Mozilla/5.0 CommonHouse-Ingest" } });
   if (!res.ok) throw new Error(`URL fetch failed: ${res.status}`);
   const html = await res.text();
   // Minimal strip-to-text — remove scripts/styles, collapse whitespace
@@ -152,6 +156,11 @@ async function fetchUrlAsText(url: string): Promise<string> {
 }
 
 async function _POST(req: NextRequest) {
+  // Cron paths bypass CSRF (server-to-server). Browser paths must be same-origin.
+  if (!isValidCronRequest(req)) {
+    const csrf = requireSameOriginRequest(req);
+    if (csrf) return csrf;
+  }
   if (!(await isAuthorized(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

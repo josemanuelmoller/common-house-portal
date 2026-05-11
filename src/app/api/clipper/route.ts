@@ -24,21 +24,48 @@ import { buildPersonIndex, resolvePerson, type PersonIndex, type ResolutionReaso
 //  - Bearer token:   Authorization: Bearer <CLIPPER_TOKEN>  (Chrome extension)
 //  - Clerk admin     (fallback if called from portal UI)
 //
-// CORS: open. Bearer/session is the gate.
+// CORS: locked to portal origin + the Chrome extension scheme. The audit
+// flagged that `*` plus a long-lived shared bearer token let any web page
+// attempt to write to /api/clipper from the victim's browser. Per-origin
+// allowlist eliminates that surface.
+const ALLOWED_ORIGINS = new Set<string>([
+  "https://portal.wearecommonhouse.com",
+  "https://common-house-portal.vercel.app",
+  "http://localhost:3000",
+]);
+const ALLOW_EXT_PREFIX = "chrome-extension://";
 
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin":  "*",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
-  "Access-Control-Max-Age":       "86400",
-};
-
-function corsJson(body: unknown, status = 200) {
-  return NextResponse.json(body, { status, headers: CORS_HEADERS });
+function resolveAllowedOrigin(origin: string | null): string {
+  if (!origin) return "";
+  if (ALLOWED_ORIGINS.has(origin)) return origin;
+  if (origin.startsWith(ALLOW_EXT_PREFIX)) return origin;
+  return "";
 }
 
-export async function OPTIONS() {
-  return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
+// Set by the POST/OPTIONS entry points at the start of the request so the
+// many deep helpers that call corsJson() don't have to thread `req` through
+// every layer. Re-set on every request; never persisted between requests
+// because module re-use inside the lambda is per-invocation here.
+let _currentOrigin = "";
+
+function corsHeaders(): Record<string, string> {
+  return {
+    "Access-Control-Allow-Origin":      _currentOrigin,
+    "Vary":                             "Origin",
+    "Access-Control-Allow-Methods":     "POST, OPTIONS",
+    "Access-Control-Allow-Headers":     "Content-Type, Authorization",
+    "Access-Control-Max-Age":           "86400",
+  };
+}
+
+function corsJson(body: unknown, status = 200) {
+  return NextResponse.json(body, { status, headers: corsHeaders() });
+}
+
+export async function OPTIONS(req: NextRequest) {
+  _currentOrigin = resolveAllowedOrigin(req.headers.get("origin"));
+  if (!_currentOrigin) return new NextResponse(null, { status: 403 });
+  return new NextResponse(null, { status: 204, headers: corsHeaders() });
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -468,6 +495,7 @@ async function handleWhatsappClip(body: ClipBody, req: NextRequest) {
 // ─── Entrypoint ───────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
+  _currentOrigin = resolveAllowedOrigin(req.headers.get("origin"));
   const authFail = await authorize(req);
   if (authFail) return authFail;
 
