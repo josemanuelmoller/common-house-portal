@@ -53,7 +53,8 @@ function authCheck(req: NextRequest): boolean {
   const agentKey  = req.headers.get("x-agent-key");
   const cronToken = req.headers.get("authorization");
   const expected  = process.env.CRON_SECRET;
-  if (agentKey && agentKey === expected) return true;
+  if (!expected) return false; // fail closed when env unset (regression caught by Wave-5 re-audit)
+  if (agentKey === expected) return true;
   if (cronToken === `Bearer ${expected}`) return true;
   return false;
 }

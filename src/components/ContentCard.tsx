@@ -209,15 +209,29 @@ export function ContentCard({ item, onArchive }: { item: ContentCardItem; onArch
 
   function handleDownloadPdf(e: React.MouseEvent) {
     e.stopPropagation();
-    // Inject auto-print trigger and open in new tab — browser saves as PDF
+    // Wave 5 CR7: previously this used `window.open(blob:URL)` which inherits
+    // the parent's origin. slideHtml is LLM-generated and treated as untrusted
+    // (the iframe render at line 282 uses sandbox=allow-scripts only). The
+    // blob-in-new-tab path bypassed that sandbox — any script in slideHtml
+    // ran with `portal.wearecommonhouse.com` origin and the admin's cookies.
+    //
+    // Fix: render print via a sandboxed iframe inside the current tab. The
+    // iframe is in an opaque origin (sandbox without allow-same-origin), so
+    // scripts cannot reach `document.cookie` or call same-origin /api/*.
     const printHtml = item.slideHtml.replace(
       "</body>",
       `<script>window.onload=function(){setTimeout(function(){window.print();},400);}</script></body>`
     );
-    const blob = new Blob([printHtml], { type: "text/html" });
-    const url = URL.createObjectURL(blob);
-    window.open(url, "_blank");
-    setTimeout(() => URL.revokeObjectURL(url), 15000);
+    const iframe = document.createElement("iframe");
+    iframe.setAttribute("sandbox", "allow-scripts allow-modals");
+    iframe.style.cssText =
+      "position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden";
+    iframe.srcdoc = printHtml;
+    document.body.appendChild(iframe);
+    // Clean up after the print dialog closes (~30s is generous for slow render).
+    setTimeout(() => {
+      if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
+    }, 30000);
   }
 
   async function handleDownloadPpt(e: React.MouseEvent) {

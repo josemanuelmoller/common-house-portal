@@ -21,6 +21,7 @@
 import { NextResponse, after } from "next/server";
 import { currentUser } from "@clerk/nextjs/server";
 import { adminGuardApi } from "@/lib/require-admin";
+import { requireSameOriginRequest } from "@/lib/require-same-origin";
 import {
   createInboxItem,
   uploadInboxMedia,
@@ -39,6 +40,9 @@ const ALLOWED_SOURCES: InboxItemSource[] = [
 ];
 
 export async function POST(req: Request) {
+  // CSRF: PWA quick-capture is called from same-origin only.
+  const csrf = requireSameOriginRequest(req);
+  if (csrf) return csrf;
   const guard = await adminGuardApi();
   if (guard) return guard;
 

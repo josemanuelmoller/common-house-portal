@@ -90,8 +90,9 @@ Located in `.github/workflows/security-gates.yml`:
 
 | Gate | What it does | When it runs |
 |---|---|---|
-| `check-secrets` | Pattern-scans new/changed files for `ntn_*`, `sk_live_*`, `sk-ant-*`, `AIza*`, JWTs, PEM keys, and known historical literals (`ch-os-agent-2024-secure`, `ch-agents-2026`). | every PR + push to main |
-| `check-api-auth` | Every `src/app/api/**/route.ts` that exports POST/PATCH/PUT/DELETE must reference one of `adminGuardApi`, `requireCronAuth`, `isValidCronRequest`, `currentUser`, `requireAdminAction`, `requireSameOriginRequest`, or a known shared-secret header. Public allowlist is in `scripts/check-api-auth.sh`. | every PR + push to main |
+| `check-secrets` | Pattern-scans new/changed files for `ntn_*`, `sk_live_*`, `sk-ant-*`, `sk-proj-*`, `AIza*`, `GOCSPX-*`, `xox[abprs]-`, `ghp_*`/`github_pat_*`, `glpat-*`, `npm_*`, `AKIA*`, `dop_v1_*`, `rk_live_*`, `whsec_*`, JWTs, PEM keys, and known historical literals (`ch-os-agent-2024-secure`, `ch-agents-2026`). Wave 5 H13 extended the pattern set. | every PR + push to main |
+| `check-api-auth` | Every mutating `src/app/api/**/route.ts` must INVOKE (not merely reference) `adminGuardApi(...)`, `requireCronAuth(...)`, `isValidCronRequest(...)`, `currentUser(...)`, `requireAdminAction(...)`, `requireAdmin(...)`, `requireSameOriginRequest(...)`, or `requireNavigationOrSameOrigin(...)`. Comments + stale imports do NOT satisfy the gate (Wave 5 H1 hardening). | every PR + push to main |
+| `check-no-err-leak` | NEW routes that echo `err.message` / `String(err)` / `detail: err.message` to the client are rejected. Existing offenders are pinned in `scripts/err-leak-baseline.txt`; the gate fails on any addition. Wave 5 H7. | every PR + push to main |
 | `npm-audit` | Fails when `npm audit` reports more high/critical vulnerabilities than the documented baseline (5 high transitive in `d3-color`/`postcss` as of Wave 3). | every PR + push to main |
 | `typecheck` | `tsc --noEmit` clean. | every PR + push to main |
 
@@ -119,12 +120,17 @@ Any addition here must:
 
 ## 6. Defense-in-depth boundaries
 
-- **`import "server-only"`** on `src/lib/{notion/core,supabase,supabase-server,drive,google-auth,plan,hall-compose}.ts`. Client-safe types live in `*-shared.ts` siblings (`plan-shared.ts`, `hall-compose-shared.ts`). Forgetting this and importing the server lib from a client component fails the build.
-- **RLS** on every public table in Supabase. `anon` and `authenticated` roles have explicit `REVOKE` (Wave 2.5 migration `20260511120000_rls_defense_in_depth.sql`). `service_role` bypasses RLS and is the only role with write access via API routes.
-- **CSRF**: `requireSameOriginRequest()` on every multipart upload route. JSON routes are protected by the implicit CORS preflight (browsers refuse to send a Clerk cookie cross-origin when the Content-Type triggers preflight and the server doesn't ACAO the attacker's origin).
+- **`import "server-only"`** on `src/lib/{notion/core,supabase,supabase-server,drive,google-auth,plan,hall-compose,safe-fetch,require-cron}.ts`. Client-safe types live in `*-shared.ts` siblings (`plan-shared.ts`, `hall-compose-shared.ts`). Forgetting this and importing the server lib from a client component fails the build.
+- **RLS** on every public table AND view in Supabase. `anon` and `authenticated` roles have explicit `REVOKE` via Wave 2.5 (`20260511120000_rls_defense_in_depth.sql`, tables) + Wave 5 H4 (`20260511140000_rls_defense_views.sql`, views + matviews). `service_role` bypasses RLS and is the only role with write access via API routes.
+- **CSRF**: `requireSameOriginRequest()` on every multipart upload route AND on JSON routes whose handlers mutate external state (`/api/hall/nudge-draft` etc.) — closes the `enctype="text/plain"` CSRF smuggle on JSON. Special-case `requireNavigationOrSameOrigin()` for PWA Share Target. Wave 5 H2: same-site no longer accepted by default.
 - **SSRF**: `safeFetch()` on every route that fetches an admin-supplied URL. Blocks loopback, RFC1918, 169.254.169.254 (cloud metadata), non-http(s).
-- **Storage paths**: admin-supplied `storagePath` and `projectId` are validated against shape regexes / prefix allowlists before being interpolated into bucket paths. See `src/app/api/garage-upload/finalize/route.ts`.
+- **Storage paths**: admin-supplied `storagePath`, `projectId`, and `originalFileName` are validated against shape regexes / prefix allowlists / character-class allowlists before being interpolated into bucket paths. See `src/app/api/garage-upload/finalize/route.ts`, `src/app/api/ingest-library/route.ts`, `src/app/api/library/ingest-to-tree/route.ts`.
 - **Zip-bomb guard**: `extractPptxText` caps decompressed size at 75 MB / 50 MB per entry / 5000 entries.
+- **Race-free per-request state**: route helpers receive a `CorsResponder` (or equivalent) at the handler entrypoint instead of stashing into module-level `let` (Wave 5 CR3 fix to `/api/clipper`).
+- **Iframe sandbox**: `sandbox="allow-scripts"` (NEVER with `allow-same-origin`) on every iframe that renders LLM-generated or untrusted HTML — `ContentCard.tsx` slide preview + `ProposalDeckFrame.tsx` deck render. PDF download path uses an in-page sandboxed iframe rather than `window.open(blob:)` (Wave 5 CR6 / CR7).
+- **Safe href**: `src/lib/safe-href.ts` returns `null` for `javascript:` / `data:` / `vbscript:` / control-char-smuggled schemes. Use it on any `href` bound to an LLM- or ingest-derived URL. Audit Wave 5 H8 applied to top sites; full sweep tracked.
+- **Push subscription ownership**: `/api/push/subscribe` checks `user_id` ownership on both upsert and revoke (Wave 5 H10), preventing cross-user hijack.
+- **Service worker message origin validation**: SW message listener verifies `event.source.url` is same-origin before acting (Wave 5 H11).
 
 ## 7. Known accepted risks
 
@@ -149,4 +155,6 @@ Any addition here must:
 | Wave 1 | 2026-05-10 | [#8](https://github.com/josemanuelmoller/common-house-portal/pull/8) | Critical fixes: JWT bypass, backdoor removal, empty-secret guard, XSS escapes, xlsx CVE, Clerk CVE. |
 | Wave 2 | 2026-05-11 | [#9](https://github.com/josemanuelmoller/common-house-portal/pull/9) | Headers/CSP, SSRF, CSRF, storage path, RLS defense-in-depth, OAuth diagnostic gating. |
 | Wave 3 | 2026-05-11 | [#10](https://github.com/josemanuelmoller/common-house-portal/pull/10) | server-only on libs, fallback observability, zip-bomb guard, chrome ext, super-admin gate, route cleanup. |
-| Wave 4 | 2026-05-11 | (this PR) | Process hardening: plan/hall-compose split, ESLint rule, pre-commit hook, dependabot, CI gates, this doc. |
+| Wave 4 | 2026-05-11 | [#11](https://github.com/josemanuelmoller/common-house-portal/pull/11) | Process hardening: plan/hall-compose split, ESLint rule, pre-commit hook, dependabot, CI gates, this doc. |
+| Re-audit | 2026-05-11 | — | Second external-attacker pass: 9 CRs, 16 HIGH found — most introduced by Waves 1-4 fixes themselves (clipper race, CSRF gaps on PWA, RLS missed views, hall-data CORS, etc.). |
+| Wave 5 | 2026-05-11 | (this PR) | Re-audit remediation: 9 CR + 8 HIGH closed. New `requireNavigationOrSameOrigin` helper. RLS view migration. `garage-docs` bucket created. `safeHref` helper. New CI gates: improved `check-api-auth` (call-site, not substring) + `check-no-err-leak`. Husky wired. |

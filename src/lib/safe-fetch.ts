@@ -19,6 +19,7 @@
  *     and re-validate each hop's destination.
  */
 
+import "server-only";
 import { lookup } from "node:dns/promises";
 
 class SsrfBlockedError extends Error {

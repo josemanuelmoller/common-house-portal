@@ -2,6 +2,7 @@
 
 import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { safeHref } from "@/lib/safe-href";
 
 export type CompetitiveIntelRow = {
   id: string;
@@ -344,9 +345,11 @@ function SignalSlidePanel({ signal, onClose }: { signal: CompetitiveIntelRow; on
           className="px-5 py-3 flex items-center gap-3 shrink-0"
           style={{ borderTop: "1px solid var(--hall-stroke-0)" }}
         >
-          {signal.sourceUrl && (
+          {(() => {
+            const safe = safeHref(signal.sourceUrl);
+            return safe ? (
             <a
-              href={signal.sourceUrl}
+              href={safe}
               target="_blank"
               rel="noopener noreferrer"
               className="flex-1 text-center py-2 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-opacity hover:opacity-70"
@@ -357,7 +360,8 @@ function SignalSlidePanel({ signal, onClose }: { signal: CompetitiveIntelRow; on
             >
               {dom ?? "Source"} ↗
             </a>
-          )}
+            ) : null;
+          })()}
           <a
             href={signal.notionUrl}
             target="_blank"
