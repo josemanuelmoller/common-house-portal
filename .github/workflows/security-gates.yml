@@ -20,7 +20,7 @@ jobs:
     name: secrets scan
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           # Fetch enough history that diff-based scans can compare to base.
           fetch-depth: 0
@@ -42,7 +42,7 @@ jobs:
     name: api auth coverage
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Verify every mutating /api route invokes an auth helper
         run: bash scripts/check-api-auth.sh
 
@@ -50,7 +50,7 @@ jobs:
     name: no err.message echoed to client
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Verify NEW routes do not echo err.message / String(err)
         run: bash scripts/check-no-err-leak.sh
 
@@ -58,7 +58,7 @@ jobs:
     name: npm audit (high+)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
@@ -90,7 +90,7 @@ jobs:
     name: tsc --noEmit
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
