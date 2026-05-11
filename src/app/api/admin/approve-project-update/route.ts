@@ -12,18 +12,19 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
 // notion-cutoff-2026-06-02: removed; canonical write is now to projects (Supabase).
 // import { Client } from "@notionhq/client";
 // const notion = new Client({ auth: process.env.NOTION_API_KEY });
-import { isAdminUser } from "@/lib/clients";
+import { adminGuardApi } from "@/lib/require-admin";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 
 export async function POST(req: NextRequest) {
-  const { userId } = await auth();
-  if (!userId || !isAdminUser(userId)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  // adminGuardApi checks BOTH ADMIN_USER_IDS and ADMIN_EMAILS — the rest of the
+  // codebase uses this helper; the older inline `isAdminUser(userId)`-only check
+  // diverged from the project contract and could silently lock out legitimate
+  // admins on prod where Clerk userIds drift from dev.
+  const guard = await adminGuardApi();
+  if (guard) return guard;
 
   const { projectId, action, draftText } = await req.json() as {
     projectId: string;

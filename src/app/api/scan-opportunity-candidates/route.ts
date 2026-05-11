@@ -44,7 +44,6 @@ async function authCheck(req: NextRequest): Promise<boolean> {
   const cronToken = req.headers.get("authorization");
   const expected  = process.env.CRON_SECRET;
   if (expected && (agentKey === expected || cronToken === `Bearer ${expected}`)) return true;
-  if (agentKey === "ch-os-agent-2024-secure") return true;
   try {
     const guard = await adminGuardApi();
     return guard === null;

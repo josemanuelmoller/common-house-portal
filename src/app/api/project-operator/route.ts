@@ -22,6 +22,7 @@ import { Client } from "@notionhq/client";
 import { withRoutineLog } from "@/lib/routine-log";
 import { computeAnthropicCost, makeUsageAccumulator, addUsage, type AnthropicUsage } from "@/lib/anthropic-cost";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
+import { requireCronAuth } from "@/lib/require-cron";
 
 const HAIKU_MODEL = "claude-haiku-4-5";
 
@@ -161,11 +162,8 @@ Return only the paragraph text, no labels, no markdown.`;
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 async function _POST(req: NextRequest) {
-  const agentKey = req.headers.get("x-agent-key");
-  const cronKey  = req.headers.get("authorization");
-  const validKey = agentKey === process.env.CRON_SECRET ||
-                   cronKey  === `Bearer ${process.env.CRON_SECRET}`;
-  if (!validKey) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const authFail = requireCronAuth(req);
+  if (authFail) return authFail;
 
   const projects = await fetchActiveProjects();
   const usageAcc = makeUsageAccumulator();

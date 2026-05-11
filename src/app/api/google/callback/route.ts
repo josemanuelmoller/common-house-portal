@@ -25,6 +25,19 @@ function resolveRedirectUri(req: NextRequest): string {
   return `${req.nextUrl.origin}/api/google/callback`;
 }
 
+// Escape every untrusted string interpolated into the HTML response below.
+// The previous version inlined `error`, `grantedScope`, scope tokens, and the
+// token exchange error message verbatim — a crafted `?error=<svg/onload=...>`
+// produced reflected XSS in the admin session.
+function escapeHtml(s: string): string {
+  return s.replace(/[&<>"']/g, c => (
+    c === "&" ? "&amp;" :
+    c === "<" ? "&lt;" :
+    c === ">" ? "&gt;" :
+    c === '"' ? "&quot;" : "&#39;"
+  ));
+}
+
 function renderHtml(body: string, title = "Google consent — Common House Portal"): string {
   return `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title>
 <style>
@@ -49,7 +62,7 @@ export async function GET(req: NextRequest) {
   if (error) {
     return new NextResponse(
       renderHtml(`<p class="err">Consent declined or failed</p>
-        <h1>Google returned: <code>${error}</code></h1>
+        <h1>Google returned: <code>${escapeHtml(error)}</code></h1>
         <p><a href="/api/google/auth">Try again</a></p>`),
       { status: 200, headers: { "content-type": "text/html; charset=utf-8" } }
     );
@@ -94,15 +107,15 @@ export async function GET(req: NextRequest) {
             <li>Revoke access for the Common House Portal client</li>
             <li>Restart the flow from <a href="/api/google/auth">/api/google/auth</a></li>
           </ol>
-          <p class="muted">Granted scopes (access token only): <code>${grantedScope || "—"}</code></p>`),
+          <p class="muted">Granted scopes (access token only): <code>${escapeHtml(grantedScope || "—")}</code></p>`),
         { status: 200, headers: { "content-type": "text/html; charset=utf-8" } }
       );
     }
 
     // Never log the token. Render it only.
-    const scopeList = [...grantedSet].filter(Boolean).map(s => `<li><code>${s}</code></li>`).join("");
+    const scopeList = [...grantedSet].filter(Boolean).map(s => `<li><code>${escapeHtml(s)}</code></li>`).join("");
     const missingList = missing.length
-      ? `<p class="err">Warning — scopes missing from the grant:</p><ul>${missing.map(s => `<li><code>${s}</code></li>`).join("")}</ul>
+      ? `<p class="err">Warning — scopes missing from the grant:</p><ul>${missing.map(s => `<li><code>${escapeHtml(s)}</code></li>`).join("")}</ul>
          <p class="muted">If any scope is missing, the corresponding feature will fail. Re-run the flow if needed.</p>`
       : `<p class="ok">All required scopes granted</p>`;
 
@@ -120,13 +133,13 @@ export async function GET(req: NextRequest) {
         </ol>
 
         <p><strong>New refresh token (copy once, then close this page):</strong></p>
-        <pre id="rt">${refreshToken}</pre>
+        <pre id="rt">${escapeHtml(refreshToken)}</pre>
         <button onclick="navigator.clipboard.writeText(document.getElementById('rt').innerText);this.textContent='Copied ✓'">Copy to clipboard</button>
 
         <details style="margin-top:24px">
           <summary class="muted">Granted scopes</summary>
           <ul>${scopeList}</ul>
-          <p class="muted">Access token (short-lived, for debug only): <code>${accessToken.slice(0, 16)}…</code></p>
+          <p class="muted">Access token (short-lived, for debug only): <code>${escapeHtml(accessToken.slice(0, 16))}…</code></p>
         </details>
 
         <p class="muted" style="margin-top:32px">After saving the env var in Vercel, return to <a href="/admin">/admin</a> and reload. Suggested Time Blocks will activate automatically.</p>`),
@@ -137,10 +150,10 @@ export async function GET(req: NextRequest) {
     return new NextResponse(
       renderHtml(`<p class="err">Token exchange failed</p>
         <h1>Google rejected the authorization code.</h1>
-        <pre>${message.replace(/</g, "&lt;")}</pre>
+        <pre>${escapeHtml(message)}</pre>
         <p>Common causes:</p>
         <ul>
-          <li>Redirect URI in Google Cloud Console does not match exactly <code>${resolveRedirectUri(req)}</code></li>
+          <li>Redirect URI in Google Cloud Console does not match exactly <code>${escapeHtml(resolveRedirectUri(req))}</code></li>
           <li>The OAuth client's publishing status is "Testing" and your email is not on the test-users list</li>
           <li>You clicked back/forward during the flow; restart from <a href="/api/google/auth">/api/google/auth</a></li>
         </ul>`),

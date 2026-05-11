@@ -9,8 +9,8 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.88.0",
-    "@clerk/nextjs": "^7.0.12",
+    "@anthropic-ai/sdk": "^0.95.1",
+    "@clerk/nextjs": "^7.3.3",
     "@notionhq/client": "^2.2.15",
     "@supabase/supabase-js": "^2.103.0",
     "@tremor/react": "^3.18.7",
@@ -27,7 +27,7 @@
     "recharts": "^3.8.1",
     "remark-gfm": "^4.0.1",
     "web-push": "^3.6.7",
-    "xlsx": "^0.18.5"
+    "xlsx": "https://cdn.sheetjs.com/xlsx-latest/xlsx-latest.tgz"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

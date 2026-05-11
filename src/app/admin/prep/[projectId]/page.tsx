@@ -8,13 +8,46 @@ import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { GenerateBriefButton } from "@/components/GenerateBriefButton";
 
 // Simple markdown renderer (same style as /admin/knowledge/[...path])
+
+// Returns the URL escaped for an href attribute if its scheme is safe; otherwise null.
+// Required because prep_briefs.content_md is LLM-generated and an attacker who
+// can plant `[click](javascript:alert(1))` in evidence ingestion would otherwise
+// trigger XSS when an admin opens this page.
+function isSafeLinkUrl(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  const cleaned = trimmed.replace(/[\x00-\x1f\x7f]/g, "");
+  const lower = cleaned.toLowerCase();
+  const isRelative =
+    cleaned.startsWith("/") ||
+    cleaned.startsWith("#") ||
+    cleaned.startsWith("./") ||
+    cleaned.startsWith("../") ||
+    !/^[a-z][a-z0-9+\-.]*:/i.test(cleaned);
+  const isSafeScheme =
+    lower.startsWith("http://") ||
+    lower.startsWith("https://") ||
+    lower.startsWith("mailto:") ||
+    lower.startsWith("tel:");
+  if (!isRelative && !isSafeScheme) return null;
+  return cleaned
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
 function renderInline(text: string): string {
   let out = text
     .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   out = out.replace(/`([^`]+)`/g, '<code class="text-[11px] px-1 py-0.5 rounded" style="background: var(--hall-fill-soft); font-family: var(--font-hall-mono);">$1</code>');
   out = out.replace(/\*\*([^*]+)\*\*/g, '<strong class="font-semibold" style="color: var(--hall-ink-0);">$1</strong>');
   out = out.replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '<em class="italic">$1</em>');
-  out = out.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="underline underline-offset-2" style="color: var(--hall-ink-0); text-decoration-color: var(--hall-ink-0);">$1</a>');
+  out = out.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_m, label: string, raw: string) => {
+    const safe = isSafeLinkUrl(raw);
+    if (!safe) return label;
+    return `<a href="${safe}" class="underline underline-offset-2" style="color: var(--hall-ink-0); text-decoration-color: var(--hall-ink-0);">${label}</a>`;
+  });
   return out;
 }
 

@@ -92,7 +92,8 @@ function uuidOrNull(id: string | undefined): string | null {
 async function _POST(req: NextRequest) {
   // Auth: cron secret OR admin session
   const authHeader = req.headers.get("authorization");
-  const cronOK = authHeader === `Bearer ${process.env.CRON_SECRET}`;
+  const expectedCron = process.env.CRON_SECRET;
+  const cronOK = !!expectedCron && authHeader === `Bearer ${expectedCron}`;
   if (!cronOK) {
     const guard = await adminGuardApi();
     if (guard) return guard;

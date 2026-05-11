@@ -50,6 +50,7 @@ function authCheck(req: NextRequest): boolean {
   const agentKey  = req.headers.get("x-agent-key");
   const cronToken = req.headers.get("authorization");
   const expected  = process.env.CRON_SECRET;
+  if (!expected) return false;
   return (agentKey === expected) || (cronToken === `Bearer ${expected}`);
 }
 

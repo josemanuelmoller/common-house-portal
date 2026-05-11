@@ -162,7 +162,7 @@ Al finalizar, reporta resultado al portal:
 ```bash
 curl -s -X POST https://common-house-app.vercel.app/api/agent-run \
   -H "Content-Type: application/json" \
-  -H "x-agent-key: ch-agents-2026" \
+  -H "x-agent-key: $AGENT_API_KEY" \
   -d '{
     "agent_name": "draft-checkin-email",
     "status": "[success|warning|error|skipped]",
