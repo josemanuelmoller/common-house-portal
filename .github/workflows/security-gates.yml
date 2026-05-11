@@ -43,8 +43,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Verify every mutating /api route references an auth helper
+      - name: Verify every mutating /api route invokes an auth helper
         run: bash scripts/check-api-auth.sh
+
+  check-no-err-leak:
+    name: no err.message echoed to client
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify NEW routes do not echo err.message / String(err)
+        run: bash scripts/check-no-err-leak.sh
 
   npm-audit:
     name: npm audit (high+)

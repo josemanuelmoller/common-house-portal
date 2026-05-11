@@ -257,7 +257,9 @@ async function _POST(req: NextRequest) {
   let sourceFileUrl: string | undefined;
   if (buffer && originalFileName) {
     const slug = randomUUID().slice(0, 8);
-    storagePath = `library/${slug}-${originalFileName}`;
+    // Sanitize filename (Wave 5 CR4) — was interpolated raw allowing traversal.
+    const safeName = originalFileName.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 100);
+    storagePath = `library/${slug}-${safeName}`;
     const { error: upErr } = await sb.storage.from(BUCKET).upload(storagePath, buffer, {
       contentType: fileMimeType,
       upsert: false,

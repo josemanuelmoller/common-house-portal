@@ -14,6 +14,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { google } from "googleapis";
 import Anthropic from "@anthropic-ai/sdk";
 import { adminGuardApi } from "@/lib/require-admin";
+import { requireSameOriginRequest } from "@/lib/require-same-origin";
 import { createPageWithMirror } from "@/lib/notion-mirror-push";
 
 export const dynamic = "force-dynamic";
@@ -42,6 +43,11 @@ type NudgePayload = {
 };
 
 export async function POST(req: NextRequest) {
+  // CSRF: route writes a Gmail draft on the admin's mailbox; cross-origin POST
+  // via text/plain enctype can bypass the implicit CORS preflight on JSON,
+  // so require an explicit same-origin signal.
+  const csrf = requireSameOriginRequest(req);
+  if (csrf) return csrf;
   const guard = await adminGuardApi();
   if (guard) return guard;
 

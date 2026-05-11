@@ -205,6 +205,18 @@ self.addEventListener("sync", (event) => {
 });
 
 self.addEventListener("message", (event) => {
+  // Wave 5 H11: only accept messages from clients on the same origin as the
+  // service worker (already enforced by scope, but explicit for defence-in-
+  // depth — a future SW broadcast/postMessage from another doc shouldn't
+  // trigger queue flushes).
+  if (event.source && "url" in event.source) {
+    try {
+      const srcOrigin = new URL(event.source.url).origin;
+      if (srcOrigin !== self.location.origin) return;
+    } catch {
+      return;
+    }
+  }
   if (event.data === "SKIP_WAITING") self.skipWaiting();
   if (event.data === "FLUSH_INBOX_QUEUE") {
     event.waitUntil(flushQueue().catch(() => {}));

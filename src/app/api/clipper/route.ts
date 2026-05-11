@@ -42,15 +42,17 @@ function resolveAllowedOrigin(origin: string | null): string {
   return "";
 }
 
-// Set by the POST/OPTIONS entry points at the start of the request so the
-// many deep helpers that call corsJson() don't have to thread `req` through
-// every layer. Re-set on every request; never persisted between requests
-// because module re-use inside the lambda is per-invocation here.
-let _currentOrigin = "";
-
-function corsHeaders(): Record<string, string> {
+// Wave 5 CR3: previously this module had a `let _currentOrigin = ""` that the
+// POST entrypoint set before invoking helpers. That was racy under concurrent
+// requests in a warm Vercel lambda (multiple requests share the JS heap), so
+// one request could read another's origin into its response header.
+//
+// Now: build a per-request responder object at the handler entrypoint and pass
+// it into every helper that needs to emit CORS-tagged JSON. No module-scope
+// mutable state.
+function corsHeadersFor(origin: string): Record<string, string> {
   return {
-    "Access-Control-Allow-Origin":      _currentOrigin,
+    "Access-Control-Allow-Origin":      origin,
     "Vary":                             "Origin",
     "Access-Control-Allow-Methods":     "POST, OPTIONS",
     "Access-Control-Allow-Headers":     "Content-Type, Authorization",
@@ -58,14 +60,24 @@ function corsHeaders(): Record<string, string> {
   };
 }
 
-function corsJson(body: unknown, status = 200) {
-  return NextResponse.json(body, { status, headers: corsHeaders() });
+type CorsResponder = {
+  origin: string;
+  json: (body: unknown, status?: number) => NextResponse;
+};
+
+function makeCorsResponder(req: Request): CorsResponder {
+  const origin = resolveAllowedOrigin(req.headers.get("origin"));
+  return {
+    origin,
+    json: (body: unknown, status = 200) =>
+      NextResponse.json(body, { status, headers: corsHeadersFor(origin) }),
+  };
 }
 
 export async function OPTIONS(req: NextRequest) {
-  _currentOrigin = resolveAllowedOrigin(req.headers.get("origin"));
-  if (!_currentOrigin) return new NextResponse(null, { status: 403 });
-  return new NextResponse(null, { status: 204, headers: corsHeaders() });
+  const cors = makeCorsResponder(req);
+  if (!cors.origin) return new NextResponse(null, { status: 403 });
+  return new NextResponse(null, { status: 204, headers: corsHeadersFor(cors.origin) });
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -97,7 +109,7 @@ type ClipBody = {
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
-async function authorize(req: NextRequest): Promise<NextResponse | null> {
+async function authorize(req: NextRequest, cors: CorsResponder): Promise<NextResponse | null> {
   const authHeader = req.headers.get("authorization") ?? "";
   const bearerMatch = authHeader.match(/^Bearer\s+(.+)$/i);
   const expected = process.env.CLIPPER_TOKEN ?? "";
@@ -106,7 +118,7 @@ async function authorize(req: NextRequest): Promise<NextResponse | null> {
   const adminResp = await adminGuardApi();
   if (!adminResp) return null;
 
-  return corsJson({ error: "Unauthorized" }, 401);
+  return cors.json({ error: "Unauthorized" }, 401);
 }
 
 // ─── Supabase helpers ─────────────────────────────────────────────────────────
@@ -170,7 +182,7 @@ async function findExistingByDedupKey(
 
 // ─── Web clip handler ────────────────────────────────────────────────────────
 
-async function handleWebClip(body: ClipBody) {
+async function handleWebClip(cors: CorsResponder, body: ClipBody) {
   const { url, title, selection, notes, projectId } = body;
 
   const pageTitle = (title || url).slice(0, 180);
@@ -183,7 +195,7 @@ async function handleWebClip(body: ClipBody) {
 
   const sb = getSupabase();
   const existing = await findExistingByDedupKey(sb, dedupKey);
-  if (existing) return corsJson({ ok: true, id: existing.notion_id ?? existing.id, deduped: true });
+  if (existing) return cors.json({ ok: true, id: existing.notion_id ?? existing.id, deduped: true });
 
   const summaryParts: string[] = [];
   if (selectionText) summaryParts.push(selectionText);
@@ -229,22 +241,22 @@ async function handleWebClip(body: ClipBody) {
       .single();
 
     if (error || !data) {
-      const message = error?.message ?? "Unknown Supabase error";
-      return corsJson({ error: message }, 500);
+      console.error("[clipper handleWebClip] sources insert failed:", error?.message);
+      return cors.json({ error: "Internal error" }, 500);
     }
 
-    return corsJson({ ok: true, id: data.notion_id ?? data.id, deduped: false });
+    return cors.json({ ok: true, id: data.notion_id ?? data.id, deduped: false });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown Supabase error";
-    return corsJson({ error: message }, 500);
+    console.error("[clipper handleWebClip] threw:", err);
+    return cors.json({ error: "Internal error" }, 500);
   }
 }
 
 // ─── WhatsApp clip handler ───────────────────────────────────────────────────
 
-async function handleWhatsappClip(body: ClipBody, req: NextRequest) {
+async function handleWhatsappClip(cors: CorsResponder, body: ClipBody, req: NextRequest) {
   const { url, chat_name, messages, raw_content, notes } = body;
-  if (!messages?.length) return corsJson({ error: "messages array required" }, 400);
+  if (!messages?.length) return cors.json({ error: "messages array required" }, 400);
 
   const chatTitle = (chat_name || "WhatsApp conversation").slice(0, 180);
   const notesText = (notes ?? "").trim();
@@ -258,7 +270,7 @@ async function handleWhatsappClip(body: ClipBody, req: NextRequest) {
 
   const sb = getSupabase();
   const existing = await findExistingByDedupKey(sb, dedupKey);
-  if (existing) return corsJson({ ok: true, id: existing.notion_id ?? existing.id, deduped: true });
+  if (existing) return cors.json({ ok: true, id: existing.notion_id ?? existing.id, deduped: true });
 
   // Build the compact summary (fits in 1900 chars)
   const rangeStr = `${first.date} ${first.time} — ${last.date} ${last.time}`;
@@ -317,7 +329,7 @@ async function handleWhatsappClip(body: ClipBody, req: NextRequest) {
 
   if (srcErr || !srcRow) {
     console.error("[clipper] WA sources insert failed:", srcErr);
-    return corsJson({ error: "Failed to create source: " + (srcErr?.message ?? "unknown") }, 500);
+    return cors.json({ error: "Failed to create source" }, 500);
   }
 
   const sourceId = srcRow.id as string;
@@ -481,7 +493,7 @@ async function handleWhatsappClip(body: ClipBody, req: NextRequest) {
     console.warn("[clipper] AI distill trigger failed:", e);
   }
 
-  return corsJson({
+  return cors.json({
     ok:               true,
     id:               sourceExternalId,
     deduped:          false,
@@ -495,24 +507,24 @@ async function handleWhatsappClip(body: ClipBody, req: NextRequest) {
 // ─── Entrypoint ───────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
-  _currentOrigin = resolveAllowedOrigin(req.headers.get("origin"));
-  const authFail = await authorize(req);
+  const cors = makeCorsResponder(req);
+  const authFail = await authorize(req, cors);
   if (authFail) return authFail;
 
   let body: ClipBody;
   try {
     body = await req.json();
   } catch {
-    return corsJson({ error: "Invalid JSON body" }, 400);
+    return cors.json({ error: "Invalid JSON body" }, 400);
   }
 
   if (!body.url || !/^https?:\/\//i.test(body.url)) {
-    return corsJson({ error: "Valid http(s) url required" }, 400);
+    return cors.json({ error: "Valid http(s) url required" }, 400);
   }
 
   if (body.source_type === "whatsapp" && body.messages?.length) {
-    return handleWhatsappClip(body, req);
+    return handleWhatsappClip(cors, body, req);
   }
 
-  return handleWebClip(body);
+  return handleWebClip(cors, body);
 }

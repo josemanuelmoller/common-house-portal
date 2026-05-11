@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { adminGuardApi } from "@/lib/require-admin";
+import { requireSameOriginRequest } from "@/lib/require-same-origin";
 import {
   generateDigestionProposal,
   generateDigestionProposalFromText,
@@ -65,6 +66,8 @@ function detectKindByName(name: string, mime?: string): DigestKind | null {
  * notion_push.py after admin reviews + edits the proposal.
  */
 export async function POST(req: NextRequest) {
+  const csrf = requireSameOriginRequest(req);
+  if (csrf) return csrf;
   const guard = await adminGuardApi();
   if (guard) return guard;
 

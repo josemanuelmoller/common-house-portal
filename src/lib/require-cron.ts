@@ -15,6 +15,7 @@
  *
  * Returns NextResponse on failure (401 / 500) — null on success.
  */
+import "server-only";
 import { NextResponse } from "next/server";
 
 export function requireCronAuth(req: Request): NextResponse | null {

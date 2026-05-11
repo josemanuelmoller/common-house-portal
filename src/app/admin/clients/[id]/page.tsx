@@ -12,6 +12,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { requireAdmin } from "@/lib/require-admin";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
+import { safeHref } from "@/lib/safe-href";
 import { PortalShell } from "@/components/PortalShell";
 import { HallSection } from "@/components/HallSection";
 import { EngagementEditor } from "@/components/EngagementEditor";
@@ -197,20 +198,23 @@ export default async function EngagementDetailPage({
                     </Link>
                   </>
                 )}
-                {org.website && (
-                  <>
-                    {" · "}
-                    <a
-                      href={org.website}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="underline underline-offset-2"
-                      style={{ color: "var(--hall-ink-0)" }}
-                    >
-                      {org.website.replace(/^https?:\/\//, "").replace(/\/$/, "")}
-                    </a>
-                  </>
-                )}
+                {(() => {
+                  const safe = safeHref(org.website);
+                  return safe ? (
+                    <>
+                      {" · "}
+                      <a
+                        href={safe}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="underline underline-offset-2"
+                        style={{ color: "var(--hall-ink-0)" }}
+                      >
+                        {safe.replace(/^https?:\/\//, "").replace(/\/$/, "")}
+                      </a>
+                    </>
+                  ) : null;
+                })()}
               </span>
             ) : e.org_notion_id ? (
               <span style={{ color: "var(--hall-muted-3)" }}>

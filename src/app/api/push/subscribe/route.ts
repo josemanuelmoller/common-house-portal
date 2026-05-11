@@ -50,6 +50,20 @@ export async function POST(req: Request) {
   }
 
   const sb = getSupabaseServerClient();
+
+  // Wave 5 H10: ownership check. The previous upsert keyed on `endpoint` alone
+  // — any admin sending another admin's endpoint would rewrite `user_id`,
+  // hijacking the subscription record. Verify endpoint belongs to this user
+  // (or is new) before upserting.
+  const { data: existing } = await sb
+    .from("push_subscriptions")
+    .select("user_id")
+    .eq("endpoint", endpoint)
+    .maybeSingle();
+  if (existing && existing.user_id !== user.id) {
+    return NextResponse.json({ error: "Endpoint owned by another user" }, { status: 409 });
+  }
+
   const { data, error } = await sb
     .from("push_subscriptions")
     .upsert(
@@ -68,7 +82,8 @@ export async function POST(req: Request) {
     .single();
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("[push subscribe POST]", error.message);
+    return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
 
   return NextResponse.json({ ok: true, id: data?.id });
@@ -77,6 +92,10 @@ export async function POST(req: Request) {
 export async function DELETE(req: Request) {
   const guard = await adminGuardApi();
   if (guard) return guard;
+  const user = await currentUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   const { searchParams } = new URL(req.url);
   const endpoint = searchParams.get("endpoint");
@@ -85,13 +104,17 @@ export async function DELETE(req: Request) {
   }
 
   const sb = getSupabaseServerClient();
+  // Wave 5 H10: only revoke if it belongs to this user. Previously any admin
+  // could revoke any other user's subscription by guessing their endpoint.
   const { error } = await sb
     .from("push_subscriptions")
     .update({ is_revoked: true })
-    .eq("endpoint", endpoint);
+    .eq("endpoint", endpoint)
+    .eq("user_id", user.id);
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("[push subscribe DELETE]", error.message);
+    return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
 
   return NextResponse.json({ ok: true });

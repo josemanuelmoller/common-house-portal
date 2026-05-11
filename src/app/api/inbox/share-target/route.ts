@@ -14,6 +14,7 @@
 import { NextResponse, after } from "next/server";
 import { currentUser } from "@clerk/nextjs/server";
 import { adminGuardApi } from "@/lib/require-admin";
+import { requireNavigationOrSameOrigin } from "@/lib/require-same-origin";
 import { createInboxItem, uploadInboxMedia } from "@/lib/inbox";
 import { classifyInboxItem } from "@/lib/inbox-classifier";
 
@@ -21,6 +22,11 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
+  // CSRF: accept only first-party navigations (Android share has
+  // Sec-Fetch-Site=none + Sec-Fetch-Mode=navigate) and reject attacker
+  // form-POSTs that come as Sec-Fetch-Site=cross-site.
+  const csrf = requireNavigationOrSameOrigin(req);
+  if (csrf) return csrf;
   const guard = await adminGuardApi();
   if (guard) return guard;
 

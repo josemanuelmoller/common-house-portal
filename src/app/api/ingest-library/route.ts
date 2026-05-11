@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@supabase/supabase-js";
 import { adminGuardApi } from "@/lib/require-admin";
+import { requireSameOriginRequest } from "@/lib/require-same-origin";
 // notion-cutoff-2026-06-02: createKnowledgeAssetDraft + notion archive write
 // replaced by canonical writes to `knowledge_assets`. Imports retained as
 // commented references; will be deleted at Phase 6.
@@ -51,6 +52,8 @@ Return ONLY the JSON object, no markdown, no explanation.`;
 // ─── POST — ingest text or file ───────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
+  const csrf = requireSameOriginRequest(req);
+  if (csrf) return csrf;
   const guard = await adminGuardApi();
   if (guard) return guard;
 
@@ -151,7 +154,11 @@ export async function POST(req: NextRequest) {
   if (fileBuffer && originalFileName) {
     const supabase = getSupabase();
     const slug = Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 6);
-    storagePath = `library/${slug}-${originalFileName}`;
+    // Sanitize filename — admin-supplied; previously interpolated raw, which
+    // allowed `../proposals/<other>/x.pdf` style traversal within the bucket.
+    // Mirrors proposal-upload's safeName regex (Wave 2.3).
+    const safeName = originalFileName.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 100);
+    storagePath = `library/${slug}-${safeName}`;
 
     const { error: uploadError } = await supabase.storage
       .from(BUCKET)

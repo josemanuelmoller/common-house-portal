@@ -68,8 +68,16 @@ export function ProposalDeckFrame({ src, aspect, title }: Props) {
             className="absolute inset-0 w-full h-full"
             style={{ border: "none", background: "white" }}
             allow="fullscreen"
-            // sandbox left off so the deck's deck-stage.js can run scripts.
-            // src is from /public so it shares origin with the host page.
+            // Wave 5 CR6: sandbox enabled. Decks live under /public so they
+            // share origin with portal — without sandbox, deck scripts would
+            // run with portal cookies + could call same-origin /api/*.
+            //
+            // allow-scripts: deck-stage.js still works.
+            // allow-popups: deck can open external links.
+            // allow-popups-to-escape-sandbox: those popups are not sandboxed.
+            // allow-same-origin INTENTIONALLY OMITTED — the deck operates in
+            // an opaque origin and cannot reach `parent`/`document.cookie`.
+            sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
           />
         </div>
 

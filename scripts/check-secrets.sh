@@ -39,18 +39,46 @@ if [ ${#TARGETS[@]} -eq 0 ]; then
 fi
 
 PATTERNS=(
+  # Notion
   'ntn_[A-Za-z0-9]{30,}'
+  # Clerk
   'sk_live_[A-Za-z0-9_-]{20,}'
   'pk_live_[A-Za-z0-9_-]{20,}'
   'sk_test_[A-Za-z0-9_-]{20,}'
   'pk_test_[A-Za-z0-9_-]{20,}'
+  # Anthropic
   'sk-ant-[A-Za-z0-9_-]{20,}'
+  # OpenAI (project, service-account, vanilla)
+  'sk-proj-[A-Za-z0-9_-]{20,}'
+  'sk-svcacct-[A-Za-z0-9_-]{20,}'
+  # Google API key / OAuth tokens / OAuth client secret
   'AIza[A-Za-z0-9_-]{30,}'
   '1//[A-Za-z0-9_-]{30,}'
   'ya29\.[A-Za-z0-9._-]{30,}'
+  'GOCSPX-[A-Za-z0-9_-]{20,}'
+  # Slack
+  'xox[abprs]-[A-Za-z0-9-]{20,}'
+  # GitHub PATs
+  'gh[pousr]_[A-Za-z0-9]{20,}'
+  'github_pat_[A-Za-z0-9_-]{40,}'
+  # GitLab PAT
+  'glpat-[A-Za-z0-9_-]{20,}'
+  # npm token
+  'npm_[A-Za-z0-9]{30,}'
+  # AWS access key
+  'AKIA[0-9A-Z]{16}'
+  # DigitalOcean
+  'dop_v1_[A-Za-z0-9]{30,}'
+  # Stripe restricted / webhook secrets
+  'rk_live_[A-Za-z0-9_-]{20,}'
+  'whsec_[A-Za-z0-9_-]{20,}'
+  # JWT shape
   'eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}'
+  # PEM private key
   'BEGIN [A-Z ]+PRIVATE KEY'
+  # Generic bearer / shared-secret shape (≥30 chars after Bearer)
   'Bearer [A-Za-z0-9._-]{30,}'
+  # Known historical literals (sanity)
   'ch-os-agent-2024-secure'
   'ch-agents-2026'
 )

@@ -49,24 +49,40 @@ function timeAgo(iso: string): string {
   return `hace ${Math.floor(h / 24)}d`
 }
 
-function corsHeaders() {
+// Wave 5 CR5: previously this route returned `Access-Control-Allow-Origin: *`,
+// which let any origin scrape the entire CH portfolio + decision pipeline from
+// a victim's browser. Lock to portal origin + the public marketing site;
+// server-to-server scrapers (curl) still work, but the browser cannot share
+// the response cross-origin with hostile JavaScript.
+const ALLOWED_HALL_ORIGINS = new Set<string>([
+  "https://portal.wearecommonhouse.com",
+  "https://wearecommonhouse.com",
+  "https://www.wearecommonhouse.com",
+  "http://localhost:3000",
+])
+
+function corsHeadersFor(req: Request) {
+  const origin = req.headers.get("origin") ?? ""
+  const allow = ALLOWED_HALL_ORIGINS.has(origin) ? origin : ""
   return {
-    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Origin": allow,
+    "Vary": "Origin",
     "Access-Control-Allow-Methods": "GET, OPTIONS",
     "Cache-Control": "s-maxage=180, stale-while-revalidate=60",
   }
 }
 
-export async function OPTIONS() {
-  return new NextResponse(null, { status: 204, headers: corsHeaders() })
+export async function OPTIONS(req: Request) {
+  return new NextResponse(null, { status: 204, headers: corsHeadersFor(req) })
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     // Run each Notion query in isolation — one failing DB must not blank out the
-    // whole Hall dashboard. Errors are surfaced in the response as `sourceErrors`
-    // so the frontend can degrade gracefully and server logs pinpoint the culprit.
-    const sourceErrors: Record<string, string> = {}
+    // whole Hall dashboard. Track which sources failed (as boolean flags) so
+    // the frontend can degrade gracefully. Wave 5 CR5: do NOT echo Notion
+    // error messages to the public response — they include database IDs.
+    const sourceErrors: Record<string, boolean> = {}
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     async function safeQuery(name: string, args: any): Promise<{ results: AnyPage[]; has_more: boolean }> {
@@ -74,9 +90,8 @@ export async function GET() {
         const res = await notion.databases.query(args)
         return { results: res.results as AnyPage[], has_more: res.has_more ?? false }
       } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err)
-        sourceErrors[name] = msg
-        console.error(`[hall-data] ${name} query failed:`, msg)
+        sourceErrors[name] = true
+        console.error(`[hall-data] ${name} query failed:`, err)
         return { results: [], has_more: false }
       }
     }
@@ -189,7 +204,7 @@ export async function GET() {
         .limit(100)
 
       if (error) {
-        sourceErrors.agentPulse = error.message
+        sourceErrors.agentPulse = true
         console.error("[hall-data] agent_runs query failed:", error.message)
       } else if (data) {
         const seen = new Set<string>()
@@ -207,9 +222,8 @@ export async function GET() {
           }))
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
-      sourceErrors.agentPulse = msg
-      console.error("[hall-data] supabase client unavailable:", msg)
+      sourceErrors.agentPulse = true
+      console.error("[hall-data] supabase client unavailable:", err)
     }
 
     return NextResponse.json(
@@ -224,13 +238,13 @@ export async function GET() {
         fetchedAt: new Date().toISOString(),
         ...(Object.keys(sourceErrors).length ? { sourceErrors } : {}),
       },
-      { headers: corsHeaders() }
+      { headers: corsHeadersFor(req) }
     )
   } catch (err) {
     console.error("[hall-data] unexpected error:", err)
     return NextResponse.json(
-      { error: "Failed to fetch hall data", detail: err instanceof Error ? err.message : String(err) },
-      { status: 500, headers: corsHeaders() }
+      { error: "Failed to fetch hall data" },
+      { status: 500, headers: corsHeadersFor(req) }
     )
   }
 }
