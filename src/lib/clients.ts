@@ -126,19 +126,23 @@ export function isAdminEmail(email: string): boolean {
 
 // Super-admin gate — controls access to sensitive IP (Knowledge Assets, etc.)
 // Set SUPER_ADMIN_USER_IDS and/or SUPER_ADMIN_EMAILS in env to grant access.
-// Falls back to ADMIN_USER_IDS/ADMIN_EMAILS if no super-admin env vars are set,
-// so the system is non-breaking on existing deployments.
+//
+// Previously this fell back to ADMIN_USER_IDS/ADMIN_EMAILS when no super-admin
+// env vars were set, so every admin was implicitly a super-admin. The audit
+// flagged that this collapsed the gate. Now: in production the super-admin
+// env MUST be set explicitly. Non-production deployments still fall back to
+// admin so dev/preview keeps working without extra setup.
 export function isSuperAdminUser(userId: string): boolean {
   const superIds = (process.env.SUPER_ADMIN_USER_IDS ?? "").split(",").map(s => s.trim()).filter(Boolean);
   if (superIds.length > 0) return superIds.includes(userId);
-  // Fallback: if no SUPER_ADMIN_USER_IDS configured, treat all admins as super-admins
+  if (process.env.NODE_ENV === "production") return false;
   return isAdminUser(userId);
 }
 
 export function isSuperAdminEmail(email: string): boolean {
   const superEmails = (process.env.SUPER_ADMIN_EMAILS ?? "").split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
   if (superEmails.length > 0) return superEmails.includes(email.toLowerCase());
-  // Fallback: if no SUPER_ADMIN_EMAILS configured, treat all admins as super-admins
+  if (process.env.NODE_ENV === "production") return false;
   return isAdminEmail(email);
 }
 

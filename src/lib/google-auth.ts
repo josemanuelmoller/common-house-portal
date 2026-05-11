@@ -24,6 +24,7 @@
  * this cleanly to the user — never silently fall back.
  */
 
+import "server-only";
 import { google } from "googleapis";
 import type { OAuth2Client } from "google-auth-library";
 

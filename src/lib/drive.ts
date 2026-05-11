@@ -1,3 +1,4 @@
+import "server-only";
 import { google } from "googleapis";
 import { DEFAULT_FOLDERS, FolderName } from "./drive-constants";
 

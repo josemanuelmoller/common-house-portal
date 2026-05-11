@@ -9,8 +9,23 @@
  * the user is told to "Save as PDF" and use the native PDF path instead.
  */
 
+import "server-only";
 import mammoth from "mammoth";
 import JSZip from "jszip";
+
+// Zip-bomb defense: PPTX/DOCX are ZIP archives. JSZip will happily inflate a
+// crafted multi-gigabyte zip into RAM until the lambda OOMs. Cap decompressed
+// size + per-entry size + total entry count.
+const MAX_DECOMPRESSED_BYTES = 75 * 1024 * 1024;   // 75 MB total inflate
+const MAX_ENTRY_BYTES        = 50 * 1024 * 1024;   // 50 MB single file
+const MAX_ENTRIES            = 5000;               // count cap
+
+class ZipBombError extends Error {
+  constructor(reason: string) {
+    super(`Zip bomb detected: ${reason}`);
+    this.name = "ZipBombError";
+  }
+}
 
 /** Extract raw text from a DOCX buffer using mammoth. */
 export async function extractDocxText(buffer: Buffer): Promise<string> {
@@ -29,6 +44,26 @@ export async function extractDocxText(buffer: Buffer): Promise<string> {
  */
 export async function extractPptxText(buffer: Buffer): Promise<string> {
   const zip = await JSZip.loadAsync(buffer);
+
+  // Cheap shape check before any async()/string read: count entries + sum
+  // uncompressed sizes from the central directory.
+  let entryCount = 0;
+  let totalUncompressed = 0;
+  zip.forEach((_path, file) => {
+    entryCount++;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const uncompressed = ((file as unknown) as { _data?: { uncompressedSize?: number } })._data?.uncompressedSize ?? 0;
+    if (uncompressed > MAX_ENTRY_BYTES) {
+      throw new ZipBombError(`entry exceeds ${MAX_ENTRY_BYTES} bytes`);
+    }
+    totalUncompressed += uncompressed;
+  });
+  if (entryCount > MAX_ENTRIES) {
+    throw new ZipBombError(`entry count ${entryCount} exceeds ${MAX_ENTRIES}`);
+  }
+  if (totalUncompressed > MAX_DECOMPRESSED_BYTES) {
+    throw new ZipBombError(`total uncompressed ${totalUncompressed} exceeds ${MAX_DECOMPRESSED_BYTES}`);
+  }
 
   type SlideEntry = { num: number; text: string; notes: string };
   const byNum = new Map<number, SlideEntry>();
