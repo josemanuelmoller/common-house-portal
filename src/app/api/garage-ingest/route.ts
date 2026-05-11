@@ -7,6 +7,7 @@ import { adminGuardApi } from "@/lib/require-admin";
 // fan-outs in this route now target Supabase canonical tables.
 import { notion } from "@/lib/notion";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
+import { safeFetch, SsrfBlockedError } from "@/lib/safe-fetch";
 import * as XLSX from "xlsx";
 import mammoth from "mammoth";
 import { extractPptxText } from "@/lib/office-text-extract";
@@ -278,12 +279,18 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Step 1: Download the file ──────────────────────────────────────────────
+  // safeFetch enforces SSRF allowlist: no loopback, no RFC1918, no
+  // 169.254.169.254 metadata, no file://. Without it an admin (or a
+  // compromised admin session) could read the lambda's metadata endpoint.
   let fileBuffer: ArrayBuffer;
   try {
-    const fileRes = await fetch(fileUrl);
+    const fileRes = await safeFetch(fileUrl);
     if (!fileRes.ok) throw new Error(`Download failed: ${fileRes.status}`);
     fileBuffer = await fileRes.arrayBuffer();
   } catch (err) {
+    if (err instanceof SsrfBlockedError) {
+      return NextResponse.json({ error: "URL rejected by SSRF policy", detail: err.message }, { status: 400 });
+    }
     return NextResponse.json(
       { error: `Failed to download file: ${err instanceof Error ? err.message : String(err)}` },
       { status: 502 }

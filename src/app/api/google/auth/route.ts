@@ -122,9 +122,14 @@ export async function GET(req: NextRequest) {
     parsed_scope_param,
   }));
 
-  // Allow ?go=1 to actually redirect (so we can complete the flow once we
-  // have verified the values). Default is diagnostic JSON.
-  if (req.nextUrl.searchParams.get("go") === "1") {
+  // Always redirect in production. Diagnostic mode (JSON dump of env, headers,
+  // and client_id suffix) is restricted to non-production environments or to
+  // explicit opt-in via GOOGLE_AUTH_DEBUG=1. The previous behaviour exposed
+  // env_override values, redirect URI char codes, and last-12 of client_id
+  // to anyone with an admin session — strictly unnecessary in prod.
+  const debugEnabled = process.env.NODE_ENV !== "production"
+    || process.env.GOOGLE_AUTH_DEBUG === "1";
+  if (!debugEnabled || req.nextUrl.searchParams.get("go") === "1") {
     return NextResponse.redirect(auth_url);
   }
 
