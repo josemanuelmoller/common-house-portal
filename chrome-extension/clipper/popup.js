@@ -74,11 +74,15 @@ async function setLastClipTs(chatKey, ts) {
 }
 
 async function getSettings() {
+  // apiUrl is intentionally hardcoded to DEFAULT_API_URL — the audit flagged
+  // that letting users override apiUrl from options.html allowed a single
+  // misconfiguration (or social-engineered "use this URL") to exfiltrate the
+  // bearer token + clipped content to an attacker. Token remains user-set.
   return new Promise((resolve) => {
-    chrome.storage.local.get(["clipperToken", "clipperApiUrl"], (res) => {
+    chrome.storage.local.get(["clipperToken"], (res) => {
       resolve({
-        token:  res.clipperToken  || "",
-        apiUrl: res.clipperApiUrl || DEFAULT_API_URL,
+        token:  res.clipperToken || "",
+        apiUrl: DEFAULT_API_URL,
       });
     });
   });

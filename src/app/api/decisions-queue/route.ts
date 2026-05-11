@@ -83,8 +83,12 @@ export async function GET() {
       { headers: corsHeaders() }
     );
   } catch (err) {
+    // Do not echo `String(err)` — Notion error messages contain database IDs
+    // and property names. Log the detail server-side; return a stable code to
+    // the caller.
+    console.error("[decisions-queue]", err);
     return NextResponse.json(
-      { error: "Failed to fetch decisions", detail: String(err) },
+      { error: "Failed to fetch decisions" },
       { status: 500, headers: corsHeaders() }
     );
   }

@@ -93,9 +93,12 @@ export async function POST(req: NextRequest) {
       assertGarageStoragePath(upload.storagePath);
       // Create a long-lived signed read URL
       const supabase = getSupabase();
+      // download:true forces Content-Disposition: attachment on the response,
+      // so HTML/SVG uploads (if they ever slip past the bucket mime whitelist)
+      // can't render inline with portal cookies.
       const { data: signedData, error: urlError } = await supabase.storage
         .from("garage-docs")
-        .createSignedUrl(upload.storagePath, 60 * 60 * 24 * 365 * 10);
+        .createSignedUrl(upload.storagePath, 60 * 60 * 24 * 365 * 10, { download: true });
 
       if (urlError || !signedData?.signedUrl) {
         const msg = urlError?.message ?? "no signed URL returned";

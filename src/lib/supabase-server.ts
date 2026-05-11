@@ -9,7 +9,12 @@
  * Read-only access pattern: no service role key needed for SELECT on opportunities.
  */
 
+import "server-only";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
+
+// Module-scoped flag so the fallback warning only fires once per lambda instance
+// (avoids flooding Vercel logs on every request when service key is missing).
+let _warnedAboutAnonFallback = false;
 
 /** Returns a server-side Supabase client. Throws if env vars are missing. */
 export function getSupabaseServerClient(): SupabaseClient {
@@ -18,12 +23,25 @@ export function getSupabaseServerClient(): SupabaseClient {
   // stale values across deployments. SUPABASE_URL and SUPABASE_SERVICE_KEY are
   // runtime-only env vars and are always read fresh from the process environment.
   const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_KEY ?? process.env.SUPABASE_ANON_KEY;
+  const serviceKey = process.env.SUPABASE_SERVICE_KEY;
+  const anonKey    = process.env.SUPABASE_ANON_KEY;
+  const key = serviceKey ?? anonKey;
 
   if (!url || !key) {
     throw new Error(
       "SUPABASE_URL / SUPABASE_SERVICE_KEY (or SUPABASE_ANON_KEY) not set. Check .env.local or Vercel env vars."
     );
+  }
+
+  // AGENTS.md "Fallback observability rule": surface a visible warning when we
+  // degrade from service-role to anon. Without this, a misconfigured prod
+  // returns 200 OK with empty rows (RLS denial) and looks healthy from outside.
+  if (!serviceKey && anonKey && !_warnedAboutAnonFallback) {
+    console.warn(
+      "[supabase] DEGRADED: SUPABASE_SERVICE_KEY missing — falling back to SUPABASE_ANON_KEY. " +
+      "Service-role reads/writes will be RLS-restricted to whatever policies permit anon."
+    );
+    _warnedAboutAnonFallback = true;
   }
 
   return createClient(url, key, {
