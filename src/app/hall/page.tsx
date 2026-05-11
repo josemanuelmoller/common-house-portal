@@ -24,6 +24,7 @@ import {
   getSourceActivity,
 } from "@/lib/notion";
 import { getProjectIdForUser, isAdminUser, isAdminEmail } from "@/lib/clients";
+import { listGrantsForCurrentUser } from "@/lib/require-client-access";
 import type {
   HallProject,
   HallMaterial,
@@ -117,6 +118,19 @@ export default async function HallPage({
   const adminViewAs = isAdmin ? (search.as ?? "").trim() || null : null;
 
   if (isAdmin && !adminViewAs) redirect("/admin");
+
+  // ── Client-scoped access (new flow, takes precedence over CLIENT_REGISTRY) ─
+  // If the signed-in user has at least one active grant in client_access,
+  // route them to the new /hall/[slug] page. This is the canonical flow for
+  // prospect / external client onboarding going forward.
+  if (!isAdmin) {
+    const grants = await listGrantsForCurrentUser();
+    if (grants.length > 0) {
+      const first = grants[0];
+      if (first.hallSlug) redirect(`/hall/${first.hallSlug}`);
+    }
+  }
+
   const projectId = adminViewAs ?? getProjectIdForUser(email);
 
   if (!projectId) {

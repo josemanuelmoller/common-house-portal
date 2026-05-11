@@ -26,6 +26,8 @@ Status tags used below:
 | `/status` | live / public | Public uptime page. Reads `public/status/uptime.json` written by `.github/workflows/uptime-check.yml` every 10 min. No auth. | `src/app/status/page.tsx` |
 | `/trust` | live / public | Public trust pack. Sub-processors, security posture, compliance status, incident response. No auth. | `src/app/trust/page.tsx` |
 | `/security` | live / public | Responsible disclosure policy + hall of fame. No auth. Mirrored at `/.well-known/security.txt`. | `src/app/security/page.tsx` |
+| `/hall/[slug]` | live | Client-scoped Hall. Gated by `client_access` table — admin passes, granted client passes, everyone else redirected. Slug = `projects.hall_slug`. Supabase-first. | `src/app/hall/[slug]/page.tsx` |
+| `/no-access` | live | Landing for authenticated users with no active grant in `client_access`. Shows sign-out + support email. | `src/app/no-access/page.tsx` |
 | `/living-room` | partial | Community showcase. Members, milestones, themes from Notion. Auth required; admin sees curation link. | `src/app/living-room/page.tsx` |
 | `/residents` | admin-only | People directory (CH team + EIRs + Digital Residents). | `src/app/residents/page.tsx` |
 | `/library` | admin-only | Knowledge Assets browser. Cross-project intelligence layer. | `src/app/library/page.tsx` |
