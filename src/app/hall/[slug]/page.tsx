@@ -1,10 +1,13 @@
 // Client-scoped Hall — /hall/[slug]
 //
-// Renders a single project from Supabase, gated by client_access table.
-// Designed for pre-sale prospect demos: focused on welcome + discovery
-// synthesis + next steps. Hides internal-only fields (agent drafts, raw
-// evidence, internal pricing) by reading ONLY the hall_* columns of the
-// projects row.
+// Renders a single project from Supabase, gated by client_access. Reads:
+//  - hall_hero (rich JSONB from compose flow) → quote, angles, listening,
+//    proposal, timeline via <HallComposedHero>
+//  - flat hall_* columns → welcome + what we heard prose fallback
+//
+// Designed for prospect demos: focused, polished, hides ALL internal data
+// (agent drafts, raw evidence, internal notes) by reading ONLY the hall_*
+// surface.
 //
 // Auth: requireClientAccessForSlug — admin passes, granted user passes,
 // everyone else redirected.
@@ -13,6 +16,9 @@ import { notFound } from "next/navigation";
 import { SignOutButton } from "@clerk/nextjs";
 import { requireClientAccessForSlug } from "@/lib/require-client-access";
 import { supabaseAdmin } from "@/lib/supabase";
+import { HallComposedHero } from "@/components/hall/HallComposedHero";
+import { withDraftDefaults } from "@/lib/hall-compose-shared";
+import type { HallDraft } from "@/lib/hall-compose-shared";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +30,7 @@ type ProjectRow = {
   current_stage: string | null;
   geography: string | null;
   themes: string | null;
+  hall_hero: HallDraft | null;
   hall_welcome_note: string | null;
   hall_current_focus: string | null;
   hall_next_milestone: string | null;
@@ -38,41 +45,39 @@ async function loadProject(slug: string): Promise<ProjectRow | null> {
   const { data } = await sb
     .from("projects")
     .select(
-      "id, name, hall_slug, project_status, current_stage, geography, themes, hall_welcome_note, hall_current_focus, hall_next_milestone, hall_challenge, hall_matters_most, hall_obstacles, hall_success"
+      "id, name, hall_slug, project_status, current_stage, geography, themes, hall_hero, hall_welcome_note, hall_current_focus, hall_next_milestone, hall_challenge, hall_matters_most, hall_obstacles, hall_success"
     )
     .eq("hall_slug", slug)
     .maybeSingle();
   return (data as ProjectRow | null) ?? null;
 }
 
-function Section({
-  num,
-  title,
-  children,
+function Field({
+  label,
+  value,
 }: {
-  num: string;
-  title: string;
-  children: React.ReactNode;
+  label: string;
+  value: string | null | undefined;
 }) {
-  return (
-    <section className="mb-12">
-      <div className="flex items-baseline gap-3 mb-4 border-b border-black/10 pb-3">
-        <span className="text-[11px] font-mono text-black/30 tabular-nums">{num}</span>
-        <h2 className="text-[20px] font-light tracking-[-0.4px]">{title}</h2>
-      </div>
-      <div className="text-[15px] leading-[1.65] text-black/75">{children}</div>
-    </section>
-  );
-}
-
-function Field({ label, value }: { label: string; value: string | null | undefined }) {
   if (!value) return null;
   return (
-    <div className="mb-5">
-      <div className="text-[11px] uppercase tracking-[1.2px] font-bold text-black/45 mb-2">
-        {label}
+    <div className="mb-6">
+      <div
+        className="mb-2"
+        style={{
+          fontFamily: "var(--font-hall-mono)",
+          fontSize: 10,
+          letterSpacing: "0.12em",
+          textTransform: "uppercase",
+          color: "var(--hall-muted-2)",
+        }}
+      >
+        · {label.toUpperCase()}
       </div>
-      <div className="text-[15px] leading-[1.65] text-black/75 whitespace-pre-line">
+      <div
+        className="text-[15px] leading-[1.65] whitespace-pre-line"
+        style={{ color: "var(--hall-ink-3)" }}
+      >
         {value}
       </div>
     </div>
@@ -91,12 +96,26 @@ export default async function HallSlugPage({
 
   const isAdmin = access.kind === "admin";
   const stage = project.current_stage || project.project_status || null;
+  const projectName = project.name ?? "Your project";
+
+  // Normalize the hero so missing optional fields don't crash the renderer.
+  const hero: HallDraft | null = project.hall_hero
+    ? withDraftDefaults(project.hall_hero)
+    : null;
 
   const anyHeard =
     project.hall_challenge ||
     project.hall_matters_most ||
     project.hall_obstacles ||
     project.hall_success;
+
+  // ── topics list (small badge row above hero, if topics are present) ──
+  const topicNames =
+    hero?.topics
+      ?.slice()
+      .sort((a, b) => b.weight - a.weight)
+      .slice(0, 6)
+      .map((t) => t.name) ?? [];
 
   return (
     <div
@@ -107,133 +126,366 @@ export default async function HallSlugPage({
         fontFamily: "var(--font-hall-sans)",
       }}
     >
-      <div className="max-w-[760px] mx-auto px-6 sm:px-10 py-12 sm:py-16">
-        {/* ── Header ───────────────────────────────────────────────────────── */}
-        <header className="mb-12">
-          <div className="flex items-center justify-between mb-3">
-            <div className="text-[11px] uppercase tracking-[1.5px] font-bold text-black/45">
+      {/* ── Top chrome ─────────────────────────────────────────────────────── */}
+      <div
+        className="border-b"
+        style={{ borderColor: "var(--hall-line-soft, rgba(0,0,0,0.08))" }}
+      >
+        <div className="max-w-5xl mx-auto px-9 py-5 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <span
+              className="inline-block w-2 h-2 rounded-full"
+              style={{ background: "var(--hall-lime, #c6f24a)" }}
+            />
+            <span
+              style={{
+                fontFamily: "var(--font-hall-mono)",
+                fontSize: 11,
+                fontWeight: 700,
+                letterSpacing: "0.14em",
+                textTransform: "uppercase",
+                color: "var(--hall-ink-0)",
+              }}
+            >
               Common House — Hall
-            </div>
-            <SignOutButton>
-              <button
-                type="button"
-                className="text-[11px] uppercase tracking-[1px] font-bold text-black/45 hover:text-black/80"
+            </span>
+            {isAdmin && (
+              <span
+                className="px-2 py-0.5"
+                style={{
+                  fontFamily: "var(--font-hall-mono)",
+                  fontSize: 9,
+                  fontWeight: 700,
+                  letterSpacing: "0.08em",
+                  background: "#0a0a0a",
+                  color: "#c6f24a",
+                  borderRadius: 2,
+                }}
               >
-                Sign out
-              </button>
-            </SignOutButton>
+                ADMIN PREVIEW
+              </span>
+            )}
           </div>
-          <h1 className="text-[36px] sm:text-[44px] font-light tracking-[-1.4px] leading-[1.05] mb-4">
-            {project.name ?? "Your project"}
+          <SignOutButton>
+            <button
+              type="button"
+              style={{
+                fontFamily: "var(--font-hall-mono)",
+                fontSize: 11,
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
+                color: "var(--hall-muted-2)",
+                fontWeight: 700,
+              }}
+            >
+              Sign out →
+            </button>
+          </SignOutButton>
+        </div>
+      </div>
+
+      {/* ── Page title block ───────────────────────────────────────────────── */}
+      <header
+        className="px-9 py-12"
+        style={{
+          borderBottom: "1px solid var(--hall-line-soft, rgba(0,0,0,0.08))",
+        }}
+      >
+        <div className="max-w-5xl mx-auto">
+          <div
+            className="mb-3"
+            style={{
+              fontFamily: "var(--font-hall-mono)",
+              fontSize: 10,
+              letterSpacing: "0.16em",
+              textTransform: "uppercase",
+              color: "var(--hall-muted-2)",
+            }}
+          >
+            · YOUR PROJECT SPACE
+          </div>
+          <h1
+            className="leading-[1.02] tracking-[-0.025em]"
+            style={{
+              fontFamily:
+                "var(--font-hall-display, 'Instrument Serif', serif)",
+              fontSize: "clamp(36px, 5.5vw, 64px)",
+              fontWeight: 400,
+              color: "var(--hall-ink-0)",
+            }}
+          >
+            {projectName}
           </h1>
-          <div className="flex flex-wrap gap-3 items-center text-[12px] text-black/55">
+          <div className="mt-5 flex flex-wrap items-center gap-3">
             {stage && (
               <span
-                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border"
-                style={{ borderColor: "rgba(0,0,0,0.18)" }}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full"
+                style={{
+                  border: "1px solid var(--hall-ink-0)",
+                  fontFamily: "var(--font-hall-mono)",
+                  fontSize: 10,
+                  fontWeight: 700,
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                  color: "var(--hall-ink-0)",
+                }}
               >
-                <span className="w-1.5 h-1.5 rounded-full bg-[#c6f24a]" />
+                <span
+                  className="w-1.5 h-1.5 rounded-full"
+                  style={{ background: "var(--hall-lime, #c6f24a)" }}
+                />
                 {stage}
               </span>
             )}
             {project.geography && (
-              <span className="text-black/50">{project.geography}</span>
-            )}
-            {project.themes && (
-              <span className="text-black/40 text-[11px] font-mono">
-                {project.themes}
-              </span>
-            )}
-            {isAdmin && (
               <span
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-[0.5px]"
-                style={{ background: "#0a0a0a", color: "#c6f24a" }}
+                style={{
+                  fontFamily: "var(--font-hall-mono)",
+                  fontSize: 11,
+                  color: "var(--hall-muted-2)",
+                  letterSpacing: "0.04em",
+                }}
               >
-                Admin preview
+                {project.geography}
               </span>
+            )}
+            {topicNames.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {topicNames.map((t) => (
+                  <span
+                    key={t}
+                    className="px-2 py-0.5"
+                    style={{
+                      fontFamily: "var(--font-hall-mono)",
+                      fontSize: 10,
+                      letterSpacing: "0.04em",
+                      background: "var(--hall-fill-soft, rgba(0,0,0,0.04))",
+                      color: "var(--hall-ink-3, #2a2a2a)",
+                    }}
+                  >
+                    {t}
+                  </span>
+                ))}
+              </div>
             )}
           </div>
-        </header>
+        </div>
+      </header>
 
-        {/* ── Welcome ──────────────────────────────────────────────────────── */}
-        {project.hall_welcome_note && (
-          <div
-            className="mb-12 p-6 rounded-[14px] border bg-white"
-            style={{ borderColor: "rgba(0,0,0,0.08)" }}
-          >
-            <div className="text-[11px] uppercase tracking-[1.2px] font-bold text-black/45 mb-3">
-              Welcome
-            </div>
-            <p className="text-[16px] leading-[1.65] text-black/80 whitespace-pre-line">
+      {/* ── Welcome card ────────────────────────────────────────────────────── */}
+      {project.hall_welcome_note && (
+        <section
+          className="px-9 py-12"
+          style={{
+            borderBottom: "1px solid var(--hall-line-soft, rgba(0,0,0,0.08))",
+          }}
+        >
+          <div className="max-w-5xl mx-auto">
+            <p
+              className="mb-3"
+              style={{
+                fontFamily: "var(--font-hall-mono)",
+                fontSize: 10,
+                letterSpacing: "0.12em",
+                textTransform: "uppercase",
+                color: "var(--hall-muted-2)",
+              }}
+            >
+              · WELCOME
+            </p>
+            <p
+              className="text-[18px] md:text-[20px] leading-[1.55] max-w-[680px] whitespace-pre-line"
+              style={{ color: "var(--hall-ink-0)" }}
+            >
               {project.hall_welcome_note}
             </p>
           </div>
-        )}
+        </section>
+      )}
 
-        {/* ── Where we are right now ───────────────────────────────────────── */}
-        {(project.hall_current_focus || project.hall_next_milestone) && (
-          <Section num="01" title="Where we are right now">
-            <Field label="Current focus" value={project.hall_current_focus} />
-            <Field label="Next milestone" value={project.hall_next_milestone} />
-          </Section>
-        )}
+      {/* ── HallComposedHero: quote + angles + signature + listening + proposal + timeline ── */}
+      {hero && <HallComposedHero hero={hero} projectName={projectName} />}
 
-        {/* ── What we heard ────────────────────────────────────────────────── */}
-        {anyHeard && (
-          <Section num="02" title="What we heard">
-            <Field label="The challenge" value={project.hall_challenge} />
-            <Field label="What matters most" value={project.hall_matters_most} />
-            <Field label="What may be in the way" value={project.hall_obstacles} />
-            <Field label="What success could look like" value={project.hall_success} />
-          </Section>
-        )}
-
-        {/* ── Empty state when no Hall fields populated yet ────────────────── */}
-        {!project.hall_welcome_note &&
-          !project.hall_current_focus &&
-          !project.hall_next_milestone &&
-          !anyHeard && (
-            <div className="border border-dashed border-black/15 rounded-[14px] p-8 text-center">
-              <div className="text-[13px] text-black/55 mb-2">
-                Your Hall is being prepared.
+      {/* ── Where we are + What we heard (prose synthesis) ─────────────────── */}
+      {(project.hall_current_focus ||
+        project.hall_next_milestone ||
+        anyHeard) && (
+        <section
+          className="px-9 py-12"
+          style={{
+            borderBottom: "1px solid var(--hall-line-soft, rgba(0,0,0,0.08))",
+          }}
+        >
+          <div className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-10">
+            {/* Left column: where we are now */}
+            {(project.hall_current_focus || project.hall_next_milestone) && (
+              <div>
+                <p
+                  className="mb-4"
+                  style={{
+                    fontFamily: "var(--font-hall-mono)",
+                    fontSize: 10,
+                    letterSpacing: "0.12em",
+                    textTransform: "uppercase",
+                    color: "var(--hall-muted-2)",
+                  }}
+                >
+                  · WHERE WE ARE
+                </p>
+                <Field
+                  label="Current focus"
+                  value={project.hall_current_focus}
+                />
+                <Field
+                  label="Next milestone"
+                  value={project.hall_next_milestone}
+                />
               </div>
-              <div className="text-[12px] text-black/45 leading-relaxed">
-                Your Common House contact is putting together the first view of
-                your project. Check back shortly.
+            )}
+            {/* Right column: what we heard */}
+            {anyHeard && (
+              <div>
+                <p
+                  className="mb-4"
+                  style={{
+                    fontFamily: "var(--font-hall-mono)",
+                    fontSize: 10,
+                    letterSpacing: "0.12em",
+                    textTransform: "uppercase",
+                    color: "var(--hall-muted-2)",
+                  }}
+                >
+                  · WHAT WE HEARD
+                </p>
+                <Field label="The challenge" value={project.hall_challenge} />
+                <Field
+                  label="What matters most"
+                  value={project.hall_matters_most}
+                />
+                <Field
+                  label="What may be in the way"
+                  value={project.hall_obstacles}
+                />
+                <Field
+                  label="What success could look like"
+                  value={project.hall_success}
+                />
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* ── Empty state when no Hall fields populated yet ──────────────────── */}
+      {!project.hall_welcome_note &&
+        !hero &&
+        !project.hall_current_focus &&
+        !project.hall_next_milestone &&
+        !anyHeard && (
+          <section className="px-9 py-16">
+            <div className="max-w-5xl mx-auto">
+              <div
+                className="px-8 py-12 text-center"
+                style={{
+                  border:
+                    "1px dashed var(--hall-line, rgba(0,0,0,0.15))",
+                  background: "var(--hall-paper-0, #fff)",
+                }}
+              >
+                <p
+                  className="mb-3"
+                  style={{
+                    fontFamily: "var(--font-hall-mono)",
+                    fontSize: 11,
+                    letterSpacing: "0.08em",
+                    textTransform: "uppercase",
+                    color: "var(--hall-muted-2)",
+                  }}
+                >
+                  Your Hall is being prepared
+                </p>
+                <p
+                  className="text-[13px]"
+                  style={{ color: "var(--hall-muted-3)" }}
+                >
+                  Your Common House contact is putting together the first
+                  view. Check back shortly.
+                </p>
               </div>
             </div>
-          )}
+          </section>
+        )}
 
-        {/* ── Contact ──────────────────────────────────────────────────────── */}
-        <Section num="03" title="Contact">
-          <p>
+      {/* ── Contact ────────────────────────────────────────────────────────── */}
+      <section className="px-9 py-12">
+        <div className="max-w-5xl mx-auto">
+          <p
+            className="mb-3"
+            style={{
+              fontFamily: "var(--font-hall-mono)",
+              fontSize: 10,
+              letterSpacing: "0.12em",
+              textTransform: "uppercase",
+              color: "var(--hall-muted-2)",
+            }}
+          >
+            · CONTACT
+          </p>
+          <p
+            className="text-[15px] leading-relaxed"
+            style={{ color: "var(--hall-ink-3)" }}
+          >
             Questions or anything you&apos;d like to add?{" "}
             <a
               href="mailto:josemanuel@wearecommonhouse.com"
-              className="underline hover:text-black"
+              className="underline hover:opacity-70"
+              style={{ color: "var(--hall-ink-0)" }}
             >
               josemanuel@wearecommonhouse.com
             </a>
           </p>
-        </Section>
+        </div>
+      </section>
 
-        <footer className="text-[11px] text-black/35 leading-relaxed border-t border-black/10 pt-6 mt-12">
-          <div>Prepared by Common House</div>
-          <div className="mt-1">
-            <a href="/trust" className="underline hover:text-black/60">
+      <footer
+        className="px-9 py-8"
+        style={{
+          borderTop: "1px solid var(--hall-line-soft, rgba(0,0,0,0.08))",
+        }}
+      >
+        <div className="max-w-5xl mx-auto flex flex-wrap items-center justify-between gap-3">
+          <p
+            style={{
+              fontFamily: "var(--font-hall-mono)",
+              fontSize: 10,
+              letterSpacing: "0.08em",
+              color: "var(--hall-muted-3)",
+            }}
+          >
+            Prepared by Common House
+          </p>
+          <p
+            style={{
+              fontFamily: "var(--font-hall-mono)",
+              fontSize: 10,
+              letterSpacing: "0.08em",
+              color: "var(--hall-muted-3)",
+            }}
+          >
+            <a href="/trust" className="hover:underline">
               Trust
-            </a>
-            {" · "}
-            <a href="/status" className="underline hover:text-black/60">
+            </a>{" "}
+            ·{" "}
+            <a href="/status" className="hover:underline">
               Status
-            </a>
-            {" · "}
-            <a href="/security" className="underline hover:text-black/60">
+            </a>{" "}
+            ·{" "}
+            <a href="/security" className="hover:underline">
               Security
             </a>
-          </div>
-        </footer>
-      </div>
+          </p>
+        </div>
+      </footer>
     </div>
   );
 }
