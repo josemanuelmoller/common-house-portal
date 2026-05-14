@@ -35,11 +35,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
-          token: ${{ secrets.GITHUB_TOKEN }}
-
+      # No checkout of main needed: the probe is pure curl, and the publish
+      # step clones the `status` branch on its own.
       - name: Probe twice, 30s apart
         id: probe
         shell: bash
@@ -94,9 +91,10 @@ jobs:
           echo "root_codes=${first[root]},${second[root]}" >> "$GITHUB_OUTPUT"
           echo "api_codes=${first[api]},${second[api]}"   >> "$GITHUB_OUTPUT"
 
-      - name: Write status JSON
+      - name: Publish status to `status` branch
         shell: bash
         env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OVERALL: ${{ steps.probe.outputs.overall }}
           ROOT_STATUS: ${{ steps.probe.outputs.root }}
           API_STATUS: ${{ steps.probe.outputs.api }}
@@ -104,15 +102,38 @@ jobs:
           API_CODES: ${{ steps.probe.outputs.api_codes }}
           NOW: ${{ steps.probe.outputs.now }}
         run: |
+          set -e
+          # Status JSON is published to a dedicated `status` branch — NOT main.
+          # Committing to main triggered a full production redeploy on every
+          # probe, and the deploy churn made the next probe flap. Vercel deploys
+          # are disabled for this branch (see vercel.json `git.deploymentEnabled`).
+          # The portal's /status page fetches these files from the raw branch URL.
+
+          AUTH_URL="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+
+          # Clone the status branch; create it as an orphan if it does not exist yet.
+          if git clone --depth 1 --branch status "$AUTH_URL" status-repo 2>/dev/null; then
+            echo "status branch exists"
+          else
+            echo "status branch missing — creating orphan"
+            git clone --depth 1 "$AUTH_URL" status-repo
+            cd status-repo
+            git checkout --orphan status
+            git rm -rf . >/dev/null 2>&1 || true
+            cd - >/dev/null
+          fi
+
+          cd status-repo
           mkdir -p public/status
-          # Append to history (last 144 entries = 24h at 10-min interval)
           HIST_FILE=public/status/history.json
+
+          # Append to history on the status branch (last 144 entries = 24h @ 10-min).
           if [ ! -f "$HIST_FILE" ]; then echo "[]" > "$HIST_FILE"; fi
           jq --arg ts "$NOW" --arg ov "$OVERALL" \
              '. + [{ts:$ts, overall:$ov}] | .[-144:]' \
              "$HIST_FILE" > "$HIST_FILE.tmp" && mv "$HIST_FILE.tmp" "$HIST_FILE"
 
-          # Current snapshot
+          # Current snapshot.
           jq -n \
             --arg ts "$NOW" \
             --arg ov "$OVERALL" \
@@ -128,21 +149,12 @@ jobs:
               note: "Auto-probed every 10 min by GitHub Actions. See .github/workflows/uptime-check.yml"
             }' > public/status/uptime.json
 
-      - name: Commit if changed
-        shell: bash
-        run: |
           git config user.name  "ch-uptime-bot"
           git config user.email "ch-uptime-bot@users.noreply.github.com"
-          if git diff --quiet public/status/; then
+          git add public/status/
+          if git diff --cached --quiet; then
             echo "No status change."
             exit 0
           fi
-          git add public/status/
-          git commit -m "chore(status): uptime probe ${{ steps.probe.outputs.overall }} @ ${{ steps.probe.outputs.now }}"
-          # Retry-safe push: pull --rebase to absorb concurrent uptime commits
-          for i in 1 2 3; do
-            git pull --rebase --autostash origin main && git push origin HEAD:main && exit 0
-            sleep 5
-          done
-          echo "::error::push failed after 3 retries"
-          exit 1
+          git commit -m "chore(status): uptime probe ${OVERALL} @ ${NOW}"
+          git push "$AUTH_URL" HEAD:status

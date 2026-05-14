@@ -1,13 +1,14 @@
 // Public status page — no auth required.
-// Reads public/status/uptime.json + history.json, written by the
+// Reads uptime.json + history.json from the `status` branch, written by the
 // .github/workflows/uptime-check.yml workflow every 10 minutes.
+//
+// The status JSON lives on a dedicated `status` branch (not main) and is
+// fetched at runtime — committing it to main would trigger a full production
+// redeploy on every probe, and deploy churn made the next probe flap.
 //
 // Source: GitHub Actions cron (free tier, ~144 runs/day).
 // Anti-flap: each probe runs twice 30s apart; a service is only marked
 // "down" if both probes fail. See workflow for details.
-
-import fs from "node:fs/promises";
-import path from "node:path";
 
 export const metadata = {
   title: "Common House — Status",
@@ -17,6 +18,9 @@ export const metadata = {
 // Re-render every 5 min so freshly committed status JSON shows up
 // without a deploy.
 export const revalidate = 300;
+
+const STATUS_RAW_BASE =
+  "https://raw.githubusercontent.com/josemanuelmoller/common-house-portal/status/public/status";
 
 type ServiceStatus = "ok" | "degraded" | "down";
 
@@ -29,11 +33,13 @@ type UptimeSnapshot = {
 
 type HistoryEntry = { ts: string; overall: ServiceStatus };
 
-async function readJson<T>(relPath: string, fallback: T): Promise<T> {
+async function readJson<T>(file: string, fallback: T): Promise<T> {
   try {
-    const full = path.join(process.cwd(), relPath);
-    const raw = await fs.readFile(full, "utf8");
-    return JSON.parse(raw) as T;
+    const res = await fetch(`${STATUS_RAW_BASE}/${file}`, {
+      next: { revalidate: 300 },
+    });
+    if (!res.ok) return fallback;
+    return (await res.json()) as T;
   } catch {
     return fallback;
   }
@@ -87,13 +93,13 @@ function HistoryBar({ entries }: { entries: HistoryEntry[] }) {
 }
 
 export default async function StatusPage() {
-  const snapshot = await readJson<UptimeSnapshot>("public/status/uptime.json", {
+  const snapshot = await readJson<UptimeSnapshot>("uptime.json", {
     checked_at: new Date().toISOString(),
     overall: "ok",
     services: [],
     note: "No data yet — uptime workflow has not run.",
   });
-  const history = await readJson<HistoryEntry[]>("public/status/history.json", []);
+  const history = await readJson<HistoryEntry[]>("history.json", []);
 
   const overallColor = statusColor(snapshot.overall);
   const overallLabel = statusLabel(snapshot.overall);

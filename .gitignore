@@ -67,3 +67,8 @@ next-env.d.ts
 
 # local-only dev launcher (worktree-specific paths)
 /start-worktree.cmd
+
+# Uptime status JSON lives on the dedicated `status` branch, not main
+# (see .github/workflows/uptime-check.yml). The workflow writes it there
+# transiently during a run; never commit it to main.
+public/status/

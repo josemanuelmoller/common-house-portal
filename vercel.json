@@ -3,6 +3,11 @@
   "buildCommand": "npm run build",
   "installCommand": "npm install",
   "regions": ["lhr1"],
+  "git": {
+    "deploymentEnabled": {
+      "status": false
+    }
+  },
   "headers": [
     {
       "source": "/api/(.*)",
