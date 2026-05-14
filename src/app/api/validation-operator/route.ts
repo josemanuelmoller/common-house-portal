@@ -74,6 +74,10 @@ type EvidenceLike = {
   excerpt: string;
   projectId: string | null;
   dateCaptured: string | null;
+  // Meeting transcripts are high-trust sources — a clear excerpt is enough
+  // to validate even without a project link (many ecosystem meetings belong
+  // to no garage project).
+  isMeeting: boolean;
 };
 
 // Supabase-native read. Covers both Supabase-native evidence (meeting
@@ -84,7 +88,7 @@ async function getEvidenceByStatus(status: "New" | "Reviewed"): Promise<Evidence
   const sb = getSupabaseServerClient();
   const { data, error } = await sb
     .from("evidence")
-    .select("id, title, evidence_type, confidence_level, source_excerpt, project_notion_id, date_captured")
+    .select("id, title, evidence_type, confidence_level, source_excerpt, project_notion_id, date_captured, legacy_source_db")
     .eq("validation_status", status)
     .limit(2000);
   if (error) {
@@ -99,6 +103,7 @@ async function getEvidenceByStatus(status: "New" | "Reviewed"): Promise<Evidence
     source_excerpt: string | null;
     project_notion_id: string | null;
     date_captured: string | null;
+    legacy_source_db: string | null;
   }>).map(r => ({
     id:           r.id,
     title:        r.title ?? "",
@@ -107,6 +112,7 @@ async function getEvidenceByStatus(status: "New" | "Reviewed"): Promise<Evidence
     excerpt:      r.source_excerpt ?? "",
     projectId:    r.project_notion_id,
     dateCaptured: r.date_captured,
+    isMeeting:    r.legacy_source_db === "Meetings [master]",
   }));
 }
 
@@ -122,8 +128,13 @@ function classifyNew(ev: EvidenceLike): Classification {
   const hasProject = Boolean(ev.projectId);
   const conf = ev.confidence;
 
-  if (!hasExcerpt || !hasProject) {
-    return { tier: "KEEP_NEW", reason: "missing excerpt or project — needs human" };
+  if (!hasExcerpt) {
+    return { tier: "KEEP_NEW", reason: "missing excerpt — needs human" };
+  }
+  // Meeting transcripts are high-trust: a clear excerpt is enough even with
+  // no project link. Non-meeting evidence still needs a project to auto-clear.
+  if (!hasProject && !ev.isMeeting) {
+    return { tier: "KEEP_NEW", reason: "missing project — needs human" };
   }
   if (conf === "Low" || !conf) {
     return { tier: "KEEP_NEW", reason: "Low confidence — needs human" };
