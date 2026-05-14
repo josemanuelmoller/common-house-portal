@@ -1,0 +1,23 @@
+{
+  "checked_at": "2026-05-14T13:11:06Z",
+  "overall": "degraded",
+  "services": [
+    {
+      "name": "Portal",
+      "status": "degraded",
+      "codes": [
+        "403",
+        "403"
+      ]
+    },
+    {
+      "name": "Hall API",
+      "status": "degraded",
+      "codes": [
+        "403",
+        "403"
+      ]
+    }
+  ],
+  "note": "Auto-probed every 10 min by GitHub Actions. See .github/workflows/uptime-check.yml"
+}
