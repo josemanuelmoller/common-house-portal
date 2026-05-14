@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-// notion-cutoff-2026-06-02: write removed; canonical write is now to evidence (Supabase).
-// `notion` import is retained because `getAllEvidence` (read path) still touches Notion
-// until the validation-operator's read source is migrated. See PHASE_4_5_INVENTORY.md row 11.
-import { getAllEvidence } from "@/lib/notion";
+// notion-cutoff-2026-06-02: both read and write paths are now Supabase-native.
+// The previous Notion read (getAllEvidence) could not see Supabase-native
+// evidence — e.g. meeting evidence written directly by extract-meeting-evidence
+// — so that evidence never left the New queue and the Fireflies action-item
+// ingestor (which needs Validated rows) stayed empty.
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { withRoutineLog } from "@/lib/routine-log";
 
@@ -75,6 +76,40 @@ type EvidenceLike = {
   dateCaptured: string | null;
 };
 
+// Supabase-native read. Covers both Supabase-native evidence (meeting
+// evidence, etc.) AND Notion-origin evidence, which sync-evidence mirrors
+// into the same table — so this is strictly more complete than the old
+// Notion-only read.
+async function getEvidenceByStatus(status: "New" | "Reviewed"): Promise<EvidenceLike[]> {
+  const sb = getSupabaseServerClient();
+  const { data, error } = await sb
+    .from("evidence")
+    .select("id, title, evidence_type, confidence_level, source_excerpt, project_notion_id, date_captured")
+    .eq("validation_status", status)
+    .limit(2000);
+  if (error) {
+    console.error(`[validation-operator] read ${status} failed:`, error.message);
+    return [];
+  }
+  return ((data ?? []) as Array<{
+    id: string;
+    title: string | null;
+    evidence_type: string | null;
+    confidence_level: string | null;
+    source_excerpt: string | null;
+    project_notion_id: string | null;
+    date_captured: string | null;
+  }>).map(r => ({
+    id:           r.id,
+    title:        r.title ?? "",
+    type:         r.evidence_type ?? "",
+    confidence:   r.confidence_level ?? "",
+    excerpt:      r.source_excerpt ?? "",
+    projectId:    r.project_notion_id,
+    dateCaptured: r.date_captured,
+  }));
+}
+
 type Classification =
   | { tier: "AUTO_VALIDATE"; reason: string }
   | { tier: "AUTO_REVIEW"; reason: string }
@@ -137,8 +172,8 @@ async function _POST(req: NextRequest) {
   }
 
   const [newItems, reviewedItems] = await Promise.all([
-    getAllEvidence("New"),
-    getAllEvidence("Reviewed"),
+    getEvidenceByStatus("New"),
+    getEvidenceByStatus("Reviewed"),
   ]);
   const sb = getSupabaseServerClient();
 
@@ -155,11 +190,9 @@ async function _POST(req: NextRequest) {
   };
 
   async function writeStatus(id: string, status: "Validated" | "Reviewed" | "Superseded") {
-    // notion-cutoff-2026-06-02: replaced by canonical write to evidence (Supabase).
-    // await notion.pages.update({
-    //   page_id: id,
-    //   properties: { "Validation Status": { select: { name: status } } },
-    // });
+    // notion-cutoff-2026-06-02: canonical write is Supabase. `id` is the
+    // evidence uuid PK (evidence.id) — notion_id is NULL on Supabase-native
+    // rows, so it cannot be used as the update key.
     const nowIso = new Date().toISOString();
     const update: Record<string, unknown> = {
       validation_status: status,
@@ -170,7 +203,7 @@ async function _POST(req: NextRequest) {
     }
     const { error } = await sb.from("evidence")
       .update(update)
-      .eq("notion_id", id);
+      .eq("id", id);
     if (error) throw new Error(`evidence update failed: ${error.message}`);
   }
 

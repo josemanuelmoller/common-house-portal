@@ -384,9 +384,13 @@ async function _POST(req: NextRequest) {
       //   Source URL         → source_url
       //   Linked Projects    → project_notion_id
       //   Processed Summary  → processed_summary
+      // Upsert on source_external_id: extract-meeting-evidence may have
+      // already created a minimal row for this transcript hours earlier.
+      // Upserting enriches that row (project link, summary) instead of
+      // failing on the source_external_id unique index.
       const { error: insertErr } = await sb
         .from("sources")
-        .insert({
+        .upsert({
           title:             t.title.slice(0, 200),
           source_type:       "Meeting",
           source_platform:   "Fireflies",
@@ -397,7 +401,7 @@ async function _POST(req: NextRequest) {
           processed_summary: summary ? summary.slice(0, 2000) : null,
           dedup_key:         `fireflies:${t.id}`,
           source_external_id: t.id,
-        });
+        }, { onConflict: "source_external_id" });
       if (insertErr) {
         sourceErrors.push(`${t.title}: ${insertErr.message}`);
         continue;

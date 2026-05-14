@@ -350,6 +350,7 @@ async function writeEvidence(
   dateStr:   string,
   orgId:     string | null,
   projectId: string | null,
+  sourceId:  string | null,
 ): Promise<string> {
   const evidenceType = VALID_TYPES.has(item.type) ? item.type : "Outcome";
   const confidence   = VALID_CONFIDENCE.has(item.confidence) ? item.confidence : "Medium";
@@ -406,6 +407,10 @@ async function writeEvidence(
       topics:              validTopics.length > 0 ? validTopics.join(", ") : null,
       org_notion_id:       orgId,
       project_notion_id:   projectId,
+      // Stable FK back to the Fireflies meeting source. Without this the
+      // Fireflies action-item ingestor cannot find this evidence and the
+      // Hall "Commitments" surface stays empty.
+      source_id:           sourceId,
     })
     .select("id")
     .single();
@@ -413,6 +418,55 @@ async function writeEvidence(
     throw new Error(`evidence insert failed: ${error.message}`);
   }
   return (data?.id as string) ?? "";
+}
+
+// ─── Source find-or-create ────────────────────────────────────────────────────
+// Each transcript must have a row in `sources` so evidence can FK to it.
+// fireflies-sync also creates these (and enriches with project links), but it
+// runs hours later AND only for transcripts that match a project — so this
+// extractor owns "ensure the source exists". Keyed on source_external_id (the
+// Fireflies transcript id), which is stable and always present, unlike notion_id.
+
+async function ensureFirefliesSource(t: FirefliesTranscript): Promise<string | null> {
+  const sb = getSupabaseServerClient();
+
+  const { data: existing } = await sb
+    .from("sources")
+    .select("id")
+    .eq("source_external_id", t.id)
+    .maybeSingle();
+  if (existing?.id) return existing.id as string;
+
+  const meetingDate = new Date(t.date).toISOString().slice(0, 10);
+  const summary     = t.summary?.overview || t.summary?.shorthand_bullet || "";
+  const { data: created, error } = await sb
+    .from("sources")
+    .insert({
+      title:              t.title.slice(0, 200),
+      source_type:        "Meeting",
+      source_platform:    "Fireflies",
+      processing_status:  "Processed",
+      source_date:        meetingDate,
+      // Same viewer URL format fireflies-sync uses — keeps its URL-based
+      // dedup consistent so it does not create a duplicate row later.
+      source_url:         `https://app.fireflies.ai/view/${t.id}`,
+      processed_summary:  summary ? summary.slice(0, 2000) : null,
+      dedup_key:          `fireflies:${t.id}`,
+      source_external_id: t.id,
+    })
+    .select("id")
+    .single();
+
+  if (error) {
+    // Unique-violation race (another writer created it first) — re-select.
+    const { data: raced } = await sb
+      .from("sources")
+      .select("id")
+      .eq("source_external_id", t.id)
+      .maybeSingle();
+    return raced?.id ?? null;
+  }
+  return created?.id ?? null;
 }
 
 // ─── Main handler ─────────────────────────────────────────────────────────────
@@ -451,6 +505,8 @@ async function _POST(req: NextRequest) {
         const items     = await extractEvidence(t, usageAcc);
         const dateStr   = new Date(t.date).toISOString().slice(0, 10);
         const projectId = resolveProject(t.title, t.participants);
+        // Ensure the meeting has a `sources` row so evidence can FK to it.
+        const sourceId  = await ensureFirefliesSource(t);
         const ids:      string[] = [];
         let   skipped   = 0;
 
@@ -461,7 +517,7 @@ async function _POST(req: NextRequest) {
             if (existingKeys.has(key)) { skipped++; continue; }
 
             const orgId = resolveOrg(item.org_name, t.participants);
-            const id    = await writeEvidence(item, dateStr, orgId, projectId);
+            const id    = await writeEvidence(item, dateStr, orgId, projectId, sourceId);
             existingKeys.add(key); // prevent within-run duplicates
             ids.push(id);
           } catch (e) {

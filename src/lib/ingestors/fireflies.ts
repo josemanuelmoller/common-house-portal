@@ -60,13 +60,16 @@ const ACTIONABLE_EVIDENCE_TYPES = [
 ];
 
 type EvidenceRow = {
-  notion_id:           string;
+  id:                  string;
   title:               string;
   evidence_type:       string;
   evidence_statement:  string | null;
   date_captured:       string;
   project_notion_id:   string | null;
-  source_notion_id:    string | null;
+  // FK to sources.id — stable uuid join key. Replaced the old text-based
+  // source_notion_id ↔ sources.notion_id join, which broke once Notion
+  // writes were turned off and notion_id went NULL on recent sources.
+  source_id:           string | null;
   // from sources join
   source_url:          string | null;
   source_date:         string | null;
@@ -127,7 +130,7 @@ export async function runFirefliesIngestor(input: IngestInput): Promise<IngestRe
       let latest = since ? new Date(since) : new Date(0);
 
       // ─── Gather meeting attendees for RelationshipSignals ────────────
-      const meetingIds = Array.from(new Set(rows.map(r => r.source_notion_id).filter((x): x is string => !!x)));
+      const meetingIds = Array.from(new Set(rows.map(r => r.source_id).filter((x): x is string => !!x)));
       const attendeesByMeeting = await getAttendeesByMeeting(meetingIds);
 
       // ─── Resolve emails → people.id (for relationship signals) ───────
@@ -141,7 +144,7 @@ export async function runFirefliesIngestor(input: IngestInput): Promise<IngestRe
         const rowDate = new Date(row.date_captured);
         if (rowDate > latest) latest = rowDate;
 
-        const cls = classifications.get(row.notion_id);
+        const cls = classifications.get(row.id);
         if (!cls || !cls.is_actionable || cls.intent === "skip") { skipped++; continue; }
         if (cls.actor === "ambiguous" || cls.actor === "none") { skipped++; continue; }
 
@@ -174,8 +177,8 @@ export async function runFirefliesIngestor(input: IngestInput): Promise<IngestRe
         const signal: ActionSignal = {
           kind: "action",
           source_type: SOURCE_TYPE,
-          source_id: row.notion_id,
-          source_url: row.source_url ?? `https://www.notion.so/${row.notion_id.replace(/-/g, "")}`,
+          source_id: row.id,
+          source_url: row.source_url ?? "",
           emitted_at: new Date().toISOString(),
           ingestor_version: INGESTOR_VERSION,
           related_ids: {},
@@ -199,7 +202,7 @@ export async function runFirefliesIngestor(input: IngestInput): Promise<IngestRe
 
       // ─── RelationshipSignals per meeting × attendee ──────────────────
       for (const meetingId of meetingIds) {
-        const meetingRow = rows.find(r => r.source_notion_id === meetingId);
+        const meetingRow = rows.find(r => r.source_id === meetingId);
         const meetingDate = meetingRow?.source_date ?? meetingRow?.date_captured;
         if (!meetingDate) continue;
         const attendees = attendeesByMeeting[meetingId] ?? [];
@@ -291,39 +294,39 @@ async function fetchFirefliesEvidenceSince(since: string | null, maxItems: numbe
   const sinceDate = since ? new Date(since) : new Date(Date.now() - DEFAULT_BACKFILL_DAYS * 86_400_000);
   const sinceDateStr = sinceDate.toISOString().slice(0, 10);
 
-  // Step 1: Get all Fireflies source notion_ids. Most evidence rows lack a
-  // linked source_notion_id (manual entries, conversation-derived, etc.), so
-  // we must filter at the DB level rather than LIMIT + client-side filter
-  // — otherwise the newest orphan rows crowd out the Fireflies ones.
+  // Step 1: Get all Fireflies source ids. Most evidence rows lack a linked
+  // source_id (manual entries, conversation-derived, etc.), so we must filter
+  // at the DB level rather than LIMIT + client-side filter — otherwise the
+  // newest orphan rows crowd out the Fireflies ones.
   const { data: srcData, error: srcErr } = await sb
     .from("sources")
-    .select("notion_id, source_url, source_date, title")
+    .select("id, source_url, source_date, title")
     .eq("source_platform", "Fireflies");
   if (srcErr) throw new Error(`fetchFirefliesEvidenceSince sources: ${srcErr.message}`);
-  const sources = (srcData ?? []) as Array<{ notion_id: string; source_url: string | null; source_date: string | null; title: string | null }>;
+  const sources = (srcData ?? []) as Array<{ id: string; source_url: string | null; source_date: string | null; title: string | null }>;
   if (sources.length === 0) return [];
 
   const srcMeta = new Map<string, { url: string | null; date: string | null; title: string | null }>();
-  for (const s of sources) srcMeta.set(s.notion_id, { url: s.source_url, date: s.source_date, title: s.title });
+  for (const s of sources) srcMeta.set(s.id, { url: s.source_url, date: s.source_date, title: s.title });
 
   // Step 2: Evidence whose source is one of those Fireflies meetings.
   const { data, error } = await sb
     .from("evidence")
     .select(
-      "notion_id, title, evidence_type, evidence_statement, date_captured, " +
-      "project_notion_id, source_notion_id"
+      "id, title, evidence_type, evidence_statement, date_captured, " +
+      "project_notion_id, source_id"
     )
     .eq("validation_status", "Validated")
     .in("evidence_type", ACTIONABLE_EVIDENCE_TYPES)
     .gte("date_captured", sinceDateStr)
-    .in("source_notion_id", Array.from(srcMeta.keys()))
+    .in("source_id", Array.from(srcMeta.keys()))
     .order("date_captured", { ascending: false })
     .limit(maxItems);
 
   if (error) throw new Error(`fetchFirefliesEvidenceSince evidence: ${error.message}`);
   const rows = (data ?? []) as unknown as EvidenceRow[];
   return rows.map(r => {
-    const meta = srcMeta.get(r.source_notion_id ?? "");
+    const meta = srcMeta.get(r.source_id ?? "");
     return {
       ...r,
       source_url:    meta?.url ?? null,
@@ -333,21 +336,21 @@ async function fetchFirefliesEvidenceSince(since: string | null, maxItems: numbe
   });
 }
 
-async function getAttendeesByMeeting(sourceNotionIds: string[]): Promise<Record<string, string[]>> {
-  if (sourceNotionIds.length === 0) return {};
+async function getAttendeesByMeeting(sourceIds: string[]): Promise<Record<string, string[]>> {
+  if (sourceIds.length === 0) return {};
   const sb = getSupabaseServerClient();
-  // Map source.notion_id → transcript observation by joining via source_external_id or title.
-  // hall_transcript_observations is keyed by transcript_id which isn't the source_notion_id;
+  // Map source.id → transcript observation by joining via source_external_id or title.
+  // hall_transcript_observations is keyed by transcript_id which isn't the source id;
   // we join via sources.source_external_id = transcript_id when present, else by title.
   const { data: srcs } = await sb
     .from("sources")
-    .select("notion_id, source_external_id, title")
-    .in("notion_id", sourceNotionIds);
+    .select("id, source_external_id, title")
+    .in("id", sourceIds);
   const srcByExt = new Map<string, string>();
   const srcByTitle = new Map<string, string>();
-  for (const s of (srcs ?? []) as Array<{ notion_id: string; source_external_id: string | null; title: string | null }>) {
-    if (s.source_external_id) srcByExt.set(s.source_external_id, s.notion_id);
-    if (s.title) srcByTitle.set(s.title, s.notion_id);
+  for (const s of (srcs ?? []) as Array<{ id: string; source_external_id: string | null; title: string | null }>) {
+    if (s.source_external_id) srcByExt.set(s.source_external_id, s.id);
+    if (s.title) srcByTitle.set(s.title, s.id);
   }
 
   const transcriptIds = Array.from(srcByExt.keys());
@@ -363,8 +366,8 @@ async function getAttendeesByMeeting(sourceNotionIds: string[]): Promise<Record<
       out[sid] = (o.participant_emails ?? []).filter(Boolean);
     }
   }
-  // Fallback: title match for any source_notion_id not yet resolved
-  const unresolved = sourceNotionIds.filter(id => !(id in out));
+  // Fallback: title match for any source id not yet resolved
+  const unresolved = sourceIds.filter(id => !(id in out));
   if (unresolved.length > 0) {
     const titles = Array.from(new Set(unresolved.map(id => {
       for (const [title, nid] of srcByTitle.entries()) if (nid === id) return title;
@@ -471,7 +474,7 @@ Return ONLY a JSON array: [{"index": <int>, "is_actionable": <bool>, "actor": ".
       const intent = (["deliver", "chase", "follow_up", "skip"] as const).includes(row.intent as never)
         ? (row.intent as Classification["intent"])
         : "skip";
-      out.set(r.notion_id, {
+      out.set(r.id, {
         is_actionable: !!row.is_actionable,
         actor:         actor as Classification["actor"],
         counterparty:  row.counterparty ?? null,
