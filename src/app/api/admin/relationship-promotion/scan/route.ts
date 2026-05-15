@@ -116,7 +116,8 @@ export async function POST(req: NextRequest) {
     const { data: statusRows, error: statusErr } = await sb
       .from("v_org_status")
       .select("notion_id, relationship_type, raw_relationship_stage")
-      .not("relationship_type", "in", "(Prospect,Archived)");
+      // Portfolio is orthogonal to the funnel — excluded here too.
+      .not("relationship_type", "in", "(Prospect,Archived,Portfolio)");
     if (statusErr) return NextResponse.json({ error: "status view failed", detail: statusErr.message }, { status: 502 });
     const interestingIds = (statusRows ?? [])
       .filter((s: { notion_id: string; relationship_type: string; raw_relationship_stage: string | null }) => {
@@ -244,27 +245,33 @@ export async function POST(req: NextRequest) {
     }
 
     // Canonical signal: derived relationship_type from v_org_status. If the
-    // derived type is not 'Prospect'/'Archived' and it doesn't match the raw
-    // stage, that alone is a strong promotion signal (weight 4, dominant).
+    // derived type is one that MAPS to a relationship_stage value AND it
+    // doesn't match the raw stage, that alone is a strong promotion signal
+    // (weight 4, dominant).
+    //
+    // 'Portfolio' is deliberately excluded: it's an orthogonal axis (the org
+    // belongs to CH's portfolio with a startup engagement_model), not a step
+    // in the Prospect → Active Client → Lapsed → Archived funnel. Portfolio
+    // orgs don't get "promoted" — they get tagged on a different surface.
     const derived = statusByNotion.get(org.notion_id);
+    const derivedStage:
+      | "Active Client" | "Partner" | "Investor" | "Funder" | null =
+        derived?.relationship_type === "Client"   ? "Active Client" :
+        derived?.relationship_type === "Partner"  ? "Partner" :
+        derived?.relationship_type === "Funder"   ? "Funder" :
+        derived?.relationship_type === "Investor" ? "Investor" :
+        null;
     if (
       derived &&
-      derived.relationship_type !== "Prospect" &&
-      derived.relationship_type !== "Archived" &&
-      derived.relationship_type !== org.relationship_stage &&
-      // Don't double-fire "Active Client" stage when derived says Client —
-      // these mean the same thing in the legacy stage vocabulary.
-      !(derived.relationship_type === "Client" && org.relationship_stage === "Active Client")
+      derivedStage &&
+      derivedStage !== org.relationship_stage &&
+      // "Active Client" stage == "Client" derived type — same thing, two vocab.
+      !(derivedStage === "Active Client" && org.relationship_stage === "Active Client")
     ) {
       signals.push({
         name: `derived_${derived.relationship_type.toLowerCase()}_via_canonical_view`,
         weight: 4,
-        proposes_class:
-          derived.relationship_type === "Client"  ? "Active Client" :
-          derived.relationship_type === "Partner" ? "Partner" :
-          derived.relationship_type === "Funder"  ? "Funder" :
-          derived.relationship_type === "Investor"? "Investor" :
-          undefined,
+        proposes_class: derivedStage,
       });
     }
 
