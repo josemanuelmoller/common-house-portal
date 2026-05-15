@@ -379,6 +379,45 @@ export async function persistRelationshipSignal(signal: RelationshipSignal): Pro
     .from("relationship_signals")
     .upsert(patch, { onConflict: "contact_id" });
   if (error) throw new Error(`persistRelationshipSignal: ${error.message}`);
+
+  // Bump opportunities.last_signal_at for any open opportunity tied to this
+  // contact's org. Feeds the Hall Pipeline State "new signal" chip.
+  // Failures are non-fatal — log and continue.
+  if (signal.payload.direction === "inbound" || signal.payload.direction === "meeting") {
+    try {
+      await bumpOpportunitiesLastSignalForContact(sb, signal.payload.contact_id, at);
+    } catch (e) {
+      console.warn("[persist] last_signal_at bump failed:", e);
+    }
+  }
+}
+
+async function bumpOpportunitiesLastSignalForContact(
+  sb: ReturnType<typeof getSupabaseServerClient>,
+  contactId: string,
+  at: string,
+): Promise<void> {
+  const { data: person } = await sb
+    .from("people")
+    .select("org_notion_id")
+    .eq("id", contactId)
+    .maybeSingle();
+  const orgId = person?.org_notion_id;
+  if (!orgId) return;
+
+  // Only bump opportunities whose current last_signal_at is older than `at`,
+  // so we never go backwards on a delayed-arrival event.
+  const { data: opps } = await sb
+    .from("opportunities")
+    .select("notion_id, last_signal_at")
+    .eq("org_notion_id", orgId)
+    .eq("is_active", true)
+    .eq("is_archived", false);
+  for (const o of (opps ?? []) as Array<{ notion_id: string | null; last_signal_at: string | null }>) {
+    if (!o.notion_id) continue;
+    if (o.last_signal_at && new Date(o.last_signal_at).getTime() >= new Date(at).getTime()) continue;
+    await sb.from("opportunities").update({ last_signal_at: at }).eq("notion_id", o.notion_id);
+  }
 }
 
 function maxTs(a: string | undefined, b: string): string {

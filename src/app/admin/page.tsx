@@ -38,6 +38,7 @@ import { HallPortfolioPulse } from "@/components/HallPortfolioPulse";
 import { HallAskQueue } from "@/components/HallAskQueue";
 import { HallTimeAllocation } from "@/components/HallTimeAllocation";
 import { HallCommitmentLedger } from "@/components/HallCommitmentLedger";
+import { HallPipelineState } from "@/components/HallPipelineState";
 import { HallTodayAgenda } from "@/components/HallTodayAgenda";
 import { HallAutopilotLog } from "@/components/HallAutopilotLog";
 import { HallTabs } from "@/components/HallTabs";
@@ -1054,6 +1055,11 @@ export default async function AdminPage() {
             meta={`${inboxData.items.length} VISIBLE · ${inboxData.total_scanned} TOTAL`}
           >
             <InboxTriage initialItems={inboxData.items} initialScanned={inboxData.total_scanned} />
+          </HallSection>
+
+          {/* ── Pipeline state — clients + prospects needing attention ───── */}
+          <HallSection title="Pipeline " flourish="state">
+            <Suspense fallback={<HallSkeleton lines={4} />}><HallPipelineState /></Suspense>
           </HallSection>
 
           {/* ── Commitments — left col, below inbox ──────────────────────── */}
