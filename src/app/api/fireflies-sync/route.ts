@@ -1,15 +1,17 @@
 /**
  * POST /api/fireflies-sync
  *
- * Comprehensive Fireflies → Notion sync. One cron, all non-AI writes:
+ * Comprehensive Fireflies sync. One cron, all non-AI writes:
  *
- *   1. CH Projects  [OS v2] — "Last Meeting Date"
- *   2. CH Sources   [OS v2] — Meeting source record per matched transcript
- *                             (deduped by Source URL = Fireflies viewer link)
- *   3. CH People    [OS v2] — "Last Contact Date" for participant emails
- *
- * Project matching uses BOTH title-substring logic AND a keyword override map
- * so meetings like "Sesiones avance proyecto Refill" correctly link to iRefill.
+ *   1. sources    — one row per transcript (always), with org_notion_id and
+ *                   project_notion_id resolved from Supabase entity index
+ *                   (organizations, people, projects). No hard-coded maps.
+ *   2. projects   — last_meeting_date forward-bumped on matched projects
+ *                   regardless of project_status (a project in "Proposed"
+ *                   that has a meeting still benefits from the timestamp).
+ *   3. people     — last_contact_date for all participants of every
+ *                   transcript, not only matched ones.
+ *   4. hall_attendees — observed contacts, dedup by transcript_id.
  *
  * Default (daily cron): reads only yesterday's meetings (delta).
  * Backfill: POST with body { days: 60 } to seed historical data.
@@ -19,47 +21,17 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-// notion-cutoff-2026-06-02: Notion client retained for read-only project list +
-// dedup fallback. Project Last Meeting Date and Sources creation are now
-// canonical Supabase writes (projects, sources).
-import { Client } from "@notionhq/client";
 import { currentUser } from "@clerk/nextjs/server";
 import { isAdminUser, isAdminEmail } from "@/lib/clients";
 import { withRoutineLog } from "@/lib/routine-log";
 import { observeTranscript } from "@/lib/hall-contact-observers";
 import { getSelfEmails } from "@/lib/hall-self";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
+import { loadEntityIndex, resolveOrgId, resolveProjectId } from "@/lib/resolve-meeting-entities";
 
 export const maxDuration = 90;
 
-const notion = new Client({ auth: process.env.NOTION_API_KEY });
 const FIREFLIES_API = "https://api.fireflies.ai/graphql";
-const PROJECTS_DB   = "49d59b18095f46588960f2e717832c5f";
-const SOURCES_DB    = "d88aff1b019d4110bcefab7f5bfbd0ae";
-const PEOPLE_DB     = "1bc0f96f33ca4a9e9ff26844377e81de";
-
-// ─── Keyword overrides ────────────────────────────────────────────────────────
-// For projects whose names are substrings that won't appear verbatim in titles.
-// Key = Notion Project ID, value = keywords to match (case-insensitive).
-
-const PROJECT_KEYWORD_OVERRIDES: Record<string, string[]> = {
-  // iRefill — meetings are titled "Sesiones avance proyecto Refill...", "Reunión Refill...", etc.
-  "33f45e5b-6633-81f6-9b68-d898237d6533": ["refill", "airefil", "automercado", "auto mercado", "rajneesh", "dispensadora"],
-  // SUFI — usually in title but also via participant email domains
-  "33f45e5b-6633-81f4-bde2-f97d7a11bfb3": ["sufi", "andresalejandrobarbieri"],
-  // Way Out — various spellings
-  "33f45e5b-6633-8129-b715-ea38f400d631": ["wayout", "way out", "wayout"],
-  // Beeok
-  "33f45e5b-6633-8124-b2b8-c79d18a4d46a": ["beeok"],
-  // Yenxa
-  "33f45e5b-6633-812a-9b42-faf1f0b2518b": ["yenxa"],
-  // Moss Solutions
-  "33f45e5b-6633-8138-937a-f600fc992756": ["moss solutions", "moss"],
-  // GotoFly
-  "33f45e5b-6633-814e-8d18-e3c96a8d20ca": ["gotofly", "goto fly"],
-  // Movener
-  "33f45e5b-6633-810b-81d1-e22915da2506": ["movener"],
-};
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
@@ -137,39 +109,12 @@ async function getTranscripts(fromDate: string, toDate: string): Promise<Firefli
   return json?.data?.transcripts ?? [];
 }
 
-// ─── Project matching ─────────────────────────────────────────────────────────
-
-interface ProjectRecord {
-  id:                 string;
-  name:               string;
-  currentMeetingDate: string | null;
-}
-
-function matchesProject(project: ProjectRecord, transcript: FirefliesTranscript): boolean {
-  const title = transcript.title.toLowerCase();
-  const proj  = project.name.toLowerCase();
-
-  // 1. Direct substring match
-  if (title.includes(proj) || proj.includes(title)) return true;
-
-  // 2. Token match: significant words (≥4 chars) from project name in title
-  const tokens = proj.split(/\W+/).filter(t => t.length >= 4);
-  if (tokens.some(t => title.includes(t))) return true;
-
-  // 3. Keyword override map
-  const overrideKeywords = PROJECT_KEYWORD_OVERRIDES[project.id] ?? [];
-  const allText = (title + " " + transcript.participants.join(" ")).toLowerCase();
-  if (overrideKeywords.some(k => allText.includes(k.toLowerCase()))) return true;
-
-  return false;
-}
-
 // ─── Deduplication: CH Sources URLs already in DB ────────────────────────────
 
 async function getExistingSourceUrls(fromDate: string): Promise<Set<string>> {
   const existing = new Set<string>();
 
-  // Supabase-first (canonical post-cutoff)
+  // Supabase canonical (Notion fallback removed 2026-05-15, post Phase 2 backfill).
   try {
     const sb = getSupabaseServerClient();
     const { data } = await sb
@@ -181,30 +126,6 @@ async function getExistingSourceUrls(fromDate: string): Promise<Set<string>> {
     for (const row of (data ?? []) as { source_url: string | null }[]) {
       if (row.source_url) existing.add(row.source_url);
     }
-  } catch { /* non-fatal — continue with Notion fallback */ }
-
-  // Notion fallback retained until cutoff so pre-Phase-2 rows still de-dup.
-  try {
-    let cursor: string | undefined;
-    do {
-      const res = await notion.databases.query({
-        database_id: SOURCES_DB,
-        filter: {
-          and: [
-            { property: "Source Platform", select: { equals: "Fireflies" } },
-            { property: "Source Date",     date:   { on_or_after: fromDate } },
-          ],
-        },
-        page_size: 100,
-        ...(cursor ? { start_cursor: cursor } : {}),
-      });
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      for (const page of res.results as any[]) {
-        const url = page.properties?.["Source URL"]?.url as string | null;
-        if (url) existing.add(url);
-      }
-      cursor = res.has_more ? (res.next_cursor ?? undefined) : undefined;
-    } while (cursor);
   } catch { /* non-fatal */ }
 
   return existing;
@@ -259,31 +180,12 @@ async function _POST(req: NextRequest) {
   const toIso         = now.toISOString();
   const fromDateOnly  = fromIso.slice(0, 10);
 
-  // ── 1. Load active projects ──────────────────────────────────────────────────
-  let projects: ProjectRecord[] = [];
-  try {
-    const res = await notion.databases.query({
-      database_id: PROJECTS_DB,
-      filter: { property: "Project Status", select: { equals: "Active" } },
-      page_size: 100,
-    });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    projects = (res.results as any[]).map(p => ({
-      id:                 p.id,
-      name:               p.properties["Project Name"]?.title?.[0]?.plain_text ?? "",
-      currentMeetingDate: p.properties["Last Meeting Date"]?.date?.start ?? null,
-    })).filter(p => p.name.trim() !== "");
-  } catch (err) {
-    return NextResponse.json({ error: "Failed to load projects", detail: String(err) }, { status: 500 });
-  }
-
-  // ── 2. Fetch transcripts from Fireflies ─────────────────────────────────────
+  // ── 1. Fetch transcripts from Fireflies ─────────────────────────────────────
   let transcripts: FirefliesTranscript[];
   try {
     transcripts = await getTranscripts(fromIso, toIso);
   } catch (err) {
     const e = err as FirefliesError;
-    // Surface the real cause to the UI instead of silent 0.
     return NextResponse.json({
       ok: false,
       error: "fireflies_api_error",
@@ -300,106 +202,106 @@ async function _POST(req: NextRequest) {
     });
   }
 
-  // ── 3. Pre-load existing Source URLs to prevent duplicates ──────────────────
-  const alreadyIngested = await getExistingSourceUrls(fromDateOnly);
+  // ── 2. Load entity index + dedup set ────────────────────────────────────────
+  // The index is canonical Supabase (organizations + people + projects). No
+  // hard-coded org/project maps — anything that can be resolved by participant
+  // email, email domain, or name substring is resolved automatically.
+  const sb = getSupabaseServerClient();
+  const [idx, alreadyIngested, selfEmails] = await Promise.all([
+    loadEntityIndex(sb),
+    getExistingSourceUrls(fromDateOnly),
+    getSelfEmails(),
+  ]);
 
-  // ── 4. Match transcripts to projects ────────────────────────────────────────
-  const latestByProject = new Map<string, string>();                              // projectId → date
-  const matchPairs: { transcript: FirefliesTranscript; projectId: string }[] = [];
+  // ── 3. Resolve org + project per transcript ─────────────────────────────────
+  // Every transcript gets a source row, whether or not we match a project.
+  // Unmatched transcripts are still valuable (they contain participants for
+  // hall_attendees observation + raw content for future re-extraction). The
+  // old behaviour silently discarded them; that is the bug we are killing.
+  type Resolved = {
+    transcript:  FirefliesTranscript;
+    meetingDate: string;
+    orgId:       string | null;
+    projectId:   string | null;
+    orgPath:     string;
+    projPath:    string;
+  };
 
-  for (const t of transcripts) {
-    const meetingDate = new Date(t.date).toISOString().slice(0, 10);
-    for (const p of projects) {
-      if (!matchesProject(p, t)) continue;
+  const resolved: Resolved[] = transcripts.map(t => {
+    const orgResult  = resolveOrgId(idx, { title: t.title, participantEmails: t.participants, selfEmails });
+    const projResult = resolveProjectId(idx, orgResult.orgNotionId, { title: t.title });
+    return {
+      transcript:  t,
+      meetingDate: new Date(t.date).toISOString().slice(0, 10),
+      orgId:       orgResult.orgNotionId,
+      projectId:   projResult.projectNotionId,
+      orgPath:     orgResult.matchPath,
+      projPath:    projResult.matchPath,
+    };
+  });
 
-      const current = latestByProject.get(p.id);
-      if (!current || meetingDate > current) latestByProject.set(p.id, meetingDate);
-
-      matchPairs.push({ transcript: t, projectId: p.id });
-    }
+  // ── 4. Update projects.last_meeting_date for matched projects ───────────────
+  const latestByProject = new Map<string, string>();
+  for (const r of resolved) {
+    if (!r.projectId) continue;
+    const cur = latestByProject.get(r.projectId);
+    if (!cur || r.meetingDate > cur) latestByProject.set(r.projectId, r.meetingDate);
   }
 
-  // ── 5. Update CH Projects "Last Meeting Date" ────────────────────────────────
   let projectsUpdated = 0;
   const projectErrors: string[] = [];
-  const sb = getSupabaseServerClient();
-
   for (const [projectId, meetingDate] of latestByProject) {
-    const project = projects.find(p => p.id === projectId)!;
-    if (project.currentMeetingDate && project.currentMeetingDate >= meetingDate) continue;
     try {
-      // notion-cutoff-2026-06-02: replaced by canonical write to projects
-      // await notion.pages.update({
-      //   page_id: projectId,
-      //   properties: { "Last Meeting Date": { date: { start: meetingDate } } } as any,
-      // });
-      //
-      // Notion → Supabase (projects) column mapping:
-      //   Last Meeting Date → last_meeting_date
+      // Only bump forward — never overwrite a more recent date with an older one.
+      const { data: cur } = await sb
+        .from("projects")
+        .select("last_meeting_date")
+        .eq("notion_id", projectId)
+        .maybeSingle();
+      const existing = (cur as { last_meeting_date: string | null } | null)?.last_meeting_date ?? null;
+      if (existing && existing >= meetingDate) continue;
+
       const { error: upErr } = await sb
         .from("projects")
         .update({ last_meeting_date: meetingDate, updated_at: new Date().toISOString() })
         .eq("notion_id", projectId);
-      if (upErr) {
-        projectErrors.push(`${project.name}: ${upErr.message}`);
-      } else {
-        projectsUpdated++;
-      }
+      if (upErr) projectErrors.push(`${projectId}: ${upErr.message}`);
+      else       projectsUpdated++;
     } catch (err) {
-      projectErrors.push(`${project.name}: ${err instanceof Error ? err.message : String(err)}`);
+      projectErrors.push(`${projectId}: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 
-  // ── 6. Create CH Sources records (deduplicated) ──────────────────────────────
+  // ── 5. Upsert sources (one row per transcript, regardless of match) ────────
   let sourcesCreated = 0;
+  let sourcesEnriched = 0;
   const sourceErrors: string[] = [];
 
-  for (const { transcript: t, projectId } of matchPairs) {
+  for (const r of resolved) {
+    const t = r.transcript;
     const viewerUrl = `https://app.fireflies.ai/view/${t.id}`;
-    if (alreadyIngested.has(viewerUrl)) continue;
-
-    const meetingDate = new Date(t.date).toISOString().slice(0, 10);
-    const summary     = t.summary?.overview || t.summary?.shorthand_bullet || "";
+    const summary   = t.summary?.overview || t.summary?.shorthand_bullet || "";
 
     try {
-      // notion-cutoff-2026-06-02: replaced by canonical write to sources
-      // const props: Record<string, unknown> = {
-      //   "Source Title":      { title: [{ text: { content: t.title.slice(0, 200) } }] },
-      //   "Source Type":       { select: { name: "Meeting" } },
-      //   "Source Platform":   { select: { name: "Fireflies" } },
-      //   "Processing Status": { select: { name: "Processed" } },
-      //   "Source Date":       { date:   { start: meetingDate } },
-      //   "Source URL":        { url: viewerUrl },
-      //   "Linked Projects":   { relation: [{ id: projectId }] },
-      // };
-      // if (summary) props["Processed Summary"] = { rich_text: [{ text: { content: summary.slice(0, 2000) } }] };
-      // await notion.pages.create({ parent: { database_id: SOURCES_DB }, properties: props as ... });
-      //
-      // Notion → Supabase (sources) column mapping:
-      //   Source Title       → title
-      //   Source Type        → source_type
-      //   Source Platform    → source_platform
-      //   Processing Status  → processing_status
-      //   Source Date        → source_date
-      //   Source URL         → source_url
-      //   Linked Projects    → project_notion_id
-      //   Processed Summary  → processed_summary
       // Upsert on source_external_id: extract-meeting-evidence may have
-      // already created a minimal row for this transcript hours earlier.
-      // Upserting enriches that row (project link, summary) instead of
-      // failing on the source_external_id unique index.
+      // created a minimal row hours earlier. Upserting enriches it
+      // (project link, org link, summary) instead of failing on the
+      // unique index. We always include org_notion_id and project_notion_id
+      // — including when they resolve to null — so a previously-unresolved
+      // row is *not* left with a stale-incorrect value.
       const { error: insertErr } = await sb
         .from("sources")
         .upsert({
-          title:             t.title.slice(0, 200),
-          source_type:       "Meeting",
-          source_platform:   "Fireflies",
-          processing_status: "Processed",
-          source_date:       meetingDate,
-          source_url:        viewerUrl,
-          project_notion_id: projectId,
-          processed_summary: summary ? summary.slice(0, 2000) : null,
-          dedup_key:         `fireflies:${t.id}`,
+          title:              t.title.slice(0, 200),
+          source_type:        "Meeting",
+          source_platform:    "Fireflies",
+          processing_status:  "Processed",
+          source_date:        r.meetingDate,
+          source_url:         viewerUrl,
+          org_notion_id:      r.orgId,
+          project_notion_id:  r.projectId,
+          processed_summary:  summary ? summary.slice(0, 2000) : null,
+          dedup_key:          `fireflies:${t.id}`,
           source_external_id: t.id,
         }, { onConflict: "source_external_id" });
       if (insertErr) {
@@ -407,23 +309,23 @@ async function _POST(req: NextRequest) {
         continue;
       }
 
-      alreadyIngested.add(viewerUrl); // prevent duplicate within same run
-      sourcesCreated++;
+      if (alreadyIngested.has(viewerUrl)) sourcesEnriched++;
+      else                                sourcesCreated++;
+      alreadyIngested.add(viewerUrl);
     } catch (err) {
       sourceErrors.push(`${t.title}: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 
-  // ── 7. Update CH People "Last Contact Date" ──────────────────────────────────
-  // Collect unique participant emails from all matched meetings
-  const participantEmails = new Map<string, string>(); // email → most recent meeting date
-
-  for (const { transcript: t } of matchPairs) {
-    const meetingDate = new Date(t.date).toISOString().slice(0, 10);
-    for (const email of (t.participants ?? [])) {
+  // ── 6. Update CH People "Last Contact Date" ──────────────────────────────────
+  // Use all transcripts, not only matched ones — a person we just spoke to
+  // is still "recently contacted" even if the meeting did not link to a project.
+  const participantEmails = new Map<string, string>();
+  for (const r of resolved) {
+    for (const email of (r.transcript.participants ?? [])) {
       if (!email.includes("@")) continue;
       const current = participantEmails.get(email);
-      if (!current || meetingDate > current) participantEmails.set(email, meetingDate);
+      if (!current || r.meetingDate > current) participantEmails.set(email, r.meetingDate);
     }
   }
 
@@ -437,7 +339,8 @@ async function _POST(req: NextRequest) {
   //    those tied to a project. Dedup by transcript_id prevents inflation.
   //    Self identities (Jose's own emails across accounts) are stripped
   //    before credit so the registry never contains him as 'a contact of himself'.
-  const selfSet = await getSelfEmails();
+  //    selfEmails was loaded above; reuse it instead of refetching.
+  const selfSet = selfEmails;
   let observedContacts = 0;
   for (const t of transcripts) {
     try {
@@ -459,17 +362,31 @@ async function _POST(req: NextRequest) {
 
   const errors = [...projectErrors, ...sourceErrors];
 
+  // Match-path distribution: lets us spot regressions (e.g. an unexpected
+  // spike in "miss" or in "title-substring" matches) without grepping logs.
+  const orgPathCounts: Record<string, number> = {};
+  const projPathCounts: Record<string, number> = {};
+  for (const r of resolved) {
+    const o = r.orgPath.split(":")[0];
+    const p = r.projPath.split(":")[0];
+    orgPathCounts[o]  = (orgPathCounts[o]  ?? 0) + 1;
+    projPathCounts[p] = (projPathCounts[p] ?? 0) + 1;
+  }
+
   return NextResponse.json({
     ok: true,
     mode:             days === 1 ? "delta" : `backfill-${days}d`,
     fromDate:         fromIso,
     toDate:           toIso,
     transcripts:      transcripts.length,
-    matched:          latestByProject.size,
+    org_matches:      resolved.filter(r => r.orgId).length,
+    project_matches:  resolved.filter(r => r.projectId).length,
     projects_updated: projectsUpdated,
     sources_created:  sourcesCreated,
+    sources_enriched: sourcesEnriched,
     people_updated:   peopleUpdated,
     observed_contacts: observedContacts,
+    match_paths:      { org: orgPathCounts, project: projPathCounts },
     errors,
   });
 }

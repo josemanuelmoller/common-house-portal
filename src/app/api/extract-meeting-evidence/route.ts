@@ -18,23 +18,20 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-// notion-cutoff-2026-06-02: Notion client retained for read-only dedup
-// fallback. Evidence rows are now canonically written to Supabase `evidence`.
-import { Client } from "@notionhq/client";
 import Anthropic from "@anthropic-ai/sdk";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { withRoutineLog } from "@/lib/routine-log";
 import { computeAnthropicCost, makeUsageAccumulator, addUsage, type AnthropicUsage } from "@/lib/anthropic-cost";
+import { loadEntityIndex, resolveOrgId, resolveProjectId, type EntityIndex } from "@/lib/resolve-meeting-entities";
+import { getSelfEmails } from "@/lib/hall-self";
 
 const HAIKU_MODEL = "claude-haiku-4-5-20251001";
 
 export const maxDuration = 90;
 
-const notion    = new Client({ auth: process.env.NOTION_API_KEY });
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 const FIREFLIES_API = "https://api.fireflies.ai/graphql";
-const EVIDENCE_DB   = "fa28124978d043039d8932ac9964ccf5";
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
@@ -46,97 +43,12 @@ function authCheck(req: NextRequest): boolean {
   return (agentKey === expected) || (cronToken === `Bearer ${expected}`);
 }
 
-// ─── CH Organization IDs (for "Organization" relation on evidence) ────────────
-// Key = display name, notionId = CH Organizations [OS v2] page ID (no dashes)
-
-const ORG_MAP: Record<string, { notionId: string; keywords: string[]; emailDomains: string[] }> = {
-  "iRefill": {
-    notionId:     "33f45e5b-6633-810b-95ea-fddc3219b71a",
-    keywords:     ["irefill", "airefil", "refill", "rajneesh", "auto mercado", "automercado", "dispensadora"],
-    emailDomains: ["irefill.in", "automercado.biz"],
-  },
-  "SUFI": {
-    notionId:     "33f45e5b-6633-81b3-84ef-fa1ad08b091b",
-    keywords:     ["sufi", "andresalejandrobarbieri"],
-    emailDomains: [],
-  },
-  "Way Out": {
-    notionId:     "33f45e5b-6633-81cd-9e1b-df610a9ff5dc",
-    keywords:     ["wayout", "way out"],
-    emailDomains: [],
-  },
-  "Beeok": {
-    notionId:     "33f45e5b-6633-818a-ad5b-c387eac4dff7",
-    keywords:     ["beeok"],
-    emailDomains: [],
-  },
-  "Yenxa": {
-    notionId:     "33f45e5b-6633-8110-8260-dfe9a94ef4e8",
-    keywords:     ["yenxa"],
-    emailDomains: [],
-  },
-  "Moss Solutions": {
-    notionId:     "33f45e5b-6633-811a-ab3d-ea9e39d97a11",
-    keywords:     ["moss solutions", "moss"],
-    emailDomains: [],
-  },
-  "GotoFly": {
-    notionId:     "33f45e5b-6633-81df-8654-cc715a5bb81e",
-    keywords:     ["gotofly", "goto fly"],
-    emailDomains: [],
-  },
-  "Movener": {
-    notionId:     "33f45e5b-6633-8153-93d1-f86985420a9e",
-    keywords:     ["movener"],
-    emailDomains: [],
-  },
-};
-
-// ─── CH Project IDs (for "Project" relation on evidence) ─────────────────────
-// Covers all 8 garage startups. Keywords match meeting titles + participant emails.
-
-const PROJECT_MAP: Record<string, { projectId: string; keywords: string[]; emailDomains: string[] }> = {
-  "iRefill": {
-    projectId:    "33f45e5b-6633-81f6-9b68-d898237d6533",
-    keywords:     ["irefill", "airefil", "refill", "rajneesh", "auto mercado", "automercado", "dispensadora"],
-    emailDomains: ["irefill.in", "automercado.biz"],
-  },
-  "SUFI": {
-    projectId:    "33f45e5b-6633-81f4-bde2-f97d7a11bfb3",
-    keywords:     ["sufi", "andresalejandrobarbieri"],
-    emailDomains: [],
-  },
-  "Way Out": {
-    projectId:    "33f45e5b-6633-8129-b715-ea38f400d631",
-    keywords:     ["wayout", "way out"],
-    emailDomains: [],
-  },
-  "Beeok": {
-    projectId:    "33f45e5b-6633-8124-b2b8-c79d18a4d46a",
-    keywords:     ["beeok"],
-    emailDomains: [],
-  },
-  "Yenxa": {
-    projectId:    "33f45e5b-6633-812a-9b42-faf1f0b2518b",
-    keywords:     ["yenxa"],
-    emailDomains: [],
-  },
-  "Moss Solutions": {
-    projectId:    "33f45e5b-6633-8138-937a-f600fc992756",
-    keywords:     ["moss solutions", "moss"],
-    emailDomains: [],
-  },
-  "GotoFly": {
-    projectId:    "33f45e5b-6633-814e-8d18-e3c96a8d20ca",
-    keywords:     ["gotofly", "goto fly"],
-    emailDomains: [],
-  },
-  "Movener": {
-    projectId:    "33f45e5b-6633-810b-81d1-e22915da2506",
-    keywords:     ["movener"],
-    emailDomains: [],
-  },
-};
+// Org / project mapping is done by `resolve-meeting-entities.ts` using
+// Supabase as source of truth. The previous ORG_MAP / PROJECT_MAP dictionaries
+// (8 hard-coded "garage" startups) were removed 2026-05-15 — they were the
+// reason any client outside that list (e.g. Engatel) silently lost their
+// meeting evidence link, because the resolver returned null for them and the
+// evidence row was inserted with org_notion_id=NULL.
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -191,27 +103,9 @@ const THEME_ALIAS: Record<string, string> = {
   "Approvals": "Approvals",
 };
 
-// ─── Org + Project resolution ─────────────────────────────────────────────────
-
-function resolveOrg(orgHint: string, participants: string[]): string | null {
-  const hint   = orgHint.toLowerCase();
-  const emails = participants.join(" ").toLowerCase();
-  for (const org of Object.values(ORG_MAP)) {
-    if (org.keywords.some(k => hint.includes(k) || emails.includes(k))) return org.notionId;
-    if (org.emailDomains.some(d => emails.includes(d)))                  return org.notionId;
-  }
-  return null;
-}
-
-function resolveProject(transcriptTitle: string, participants: string[]): string | null {
-  const title  = transcriptTitle.toLowerCase();
-  const emails = participants.join(" ").toLowerCase();
-  for (const proj of Object.values(PROJECT_MAP)) {
-    if (proj.keywords.some(k => title.includes(k) || emails.includes(k))) return proj.projectId;
-    if (proj.emailDomains.some(d => emails.includes(d)))                   return proj.projectId;
-  }
-  return null;
-}
+// Org + project resolution lives in src/lib/resolve-meeting-entities.ts.
+// We call resolveOrgId / resolveProjectId per evidence item (org) and per
+// transcript (project), passing the LLM-extracted org_name as a hint.
 
 // ─── Deduplication ────────────────────────────────────────────────────────────
 // Pre-load evidence titles already captured in the window.
@@ -220,7 +114,7 @@ function resolveProject(transcriptTitle: string, participants: string[]): string
 async function loadExistingEvidenceKeys(fromDateStr: string): Promise<Set<string>> {
   const existing = new Set<string>();
 
-  // Supabase-first (canonical post-cutoff)
+  // Supabase canonical (Notion fallback removed 2026-05-15, post Phase 2 backfill).
   try {
     const sb = getSupabaseServerClient();
     const { data } = await sb
@@ -232,32 +126,7 @@ async function loadExistingEvidenceKeys(fromDateStr: string): Promise<Set<string
     for (const row of (data ?? []) as { title: string | null; date_captured: string | null }[]) {
       if (row.title && row.date_captured) existing.add(`${row.title.toLowerCase()}::${row.date_captured}`);
     }
-  } catch { /* non-fatal — fall through to Notion */ }
-
-  // Notion fallback retained until cutoff so pre-Phase-2 rows still de-dup.
-  try {
-    let cursor: string | undefined;
-    do {
-      const res = await notion.databases.query({
-        database_id: EVIDENCE_DB,
-        filter: {
-          and: [
-            { property: "Date Captured",   date:      { on_or_after: fromDateStr } },
-            { property: "Legacy Source DB", select:    { equals: "Meetings [master]" } },
-          ],
-        },
-        page_size: 100,
-        ...(cursor ? { start_cursor: cursor } : {}),
-      });
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      for (const page of res.results as any[]) {
-        const title = page.properties?.["Evidence Title"]?.title?.[0]?.plain_text ?? "";
-        const date  = page.properties?.["Date Captured"]?.date?.start ?? "";
-        if (title && date) existing.add(`${title.toLowerCase()}::${date}`);
-      }
-      cursor = res.has_more ? (res.next_cursor ?? undefined) : undefined;
-    } while (cursor);
-  } catch { /* non-critical — if query fails, dedup is skipped */ }
+  } catch { /* non-fatal — if query fails, dedup is skipped */ }
   return existing;
 }
 
@@ -427,15 +296,31 @@ async function writeEvidence(
 // extractor owns "ensure the source exists". Keyed on source_external_id (the
 // Fireflies transcript id), which is stable and always present, unlike notion_id.
 
-async function ensureFirefliesSource(t: FirefliesTranscript): Promise<string | null> {
+async function ensureFirefliesSource(
+  t: FirefliesTranscript,
+  orgId: string | null,
+  projectId: string | null,
+): Promise<string | null> {
   const sb = getSupabaseServerClient();
 
   const { data: existing } = await sb
     .from("sources")
-    .select("id")
+    .select("id, org_notion_id, project_notion_id")
     .eq("source_external_id", t.id)
     .maybeSingle();
-  if (existing?.id) return existing.id as string;
+  if (existing?.id) {
+    // Existing row may have been created earlier without org/project (e.g.
+    // by a pre-resolver run). Patch the link forward whenever we now have
+    // a resolution but the stored row does not.
+    const patch: Record<string, string> = {};
+    const existingRow = existing as { id: string; org_notion_id: string | null; project_notion_id: string | null };
+    if (orgId     && !existingRow.org_notion_id)     patch.org_notion_id     = orgId;
+    if (projectId && !existingRow.project_notion_id) patch.project_notion_id = projectId;
+    if (Object.keys(patch).length > 0) {
+      await sb.from("sources").update(patch).eq("id", existingRow.id);
+    }
+    return existingRow.id;
+  }
 
   const meetingDate = new Date(t.date).toISOString().slice(0, 10);
   const summary     = t.summary?.overview || t.summary?.shorthand_bullet || "";
@@ -450,6 +335,8 @@ async function ensureFirefliesSource(t: FirefliesTranscript): Promise<string | n
       // Same viewer URL format fireflies-sync uses — keeps its URL-based
       // dedup consistent so it does not create a duplicate row later.
       source_url:         `https://app.fireflies.ai/view/${t.id}`,
+      org_notion_id:      orgId,
+      project_notion_id:  projectId,
       processed_summary:  summary ? summary.slice(0, 2000) : null,
       dedup_key:          `fireflies:${t.id}`,
       source_external_id: t.id,
@@ -464,9 +351,9 @@ async function ensureFirefliesSource(t: FirefliesTranscript): Promise<string | n
       .select("id")
       .eq("source_external_id", t.id)
       .maybeSingle();
-    return raced?.id ?? null;
+    return (raced as { id: string } | null)?.id ?? null;
   }
-  return created?.id ?? null;
+  return (created as { id: string } | null)?.id ?? null;
 }
 
 // ─── Main handler ─────────────────────────────────────────────────────────────
@@ -495,37 +382,73 @@ async function _POST(req: NextRequest) {
       return NextResponse.json({ ok: true, meetings: 0, evidence_written: 0, skipped: 0, cost_usd: 0, message: "No new meetings in window" });
     }
 
+    // 3. Load the Supabase entity index + self-identity set once.
+    //    resolveOrgId / resolveProjectId are pure-function lookups against
+    //    this in-memory snapshot. Self emails are excluded from the primary
+    //    org match so a Jose-hosted meeting resolves to the counterpart
+    //    org rather than Common House.
+    const sb: ReturnType<typeof getSupabaseServerClient> = getSupabaseServerClient();
+    const [idx, selfEmails]: [EntityIndex, Set<string>] = await Promise.all([
+      loadEntityIndex(sb),
+      getSelfEmails(),
+    ]);
+
     const usageAcc = makeUsageAccumulator();
-    const results: { meetingTitle: string; evidenceCount: number; skipped: number; ids: string[] }[] = [];
+    const results: { meetingTitle: string; evidenceCount: number; skipped: number; orgPath: string; projPath: string; ids: string[] }[] = [];
     const errors:  string[] = [];
 
-    // 3. Process each transcript
+    // 4. Process each transcript
     for (const t of transcripts) {
       try {
         const items     = await extractEvidence(t, usageAcc);
         const dateStr   = new Date(t.date).toISOString().slice(0, 10);
-        const projectId = resolveProject(t.title, t.participants);
-        // Ensure the meeting has a `sources` row so evidence can FK to it.
-        const sourceId  = await ensureFirefliesSource(t);
+        // Project is resolved per transcript (one project per meeting).
+        // Org is resolved per evidence item below, falling back to the
+        // transcript-level org so unmatched LLM org_name strings still get
+        // linked correctly via participants.
+        const transcriptOrg = resolveOrgId(idx, {
+          title: t.title,
+          participantEmails: t.participants,
+          selfEmails,
+        });
+        const projResult = resolveProjectId(idx, transcriptOrg.orgNotionId, { title: t.title });
+        // Ensure the meeting has a `sources` row so evidence can FK to it,
+        // and patch in org/project links if the row predates the resolver.
+        const sourceId  = await ensureFirefliesSource(t, transcriptOrg.orgNotionId, projResult.projectNotionId);
         const ids:      string[] = [];
         let   skipped   = 0;
 
         for (const item of items) {
           try {
-            // Dedup check: skip if we already have this title on this date
             const key = `${item.title.toLowerCase()}::${dateStr}`;
             if (existingKeys.has(key)) { skipped++; continue; }
 
-            const orgId = resolveOrg(item.org_name, t.participants);
-            const id    = await writeEvidence(item, dateStr, orgId, projectId, sourceId);
-            existingKeys.add(key); // prevent within-run duplicates
+            // Org resolution per item: use the LLM-extracted org_name as a
+            // hint, but if that does not resolve, fall back to the
+            // transcript-level org (participants are the strongest signal).
+            const itemOrg = resolveOrgId(idx, {
+              title: t.title,
+              participantEmails: t.participants,
+              orgNameHint: item.org_name,
+              selfEmails,
+            });
+            const orgId = itemOrg.orgNotionId ?? transcriptOrg.orgNotionId;
+            const id    = await writeEvidence(item, dateStr, orgId, projResult.projectNotionId, sourceId);
+            existingKeys.add(key);
             ids.push(id);
           } catch (e) {
             errors.push(`${t.title} / "${item.title}": ${String(e)}`);
           }
         }
 
-        results.push({ meetingTitle: t.title, evidenceCount: ids.length, skipped, ids });
+        results.push({
+          meetingTitle:  t.title,
+          evidenceCount: ids.length,
+          skipped,
+          orgPath:       transcriptOrg.matchPath,
+          projPath:      projResult.matchPath,
+          ids,
+        });
       } catch (e) {
         errors.push(`${t.title}: ${String(e)}`);
       }
