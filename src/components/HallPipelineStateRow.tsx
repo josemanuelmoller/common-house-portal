@@ -9,6 +9,7 @@ const REASON_COLOR: Record<SerializedPipelineRow["reason"], string> = {
   ball_with_jose: "var(--hall-danger)",
   ball_with_them: "var(--hall-warn)",
   drift:          "var(--hall-muted-3)",
+  healthy:        "var(--hall-ok)",
 };
 
 const TREND_GLYPH: Record<SerializedPipelineRow["trend"], string> = {
@@ -152,47 +153,61 @@ export function HallPipelineStateRow({ row }: { row: SerializedPipelineRow }) {
             </div>
           </div>
 
-          {/* CTAs */}
-          <div className="flex flex-col gap-1.5 items-end shrink-0">
-            <button
-              type="button"
-              onClick={onPrimary}
-              disabled={busy !== null}
-              className="hall-btn-primary text-[11px] px-2.5 py-1 disabled:opacity-40 whitespace-nowrap"
-            >
-              {busy === "primary" ? "..." : row.ctaPrimary.label}
-            </button>
-            <div className="flex gap-1.5">
+          {/* CTAs — suppressed on healthy rows (informational only). */}
+          {row.reason !== "healthy" && (
+            <div className="flex flex-col gap-1.5 items-end shrink-0">
               <button
                 type="button"
-                onClick={onResolve}
+                onClick={onPrimary}
                 disabled={busy !== null}
-                className="text-[10px] px-2 py-0.5 rounded border disabled:opacity-40 whitespace-nowrap"
-                style={{
-                  borderColor: "var(--hall-line)",
-                  color: "var(--hall-muted-1)",
-                  fontFamily: "var(--font-hall-sans)",
-                }}
-                title="Cierra el loop subyacente y saca esta fila."
+                className="hall-btn-primary text-[11px] px-2.5 py-1 disabled:opacity-40 whitespace-nowrap"
               >
-                {busy === "resolve" ? "..." : row.ctaResolveLabel}
+                {busy === "primary" ? "..." : row.ctaPrimary.label}
               </button>
-              <button
-                type="button"
-                onClick={() => onSnooze(3)}
-                disabled={busy !== null}
-                className="text-[10px] px-2 py-0.5 rounded border disabled:opacity-40"
-                style={{
-                  borderColor: "var(--hall-line)",
-                  color: "var(--hall-muted-1)",
-                  fontFamily: "var(--font-hall-sans)",
-                }}
-                title="Oculta esta fila 3 días."
-              >
-                Snooze 3d
-              </button>
+              <div className="flex gap-1.5">
+                <button
+                  type="button"
+                  onClick={onResolve}
+                  disabled={busy !== null}
+                  className="text-[10px] px-2 py-0.5 rounded border disabled:opacity-40 whitespace-nowrap"
+                  style={{
+                    borderColor: "var(--hall-line)",
+                    color: "var(--hall-muted-1)",
+                    fontFamily: "var(--font-hall-sans)",
+                  }}
+                  title="Cierra el loop subyacente y saca esta fila."
+                >
+                  {busy === "resolve" ? "..." : row.ctaResolveLabel}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onSnooze(3)}
+                  disabled={busy !== null}
+                  className="text-[10px] px-2 py-0.5 rounded border disabled:opacity-40"
+                  style={{
+                    borderColor: "var(--hall-line)",
+                    color: "var(--hall-muted-1)",
+                    fontFamily: "var(--font-hall-sans)",
+                  }}
+                  title="Oculta esta fila 3 días."
+                >
+                  Snooze 3d
+                </button>
+              </div>
             </div>
-          </div>
+          )}
+          {row.reason === "healthy" && (
+            <span
+              className="shrink-0 uppercase tracking-[0.08em] font-bold"
+              style={{
+                fontFamily: "var(--font-hall-mono)",
+                fontSize: 9,
+                color: "var(--hall-ok)",
+              }}
+            >
+              ✓ healthy
+            </span>
+          )}
         </div>
 
         {err && (

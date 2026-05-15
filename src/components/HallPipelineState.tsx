@@ -45,13 +45,15 @@ export async function HallPipelineState() {
 
       {(resolvedToday.length > 0 || snoozedCount > 0) && (
         <HallPipelineStateResolved
-          resolved={resolvedToday.map(r => ({
-            logId: r.logId,
-            name: r.name,
-            reason: r.reason,
-            resolution: r.resolution,
-            resolvedAt: r.resolvedAt,
-          }))}
+          resolved={resolvedToday
+            .filter(r => r.reason !== "healthy")
+            .map(r => ({
+              logId: r.logId,
+              name: r.name,
+              reason: r.reason as "ball_with_jose" | "ball_with_them" | "drift" | "pre_meeting",
+              resolution: r.resolution,
+              resolvedAt: r.resolvedAt,
+            }))}
           snoozedCount={snoozedCount}
         />
       )}
@@ -64,7 +66,7 @@ export type SerializedPipelineRow = {
   entityId: string;
   name: string;
   kind: "client" | "prospect";
-  reason: "ball_with_jose" | "ball_with_them" | "drift" | "pre_meeting";
+  reason: "ball_with_jose" | "ball_with_them" | "drift" | "pre_meeting" | "healthy";
   reasonDetail: string;
   topics: string[];
   ballSummary: string | null;

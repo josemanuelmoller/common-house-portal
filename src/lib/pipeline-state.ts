@@ -28,7 +28,7 @@ import { getSupabaseServerClient } from "@/lib/supabase-server";
 // ───────────────────────── Types ─────────────────────────
 
 export type EntityKind = "client" | "prospect";
-export type Reason = "ball_with_jose" | "ball_with_them" | "drift" | "pre_meeting";
+export type Reason = "ball_with_jose" | "ball_with_them" | "drift" | "pre_meeting" | "healthy";
 export type Trend = "heating" | "steady" | "cooling" | "cold";
 export type Resolution =
   | "manual_done"
@@ -381,7 +381,23 @@ export async function getPipelineState(): Promise<PipelineStateResult> {
       reasonDetail = `Follow-up Needed (marcado)`;
     }
 
-    if (!reason) continue;
+    // Roster pass: clients are ALWAYS shown (even if healthy), so the operator
+    // sees the full active book at a glance. Prospects are also shown when
+    // they have any recorded contact activity — gives visibility into the
+    // pipeline without forcing a fake "needs action" CTA. Truly silent
+    // prospects with zero contact ever still surface via the drift branch
+    // above (peopleAct empty → "Sin contactos asociados").
+    if (!reason) {
+      const hasContactActivity = peopleAct.length > 0 && !!lastInbound;
+      if (cand.kind === "client" || hasContactActivity) {
+        reason = "healthy";
+        reasonDetail = hasContactActivity
+          ? `Último contacto hace ${driftDays}d`
+          : "Sin actividad registrada";
+      } else {
+        continue;
+      }
+    }
 
     surfaced.push({
       ...cand,
@@ -399,8 +415,11 @@ export async function getPipelineState(): Promise<PipelineStateResult> {
   );
 
   // 6a. Insert open log rows for newly-surfaced (entity, reason) pairs.
+  //     `healthy` is a roster-pass classification, not an attention event —
+  //     do not log it.
   const toInsert: Array<Pick<LogRow, "entity_type" | "entity_id" | "reason">> = [];
   for (const s of surfaced) {
+    if (s.reason === "healthy") continue;
     const k = `${s.entityType}:${s.entityId}:${s.reason}`;
     if (!openLogByKey.has(k)) {
       toInsert.push({ entity_type: s.entityType, entity_id: s.entityId, reason: s.reason });
@@ -496,14 +515,25 @@ export async function getPipelineState(): Promise<PipelineStateResult> {
     });
   }
 
-  // 8. Rank: pre_meeting first (urgent), then ball_with_jose by days, then them, then drift
+  // 8. Rank: attention reasons first, healthy at the bottom (roster baseline).
+  //    Within attention, pre_meeting → ball_with_jose → ball_with_them → drift.
   const reasonRank: Record<Reason, number> = {
     pre_meeting: 0,
     ball_with_jose: 1,
     ball_with_them: 2,
     drift: 3,
+    healthy: 4,
   };
-  rows.sort((a, b) => reasonRank[a.reason] - reasonRank[b.reason] || b.daysSinceSurfaced - a.daysSinceSurfaced);
+  // Within `healthy`, clients come before prospects so the active book sits
+  // visually grouped at the bottom of the block.
+  rows.sort((a, b) => {
+    const r = reasonRank[a.reason] - reasonRank[b.reason];
+    if (r !== 0) return r;
+    if (a.reason === "healthy" && b.reason === "healthy") {
+      if (a.kind !== b.kind) return a.kind === "client" ? -1 : 1;
+    }
+    return b.daysSinceSurfaced - a.daysSinceSurfaced;
+  });
 
   // 9. Resolved-today footer (last 24h)
   const since = new Date(now - MS_DAY).toISOString();
@@ -711,6 +741,11 @@ function computeTrend(people: PersonActivityRow[], now: number): Trend {
 }
 
 function buildPrimaryCTA(s: { reason: Reason; oppRow?: OppRow; orgRow?: OrgRow; entityId: string; entityType: "organization" | "opportunity" }): CTA {
+  if (s.reason === "healthy") {
+    // No active push — the row is informational. The client renderer
+    // suppresses the button entirely when action === 'open_review'.
+    return { label: "View", action: "open_review", payload: { entityId: s.entityId } };
+  }
   if (s.reason === "pre_meeting") {
     return { label: "Open prep brief", action: "open_prep", payload: { entityId: s.entityId } };
   }
@@ -736,6 +771,7 @@ function buildResolveLabel(reason: Reason): string {
     case "ball_with_them":  return "Mark received";
     case "drift":           return "Acknowledge — not pursuing";
     case "pre_meeting":     return "Skip prep";
+    case "healthy":         return ""; // suppressed on the client
   }
 }
 
