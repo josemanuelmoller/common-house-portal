@@ -202,24 +202,36 @@ function resolveProjectId(idx, orgNotionId, { title = "" }) {
   return { projectNotionId: null, matchPath: "miss" };
 }
 
-// ── Fireflies fetch (single bulk query for a date window) ───────────────────
+// ── Fireflies fetch (paginated bulk query) ──────────────────────────────────
 // Per-id `transcript(id:)` queries hit the per-call rate budget hard. The
-// bulk `transcripts(fromDate:, toDate:)` query returns up to ~50 transcripts
-// in one shot and counts as a single hit — far cheaper for backfill.
+// bulk `transcripts(fromDate:, toDate:, limit:, skip:)` query returns up to
+// 50 transcripts per page. We page through until exhausted.
 async function fetchTranscriptsBulk(fromIso, toIso) {
-  const query = `query Bulk($fromDate: DateTime, $toDate: DateTime) {
-    transcripts(fromDate: $fromDate, toDate: $toDate) { id title date participants }
-  }`;
-  const res = await fetch("https://api.fireflies.ai/graphql", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${FIREFLIES_KEY}` },
-    body: JSON.stringify({ query, variables: { fromDate: fromIso, toDate: toIso } }),
-  });
-  const json = await res.json().catch(() => ({}));
-  if (!res.ok || json?.errors) {
-    return { error: json?.errors ?? `HTTP ${res.status}`, transcripts: [] };
+  const PAGE = 50;
+  const out = [];
+  let skip = 0;
+  for (let i = 0; i < 20; i++) {                 // hard cap 1000 records
+    const query = `query Bulk($fromDate: DateTime, $toDate: DateTime, $limit: Int, $skip: Int) {
+      transcripts(fromDate: $fromDate, toDate: $toDate, limit: $limit, skip: $skip) {
+        id title date participants
+      }
+    }`;
+    const res = await fetch("https://api.fireflies.ai/graphql", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${FIREFLIES_KEY}` },
+      body: JSON.stringify({ query, variables: { fromDate: fromIso, toDate: toIso, limit: PAGE, skip } }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || json?.errors) {
+      return { error: json?.errors ?? `HTTP ${res.status}`, transcripts: out };
+    }
+    const page = json?.data?.transcripts ?? [];
+    out.push(...page);
+    if (page.length < PAGE) break;
+    skip += PAGE;
+    await new Promise(r => setTimeout(r, 250));
   }
-  return { error: null, transcripts: json?.data?.transcripts ?? [] };
+  return { error: null, transcripts: out };
 }
 
 // ── Main ────────────────────────────────────────────────────────────────────
