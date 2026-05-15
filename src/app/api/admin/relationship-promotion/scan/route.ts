@@ -81,16 +81,67 @@ export async function POST(req: NextRequest) {
 
   const sb = getSupabaseServerClient();
 
-  // 1. Fetch candidate organizations (recent activity OR explicit list)
-  const orgQuery = sb
-    .from("organizations")
-    .select("id, notion_id, name, relationship_stage, relationship_classes, updated_at")
-    .order("updated_at", { ascending: false })
-    .limit(limit);
-  if (body.org_ids?.length) orgQuery.in("id", body.org_ids);
-  else orgQuery.gte("updated_at", since);
-  const { data: orgs, error: orgErr } = await orgQuery;
-  if (orgErr) return NextResponse.json({ error: "orgs query failed", detail: orgErr.message }, { status: 502 });
+  // 1. Fetch candidate organizations.
+  //
+  //    If org_ids is explicit, honour it. Otherwise fetch candidates whose
+  //    canonical derived state ALREADY suggests a promotion: any row where
+  //    v_org_status.relationship_type is a real type (not Prospect, not
+  //    Archived). Filtering by `organizations.updated_at` was broken — Phase
+  //    1 cleanups touched engagements and projects, not the org row itself,
+  //    so the most obvious mismatches (Engatel with raw_stage='Prospect' but
+  //    derived='Client') never entered the scan window.
+  //
+  //    The since/lookback param remains accepted for backwards compat but
+  //    is unused in the canonical-view path.
+  let orgs: Array<{
+    id: string;
+    notion_id: string | null;
+    name: string;
+    relationship_stage: string | null;
+    relationship_classes: string[] | null;
+    updated_at: string | null;
+  }> | null = null;
+  if (body.org_ids?.length) {
+    const r = await sb
+      .from("organizations")
+      .select("id, notion_id, name, relationship_stage, relationship_classes, updated_at")
+      .in("id", body.org_ids)
+      .order("updated_at", { ascending: false })
+      .limit(limit);
+    if (r.error) return NextResponse.json({ error: "orgs query failed", detail: r.error.message }, { status: 502 });
+    orgs = r.data ?? [];
+  } else {
+    // Get notion_ids whose derived type is meaningful (not Prospect/Archived)
+    // AND whose raw stage doesn't already match — that IS the candidate set.
+    const { data: statusRows, error: statusErr } = await sb
+      .from("v_org_status")
+      .select("notion_id, relationship_type, raw_relationship_stage")
+      .not("relationship_type", "in", "(Prospect,Archived)");
+    if (statusErr) return NextResponse.json({ error: "status view failed", detail: statusErr.message }, { status: 502 });
+    const interestingIds = (statusRows ?? [])
+      .filter((s: { notion_id: string; relationship_type: string; raw_relationship_stage: string | null }) => {
+        const rs  = s.raw_relationship_stage;
+        const rt  = s.relationship_type;
+        if (rs === rt) return false;
+        if (rs === "Active Client" && rt === "Client") return false;  // vocabulary equivalent
+        return true;
+      })
+      .map((s: { notion_id: string }) => s.notion_id);
+    if (interestingIds.length === 0) {
+      orgs = [];
+    } else {
+      const r = await sb
+        .from("organizations")
+        .select("id, notion_id, name, relationship_stage, relationship_classes, updated_at")
+        .in("notion_id", interestingIds)
+        .order("updated_at", { ascending: false })
+        .limit(limit);
+      if (r.error) return NextResponse.json({ error: "orgs query failed", detail: r.error.message }, { status: 502 });
+      orgs = r.data ?? [];
+    }
+  }
+  const orgErr = null;
+  if (orgErr) return NextResponse.json({ error: "orgs query failed", detail: "unreachable" }, { status: 502 });
 
   // 1b. Load canonical derived status for each candidate. v_org_status
   // computes relationship_type from real signals (engagements + projects);
