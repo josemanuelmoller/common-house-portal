@@ -54,7 +54,7 @@ const LEAVES = onePath
   ? [onePath]
   : ["reuse/enablers/advocacy", "reuse/packaging/transit", "reuse/enablers/apps"];
 
-const SYSTEM = `You are the Knowledge Curator for Common House OS v2.
+const SYSTEM_CREATE = `You are the Knowledge Curator for Common House OS v2.
 
 You are writing v1 of a playbook for a leaf node in the Common House knowledge tree, sourced exclusively from a structured external reference dataset (PR3/EMF reuse atlas). You are NOT writing CH-specific strategy — you are summarizing what the atlas reveals about this category as a domain.
 
@@ -82,7 +82,39 @@ Boundaries:
 - Do not export your own opinions on whether CH should pursue this category. That's downstream.
 - Do not duplicate the node summary (it's already on the node).`;
 
-function buildPrompt(facts) {
+const SYSTEM_AMEND = `You are the Knowledge Curator for Common House OS v2.
+
+You are producing the NEXT VERSION of an existing playbook for a leaf node in the Common House knowledge tree. A prior version already exists, anchored in operational case-study material (typically deep Slack distillation from a specific operator, e.g. Algramo). You now have access to a structured external reference dataset (PR3/EMF reuse atlas) covering hundreds of operators worldwide.
+
+Your job is to MERGE — not replace. Preserve the operational depth from the prior version (specific failure modes, store-by-store learnings, vendor names, retailer interactions, financial signals) AND add what the atlas provides (universe scope, geographic distribution, sub-category breakdown, alternative business models the prior version didn't see).
+
+Voice and conventions (same as before):
+- Markdown only.
+- Plain, declarative, evidence-anchored. Never speculate beyond the data provided.
+- Specific organizations cited as "{Organization} ({Country}, founded {year})".
+- Spanish narrative fine; technical terms in English.
+- No top H1 title.
+- Length target: 2500–4500 words (longer than v1 because you're merging two evidence bases).
+
+Section structure for the merged version:
+1. **Overview** — refined definition that takes both case-study depth and atlas scope into account.
+2. **Landscape map** — sub-category breakdown from the atlas (with counts) PLUS where the prior version's case studies fit in that map.
+3. **Geographic concentration** — atlas-derived country distribution. Note where the case studies sit and where coverage is thinner.
+4. **Operational playbook** — preserve the deep "how to actually run this" content from v1 (store ops, customer behavior, P&L signals). This is the section where the prior version's value lives.
+5. **Notable operators (atlas additions)** — operators the prior version didn't cover, chosen for variety. Format "**{Org}** — {Country}, founded {year}. {1-2 sentences}".
+6. **Maturity distribution** — Concept/Pilot/Growth/Established breakdown from atlas + observed maturity arc from case studies.
+7. **Failure modes** — combine: case-study failure modes from v1 (deep) + atlas inactive operators (broad).
+8. **Open questions for Common House** — refined questions that bridge case-study depth and atlas breadth. The atlas reveals 'who exists' — the open questions should be about 'what's true across them'.
+9. **Provenance & methodology** — short paragraph naming both source bases: "This v{N} playbook merges {prior_source_count} operator-specific sources (Slack-distilled, deep case studies) with {atlas_count} atlas rows (PR3/EMF, structured) on {date}. The operational playbook section is preserved from prior versions; landscape, geography, and atlas operators are new in this version."
+
+Boundaries:
+- DO NOT delete or summarize away the operational depth of the prior version. The case-study material is rare; the atlas material is reproducible.
+- If the prior version's claims conflict with the atlas, surface the tension explicitly rather than silently picking one.
+- Do not invent numbers. If you cite a percentage, it must be reconstructable from the facts pack.
+- Do not export your own opinions on whether CH should pursue this category.
+- Do not duplicate the node summary.`;
+
+function buildPromptCreate(facts) {
   return `Write v1 of the playbook for the knowledge node: **${facts.node_path}** ("${facts.node_title}").
 
 Node summary (already on the node, do not duplicate verbatim):
@@ -95,6 +127,28 @@ Facts pack (the ONLY evidence you may use):
 ${JSON.stringify(facts, null, 2)}
 
 Generate the playbook now, following the section structure in your system prompt.`;
+}
+
+function buildPromptAmend(facts, priorPlaybook, priorVersion, priorSourceCount) {
+  return `Produce v${priorVersion + 1} of the playbook for **${facts.node_path}** ("${facts.node_title}").
+
+You are merging the prior v${priorVersion} playbook (below, ${priorPlaybook.length} chars, anchored in ${priorSourceCount ?? "an unknown number of"} deep case-study sources) with a new atlas evidence base (${facts.total_operators} operators, ${facts.active_count} active).
+
+═══════════════ PRIOR v${priorVersion} PLAYBOOK ═══════════════
+${priorPlaybook}
+═══════════════ END PRIOR PLAYBOOK ═══════════════
+
+═══════════════ NEW ATLAS FACTS ═══════════════
+Node summary (do not duplicate verbatim):
+> ${facts.node_summary}
+
+Context axes: ${(facts.context_axes ?? []).join(", ") || "(none)"}.
+
+Atlas facts pack:
+${JSON.stringify(facts, null, 2)}
+═══════════════ END ATLAS FACTS ═══════════════
+
+Produce the merged v${priorVersion + 1} now. Preserve the operational depth of the prior version (especially any 'how-to' or P&L content). Add the atlas dimension. Surface tensions if any. Follow the merged section structure in your system prompt.`;
 }
 
 function countBy(rows, key) {
@@ -145,13 +199,26 @@ console.log(`Synthesizing ${LEAVES.length} playbook(s) via ${MODEL}${dryRun ? " 
 for (const path of LEAVES) {
   console.log(`━━━ ${path} ━━━`);
 
-  // 1) Load node
+  // 1) Load node (including existing playbook + version count)
   const { data: node, error: nErr } = await sb
     .from("knowledge_nodes")
-    .select("id, path, title, summary, context_axes")
+    .select("id, path, title, summary, context_axes, playbook_md, playbook_source_count")
     .eq("path", path)
     .single();
   if (nErr || !node) { console.error(`  node not found: ${nErr?.message}`); continue; }
+
+  const isAmend = (node.playbook_md ?? "").length > 200;
+  const { data: priorVersionRow } = await sb
+    .from("playbook_versions")
+    .select("version")
+    .eq("node_id", node.id)
+    .order("version", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const priorVersion   = (priorVersionRow?.version ?? 0);
+  const nextVersion    = priorVersion + 1;
+  const mode           = isAmend ? "AMEND" : "CREATED";
+  console.log(`  mode: ${mode} (prior v${priorVersion} → next v${nextVersion})`);
 
   // 2) Load atlas rows attached to this leaf
   const { data: rows, error: rErr } = await sb
@@ -196,13 +263,16 @@ for (const path of LEAVES) {
 
   if (dryRun) { continue; }
 
-  // 4) Call Claude
-  const prompt = buildPrompt(facts);
+  // 4) Call Claude — pick prompt + system based on mode
+  const prompt = isAmend
+    ? buildPromptAmend(facts, node.playbook_md, priorVersion, node.playbook_source_count)
+    : buildPromptCreate(facts);
+  const system = isAmend ? SYSTEM_AMEND : SYSTEM_CREATE;
   const t0 = Date.now();
   const resp = await anthropic.messages.create({
     model: MODEL,
-    max_tokens: 6000,
-    system: SYSTEM,
+    max_tokens: isAmend ? 10000 : 6000, // amends are longer
+    system,
     messages: [{ role: "user", content: prompt }],
   });
   const content = resp.content.filter((b) => b.type === "text").map((b) => b.text).join("\n").trim();
@@ -218,11 +288,17 @@ for (const path of LEAVES) {
   //    available across supabase-js calls — but each is idempotent enough).
   const now = new Date().toISOString();
 
+  // Source count for amends = prior_sources + atlas_rows (deduped against the
+  // landscape table — they're different evidence bases that don't overlap by row).
+  const newSourceCount = isAmend
+    ? (node.playbook_source_count ?? 0) + all.length
+    : all.length;
+
   const { error: uErr } = await sb
     .from("knowledge_nodes")
     .update({
       playbook_md: content,
-      playbook_source_count: all.length,
+      playbook_source_count: newSourceCount,
       playbook_generated_at: now,
     })
     .eq("id", node.id);
@@ -232,22 +308,24 @@ for (const path of LEAVES) {
     .from("playbook_versions")
     .insert({
       node_id: node.id,
-      version: 1,
+      version: nextVersion,
       content_md: content,
-      source_count: all.length,
+      source_count: newSourceCount,
       generated_at: now,
-      generated_by: "reuse-landscape-synthesizer/v1",
+      generated_by: `reuse-landscape-synthesizer/v${nextVersion}`,
     });
   if (vErr) { console.error(`  insert version failed: ${vErr.message}`); }
 
-  const reasoning = `v1 playbook synthesized from ${all.length} atlas rows (${active.length} active, ${inactive.length} inactive). Source: public.reuse_landscape filtered by knowledge_node_id. Model: ${MODEL}. No evidence rows involved; this is a first-pass bootstrap from the PR3/EMF reuse atlas.`;
+  const reasoning = isAmend
+    ? `v${nextVersion} playbook AMENDED — merged prior v${priorVersion} (${node.playbook_source_count ?? "?"} deep sources) with ${all.length} atlas rows (${active.length} active, ${inactive.length} inactive). Operational depth from v${priorVersion} preserved; atlas adds universe scope + geographic distribution. Model: ${MODEL}.`
+    : `v1 playbook synthesized from ${all.length} atlas rows (${active.length} active, ${inactive.length} inactive). Source: public.reuse_landscape filtered by knowledge_node_id. Model: ${MODEL}. No evidence rows involved; this is a first-pass bootstrap from the PR3/EMF reuse atlas.`;
   const { error: cErr } = await sb
     .from("knowledge_node_changelog")
     .insert({
       node_id: node.id,
-      action: "CREATED", // allowed: CREATED, APPEND, AMEND, SPLIT, IGNORE
+      action: isAmend ? "AMEND" : "CREATED", // allowed: CREATED, APPEND, AMEND, SPLIT, IGNORE
       section: "playbook_md",
-      diff_before: null,
+      diff_before: isAmend ? (node.playbook_md ?? "").slice(0, 300) + "…" : null,
       diff_after: content.slice(0, 500) + (content.length > 500 ? "…" : ""),
       reasoning,
       status: "applied", // allowed: applied, proposed, rejected
@@ -256,7 +334,7 @@ for (const path of LEAVES) {
     });
   if (cErr) { console.error(`  changelog insert failed: ${cErr.message}`); }
 
-  console.log(`  ✓ written: playbook_md (${content.length} chars), v1, changelog audit`);
+  console.log(`  ✓ written: playbook_md (${content.length} chars), v${nextVersion}, changelog ${isAmend ? "AMEND" : "CREATED"}`);
 }
 
 console.log("\nDone.");

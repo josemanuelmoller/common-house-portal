@@ -143,6 +143,33 @@ export async function getChildren(parentId: string): Promise<KnowledgeNode[]> {
   return (data as KnowledgeNode[]) ?? [];
 }
 
+/** Fetch playbook versions for a node (most recent first). */
+export type PlaybookVersion = {
+  version: number;
+  content_md: string;
+  source_count: number | null;
+  generated_at: string;
+  generated_by: string;
+};
+
+export async function getNodePlaybookVersions(
+  nodeId: string,
+  limit = 20,
+): Promise<PlaybookVersion[]> {
+  const sb = getSupabaseServerClient();
+  const { data, error } = await sb
+    .from("playbook_versions")
+    .select("version, content_md, source_count, generated_at, generated_by")
+    .eq("node_id", nodeId)
+    .order("version", { ascending: false })
+    .limit(limit);
+  if (error) {
+    console.error("[knowledge-nodes] getNodePlaybookVersions:", error.message);
+    return [];
+  }
+  return (data as PlaybookVersion[]) ?? [];
+}
+
 /** Fetch changelog entries for a node. Most recent first. */
 export async function getNodeChangelog(
   nodeId: string,
