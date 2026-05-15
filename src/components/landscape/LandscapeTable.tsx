@@ -17,7 +17,21 @@ export type LandscapeRow = {
   organization_id: string | null;
   channels: string[] | null;
   employees_band: string | null;
+  knowledge_node_id: string | null;
+  // Supabase nested select types many-to-one as an array (cardinality unknown to
+  // the type generator). Runtime returns either object or array — handle both.
+  knowledge_nodes:
+    | { path: string; title: string }
+    | { path: string; title: string }[]
+    | null;
 };
+
+function pickNode(
+  v: LandscapeRow["knowledge_nodes"]
+): { path: string; title: string } | null {
+  if (!v) return null;
+  return Array.isArray(v) ? v[0] ?? null : v;
+}
 
 const headCls = "text-[10px] uppercase tracking-[0.06em] py-2 px-3 text-left";
 const headStyle: React.CSSProperties = {
@@ -108,6 +122,25 @@ export function LandscapeTable({ rows }: { rows: LandscapeRow[] }) {
                       {r.sub_category}
                     </span>
                   )}
+                  {(() => {
+                    const node = pickNode(r.knowledge_nodes);
+                    if (!node) return null;
+                    return (
+                      <span
+                        className="text-[10px] mt-1 inline-block px-1.5 py-0.5"
+                        title={`Maps to knowledge_nodes: ${node.path}`}
+                        style={{
+                          fontFamily: "var(--font-hall-mono)",
+                          border: "1px solid var(--hall-line-soft)",
+                          borderRadius: 2,
+                          color: "var(--hall-muted-2)",
+                          width: "fit-content",
+                        }}
+                      >
+                        ↳ {node.path.replace(/^reuse\//, "")}
+                      </span>
+                    );
+                  })()}
                 </div>
               </td>
               <td className={cellCls} style={cellStyle}>

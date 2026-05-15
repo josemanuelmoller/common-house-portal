@@ -21,6 +21,12 @@ Returns matching rows from `public.reuse_landscape` for a given research questio
 ## Input shape
 
 The caller specifies any subset of:
+- `leaf` — path under `reuse/` in knowledge_nodes, e.g. `reuse/packaging/refill/at-home`,
+  `reuse/packaging/refill/on-the-go`, `reuse/packaging/return/on-the-go`,
+  `reuse/packaging/return/from-home`, `reuse/packaging/transit`,
+  `reuse/enablers/advocacy`, `reuse/enablers/apps`.
+  Resolves via `reuse_landscape.knowledge_node_id`. PREFERRED entry point when the
+  caller is operating in a knowledge context (curator, plan-master).
 - `category` — e.g. "Reusable Cup & Container Programs"
 - `sub_category` — e.g. "Reusable Cup Program"
 - `region` — one of: Africa, Asia, Europe, Middle East, North America, Oceana, South America, Global
@@ -31,8 +37,9 @@ The caller specifies any subset of:
 - `material` — free-text contains, matched against `materials[]`
 - `channel` — Restaurants/Cafes, Cities, Events, Corporate, Festivals, Stadiums, Package-Free Shop - Food & Bev, Package-Free Shop - Home & Personal Care, Local Delivery, Delivery by Mail
 - `search` — free-text ILIKE over solution_name + organization_name + description
+- `since_founded` — int (e.g. 2018) — only operators founded on/after this year
 - `limit` — default 25, max 200
-- `mode` — "list" (default) or "summary"
+- `mode` — "list" (default), "summary", or "by-node" (coverage rollup)
 
 At least one filter must be present. Reject queries that would return all 1468 rows.
 
@@ -65,7 +72,54 @@ organization_id (FK → organizations.id), ch_relevance_score, ch_tags[]
 
 ---
 
+## Knowledge tree mapping (auto-routed)
+
+Every atlas row is FK-mapped to one of these knowledge_nodes leaves via
+`reuse_landscape.knowledge_node_id`. The mapping was applied bulk; see
+`knowledge_node_routing = 'auto'` rows.
+
+| Atlas category | → knowledge_node leaf |
+|---|---|
+| Concentrate-Based Refill / Pre-Filled Refill / SUP-Free Pouches | `reuse/packaging/refill/at-home` |
+| Refill Vending / Package-Free Shops | `reuse/packaging/refill/on-the-go` |
+| Reusable Cup & Container Programs | `reuse/packaging/return/on-the-go` |
+| Reusable Shipping & Logistics (B2C, Mailers) | `reuse/packaging/return/from-home` |
+| Reusable Shipping & Logistics (B2B) | `reuse/packaging/transit` |
+| Reuse Advocacy | `reuse/enablers/advocacy` |
+| App / Digital Rewards | `reuse/enablers/apps` |
+
+When `leaf=<path>` is provided, prefer `WHERE knowledge_node_id = (SELECT id FROM
+knowledge_nodes WHERE path = $leaf)` over category-string matching — it survives
+any future renames of atlas categories and respects human overrides
+(`knowledge_node_routing = 'manual'`).
+
+---
+
 ## Query patterns
+
+### list mode — operators feeding a knowledge leaf
+```sql
+SELECT l.solution_name, l.organization_name, l.hq_country, l.year_founded, l.stage, l.status
+FROM public.reuse_landscape l
+JOIN public.knowledge_nodes k ON k.id = l.knowledge_node_id
+WHERE k.path = $1            -- e.g. 'reuse/packaging/refill/at-home'
+  AND l.status = 'Active'
+  AND ($2::int IS NULL OR l.year_founded >= $2)
+ORDER BY l.year_founded DESC NULLS LAST, l.organization_name
+LIMIT $3;
+```
+
+### by-node mode — coverage rollup (one row per leaf)
+```sql
+SELECT path, atlas_total, atlas_active, sources_in_playbook,
+       playbook_coverage_pct, countries, young_active
+FROM public.vw_knowledge_node_operators
+WHERE atlas_total > 0
+ORDER BY atlas_total DESC;
+```
+Use this when the caller asks "where does our playbook have the most
+enrichment headroom?" or "which leaves do we know least about?". The view is
+materialised on-demand (it's a regular view; query cost ≈ a join over 1.5K rows).
 
 ### list mode — single category in a region
 ```sql
@@ -139,6 +193,22 @@ By <dimension>:
   ...
 
 Top stages: <stage>: <n> · <stage>: <n> · ...
+```
+
+### by-node mode
+```
+REUSE ATLAS — knowledge tree coverage rollup
+
+  reuse/packaging/refill/on-the-go     atlas: 831 (709 active, 65 ctries) · playbook: 70 sources · cov: 8.4%
+  reuse/packaging/refill/at-home       atlas: 202 (192 active, 40 ctries) · playbook: 12 sources · cov: 5.9%
+  reuse/packaging/return/on-the-go     atlas: 181 (156 active, 39 ctries) · playbook: 10 sources · cov: 5.5%
+  reuse/enablers/advocacy              atlas: 179 (157 active, 45 ctries) · playbook: —          · cov: 0%
+  reuse/packaging/transit              atlas:  35 ( 35 active, 17 ctries) · playbook: —          · cov: 0%
+  reuse/enablers/apps                  atlas:  22 ( 20 active, 15 ctries) · playbook: —          · cov: 0%
+  reuse/packaging/return/from-home     atlas:  18 ( 18 active,  9 ctries) · playbook:  8 sources · cov: 44.4%
+
+Lowest coverage (highest enrichment headroom): refill/at-home, return/on-the-go, refill/on-the-go.
+Zero-coverage leaves (need first playbook pass): enablers/advocacy, transit, enablers/apps.
 ```
 
 ---

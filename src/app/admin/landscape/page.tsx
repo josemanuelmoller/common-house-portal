@@ -29,8 +29,11 @@ type SP = {
   stage?: string;
   status?: string;
   promoted?: string;
+  node?: string;   // knowledge_nodes.path filter, e.g. "reuse/packaging/refill/at-home"
   page?: string;
 };
+
+type NodeFacet = { id: string; path: string; title: string; atlas_total: number };
 
 export default async function LandscapePage({
   searchParams,
@@ -46,10 +49,21 @@ export default async function LandscapePage({
   const sb = getSupabaseServerClient();
 
   // Build the row query.
+  // Resolve node filter → uuid up front so the table query can use the FK.
+  let nodeId: string | null = null;
+  if (sp.node) {
+    const { data: n } = await sb
+      .from("knowledge_nodes")
+      .select("id")
+      .eq("path", sp.node)
+      .maybeSingle();
+    nodeId = (n as { id: string } | null)?.id ?? null;
+  }
+
   let q = sb
     .from("reuse_landscape")
     .select(
-      "id, solution_name, organization_name, website, description, solution_category, sub_category, waste_types, stage, hq_country, active_regions, status, year_founded, organization_id, channels, employees_band",
+      "id, solution_name, organization_name, website, description, solution_category, sub_category, waste_types, stage, hq_country, active_regions, status, year_founded, organization_id, channels, employees_band, knowledge_node_id, knowledge_nodes!inner(path, title)",
       { count: "exact" }
     )
     .order("organization_name", { ascending: true })
@@ -68,6 +82,7 @@ export default async function LandscapePage({
   if (sp.region)   q = q.contains("active_regions", [sp.region]);
   if (sp.promoted === "yes") q = q.not("organization_id", "is", null);
   if (sp.promoted === "no")  q = q.is("organization_id", null);
+  if (nodeId)       q = q.eq("knowledge_node_id", nodeId);
 
   const [{ data: rows, count, error }, facetsRes] = await Promise.all([
     q,
@@ -105,9 +120,11 @@ export default async function LandscapePage({
         regions={facetsRes.regions}
         countries={facetsRes.countries}
         stages={facetsRes.stages}
+        nodes={facetsRes.nodes}
         initial={{
           q: sp.q ?? "",
           cat: sp.cat ?? "",
+          node: sp.node ?? "",
           region: sp.region ?? "",
           country: sp.country ?? "",
           stage: sp.stage ?? "",
@@ -178,7 +195,7 @@ export default async function LandscapePage({
 }
 
 function totalActive(sp: SP) {
-  return ["q", "cat", "region", "country", "stage", "status", "promoted"].filter(
+  return ["q", "cat", "node", "region", "country", "stage", "status", "promoted"].filter(
     (k) => sp[k as keyof SP] && sp[k as keyof SP] !== ""
   ).length;
 }
@@ -199,9 +216,10 @@ async function getFacets(
   regions: string[];
   countries: string[];
   stages: string[];
+  nodes: NodeFacet[];
 }> {
   // Cheap distinct queries. With 1.5K rows these are sub-100ms.
-  const [cats, ctries, stages] = await Promise.all([
+  const [cats, ctries, stages, nodes] = await Promise.all([
     sb
       .from("reuse_landscape")
       .select("solution_category")
@@ -217,6 +235,11 @@ async function getFacets(
       .select("stage")
       .not("stage", "is", null)
       .order("stage"),
+    sb
+      .from("vw_knowledge_node_operators")
+      .select("node_id, path, title, atlas_total")
+      .gt("atlas_total", 0)
+      .order("atlas_total", { ascending: false }),
   ]);
   const uniq = (arr: ({ [k: string]: string | null } | null)[] | null, key: string) =>
     Array.from(
@@ -237,5 +260,7 @@ async function getFacets(
     ],
     countries: uniq(ctries.data, "hq_country"),
     stages: uniq(stages.data, "stage"),
+    nodes: ((nodes.data ?? []) as Array<{ node_id: string; path: string; title: string; atlas_total: number }>)
+      .map((n) => ({ id: n.node_id, path: n.path, title: n.title, atlas_total: n.atlas_total })),
   };
 }

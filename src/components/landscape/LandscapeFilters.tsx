@@ -6,6 +6,7 @@ import { useState, useTransition } from "react";
 type Initial = {
   q: string;
   cat: string;
+  node: string;
   region: string;
   country: string;
   stage: string;
@@ -13,11 +14,14 @@ type Initial = {
   promoted: string;
 };
 
+type NodeOption = { id: string; path: string; title: string; atlas_total: number };
+
 type Props = {
   categories: string[];
   regions: string[];
   countries: string[];
   stages: string[];
+  nodes: NodeOption[];
   initial: Initial;
 };
 
@@ -26,6 +30,7 @@ export function LandscapeFilters({
   regions,
   countries,
   stages,
+  nodes,
   initial,
 }: Props) {
   const router = useRouter();
@@ -46,6 +51,7 @@ export function LandscapeFilters({
     const cleared: Initial = {
       q: "",
       cat: "",
+      node: "",
       region: "",
       country: "",
       stage: "",
@@ -95,6 +101,29 @@ export function LandscapeFilters({
           className={selectCls}
           style={selectStyle}
         />
+      </div>
+
+      <div>
+        <label
+          className={labelCls}
+          style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
+          title="Maps to a leaf in the knowledge tree (reuse/packaging/refill/* etc.)"
+        >
+          Knowledge node
+        </label>
+        <select
+          className={selectCls}
+          style={selectStyle}
+          value={state.node}
+          onChange={(e) => apply({ node: e.target.value })}
+        >
+          <option value="">All ({nodes.length})</option>
+          {nodes.map((n) => (
+            <option key={n.id} value={n.path}>
+              {n.path.replace(/^reuse\//, "")} ({n.atlas_total})
+            </option>
+          ))}
+        </select>
       </div>
 
       <div>
