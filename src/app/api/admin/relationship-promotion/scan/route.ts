@@ -91,6 +91,33 @@ export async function POST(req: NextRequest) {
   else orgQuery.gte("updated_at", since);
   const { data: orgs, error: orgErr } = await orgQuery;
   if (orgErr) return NextResponse.json({ error: "orgs query failed", detail: orgErr.message }, { status: 502 });
+
+  // 1b. Load canonical derived status for each candidate. v_org_status
+  // computes relationship_type from real signals (engagements + projects);
+  // any mismatch with raw_relationship_stage is the promotion trigger.
+  const candidateNotionIds = (orgs ?? [])
+    .map((o) => o.notion_id)
+    .filter((v): v is string => !!v);
+  const statusByNotion = new Map<
+    string,
+    { relationship_type: string; operational_state: string }
+  >();
+  if (candidateNotionIds.length > 0) {
+    const { data: statusRows } = await sb
+      .from("v_org_status")
+      .select("notion_id, relationship_type, operational_state")
+      .in("notion_id", candidateNotionIds);
+    for (const r of (statusRows ?? []) as Array<{
+      notion_id: string;
+      relationship_type: string;
+      operational_state: string;
+    }>) {
+      statusByNotion.set(r.notion_id, {
+        relationship_type: r.relationship_type,
+        operational_state: r.operational_state,
+      });
+    }
+  }
   if (!orgs || orgs.length === 0) {
     return NextResponse.json({
       ok: true,
@@ -165,16 +192,47 @@ export async function POST(req: NextRequest) {
       continue;
     }
 
+    // Canonical signal: derived relationship_type from v_org_status. If the
+    // derived type is not 'Prospect'/'Archived' and it doesn't match the raw
+    // stage, that alone is a strong promotion signal (weight 4, dominant).
+    const derived = statusByNotion.get(org.notion_id);
+    if (
+      derived &&
+      derived.relationship_type !== "Prospect" &&
+      derived.relationship_type !== "Archived" &&
+      derived.relationship_type !== org.relationship_stage &&
+      // Don't double-fire "Active Client" stage when derived says Client —
+      // these mean the same thing in the legacy stage vocabulary.
+      !(derived.relationship_type === "Client" && org.relationship_stage === "Active Client")
+    ) {
+      signals.push({
+        name: `derived_${derived.relationship_type.toLowerCase()}_via_canonical_view`,
+        weight: 4,
+        proposes_class:
+          derived.relationship_type === "Client"  ? "Active Client" :
+          derived.relationship_type === "Partner" ? "Partner" :
+          derived.relationship_type === "Funder"  ? "Funder" :
+          derived.relationship_type === "Investor"? "Investor" :
+          undefined,
+      });
+    }
+
     if (signals.length === 0) continue;
 
     const score = signals.reduce((s, x) => s + x.weight, 0);
-    // Proposed class = highest-weight engagement signal, fallback Active Client
+    // Proposed class — prefer the canonical-view derivation when present,
+    // else the highest-weight engagement signal, else default Active Client.
     const proposed_class =
-      signals.find((s) => s.proposes_class && s.weight >= 3)?.proposes_class ?? "Active Client";
+      signals.find((s) => s.name.startsWith("derived_") && s.proposes_class)?.proposes_class ??
+      signals.find((s) => s.proposes_class && s.weight >= 3)?.proposes_class ??
+      "Active Client";
 
     // Skip orgs whose stage already matches the proposal
     const proposed_stage = proposed_class;
     if (org.relationship_stage === proposed_stage) continue;
+    // Also skip if the canonical view says Client and the stage is already
+    // "Active Client" (legacy vocabulary equivalent).
+    if (proposed_class === "Active Client" && org.relationship_stage === "Active Client") continue;
 
     candidates.push({
       org_id: org.id,

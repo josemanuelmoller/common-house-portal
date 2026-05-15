@@ -8,8 +8,20 @@ import {
   type ProposedOrganization,
 } from "@/lib/contacts";
 import { HallOrganizationTagEditor } from "@/components/HallOrganizationTagEditor";
+import { getSupabaseServerClient } from "@/lib/supabase-server";
 
 export const dynamic = "force-dynamic";
+
+type OrgStatus = {
+  relationship_type: string;
+  operational_state: string;
+};
+
+function operationalStateColor(state: string): string {
+  if (state.startsWith("Active")) return "var(--hall-ok)";
+  if (state === "Proposal in flight") return "var(--hall-warn)";
+  return "var(--hall-muted-3)";
+}
 
 function timeAgo(iso: string | null): string {
   if (!iso) return "never";
@@ -32,10 +44,27 @@ function primaryClass(o: OrganizationListEntry): Cls | null {
 
 export default async function HallOrganizationsPage() {
   await requireAdmin();
-  const [registered, proposed] = await Promise.all([
+  const sb = getSupabaseServerClient();
+  const [registered, proposed, statusResp] = await Promise.all([
     getOrganizationsList(),
     getProposedOrganizations(3),
+    sb.from("v_org_status").select("notion_id, relationship_type, operational_state"),
   ]);
+
+  // Build notion_id → derived status map from v_org_status (canonical view).
+  // Manual tag in `relationship_classes` is preserved as-is for grouping —
+  // the derived state is shown alongside so mismatches are visible.
+  const statusByNotion = new Map<string, OrgStatus>();
+  for (const r of (statusResp.data ?? []) as Array<{
+    notion_id: string | null;
+    relationship_type: string;
+    operational_state: string;
+  }>) {
+    if (r.notion_id) statusByNotion.set(r.notion_id, {
+      relationship_type: r.relationship_type,
+      operational_state: r.operational_state,
+    });
+  }
 
   const active    = registered.filter(o => !o.dismissed_at);
   const dismissed = registered.filter(o =>  o.dismissed_at);
@@ -134,7 +163,13 @@ export default async function HallOrganizationsPage() {
               <section key={cls} className="mb-7">
                 <SectionHead title={cls === "Unclassified" ? "Unclassified" : cls} meta={`${rows.length} TOTAL`} />
                 <ul className="flex flex-col">
-                  {rows.map(o => <OrgRow key={o.domain} org={o} />)}
+                  {rows.map(o => (
+                    <OrgRow
+                      key={o.domain}
+                      org={o}
+                      status={o.notion_id ? statusByNotion.get(o.notion_id) : undefined}
+                    />
+                  ))}
                 </ul>
               </section>
             );
@@ -145,7 +180,13 @@ export default async function HallOrganizationsPage() {
             <section className="mb-7" style={{ opacity: 0.6 }}>
               <SectionHead title="Dismissed" meta={`${dismissed.length} TOTAL`} />
               <ul className="flex flex-col">
-                {dismissed.map(o => <OrgRow key={o.domain} org={o} />)}
+                {dismissed.map(o => (
+                  <OrgRow
+                    key={o.domain}
+                    org={o}
+                    status={o.notion_id ? statusByNotion.get(o.notion_id) : undefined}
+                  />
+                ))}
               </ul>
             </section>
           )}
@@ -254,8 +295,18 @@ function ProposedRow({ org }: { org: ProposedOrganization }) {
   );
 }
 
-function OrgRow({ org }: { org: OrganizationListEntry }) {
+function OrgRow({ org, status }: { org: OrganizationListEntry; status?: OrgStatus }) {
   const touches = org.meeting_sum + org.email_sum + org.transcript_sum;
+  // Mismatch alert: manual tag says one thing, derived state says another.
+  // Only flag when the manual side has a class to compare against (else
+  // it's just "unclassified vs derived" and not a contradiction).
+  const manualPrimary = org.relationship_classes[0];
+  const derivedType   = status?.relationship_type;
+  const typeMismatch  =
+    !!manualPrimary && !!derivedType &&
+    manualPrimary !== derivedType &&
+    !(manualPrimary === "Client" && derivedType === "Partner") &&  // Partner-that-pays is legitimate
+    !(manualPrimary === "Partner" && derivedType === "Client");
   return (
     <li style={{ borderTop: "1px solid var(--hall-line-soft)" }}>
       <div className="flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-4 py-3 transition-colors hover:bg-[var(--hall-fill-soft)] px-1">
@@ -289,6 +340,36 @@ function OrgRow({ org }: { org: OrganizationListEntry }) {
                 {c.toUpperCase()}
               </span>
             ))}
+            {status && status.operational_state !== "Idle" && status.operational_state !== "Archived" && (
+              <span
+                className="text-[9px] px-1.5 py-0.5 uppercase"
+                style={{
+                  fontFamily: "var(--font-hall-mono)",
+                  fontWeight: 700,
+                  letterSpacing: "0.08em",
+                  border: "1px solid var(--hall-line)",
+                  color: operationalStateColor(status.operational_state),
+                }}
+                title="Derived operational state from v_org_status — based on real signals (engagements + projects)"
+              >
+                {status.operational_state}
+              </span>
+            )}
+            {typeMismatch && (
+              <span
+                className="text-[9px] px-1.5 py-0.5 uppercase"
+                style={{
+                  fontFamily: "var(--font-hall-mono)",
+                  fontWeight: 700,
+                  letterSpacing: "0.08em",
+                  border: "1px solid var(--hall-warn)",
+                  color: "var(--hall-warn)",
+                }}
+                title={`Manual tag: ${manualPrimary} · Derived from signals: ${derivedType}. Consider reconciling.`}
+              >
+                ⚠ {derivedType?.toUpperCase()}
+              </span>
+            )}
             {org.notion_id && (
               <span
                 className="text-[9px] px-1.5 py-0.5 uppercase"

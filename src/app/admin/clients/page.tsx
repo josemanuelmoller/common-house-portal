@@ -2,13 +2,14 @@
  * /admin/clients — Engagements list
  *
  * Surfaces every row in the canonical Supabase `engagements` table, joined
- * to `organizations` (by `org_notion_id = organizations.notion_id`) so the
- * org name + website are inline. This is the only operator surface for the
- * Engatel relationship and the relationship-promotion-operator depends on
- * it for freeze acceptance criterion #6.
+ * to `organizations` and to the canonical `v_org_status` view (created
+ * 2026-05-15) so each row carries both its formal engagement status AND
+ * its derived operational state (Active Delivery / Active Partnership /
+ * Proposal in flight / Idle). The bottom section also lists orgs that
+ * have real operational signals — Active projects, partnerships, portfolio
+ * — but no engagement row yet, so data gaps stop hiding.
  *
- * Read path is Supabase only (no Notion). Engagements without an
- * `org_notion_id` are still surfaced — the org cell is left empty.
+ * Read path is Supabase only (no Notion).
  */
 
 import Link from "next/link";
@@ -40,9 +41,23 @@ type OrgRow = {
   website: string | null;
 };
 
+type OrgStatusRow = {
+  notion_id: string;
+  name: string | null;
+  relationship_type: string;
+  operational_state: string;
+  is_active_delivery: boolean;
+  is_active_partnership: boolean;
+  is_active_portfolio: boolean;
+  active_projects_count: number;
+  active_engagements_count: number;
+  last_meeting_date: string | null;
+};
+
 type EngagementWithOrg = EngagementRow & {
   org_name: string | null;
   org_website: string | null;
+  operational_state: string | null;
 };
 
 const TYPE_ORDER = ["Client", "Partner", "Investor", "Funder", "Vendor"] as const;
@@ -70,15 +85,20 @@ export default async function ClientsListPage() {
   await requireAdmin();
 
   const sb = getSupabaseServerClient();
-  const { data: engagementsData, error: eErr } = await sb
-    .from("engagements")
-    .select(
+  const [engagementsResp, statusResp] = await Promise.all([
+    sb.from("engagements").select(
       "id, notion_id, relationship_name, engagement_type, relationship_status, engagement_value, org_notion_id, start_date, end_date, expected_close_date, notion_created_at, updated_at"
-    );
+    ),
+    sb.from("v_org_status").select(
+      "notion_id, name, relationship_type, operational_state, is_active_delivery, is_active_partnership, is_active_portfolio, active_projects_count, active_engagements_count, last_meeting_date"
+    ),
+  ]);
+  const eErr = engagementsResp.error;
+  const engagements = (engagementsResp.data ?? []) as EngagementRow[];
+  const statusRows  = (statusResp.data ?? []) as OrgStatusRow[];
+  const statusByOrg = new Map(statusRows.map((s) => [s.notion_id, s]));
 
-  const engagements = (engagementsData ?? []) as EngagementRow[];
-
-  // Fetch the unique linked orgs in a single query.
+  // Fetch the unique linked orgs (name + website) for engagements.
   const orgIds = Array.from(
     new Set(engagements.map((e) => e.org_notion_id).filter((v): v is string => !!v))
   );
@@ -95,12 +115,25 @@ export default async function ClientsListPage() {
 
   const enriched: EngagementWithOrg[] = engagements.map((e) => {
     const o = e.org_notion_id ? orgsById.get(e.org_notion_id) : undefined;
+    const s = e.org_notion_id ? statusByOrg.get(e.org_notion_id) : undefined;
     return {
       ...e,
       org_name: o?.name ?? null,
       org_website: o?.website ?? null,
+      operational_state: s?.operational_state ?? null,
     };
   });
+
+  // Orgs with real operational signal but no engagement row — surfaces the
+  // gap rather than hiding it. Excludes Archived + Idle. Excludes orgs that
+  // already appear in an engagement row above.
+  const orgsWithEngagement = new Set(
+    engagements.map((e) => e.org_notion_id).filter((v): v is string => !!v)
+  );
+  const orphanOrgs = statusRows
+    .filter((s) => !orgsWithEngagement.has(s.notion_id))
+    .filter((s) => s.operational_state !== "Idle" && s.operational_state !== "Archived")
+    .sort((a, b) => (b.active_projects_count ?? 0) - (a.active_projects_count ?? 0));
 
   // Group by engagement_type — Client first, then Partner, Investor, Funder, Vendor.
   const groups = new Map<EngagementType | "Other", EngagementWithOrg[]>();
@@ -209,7 +242,29 @@ export default async function ClientsListPage() {
         );
       })}
 
-      {total === 0 && !eErr && (
+      {orphanOrgs.length > 0 && (
+        <HallSection
+          title="Active without engagement"
+          meta={`${orphanOrgs.length} ORG${orphanOrgs.length === 1 ? "" : "S"} · DATA GAP`}
+        >
+          <p
+            className="text-[10.5px] mb-3"
+            style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)", lineHeight: 1.6 }}
+          >
+            Organisations with real operational signal (Active project,
+            partnership or portfolio relationship) but no engagement row in
+            Supabase. Click → create the engagement when the formal terms
+            are confirmed.
+          </p>
+          <ul className="flex flex-col">
+            {orphanOrgs.map((s) => (
+              <OrphanOrgRow key={s.notion_id} status={s} />
+            ))}
+          </ul>
+        </HallSection>
+      )}
+
+      {total === 0 && orphanOrgs.length === 0 && !eErr && (
         <p
           className="text-[11.5px]"
           style={{ color: "var(--hall-muted-2)", fontFamily: "var(--font-hall-sans)" }}
@@ -218,6 +273,59 @@ export default async function ClientsListPage() {
         </p>
       )}
     </PortalShell>
+  );
+}
+
+function operationalStateColor(state: string | null): string {
+  switch (state) {
+    case "Active Delivery":     return "var(--hall-ok)";
+    case "Active Partnership":  return "var(--hall-ok)";
+    case "Active Portfolio":    return "var(--hall-ok)";
+    case "Proposal in flight":  return "var(--hall-warn)";
+    case "Archived":            return "var(--hall-muted-3)";
+    case "Idle":                return "var(--hall-muted-3)";
+    default:                    return "var(--hall-muted-3)";
+  }
+}
+
+function OrphanOrgRow({ status }: { status: OrgStatusRow }) {
+  const stateColor = operationalStateColor(status.operational_state);
+  return (
+    <li style={{ borderTop: "1px solid var(--hall-line-soft)" }}>
+      <Link
+        href={`/admin/clients/new?org_notion_id=${encodeURIComponent(status.notion_id)}`}
+        className="block py-3 px-1 transition-colors hover:bg-[var(--hall-fill-soft)]"
+      >
+        <div className="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-4">
+          <span
+            className="flex-1 min-w-0 text-[12.5px] font-semibold truncate"
+            style={{ color: "var(--hall-ink-0)" }}
+          >
+            {status.name ?? "(unnamed)"}
+          </span>
+          <span
+            className="text-[9px] uppercase whitespace-nowrap"
+            style={{
+              fontFamily: "var(--font-hall-mono)",
+              fontWeight: 700,
+              letterSpacing: "0.08em",
+              border: "1px solid var(--hall-line)",
+              padding: "2px 6px",
+              color: stateColor,
+            }}
+          >
+            {status.operational_state}
+          </span>
+          <span
+            className="text-[10px] uppercase whitespace-nowrap"
+            style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)", letterSpacing: "0.06em" }}
+          >
+            {status.relationship_type} · {status.active_projects_count} project
+            {status.active_projects_count === 1 ? "" : "s"}
+          </span>
+        </div>
+      </Link>
+    </li>
   );
 }
 
@@ -259,6 +367,21 @@ function EngagementRowItem({ engagement }: { engagement: EngagementWithOrg }) {
               >
                 {status}
               </span>
+              {engagement.operational_state && engagement.operational_state !== "Idle" && (
+                <span
+                  className="text-[9px] px-1.5 py-0.5 uppercase"
+                  style={{
+                    fontFamily: "var(--font-hall-mono)",
+                    fontWeight: 700,
+                    letterSpacing: "0.08em",
+                    border: "1px solid var(--hall-line)",
+                    color: operationalStateColor(engagement.operational_state),
+                  }}
+                  title="Derived operational state from v_org_status (Active project or partnership)"
+                >
+                  {engagement.operational_state}
+                </span>
+              )}
             </div>
             <p
               className="text-[10.5px] mt-0.5"
