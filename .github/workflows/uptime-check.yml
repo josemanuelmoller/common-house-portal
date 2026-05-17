@@ -127,6 +127,15 @@ jobs:
           mkdir -p public/status
           HIST_FILE=public/status/history.json
 
+          # Ensure this branch has a vercel.json that disables Vercel deploys.
+          # Vercel reads vercel.json from the commit being deployed; without
+          # this file the project falls back to "deploy all branches" and
+          # tries to build every status-branch push (which fails in ~6s
+          # because there is no package.json on this branch).
+          if [ ! -f vercel.json ]; then
+            printf '%s\n' '{' '  "git": {' '    "deploymentEnabled": false' '  }' '}' > vercel.json
+          fi
+
           # Append to history on the status branch (last 144 entries = 24h @ 10-min).
           if [ ! -f "$HIST_FILE" ]; then echo "[]" > "$HIST_FILE"; fi
           jq --arg ts "$NOW" --arg ov "$OVERALL" \
@@ -151,7 +160,7 @@ jobs:
 
           git config user.name  "ch-uptime-bot"
           git config user.email "ch-uptime-bot@users.noreply.github.com"
-          git add public/status/
+          git add public/status/ vercel.json
           if git diff --cached --quiet; then
             echo "No status change."
             exit 0
