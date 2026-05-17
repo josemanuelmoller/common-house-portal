@@ -202,5 +202,9 @@
   {
     "ts": "2026-05-17T18:12:56Z",
     "overall": "degraded"
+  },
+  {
+    "ts": "2026-05-17T19:39:01Z",
+    "overall": "degraded"
   }
 ]
