@@ -674,7 +674,7 @@ async function fetchInboxServer(): Promise<{ items: InboxItem[]; total_scanned: 
   }
 }
 
-export default async function AdminPage({ searchParams }: { searchParams?: Promise<{ stub?: string }> }) {
+export default async function AdminPage({ searchParams }: { searchParams?: Promise<{ stub?: string; full?: string }> }) {
   console.error("[admin/page] DIAG: render start");
   let adminUser;
   try {
@@ -685,17 +685,46 @@ export default async function AdminPage({ searchParams }: { searchParams?: Promi
     throw e;
   }
 
-  // DIAG ESCAPE HATCH: /admin?stub=1 → render a minimal page that proves
-  // requireAdmin works and JSX render works. If THIS still crashes, the
-  // bug is in module init / requireAdmin / very early. If THIS renders,
-  // the bug is in the loaders or the JSX tree.
+  // SAFE MODE 2026-05-18: /admin started crashing with a TypeError in some
+  // server-component path that even reverting all source changes did not
+  // fix. Default to a minimal placeholder + nav to keep the portal usable;
+  // re-enable the full dashboard with ?full=1 once the bug is found.
   const sp = await searchParams;
-  if (sp?.stub === "1") {
+  if (sp?.full !== "1") {
     return (
-      <div style={{ padding: 40, fontFamily: "monospace" }}>
-        <h1>ADMIN DIAG STUB</h1>
-        <p>requireAdmin OK. user.id = {adminUser?.id}</p>
-        <p>If you see this, the page module + requireAdmin + JSX render all work.</p>
+      <div style={{ padding: 32, fontFamily: "system-ui, -apple-system, sans-serif", maxWidth: 760, margin: "0 auto" }}>
+        <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 8 }}>Common House — Admin (safe mode)</h1>
+        <p style={{ color: "#666", marginBottom: 24, fontSize: 14 }}>
+          The main dashboard is temporarily disabled while a render bug is being investigated.
+          All sub-pages below work as normal.
+        </p>
+        <ul style={{ listStyle: "none", padding: 0, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 8 }}>
+          {[
+            ["/admin/decisions",       "Decisions"],
+            ["/admin/inbox",           "Inbox"],
+            ["/admin/hall/contacts",   "Contacts"],
+            ["/admin/hall/organizations", "Organizations"],
+            ["/admin/hall/commitments","Commitments"],
+            ["/admin/agents",          "Agents"],
+            ["/admin/grants",          "Grants"],
+            ["/admin/content",         "Content"],
+            ["/admin/comms",           "Comms"],
+            ["/admin/insights",        "Insights"],
+            ["/admin/investors",       "Investors"],
+            ["/admin/plan",            "Plan"],
+            ["/admin/projects",        "Projects"],
+            ["/admin/os",              "OS"],
+          ].map(([href, label]) => (
+            <li key={href}>
+              <a href={href} style={{ display: "block", padding: "10px 14px", border: "1px solid #e4e4dd", borderRadius: 8, color: "#0a0a0a", textDecoration: "none", fontSize: 14 }}>
+                {label} →
+              </a>
+            </li>
+          ))}
+        </ul>
+        <p style={{ color: "#999", marginTop: 32, fontSize: 12 }}>
+          Signed in as {adminUser?.primaryEmailAddress?.emailAddress}. Re-enable full dashboard with <code>?full=1</code> once fixed.
+        </p>
       </div>
     );
   }
