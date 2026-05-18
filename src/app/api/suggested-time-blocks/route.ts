@@ -55,7 +55,6 @@ type StoredBlock = {
   linked_entity_type: string;
   linked_entity_id: string;
   linked_entity_label: string;
-  project_name: string | null;
   suggested_start_time: string;
   suggested_end_time: string;
   duration_minutes: number;
@@ -87,7 +86,7 @@ export async function GET(_req: NextRequest) {
   // ── Step 1: check if stored set is still fresh ──────────────────────────
   const { data: existing } = await sb
     .from("suggested_time_blocks")
-    .select("id,title,linked_entity_type,linked_entity_id,linked_entity_label,project_name,suggested_start_time,suggested_end_time,duration_minutes,task_type,urgency_score,confidence_score,why_now,expected_outcome,fingerprint,status,generated_at,gcal_event_link")
+    .select("id,title,linked_entity_type,linked_entity_id,linked_entity_label,suggested_start_time,suggested_end_time,duration_minutes,task_type,urgency_score,confidence_score,why_now,expected_outcome,fingerprint,status,generated_at,gcal_event_link")
     .eq("user_email", email)
     .eq("status", "suggested")
     .gte("suggested_start_time", nowIso)
@@ -158,12 +157,7 @@ export async function GET(_req: NextRequest) {
     const prepCands      = await candidatesFromMeetings(upcoming, now, attendeeLookup);
     const followUpCands  = candidatesFromRecentMeetings(recent, now, attendeeLookup);
 
-    // Fingerprint blacklist:
-    //   - dismissed → suppressed permanently. Dismiss means "no quiero esto, punto".
-    //     If the underlying loop/opportunity changes its fingerprint (new content,
-    //     new entity, regenerated as a different intent), it won't match → naturally
-    //     re-surfaces. That's the only acceptable resurrection path.
-    //   - snoozed → suppressed until snoozed_until (explicit, time-bounded).
+    // Fingerprint blacklist: dismissed in last 24h, snoozed until future
     const { data: blocks } = await sb
       .from("suggested_time_blocks")
       .select("fingerprint,status,dismissed_at,snoozed_until")
@@ -171,8 +165,9 @@ export async function GET(_req: NextRequest) {
       .in("status", ["dismissed", "snoozed"]);
 
     const suppressed = new Set<string>();
+    const cutoff = Date.now() - 24 * 3600_000;
     for (const r of (blocks ?? []) as { fingerprint: string; status: string; dismissed_at: string | null; snoozed_until: string | null }[]) {
-      if (r.status === "dismissed" && r.dismissed_at) {
+      if (r.status === "dismissed" && r.dismissed_at && new Date(r.dismissed_at).getTime() > cutoff) {
         suppressed.add(r.fingerprint);
       } else if (r.status === "snoozed" && r.snoozed_until && new Date(r.snoozed_until).getTime() > Date.now()) {
         suppressed.add(r.fingerprint);
@@ -237,7 +232,6 @@ export async function GET(_req: NextRequest) {
         linked_entity_type:   m.candidate.entity_type,
         linked_entity_id:     m.candidate.entity_id,
         linked_entity_label:  m.candidate.entity_label,
-        project_name:         m.candidate.project_name,
         suggested_start_time: startDate.toISOString(),
         suggested_end_time:   endDate.toISOString(),
         duration_minutes:     cappedMin,
@@ -253,7 +247,7 @@ export async function GET(_req: NextRequest) {
     const { data: saved, error: insertErr } = await sb
       .from("suggested_time_blocks")
       .insert(inserted)
-      .select("id,title,linked_entity_type,linked_entity_id,linked_entity_label,project_name,suggested_start_time,suggested_end_time,duration_minutes,task_type,urgency_score,confidence_score,why_now,expected_outcome,fingerprint,status,generated_at,gcal_event_link");
+      .select("id,title,linked_entity_type,linked_entity_id,linked_entity_label,suggested_start_time,suggested_end_time,duration_minutes,task_type,urgency_score,confidence_score,why_now,expected_outcome,fingerprint,status,generated_at,gcal_event_link");
 
     if (insertErr) {
       return NextResponse.json({ error: "insert_failed", message: insertErr.message }, { status: 500 });
@@ -352,7 +346,6 @@ function formatForClient(row: StoredBlock, tz: string) {
     entity_type:        row.linked_entity_type,
     entity_id:          row.linked_entity_id,
     entity_label:       row.linked_entity_label,
-    project_name:       row.project_name,
     start:              row.suggested_start_time,
     end:                row.suggested_end_time,
     duration_min:       row.duration_minutes,

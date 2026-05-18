@@ -85,7 +85,7 @@ export function EvidenceQueueRow({ id, title, excerpt, projectName, type, valida
         )}
       </td>
       <td className="px-4 py-3 text-xs font-medium text-[#0a0a0a]/50">
-        {projectName || <span className="italic text-[#0a0a0a]/35">(sin proyecto)</span>}
+        {projectName || "—"}
       </td>
       <td className="px-4 py-3"><StatusBadge value={type} /></td>
       <td className="px-4 py-3"><StatusBadge value={validationStatus} /></td>

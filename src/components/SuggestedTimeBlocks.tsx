@@ -20,8 +20,6 @@ type Suggestion = {
   entity_type: string;
   entity_id: string;
   entity_label: string;
-  /** Parent project name (loop.parent_project_name). null → "(sin proyecto)". */
-  project_name: string | null;
   start: string;
   end: string;
   duration_min: number;
@@ -34,8 +32,6 @@ type Suggestion = {
   gcal_event_link: string | null;
   slot_label: string;
 };
-
-const NO_PROJECT_LABEL = "(sin proyecto)";
 
 type ApiResponse =
   | { mode: "cached" | "fresh"; suggestions: Suggestion[]; generated_at?: string }
@@ -290,17 +286,6 @@ export function SuggestedTimeBlocks() {
                   style={{ color: "var(--hall-muted-2)" }}
                 >
                   {item.entity_label}
-                </p>
-                <p
-                  className="text-[10px] sm:text-[10.5px] mt-0.5 truncate"
-                  style={{
-                    fontFamily: "var(--font-hall-mono)",
-                    color: item.project_name ? "var(--hall-ink-3)" : "var(--hall-muted-3)",
-                    fontStyle: item.project_name ? "normal" : "italic",
-                  }}
-                  title={item.project_name ?? NO_PROJECT_LABEL}
-                >
-                  Proyecto: {item.project_name ?? NO_PROJECT_LABEL}
                 </p>
                 <p
                   className="text-[10.5px] sm:text-[11px] mt-1.5 leading-[1.5]"

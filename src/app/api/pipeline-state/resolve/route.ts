@@ -9,11 +9,9 @@
  * }
  *
  * Marks a Pipeline State row resolved manually. When closeUnderlying=true
- * (default) it persists a permanent dismiss in hall_snoozes (or a 24h
- * snooze for pre_meeting), so the row doesn't re-surface on the next
- * render. The dismiss auto-lifts only if a fresh inbound signal lands
- * after the dismiss timestamp — explicit user intent ("don't show me this")
- * is respected until reality changes.
+ * (default) it also resolves the underlying entities so the row doesn't
+ * re-surface on the next render. For drift on an organization, applies a
+ * 30-day snooze as soft dormancy.
  */
 
 import { NextRequest, NextResponse } from "next/server";

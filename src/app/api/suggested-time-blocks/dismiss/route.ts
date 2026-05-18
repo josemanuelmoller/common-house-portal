@@ -2,11 +2,8 @@
  * POST /api/suggested-time-blocks/dismiss
  * Body: { id: string }
  *
- * Marks the suggestion dismissed permanently. The fingerprint is remembered
- * forever so the same candidate isn't re-proposed on any future generation.
- * Re-surfacing only happens if the underlying entity changes (new loop id,
- * new content → new fingerprint). For "I'll come back tomorrow" use the
- * /snooze endpoint with explicit hours instead.
+ * Marks the suggestion dismissed. The fingerprint is remembered for 24h so
+ * the same candidate isn't re-proposed on the next generation.
  */
 
 import { NextRequest, NextResponse } from "next/server";

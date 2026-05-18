@@ -24,13 +24,6 @@ export type Candidate = {
   entity_type: "loop" | "opportunity" | "project" | "meeting_prep" | "meeting_follow_up";
   entity_id: string;
   entity_label: string;
-  /**
-   * Parent project name, when the candidate's underlying entity is linked to
-   * a project. Cards must always disclose project context — null renders as
-   * "(sin proyecto)" so the user can never miss which initiative the work
-   * belongs to. (Fase 3 audit, 2026-05-18.)
-   */
-  project_name: string | null;
   duration_min: number;
   task_type: TaskType;
   urgency_score: number;      // 0-100
@@ -56,7 +49,6 @@ type LoopRow = {
   linked_entity_type: string;
   linked_entity_id: string;
   linked_entity_name: string;
-  parent_project_name: string | null;
   review_url: string | null;
   intervention_moment: string;
 };
@@ -129,7 +121,7 @@ export async function candidatesFromLoops(limit = 20): Promise<Candidate[]> {
   const sb = getSupabaseServerClient();
   const { data, error } = await sb
     .from("loops")
-    .select("id,title,loop_type,status,priority_score,founder_owned,due_at,linked_entity_type,linked_entity_id,linked_entity_name,parent_project_name,review_url,intervention_moment")
+    .select("id,title,loop_type,status,priority_score,founder_owned,due_at,linked_entity_type,linked_entity_id,linked_entity_name,review_url,intervention_moment")
     .in("status", ["open", "in_progress", "reopened"])
     .order("priority_score", { ascending: false, nullsFirst: false })
     .limit(limit);
@@ -178,7 +170,6 @@ export async function candidatesFromLoops(limit = 20): Promise<Candidate[]> {
       entity_type:      "loop",
       entity_id:        l.id,
       entity_label:     l.linked_entity_name,
-      project_name:     l.parent_project_name,
       duration_min:     loopDuration(l.loop_type),
       task_type:        loopTaskType(l.loop_type),
       urgency_score:    urgency,
@@ -238,10 +229,6 @@ export async function candidatesFromOpportunities(
       entity_type:      "opportunity",
       entity_id:        o.notion_id,
       entity_label:     o.org_name ?? o.title,
-      // Opportunities don't carry a direct project link in the current schema.
-      // The org may map to several projects — refusing to pick one wrong is
-      // better than showing a misleading label.
-      project_name:     null,
       duration_min:     step.length > 80 ? 60 : 45,
       task_type:        "deep_work",
       urgency_score:    urgency,
@@ -409,8 +396,6 @@ export async function candidatesFromMeetings(
         entity_type:      "meeting_prep",
         entity_id:        m.id,
         entity_label:     m.title,
-        // Meetings aren't linked to a project in the calendar layer.
-        project_name:     null,
         duration_min:     45,
         task_type:        "prep",
         urgency_score:    urgency,
@@ -444,7 +429,6 @@ export function candidatesFromRecentMeetings(
       entity_type:      "meeting_follow_up",
       entity_id:        m.id,
       entity_label:     m.title,
-      project_name:     null,
       duration_min:     30,
       task_type:        "follow_up",
       urgency_score:    80,

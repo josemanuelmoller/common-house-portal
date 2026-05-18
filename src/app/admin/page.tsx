@@ -64,7 +64,6 @@ import {
 import type { CoSTask } from "@/lib/notion";
 import { ADMIN_NAV } from "@/lib/admin-nav";
 import { requireAdmin } from "@/lib/require-admin";
-import { getDismissedDraftIds } from "@/lib/hall-draft-dismissals";
 import { TriggerBriefingButton } from "@/components/TriggerBriefingButton";
 import { ReadyForJoseSection } from "@/components/ReadyForJoseSection";
 import { SuggestedTimeBlocks } from "@/components/SuggestedTimeBlocks";
@@ -734,11 +733,9 @@ export default async function AdminPage() {
   // ── Ready for Jose — only actionable draft types (email drafts, posts, briefs)
   // Market Signal and other system-generated signals are excluded: they have no
   // Jose-facing next action. "Approved" on those means the agent approved its own output.
-  // Dismissed drafts (hall_draft_dismissals) are filtered out permanently per user.
   const RFJ_TYPES = new Set(["Follow-up Email", "Check-in Email", "LinkedIn Post", "Grant Brief", "Grant Application Draft"]);
-  const dismissedDraftIds = await getDismissedDraftIds(adminUser.id);
-  const rfjGmailDrafts    = gmailDrafts.filter(d => RFJ_TYPES.has(d.draftType) && !dismissedDraftIds.has(d.id));
-  const rfjApprovedDrafts = approvedDrafts.filter(d => RFJ_TYPES.has(d.draftType) && !dismissedDraftIds.has(d.id));
+  const rfjGmailDrafts    = gmailDrafts.filter(d => RFJ_TYPES.has(d.draftType));
+  const rfjApprovedDrafts = approvedDrafts.filter(d => RFJ_TYPES.has(d.draftType));
 
   // ── Derived state ────────────────────────────────────────────────────────────
   const withBlockers    = projects.filter(p => p.blockerCount > 0);

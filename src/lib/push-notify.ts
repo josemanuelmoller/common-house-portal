@@ -72,7 +72,7 @@ export async function sendPush(
 
   let q = sb
     .from("push_subscriptions")
-    .select("id, endpoint, p256dh, auth, user_id")
+    .select("id, endpoint, p256dh, auth")
     .eq("is_revoked", false)
     .eq(channelCol, true);
   if (opts.userId) q = q.eq("user_id", opts.userId);
@@ -86,34 +86,16 @@ export async function sendPush(
     return { attempted: 0, sent: 0, revoked: 0, errors: 0 };
   }
 
-  // Respect active push_snoozes: if a (tag, user_id) row is snoozed past now,
-  // skip emission for that user. Without this filter the user could tap
-  // "Snooze 1h" on a notification but the next digest cron would re-emit
-  // the same tag immediately (B-004 audit).
-  const tag = payload.tag ?? null;
-  const userIds = [...new Set(subs.map(s => s.user_id).filter((u): u is string => !!u))];
-  const snoozedUsers = new Set<string>();
-  if (tag && userIds.length > 0) {
-    const { data: snoozes } = await sb
-      .from("push_snoozes")
-      .select("user_id")
-      .eq("tag", tag)
-      .in("user_id", userIds)
-      .gt("snoozed_until", new Date().toISOString());
-    for (const s of (snoozes ?? []) as { user_id: string }[]) snoozedUsers.add(s.user_id);
-  }
-
   const body = JSON.stringify(payload);
-  const effectiveSubs = subs.filter(s => !s.user_id || !snoozedUsers.has(s.user_id));
   const result: SendResult = {
-    attempted: effectiveSubs.length,
+    attempted: subs.length,
     sent: 0,
     revoked: 0,
     errors: 0,
   };
 
   await Promise.all(
-    effectiveSubs.map(async (sub) => {
+    subs.map(async (sub) => {
       try {
         await webpush.sendNotification(
           {
