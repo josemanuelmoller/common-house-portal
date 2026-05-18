@@ -674,7 +674,7 @@ async function fetchInboxServer(): Promise<{ items: InboxItem[]; total_scanned: 
   }
 }
 
-export default async function AdminPage() {
+export default async function AdminPage({ searchParams }: { searchParams?: Promise<{ stub?: string }> }) {
   console.error("[admin/page] DIAG: render start");
   let adminUser;
   try {
@@ -683,6 +683,21 @@ export default async function AdminPage() {
   } catch (e) {
     console.error("[admin/page] DIAG: requireAdmin FAILED:", e instanceof Error ? e.stack ?? e.message : e);
     throw e;
+  }
+
+  // DIAG ESCAPE HATCH: /admin?stub=1 → render a minimal page that proves
+  // requireAdmin works and JSX render works. If THIS still crashes, the
+  // bug is in module init / requireAdmin / very early. If THIS renders,
+  // the bug is in the loaders or the JSX tree.
+  const sp = await searchParams;
+  if (sp?.stub === "1") {
+    return (
+      <div style={{ padding: 40, fontFamily: "monospace" }}>
+        <h1>ADMIN DIAG STUB</h1>
+        <p>requireAdmin OK. user.id = {adminUser?.id}</p>
+        <p>If you see this, the page module + requireAdmin + JSX render all work.</p>
+      </div>
+    );
   }
 
   // DIAGNOSTIC 2026-05-18: /admin started crashing with "TypeError: Cannot
