@@ -10,6 +10,7 @@
  */
 
 import { getSupabaseServerClient } from "@/lib/supabase-server";
+import { resolveProjectNames } from "@/lib/resolve-project-name";
 
 /**
  * Keep this shape compatible with the existing InboxTriage client component
@@ -290,11 +291,17 @@ export async function getCommitmentActions(limit = 60): Promise<CommitmentAction
 
   // Resolve project names in one round-trip for every action item that has
   // a project_id. Surfaces must always disclose project context per owner
-  // rule (2026-05-18 audit).
-  const { resolveProjectNames } = await import("./resolve-project-name");
-  const { byId } = await resolveProjectNames({
-    projectIds: rows.map(r => r.project_id).filter((x): x is string => !!x),
-  });
+  // rule (2026-05-18 audit). Defensive: if the lookup fails, fall back to
+  // null projectName so the commitment row still renders.
+  let byId = new Map<string, string>();
+  try {
+    const resolved = await resolveProjectNames({
+      projectIds: rows.map(r => r.project_id).filter((x): x is string => !!x),
+    });
+    byId = resolved.byId;
+  } catch (e) {
+    console.error("[getCommitmentActions] resolveProjectNames failed:", e);
+  }
 
   const now = Date.now();
   return rows.map(r => {

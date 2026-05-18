@@ -735,8 +735,16 @@ export default async function AdminPage() {
   // Market Signal and other system-generated signals are excluded: they have no
   // Jose-facing next action. "Approved" on those means the agent approved its own output.
   // Dismissed drafts (hall_draft_dismissals) are filtered out permanently per user.
+  // Defensive: if the lookup fails, fall back to empty set so the page still renders
+  // (we'd rather show too many drafts than crash the whole admin page).
   const RFJ_TYPES = new Set(["Follow-up Email", "Check-in Email", "LinkedIn Post", "Grant Brief", "Grant Application Draft"]);
-  const dismissedDraftIds = await getDismissedDraftIds(adminUser.id);
+  let dismissedDraftIds: Set<string>;
+  try {
+    dismissedDraftIds = await getDismissedDraftIds(adminUser.id);
+  } catch (e) {
+    console.error("[admin] getDismissedDraftIds failed:", e);
+    dismissedDraftIds = new Set();
+  }
   const rfjGmailDrafts    = gmailDrafts.filter(d => RFJ_TYPES.has(d.draftType) && !dismissedDraftIds.has(d.id));
   const rfjApprovedDrafts = approvedDrafts.filter(d => RFJ_TYPES.has(d.draftType) && !dismissedDraftIds.has(d.id));
 
