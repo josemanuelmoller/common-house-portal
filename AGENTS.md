@@ -1,3 +1,13 @@
+<!-- BEGIN:lessons-pointer -->
+## Lessons file — read before non-trivial changes
+
+`tasks/lessons.md` is the repo-scoped lessons log. It carries the
+non-obvious rules that have already cost us bugs, deploys, or
+re-litigated decisions. Skim the section relevant to the area you are
+about to change. If the owner corrects a recurring pattern during the
+session, append a lesson there (format and template are in the file).
+<!-- END:lessons-pointer -->
+
 <!-- BEGIN:nextjs-agent-rules -->
 # This is NOT the Next.js you know
 

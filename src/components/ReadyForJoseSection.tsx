@@ -1,39 +1,15 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { AgentDraft } from "@/lib/notion";
 
-// Dismissals expire after 24 hours so completed items don't pile up permanently
-const DISMISS_TTL_MS = 24 * 60 * 60 * 1000;
-const STORAGE_KEY = "rfj_dismissed_v1";
-
-function loadDismissed(): Set<string> {
-  if (typeof window === "undefined") return new Set();
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return new Set();
-    const parsed: Record<string, number> = JSON.parse(raw);
-    const now = Date.now();
-    const active = Object.entries(parsed)
-      .filter(([, ts]) => now - ts < DISMISS_TTL_MS)
-      .map(([id]) => id);
-    return new Set(active);
-  } catch {
-    return new Set();
-  }
-}
-
-function saveDismiss(id: string) {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    const parsed: Record<string, number> = raw ? JSON.parse(raw) : {};
-    parsed[id] = Date.now();
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
-  } catch {
-    /* ignore */
-  }
-}
+// Server-side dismissal. The previous mechanism used localStorage with a
+// 24h TTL, which meant dismissals were lost on browser switch AND the same
+// card reappeared the next day even when the user said "Dismiss" — exactly
+// the anti-pattern flagged in tasks/lessons.md L-011. Dismissals are now
+// permanent and persisted in hall_draft_dismissals (per user). Server
+// component filters them out before passing items down.
 
 function estimatedTime(draftType: string): string {
   if (draftType === "Follow-up Email" || draftType === "Check-in Email") return "5 min";
@@ -60,17 +36,30 @@ export function ReadyForJoseSection({
   approvedDrafts: AgentDraft[]; // status === "Approved"       — ready to push to Gmail
 }) {
   const router = useRouter();
+  // Local optimistic set — hides the card immediately while the POST is
+  // in flight. The authoritative source after a successful POST is the
+  // server-side hall_draft_dismissals table; the parent server component
+  // re-renders without the card on router.refresh().
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const [states, setStates] = useState<Record<string, ItemState>>({});
 
-  // Hydrate from localStorage after mount (avoids SSR mismatch)
-  useEffect(() => {
-    setDismissed(loadDismissed());
-  }, []);
-
-  function dismiss(id: string) {
-    saveDismiss(id);
+  async function dismiss(id: string) {
+    const previous = dismissed;
     setDismissed((prev) => new Set([...prev, id]));
+    try {
+      const res = await fetch("/api/agent-drafts/dismiss", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ draftId: id }),
+      });
+      if (!res.ok) {
+        setDismissed(previous);
+        return;
+      }
+      router.refresh();
+    } catch {
+      setDismissed(previous);
+    }
   }
 
   async function pushToGmail(draft: AgentDraft) {

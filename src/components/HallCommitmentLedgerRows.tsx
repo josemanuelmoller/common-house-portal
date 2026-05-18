@@ -16,13 +16,17 @@ import Link from "next/link";
  */
 
 export type CommitmentLite = {
-  id:         string;
-  title:      string;
-  snippet:    string;
-  daysAgo:    number;
-  owner:      "jose" | "others";
-  notionUrl:  string;
+  id:           string;
+  title:        string;
+  snippet:      string;
+  daysAgo:      number;
+  owner:        "jose" | "others";
+  notionUrl:    string;
+  /** Parent project name. null → renders as "(sin proyecto)". */
+  projectName:  string | null;
 };
+
+const NO_PROJECT_LABEL = "(sin proyecto)";
 
 const DISMISSED_KEY = "hall-commitments-dismissed";
 
@@ -244,6 +248,17 @@ function CommitmentRow({
           title={c.snippet}
         >
           {c.snippet}
+        </span>
+        <span
+          className="block text-[10px] line-clamp-1"
+          style={{
+            fontFamily: "var(--font-hall-mono)",
+            color: c.projectName ? "var(--hall-ink-3)" : "var(--hall-muted-3)",
+            fontStyle: c.projectName ? "normal" : "italic",
+          }}
+          title={c.projectName ?? NO_PROJECT_LABEL}
+        >
+          Proyecto: {c.projectName ?? NO_PROJECT_LABEL}
         </span>
       </a>
       <div className="flex items-center gap-1.5 shrink-0">

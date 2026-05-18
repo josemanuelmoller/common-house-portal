@@ -19,12 +19,13 @@ export async function HallCommitmentLedger() {
   const all = await getCommitmentActions(60);
 
   const toLite = (c: (typeof all)[number]): CommitmentLite => ({
-    id:        c.actionItemId,
-    title:     c.title,
-    snippet:   c.snippet,
-    daysAgo:   c.daysAgo,
-    owner:     c.owner,
-    notionUrl: c.sourceUrl,
+    id:          c.actionItemId,
+    title:       c.title,
+    snippet:     c.snippet,
+    daysAgo:     c.daysAgo,
+    owner:       c.owner,
+    notionUrl:   c.sourceUrl,
+    projectName: c.projectName,
   });
 
   const joseCommits   = all.filter(c => c.owner === "jose").slice(0, 5).map(toLite);

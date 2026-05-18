@@ -314,7 +314,12 @@ export function ContentCard({ item, onArchive }: { item: ContentCardItem; onArch
             <p className="text-[10px] text-[#0a0a0a]/40 mt-0.5">
               {item.contentType || "—"}
               {item.channel ? ` · ${item.channel}` : ""}
-              {item.projectName ? ` · ${item.projectName}` : ""}
+              {" · "}
+              {item.projectName ? (
+                <span>{item.projectName}</span>
+              ) : (
+                <span className="italic text-[#0a0a0a]/30">(sin proyecto)</span>
+              )}
               {hasSlides && <span className="ml-1.5 text-purple-500 font-bold">· Slides HTML</span>}
             </p>
           </div>

@@ -244,6 +244,8 @@ export type CommitmentActionView = {
   sourceUrl: string;
   intent: string;
   priorityScore: number;
+  /** Parent project name (null when no project_id linked). */
+  projectName: string | null;
 };
 
 export async function getCommitmentActions(limit = 60): Promise<CommitmentActionView[]> {
@@ -259,7 +261,7 @@ export async function getCommitmentActions(limit = 60): Promise<CommitmentAction
     .from("action_items")
     .select(
       "id, source_type, source_url, subject, counterparty, next_action, " +
-      "intent, priority_score, last_motion_at"
+      "intent, priority_score, last_motion_at, project_id"
     )
     .in("intent", ["deliver", "chase", "follow_up", "close_loop"])
     .in("source_type", COMMITMENT_SOURCES)
@@ -283,7 +285,16 @@ export async function getCommitmentActions(limit = 60): Promise<CommitmentAction
     intent: string;
     priority_score: number;
     last_motion_at: string;
+    project_id: string | null;
   }>;
+
+  // Resolve project names in one round-trip for every action item that has
+  // a project_id. Surfaces must always disclose project context per owner
+  // rule (2026-05-18 audit).
+  const { resolveProjectNames } = await import("./resolve-project-name");
+  const { byId } = await resolveProjectNames({
+    projectIds: rows.map(r => r.project_id).filter((x): x is string => !!x),
+  });
 
   const now = Date.now();
   return rows.map(r => {
@@ -299,6 +310,7 @@ export async function getCommitmentActions(limit = 60): Promise<CommitmentAction
       sourceUrl:    r.source_url ?? "",
       intent:       r.intent,
       priorityScore: r.priority_score,
+      projectName:  r.project_id ? (byId.get(r.project_id) ?? null) : null,
     };
   });
 }

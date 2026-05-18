@@ -145,7 +145,13 @@ type DecisionItemRow = {
   due_date: string | null;
 };
 
-type SnoozeRow = { entity_type: string; entity_id: string; until_at: string };
+type SnoozeRow = { entity_type: string; entity_id: string; until_at: string; snoozed_at: string };
+
+// Sentinel for "permanent" snoozes (Acknowledge — not pursuing, etc.).
+// hall_snoozes.until_at is NOT NULL so we cannot use null. Sentinel is far
+// enough in the future that it acts as a forever marker without breaking
+// any tooling that expects a real timestamp.
+const PERMANENT_UNTIL = "9999-12-31T23:59:59Z";
 
 type LogRow = {
   id: string;
@@ -208,7 +214,7 @@ export async function getPipelineState(): Promise<PipelineStateResult> {
           .select("id, title, status, priority, org_notion_id, due_date")
           .in("org_notion_id", orgIdsArr)
           .in("status", ["Open", "Pending", "Pending Review", "In Progress"]),
-    sb.from("hall_snoozes").select("entity_type, entity_id, until_at").gt("until_at", new Date().toISOString()),
+    sb.from("hall_snoozes").select("entity_type, entity_id, until_at, snoozed_at").gt("until_at", new Date().toISOString()),
     sb.from("hall_attention_log").select("id, entity_type, entity_id, reason, surfaced_at, resolved_at, resolution"),
     orgIdsArr.length === 0
       ? Promise.resolve({ data: [] })
@@ -268,7 +274,11 @@ export async function getPipelineState(): Promise<PipelineStateResult> {
   const aiByOrg = groupBy(actionItems, r => r.org_notion_id);
   const decByOrg = groupBy(decisions, r => r.org_notion_id);
   const snoozeKey = (t: string, id: string) => `${t}:${id}`;
-  const snoozedSet = new Set(snoozes.map(s => snoozeKey(s.entity_type, s.entity_id)));
+  // Map snooze key → snoozed_at, so the candidate loop can lift the
+  // suppression when a materially new signal arrives after the snooze.
+  // A permanent dismiss (until_at = '9999-12-31') still appears here; what
+  // unlocks it is a fresh inbound signal, not the passage of time.
+  const snoozedAtByKey = new Map(snoozes.map(s => [snoozeKey(s.entity_type, s.entity_id), s.snoozed_at]));
   const openLogByKey = new Map<string, LogRow>();
   const closedLogByKey = new Map<string, LogRow>();
   for (const l of logs) {
@@ -330,13 +340,19 @@ export async function getPipelineState(): Promise<PipelineStateResult> {
   const surfaced: Surfaced[] = [];
 
   for (const cand of candidates) {
-    if (snoozedSet.has(snoozeKey(cand.entityType, cand.entityId))) continue;
-
     const ais = (cand.orgNotionId ? aiByOrg.get(cand.orgNotionId) : undefined) ?? [];
     const dis = (cand.orgNotionId ? decByOrg.get(cand.orgNotionId) : undefined) ?? [];
     const peopleAct = (cand.orgNotionId ? peopleActByOrg.get(cand.orgNotionId) : undefined) ?? [];
     const lastInbound = maxIso(peopleAct.flatMap(p => [p.last_email_at, p.last_transcript_at]));
     const lastSignal = cand.oppRow?.last_signal_at ?? lastInbound;
+
+    // Snooze check with materially-new escape: if the entity has been snoozed
+    // (including permanent dismiss) but a fresh inbound signal arrived AFTER
+    // the snooze, lift the suppression. This is the only way a permanent
+    // dismiss un-permanents itself — explicit user intent ("don't show me
+    // this") is respected until reality changes.
+    const snoozedAt = snoozedAtByKey.get(snoozeKey(cand.entityType, cand.entityId));
+    if (snoozedAt && (!lastSignal || new Date(lastSignal).getTime() <= new Date(snoozedAt).getTime())) continue;
 
     const ballJose = computeBallWithJose(ais, dis, now);
     const ballThem = computeBallWithThem(ais, now);
@@ -578,7 +594,28 @@ export async function snoozeEntity(
   const until = new Date(Date.now() + days * MS_DAY).toISOString();
   await sb
     .from("hall_snoozes")
-    .upsert({ entity_type: entityType, entity_id: entityId, until_at: until, reason, snoozed_by: snoozedBy }, {
+    .upsert({ entity_type: entityType, entity_id: entityId, until_at: until, reason, snoozed_by: snoozedBy, snoozed_at: new Date().toISOString() }, {
+      onConflict: "entity_type,entity_id",
+    });
+}
+
+/**
+ * Permanent dismiss. Writes a sentinel `until_at` so the entity stays
+ * suppressed forever. The reader auto-lifts the suppression if a fresh
+ * inbound signal arrives after snoozed_at — that's the only resurrection
+ * path. Use this when the user clicks an "Acknowledge / not pursuing" CTA;
+ * use `snoozeEntity` only when the user picks an explicit short window.
+ */
+export async function dismissEntityForever(
+  entityType: "organization" | "opportunity",
+  entityId: string,
+  reason: string | null,
+  dismissedBy: string | null
+): Promise<void> {
+  const sb = getSupabaseServerClient();
+  await sb
+    .from("hall_snoozes")
+    .upsert({ entity_type: entityType, entity_id: entityId, until_at: PERMANENT_UNTIL, reason, snoozed_by: dismissedBy, snoozed_at: new Date().toISOString() }, {
       onConflict: "entity_type,entity_id",
     });
 }
@@ -641,9 +678,23 @@ export async function manualResolve(
     }
   }
 
-  if (closeUnderlying && reason === "drift" && entityType === "organization") {
-    // "Acknowledge — not pursuing" → snooze 30d as a soft dormancy signal.
-    await snoozeEntity(entityType, entityId, 30, "drift_acknowledged", resolvedBy);
+  // Persist the dismissal so the next render doesn't re-open the same reason.
+  // Without this, the reason gets re-derived from current data and the row
+  // resurfaces immediately. Dispatch by reason:
+  //   - drift / ball_with_them / ball_with_jose → permanent dismiss.
+  //     Auto-lifts only if a fresh inbound signal lands after snoozed_at
+  //     (handled in the reader). For ball_with_jose the cascade above already
+  //     closes the underlying AIs/DIs; the permanent dismiss is the safety
+  //     net for cases where the cascade is a no-op (e.g. orphan AIs).
+  //   - pre_meeting → 24h snooze. The same meeting can't re-trigger within
+  //     the 48h window, and the next meeting on the calendar deserves its
+  //     own prep prompt (entity-level permanent dismiss would suppress it).
+  if (closeUnderlying) {
+    if (reason === "pre_meeting") {
+      await snoozeEntity(entityType, entityId, 1, "pre_meeting_skipped", resolvedBy);
+    } else {
+      await dismissEntityForever(entityType, entityId, `${reason}_acknowledged`, resolvedBy);
+    }
   }
 
   return { closedLog: (closed?.length ?? 0) > 0, closedItems };
