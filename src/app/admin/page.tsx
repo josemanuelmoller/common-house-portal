@@ -677,6 +677,19 @@ async function fetchInboxServer(): Promise<{ items: InboxItem[]; total_scanned: 
 export default async function AdminPage() {
   const adminUser = await requireAdmin();
 
+  // DIAGNOSTIC 2026-05-18: /admin started crashing with "TypeError: Cannot
+  // read prop..." (truncated log). Wrap each loader so we get the exact
+  // culprit + a safe fallback, instead of crashing the whole page.
+  type Loader<T> = { name: string; fn: () => Promise<T>; fallback: T };
+  async function safeLoad<T>(L: Loader<T>): Promise<T> {
+    try {
+      return await L.fn();
+    } catch (e) {
+      console.error(`[admin/page] LOADER FAILED: ${L.name}`, e instanceof Error ? e.stack ?? e.message : e);
+      return L.fallback;
+    }
+  }
+
   const [
     projects,
     decisions,
@@ -697,27 +710,25 @@ export default async function AdminPage() {
     inboxData,
     agentsOnline,
   ] = await Promise.all([
-    getProjectsOverview(),
-    getDecisionItems("Open"),
-    getDailyBriefing(),
-    getLatestMarketSignals(),
-    getRecentInsightBriefBriefs(),
-    getRecentCompetitiveIntel(30),
-    // Outbox: only Pending Review drafts whose approval triggers an external
-    // action (LinkedIn, email, delegation). Market Signal + Quick Win Scan are
-    // filtered out — they surface in their own Hall sections, not in approval.
-    getOutboxDrafts(),
-    getAgentDrafts("Draft Created"),
-    getAgentDrafts("Approved"),
-    getCoSActions(40),  // Phase 6.5: CoS desk reads from action_items layer
-    getParkedLoops(),
-    getRadarLoops(),
-    getCandidateOpportunities(),
-    getOpportunitiesByScope(),
-    getColdRelationships(),
-    getReadyContent(),
-    fetchInboxServer(),
-    getAgentsOnlineCount(),
+    safeLoad({ name: "getProjectsOverview",        fn: () => getProjectsOverview(),         fallback: [] as Awaited<ReturnType<typeof getProjectsOverview>> }),
+    safeLoad({ name: "getDecisionItems('Open')",   fn: () => getDecisionItems("Open"),      fallback: [] as Awaited<ReturnType<typeof getDecisionItems>> }),
+    safeLoad<Awaited<ReturnType<typeof getDailyBriefing>>>({ name: "getDailyBriefing", fn: () => getDailyBriefing(), fallback: null }),
+    safeLoad<Awaited<ReturnType<typeof getLatestMarketSignals>>>({ name: "getLatestMarketSignals", fn: () => getLatestMarketSignals(), fallback: null }),
+    safeLoad({ name: "getRecentInsightBriefBriefs",fn: () => getRecentInsightBriefBriefs(), fallback: [] as Awaited<ReturnType<typeof getRecentInsightBriefBriefs>> }),
+    safeLoad({ name: "getRecentCompetitiveIntel",  fn: () => getRecentCompetitiveIntel(30), fallback: [] as Awaited<ReturnType<typeof getRecentCompetitiveIntel>> }),
+    // Outbox: only Pending Review drafts whose approval triggers an external action.
+    safeLoad({ name: "getOutboxDrafts",            fn: () => getOutboxDrafts(),             fallback: [] as Awaited<ReturnType<typeof getOutboxDrafts>> }),
+    safeLoad({ name: "getAgentDrafts('Draft Created')", fn: () => getAgentDrafts("Draft Created"), fallback: [] as Awaited<ReturnType<typeof getAgentDrafts>> }),
+    safeLoad({ name: "getAgentDrafts('Approved')", fn: () => getAgentDrafts("Approved"),    fallback: [] as Awaited<ReturnType<typeof getAgentDrafts>> }),
+    safeLoad({ name: "getCoSActions",              fn: () => getCoSActions(40),             fallback: [] as Awaited<ReturnType<typeof getCoSActions>> }),
+    safeLoad({ name: "getParkedLoops",             fn: () => getParkedLoops(),              fallback: [] as Awaited<ReturnType<typeof getParkedLoops>> }),
+    safeLoad({ name: "getRadarLoops",              fn: () => getRadarLoops(),               fallback: [] as Awaited<ReturnType<typeof getRadarLoops>> }),
+    safeLoad({ name: "getCandidateOpportunities",  fn: () => getCandidateOpportunities(),   fallback: [] as Awaited<ReturnType<typeof getCandidateOpportunities>> }),
+    safeLoad({ name: "getOpportunitiesByScope",    fn: () => getOpportunitiesByScope(),     fallback: {} as Awaited<ReturnType<typeof getOpportunitiesByScope>> }),
+    safeLoad({ name: "getColdRelationships",       fn: () => getColdRelationships(),        fallback: [] as Awaited<ReturnType<typeof getColdRelationships>> }),
+    safeLoad({ name: "getReadyContent",            fn: () => getReadyContent(),             fallback: [] as Awaited<ReturnType<typeof getReadyContent>> }),
+    safeLoad({ name: "fetchInboxServer",           fn: () => fetchInboxServer(),            fallback: { items: [], total_scanned: 0 } as Awaited<ReturnType<typeof fetchInboxServer>> }),
+    safeLoad({ name: "getAgentsOnlineCount",       fn: () => getAgentsOnlineCount(),        fallback: 0 as Awaited<ReturnType<typeof getAgentsOnlineCount>> }),
   ]);
   // Phase 13 — load strategic objectives separately (Supabase, fast).
   // Used by computeFocusRecommendation to weight items by tier.
