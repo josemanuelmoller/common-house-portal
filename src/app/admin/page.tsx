@@ -675,7 +675,15 @@ async function fetchInboxServer(): Promise<{ items: InboxItem[]; total_scanned: 
 }
 
 export default async function AdminPage() {
-  const adminUser = await requireAdmin();
+  console.error("[admin/page] DIAG: render start");
+  let adminUser;
+  try {
+    adminUser = await requireAdmin();
+    console.error("[admin/page] DIAG: requireAdmin OK, user.id=", adminUser?.id);
+  } catch (e) {
+    console.error("[admin/page] DIAG: requireAdmin FAILED:", e instanceof Error ? e.stack ?? e.message : e);
+    throw e;
+  }
 
   // DIAGNOSTIC 2026-05-18: /admin started crashing with "TypeError: Cannot
   // read prop..." (truncated log). Wrap each loader so we get the exact
@@ -730,9 +738,24 @@ export default async function AdminPage() {
     safeLoad({ name: "fetchInboxServer",           fn: () => fetchInboxServer(),            fallback: { items: [], total_scanned: 0 } as Awaited<ReturnType<typeof fetchInboxServer>> }),
     safeLoad({ name: "getAgentsOnlineCount",       fn: () => getAgentsOnlineCount(),        fallback: 0 as Awaited<ReturnType<typeof getAgentsOnlineCount>> }),
   ]);
+  console.error("[admin/page] DIAG: Promise.all completed. counts=", {
+    projects: projects?.length, decisions: decisions?.length,
+    gmailDrafts: gmailDrafts?.length, approvedDrafts: approvedDrafts?.length,
+    cosTasks: cosTasks?.length, parkedTasks: parkedTasks?.length,
+    radarLoops: radarLoops?.length, candidates: candidates?.length,
+    coldRelationships: coldRelationships?.length, readyContent: readyContent?.length,
+    competitiveIntel: competitiveIntel?.length,
+  });
   // Phase 13 — load strategic objectives separately (Supabase, fast).
   // Used by computeFocusRecommendation to weight items by tier.
-  const strategicObjectives = await getObjectivesForYear(new Date().getFullYear());
+  let strategicObjectives;
+  try {
+    strategicObjectives = await getObjectivesForYear(new Date().getFullYear());
+    console.error("[admin/page] DIAG: getObjectivesForYear OK, count=", strategicObjectives?.length);
+  } catch (e) {
+    console.error("[admin/page] DIAG: getObjectivesForYear FAILED:", e instanceof Error ? e.stack ?? e.message : e);
+    strategicObjectives = [] as Awaited<ReturnType<typeof getObjectivesForYear>>;
+  }
 
   const competitiveLastScan = competitiveIntel.reduce<string | null>(
     (latest, r) =>
