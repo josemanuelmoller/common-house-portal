@@ -21,6 +21,7 @@ import { google } from "googleapis";
 import { adminGuardApi } from "@/lib/require-admin";
 import { notion, DB } from "@/lib/notion";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
+import { logServerError } from "@/lib/debug-log";
 
 // ─── Gmail auth ───────────────────────────────────────────────────────────────
 
@@ -170,9 +171,9 @@ export async function POST(req: NextRequest) {
       subject,
     });
   } catch (err) {
-    // Gmail send errors can include account hints / refresh-token failure
-    // strings — log server-side, surface a generic message to the caller.
-    console.error("[/api/send-draft] gmail send failed:", err);
+    // Gmail send errors carry account hints / refresh-token paths — full
+    // stack to debug_log, generic message to the caller.
+    await logServerError("api/send-draft", err, { phase: "gmail_send" });
     return NextResponse.json({
       ok: false,
       error: "Internal error",
