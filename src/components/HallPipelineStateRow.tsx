@@ -26,12 +26,15 @@ const TREND_COLOR: Record<SerializedPipelineRow["trend"], string> = {
   cold:    "var(--hall-danger)",
 };
 
+type ApiResult<T = Record<string, unknown>> = { ok: true; body: T } | { ok: false; error: string };
+
 export function HallPipelineStateRow({ row }: { row: SerializedPipelineRow }) {
   const router = useRouter();
   const [busy, setBusy] = useState<"primary" | "resolve" | "snooze" | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
 
-  async function callApi(path: string, body: object): Promise<boolean> {
+  async function callApi<T = Record<string, unknown>>(path: string, body: object): Promise<ApiResult<T>> {
     setErr(null);
     try {
       const res = await fetch(path, {
@@ -39,50 +42,83 @@ export function HallPipelineStateRow({ row }: { row: SerializedPipelineRow }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
+      const j = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const j = await res.json().catch(() => ({}));
-        setErr(j.error ?? `HTTP ${res.status}`);
-        return false;
+        const errorMsg = (j && typeof j === "object" && "error" in j) ? String(j.error) : `HTTP ${res.status}`;
+        setErr(errorMsg);
+        return { ok: false, error: errorMsg };
       }
-      return true;
+      return { ok: true, body: j as T };
     } catch (e) {
-      setErr(String(e));
-      return false;
+      const errorMsg = e instanceof Error ? e.message : String(e);
+      setErr(errorMsg);
+      return { ok: false, error: errorMsg };
     }
+  }
+
+  function flashToast(msg: string) {
+    setToast(msg);
+    setTimeout(() => setToast(null), 3500);
   }
 
   async function onPrimary() {
     setBusy("primary");
-    const ok = await callApi("/api/pipeline-state/draft", {
+    const result = await callApi<{
+      ok?: boolean;
+      navigate?: boolean;
+      queued?: boolean;
+      logged?: boolean;
+      draftId?: string | null;
+      snoozedDays?: number;
+      note?: string;
+    }>("/api/pipeline-state/draft", {
       entityType: row.entityType,
       entityId:   row.entityId,
       action:     row.ctaPrimary.action,
       payload:    row.ctaPrimary.payload ?? {},
     });
     setBusy(null);
-    if (ok) router.refresh();
+    if (!result.ok) return;
+
+    const b = result.body;
+    // Branch by what the server actually did, not just "request succeeded":
+    //   navigate=true  → open_prep / open_review — take the user to row.url
+    //   queued=true    → draft skill ran — tell the user to check inbox
+    //   logged=true    → honest fallback — click was recorded + snoozed
+    if (b.navigate) {
+      if (row.url) {
+        window.open(row.url, "_blank", "noopener,noreferrer");
+      } else {
+        flashToast("No hay enlace asociado a esta fila.");
+      }
+    } else if (b.queued) {
+      flashToast("Borrador encolado. Revísalo en tu bandeja.");
+    } else if (b.logged) {
+      flashToast(`Anotado. Snooze ${b.snoozedDays ?? 1}d hasta que llegue señal nueva.`);
+    }
+    router.refresh();
   }
 
   async function onResolve() {
     setBusy("resolve");
-    const ok = await callApi("/api/pipeline-state/resolve", {
+    const result = await callApi("/api/pipeline-state/resolve", {
       entityType: row.entityType,
       entityId:   row.entityId,
       reason:     row.reason,
     });
     setBusy(null);
-    if (ok) router.refresh();
+    if (result.ok) router.refresh();
   }
 
   async function onSnooze(days: number) {
     setBusy("snooze");
-    const ok = await callApi("/api/pipeline-state/snooze", {
+    const result = await callApi("/api/pipeline-state/snooze", {
       entityType: row.entityType,
       entityId:   row.entityId,
       days,
     });
     setBusy(null);
-    if (ok) router.refresh();
+    if (result.ok) router.refresh();
   }
 
   return (
@@ -213,6 +249,11 @@ export function HallPipelineStateRow({ row }: { row: SerializedPipelineRow }) {
         {err && (
           <p className="text-[10px] ml-5" style={{ color: "var(--hall-danger)" }}>
             {err}
+          </p>
+        )}
+        {toast && (
+          <p className="text-[10px] ml-5" style={{ color: "var(--hall-muted-1)" }}>
+            {toast}
           </p>
         )}
       </div>

@@ -65,11 +65,13 @@ export function CandidateSection({ candidates }: Props) {
   const [scanning, setScanning] = useState(false);
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+  const [actionErr, setActionErr] = useState<{ id: string; msg: string } | null>(null);
 
   async function handleAction(candidateId: string, action: "promote" | "ignore") {
     setActing(candidateId);
+    setActionErr(null);
     try {
-      await fetch("/api/promote-candidate", {
+      const res = await fetch("/api/promote-candidate", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -78,10 +80,19 @@ export function CandidateSection({ candidates }: Props) {
           ...(action === "ignore" ? { reason: "Ignored via Hall review" } : {}),
         }),
       });
-      // Optimistic: remove from view immediately
+      // Surface server-side failures instead of pretending they succeeded.
+      // Optimistic hide was lying when the API returned 4xx/5xx — the row
+      // came back next render with no explanation.
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({} as { error?: string }));
+        setActionErr({ id: candidateId, msg: body?.error ?? `HTTP ${res.status}` });
+        return;
+      }
       setDismissed(prev => new Set(prev).add(candidateId));
-      router.refresh(); // re-fetch server data in background
-    } catch { /* silent */ } finally {
+      router.refresh();
+    } catch (e) {
+      setActionErr({ id: candidateId, msg: e instanceof Error ? e.message : String(e) });
+    } finally {
       setActing(null);
     }
   }
@@ -244,6 +255,11 @@ export function CandidateSection({ candidates }: Props) {
                   Notion →
                 </a>
               </div>
+              {actionErr?.id === c.id && (
+                <p className="text-[10px] text-red-500 mt-1">
+                  Acción falló: {actionErr.msg}
+                </p>
+              )}
             </div>
           </div>
         );

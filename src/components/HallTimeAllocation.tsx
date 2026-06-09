@@ -132,10 +132,14 @@ export async function HallTimeAllocation() {
           .map(a => {
             const pct = totalHours > 0 ? (a.hours / totalHours) * 100 : 0;
             const target = a.bucket.target;
+            // L-005 fix: previously `far ? "OVER"` — when you have 0 hours
+            // against a target, the correct status is UNDER (you're below
+            // target), not OVER. The label was counter-factual and read as
+            // "Client 0%/20% — OVER" which made no sense.
             const far  = target > 0 && a.hours === 0;
             const near = target > 0 && pct > 0 && pct < target;
             const over = target > 0 && pct > target * 1.5;
-            const status = far ? "OVER" : near ? "UNDER" : over ? "OVER" : target > 0 ? "OK" : "";
+            const status = far ? "UNDER" : near ? "UNDER" : over ? "OVER" : target > 0 ? "OK" : "";
             const statusColor = far ? "var(--hall-danger)"
               : near ? "var(--hall-warn)"
               : over ? "var(--hall-danger)"
