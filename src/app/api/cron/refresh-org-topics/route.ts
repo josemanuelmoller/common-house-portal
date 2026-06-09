@@ -168,7 +168,11 @@ Output JSON only: {"topics":[{"label":"..."},{"label":"..."},{"label":"..."}]}. 
       const m = text.match(/\{[\s\S]*\}/);
       if (m) parsed = JSON.parse(m[0]);
     } catch (e) {
-      results.push({ org_notion_id: orgId, topic_count: 0, ok: false, error: String(e) });
+      // Log full error server-side, surface a sanitised label to the
+      // caller. err.message from JSON.parse on LLM output can include
+      // payload fragments — not for cron-secret consumers.
+      console.error("[/api/cron/refresh-org-topics] parse failed for org", orgId, e);
+      results.push({ org_notion_id: orgId, topic_count: 0, ok: false, error: "parse_failed" });
       continue;
     }
 

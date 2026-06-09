@@ -170,9 +170,12 @@ export async function POST(req: NextRequest) {
       subject,
     });
   } catch (err) {
+    // Gmail send errors can include account hints / refresh-token failure
+    // strings — log server-side, surface a generic message to the caller.
+    console.error("[/api/send-draft] gmail send failed:", err);
     return NextResponse.json({
       ok: false,
-      error: err instanceof Error ? err.message : String(err),
+      error: "Internal error",
     }, { status: 500 });
   }
 }

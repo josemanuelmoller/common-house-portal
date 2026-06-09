@@ -101,8 +101,10 @@ export async function POST(req: NextRequest) {
       }
     }
   } catch (err) {
+    // Notion search errors can include workspace IDs / token error names.
+    console.error("[/api/hall-organizations/sync-notion] org search failed:", err);
     return NextResponse.json(
-      { error: "organizations search failed", detail: err instanceof Error ? err.message : String(err) },
+      { error: "organizations search failed" },
       { status: 502 },
     );
   }
@@ -144,8 +146,9 @@ export async function POST(req: NextRequest) {
       matchedId = (created.notion_id as string | null) ?? (created.id as string);
       action = "created";
     } catch (err) {
+      console.error("[/api/hall-organizations/sync-notion] org insert failed:", err);
       return NextResponse.json(
-        { error: "organizations insert failed", detail: err instanceof Error ? err.message : String(err) },
+        { error: "organizations insert failed" },
         { status: 502 },
       );
     }
