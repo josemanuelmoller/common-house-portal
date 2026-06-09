@@ -3,23 +3,7 @@ import { Sidebar } from "@/components/Sidebar";
 import { getPipelineOpportunities, PipelineOpportunity } from "@/lib/notion";
 import { requireAdmin } from "@/lib/require-admin";
 
-// ── Dummy data for UI testing ─────────────────────────────────────────────────
-const DUMMY_ACTIVE: PipelineOpportunity[] = [
-  { id: "a1", name: "Retail Refill — Co-op", orgName: "Co-op", type: "CH Sale", stage: "Active", scope: "CH", followUpStatus: "Needed", score: 59, qualificationStatus: "Needs Review", lastEdited: "2026-04-10", notionUrl: "#", daysInStage: 8 },
-  { id: "a2", name: "ZWF Forum 2026 — Strategy", orgName: "Zero Waste Forum", type: "Partnership", stage: "Active", scope: "CH", followUpStatus: "Waiting", score: 74, qualificationStatus: "Qualified", lastEdited: "2026-04-11", notionUrl: "#", daysInStage: 3 },
-  { id: "a3", name: "SUFI — Fair4All Finance", orgName: "SUFI", type: "Grant", stage: "Active", scope: "Portfolio", followUpStatus: "Needed", score: 71, qualificationStatus: "Qualified", lastEdited: "2026-04-12", notionUrl: "#", daysInStage: 1 },
-];
-const DUMMY_PROPOSAL: PipelineOpportunity[] = [
-  { id: "p1", name: "Waitrose Refill Pilot", orgName: "Waitrose", type: "CH Sale", stage: "Proposal Sent", scope: "CH", followUpStatus: "Sent", score: 53, qualificationStatus: "Needs Review", lastEdited: "2026-04-07", notionUrl: "#", daysInStage: 6 },
-  { id: "p2", name: "Beeok — Series A (Circularity Capital)", orgName: "Beeok", type: "Investor Match", stage: "Proposal Sent", scope: "Portfolio", followUpStatus: "Waiting", score: 88, qualificationStatus: "Qualified", lastEdited: "2026-04-09", notionUrl: "#", daysInStage: 4 },
-];
-const DUMMY_NEGOTIATION: PipelineOpportunity[] = [
-  { id: "n1", name: "LIFE Programme — ENV-CIR Call", orgName: "European Commission", type: "Grant", stage: "Negotiation", scope: "CH", followUpStatus: "None", score: 82, qualificationStatus: "Qualified", lastEdited: "2026-04-12", notionUrl: "#", daysInStage: 2 },
-];
-const DUMMY_CLOSED: PipelineOpportunity[] = [
-  { id: "c1", name: "Auto Mercado Fase 2", orgName: "Auto Mercado", type: "CH Sale", stage: "Won", scope: "CH", followUpStatus: "None", score: 91, qualificationStatus: "Qualified", lastEdited: "2026-04-05", notionUrl: "#", daysInStage: null },
-  { id: "c2", name: "COP31 Activation Brief", orgName: "UNFCCC", type: "Partnership", stage: "Lost", scope: "CH", followUpStatus: "None", score: 44, qualificationStatus: "Needs Review", lastEdited: "2026-04-03", notionUrl: "#", daysInStage: null },
-];
+export const dynamic = "force-dynamic";
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
@@ -148,13 +132,23 @@ function KanbanCol({ label, items, accent }: { label: string; items: PipelineOpp
 export default async function PipelinePage() {
   await requireAdmin();
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const _live = await getPipelineOpportunities();
-  // TODO: replace with live data once Opportunity Score field is populated in Notion
-  const active       = DUMMY_ACTIVE;
-  const proposalSent = DUMMY_PROPOSAL;
-  const negotiation  = DUMMY_NEGOTIATION;
-  const recentlyClosed = DUMMY_CLOSED;
+  // Live read — replaces the DUMMY_* arrays that were rendering fake
+  // opportunities in production. getPipelineOpportunities already returns
+  // the four buckets pre-shaped; on failure we degrade to empty (the
+  // KanbanCol empty-state renders "—" instead of crashing the page).
+  let active: PipelineOpportunity[] = [];
+  let proposalSent: PipelineOpportunity[] = [];
+  let negotiation: PipelineOpportunity[] = [];
+  let recentlyClosed: PipelineOpportunity[] = [];
+  try {
+    const data = await getPipelineOpportunities();
+    active = data.active;
+    proposalSent = data.proposalSent;
+    negotiation = data.negotiation;
+    recentlyClosed = data.recentlyClosed;
+  } catch (e) {
+    console.error("[admin/pipeline] getPipelineOpportunities failed:", e);
+  }
 
   const total   = active.length + proposalSent.length + negotiation.length;
   const wonCount  = recentlyClosed.filter(o => o.stage === "Won").length;

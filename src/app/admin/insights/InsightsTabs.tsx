@@ -1,74 +1,21 @@
 "use client";
 import { useState } from "react";
 
-const BRIEFS = [
-  {
-    label: "Circular Economy · EU Policy · 8 Apr 2026",
-    title: "EU Packaging & Packaging Waste Regulation — Implicaciones para portfolio CH",
-    points: [
-      "La PPWR obliga a los retailers a ofrecer opciones de refill para ciertos formatos antes de 2030.",
-      "Refill.co y Fair Cycle están directamente alineados con los requisitos de la norma.",
-      "Auto Mercado podría usar el cumplimiento normativo como palanca comercial para acelerar el piloto.",
-      "Ventana de 5 años para diferenciación como «primer mover» en retail CR/LATAM.",
-    ],
-    source: "PDF · 24 págs · EU Commission",
-  },
-  {
-    label: "Grants · Impact Finance · 5 Apr 2026",
-    title: "LIFE Programme 2026 — Fit analysis para portfolio startups",
-    points: [
-      "Deadline 21 Apr. Eco Loop y Refill.co tienen el mayor fit (78 y 82 puntos).",
-      "Los criterios de circularidad medible están bien cubiertos por ambas startups.",
-      "CircularWave necesita ajustar framing para encajar en el eje «nature restoration».",
-    ],
-    source: "URL · LIFE Programme · EC",
-  },
-  {
-    label: "Strategy · Retail · 2 Apr 2026",
-    title: "Refill in Supermarkets — Behavioral drivers y barreras de adopción",
-    points: [
-      "Convenience y pricing son los drivers principales — no el awareness medioambiental.",
-      "Los programas de fidelidad multiplican por 3x la tasa de adopción en primeros 90 días.",
-      "Packaging aesthetics son barrera #1 para segmentos premium. Implicación directa para Auto Mercado.",
-    ],
-    source: "PPT · 18 slides · Eunomia Research",
-  },
-  {
-    label: "Investor Intelligence · Series A · 28 Mar 2026",
-    title: "CircularWave — Investor landscape y comparable rounds",
-    points: [
-      "4 impact-first funds activos en el sector con ticket promedio de €3-5M.",
-      "CircularWave unit economics superiores a 3 comparables públicos en rondas Serie A 2025.",
-    ],
-    source: "PDF + URL · CB Insights + Pitchbook",
-  },
-  {
-    label: "Policy · LATAM · 22 Mar 2026",
-    title: "Economía circular en LATAM — Estado regulatorio por país",
-    points: [
-      "Colombia y Chile lideran en legislación EPR — oportunidad para Refill.co.",
-      "Costa Rica sin normativa específica pero con voluntad política. Timing favorable para AM.",
-    ],
-    source: "DOC · 31 págs · CEPAL",
-  },
-];
+// Insight Brief row shape (real, from notion_insight_briefs via getRecentInsightBriefBriefs).
+// Note: `points` (atomic insight bullets) is NOT in the current schema; the
+// page used to render hardcoded sample bullets, which we removed in favour
+// of the real metadata (theme, source type, last edited date).
+export type InsightBriefRow = {
+  id: string;
+  title: string;
+  sourceLink: string | null;
+  notionUrl: string;
+  theme: string[];
+  sourceType: string | null;
+  lastEditedAt: string | null;
+};
 
-const ROUTED = [
-  { insight: "PPWR — implicaciones para retailers con refill antes de 2030",          type: "Outcome",    dest: "CH Evidence",    project: "Portfolio",   date: "8 Apr" },
-  { insight: "LIFE Programme — deadline 21 Apr, fit Eco Loop 78pts",                  type: "Blocker",    dest: "Decision Center",project: "Grants",      date: "5 Apr" },
-  { insight: "Adopción refill: fidelidad x3 en primeros 90 días",                     type: "Insight",    dest: "Knowledge Assets",project: "Retail",     date: "2 Apr" },
-  { insight: "CircularWave: 4 impact funds activos, ticket €3-5M",                    type: "Insight",    dest: "CH Evidence",    project: "CircularWave",date: "28 Mar" },
-  { insight: "EPR Colombia y Chile — oportunidad Refill.co",                          type: "Outcome",    dest: "Knowledge Assets",project: "Portfolio",  date: "22 Mar" },
-];
-
-function typePillStyle(type: string): { bg: string; color: string } {
-  if (type === "Outcome") return { bg: "var(--hall-ok-soft)",   color: "var(--hall-ok)" };
-  if (type === "Blocker") return { bg: "var(--hall-danger-soft)", color: "var(--hall-danger)" };
-  if (type === "Insight") return { bg: "var(--hall-info-soft)", color: "var(--hall-info)" };
-  return { bg: "var(--hall-fill-soft)", color: "var(--hall-muted-2)" };
-}
-
-export function InsightsTabs() {
+export function InsightsTabs({ briefs }: { briefs: InsightBriefRow[] }) {
   const [tab, setTab] = useState<"upload" | "briefs" | "routed">("upload");
 
   const eyebrowDate = new Date()
@@ -228,11 +175,15 @@ export function InsightsTabs() {
                   <span
                     style={{fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--hall-muted-2)", letterSpacing: "0.06em"}}
                   >
-                    2 RECENT
+                    {briefs.length === 0 ? "0 BRIEFS" : `${Math.min(3, briefs.length)} OF ${briefs.length}`}
                   </span>
                 </div>
                 <div className="flex flex-col gap-4">
-                  {BRIEFS.slice(0, 3).map(b => <BriefCard key={b.title} brief={b} />)}
+                  {briefs.length === 0 ? (
+                    <EmptyState label="No briefs ingested yet. Upload a document to generate the first one." />
+                  ) : (
+                    briefs.slice(0, 3).map(b => <BriefCard key={b.id} brief={b} />)
+                  )}
                 </div>
               </section>
             </div>
@@ -254,16 +205,25 @@ export function InsightsTabs() {
                 <span
                   style={{fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--hall-muted-2)", letterSpacing: "0.06em"}}
                 >
-                  {BRIEFS.length} VALIDATED
+                  {briefs.length} TOTAL
                 </span>
               </div>
               <div className="flex flex-col gap-4">
-                {BRIEFS.map(b => <BriefCard key={b.title} brief={b} />)}
+                {briefs.length === 0 ? (
+                  <EmptyState label="No briefs ingested yet. Upload a document to generate the first one." />
+                ) : (
+                  briefs.map(b => <BriefCard key={b.id} brief={b} />)
+                )}
               </div>
             </section>
           )}
 
-          {/* ── Routed Outputs ── */}
+          {/* ── Routed Outputs ──
+              Not yet implemented: there is no canonical Supabase table that
+              records insight → destination routing (CH Evidence / Decision
+              Center / Knowledge Assets). Shown as an honest empty state
+              instead of fake rows. Add a routing record when the upstream
+              writer ships. */}
           {tab === "routed" && (
             <section>
               <div
@@ -279,60 +239,10 @@ export function InsightsTabs() {
                 <span
                   style={{fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--hall-muted-2)", letterSpacing: "0.06em"}}
                 >
-                  {ROUTED.length} ITEMS · LAST 2 WEEKS
+                  NOT WIRED
                 </span>
               </div>
-              <div style={{ border: "1px solid var(--hall-line-soft)", borderRadius: 3, overflow: "hidden" }}>
-                <div
-                  className="grid grid-cols-[2fr_90px_130px_100px_60px] px-5 py-3"
-                  style={{
-                    borderBottom: "1px solid var(--hall-line-soft)",
-                    background: "var(--hall-paper-1)",
-                  }}
-                >
-                  {["Insight","Tipo","Destino","Proyecto","Fecha"].map(h => (
-                    <p
-                      key={h}
-                      className="text-[9px] font-bold uppercase tracking-widest"
-                      style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-3)" }}
-                    >
-                      {h}
-                    </p>
-                  ))}
-                </div>
-                {ROUTED.map((row, i) => {
-                  const ts = typePillStyle(row.type);
-                  return (
-                    <div
-                      key={i}
-                      className="grid grid-cols-[2fr_90px_130px_100px_60px] px-5 py-3.5 transition-colors items-center"
-                      style={i === 0 ? undefined : { borderTop: "1px solid var(--hall-line-soft)" }}
-                    >
-                      <p className="text-[11.5px] font-medium leading-snug" style={{color: "var(--hall-ink-0)"}}>{row.insight}</p>
-                      <span
-                        className="text-[8px] font-bold px-2 py-1 w-fit"
-                        style={{
-                          fontFamily: "var(--font-hall-mono)",
-                          letterSpacing: "0.06em",
-                          borderRadius: 3,
-                          background: ts.bg,
-                          color: ts.color,
-                        }}
-                      >
-                        {row.type}
-                      </span>
-                      <p className="text-[10px] font-medium" style={{color: "var(--hall-muted-2)"}}>{row.dest}</p>
-                      <p className="text-[10px]" style={{color: "var(--hall-muted-2)"}}>{row.project}</p>
-                      <p
-                        className="text-[10px]"
-                        style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-3)", letterSpacing: "0.06em" }}
-                      >
-                        {row.date}
-                      </p>
-                    </div>
-                  );
-                })}
-              </div>
+              <EmptyState label="Insight routing isn't wired yet — once briefs route to CH Evidence / Decision Center / Knowledge Assets, the destination ledger renders here." />
             </section>
           )}
 
@@ -342,7 +252,31 @@ export function InsightsTabs() {
   );
 }
 
-function BriefCard({ brief }: { brief: typeof BRIEFS[0] }) {
+function EmptyState({ label }: { label: string }) {
+  return (
+    <div
+      className="px-5 py-6 text-center"
+      style={{ border: "1px dashed var(--hall-line-soft)", borderRadius: 3 }}
+    >
+      <p className="text-[11px] leading-relaxed" style={{ color: "var(--hall-muted-3)" }}>
+        {label}
+      </p>
+    </div>
+  );
+}
+
+function formatBriefLabel(brief: InsightBriefRow): string {
+  const themePart = brief.theme.length > 0 ? brief.theme.join(" · ") : "Brief";
+  const sourcePart = brief.sourceType ?? "Document";
+  const datePart = brief.lastEditedAt
+    ? new Date(brief.lastEditedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
+    : "—";
+  return `${themePart} · ${sourcePart} · ${datePart}`;
+}
+
+function BriefCard({ brief }: { brief: InsightBriefRow }) {
+  const label = formatBriefLabel(brief);
+  const hasSource = !!brief.sourceLink || !!brief.notionUrl;
   return (
     <div
       className="px-5 py-4"
@@ -352,28 +286,30 @@ function BriefCard({ brief }: { brief: typeof BRIEFS[0] }) {
         className="text-[8px] font-bold uppercase mb-2"
         style={{ fontFamily: "var(--font-hall-mono)", letterSpacing: "0.08em", color: "var(--hall-muted-3)" }}
       >
-        {brief.label}
+        {label}
       </p>
-      <p className="text-[13.5px] font-bold tracking-tight leading-snug mb-3" style={{color: "var(--hall-ink-0)"}}>{brief.title}</p>
-      <div className="flex flex-col gap-1.5">
-        {brief.points.map((pt, i) => (
-          <div
-            key={i}
-            className="flex items-start gap-2 text-xs leading-relaxed"
-            style={{color: "var(--hall-ink-3)"}}
-          >
-            <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 mt-1" style={{background: "var(--hall-ink-0)"}} />
-            {pt}
-          </div>
-        ))}
-      </div>
+      <p className="text-[13.5px] font-bold tracking-tight leading-snug" style={{color: "var(--hall-ink-0)"}}>
+        {brief.title || "Untitled brief"}
+      </p>
       <div className="flex items-center justify-between mt-3.5 pt-3" style={{borderTop: "1px solid var(--hall-line-soft)"}}>
-        <p
-          className="text-[9px] font-semibold"
-          style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)", letterSpacing: "0.06em" }}
-        >
-          {brief.source}
-        </p>
+        {hasSource ? (
+          <a
+            href={brief.sourceLink ?? brief.notionUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[9px] font-semibold hover:underline"
+            style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)", letterSpacing: "0.06em" }}
+          >
+            {brief.sourceLink ? "OPEN SOURCE ↗" : "OPEN IN NOTION ↗"}
+          </a>
+        ) : (
+          <span
+            className="text-[9px] font-semibold"
+            style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-3)", letterSpacing: "0.06em" }}
+          >
+            NO SOURCE LINK
+          </span>
+        )}
         <span
           className="text-[8px] font-bold px-2 py-0.5"
           style={{
