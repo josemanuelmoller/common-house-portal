@@ -11,9 +11,6 @@ src/app/api/contact-topics/synthesize/route.ts
 src/app/api/cos-loops/route.ts
 src/app/api/create-candidate/route.ts
 src/app/api/create-project-folders/route.ts
-src/app/api/cron/observe-calendar/route.ts
-src/app/api/cron/refresh-org-topics/route.ts
-src/app/api/cron/run-inbox-classify/route.ts
 src/app/api/edit-pitch/route.ts
 src/app/api/extract-conversation-evidence/route.ts
 src/app/api/extract-meeting-evidence/route.ts
@@ -24,12 +21,10 @@ src/app/api/garage-ingest/route.ts
 src/app/api/grants-data/route.ts
 src/app/api/hall-contacts/route.ts
 src/app/api/hall-manual-triggers-status/route.ts
-src/app/api/hall-organizations/sync-notion/route.ts
 src/app/api/hall/ask-queue/route.ts
 src/app/api/hall/nudge-draft/route.ts
 src/app/api/inbox-ignore/route.ts
 src/app/api/inbox-triage/route.ts
-src/app/api/ingest-gmail/route.ts
 src/app/api/ingest-library/digest/execute/route.ts
 src/app/api/ingest-library/digest/route.ts
 src/app/api/ingest-meetings/route.ts
@@ -53,7 +48,6 @@ src/app/api/run-skill/linkedin-post/route.ts
 src/app/api/save-pitch-batch/route.ts
 src/app/api/scan-opportunity-candidates/route.ts
 src/app/api/seed-grant-sources/route.ts
-src/app/api/send-draft/route.ts
 src/app/api/setup-all-drives/route.ts
 src/app/api/sync-evidence/route.ts
 src/app/api/sync-loops/route.ts

@@ -150,7 +150,9 @@ async function _POST(req: NextRequest) {
     });
     threadIds = (listRes.data.threads ?? []).map(t => t.id!).filter(Boolean);
   } catch (err) {
-    return NextResponse.json({ ok: false, error: String(err) }, { status: 500 });
+    // Gmail OAuth errors can include refresh-token paths in the message.
+    console.error("[/api/ingest-gmail] threads.list failed:", err);
+    return NextResponse.json({ ok: false, error: "Internal error" }, { status: 500 });
   }
 
   // Resolve the OAuth owner's email so we can exclude self from attendee

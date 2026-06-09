@@ -45,7 +45,9 @@ async function handle(req: Request) {
     .limit(BATCH);
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    // Don't echo Postgres error.message (column names / schema hints).
+    console.error("[/api/cron/run-inbox-classify] supabase read failed:", error);
+    return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
 
   const rows = (items ?? []) as InboxItem[];
@@ -55,6 +57,8 @@ async function handle(req: Request) {
 
   let processed = 0;
   let skipped = 0;
+  // We expose per-item OUTCOMES (sanitised) — never raw exception text.
+  // The full error goes to the server log keyed by item id.
   const errors: Array<{ id: string; error: string }> = [];
 
   for (const item of rows) {
@@ -64,11 +68,13 @@ async function handle(req: Request) {
         processed++;
       } else {
         skipped++;
+        // r.error is a controlled string set by the classifier — keep it.
         errors.push({ id: item.id, error: r.error || "unknown" });
       }
     } catch (e) {
       skipped++;
-      errors.push({ id: item.id, error: String(e) });
+      console.error("[/api/cron/run-inbox-classify] classify threw for item", item.id, e);
+      errors.push({ id: item.id, error: "classifier_exception" });
     }
   }
 

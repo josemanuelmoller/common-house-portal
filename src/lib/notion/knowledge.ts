@@ -1,4 +1,5 @@
 import { notion, DB, prop, text, select, multiSelect } from "./core";
+import { getSupabaseServerClient } from "@/lib/supabase-server";
 
 // ─── Knowledge Assets ─────────────────────────────────────────────────────────
 
@@ -36,6 +37,20 @@ export async function getKnowledgeAssets(): Promise<KnowledgeAsset[]> {
 
 // ─── Library ingest ───────────────────────────────────────────────────────────
 
+/**
+ * Library ingest writer for knowledge assets.
+ *
+ * Migrated 2026-06-09 from Notion (`notion.pages.create` against
+ * `DB.knowledge`) to Supabase, per the 2026-06-02 deprecation cutoff.
+ * Returns the canonical knowledge_assets.id (uuid) — call sites that
+ * stored the string verbatim already treat it as opaque.
+ *
+ * Body composition: keeps the same author intent (summary + bulleted
+ * key points + source-note footer) but renders to markdown stored in
+ * `body_md`, so the editor in /admin/knowledge-assets/[id] can edit it
+ * inline. Source URL + storage path are preserved in `payload` for any
+ * downstream consumer that needs the raw context.
+ */
 export async function createKnowledgeAssetDraft(opts: {
   title: string;
   summary: string;
@@ -48,49 +63,44 @@ export async function createKnowledgeAssetDraft(opts: {
 }): Promise<string> {
   const { title, summary, keyPoints, assetType, tags, sourceNote, sourceFileUrl, storagePath } = opts;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const page = await notion.pages.create({
-    parent: { database_id: DB.knowledge },
-    properties: {
-      "Asset Name":        { title: [{ text: { content: title } }] },
-      "Asset Type":        { select: { name: assetType } },
-      "Domain / Theme":    { multi_select: tags.slice(0, 5).map(t => ({ name: t })) },
-      "Status":            { select: { name: "Draft" } },
-      "Portal Visibility": { select: { name: "admin-only" } },
-      ...(sourceFileUrl ? { "Source File URL": { url: sourceFileUrl } } : {}),
-    } as any, // eslint-disable-line @typescript-eslint/no-explicit-any
-    children: [
-      {
-        object: "block",
-        type: "paragraph",
-        paragraph: { rich_text: [{ type: "text", text: { content: summary } }] },
-      },
-      ...(keyPoints.length > 0 ? [
-        {
-          object: "block" as const,
-          type: "bulleted_list_item" as const,
-          bulleted_list_item: { rich_text: [{ type: "text" as const, text: { content: "Key points:" } }] },
-        },
-        ...keyPoints.slice(0, 8).map(pt => ({
-          object: "block" as const,
-          type: "bulleted_list_item" as const,
-          bulleted_list_item: { rich_text: [{ type: "text" as const, text: { content: pt } }] },
-        })),
-      ] : []),
-      ...(sourceNote || storagePath ? [{
-        object: "block" as const,
-        type: "paragraph" as const,
-        paragraph: {
-          rich_text: [{ type: "text" as const, text: {
-            content: [
-              sourceNote ? `📎 Source: ${sourceNote}` : null,
-              storagePath ? `🗂 storage: ${storagePath}` : null,
-            ].filter(Boolean).join("  ·  "),
-          }}],
-        },
-      }] : []),
-    ],
-  });
+  const bodyParts: string[] = [summary];
+  if (keyPoints.length > 0) {
+    bodyParts.push("");
+    bodyParts.push("**Key points**");
+    for (const pt of keyPoints.slice(0, 8)) bodyParts.push(`- ${pt}`);
+  }
+  if (sourceNote || storagePath) {
+    bodyParts.push("");
+    bodyParts.push([
+      sourceNote ? `📎 Source: ${sourceNote}` : null,
+      storagePath ? `🗂 storage: ${storagePath}` : null,
+    ].filter(Boolean).join("  ·  "));
+  }
+  const bodyMd = bodyParts.join("\n");
 
-  return page.id;
+  const sb = getSupabaseServerClient();
+  const { data, error } = await sb
+    .from("knowledge_assets")
+    .insert({
+      title,
+      asset_type: assetType,
+      status:     "Draft",
+      summary,
+      body_md:    bodyMd,
+      payload:    {
+        tags: tags.slice(0, 5),
+        portal_visibility: "admin-only",
+        source_file_url: sourceFileUrl ?? null,
+        source_note: sourceNote ?? null,
+        storage_path: storagePath ?? null,
+        key_points: keyPoints,
+      },
+    })
+    .select("id")
+    .single();
+
+  if (error || !data) {
+    throw new Error(`createKnowledgeAssetDraft: ${error?.message ?? "insert returned no row"}`);
+  }
+  return data.id as string;
 }

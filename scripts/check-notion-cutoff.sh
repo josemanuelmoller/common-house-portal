@@ -32,16 +32,19 @@ PATTERN='await\s+notion\.(pages\.(create|update)|databases\.update|blocks\.child
 
 count_active() {
   local ref="$1"
+  # `|| true` keeps pipefail from blowing up the script when there are 0
+  # matches (the desired end state at cutoff): grep exits 1 on no matches,
+  # which under `set -o pipefail` was killing the count and exiting 1.
   if [ -z "$ref" ]; then
-    grep -rEh "$PATTERN" src/app src/lib src/components 2>/dev/null \
-      | grep -vE '^\s*//' \
-      | grep -vE 'notion-cutoff-(2026-06-02|exempt)' \
+    { grep -rEh "$PATTERN" src/app src/lib src/components 2>/dev/null || true; } \
+      | { grep -vE '^\s*//' || true; } \
+      | { grep -vE 'notion-cutoff-(2026-06-02|exempt)' || true; } \
       | wc -l \
       | tr -d ' '
   else
-    git grep -hE "$PATTERN" "$ref" -- src/app src/lib src/components 2>/dev/null \
-      | grep -vE '^\s*//' \
-      | grep -vE 'notion-cutoff-(2026-06-02|exempt)' \
+    { git grep -hE "$PATTERN" "$ref" -- src/app src/lib src/components 2>/dev/null || true; } \
+      | { grep -vE '^\s*//' || true; } \
+      | { grep -vE 'notion-cutoff-(2026-06-02|exempt)' || true; } \
       | wc -l \
       | tr -d ' '
   fi

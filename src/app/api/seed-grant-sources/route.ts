@@ -1,10 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { notion, DB } from "@/lib/notion";
 import { adminGuardApi } from "@/lib/require-admin";
+import { getSupabaseServerClient } from "@/lib/supabase-server";
 
-// One-shot seed for Grant Sources [OS v2]
+// One-shot seed for the grant_sources Supabase table.
 // POST /api/seed-grant-sources
-// Protected by secret header to prevent accidental re-runs
+//
+// Migrated 2026-06-09 from Notion (`notion.pages.create` against
+// `DB.grantSources`) to Supabase, per the 2026-06-02 Notion deprecation
+// cutoff. The previous version violated the freeze rule by adding fresh
+// Notion writes; this version is the canonical writer for grant_sources.
+// Source-list payload identical to the prior seed.
+
+export const dynamic = "force-dynamic";
 
 const SOURCES: {
   name: string;
@@ -121,32 +128,50 @@ const SOURCES: {
 ];
 
 export async function POST(req: NextRequest) {
+  void req;
   const guard = await adminGuardApi();
   if (guard) return guard;
 
-  const results: { name: string; id: string }[] = [];
+  const sb = getSupabaseServerClient();
+  const results: { name: string; id: string | null }[] = [];
   const errors: { name: string; error: string }[] = [];
 
   for (const src of SOURCES) {
     try {
-      const page = await notion.pages.create({
-        parent: { database_id: DB.grantSources },
-        properties: {
-          "Source Name": { title: [{ text: { content: src.name } }] },
-          "URL":         { url: src.url },
-          "Type":        { select: { name: src.type } },
-          "Geography":   { multi_select: src.geo.map(g => ({ name: g })) },
-          "Themes":      { multi_select: src.themes.map(t => ({ name: t })) },
-          "Active":      { checkbox: true },
-        },
-      });
-      results.push({ name: src.name, id: page.id });
+      // Upsert on funder_url so re-runs don't duplicate. Type is stored in
+      // notes (no enum column in the canonical schema); themes go to the
+      // array column; geo joined to the text column. payload preserves the
+      // original shape for any consumer that wants it back.
+      const { data, error } = await sb
+        .from("grant_sources")
+        .upsert({
+          title:       src.name,
+          funder_name: src.name,
+          funder_url:  src.url,
+          status:      "Active",
+          themes:      src.themes,
+          geography:   src.geo.join(", "),
+          notes:       `type:${src.type}`,
+          payload:     { type: src.type, geo: src.geo, themes: src.themes },
+        }, { onConflict: "funder_url" })
+        .select("id")
+        .single();
+      if (error) {
+        errors.push({ name: src.name, error: error.message });
+        continue;
+      }
+      results.push({ name: src.name, id: data?.id ?? null });
     } catch (e) {
-      errors.push({ name: src.name, error: String(e) });
+      errors.push({ name: src.name, error: e instanceof Error ? e.message : "unknown" });
     }
   }
 
-  return NextResponse.json(
-    { ok: true, seeded: results.length, errorCount: errors.length, results, errors }
-  );
+  return NextResponse.json({
+    ok:          errors.length === 0,
+    seeded:      results.length,
+    errorCount:  errors.length,
+    results,
+    errors,
+    destination: "supabase:grant_sources",
+  });
 }

@@ -16,6 +16,7 @@ import { currentUser } from "@clerk/nextjs/server";
 import { isAdminUser, isAdminEmail } from "@/lib/clients";
 import { syncCalendarDelta } from "@/lib/calendar-sync";
 import { withRoutineLog } from "@/lib/routine-log";
+import { apiError } from "@/lib/api-error";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -43,10 +44,7 @@ async function handle(req: NextRequest) {
     const result = await syncCalendarDelta();
     return NextResponse.json(result, { status: result.ok ? 200 : 502 });
   } catch (err) {
-    return NextResponse.json(
-      { ok: false, error: "unhandled", detail: err instanceof Error ? err.message : String(err) },
-      { status: 500 },
-    );
+    return apiError(err, { route: "[/api/cron/observe-calendar]" });
   }
 }
 
