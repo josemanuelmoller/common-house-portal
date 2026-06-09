@@ -83,15 +83,19 @@ export async function HallOrgsColdRelations() {
 
 // ─── Class mix ──────────────────────────────────────────────────────────────
 
+// Lime (#c6f24a) is reserved per PORTAL_DESIGN for Focus-of-day, LIVE
+// pulse, and the brand logo only — never buckets/badges. Client uses the
+// ink corporate black; VIP uses ink with an outline to distinguish from
+// Team while staying outside the reserved palette.
 const MIX_CLASSES = ["Client", "Partner", "Portfolio", "Investor", "Funder", "Team", "VIP"] as const;
 const MIX_COLOR: Record<typeof MIX_CLASSES[number], string> = {
-  Client:    "bg-[#c6f24a]",
+  Client:    "bg-[#0a0a0a]",
   Partner:   "bg-[#7dd3fc]",
   Portfolio: "bg-[#fbbf24]",
   Investor:  "bg-[#a78bfa]",
   Funder:    "bg-[#f472b6]",
-  Team:      "bg-[#0a0a0a]",
-  VIP:       "bg-[#c6f24a]",
+  Team:      "bg-[#52525b]",
+  VIP:       "bg-[#1f1f24] ring-1 ring-[#52525b]",
 };
 
 export async function HallOrgsClassMix() {

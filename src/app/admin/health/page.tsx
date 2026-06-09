@@ -487,7 +487,10 @@ export default async function HealthPage() {
                           className="text-[10px] font-bold uppercase tracking-widest mt-0.5"
                           style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-danger)" }}
                         >
-                          Stale · {daysSince(bestActivity(p)) ?? "—"}d since last activity
+                          {(() => {
+                            const d = daysSince(bestActivity(p));
+                            return d !== null ? `Stale · ${d}d since last activity` : "Stale · no activity recorded";
+                          })()}
                         </p>
                       </div>
                       <StatusBadge value={p.stage} />

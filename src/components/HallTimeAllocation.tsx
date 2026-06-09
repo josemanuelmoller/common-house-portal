@@ -13,14 +13,16 @@ import { getSelfEmails } from "@/lib/hall-self";
  * Jose sets soft targets by CLASS below — red-flagged if below target.
  */
 
+// Lime (#c6f24a) is reserved per PORTAL_DESIGN — Client/VIP recoloured to
+// stay outside the brand palette while keeping the buckets distinct.
 const BUCKETS = [
-  { key: "Client",       label: "Client",       color: "bg-[#c6f24a]", target: 20 },
+  { key: "Client",       label: "Client",       color: "bg-[#0a0a0a]", target: 20 },
   { key: "Investor",     label: "Investor",     color: "bg-[#a78bfa]", target: 10 },
   { key: "Funder",       label: "Funder",       color: "bg-[#f472b6]", target: 5  },
   { key: "Portfolio",    label: "Portfolio",    color: "bg-[#fbbf24]", target: 20 },
   { key: "Partner",      label: "Partner",      color: "bg-[#7dd3fc]", target: 15 },
-  { key: "VIP",          label: "VIP",          color: "bg-[#c6f24a]", target: 0  },
-  { key: "Team",         label: "Team",         color: "bg-[#0a0a0a]", target: 10 },
+  { key: "VIP",          label: "VIP",          color: "bg-[#1f1f24]", target: 0  },
+  { key: "Team",         label: "Team",         color: "bg-[#52525b]", target: 10 },
   { key: "Vendor",       label: "Vendor",       color: "bg-[#9ca3af]", target: 0  },
   { key: "External",     label: "External",     color: "bg-[#cbd5e1]", target: 0  },
   { key: "Personal",     label: "Personal",     color: "bg-amber-300", target: 0  },
