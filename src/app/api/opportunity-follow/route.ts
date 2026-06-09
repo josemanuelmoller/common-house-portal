@@ -154,7 +154,7 @@ export async function POST(req: NextRequest) {
     });
   } catch (err) {
     return NextResponse.json(
-      { error: "unexpected", detail: err instanceof Error ? err.message : String(err) },
+      { error: "unexpected" },
       { status: 500 },
     );
   }

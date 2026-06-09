@@ -256,7 +256,7 @@ async function _POST(req: NextRequest) {
         url:        null,
         reasoning:  err instanceof Error ? err.message : String(err),
         action:     "error",
-        error:      err instanceof Error ? err.message : String(err),
+        error: "Internal error",
       });
       // If we hit a hard quota error, stop early so we don't waste requests.
       if (String(err).includes("quota")) break;

@@ -164,7 +164,7 @@ Output ONLY the full message (Subject + body). Nothing else.`;
     draftText = message.content[0].type === "text" ? message.content[0].text : "";
   } catch (e) {
     return NextResponse.json(
-      { error: "Anthropic API error", detail: String(e) },
+      { error: "Anthropic API error" },
       { status: 500, headers: corsHeaders() }
     );
   }
@@ -195,7 +195,7 @@ Output ONLY the full message (Subject + body). Nothing else.`;
   // try {
   //   draftPage = await notion.pages.create({ parent: { database_id: AGENT_DRAFTS_DB }, properties });
   // } catch (e) {
-  //   return NextResponse.json({ error: "Notion write error", detail: String(e) }, { status: 500, headers: corsHeaders() });
+  //   return NextResponse.json({ error: "Notion write error" }, { status: 500, headers: corsHeaders() });
   // }
   void AGENT_DRAFTS_DB; // legacy id retained for traceability; no longer used as a write target.
 

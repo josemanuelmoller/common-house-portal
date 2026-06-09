@@ -208,7 +208,7 @@ Respond ONLY with the JSON array. Nothing else.`;
     pitchesRaw = message.content[0].type === "text" ? message.content[0].text : "";
     pitchUsage = message.usage;
   } catch (e) {
-    return NextResponse.json({ error: "Anthropic error", detail: String(e) }, { status: 500 });
+    return NextResponse.json({ error: "Anthropic error" }, { status: 500 });
   }
 
   // Parse JSON — tolerant of occasional fence wrapping.
@@ -225,7 +225,6 @@ Respond ONLY with the JSON array. Nothing else.`;
   } catch (e) {
     return NextResponse.json({
       error: "Failed to parse model output as JSON",
-      detail: String(e),
       raw: pitchesRaw.slice(0, 500),
     }, { status: 500 });
   }
@@ -271,9 +270,9 @@ Respond ONLY with the JSON array. Nothing else.`;
   try {
     written = await insertPitches(toInsert);
   } catch (e) {
+    console.error("[/api/propose-content-pitches] insertPitches failed:", e);
     return NextResponse.json({
       error: "insertPitches failed",
-      detail: String(e),
     }, { status: 500 });
   }
 

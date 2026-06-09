@@ -164,7 +164,7 @@ Order by urgency (most urgent first). Output ONLY the quick wins list. Nothing e
     draftText = message.content[0].type === "text" ? message.content[0].text : "";
   } catch (e) {
     return NextResponse.json(
-      { error: "Anthropic API error", detail: String(e) },
+      { error: "Anthropic API error" },
       { status: 500, headers: corsHeaders() }
     );
   }

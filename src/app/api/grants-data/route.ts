@@ -131,7 +131,7 @@ export async function GET() {
     return NextResponse.json({ ok: true, grants }, { headers: corsHeaders() });
   } catch (err) {
     return NextResponse.json(
-      { ok: false, error: String(err) },
+      { ok: false, error: "Internal error" },
       { status: 500, headers: corsHeaders() }
     );
   }

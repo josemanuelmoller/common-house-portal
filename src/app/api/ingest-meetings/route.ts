@@ -327,7 +327,7 @@ export async function POST(req: NextRequest) {
   } catch (e) {
     console.error("ingest-meetings error:", e);
     return NextResponse.json(
-      { error: "Internal error", detail: String(e) },
+      { error: "Internal error" },
       { status: 500 },
     );
   }

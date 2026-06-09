@@ -92,7 +92,7 @@ export async function POST(req: NextRequest) {
     });
     for (const t of listRes.data.threads ?? []) if (t.id) threadIds.push(t.id);
   } catch (err) {
-    return NextResponse.json({ ok: false, error: String(err) }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Internal error" }, { status: 500 });
   }
 
   let observed = 0;

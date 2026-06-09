@@ -87,7 +87,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ ok: true, loops: filtered });
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
 }
 
@@ -193,6 +193,6 @@ export async function PATCH(req: NextRequest) {
 
     return NextResponse.json({ ok: true, loopId, status: transition.status });
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
 }

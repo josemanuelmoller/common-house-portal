@@ -140,7 +140,7 @@ export async function POST(req: NextRequest) {
   } catch (e) {
     return NextResponse.json({
       ok:     false,
-      error:  e instanceof Error ? e.message : String(e),
+      error: "Internal error",
     }, { status: 502 });
   }
 

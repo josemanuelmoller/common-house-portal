@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true });
   } catch (e) {
     return NextResponse.json(
-      { error: "agent_drafts update error", detail: String(e) },
+      { error: "agent_drafts update error" },
       { status: 500 }
     );
   }

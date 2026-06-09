@@ -151,7 +151,7 @@ export async function POST(req: NextRequest) {
     if (!summary) throw new Error("empty summary");
   } catch (e) {
     return NextResponse.json({
-      ok: false, error: e instanceof Error ? e.message : String(e),
+      ok: false, error: "Internal error",
     }, { status: 502 });
   }
 

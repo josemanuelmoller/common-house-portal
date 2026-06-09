@@ -162,7 +162,7 @@ export async function POST(req: NextRequest) {
       }
       results.push({ name: src.name, id: data?.id ?? null });
     } catch (e) {
-      errors.push({ name: src.name, error: e instanceof Error ? e.message : "unknown" });
+      errors.push({ name: src.name, error: "Internal error" });
     }
   }
 

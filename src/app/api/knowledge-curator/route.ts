@@ -567,7 +567,7 @@ async function _POST(req: NextRequest) {
         section: null,
         reasoning: "error during classification or write",
         status: "error",
-        error: String(err).slice(0, 400),
+        error: "Internal error".slice(0, 400),
       });
     }
   }

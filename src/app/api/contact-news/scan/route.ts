@@ -247,7 +247,7 @@ Find recent public activity (news, LinkedIn posts, blog posts, podcasts, org ann
       outcomes.push({
         person_id: p.id, name,
         action: "error", found: 0, inserted: 0,
-        error: e instanceof Error ? e.message : String(e),
+        error: "Internal error",
       });
     }
   }
