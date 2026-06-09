@@ -69,9 +69,11 @@ import { ReadyForJoseSection } from "@/components/ReadyForJoseSection";
 import { SuggestedTimeBlocks } from "@/components/SuggestedTimeBlocks";
 import { HallManualTriggers } from "@/components/HallManualTriggers";
 import { HallLiveClock } from "@/components/HallLiveClock";
+import { SafeServerSection } from "@/components/SafeServerSection";
 import { getAgentsOnlineCount } from "@/lib/hall-agents-count";
 import { getInboxActions, countOpenGmailActions, getCoSActions } from "@/lib/action-items";
 import { getObjectivesForYear } from "@/lib/plan";
+import { logServerError } from "@/lib/debug-log";
 
 export { ADMIN_NAV as NAV } from "@/lib/admin-nav";
 export const dynamic = "force-dynamic";
@@ -674,29 +676,31 @@ async function fetchInboxServer(): Promise<{ items: InboxItem[]; total_scanned: 
   }
 }
 
-export default async function AdminPage({ searchParams }: { searchParams?: Promise<{ stub?: string; full?: string }> }) {
-  console.error("[admin/page] DIAG: render start");
+export default async function AdminPage({ searchParams }: { searchParams?: Promise<{ safe?: string }> }) {
   let adminUser;
   try {
     adminUser = await requireAdmin();
-    console.error("[admin/page] DIAG: requireAdmin OK, user.id=", adminUser?.id);
   } catch (e) {
-    console.error("[admin/page] DIAG: requireAdmin FAILED:", e instanceof Error ? e.stack ?? e.message : e);
+    await logServerError("admin/page:requireAdmin", e);
     throw e;
   }
 
-  // SAFE MODE 2026-05-18: /admin started crashing with a TypeError in some
-  // server-component path that even reverting all source changes did not
-  // fix. Default to a minimal placeholder + nav to keep the portal usable;
-  // re-enable the full dashboard with ?full=1 once the bug is found.
+  // SAFE MODE — opt-in via ?safe=1 (2026-06-09).
+  //   Previously this was opt-out (?full=1 to escape) after a 2026-05-18
+  //   crash. The crash root cause is now hunted via per-section
+  //   SafeServerSection wrappers + safeLoad debug_log writes — the dashboard
+  //   stays mounted even if one section fails. Safe mode survives as an
+  //   escape hatch in case something catastrophic happens at the page
+  //   level (auth, layout, etc.).
   const sp = await searchParams;
-  if (sp?.full !== "1") {
+  if (sp?.safe === "1") {
     return (
       <div style={{ padding: 32, fontFamily: "system-ui, -apple-system, sans-serif", maxWidth: 760, margin: "0 auto" }}>
         <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 8 }}>Common House — Admin (safe mode)</h1>
         <p style={{ color: "#666", marginBottom: 24, fontSize: 14 }}>
-          The main dashboard is temporarily disabled while a render bug is being investigated.
-          All sub-pages below work as normal.
+          Safe mode is an escape hatch. The full dashboard is the default at <code>/admin</code> —
+          individual section failures no longer crash the page (each Suspense child is wrapped in
+          its own error boundary that logs to <code>debug_log</code>). Open <code>/admin</code> to use the full Hall.
         </p>
         <ul style={{ listStyle: "none", padding: 0, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 8 }}>
           {[
@@ -723,21 +727,22 @@ export default async function AdminPage({ searchParams }: { searchParams?: Promi
           ))}
         </ul>
         <p style={{ color: "#999", marginTop: 32, fontSize: 12 }}>
-          Signed in as {adminUser?.primaryEmailAddress?.emailAddress}. Re-enable full dashboard with <code>?full=1</code> once fixed.
+          Signed in as {adminUser?.primaryEmailAddress?.emailAddress}. Open the full dashboard at <code>/admin</code>.
         </p>
       </div>
     );
   }
 
-  // DIAGNOSTIC 2026-05-18: /admin started crashing with "TypeError: Cannot
-  // read prop..." (truncated log). Wrap each loader so we get the exact
-  // culprit + a safe fallback, instead of crashing the whole page.
+  // Per-loader try/catch — a failure in one loader degrades that section
+  // (typed fallback) instead of crashing the dashboard. Errors also land
+  // in `debug_log` (full stack, not truncated like Vercel runtime logs)
+  // so we can SELECT * FROM debug_log to diagnose precisely.
   type Loader<T> = { name: string; fn: () => Promise<T>; fallback: T };
   async function safeLoad<T>(L: Loader<T>): Promise<T> {
     try {
       return await L.fn();
     } catch (e) {
-      console.error(`[admin/page] LOADER FAILED: ${L.name}`, e instanceof Error ? e.stack ?? e.message : e);
+      await logServerError(`admin/page:loader:${L.name}`, e, { loader: L.name });
       return L.fallback;
     }
   }
@@ -782,22 +787,12 @@ export default async function AdminPage({ searchParams }: { searchParams?: Promi
     safeLoad({ name: "fetchInboxServer",           fn: () => fetchInboxServer(),            fallback: { items: [], total_scanned: 0 } as Awaited<ReturnType<typeof fetchInboxServer>> }),
     safeLoad({ name: "getAgentsOnlineCount",       fn: () => getAgentsOnlineCount(),        fallback: 0 as Awaited<ReturnType<typeof getAgentsOnlineCount>> }),
   ]);
-  console.error("[admin/page] DIAG: Promise.all completed. counts=", {
-    projects: projects?.length, decisions: decisions?.length,
-    gmailDrafts: gmailDrafts?.length, approvedDrafts: approvedDrafts?.length,
-    cosTasks: cosTasks?.length, parkedTasks: parkedTasks?.length,
-    radarLoops: radarLoops?.length, candidates: candidates?.length,
-    coldRelationships: coldRelationships?.length, readyContent: readyContent?.length,
-    competitiveIntel: competitiveIntel?.length,
-  });
-  // Phase 13 — load strategic objectives separately (Supabase, fast).
-  // Used by computeFocusRecommendation to weight items by tier.
+  // Phase 13 — strategic objectives feed the Focus scoring engine.
   let strategicObjectives;
   try {
     strategicObjectives = await getObjectivesForYear(new Date().getFullYear());
-    console.error("[admin/page] DIAG: getObjectivesForYear OK, count=", strategicObjectives?.length);
   } catch (e) {
-    console.error("[admin/page] DIAG: getObjectivesForYear FAILED:", e instanceof Error ? e.stack ?? e.message : e);
+    await logServerError("admin/page:loader:getObjectivesForYear", e);
     strategicObjectives = [] as Awaited<ReturnType<typeof getObjectivesForYear>>;
   }
 
@@ -1137,12 +1132,16 @@ export default async function AdminPage({ searchParams }: { searchParams?: Promi
 
           {/* ── Pipeline state — clients + prospects needing attention ───── */}
           <HallSection title="Pipeline " flourish="state">
-            <Suspense fallback={<HallSkeleton lines={4} />}><HallPipelineState /></Suspense>
+            <Suspense fallback={<HallSkeleton lines={4} />}>
+              <SafeServerSection name="HallPipelineState" render={() => HallPipelineState()} />
+            </Suspense>
           </HallSection>
 
           {/* ── Commitments — left col, below inbox ──────────────────────── */}
           <HallSection title="Commitments">
-            <Suspense fallback={<HallSkeleton lines={4} />}><HallCommitmentLedger /></Suspense>
+            <Suspense fallback={<HallSkeleton lines={4} />}>
+              <SafeServerSection name="HallCommitmentLedger" render={() => HallCommitmentLedger()} />
+            </Suspense>
           </HallSection>
 
             </div>{/* /hall-today-col-left */}
@@ -1156,7 +1155,9 @@ export default async function AdminPage({ searchParams }: { searchParams?: Promi
 
               {/* ── Today's agenda — next meeting rich + rest compact ────── */}
               <HallSection title="Today's " flourish="agenda">
-                <Suspense fallback={<HallSkeleton lines={6} />}><HallTodayAgenda /></Suspense>
+                <Suspense fallback={<HallSkeleton lines={6} />}>
+                  <SafeServerSection name="HallTodayAgenda" render={() => HallTodayAgenda()} />
+                </Suspense>
               </HallSection>
 
               {/* ── This week — Deadline card (replaces old P1 Banner) ────
@@ -1313,7 +1314,9 @@ export default async function AdminPage({ searchParams }: { searchParams?: Promi
               </HallSection>
 
               <HallSection title="Opps going " flourish="cold">
-                <Suspense fallback={<HallSkeleton lines={3} />}><HallOppFreshnessRadar /></Suspense>
+                <Suspense fallback={<HallSkeleton lines={3} />}>
+                  <SafeServerSection name="HallOppFreshnessRadar" render={() => HallOppFreshnessRadar()} />
+                </Suspense>
               </HallSection>
             </div>
 
