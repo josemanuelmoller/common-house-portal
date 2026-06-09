@@ -145,7 +145,7 @@ type DecisionItemRow = {
   due_date: string | null;
 };
 
-type SnoozeRow = { entity_type: string; entity_id: string; until_at: string };
+type SnoozeRow = { entity_type: string; entity_id: string; until_at: string; snoozed_at: string | null };
 
 type LogRow = {
   id: string;
@@ -208,7 +208,7 @@ export async function getPipelineState(): Promise<PipelineStateResult> {
           .select("id, title, status, priority, org_notion_id, due_date")
           .in("org_notion_id", orgIdsArr)
           .in("status", ["Open", "Pending", "Pending Review", "In Progress"]),
-    sb.from("hall_snoozes").select("entity_type, entity_id, until_at").gt("until_at", new Date().toISOString()),
+    sb.from("hall_snoozes").select("entity_type, entity_id, until_at, snoozed_at").gt("until_at", new Date().toISOString()),
     sb.from("hall_attention_log").select("id, entity_type, entity_id, reason, surfaced_at, resolved_at, resolution"),
     orgIdsArr.length === 0
       ? Promise.resolve({ data: [] })
@@ -268,7 +268,12 @@ export async function getPipelineState(): Promise<PipelineStateResult> {
   const aiByOrg = groupBy(actionItems, r => r.org_notion_id);
   const decByOrg = groupBy(decisions, r => r.org_notion_id);
   const snoozeKey = (t: string, id: string) => `${t}:${id}`;
-  const snoozedSet = new Set(snoozes.map(s => snoozeKey(s.entity_type, s.entity_id)));
+  // L-011: dismiss = forever; única resurrección legítima = nueva señal posterior.
+  // Map keeps `snoozed_at` so the reader can auto-lift the snooze when an
+  // inbound email / transcript / signal lands AFTER the snooze. Without
+  // this, a dismiss-forever would bury a re-engaged opportunity.
+  const snoozedAtByKey = new Map<string, string | null>();
+  for (const s of snoozes) snoozedAtByKey.set(snoozeKey(s.entity_type, s.entity_id), s.snoozed_at);
   const openLogByKey = new Map<string, LogRow>();
   const closedLogByKey = new Map<string, LogRow>();
   for (const l of logs) {
@@ -330,13 +335,23 @@ export async function getPipelineState(): Promise<PipelineStateResult> {
   const surfaced: Surfaced[] = [];
 
   for (const cand of candidates) {
-    if (snoozedSet.has(snoozeKey(cand.entityType, cand.entityId))) continue;
-
     const ais = (cand.orgNotionId ? aiByOrg.get(cand.orgNotionId) : undefined) ?? [];
     const dis = (cand.orgNotionId ? decByOrg.get(cand.orgNotionId) : undefined) ?? [];
     const peopleAct = (cand.orgNotionId ? peopleActByOrg.get(cand.orgNotionId) : undefined) ?? [];
     const lastInbound = maxIso(peopleAct.flatMap(p => [p.last_email_at, p.last_transcript_at]));
     const lastSignal = cand.oppRow?.last_signal_at ?? lastInbound;
+
+    // L-011 auto-lift: a snoozed entity becomes visible again ONLY when a
+    // fresh signal arrives after the snooze (inbound email / transcript /
+    // opp signal). Without a newer signal the snooze stands, including
+    // the dismiss-forever sentinel (until_at = 9999-12-31). This is what
+    // lets "Acknowledge — not pursuing" be truly permanent without
+    // burying an opportunity that genuinely re-engages.
+    const snoozedAt = snoozedAtByKey.get(snoozeKey(cand.entityType, cand.entityId));
+    if (snoozedAt !== undefined) {
+      const reactivated = !!(lastSignal && new Date(lastSignal) > new Date(snoozedAt ?? 0));
+      if (!reactivated) continue;
+    }
 
     const ballJose = computeBallWithJose(ais, dis, now);
     const ballThem = computeBallWithThem(ais, now);
@@ -589,9 +604,40 @@ export async function snoozeEntity(
   const until = new Date(Date.now() + days * MS_DAY).toISOString();
   await sb
     .from("hall_snoozes")
-    .upsert({ entity_type: entityType, entity_id: entityId, until_at: until, reason, snoozed_by: snoozedBy }, {
-      onConflict: "entity_type,entity_id",
-    });
+    .upsert({
+      entity_type: entityType,
+      entity_id: entityId,
+      until_at: until,
+      snoozed_at: new Date().toISOString(),
+      reason,
+      snoozed_by: snoozedBy,
+    }, { onConflict: "entity_type,entity_id" });
+}
+
+/**
+ * L-011: dismiss = permanente. Uses a sentinel `until_at` ~9999 so the
+ * standard snooze reader still works (`until_at > now()`), but auto-lifts
+ * the moment a fresh signal arrives (see getPipelineState reader).
+ * Reason text is stored on the snooze row for audit only.
+ */
+export async function dismissEntityForever(
+  entityType: "organization" | "opportunity",
+  entityId: string,
+  reason: string | null,
+  by: string | null
+): Promise<void> {
+  const sb = getSupabaseServerClient();
+  const FOREVER = "9999-12-31T23:59:59Z";
+  await sb
+    .from("hall_snoozes")
+    .upsert({
+      entity_type: entityType,
+      entity_id: entityId,
+      until_at: FOREVER,
+      snoozed_at: new Date().toISOString(),
+      reason,
+      snoozed_by: by,
+    }, { onConflict: "entity_type,entity_id" });
 }
 
 export async function manualResolve(
@@ -652,9 +698,20 @@ export async function manualResolve(
     }
   }
 
-  if (closeUnderlying && reason === "drift" && entityType === "organization") {
-    // "Acknowledge — not pursuing" → snooze 30d as a soft dormancy signal.
-    await snoozeEntity(entityType, entityId, 30, "drift_acknowledged", resolvedBy);
+  // L-012 fix: the previous gate was `drift && organization` only, which
+  // meant Resolve on an opportunity (any reason) and Resolve on an org with
+  // reason ∈ {ball_with_them, ball_with_jose} closed the log but wrote
+  // ZERO suppression — the same row re-opened on next render. The user
+  // bug "I dismiss in Pipeline and it comes back" lives here.
+  //
+  // Now: any non-pre_meeting Resolve writes a forever snooze. The reader's
+  // auto-lift (lastSignal > snoozed_at) keeps this honest — if the
+  // counterpart re-engages with a fresh inbound, the row surfaces again
+  // because the signal IS new. pre_meeting Resolve ("Skip prep") stays
+  // unsnoozed: the next meeting with the same entity is a different event,
+  // not the same row to suppress.
+  if (closeUnderlying && reason !== "pre_meeting") {
+    await dismissEntityForever(entityType, entityId, `manual_${reason}`, resolvedBy);
   }
 
   return { closedLog: (closed?.length ?? 0) > 0, closedItems };

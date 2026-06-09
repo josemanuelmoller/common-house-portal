@@ -1,37 +1,23 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { AgentDraft } from "@/lib/notion";
 
-// Dismissals expire after 24 hours so completed items don't pile up permanently
-const DISMISS_TTL_MS = 24 * 60 * 60 * 1000;
-const STORAGE_KEY = "rfj_dismissed_v1";
-
-function loadDismissed(): Set<string> {
-  if (typeof window === "undefined") return new Set();
+// L-011 fix: dismiss is permanent and server-persisted. The previous
+// implementation was localStorage with a 24h TTL — drafts reappeared on
+// a different browser, after clearing cache, or after a day. The server
+// now records `(draft_notion_id, user_id)` in `hall_draft_dismissals`
+// and /admin/page.tsx filters by it before rendering.
+async function persistDismiss(draftId: string): Promise<void> {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return new Set();
-    const parsed: Record<string, number> = JSON.parse(raw);
-    const now = Date.now();
-    const active = Object.entries(parsed)
-      .filter(([, ts]) => now - ts < DISMISS_TTL_MS)
-      .map(([id]) => id);
-    return new Set(active);
+    await fetch("/api/agent-drafts/dismiss", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ draft_id: draftId }),
+    });
   } catch {
-    return new Set();
-  }
-}
-
-function saveDismiss(id: string) {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    const parsed: Record<string, number> = raw ? JSON.parse(raw) : {};
-    parsed[id] = Date.now();
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
-  } catch {
-    /* ignore */
+    /* best-effort — router.refresh() will fetch the server-truth anyway */
   }
 }
 
@@ -60,17 +46,14 @@ export function ReadyForJoseSection({
   approvedDrafts: AgentDraft[]; // status === "Approved"       — ready to push to Gmail
 }) {
   const router = useRouter();
+  // Optimistic local hide for the immediate frame; the server filter
+  // (hall_draft_dismissals) is the source of truth on the next render.
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const [states, setStates] = useState<Record<string, ItemState>>({});
 
-  // Hydrate from localStorage after mount (avoids SSR mismatch)
-  useEffect(() => {
-    setDismissed(loadDismissed());
-  }, []);
-
   function dismiss(id: string) {
-    saveDismiss(id);
     setDismissed((prev) => new Set([...prev, id]));
+    persistDismiss(id).then(() => router.refresh());
   }
 
   async function pushToGmail(draft: AgentDraft) {

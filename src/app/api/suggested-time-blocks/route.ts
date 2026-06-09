@@ -157,7 +157,12 @@ export async function GET(_req: NextRequest) {
     const prepCands      = await candidatesFromMeetings(upcoming, now, attendeeLookup);
     const followUpCands  = candidatesFromRecentMeetings(recent, now, attendeeLookup);
 
-    // Fingerprint blacklist: dismissed in last 24h, snoozed until future
+    // L-011 fix: dismissed fingerprints are suppressed FOREVER. The previous
+    // 24h cutoff meant the same loop reappeared every day after dismiss —
+    // the user reported dismissing the same suggestion 5x in 16 days.
+    // A new fingerprint (new loop / new content) is the only legitimate
+    // resurrection path; same fingerprint must stay buried.
+    // Snoozed fingerprints still respect their snoozed_until (by design).
     const { data: blocks } = await sb
       .from("suggested_time_blocks")
       .select("fingerprint,status,dismissed_at,snoozed_until")
@@ -165,9 +170,8 @@ export async function GET(_req: NextRequest) {
       .in("status", ["dismissed", "snoozed"]);
 
     const suppressed = new Set<string>();
-    const cutoff = Date.now() - 24 * 3600_000;
     for (const r of (blocks ?? []) as { fingerprint: string; status: string; dismissed_at: string | null; snoozed_until: string | null }[]) {
-      if (r.status === "dismissed" && r.dismissed_at && new Date(r.dismissed_at).getTime() > cutoff) {
+      if (r.status === "dismissed" && r.dismissed_at) {
         suppressed.add(r.fingerprint);
       } else if (r.status === "snoozed" && r.snoozed_until && new Date(r.snoozed_until).getTime() > Date.now()) {
         suppressed.add(r.fingerprint);
