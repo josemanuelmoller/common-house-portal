@@ -66,6 +66,7 @@ import { ADMIN_NAV } from "@/lib/admin-nav";
 import { requireAdmin } from "@/lib/require-admin";
 import { TriggerBriefingButton } from "@/components/TriggerBriefingButton";
 import { ReadyForJoseSection } from "@/components/ReadyForJoseSection";
+import { getDismissedDraftIds } from "@/lib/hall-draft-dismissals";
 import { SuggestedTimeBlocks } from "@/components/SuggestedTimeBlocks";
 import { HallManualTriggers } from "@/components/HallManualTriggers";
 import { HallLiveClock } from "@/components/HallLiveClock";
@@ -807,8 +808,19 @@ export default async function AdminPage({ searchParams }: { searchParams?: Promi
   // Market Signal and other system-generated signals are excluded: they have no
   // Jose-facing next action. "Approved" on those means the agent approved its own output.
   const RFJ_TYPES = new Set(["Follow-up Email", "Check-in Email", "LinkedIn Post", "Grant Brief", "Grant Application Draft"]);
-  const rfjGmailDrafts    = gmailDrafts.filter(d => RFJ_TYPES.has(d.draftType));
-  const rfjApprovedDrafts = approvedDrafts.filter(d => RFJ_TYPES.has(d.draftType));
+  // L-011: server-side filter for Ready-for-Jose dismisses. Load the set
+  // of draft_notion_ids this user permanently dismissed and drop them
+  // before rendering. Best-effort: an internal failure logs but doesn't
+  // crash the page.
+  let dismissedDraftIds: Set<string>;
+  try {
+    dismissedDraftIds = await getDismissedDraftIds(adminUser.id);
+  } catch (e) {
+    await logServerError("admin/page:loader:getDismissedDraftIds", e);
+    dismissedDraftIds = new Set();
+  }
+  const rfjGmailDrafts    = gmailDrafts.filter(d => RFJ_TYPES.has(d.draftType) && !dismissedDraftIds.has(d.id));
+  const rfjApprovedDrafts = approvedDrafts.filter(d => RFJ_TYPES.has(d.draftType) && !dismissedDraftIds.has(d.id));
 
   // ── Derived state ────────────────────────────────────────────────────────────
   const withBlockers    = projects.filter(p => p.blockerCount > 0);
