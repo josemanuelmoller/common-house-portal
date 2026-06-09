@@ -1313,13 +1313,12 @@ export default async function AdminPage({ searchParams }: { searchParams?: Promi
                 <CompetitiveIntelPanel rows={competitiveIntel} lastScanAt={competitiveLastScan} />
               </HallSection>
 
-              <HallSection
-                title="Inbox · "
-                flourish="needs attention"
-                meta={`${inboxData.items.length} VISIBLE · ${inboxData.total_scanned} TOTAL`}
-              >
-                <InboxTriage initialItems={inboxData.items} initialScanned={inboxData.total_scanned} />
-              </HallSection>
+              {/* InboxTriage is rendered in the Today tab above; duplicating
+                  it here mounted a second client component instance whose
+                  state (dismissed rows, optimistic hides) was independent
+                  from Today's, so user actions in Today didn't reflect here
+                  until full reload. The Signals tab keeps its real signals
+                  panels (Market + Competitive Intel) above. */}
 
               <HallSection title="Waiting on " flourish="others">
                 <Suspense fallback={<HallSkeleton lines={3} />}><HallAskQueue /></Suspense>

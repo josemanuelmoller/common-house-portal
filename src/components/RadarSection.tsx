@@ -28,18 +28,28 @@ const INTEREST_BADGE: Record<string, { label: string; cls: string }> = {
   interested: { label: "Interested", cls: "bg-[#c6f24a]/20 text-[#0a0a0a] border border-[#c6f24a]/40" },
 };
 
-async function patchInterest(loopId: string, founderInterest: string | null) {
-  await fetch("/api/cos-loops", {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ loopId, founderInterest }),
-  });
+async function patchInterest(loopId: string, founderInterest: string | null): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const res = await fetch("/api/cos-loops", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ loopId, founderInterest }),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({} as { error?: string }));
+      return { ok: false, error: body?.error ?? `HTTP ${res.status}` };
+    }
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
 }
 
 export function RadarSection({ initialLoops }: { initialLoops: RadarLoop[] }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [optimistic, setOptimistic] = useState<Record<string, string | null>>({});
+  const [errs, setErrs] = useState<Record<string, string>>({});
 
   // Optimistic state:
   //   "dropped"    → remove from Radar immediately
@@ -50,8 +60,18 @@ export function RadarSection({ initialLoops }: { initialLoops: RadarLoop[] }) {
   });
 
   async function handleAction(loopId: string, founderInterest: string | null) {
+    setErrs(prev => { const n = { ...prev }; delete n[loopId]; return n; });
     setOptimistic(prev => ({ ...prev, [loopId]: founderInterest }));
-    await patchInterest(loopId, founderInterest);
+    const result = await patchInterest(loopId, founderInterest);
+    if (!result.ok) {
+      // Roll back optimistic state and surface the failure inline. Previous
+      // version silently kept the optimistic hide even on 4xx/5xx, so the
+      // user saw "success" but the row came back on next refresh with no
+      // explanation.
+      setOptimistic(prev => { const n = { ...prev }; delete n[loopId]; return n; });
+      setErrs(prev => ({ ...prev, [loopId]: result.error ?? "Failed" }));
+      return;
+    }
     startTransition(() => { router.refresh(); });
   }
 
@@ -134,6 +154,9 @@ export function RadarSection({ initialLoops }: { initialLoops: RadarLoop[] }) {
                   Drop
                 </button>
               </div>
+              {errs[loop.id] && (
+                <span className="text-[9px] text-red-500 ml-2 shrink-0">{errs[loop.id]}</span>
+              )}
             </div>
           );
         })}
