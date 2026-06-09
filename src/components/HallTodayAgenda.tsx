@@ -141,10 +141,12 @@ export async function HallTodayAgenda() {
   ]);
 
   const candidates: { kind: string; at: string; title: string }[] = [];
-  const tx = (txRes.data ?? [])[0] as { title: string; meeting_at: string } | undefined;
-  const ml = (mailRes.data ?? [])[0] as { subject: string; last_message_at: string } | undefined;
-  if (tx) candidates.push({ kind: "Transcript", at: tx.meeting_at, title: tx.title });
-  if (ml) candidates.push({ kind: "Email", at: ml.last_message_at, title: ml.subject });
+  const tx = (txRes.data ?? [])[0] as { title: string | null; meeting_at: string | null } | undefined;
+  const ml = (mailRes.data ?? [])[0] as { subject: string | null; last_message_at: string | null } | undefined;
+  // Guard `at`: it feeds `.slice(0,10)` and `new Date()` in the render path
+  // below, both of which throw / NaN on null. Only push rows with a real date.
+  if (tx?.meeting_at) candidates.push({ kind: "Transcript", at: tx.meeting_at, title: tx.title ?? "Meeting" });
+  if (ml?.last_message_at) candidates.push({ kind: "Email", at: ml.last_message_at, title: ml.subject ?? "Email" });
   candidates.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
   const lastTouch = candidates[0] ?? null;
 

@@ -344,7 +344,14 @@ export async function getPipelineState(): Promise<PipelineStateResult> {
     const minutesToMeeting = nextMeetingAt
       ? (new Date(nextMeetingAt).getTime() - now) / 60_000
       : null;
-    const driftDays = lastInbound ? Math.floor((now - new Date(lastInbound).getTime()) / MS_DAY) : 9_999;
+    // null = no recorded contact ever (no email/transcript timestamp on any
+    // linked person). Kept distinct from a real day-count so the sentinel
+    // never leaks to the UI as "hace 9999d".
+    const driftDays = lastInbound
+      ? Math.floor((now - new Date(lastInbound).getTime()) / MS_DAY)
+      : null;
+    // For precedence comparisons, treat "never contacted" as maximally stale.
+    const driftDaysForRank = driftDays ?? Number.MAX_SAFE_INTEGER;
 
     // Precedence
     let reason: Reason | null = null;
@@ -367,11 +374,15 @@ export async function getPipelineState(): Promise<PipelineStateResult> {
     } else if (ballThem.maxAgeDays >= BALL_WITH_THEM_MIN_DAYS && ballThem.items.length > 0) {
       reason = "ball_with_them";
       reasonDetail = ballThem.summary;
-    } else if (driftDays >= DRIFT_MIN_DAYS) {
+    } else if (driftDaysForRank >= DRIFT_MIN_DAYS) {
       reason = "drift";
-      reasonDetail = peopleAct.length === 0
-        ? "Sin contactos asociados — necesita responsable"
-        : `Sin contacto hace ${driftDays}d`;
+      reasonDetail =
+        peopleAct.length === 0
+          ? "Sin contactos asociados — necesita responsable"
+          : driftDays === null
+            // People are linked but none has any recorded email/meeting.
+            ? "Contactos sin actividad registrada"
+            : `Sin contacto hace ${driftDays}d`;
     }
 
     // Prospects with follow_up_status='Needed' get bumped to ball_with_jose even
@@ -391,7 +402,7 @@ export async function getPipelineState(): Promise<PipelineStateResult> {
       const hasContactActivity = peopleAct.length > 0 && !!lastInbound;
       if (cand.kind === "client" || hasContactActivity) {
         reason = "healthy";
-        reasonDetail = hasContactActivity
+        reasonDetail = driftDays !== null
           ? `Último contacto hace ${driftDays}d`
           : "Sin actividad registrada";
       } else {

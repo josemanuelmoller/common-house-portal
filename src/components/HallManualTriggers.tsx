@@ -16,6 +16,8 @@ type TriggerDef = {
   id:       "calendar" | "gmail" | "meetings";
   label:    string;
   endpoint: string;
+  /** Optional POST body. When omitted, an empty body is sent (delta mode). */
+  body?:    Record<string, unknown>;
   summarize: (j: Record<string, unknown>) => string;
 };
 
@@ -46,6 +48,11 @@ const TRIGGERS: readonly TriggerDef[] = [
     id:       "meetings",
     label:    "Meetings",
     endpoint: "/api/fireflies-sync",
+    // Manual trigger does a 14-day rolling catch-up (deduped against
+    // existing sources), so one click recovers any gap left by downtime —
+    // the daily cron stays in delta (1-day) mode. fireflies-sync header
+    // documents `{ days: N }` as the backfill knob.
+    body:     { days: 14 },
     summarize: (j) => {
       const t = Number(j.transcripts_processed ?? j.transcripts ?? 0);
       return `${t} tx`;
@@ -92,7 +99,11 @@ export function HallManualTriggers() {
   async function run(t: TriggerDef) {
     setState(s => ({ ...s, [t.id]: { ...s[t.id], status: "running", summary: null } }));
     try {
-      const res = await fetch(t.endpoint, { method: "POST", credentials: "include" });
+      const res = await fetch(t.endpoint, {
+        method: "POST",
+        credentials: "include",
+        ...(t.body ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify(t.body) } : {}),
+      });
       const j = await res.json().catch(() => ({}));
       if (!res.ok || j?.ok === false) {
         setState(s => ({

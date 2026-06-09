@@ -12,9 +12,15 @@ import { getOrganizationsList, type OrganizationListEntry } from "@/lib/contacts
 const COLD_THRESHOLD_DAYS = 30;
 const COLD_FOCUS_CLASSES  = new Set(["Client", "Partner", "Investor", "Funder", "Portfolio"]);
 
-function daysAgo(iso: string | null): number {
-  if (!iso) return 99999;
+/** Days since `iso`, or null when there's no recorded interaction. */
+function daysAgo(iso: string | null): number | null {
+  if (!iso) return null;
   return Math.floor((Date.now() - new Date(iso).getTime()) / 86400_000);
+}
+
+/** Rank helper: "never interacted" (null) sorts as maximally cold. */
+function coldRank(iso: string | null): number {
+  return daysAgo(iso) ?? Number.MAX_SAFE_INTEGER;
 }
 
 async function loadActive(): Promise<OrganizationListEntry[]> {
@@ -28,8 +34,8 @@ export async function HallOrgsColdRelations() {
   const all = await loadActive();
   const cold = all
     .filter(o => o.relationship_classes.some(c => COLD_FOCUS_CLASSES.has(c)))
-    .filter(o => daysAgo(o.last_interaction_at) >= COLD_THRESHOLD_DAYS)
-    .sort((a, b) => daysAgo(b.last_interaction_at) - daysAgo(a.last_interaction_at))
+    .filter(o => coldRank(o.last_interaction_at) >= COLD_THRESHOLD_DAYS)
+    .sort((a, b) => coldRank(b.last_interaction_at) - coldRank(a.last_interaction_at))
     .slice(0, 8);
 
   // U1 — if network is warm, don't render an empty widget.
@@ -39,7 +45,7 @@ export async function HallOrgsColdRelations() {
     <ul className="flex flex-col">
       {cold.map(o => {
         const days = daysAgo(o.last_interaction_at);
-        const ageColor = days >= 60 ? "var(--hall-danger)" : "var(--hall-warn)";
+        const ageColor = (days ?? Number.MAX_SAFE_INTEGER) >= 60 ? "var(--hall-danger)" : "var(--hall-warn)";
         return (
           <li key={o.domain} style={{ borderTop: "1px solid var(--hall-line-soft)" }}>
             <Link
@@ -65,7 +71,7 @@ export async function HallOrgsColdRelations() {
                 className="font-semibold shrink-0"
                 style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10, color: ageColor }}
               >
-                {days}d
+                {days === null ? "sin contacto" : `${days}d`}
               </span>
             </Link>
           </li>

@@ -92,8 +92,10 @@ export async function getInboxActions(limit = DEFAULT_INBOX_LIMIT): Promise<Inbo
 
   const now = Date.now();
   return rows.map(r => {
-    const lastMotionMs = new Date(r.last_motion_at).getTime();
-    const daysWaiting = Math.max(0, Math.floor((now - lastMotionMs) / 86_400_000));
+    const lastMotionMs = r.last_motion_at ? new Date(r.last_motion_at).getTime() : NaN;
+    const daysWaiting = Number.isNaN(lastMotionMs)
+      ? 0
+      : Math.max(0, Math.floor((now - lastMotionMs) / 86_400_000));
     const score = r.priority_score;
     const label: InboxActionView["label"] =
       score >= 70 ? "Urgent" : score >= 40 ? "Needs Reply" : "FYI";
@@ -287,7 +289,10 @@ export async function getCommitmentActions(limit = 60): Promise<CommitmentAction
 
   const now = Date.now();
   return rows.map(r => {
-    const daysAgo = Math.max(0, Math.floor((now - new Date(r.last_motion_at).getTime()) / 86_400_000));
+    const motionMs = r.last_motion_at ? new Date(r.last_motion_at).getTime() : NaN;
+    const daysAgo = Number.isNaN(motionMs)
+      ? 0
+      : Math.max(0, Math.floor((now - motionMs) / 86_400_000));
     const owner: "jose" | "others" = r.intent === "chase" ? "others" : "jose";
     return {
       actionItemId: r.id,
