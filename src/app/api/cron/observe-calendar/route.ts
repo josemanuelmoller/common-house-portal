@@ -17,6 +17,7 @@ import { isAdminUser, isAdminEmail } from "@/lib/clients";
 import { syncCalendarDelta } from "@/lib/calendar-sync";
 import { withRoutineLog } from "@/lib/routine-log";
 import { apiError } from "@/lib/api-error";
+import { logServerError } from "@/lib/debug-log";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -44,6 +45,8 @@ async function handle(req: NextRequest) {
     const result = await syncCalendarDelta();
     return NextResponse.json(result, { status: result.ok ? 200 : 502 });
   } catch (err) {
+    // Capture full stack to debug_log (Vercel logs truncate to ~240 chars).
+    await logServerError("api/cron/observe-calendar", err);
     return apiError(err, { route: "[/api/cron/observe-calendar]" });
   }
 }

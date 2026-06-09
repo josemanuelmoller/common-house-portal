@@ -15,6 +15,7 @@
 import { NextResponse } from "next/server";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { classifyInboxItem } from "@/lib/inbox-classifier";
+import { logServerError } from "@/lib/debug-log";
 import type { InboxItem } from "@/lib/inbox";
 
 export const runtime = "nodejs";
@@ -45,8 +46,8 @@ async function handle(req: Request) {
     .limit(BATCH);
 
   if (error) {
-    // Don't echo Postgres error.message (column names / schema hints).
-    console.error("[/api/cron/run-inbox-classify] supabase read failed:", error);
+    // Full stack to debug_log (Vercel logs truncate to ~240 chars).
+    await logServerError("api/cron/run-inbox-classify", error, { phase: "supabase_read" });
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
 
@@ -73,7 +74,7 @@ async function handle(req: Request) {
       }
     } catch (e) {
       skipped++;
-      console.error("[/api/cron/run-inbox-classify] classify threw for item", item.id, e);
+      await logServerError("api/cron/run-inbox-classify", e, { phase: "classify", itemId: item.id });
       errors.push({ id: item.id, error: "classifier_exception" });
     }
   }

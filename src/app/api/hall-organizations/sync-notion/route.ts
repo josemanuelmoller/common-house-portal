@@ -30,6 +30,7 @@ import { NextRequest, NextResponse } from "next/server";
 // const ORGS_DB = "bef1bb86ab2b4cd280b6b33f9034b96c";
 import { adminGuardApi } from "@/lib/require-admin";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
+import { logServerError } from "@/lib/debug-log";
 
 export const dynamic = "force-dynamic";
 
@@ -102,7 +103,7 @@ export async function POST(req: NextRequest) {
     }
   } catch (err) {
     // Notion search errors can include workspace IDs / token error names.
-    console.error("[/api/hall-organizations/sync-notion] org search failed:", err);
+    await logServerError("api/hall-organizations/sync-notion", err, { phase: "org_search" });
     return NextResponse.json(
       { error: "organizations search failed" },
       { status: 502 },
@@ -146,7 +147,7 @@ export async function POST(req: NextRequest) {
       matchedId = (created.notion_id as string | null) ?? (created.id as string);
       action = "created";
     } catch (err) {
-      console.error("[/api/hall-organizations/sync-notion] org insert failed:", err);
+      await logServerError("api/hall-organizations/sync-notion", err, { phase: "org_insert" });
       return NextResponse.json(
         { error: "organizations insert failed" },
         { status: 502 },

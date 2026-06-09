@@ -16,6 +16,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
+import { logServerError } from "@/lib/debug-log";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -168,10 +169,8 @@ Output JSON only: {"topics":[{"label":"..."},{"label":"..."},{"label":"..."}]}. 
       const m = text.match(/\{[\s\S]*\}/);
       if (m) parsed = JSON.parse(m[0]);
     } catch (e) {
-      // Log full error server-side, surface a sanitised label to the
-      // caller. err.message from JSON.parse on LLM output can include
-      // payload fragments — not for cron-secret consumers.
-      console.error("[/api/cron/refresh-org-topics] parse failed for org", orgId, e);
+      // Full stack to debug_log; per-org context for SQL debugging.
+      await logServerError("api/cron/refresh-org-topics", e, { orgId, phase: "parse_llm_output" });
       results.push({ org_notion_id: orgId, topic_count: 0, ok: false, error: "parse_failed" });
       continue;
     }

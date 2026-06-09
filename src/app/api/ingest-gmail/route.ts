@@ -23,6 +23,7 @@ import { currentUser } from "@clerk/nextjs/server";
 import { isAdminUser, isAdminEmail } from "@/lib/clients";
 import { withRoutineLog } from "@/lib/routine-log";
 import { observeGmailThread } from "@/lib/hall-contact-observers";
+import { logServerError } from "@/lib/debug-log";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 
 /** Parse "Name <email@domain.com>" or raw email → lowercased email. */
@@ -150,8 +151,9 @@ async function _POST(req: NextRequest) {
     });
     threadIds = (listRes.data.threads ?? []).map(t => t.id!).filter(Boolean);
   } catch (err) {
-    // Gmail OAuth errors can include refresh-token paths in the message.
-    console.error("[/api/ingest-gmail] threads.list failed:", err);
+    // Gmail OAuth errors can include refresh-token paths — log the full
+    // stack to debug_log and return a stable public message.
+    await logServerError("api/ingest-gmail", err, { phase: "threads_list" });
     return NextResponse.json({ ok: false, error: "Internal error" }, { status: 500 });
   }
 
