@@ -178,9 +178,13 @@ export function AgentQueueSection({ drafts }: { drafts: AgentDraft[] }) {
 
   if (visible.length === 0) return null;
 
+  const RENDER_CAP = 6;
+  const overflow = Math.max(0, visible.length - RENDER_CAP);
+
   return (
-    <div className="grid grid-cols-3 gap-3">
-      {visible.slice(0, 6).map((draft) => {
+    <div className="space-y-2">
+      <div className="grid grid-cols-3 gap-3">
+      {visible.slice(0, RENDER_CAP).map((draft) => {
         const icon        = DRAFT_TYPE_ICON[draft.draftType] ?? "·";
         const isLinkedIn  = draft.draftType === "LinkedIn Post";
         const isEmail     = EMAIL_TYPES.has(draft.draftType);
@@ -588,6 +592,19 @@ export function AgentQueueSection({ drafts }: { drafts: AgentDraft[] }) {
           </div>
         );
       })}
+      </div>
+      {/* Audit fix: the Outbox section header used to show `count={agentDrafts.length}`
+          while only 6 cards rendered — "8 drafts" with 6 visible was misleading.
+          Surfacing the overflow inline keeps the count honest. */}
+      {overflow > 0 && (
+        <a
+          href="/admin/agents"
+          className="block text-center text-[10px] font-bold uppercase tracking-widest py-2"
+          style={{ color: "var(--hall-muted-2)", fontFamily: "var(--font-hall-mono)" }}
+        >
+          +{overflow} more in queue →
+        </a>
+      )}
     </div>
   );
 }

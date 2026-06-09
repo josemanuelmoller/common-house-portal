@@ -1602,7 +1602,7 @@ export default async function AdminPage({ searchParams }: { searchParams?: Promi
                           <span className="shrink-0" style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--hall-danger)" }} />
                           <span className="flex-1 min-w-0 truncate text-[12px] font-semibold" style={{ color: "var(--hall-ink-0)" }}>{p.name}</span>
                           <span className="font-semibold shrink-0" style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--hall-danger)" }}>
-                            {daysSince(bestActivity(p)) ?? "—"}d
+                            {(() => { const d = daysSince(bestActivity(p)); return d !== null ? `${d}d` : "—"; })()}
                           </span>
                         </Link>
                       </li>

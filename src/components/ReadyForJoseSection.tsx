@@ -138,8 +138,11 @@ export function ReadyForJoseSection({
                       className="text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full"
                       style={{
                         fontFamily: "var(--font-hall-mono)",
-                        background: "#c8f55a",
+                        // Lime reserved (PORTAL_DESIGN). Status chip on a
+                        // draft uses neutral ink-soft, not the brand colour.
+                        background: "var(--hall-fill-soft)",
                         color: "var(--hall-ink-0)",
+                        border: "1px solid var(--hall-line-soft)",
                       }}
                     >
                       Draft

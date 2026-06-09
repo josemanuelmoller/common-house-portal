@@ -24,11 +24,18 @@ export function TriggerBriefingButton() {
     }
   }
 
+  // Reset to idle so the user can retry without a full reload.
+  if (state === "done") {
+    setTimeout(() => setState("idle"), 4000);
+  }
+
   return (
     <button
       onClick={trigger}
       disabled={state === "loading" || state === "done"}
-      className="shrink-0 text-[11px] font-bold px-3 py-1.5 rounded-lg bg-[#c6f24a] text-[#0a0a0a] hover:bg-[#b8e54a] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+      // hall-btn-primary = solid ink-0 per PORTAL_DESIGN — lime is reserved
+      // for Focus / LIVE / brand only.
+      className="hall-btn-primary shrink-0 text-[11px] px-3 py-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
     >
       {state === "loading" ? "Generating…"
         : state === "done"    ? "Done — actualizando…"

@@ -23,9 +23,11 @@ const LOOP_TYPE_LABEL: Record<string, string> = {
   commitment: "Commitment",
 };
 
+// Lime reserved per PORTAL_DESIGN — "Interested" status uses ink-on-paper
+// instead of the brand lime to keep lime exclusive to Focus / LIVE.
 const INTEREST_BADGE: Record<string, { label: string; cls: string }> = {
-  watching:   { label: "Watching", cls: "bg-amber-50 text-amber-600 border border-amber-200" },
-  interested: { label: "Interested", cls: "bg-[#c6f24a]/20 text-[#0a0a0a] border border-[#c6f24a]/40" },
+  watching:   { label: "Watching",   cls: "bg-amber-50 text-amber-600 border border-amber-200" },
+  interested: { label: "Interested", cls: "bg-[#0a0a0a]/5 text-[#0a0a0a] border border-[#0a0a0a]/15" },
 };
 
 async function patchInterest(loopId: string, founderInterest: string | null): Promise<{ ok: boolean; error?: string }> {
@@ -95,7 +97,7 @@ export function RadarSection({ initialLoops }: { initialLoops: RadarLoop[] }) {
           const movingToCoS = interest === "interested" && optimistic[loop.id] === "interested";
 
           return (
-            <div key={loop.id} className={`flex items-center gap-3 px-5 py-3.5 transition-colors ${movingToCoS ? "bg-[#c6f24a]/10" : ""}`}>
+            <div key={loop.id} className={`flex items-center gap-3 px-5 py-3.5 transition-colors ${movingToCoS ? "bg-[#0a0a0a]/5" : ""}`}>
               {/* Type badge */}
               <span className="text-[8px] font-bold uppercase tracking-widest text-[#0a0a0a]/30 bg-[#f4f4ef] px-2 py-0.5 rounded-full shrink-0">
                 {typeLabel}
@@ -120,7 +122,7 @@ export function RadarSection({ initialLoops }: { initialLoops: RadarLoop[] }) {
 
               {/* Interest state badge */}
               {movingToCoS ? (
-                <span className="text-[8px] font-bold px-2 py-0.5 rounded-full shrink-0 bg-[#c6f24a] text-[#0a0a0a]">
+                <span className="text-[8px] font-bold px-2 py-0.5 rounded-full shrink-0 bg-[#0a0a0a] text-white">
                   → CoS
                 </span>
               ) : badge ? (
@@ -142,7 +144,7 @@ export function RadarSection({ initialLoops }: { initialLoops: RadarLoop[] }) {
                 {interest !== "interested" && (
                   <button
                     onClick={() => handleAction(loop.id, "interested")}
-                    className="text-[9px] font-bold px-2.5 py-1 rounded-lg bg-[#c6f24a] text-[#0a0a0a] hover:bg-[#b8e54a] transition-colors"
+                    className="text-[9px] font-bold px-2.5 py-1 rounded-lg bg-[#0a0a0a] text-white hover:bg-[#1f1f24] transition-colors"
                   >
                     Interested
                   </button>
