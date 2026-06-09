@@ -6,17 +6,19 @@ import { Sidebar } from "@/components/Sidebar";
 import { getWorkroomProjectsOverview } from "@/lib/notion-cached";
 import { requireAdmin } from "@/lib/require-admin";
 
-function daysSince(dateStr: string | null): number {
-  if (!dateStr) return 999;
+/** Days since `dateStr`, or null when there's no recorded activity. */
+function daysSince(dateStr: string | null): number | null {
+  if (!dateStr) return null;
   return Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000);
 }
 
-function warmthLabel(days: number): { label: string; dot: string; text: string } {
-  if (days <= 3)  return { label: "Hot",     dot: "var(--hall-danger)", text: "var(--hall-danger)" };
-  if (days <= 10) return { label: "Warm",    dot: "var(--hall-warn)",   text: "var(--hall-warn)" };
-  if (days <= 21) return { label: "Active",  dot: "var(--hall-warn)",   text: "var(--hall-warn)" };
-  if (days <= 35) return { label: "Cold",    dot: "var(--hall-info)",   text: "var(--hall-info)" };
-  return              { label: "Dormant", dot: "var(--hall-muted-3)", text: "var(--hall-muted-3)" };
+function warmthLabel(days: number | null): { label: string; dot: string; text: string } {
+  if (days === null) return { label: "—",       dot: "var(--hall-muted-3)", text: "var(--hall-muted-3)" };
+  if (days <= 3)     return { label: "Hot",     dot: "var(--hall-danger)", text: "var(--hall-danger)" };
+  if (days <= 10)    return { label: "Warm",    dot: "var(--hall-warn)",   text: "var(--hall-warn)" };
+  if (days <= 21)    return { label: "Active",  dot: "var(--hall-warn)",   text: "var(--hall-warn)" };
+  if (days <= 35)    return { label: "Cold",    dot: "var(--hall-info)",   text: "var(--hall-info)" };
+  return                    { label: "Dormant", dot: "var(--hall-muted-3)", text: "var(--hall-muted-3)" };
 }
 
 const STAGE_STYLES: Record<string, { bg: string; color: string }> = {
@@ -52,7 +54,13 @@ export default async function WorkroomsPage() {
 
   const withBlockers   = activeClients.filter(p => p.blockerCount > 0);
   const needsUpdate    = activeClients.filter(p => p.updateNeeded);
-  const staleCount     = activeClients.filter(p => daysSince(p.lastUpdate) > 30).length;
+  // Stale = updated >30d ago. Projects with NO recorded last_update are
+  // not counted as stale here (no signal ≠ cold); the legacy sentinel
+  // 999 made them all inflate this count.
+  const staleCount     = activeClients.filter(p => {
+    const d = daysSince(p.lastUpdate);
+    return d !== null && d > 30;
+  }).length;
   const executionCount = activeClients.filter(p => p.stage === "Execution").length;
 
   const todayLabel = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });

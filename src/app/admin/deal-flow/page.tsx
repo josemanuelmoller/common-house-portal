@@ -3,17 +3,23 @@ import { Sidebar } from "@/components/Sidebar";
 import { getProjectsOverview, getDecisionItems } from "@/lib/notion";
 import { requireAdmin } from "@/lib/require-admin";
 
-function daysSince(dateStr: string | null): number {
-  if (!dateStr) return 999;
+/** Days since `dateStr`, or null when there's no recorded activity. */
+function daysSince(dateStr: string | null): number | null {
+  if (!dateStr) return null;
   return Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000);
 }
 
-type WarmthKey = "hot" | "warm" | "cold";
+type WarmthKey = "hot" | "warm" | "cold" | "unknown";
 
-function warmth(days: number): { key: WarmthKey; label: string; dot: string; text: string } {
-  if (days < 7)  return { key: "hot",  label: "Hot",  dot: "var(--hall-danger)", text: "var(--hall-danger)" };
-  if (days <= 30) return { key: "warm", label: "Warm", dot: "var(--hall-warn)",  text: "var(--hall-warn)" };
-  return              { key: "cold", label: "Cold", dot: "var(--hall-info)",   text: "var(--hall-info)" };
+/** Renders Hot/Warm/Cold from days; null (no activity recorded) → Unknown.
+ *  Previously we returned 999 as a sentinel and then compared `days < 999`
+ *  at every site — leaked "999d" to the UI if a single comparator was
+ *  missed and forced "Cold" warmth on entities with literally no signal. */
+function warmth(days: number | null): { key: WarmthKey; label: string; dot: string; text: string } {
+  if (days === null) return { key: "unknown", label: "—", dot: "var(--hall-muted-3)", text: "var(--hall-muted-3)" };
+  if (days < 7)      return { key: "hot",     label: "Hot",  dot: "var(--hall-danger)", text: "var(--hall-danger)" };
+  if (days <= 30)    return { key: "warm",    label: "Warm", dot: "var(--hall-warn)",  text: "var(--hall-warn)" };
+  return                    { key: "cold",    label: "Cold", dot: "var(--hall-info)",   text: "var(--hall-info)" };
 }
 
 // Commercial pipeline stages in funnel order
@@ -331,10 +337,10 @@ export default async function DealFlowPage() {
                                 className="text-[10px] font-medium tabular-nums"
                                 style={{
                                   fontFamily: "var(--font-hall-mono)",
-                                  color: days > 30 ? "var(--hall-danger)" : "var(--hall-muted-2)",
+                                  color: (days !== null && days > 30) ? "var(--hall-danger)" : "var(--hall-muted-2)",
                                 }}
                               >
-                                {days < 999 ? `${days}d` : "—"}
+                                {days !== null ? `${days}d` : "—"}
                               </p>
                             ) : (
                               <span className="text-[12px]" style={{color: "var(--hall-muted-3)"}}>—</span>
@@ -343,7 +349,7 @@ export default async function DealFlowPage() {
 
                           {/* Warmth */}
                           <div className="flex items-center gap-1.5">
-                            {days < 999 ? (
+                            {days !== null ? (
                               <>
                                 <span
                                   className="shrink-0"

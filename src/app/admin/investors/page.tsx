@@ -3,17 +3,19 @@ import { Sidebar } from "@/components/Sidebar";
 import { getAllPeople, getProjectsOverview, getDecisionItems } from "@/lib/notion";
 import { requireAdmin } from "@/lib/require-admin";
 
-function daysSince(dateStr: string | null): number {
-  if (!dateStr) return 999;
+/** Days since `dateStr`, or null when there's no recorded activity. */
+function daysSince(dateStr: string | null): number | null {
+  if (!dateStr) return null;
   return Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000);
 }
 
-function warmthLabel(days: number): { label: string; dot: string; text: string } {
-  if (days <= 3)  return { label: "Hot",     dot: "var(--hall-danger)", text: "var(--hall-danger)" };
-  if (days <= 14) return { label: "Warm",    dot: "var(--hall-warn)",   text: "var(--hall-warn)" };
-  if (days <= 30) return { label: "Active",  dot: "var(--hall-warn)",   text: "var(--hall-warn)" };
-  if (days <= 60) return { label: "Cold",    dot: "var(--hall-info)",   text: "var(--hall-info)" };
-  return              { label: "Dormant", dot: "var(--hall-muted-3)", text: "var(--hall-muted-3)" };
+function warmthLabel(days: number | null): { label: string; dot: string; text: string } {
+  if (days === null) return { label: "—",       dot: "var(--hall-muted-3)", text: "var(--hall-muted-3)" };
+  if (days <= 3)     return { label: "Hot",     dot: "var(--hall-danger)", text: "var(--hall-danger)" };
+  if (days <= 14)    return { label: "Warm",    dot: "var(--hall-warn)",   text: "var(--hall-warn)" };
+  if (days <= 30)    return { label: "Active",  dot: "var(--hall-warn)",   text: "var(--hall-warn)" };
+  if (days <= 60)    return { label: "Cold",    dot: "var(--hall-info)",   text: "var(--hall-info)" };
+  return                    { label: "Dormant", dot: "var(--hall-muted-3)", text: "var(--hall-muted-3)" };
 }
 
 const INVESTOR_ROLES = ["Investor", "Angel", "VC", "LP", "Fund", "Funder", "Backer", "Grant Funder", "Grant Maker", "Impact Investor"];

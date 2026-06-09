@@ -36,15 +36,17 @@ const TYPE_ICON: Record<string, { icon: string; style: CSSProperties }> = {
   "Draft Review":               { icon: "▤", style: { color: "var(--hall-ink-0)",    background: "var(--hall-fill-soft)" } },
 };
 
-function daysSince(iso: string | null): number {
-  if (!iso) return 999;
+/** Days since `iso`, or null when there's no date. */
+function daysSince(iso: string | null): number | null {
+  if (!iso) return null;
   return Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
 }
 
 function DecisionCard({ d }: { d: DecisionItem }) {
   const needsExecute = d.requiresExecute && !d.executeApproved;
   const tCfg = TYPE_ICON[d.decisionType] ?? { icon: "·", style: { color: "var(--hall-muted-3)", background: "var(--hall-fill-soft)" } };
-  const overdue = d.dueDate && daysSince(d.dueDate) > 0;
+  const overdueDays = d.dueDate ? daysSince(d.dueDate) : null;
+  const overdue = overdueDays !== null && overdueDays > 0;
   return (
     <div
       className="px-6 py-4 flex items-start gap-4"
@@ -256,9 +258,11 @@ export default async function OSPage() {
   const reviewEvidenceRaw = allEvidence.filter(e => e.validationStatus === "Reviewed");
   // "Passing through" — only last 14 days. Older Reviewed items are archived by
   // the engine (validation-operator ARCHIVE tier) and don't belong in the queue.
-  const reviewEvidence    = reviewEvidenceRaw.filter(e =>
-    e.dateCaptured ? daysSince(e.dateCaptured) <= 14 : false,
-  );
+  const reviewEvidence    = reviewEvidenceRaw.filter(e => {
+    if (!e.dateCaptured) return false;
+    const d = daysSince(e.dateCaptured);
+    return d !== null && d <= 14;
+  });
   const validatedEvidence = allEvidence.filter(e => e.validationStatus === "Validated");
   const blockers          = allEvidence.filter(e => e.type === "Blocker" && e.validationStatus === "Validated");
 
