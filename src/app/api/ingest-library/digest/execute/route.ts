@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     console.error("[ingest-library/digest/execute] push error:", err);
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Phase C push failed" },
+      { error: "Internal error" },
       { status: 500 },
     );
   }

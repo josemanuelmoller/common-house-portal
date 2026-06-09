@@ -411,7 +411,7 @@ async function _POST(req: NextRequest) {
     });
   } catch (e) {
     console.error("extract-conversation-evidence error:", e);
-    return NextResponse.json({ error: "Internal error", detail: String(e) }, { status: 500 });
+    return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
 }
 

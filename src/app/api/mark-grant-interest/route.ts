@@ -171,7 +171,7 @@ export async function POST(req: NextRequest) {
     }
   } catch (err) {
     return NextResponse.json(
-      { error: "Supabase write failed", detail: String(err) },
+      { error: "Supabase write failed" },
       { status: 500, headers: corsHeaders() }
     );
   }

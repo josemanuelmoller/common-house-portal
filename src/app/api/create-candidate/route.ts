@@ -88,6 +88,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, candidateId: data?.id ?? "", notionUrl: "" });
   } catch (err) {
     console.error("[create-candidate] insert failed:", err);
-    return NextResponse.json({ error: "Failed to create candidate", detail: String(err) }, { status: 502 });
+    return NextResponse.json({ error: "Failed to create candidate" }, { status: 502 });
   }
 }

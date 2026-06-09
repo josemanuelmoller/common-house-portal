@@ -217,7 +217,7 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     console.error("[ingest-library/digest] error:", err);
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Digest pipeline error" },
+      { error: "Internal error" },
       { status: 500 },
     );
   }

@@ -90,7 +90,7 @@ Output ONLY the email (Subject + body). Nothing else.`;
     });
     draftText = message.content[0].type === "text" ? message.content[0].text : "";
   } catch (e) {
-    return NextResponse.json({ error: "Anthropic API error", detail: String(e) }, { status: 500 });
+    return NextResponse.json({ error: "Anthropic API error" }, { status: 500 });
   }
 
   // 4. Save to Agent Drafts via mirror — Notion + Supabase in one call.

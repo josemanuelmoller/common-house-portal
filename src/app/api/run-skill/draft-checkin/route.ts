@@ -118,7 +118,7 @@ Output ONLY the email (Subject + body). Nothing else.`;
     });
     draftText = message.content[0].type === "text" ? message.content[0].text : "";
   } catch (e) {
-    return NextResponse.json({ error: "Anthropic API error", detail: String(e) }, { status: 500 });
+    return NextResponse.json({ error: "Anthropic API error" }, { status: 500 });
   }
 
   // 3. Save to Agent Drafts via the mirror helper — creates the Notion page

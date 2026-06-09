@@ -30,6 +30,6 @@ export async function POST(req: NextRequest) {
     await updatePitchAngle(pitchId, angle, headline ?? null);
     return NextResponse.json({ ok: true });
   } catch (e) {
-    return NextResponse.json({ error: "update error", detail: String(e) }, { status: 500 });
+    return NextResponse.json({ error: "update error" }, { status: 500 });
   }
 }

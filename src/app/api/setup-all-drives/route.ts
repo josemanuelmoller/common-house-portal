@@ -51,7 +51,7 @@ export async function POST() {
         rootFolderId: "",
         driveUrl: "",
         status: "error",
-        error: err instanceof Error ? err.message : "Unknown error",
+        error: "Internal error",
       });
     }
   }

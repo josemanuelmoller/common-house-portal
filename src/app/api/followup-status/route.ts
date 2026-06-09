@@ -168,7 +168,7 @@ export async function PATCH(req: NextRequest) {
   } catch (err) {
     console.error("[followup-status] update failed:", err);
     return NextResponse.json(
-      { error: "Failed to update opportunity", detail: err instanceof Error ? err.message : String(err) },
+      { error: "Failed to update opportunity" },
       { status: 502 }
     );
   }

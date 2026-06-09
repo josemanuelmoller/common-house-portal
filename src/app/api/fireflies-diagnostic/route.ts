@@ -45,7 +45,7 @@ export async function GET(req: NextRequest) {
       body: await res.json().catch(() => ({})),
     };
   } catch (err) {
-    whoami = { error: err instanceof Error ? err.message : String(err) };
+    whoami = { error: "Internal error" };
   }
 
   // Probe 2: transcripts query (same shape the sync uses)
@@ -74,7 +74,7 @@ export async function GET(req: NextRequest) {
       body: await res.json().catch(() => ({})),
     };
   } catch (err) {
-    transcripts = { error: err instanceof Error ? err.message : String(err) };
+    transcripts = { error: "Internal error" };
   }
 
   return NextResponse.json({

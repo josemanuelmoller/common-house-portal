@@ -64,7 +64,7 @@ export async function GET() {
     return NextResponse.json({ ok: true, calendar, gmail, meetings });
   } catch (err) {
     return NextResponse.json(
-      { ok: false, error: err instanceof Error ? err.message : String(err) },
+      { ok: false, error: "Internal error" },
       { status: 500 },
     );
   }

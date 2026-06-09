@@ -57,6 +57,6 @@ export async function POST(req: NextRequest) {
     const written = await insertPitches(toInsert);
     return NextResponse.json({ ok: true, records_written: written });
   } catch (e) {
-    return NextResponse.json({ error: "insert failed", detail: String(e) }, { status: 500 });
+    return NextResponse.json({ error: "insert failed" }, { status: 500 });
   }
 }

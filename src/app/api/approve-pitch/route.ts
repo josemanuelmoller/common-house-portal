@@ -81,7 +81,7 @@ async function _POST(req: NextRequest) {
       written++;
       succeededIds.push(id);
     } catch (e) {
-      errors.push({ id, error: String(e) });
+      errors.push({ id, error: "Internal error" });
     }
   }
 

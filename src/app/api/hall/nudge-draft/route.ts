@@ -95,7 +95,7 @@ export async function POST(req: NextRequest) {
     const textBlock = msg.content.find(b => b.type === "text");
     draftBody = textBlock && textBlock.type === "text" ? textBlock.text.trim() : "";
   } catch (err) {
-    return NextResponse.json({ ok: false, error: "Haiku generation failed", detail: String(err) }, { status: 502 });
+    return NextResponse.json({ ok: false, error: "Haiku generation failed" }, { status: 502 });
   }
   if (!draftBody) {
     return NextResponse.json({ ok: false, error: "Empty draft body from Haiku" }, { status: 502 });
@@ -141,7 +141,7 @@ export async function POST(req: NextRequest) {
     });
     draftId = res.data.id ?? null;
   } catch (err) {
-    return NextResponse.json({ ok: false, error: "Gmail draft create failed", detail: String(err) }, { status: 502 });
+    return NextResponse.json({ ok: false, error: "Gmail draft create failed" }, { status: 502 });
   }
   if (!draftId) {
     return NextResponse.json({ ok: false, error: "Gmail did not return a draft id" }, { status: 502 });

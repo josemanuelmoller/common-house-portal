@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
     });
   } catch (err) {
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Failed to create folders" },
+      { error: "Internal error" },
       { status: 500 }
     );
   }

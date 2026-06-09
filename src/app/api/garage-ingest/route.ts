@@ -289,7 +289,7 @@ export async function POST(req: NextRequest) {
     fileBuffer = await fileRes.arrayBuffer();
   } catch (err) {
     if (err instanceof SsrfBlockedError) {
-      return NextResponse.json({ error: "URL rejected by SSRF policy", detail: err.message }, { status: 400 });
+      return NextResponse.json({ error: "URL rejected by SSRF policy" }, { status: 400 });
     }
     console.error("[garage-ingest] file download failed:", err);
     return NextResponse.json({ error: "Failed to download file" }, { status: 502 });
@@ -383,7 +383,7 @@ export async function POST(req: NextRequest) {
     extraction = JSON.parse(cleaned) as ExtractedData;
   } catch (err) {
     return NextResponse.json(
-      { error: `AI extraction failed: ${err instanceof Error ? err.message : String(err)}` },
+      { error: "AI extraction failed" },
       { status: 502 }
     );
   }

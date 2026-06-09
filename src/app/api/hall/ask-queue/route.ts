@@ -95,7 +95,7 @@ export async function GET(_req: NextRequest) {
     });
     threadIds = (res.data.threads ?? []).map(t => t.id!).filter(Boolean);
   } catch (err) {
-    return NextResponse.json({ error: "Gmail list failed", detail: String(err) }, { status: 502 });
+    return NextResponse.json({ error: "Gmail list failed" }, { status: 502 });
   }
 
   type Candidate = {

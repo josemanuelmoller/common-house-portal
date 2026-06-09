@@ -539,7 +539,7 @@ export async function POST(req: NextRequest) {
     classifications = await classifySignals(signals);
   } catch (err) {
     console.error("[scan-candidates] classification failed:", err);
-    return NextResponse.json({ error: "Classification failed", detail: String(err) }, { status: 502 });
+    return NextResponse.json({ error: "Classification failed" }, { status: 502 });
   }
 
   const opportunitySignals = classifications.filter(c => c.isOpportunity && c.confidence >= 65);

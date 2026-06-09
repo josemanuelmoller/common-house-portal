@@ -80,6 +80,6 @@ export async function PATCH(req: NextRequest) {
 
     return NextResponse.json({ ok: true, opportunityId });
   } catch (err) {
-    return NextResponse.json({ error: "Update failed", detail: String(err) }, { status: 502 });
+    return NextResponse.json({ error: "Update failed" }, { status: 502 });
   }
 }

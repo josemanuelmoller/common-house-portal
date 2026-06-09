@@ -52,6 +52,6 @@ export async function POST(req: NextRequest) {
     }
     return NextResponse.json({ ok: true, status: newStatus });
   } catch (e) {
-    return NextResponse.json({ error: "agent_drafts update error", detail: String(e) }, { status: 500 });
+    return NextResponse.json({ error: "agent_drafts update error" }, { status: 500 });
   }
 }

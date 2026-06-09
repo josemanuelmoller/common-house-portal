@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     console.error("[inbox-ignore] Unhandled:", err);
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : String(err) },
+      { error: "Internal error" },
       { status: 500 }
     );
   }

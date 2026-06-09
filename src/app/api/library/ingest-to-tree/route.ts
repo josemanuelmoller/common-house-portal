@@ -379,7 +379,7 @@ async function _POST(req: NextRequest) {
       curatorSummary = { error: `curator ${curatorRes.status}` };
     }
   } catch (err) {
-    curatorSummary = { error: String(err).slice(0, 200) };
+    curatorSummary = { error: "Internal error".slice(0, 200) };
   }
 
   return NextResponse.json({

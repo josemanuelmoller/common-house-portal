@@ -196,7 +196,7 @@ export async function GET(
     });
   } catch (err) {
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Failed to load meeting" },
+      { error: "Internal error" },
       { status: 500 }
     );
   }

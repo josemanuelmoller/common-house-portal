@@ -88,7 +88,7 @@ export async function GET(req: NextRequest) {
   } catch (err) {
     console.error("[inbox-triage] Unhandled error:", err);
     return NextResponse.json(
-      { error: "Internal error", detail: err instanceof Error ? err.message : String(err) },
+      { error: "Internal error" },
       { status: 500 }
     );
   }

@@ -184,7 +184,7 @@ async function _POST(req: NextRequest) {
 
   } catch (err) {
     console.error("[sync-evidence] Fatal:", err);
-    return NextResponse.json({ ok: false, error: String(err) }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Internal error" }, { status: 500 });
   }
 }
 
