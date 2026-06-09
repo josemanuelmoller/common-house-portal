@@ -12,12 +12,12 @@ src/app/api/cos-loops/route.ts
 src/app/api/create-candidate/route.ts
 src/app/api/create-project-folders/route.ts
 src/app/api/cron/observe-calendar/route.ts
+src/app/api/cron/refresh-org-topics/route.ts
 src/app/api/cron/run-inbox-classify/route.ts
 src/app/api/edit-pitch/route.ts
 src/app/api/extract-conversation-evidence/route.ts
 src/app/api/extract-meeting-evidence/route.ts
 src/app/api/fireflies-diagnostic/route.ts
-src/app/api/fireflies-sync/route.ts
 src/app/api/flag-opportunity/route.ts
 src/app/api/followup-status/route.ts
 src/app/api/garage-ingest/route.ts
