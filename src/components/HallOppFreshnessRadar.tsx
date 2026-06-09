@@ -83,7 +83,7 @@ type RawOpp = {
 };
 
 type ColdOpp = {
-  id: string;
+  id: string | null;
   title: string;
   orgName: string | null;
   type: string | null;
@@ -112,7 +112,7 @@ export async function HallOppFreshnessRadar() {
 
   return (
     <ul className="flex flex-col">
-      {opps.map(o => <OppRow key={o.id} opp={o} />)}
+      {opps.map((o, i) => <OppRow key={o.id ?? `idx-${i}`} opp={o} />)}
     </ul>
   );
 }
@@ -121,10 +121,15 @@ function OppRow({ opp }: { opp: ColdOpp }) {
   const ageColor = opp.daysStale >= 30 ? "var(--hall-danger)"
     : opp.daysStale >= 14 ? "var(--hall-warn)"
     : "var(--hall-muted-3)";
+  // Some opportunities have no notion_id (Supabase-native rows). Fall back
+  // to reviewUrl alone — if both are missing the row links nowhere, which
+  // is fine; it never crashes the page.
+  const href = opp.reviewUrl
+    ?? (opp.id ? `https://www.notion.so/${opp.id.replace(/-/g, "")}` : "#");
   return (
     <li style={{ borderTop: "1px solid var(--hall-line-soft)" }}>
       <a
-        href={opp.reviewUrl ?? `https://www.notion.so/${opp.id.replace(/-/g, "")}`}
+        href={href}
         target="_blank"
         rel="noopener noreferrer"
         className="flex items-start gap-3 py-2.5 transition-colors"
