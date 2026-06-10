@@ -21,9 +21,25 @@ type RevRow = {
   amount: number | string | null;
   currency: string | null;
   due_date: string | null;
+  invoice_date: string | null;
   invoice_number: string | null;
   notes: string | null;
   quarter: number | null;
+};
+
+const CCY_SYMBOL: Record<string, string> = { USD: "$", GBP: "£", EUR: "€" };
+
+function fmtOriginal(r: RevRow): string {
+  const c = (r.currency ?? "USD").toUpperCase();
+  const sym = CCY_SYMBOL[c] ?? `${c} `;
+  const n = Number(r.amount ?? 0);
+  return n >= 1_000 ? `${sym}${(n / 1_000).toFixed(1)}K` : `${sym}${Math.round(n)}`;
+}
+
+const STAGE_LABEL: Record<string, { label: string; color: string }> = {
+  paid:     { label: "cobrada",   color: "var(--hall-ok)" },
+  invoiced: { label: "facturada", color: "var(--hall-warn)" },
+  sold:     { label: "vendida",   color: "var(--hall-muted-2)" },
 };
 
 const FALLBACK_RATES: Record<string, number> = { GBP: 1.34, EUR: 1.08, USD: 1 };
@@ -63,7 +79,7 @@ export async function HallRevenueCard() {
   const [ratesRes, eventsRes, targetRes] = await Promise.all([
     getUsdRates(),
     sb.from("revenue_events")
-      .select("stage, amount, currency, due_date, invoice_number, notes, quarter")
+      .select("stage, amount, currency, due_date, invoice_date, invoice_number, notes, quarter")
       .eq("year", year),
     sb.from("strategic_objectives")
       .select("target_value")
@@ -74,7 +90,15 @@ export async function HallRevenueCard() {
   ]);
 
   const rates = ratesRes;
-  const rows = ((eventsRes.data ?? []) as RevRow[]).filter(r => r.quarter === quarter);
+  const yearRows = (eventsRes.data ?? []) as RevRow[];
+  const rows = yearRows.filter(r => r.quarter === quarter);
+
+  // Últimas facturas del año (cruzan trimestres a propósito — lo reciente es
+  // lo reciente), en su moneda original para mantener el detalle auditable.
+  const recentInvoices = [...yearRows]
+    .filter(r => r.invoice_date)
+    .sort((a, b) => (a.invoice_date! > b.invoice_date! ? -1 : 1))
+    .slice(0, 3);
   const target = Number((targetRes.data as { target_value?: number | null } | null)?.target_value ?? 0);
 
   const toUsd = (r: RevRow) => Number(r.amount ?? 0) * (rates[(r.currency ?? "USD").toUpperCase()] ?? 1);
@@ -140,6 +164,48 @@ export async function HallRevenueCard() {
           <b style={{ color: "var(--hall-ink-2)" }}>{nextDue.due_date!.slice(5)}</b>
           {nextDue.notes ? ` (${nextDue.notes.replace(/^Xero · /, "")})` : ""}
         </p>
+      )}
+
+      {/* Últimas facturas — detalle rápido sin salir del Hall */}
+      {recentInvoices.length > 0 && (
+        <div className="mt-1.5 flex flex-col">
+          <p
+            className="uppercase tracking-[0.08em] font-bold mb-1"
+            style={{ fontFamily: "var(--font-hall-mono)", fontSize: 8.5, color: "var(--hall-muted-3)" }}
+          >
+            Últimas facturas
+          </p>
+          {recentInvoices.map((r, i) => {
+            const stage = STAGE_LABEL[r.stage] ?? { label: r.stage, color: "var(--hall-muted-2)" };
+            const who = (r.notes ?? "").replace(/^Xero · /, "") || "—";
+            return (
+              <div
+                key={`${r.invoice_number}-${i}`}
+                className="flex items-baseline gap-2 py-1"
+                style={{ borderTop: "1px solid var(--hall-line-soft)" }}
+              >
+                <span
+                  className="shrink-0"
+                  style={{ fontFamily: "var(--font-hall-mono)", fontSize: 9.5, color: "var(--hall-muted-2)" }}
+                >
+                  {r.invoice_number ?? "—"}
+                </span>
+                <span className="flex-1 min-w-0 truncate text-[10.5px]" style={{ color: "var(--hall-ink-2)" }}>
+                  {who}
+                </span>
+                <span className="shrink-0 text-[10.5px] font-semibold" style={{ color: "var(--hall-ink-0)" }}>
+                  {fmtOriginal(r)}
+                </span>
+                <span
+                  className="shrink-0 uppercase tracking-[0.06em] font-bold"
+                  style={{ fontFamily: "var(--font-hall-mono)", fontSize: 8, color: stage.color }}
+                >
+                  {stage.label}
+                </span>
+              </div>
+            );
+          })}
+        </div>
       )}
 
       <Link
