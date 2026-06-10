@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { AgentDraft } from "@/lib/notion";
+import { liveHref } from "@/lib/links";
 
 const DRAFT_TYPE_ICON: Record<string, string> = {
   "LinkedIn Post":    "in",
@@ -432,7 +433,7 @@ export function AgentQueueSection({ drafts }: { drafts: AgentDraft[] }) {
                     Enviar →
                   </button>
                   <a
-                    href={draft.notionUrl}
+                    href={liveHref(draft.notionUrl) ?? undefined}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-[10px] font-bold transition-colors shrink-0"
@@ -529,7 +530,7 @@ export function AgentQueueSection({ drafts }: { drafts: AgentDraft[] }) {
                           Assign contact →
                         </button>
                         <a
-                          href={draft.notionUrl}
+                          href={liveHref(draft.notionUrl) ?? undefined}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-[10px] font-bold transition-colors shrink-0"
@@ -578,7 +579,7 @@ export function AgentQueueSection({ drafts }: { drafts: AgentDraft[] }) {
                     Revise
                   </button>
                   <a
-                    href={draft.notionUrl}
+                    href={liveHref(draft.notionUrl) ?? undefined}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-[10px] font-bold transition-colors shrink-0"

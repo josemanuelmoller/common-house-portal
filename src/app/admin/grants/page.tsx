@@ -291,19 +291,6 @@ export default async function GrantsPage() {
                 >
                   Grant <em className="hall-flourish">pipeline</em>
                 </h2>
-                <a
-                  href="https://www.notion.so/687caa98594a41b595c9960c141be0c0"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    fontFamily: "var(--font-hall-mono)",
-                    fontSize: 10,
-                    color: "var(--hall-muted-2)",
-                    letterSpacing: "0.06em",
-                  }}
-                >
-                  OPEN IN NOTION →
-                </a>
               </div>
 
               {grants.length === 0 ? (

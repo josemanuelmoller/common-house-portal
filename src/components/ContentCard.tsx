@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import { liveHref } from "@/lib/links";
 
 // ─── Simple markdown renderer ─────────────────────────────────────────────────
 
@@ -362,8 +363,8 @@ export function ContentCard({ item, onArchive }: { item: ContentCardItem; onArch
                     ) : (
                       <button onClick={handleDownloadTxt} className="text-[9px] font-bold px-2.5 py-1 rounded-md border border-[#e4e4dd] text-[#0a0a0a]/50 hover:text-[#0a0a0a] hover:border-[#0a0a0a]/30 transition-all">.txt</button>
                     )}
-                    {item.notionUrl && (
-                      <a href={item.notionUrl} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
+                    {liveHref(item.notionUrl) && (
+                      <a href={liveHref(item.notionUrl)!} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
                         className="text-[9px] font-bold px-2.5 py-1 rounded-md border border-[#e4e4dd] text-[#0a0a0a]/50 hover:text-[#0a0a0a] hover:border-[#0a0a0a]/30 transition-all">
                         Notion ↗
                       </a>
@@ -409,8 +410,8 @@ export function ContentCard({ item, onArchive }: { item: ContentCardItem; onArch
               <div className="px-4 py-6 text-center">
                 <p className="text-[11px] text-[#0a0a0a]/25">No hay draft generado aún.</p>
                 <p className="text-[10px] text-[#0a0a0a]/20 mt-1">El AI draft aparecerá aquí una vez generado (~30–60s).</p>
-                {item.notionUrl && (
-                  <a href={item.notionUrl} target="_blank" rel="noopener noreferrer"
+                {liveHref(item.notionUrl) && (
+                  <a href={liveHref(item.notionUrl)!} target="_blank" rel="noopener noreferrer"
                     className="inline-block mt-3 text-[10px] font-bold text-[#0a0a0a]/40 underline hover:text-[#0a0a0a]">
                     Ver en Notion →
                   </a>
