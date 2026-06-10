@@ -126,16 +126,20 @@ export async function getInboxActions(limit = DEFAULT_INBOX_LIMIT): Promise<Inbo
 // ─── Inbox + Drafts cross-view ─────────────────────────────────────────────
 
 /**
- * Same as getInboxActions but joins notion_agent_drafts via gmail_thread_id
- * so the UI can render a per-thread badge:
- *   ✓ Draft ready  | ⏰ Stale draft | ✓ Sent | ✗ No draft
+ * Same as getInboxActions but joins CANONICAL agent_drafts via
+ * gmail_thread_id so the UI can render a per-thread badge:
+ *   ✓ Draft ready  | ⏰ Stale draft | ✓ In Gmail | ✗ No draft
+ *
+ * (Until 2026-06-10 this joined the notion_agent_drafts mirror, whose write
+ * path was no-op'd at the Notion cutoff — the join matched zero rows and
+ * every thread rendered draft-less.)
  *
  * The thread→draft join is left-outer so threads without drafts still show.
  */
 export type DraftStatus =
   | "none"            // no draft for this thread
-  | "ready"           // Pending Review or Draft Created, fresh (<48h)
-  | "stale"           // staled_at set OR last_edited_at > 48h
+  | "ready"           // Pending Review, fresh (<48h since last touch)
+  | "stale"           // untouched > 48h
   | "approved"        // status = Approved (waiting for send)
   | "sent"            // status = Sent or Draft Created (Gmail draft exists)
   | "auto_archived";  // status = Auto-archived
@@ -160,8 +164,8 @@ export async function getInboxActionsWithDrafts(limit = DEFAULT_INBOX_LIMIT): Pr
   if (threadIds.length === 0) return inbox.map(i => ({ ...i, draft: null }));
 
   const { data, error } = await sb
-    .from("notion_agent_drafts")
-    .select("id, gmail_thread_id, title, status, last_edited_at, staled_at")
+    .from("agent_drafts")
+    .select("id, gmail_thread_id, title, status, updated_at")
     .in("gmail_thread_id", threadIds);
 
   if (error) {
@@ -174,10 +178,9 @@ export async function getInboxActionsWithDrafts(limit = DEFAULT_INBOX_LIMIT): Pr
     gmail_thread_id: string;
     title: string | null;
     status: string | null;
-    last_edited_at: string | null;
-    staled_at: string | null;
+    updated_at: string | null;
   };
-  // For each thread, pick the most recent draft.
+  // For each thread, pick the most recently touched draft.
   const byThread = new Map<string, DraftRow>();
   for (const r of (data ?? []) as DraftRow[]) {
     const existing = byThread.get(r.gmail_thread_id);
@@ -185,8 +188,8 @@ export async function getInboxActionsWithDrafts(limit = DEFAULT_INBOX_LIMIT): Pr
       byThread.set(r.gmail_thread_id, r);
       continue;
     }
-    const aTs = r.last_edited_at ? new Date(r.last_edited_at).getTime() : 0;
-    const bTs = existing.last_edited_at ? new Date(existing.last_edited_at).getTime() : 0;
+    const aTs = r.updated_at ? new Date(r.updated_at).getTime() : 0;
+    const bTs = existing.updated_at ? new Date(existing.updated_at).getTime() : 0;
     if (aTs > bTs) byThread.set(r.gmail_thread_id, r);
   }
 
@@ -195,15 +198,14 @@ export async function getInboxActionsWithDrafts(limit = DEFAULT_INBOX_LIMIT): Pr
     const row = byThread.get(i.threadId);
     if (!row) return { ...i, draft: null };
 
-    const ageMs = row.last_edited_at ? now - new Date(row.last_edited_at).getTime() : null;
+    const ageMs = row.updated_at ? now - new Date(row.updated_at).getTime() : null;
     const ageHours = ageMs != null ? Math.floor(ageMs / 3_600_000) : null;
     const status: DraftStatus = (() => {
       const s = (row.status ?? "").toLowerCase();
       if (s === "auto-archived") return "auto_archived";
       if (s === "sent") return "sent";
-      if (s === "draft created") return "sent"; // Gmail draft created — equivalent to "ready in Gmail"
+      if (s === "draft created") return "sent"; // Gmail draft exists — review it there
       if (s === "approved") return "approved";
-      if (row.staled_at != null) return "stale";
       if (ageHours != null && ageHours > 48) return "stale";
       return "ready";
     })();
@@ -214,8 +216,8 @@ export async function getInboxActionsWithDrafts(limit = DEFAULT_INBOX_LIMIT): Pr
         draftId: row.id,
         status,
         title: row.title,
-        lastEditedAt: row.last_edited_at,
-        staledAt: row.staled_at,
+        lastEditedAt: row.updated_at,
+        staledAt: null,
         ageHours,
       },
     };

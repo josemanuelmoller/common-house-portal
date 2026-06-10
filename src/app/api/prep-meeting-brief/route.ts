@@ -9,8 +9,11 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { currentUser } from "@clerk/nextjs/server";
 import { adminGuardApi } from "@/lib/require-admin";
 import { generatePrepBrief, type MeetingOverride } from "@/lib/prep-brief";
+import { getHallPreferences } from "@/lib/hall-preferences";
+import { getDefaultTimezone } from "@/lib/hall-config";
 
 export const maxDuration = 60;
 
@@ -38,10 +41,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "eventId required" }, { status: 400 });
   }
 
+  // Timezone resolution: explicit body.tz > caller's Hall preferences >
+  // hall_config default. (The old behaviour silently fell back to a
+  // hardcoded Europe/London inside prep-brief, ignoring user preferences.)
+  let tz = body.tz;
+  if (!tz) {
+    try {
+      const user = await currentUser();
+      const email = user?.primaryEmailAddress?.emailAddress;
+      tz = email ? (await getHallPreferences(email)).timezone : undefined;
+    } catch { /* cron/bearer callers have no Clerk user */ }
+  }
+  if (!tz) tz = await getDefaultTimezone();
+
   try {
     const brief = await generatePrepBrief({
       eventId:         body.eventId,
-      tz:              body.tz,
+      tz,
       factsOnly:       body.factsOnly === true,
       meetingOverride: body.meetingOverride,
     });

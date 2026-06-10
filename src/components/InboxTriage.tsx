@@ -22,6 +22,16 @@ export type InboxItem = {
   gmailUrl: string;
   /** Imperative next-action line (Phase 3) or 1-line Haiku summary (legacy). */
   summary?: string | null;
+  /** Per-thread draft state from the canonical agent_drafts join. The badge
+   *  turns "you have 9 emails" into "3 already have a draft — approve them". */
+  draftStatus?: "none" | "ready" | "stale" | "approved" | "sent" | "auto_archived";
+};
+
+const DRAFT_BADGE: Partial<Record<NonNullable<InboxItem["draftStatus"]>, { label: string; tone: "ok" | "warn" }>> = {
+  ready:    { label: "✓ Draft ready", tone: "ok" },
+  approved: { label: "✓ Approved",    tone: "ok" },
+  sent:     { label: "✉ In Gmail",    tone: "ok" },
+  stale:    { label: "⏰ Stale draft", tone: "warn" },
 };
 
 const LABEL_STYLE: Record<string, string> = {
@@ -241,6 +251,22 @@ export function InboxTriage({ initialItems, initialScanned = 0 }: Props) {
                     }}
                   >
                     Unread
+                  </span>
+                )}
+                {item.draftStatus && DRAFT_BADGE[item.draftStatus] && (
+                  <span
+                    className="font-bold uppercase tracking-widest shrink-0 mt-[2px]"
+                    style={{
+                      fontFamily: "var(--font-hall-mono)",
+                      fontSize: 8,
+                      color: DRAFT_BADGE[item.draftStatus]!.tone === "ok" ? "var(--hall-ok)" : "var(--hall-warn)",
+                      background: `color-mix(in oklab, ${DRAFT_BADGE[item.draftStatus]!.tone === "ok" ? "var(--hall-ok)" : "var(--hall-warn)"} 10%, transparent)`,
+                      padding: "1px 5px",
+                      borderRadius: 100,
+                    }}
+                    title="Estado del borrador generado para este hilo"
+                  >
+                    {DRAFT_BADGE[item.draftStatus]!.label}
                   </span>
                 )}
               </div>

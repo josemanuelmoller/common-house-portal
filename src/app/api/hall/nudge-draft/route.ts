@@ -15,7 +15,7 @@ import { google } from "googleapis";
 import Anthropic from "@anthropic-ai/sdk";
 import { adminGuardApi } from "@/lib/require-admin";
 import { requireSameOriginRequest } from "@/lib/require-same-origin";
-import { createPageWithMirror } from "@/lib/notion-mirror-push";
+import { getSupabaseServerClient } from "@/lib/supabase-server";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -147,39 +147,42 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "Gmail did not return a draft id" }, { status: 502 });
   }
 
-  // Phase 2.0: also persist to notion_agent_drafts with gmail_thread_id so the
-  // /admin cross-view can show "this thread has a draft". Best-effort —
-  // failure does not block the Gmail draft creation that already succeeded.
-  const today = new Date().toISOString().slice(0, 10);
+  // Persist to canonical agent_drafts with gmail_thread_id so the Inbox
+  // cross-view can badge "this thread has a draft". (The previous mirror
+  // write via createPageWithMirror was a no-op since 2026-05-05 — the badge
+  // join never had data.) Status 'Draft Created' = the draft already sits
+  // in Gmail awaiting Jose's review there. Best-effort: failure does not
+  // block the Gmail draft creation that already succeeded.
   const draftTitle = subjectLine.replace(/^Re:\s*/i, "").slice(0, 200);
-  let mirrorDraftId: string | null = null;
+  let recordId: string | null = null;
   try {
-    const created = await createPageWithMirror({
-      table: "notion_agent_drafts",
-      fields: {
-        title:      `Reply: ${draftTitle}`,
-        draft_type: "Follow-up Email",
-        status:     "Pending Review",
-        draft_text: draftBody.slice(0, 2000),
-      },
-      mirrorOnly: {
+    const sb = getSupabaseServerClient();
+    const { data: created, error } = await sb
+      .from("agent_drafts")
+      .insert({
+        title:           `Reply: ${draftTitle}`,
+        draft_type:      "Follow-up Email",
+        status:          "Draft Created",
+        body_md:         draftBody.slice(0, 4000),
+        source_agent:    "nudge-draft",
         gmail_thread_id: threadId,
-        created_date:    today,
-      },
-      extraNotionProperties: {
-        "Source Reference": { rich_text: [{ text: { content: `Gmail thread ${threadId} · ${toEmail}` } }] },
-      },
-    });
-    if (created.ok) mirrorDraftId = created.id ?? null;
-    else console.warn(`[nudge-draft] mirror create failed: ${created.error}`);
+        payload: {
+          gmail_draft_id: draftId,
+          to_email:       toEmail,
+        },
+      })
+      .select("id")
+      .single();
+    if (error) console.warn(`[nudge-draft] agent_drafts insert failed: ${error.message}`);
+    else recordId = (created?.id as string) ?? null;
   } catch (e) {
-    console.warn(`[nudge-draft] mirror create threw: ${e instanceof Error ? e.message : String(e)}`);
+    console.warn(`[nudge-draft] agent_drafts insert threw: ${e instanceof Error ? e.message : String(e)}`);
   }
 
   return NextResponse.json({
     ok: true,
     draftId,
-    mirrorDraftId,
+    recordId,
     gmailUrl: `https://mail.google.com/mail/u/0/#drafts/${draftId}`,
   });
 }

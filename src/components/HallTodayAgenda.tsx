@@ -3,6 +3,7 @@ import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { getSelfEmails } from "@/lib/hall-self";
 import { getContactsByEmails } from "@/lib/contacts";
 import { getHallPreferences } from "@/lib/hall-preferences";
+import { logServerError } from "@/lib/debug-log";
 
 type CalRow = {
   event_id: string;
@@ -57,12 +58,63 @@ function cleanTitle(raw: string, attendees: { name: string | null }[]): string {
   return raw;
 }
 
+type OpenCommitmentLine = { direction: "mine" | "theirs"; text: string; daysOpen: number };
+
+/** Open action_items involving these attendees — real material for the
+ *  talking points instead of relationship-class guesswork. */
+async function fetchAttendeeCommitments(attendeeEmails: string[]): Promise<OpenCommitmentLine[]> {
+  if (attendeeEmails.length === 0) return [];
+  try {
+    const sb = getSupabaseServerClient();
+    const { data: people } = await sb
+      .from("people")
+      .select("id")
+      .in("email", attendeeEmails.map(e => e.toLowerCase()));
+    const ids = (people ?? []).map(p => (p as { id: string }).id);
+    if (ids.length === 0) return [];
+    const { data } = await sb
+      .from("action_items")
+      .select("intent, next_action, subject, last_motion_at")
+      .eq("status", "open")
+      .in("counterparty_contact_id", ids)
+      .order("last_motion_at", { ascending: false })
+      .limit(5);
+    const now = Date.now();
+    return ((data ?? []) as Array<{ intent: string; next_action: string | null; subject: string; last_motion_at: string }>)
+      .map(r => ({
+        direction: (r.intent === "chase" ? "theirs" : "mine") as "mine" | "theirs",
+        text: (r.next_action ?? r.subject).slice(0, 100),
+        daysOpen: Math.max(0, Math.floor((now - new Date(r.last_motion_at).getTime()) / 86_400_000)),
+      }));
+  } catch {
+    return [];
+  }
+}
+
 async function generateTalkingPoints(
+  eventId: string,
+  meetingStartIso: string,
   title: string,
   attendees: { email: string; name: string | null; classes: string[] }[],
   lastTouch: { kind: string; at: string; title: string } | null,
 ): Promise<string[] | null> {
   if (!process.env.ANTHROPIC_API_KEY) return null;
+  const sb = getSupabaseServerClient();
+
+  // Cache first — talking points are generated ONCE per meeting, not on
+  // every page load (the previous version paid a Haiku call per render and
+  // returned silent null on failure).
+  try {
+    const { data: cached } = await sb
+      .from("hall_talking_points")
+      .select("points")
+      .eq("event_id", eventId)
+      .maybeSingle();
+    if (cached?.points && Array.isArray(cached.points) && cached.points.length > 0) {
+      return cached.points as string[];
+    }
+  } catch { /* cache miss path below */ }
+
   try {
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
     const attList = attendees.map(a => {
@@ -72,9 +124,18 @@ async function generateTalkingPoints(
     const lastLine = lastTouch
       ? `Most recent prior touchpoint: ${lastTouch.kind} on ${lastTouch.at.slice(0, 10)} — "${lastTouch.title}"`
       : "No prior touchpoint recorded.";
+
+    // Real material: open commitments either party owes. A talking point that
+    // cites "you owe them the proposal from 12d ago" beats a generic opener.
+    const commitments = await fetchAttendeeCommitments(attendees.map(a => a.email));
+    const commitmentBlock = commitments.length > 0
+      ? "\n\nOpen commitments with these attendees (cite the relevant ones):\n" +
+        commitments.map(c => `- [${c.direction === "mine" ? "Jose owes them" : "they owe Jose"}, ${c.daysOpen}d open] ${c.text}`).join("\n")
+      : "";
+
     const prompt =
-      `Meeting: ${title}\n\nAttendees (non-self):\n${attList}\n\n${lastLine}\n\n` +
-      `Give 3 concise talking points Jose (the host) should raise, tailored to the attendee relationship classes. Each 8-14 words. Output only the 3 points, one per line, no numbering, no preamble.`;
+      `Meeting: ${title}\n\nAttendees (non-self):\n${attList}\n\n${lastLine}${commitmentBlock}\n\n` +
+      `Give 3 concise talking points Jose (the host) should raise. Prioritise open commitments above (close or address them); otherwise tailor to the attendee relationship classes. Each 8-14 words. Output only the 3 points, one per line, no numbering, no preamble.`;
     const msg = await anthropic.messages.create({
       model: "claude-haiku-4-5-20251001",
       max_tokens: 300,
@@ -82,8 +143,22 @@ async function generateTalkingPoints(
     });
     const text = (msg.content[0] as { type: string; text: string }).text ?? "";
     const points = text.split("\n").map(l => l.replace(/^[-*\d.)\s]+/, "").trim()).filter(Boolean).slice(0, 3);
-    return points.length > 0 ? points : null;
-  } catch {
+    if (points.length === 0) return null;
+
+    // Persist — best-effort; a cache write failure must not hide the points.
+    try {
+      await sb.from("hall_talking_points").upsert({
+        event_id: eventId,
+        points,
+        meeting_start: meetingStartIso,
+        generated_at: new Date().toISOString(),
+      }, { onConflict: "event_id" });
+    } catch { /* non-fatal */ }
+
+    return points;
+  } catch (e) {
+    // Visible failure beats a card that silently loses its talking points.
+    await logServerError("HallTodayAgenda:generateTalkingPoints", e);
     return null;
   }
 }
@@ -162,6 +237,7 @@ export async function HallTodayAgenda({ userEmail }: { userEmail?: string } = {}
   const nextStartMs = new Date(nextRow.event_start).getTime();
   const minsAway = Math.round((nextStartMs - Date.now()) / 60_000);
   const talkingPoints = minsAway < 720 ? await generateTalkingPoints(
+    nextRow.event_id, nextRow.event_start,
     cleanTitle(nextRow.event_title, nextAttendees), nextAttendees, lastTouch
   ) : null;
 

@@ -40,6 +40,7 @@ import {
   candidatesFromMeetings,
   candidatesFromCommitments,
   fetchOpenCommitmentRows,
+  fetchTaskTypeDismissPenalties,
   quickBatchCandidate,
   loopCoveredEntityIds,
 } from "@/lib/time-block-candidates";
@@ -198,13 +199,23 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    // Dismissal feedback: block types Jose keeps rejecting lose confidence
+    // until they fall under the matcher's floor — the portal learns from his
+    // decisions instead of repeating them at him.
+    const dismissPenalties = await fetchTaskTypeDismissPenalties(email);
+
     const allCands = [
       ...commitmentCands,            // evidence-backed commitments lead the pool
       ...prepCands,
       ...loopCands,
       ...oppCands,
       ...(batchCand ? [batchCand] : []),
-    ].filter(c => !suppressed.has(c.fingerprint));
+    ]
+      .filter(c => !suppressed.has(c.fingerprint))
+      .map(c => {
+        const penalty = dismissPenalties[c.task_type];
+        return penalty ? { ...c, confidence_score: Math.max(0, c.confidence_score - penalty) } : c;
+      });
 
     const matches = matchCandidatesToSlots(allCands, slots, now, MAX_SUGGESTIONS, {
       timezone:                     prefs.timezone,
@@ -223,6 +234,7 @@ export async function GET(req: NextRequest) {
         open_commitments:       openCommitments.length,
         quick_batch:            batchCand ? 1 : 0,
         suppressed_count:       suppressed.size,
+        dismiss_penalties:      Object.keys(dismissPenalties).length > 0 ? JSON.stringify(dismissPenalties) : null,
       },
     });
 

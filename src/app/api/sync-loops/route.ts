@@ -24,6 +24,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Client } from "@notionhq/client";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { withRoutineLog } from "@/lib/routine-log";
+import { getFounderOwnedPatterns } from "@/lib/hall-config";
 import {
   buildNormalizedKey,
   buildIntentKey,
@@ -79,22 +80,15 @@ function chk(prop: any): boolean { return prop?.checkbox ?? false; }
 
 // ─── Track F: Founder-owned entity detection ──────────────────────────────────
 //
-// Hardcoded map of strategic tracks that Jose leads directly.
-// Matched against entity names at sync time; matched loops get +20 score bonus.
-// Extend this list as new strategic areas are confirmed.
+// Strategic tracks that Jose leads directly, loaded once per request from
+// hall_config (key: founder_owned_patterns) — adding a new track is a config
+// row, not a deploy. Matched against entity names at sync time; matched
+// loops get +20 score bonus.
 
-const FOUNDER_OWNED_PATTERNS: RegExp[] = [
-  /\bcop\s*31\b/i,                    // COP31 project
-  /zero\s*waste\s*forum/i,            // Zero Waste Forum
-  /\bzwf\b/i,                         // ZWF Forum 2026
-  /zero\s*waste\s*districts?/i,       // Zero Waste Districts (+ Malaysia)
-  /china\s*zero\s*waste/i,            // China Zero Waste
-  /egypt.*reuse|reuse.*egypt/i,       // Egypt Program Reuse
-  /reuse\s*for\s*all/i,               // Reuse for All project
-];
+let founderPatterns: RegExp[] = [];
 
 function isFounderOwned(entityName: string): boolean {
-  return FOUNDER_OWNED_PATTERNS.some(p => p.test(entityName));
+  return founderPatterns.some(p => p.test(entityName));
 }
 
 // ─── Operator actionability filter ───────────────────────────────────────────
@@ -809,6 +803,9 @@ async function _POST(req: NextRequest) {
   if (!authCheck(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  // Founder-owned tracks from hall_config (falls back to compiled defaults).
+  founderPatterns = await getFounderOwnedPatterns();
 
   const stats: Stats = {
     upserted: 0,

@@ -73,7 +73,8 @@ import { HallLiveClock } from "@/components/HallLiveClock";
 import { HallPipelineHealth } from "@/components/HallPipelineHealth";
 import { SafeServerSection } from "@/components/SafeServerSection";
 import { getAgentsOnlineCount } from "@/lib/hall-agents-count";
-import { getInboxActions, countOpenGmailActions, getCoSActions } from "@/lib/action-items";
+import { getInboxActionsWithDrafts, countOpenGmailActions, getCoSActions } from "@/lib/action-items";
+import { fetchOpenCommitmentRows, inferEffort, type CommitmentRow } from "@/lib/time-block-candidates";
 import { getObjectivesForYear } from "@/lib/plan";
 import { logServerError } from "@/lib/debug-log";
 
@@ -258,12 +259,88 @@ function matchOpportunity(
   return null;
 }
 
+/**
+ * Evidence-backed focus candidate from open commitments — the same pool that
+ * drives Suggested Time Blocks. A session-sized commitment (or a focused one
+ * under deadline pressure) extracted from Jose's own meetings beats heuristic
+ * task scoring: the "why" is citable, not inferred.
+ */
+function commitmentFocusCandidate(
+  commitments: CommitmentRow[],
+  now: number,
+): { rec: FocusRecommendation; score: number } | null {
+  const BLOCK_INTENTS = new Set(["deliver", "decide", "approve", "review"]);
+  let best: { row: CommitmentRow; score: number; effort: string; daysOpen: number; deadlineDays: number | null } | null = null;
+
+  for (const r of commitments) {
+    if (!BLOCK_INTENTS.has(r.intent)) continue;
+    const effort = r.effort === "quick" || r.effort === "focused" || r.effort === "session"
+      ? r.effort
+      : inferEffort(r.intent, `${r.next_action ?? ""} ${r.subject}`);
+    if (effort === "quick") continue;
+
+    const sinceIso = r.first_surfaced_at ?? r.last_motion_at;
+    const daysOpen = Math.max(0, Math.floor((now - new Date(sinceIso).getTime()) / 86_400_000));
+    const deadlineDays = r.deadline
+      ? Math.floor((new Date(r.deadline).getTime() - now) / 86_400_000)
+      : null;
+
+    // Focused work without pressure is block-scheduling material, not Focus.
+    if (effort === "focused" && (deadlineDays === null || deadlineDays > 7) && daysOpen < 10) continue;
+
+    let score = 40;
+    if (effort === "session") score += 20;
+    if (deadlineDays !== null) {
+      if (deadlineDays < 0)       score += 25;
+      else if (deadlineDays <= 2) score += 20;
+      else if (deadlineDays <= 7) score += 10;
+    }
+    score += Math.min(15, daysOpen);
+
+    if (!best || score > best.score) best = { row: r, score, effort, daysOpen, deadlineDays };
+  }
+
+  if (!best) return null;
+  const { row, effort, daysOpen, deadlineDays } = best;
+  const title = (row.next_action ?? row.subject).trim().replace(/\.$/, "");
+  const who = row.counterparty ? ` — ${row.counterparty} is waiting` : "";
+
+  const whyParts: string[] = [];
+  whyParts.push(
+    daysOpen <= 1
+      ? "You committed to this in a recent meeting."
+      : `You committed to this ${daysOpen}d ago — extracted from your own meetings.`,
+  );
+  if (deadlineDays !== null) {
+    whyParts.push(
+      deadlineDays < 0 ? `${-deadlineDays}d past due.`
+      : deadlineDays === 0 ? "Due today."
+      : `Due in ${deadlineDays}d.`,
+    );
+  }
+
+  const links: FocusLink[] = [];
+  if (row.source_url) links.push({ label: "Open source", url: row.source_url, style: "primary" });
+
+  return {
+    score: best.score,
+    rec: {
+      action:       `${title}${who}.`,
+      timeEstimate: effort === "session" ? "90 min" : "45 min",
+      whyToday:     whyParts.join(" "),
+      links,
+      winReason:    `open commitment (${effort}, ${daysOpen}d open) — evidence-backed`,
+    },
+  };
+}
+
 function computeFocusRecommendation(
   cosTasks: CoSTask[],
   inboxItems: InboxItem[],
   agentDrafts: { id: string; title: string; notionUrl: string; opportunityId: string | null }[],
   strategicObjectives: { id: string; title: string; area: string; tier: string }[] = [],
   opportunities: { id: string; name: string; stage: string; followUpStatus: string; orgName: string; type: string; score: number | null }[] = [],
+  openCommitments: CommitmentRow[] = [],
 ): FocusRecommendation | null {
   const now = Date.now();
 
@@ -317,22 +394,27 @@ function computeFocusRecommendation(
     let score = 1; // base: every non-suppressed task qualifies; scoring picks the best
     const reasons: string[] = [];
 
-    // ── PHASE 13 STEP 1 — Observation penalty ─────────────────────────
-    // Items shaped like "monitor X" / "evaluate Y" with no counterparty
-    // or link are CONTEXT, not actionable. Drop hard so they don't
-    // dominate Focus when their score is incidentally high.
-    if (isObservationShaped(task)) {
-      score -= 25;
-      reasons.push("(observation-shaped: -25)");
-    }
-
     // ── PHASE 13 STEP 2 — Strategic objective leverage ────────────────
+    // (computed before the observation penalty so the penalty can spare
+    // objective-linked monitoring work)
     const matchedObj = matchObjective(task, strategicObjectives);
     if (matchedObj) {
       const tierBoost: Record<string, number> = { high: 30, mid: 15, low: 5 };
       const boost = tierBoost[matchedObj.tier] ?? 0;
       score += boost;
       reasons.push(`tier-${matchedObj.tier} objective`);
+    }
+
+    // ── PHASE 13 STEP 1 — Observation penalty ─────────────────────────
+    // Items shaped like "monitor X" / "evaluate Y" with no counterparty
+    // or link are CONTEXT, not actionable. Drop hard so they don't
+    // dominate Focus when their score is incidentally high.
+    // Softened (2026-06-10): monitoring tied to a strategic objective or
+    // founder-owned track IS Jose's job — those keep their score.
+    const isFounderOwnedTask = task.signalReason?.startsWith("Founder-owned") ?? false;
+    if (isObservationShaped(task) && !matchedObj && !isFounderOwnedTask) {
+      score -= 25;
+      reasons.push("(observation-shaped: -25)");
     }
 
     // ── PHASE 13 STEP 3 — Active opportunity (revenue impact) ─────────
@@ -403,7 +485,12 @@ function computeFocusRecommendation(
     });
   }
 
+  // Evidence-backed commitments compete with heuristic CoS scoring on the
+  // same scale — a real "you said you'd do this" beats an inferred priority.
+  const commitmentFocus = commitmentFocusCandidate(openCommitments, now);
+
   if (candidates.length === 0) {
+    if (commitmentFocus) return commitmentFocus.rec;
     // Fallback: urgent inbox item
     const urgentInbox = inboxItems.find(i => i.label === "Urgent");
     if (urgentInbox) {
@@ -421,6 +508,9 @@ function computeFocusRecommendation(
   }
 
   candidates.sort((a, b) => b.score - a.score);
+  if (commitmentFocus && commitmentFocus.score > candidates[0].score) {
+    return commitmentFocus.rec;
+  }
   const { task, winReason, matchedObjective, matchedOpportunity, linkedDraft } = candidates[0];
 
   const hasExplicitPending = !!task.pendingAction
@@ -668,10 +758,16 @@ function QuietRow({ label, note, action }: {
 async function fetchInboxServer(): Promise<{ items: InboxItem[]; total_scanned: number }> {
   try {
     const [items, total] = await Promise.all([
-      getInboxActions(20),
+      getInboxActionsWithDrafts(20),
       countOpenGmailActions(),
     ]);
-    return { items, total_scanned: total };
+    // Surface per-thread draft state so a thread with an agent draft reads
+    // "approve it" instead of "go write a reply".
+    const withBadges: InboxItem[] = items.map(i => ({
+      ...i,
+      draftStatus: i.draft?.status ?? undefined,
+    }));
+    return { items: withBadges, total_scanned: total };
   } catch (err) {
     console.error("[fetchInboxServer] action_items read failed:", err);
     return { items: [], total_scanned: 0 };
@@ -863,8 +959,15 @@ export default async function AdminPage({ searchParams }: { searchParams?: Promi
   const dormantRelationships = coldRelationships.filter(r => r.warmth === "Dormant");
   const coldOnly             = coldRelationships.filter(r => r.warmth === "Cold");
 
-  // ── Focus recommendation — scored selection from CoS tasks + inbox fallback
-  // Phase 13 — strategic objectives + active opportunities now feed scoring.
+  // ── Focus recommendation — scored selection from CoS tasks + open
+  // commitments (evidence-backed, same pool as Suggested Time Blocks) +
+  // inbox fallback. Phase 13 — objectives + opportunities feed scoring.
+  let openCommitmentsForFocus: CommitmentRow[] = [];
+  try {
+    openCommitmentsForFocus = await fetchOpenCommitmentRows(30);
+  } catch (e) {
+    await logServerError("admin/page:loader:fetchOpenCommitmentRows", e);
+  }
   const focusOpportunities = [...opportunities.ch, ...opportunities.portfolio];
   const focusRec = computeFocusRecommendation(
     cosTasks,
@@ -872,6 +975,7 @@ export default async function AdminPage({ searchParams }: { searchParams?: Promi
     agentDrafts,
     strategicObjectives.map(o => ({ id: o.id, title: o.title, area: o.area, tier: o.tier })),
     focusOpportunities,
+    openCommitmentsForFocus,
   );
   // focusSuggestion: top CoS task with imminent meeting (≤7 days), used in Focus of the Day section
   const focusSuggestion = cosTasks.find(task => {
@@ -942,6 +1046,44 @@ export default async function AdminPage({ searchParams }: { searchParams?: Promi
           }}
         >
         <div className="px-9 py-6 space-y-7" style={{ background: "var(--hall-paper-0)" }}>
+
+          {/* ── 0.5 Morning brief — the whole day in one line ─────────────
+              Counts derived from data already loaded for the sections below;
+              the Hall should be readable in 60 seconds before any scrolling. */}
+          {(() => {
+            const sessionWork = openCommitmentsForFocus.filter(r => {
+              if (!["deliver", "decide", "approve", "review"].includes(r.intent)) return false;
+              const eff = r.effort === "quick" || r.effort === "focused" || r.effort === "session"
+                ? r.effort
+                : inferEffort(r.intent, `${r.next_action ?? ""} ${r.subject}`);
+              return eff !== "quick";
+            }).length;
+            const quickSweep = openCommitmentsForFocus.filter(r => {
+              if (r.intent === "reply") return false;
+              const eff = r.effort === "quick" || r.effort === "focused" || r.effort === "session"
+                ? r.effort
+                : inferEffort(r.intent, `${r.next_action ?? ""} ${r.subject}`);
+              return eff === "quick";
+            }).length;
+            const inboxN = inboxData.items.length;
+            const inboxWithDraft = inboxData.items.filter(i =>
+              i.draftStatus === "ready" || i.draftStatus === "approved" || i.draftStatus === "sent"
+            ).length;
+            const parts: string[] = [];
+            parts.push(focusRec ? "1 focus" : "sin focus");
+            if (sessionWork > 0) parts.push(`${sessionWork} trabajo${sessionWork === 1 ? "" : "s"} de sesión`);
+            if (inboxN > 0) parts.push(`${inboxN} inbox${inboxWithDraft > 0 ? ` (${inboxWithDraft} con borrador)` : ""}`);
+            if (quickSweep > 0) parts.push(`${quickSweep} rápidos para barrer`);
+            if (parts.length <= 1 && inboxN === 0) parts.push("día despejado");
+            return (
+              <p
+                className="uppercase tracking-[0.08em]"
+                style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--hall-muted-2)" }}
+              >
+                ☀ HOY: {parts.join(" · ")}
+              </p>
+            );
+          })()}
 
           {/* ─── K-v2 primary layout (TODAY tab) ───────────────────────────
               Narrative left: Focus hero → Suggested blocks → Inbox → Commitments.

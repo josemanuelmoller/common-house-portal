@@ -609,3 +609,45 @@ export async function loopCoveredEntityIds(): Promise<Set<string>> {
   }
   return out;
 }
+
+// ─── Dismissal feedback loop ─────────────────────────────────────────────────
+
+/**
+ * Per-task-type confidence penalty learned from Jose's own dismissals.
+ * If a block type gets dismissed most of the time over the last 30 days
+ * (minimum 5 decisions so one bad week doesn't swing it), its candidates
+ * lose up to 20 confidence points — chronically rejected types sink below
+ * the matcher's confidence floor on their own, without a human retuning
+ * weights. Accepting blocks of that type heals the penalty symmetrically.
+ */
+export async function fetchTaskTypeDismissPenalties(
+  userEmail: string,
+): Promise<Record<string, number>> {
+  const out: Record<string, number> = {};
+  try {
+    const sb = getSupabaseServerClient();
+    const since = new Date(Date.now() - 30 * 86_400_000).toISOString();
+    const { data } = await sb
+      .from("suggested_time_blocks")
+      .select("task_type, status")
+      .eq("user_email", userEmail)
+      .in("status", ["dismissed", "accepted"])
+      .gte("generated_at", since)
+      .limit(500);
+    const stats = new Map<string, { dismissed: number; total: number }>();
+    for (const r of (data ?? []) as Array<{ task_type: string; status: string }>) {
+      const s = stats.get(r.task_type) ?? { dismissed: 0, total: 0 };
+      s.total++;
+      if (r.status === "dismissed") s.dismissed++;
+      stats.set(r.task_type, s);
+    }
+    for (const [taskType, s] of stats.entries()) {
+      if (s.total < 5) continue;                      // not enough signal yet
+      const rate = s.dismissed / s.total;
+      if (rate >= 0.5) out[taskType] = Math.round(rate * 20);
+    }
+  } catch {
+    // Feedback is an optimization — never let it break generation.
+  }
+  return out;
+}

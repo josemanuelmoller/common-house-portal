@@ -18,7 +18,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { google } from "googleapis";
 import { adminGuardApi } from "@/lib/require-admin";
 import { notion } from "@/lib/notion";
-import { applyMirrorEdit, pushPending } from "@/lib/notion-mirror-push";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { recordProposalOutcome } from "@/lib/proposal-outcomes";
 import { currentUser } from "@clerk/nextjs/server";
@@ -52,8 +51,19 @@ function buildRawEmail(opts: {
   return Buffer.from(lines.join("\r\n")).toString("base64url");
 }
 
-async function resolveRecipientFromNotion(relatedEntityId: string | null): Promise<string | null> {
+async function resolveRecipient(relatedEntityId: string | null): Promise<string | null> {
   if (!relatedEntityId) return null;
+  // Supabase canonical first
+  try {
+    const sb = getSupabaseServerClient();
+    const { data } = await sb
+      .from("people")
+      .select("email")
+      .eq("notion_id", relatedEntityId)
+      .maybeSingle();
+    if (data?.email) return data.email as string;
+  } catch { /* fall through to Notion */ }
+  // Notion read fallback (tolerated read-only until Phase 6)
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const page = await notion.pages.retrieve({ page_id: relatedEntityId }) as any;
@@ -73,11 +83,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "draftId required" }, { status: 400 });
   }
 
-  // 1. Load draft from Supabase mirror (faster than Notion + has gmail_thread_id)
+  // 1. Load draft from CANONICAL agent_drafts. (The previous read against the
+  //    notion_agent_drafts mirror — frozen since the cutoff — meant this route
+  //    404'd for every draft created after 2026-05-05.)
   const sb = getSupabaseServerClient();
   const { data: draftRow, error: loadErr } = await sb
-    .from("notion_agent_drafts")
-    .select("id, title, draft_type, status, draft_text, related_entity_id, gmail_thread_id")
+    .from("agent_drafts")
+    .select("id, title, draft_type, status, body_md, target_person_notion_id, gmail_thread_id, payload")
     .eq("id", draftId)
     .maybeSingle();
   if (loadErr || !draftRow) {
@@ -92,11 +104,21 @@ export async function POST(req: NextRequest) {
     title: string | null;
     draft_type: string | null;
     status: string | null;
-    draft_text: string | null;
-    related_entity_id: string | null;
+    body_md: string | null;
+    target_person_notion_id: string | null;
     gmail_thread_id: string | null;
+    payload: { related_entity_id?: string | null } | null;
   };
-  const draft = draftRow as Row;
+  const row = draftRow as Row;
+  const draft = {
+    id: row.id,
+    title: row.title,
+    draft_type: row.draft_type,
+    status: row.status,
+    draft_text: row.body_md,
+    related_entity_id: row.payload?.related_entity_id ?? row.target_person_notion_id ?? null,
+    gmail_thread_id: row.gmail_thread_id,
+  };
 
   if (!["Follow-up Email", "Check-in Email"].includes(draft.draft_type ?? "")) {
     return NextResponse.json({
@@ -108,15 +130,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, reason: "Draft text is empty." });
   }
 
-  // 2. Mark Approved (mirror first)
-  const approveResult = await applyMirrorEdit({
-    table:   "notion_agent_drafts",
-    id:      draftId,
-    changes: { status: "Approved" },
-  });
-  if (!approveResult.ok) {
+  // 2. Mark Approved (canonical)
+  const { error: approveErr } = await sb
+    .from("agent_drafts")
+    .update({ status: "Approved", approved_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+    .eq("id", draftId);
+  if (approveErr) {
     return NextResponse.json(
-      { ok: false, error: "Mirror approve failed", detail: approveResult.error },
+      { ok: false, error: "Approve failed", detail: approveErr.message },
       { status: 500 },
     );
   }
@@ -131,9 +152,16 @@ export async function POST(req: NextRequest) {
   }
 
   const fromEmail = process.env.GMAIL_USER_EMAIL ?? "me";
-  const recipient = await resolveRecipientFromNotion(draft.related_entity_id);
-  const to        = recipient ?? fromEmail;
-  const subject   = draft.title ?? "Reply";
+  const recipient = await resolveRecipient(draft.related_entity_id);
+  // Fail loud — never silently address the email to Jose himself.
+  if (!recipient) {
+    return NextResponse.json({
+      ok: false,
+      reason: "No se pudo resolver el destinatario de este borrador. Asigna un contacto antes de enviar.",
+    }, { status: 422 });
+  }
+  const to      = recipient;
+  const subject = draft.title ?? "Reply";
   const sendMode  = process.env.GMAIL_SEND_MODE ?? "draft";
 
   // For threaded replies, fetch In-Reply-To / References headers from the
@@ -187,14 +215,16 @@ export async function POST(req: NextRequest) {
     }, { status: 502 });
   }
 
-  // 4. Mark Sent (or Draft Created)
+  // 4. Mark Sent (or Draft Created) — canonical
   const newStatus = sendMode === "direct" ? "Sent" : "Draft Created";
-  const sentResult = await applyMirrorEdit({
-    table:   "notion_agent_drafts",
-    id:      draftId,
-    changes: { status: newStatus },
-  });
-  if (sentResult.ok) await pushPending("notion_agent_drafts", draftId);
+  const { error: sentErr } = await sb
+    .from("agent_drafts")
+    .update({ status: newStatus, updated_at: new Date().toISOString() })
+    .eq("id", draftId);
+  if (sentErr) {
+    // Email already left the building — log, don't fail the user.
+    console.warn("[approve-and-send-draft] status update failed:", sentErr.message);
+  }
 
   // 5. Record proposal_outcome (fire-and-forget)
   const user = await currentUser();
