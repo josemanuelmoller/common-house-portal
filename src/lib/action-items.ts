@@ -35,6 +35,27 @@ export type InboxActionView = {
 
 const DEFAULT_INBOX_LIMIT = 20;
 
+/**
+ * Build a Gmail web URL that opens the specific thread regardless of which
+ * Google account is currently default in the user's browser.
+ *
+ *  - `#all/<threadId>` (not `#inbox/<threadId>`) so the link works even if
+ *    the thread has been archived or moved out of the Inbox label.
+ *  - `?authuser=<email>` (not `u/0/`) so Gmail switches to the mailbox that
+ *    actually owns the thread. Without this, a u/0 URL silently falls back
+ *    to the user's first signed-in account's inbox when the threadId is
+ *    not visible there.
+ *
+ * Falls back to `u/0` if GMAIL_USER_EMAIL is not set (e.g. local dev).
+ */
+function buildGmailThreadUrl(threadId: string): string {
+  const email = process.env.GMAIL_USER_EMAIL || "";
+  const accountSeg = email
+    ? `?authuser=${encodeURIComponent(email)}`
+    : "u/0/";
+  return `https://mail.google.com/mail/${accountSeg}#all/${threadId}`;
+}
+
 // ─── Reads ────────────────────────────────────────────────────────────────
 
 /**
@@ -117,9 +138,7 @@ export async function getInboxActions(limit = DEFAULT_INBOX_LIMIT): Promise<Inbo
       isUnread: score >= 70,
       label,
       reason: r.subject,
-      gmailUrl: r.source_id
-        ? `https://mail.google.com/mail/u/0/#all/${r.source_id}`
-        : (r.source_url ?? ""),
+      gmailUrl: r.source_id ? buildGmailThreadUrl(r.source_id) : (r.source_url ?? ""),
       summary: nextAction || null,
     };
   });

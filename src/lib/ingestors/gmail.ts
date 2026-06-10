@@ -424,10 +424,23 @@ async function fetchThreadsSince(
       toEmails: parseEmailList(toRaw),
       ccEmails: parseEmailList(ccRaw),
       snippet: (last.snippet ?? "").slice(0, 280),
-      permalink: `https://mail.google.com/mail/u/0/#all/${threadId}`,
+      permalink: gmailPermalink(threadId),
     });
   }
   return out;
+}
+
+/**
+ * Build a Gmail web URL that opens the thread regardless of label, and
+ * routes Gmail to the mailbox that owns it (not the browser's u/0).
+ * Mirrors buildGmailThreadUrl() in src/lib/action-items.ts.
+ */
+function gmailPermalink(threadId: string): string {
+  const email = process.env.GMAIL_USER_EMAIL || "";
+  const accountSeg = email
+    ? `?authuser=${encodeURIComponent(email)}`
+    : "u/0/";
+  return `https://mail.google.com/mail/${accountSeg}#all/${threadId}`;
 }
 
 function parseEmail(raw: string): string {
