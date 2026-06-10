@@ -78,6 +78,7 @@ import { fetchOpenCommitmentRows, inferEffort, type CommitmentRow } from "@/lib/
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { HallDecisionQueue } from "@/components/HallDecisionQueue";
 import { HallPitchQueue, type HallPitch } from "@/components/HallPitchQueue";
+import { HallRevenueCard } from "@/components/HallRevenueCard";
 import { getObjectivesForYear } from "@/lib/plan";
 import { logServerError } from "@/lib/debug-log";
 
@@ -1364,6 +1365,15 @@ export default async function AdminPage({ searchParams }: { searchParams?: Promi
               <HallSection title="Today's " flourish="agenda">
                 <Suspense fallback={<HallSkeleton lines={6} />}>
                   <SafeServerSection name="HallTodayAgenda" render={() => HallTodayAgenda({ userEmail: adminUser.primaryEmailAddress?.emailAddress ?? "" })} />
+                </Suspense>
+              </HallSection>
+
+              {/* ── Revenue — el CFO en el pasillo: % de meta, cobrado vs
+                  facturado (todo en USD), próxima factura por vencer. Datos
+                  de revenue_events (sync Xero nocturno). */}
+              <HallSection title="Revenue">
+                <Suspense fallback={<HallSkeleton lines={3} />}>
+                  <SafeServerSection name="HallRevenueCard" render={() => HallRevenueCard()} />
                 </Suspense>
               </HallSection>
 
