@@ -24,6 +24,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { withRoutineLog } from "@/lib/routine-log";
+import { syncXeroRevenue } from "@/lib/xero-sync";
 
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
@@ -283,6 +284,30 @@ async function _POST(req: NextRequest) {
 
   const db = supabaseAdmin();
 
+  // Pull fresh actuals from Xero before recomputing revenue KPIs, so the
+  // `revenue_sum` handler reads up-to-date invoiced/paid figures. A Xero failure
+  // must NOT block KPI computation — degrade visibly and continue. `not_connected`
+  // is the expected state until José completes /api/xero/auth, so log it quietly.
+  let xero: Pick<Awaited<ReturnType<typeof syncXeroRevenue>>, "ok" | "reason" | "fetched" | "upserted" | "errors"> = {
+    ok: false,
+    reason: "skipped",
+    fetched: 0,
+    upserted: 0,
+    errors: [],
+  };
+  try {
+    const r = await syncXeroRevenue();
+    xero = { ok: r.ok, reason: r.reason, fetched: r.fetched, upserted: r.upserted, errors: r.errors };
+    if (!r.ok && r.reason !== "not_connected") {
+      console.warn(`[compute-kpi] xero sync degraded: reason=${r.reason ?? "?"} errors=${r.errors.join("; ")}`);
+    } else if (r.ok) {
+      console.log(`[compute-kpi] xero sync ok: fetched=${r.fetched} upserted=${r.upserted}`);
+    }
+  } catch (e) {
+    xero = { ok: false, reason: "threw", fetched: 0, upserted: 0, errors: [e instanceof Error ? e.message : String(e)] };
+    console.warn(`[compute-kpi] xero sync threw: ${e instanceof Error ? e.message : String(e)}`);
+  }
+
   const { data: objectives, error: objErr } = await db
     .from("strategic_objectives")
     .select("id, metric_type, metric_params, current_value, status")
@@ -336,7 +361,7 @@ async function _POST(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ ok: true, at: nowIso, stats });
+  return NextResponse.json({ ok: true, at: nowIso, xero, stats });
 }
 
 // Allow GET for easy cron-without-body triggers
