@@ -70,6 +70,7 @@ import { getDismissedDraftIds } from "@/lib/hall-draft-dismissals";
 import { SuggestedTimeBlocks } from "@/components/SuggestedTimeBlocks";
 import { HallManualTriggers } from "@/components/HallManualTriggers";
 import { HallLiveClock } from "@/components/HallLiveClock";
+import { HallPipelineHealth } from "@/components/HallPipelineHealth";
 import { SafeServerSection } from "@/components/SafeServerSection";
 import { getAgentsOnlineCount } from "@/lib/hall-agents-count";
 import { getInboxActions, countOpenGmailActions, getCoSActions } from "@/lib/action-items";
@@ -920,6 +921,14 @@ export default async function AdminPage({ searchParams }: { searchParams?: Promi
             agentsOnline={agentsOnline ?? undefined}
           />
         </header>
+
+        {/* Pipeline health — quiet micro-line when OK, visible strip when a
+            source stalls or routines error. Self-contained: never throws. */}
+        <div className="px-9 pt-2">
+          <Suspense fallback={null}>
+            <HallPipelineHealth />
+          </Suspense>
+        </div>
 
         <HallTabs
           badges={{

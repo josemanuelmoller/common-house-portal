@@ -83,13 +83,23 @@ export async function POST(req: NextRequest) {
     .eq("entity_id", entityId)
     .is("resolved_at", null);
 
-  // Proxy to existing skill route if mapped + opportunityId present.
+  // Build the skill-specific proxy body. Each skill has its own contract:
+  //   draft-checkin  → { personId }   (a check-in needs a human recipient)
+  //   draft-followup → { opportunityId }
+  // The old code sent { opportunityId } to draft-checkin, which requires
+  // personId — the inner route 400'd, the catch swallowed it, and the user
+  // saw a success toast for a draft that never existed.
   const skillPath = SKILL_MAP[act];
+  const personId = payload && typeof payload.personId === "string" ? payload.personId : undefined;
   const opportunityId = (payload && typeof payload.opportunityId === "string")
     ? payload.opportunityId
     : (entityType === "opportunity" ? entityId : undefined);
 
-  if (skillPath && opportunityId) {
+  let proxyBody: Record<string, unknown> | null = null;
+  if (act === "draft_checkin" && personId) proxyBody = { personId };
+  else if (act === "draft_followup" && opportunityId) proxyBody = { opportunityId };
+
+  if (skillPath && proxyBody) {
     try {
       const origin = new URL(req.url).origin;
       const proxied = await fetch(`${origin}${skillPath}`, {
@@ -98,7 +108,7 @@ export async function POST(req: NextRequest) {
           "Content-Type": "application/json",
           cookie: req.headers.get("cookie") ?? "",
         },
-        body: JSON.stringify({ opportunityId }),
+        body: JSON.stringify(proxyBody),
       });
       if (proxied.ok) {
         const j = await proxied.json().catch(() => ({}));
@@ -107,21 +117,27 @@ export async function POST(req: NextRequest) {
         await snoozeEntity(entityType, entityId, 1, `drafted:${act}`, email);
         return NextResponse.json({ ok: true, queued: true, draftId: j.draftId ?? null });
       }
-      // Proxy failed → fall through to honest fallback
+      const errBody = await proxied.json().catch(() => ({} as { error?: string }));
+      return NextResponse.json({
+        ok: false,
+        error: "draft_failed",
+        note: `El skill respondió ${proxied.status}${errBody?.error ? ` — ${errBody.error}` : ""}. Nada se generó.`,
+      }, { status: 422 });
     } catch (e) {
       console.error("[pipeline-state/draft] proxy error:", e);
+      return NextResponse.json({
+        ok: false,
+        error: "draft_failed",
+        note: "No se pudo contactar el skill de borradores. Nada se generó.",
+      }, { status: 422 });
     }
   }
 
-  // Honest fallback: log the click + snooze 1d. Tells the user "we heard
-  // you, we won't nag until tomorrow" without faking a draft.
-  await snoozeEntity(entityType, entityId, 1, `draft_requested:${act}`, email);
-  return NextResponse.json({
-    ok: true,
-    logged: true,
-    snoozedDays: 1,
-    note: skillPath
-      ? "Skill proxy unavailable (no opportunityId for org-level row). Logged + snoozed 1d."
-      : `No skill wired for ${act} yet. Logged + snoozed 1d.`,
-  });
+  // Honest refusal — no silent snooze, no fake success. The click is already
+  // recorded in the attention_log detail above for the audit trail.
+  const note =
+    act === "draft_checkin"
+      ? "Esta fila no tiene contacto vinculado — usa «Link contact» para asociar una persona primero."
+      : `No hay skill conectado para ${act} todavía. Nada se generó.`;
+  return NextResponse.json({ ok: false, error: "skill_unavailable", note }, { status: 422 });
 }

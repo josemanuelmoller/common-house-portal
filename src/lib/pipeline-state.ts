@@ -39,7 +39,7 @@ export type Resolution =
 
 export type CTA = {
   label: string;
-  action: "draft_followup" | "draft_checkin" | "open_prep" | "open_review" | "draft_proposal";
+  action: "draft_followup" | "draft_checkin" | "open_prep" | "open_review" | "draft_proposal" | "link_contact";
   payload?: Record<string, unknown>;
 };
 
@@ -161,6 +161,8 @@ type TopicsRow = { org_notion_id: string; topics: Array<{ label: string }> };
 
 type PersonActivityRow = {
   org_notion_id: string;
+  notion_id: string | null;
+  full_name: string | null;
   last_email_at: string | null;
   last_transcript_at: string | null;
   last_email_subject: string | null;
@@ -216,7 +218,7 @@ export async function getPipelineState(): Promise<PipelineStateResult> {
     orgIdsArr.length === 0
       ? Promise.resolve({ data: [] })
       : sb.from("people")
-          .select("org_notion_id, last_email_at, last_transcript_at, last_email_subject")
+          .select("org_notion_id, notion_id, full_name, last_email_at, last_transcript_at, last_email_subject")
           .in("org_notion_id", orgIdsArr)
           .not("org_notion_id", "is", null),
   ]);
@@ -506,7 +508,7 @@ export async function getPipelineState(): Promise<PipelineStateResult> {
         (now - new Date(s.lastSignalAt).getTime()) < NEW_SIGNAL_WINDOW_HOURS * 3_600_000
       : false;
 
-    const cta = buildPrimaryCTA(s);
+    const cta = buildPrimaryCTA(s, peopleAct);
     const ctaResolveLabel = buildResolveLabel(s.reason);
     const url = s.oppRow?.review_url ?? null;
 
@@ -808,7 +810,21 @@ function computeTrend(people: PersonActivityRow[], now: number): Trend {
   return "steady";
 }
 
-function buildPrimaryCTA(s: { reason: Reason; oppRow?: OppRow; orgRow?: OrgRow; entityId: string; entityType: "organization" | "opportunity" }): CTA {
+/** Most recently active linked person — the natural recipient for a check-in. */
+function pickBestPerson(peopleAct: PersonActivityRow[]): PersonActivityRow | null {
+  const withId = peopleAct.filter(p => p.notion_id);
+  if (withId.length === 0) return null;
+  return [...withId].sort((a, b) => {
+    const ta = Math.max(a.last_email_at ? Date.parse(a.last_email_at) : 0, a.last_transcript_at ? Date.parse(a.last_transcript_at) : 0);
+    const tb = Math.max(b.last_email_at ? Date.parse(b.last_email_at) : 0, b.last_transcript_at ? Date.parse(b.last_transcript_at) : 0);
+    return tb - ta;
+  })[0];
+}
+
+function buildPrimaryCTA(
+  s: { reason: Reason; oppRow?: OppRow; orgRow?: OrgRow; entityId: string; entityType: "organization" | "opportunity"; orgNotionId: string | null },
+  peopleAct: PersonActivityRow[],
+): CTA {
   if (s.reason === "healthy") {
     // No active push — the row is informational. The client renderer
     // suppresses the button entirely when action === 'open_review'.
@@ -818,7 +834,28 @@ function buildPrimaryCTA(s: { reason: Reason; oppRow?: OppRow; orgRow?: OrgRow; 
     return { label: "Open prep brief", action: "open_prep", payload: { entityId: s.entityId } };
   }
   if (s.reason === "drift") {
-    return { label: "Draft check-in", action: "draft_checkin", payload: { entityId: s.entityId, entityType: s.entityType } };
+    // A check-in needs a recipient. With linked people, address the most
+    // recently active one (draft-checkin requires personId — the old payload
+    // without it could never produce a draft). Without linked people, the
+    // root cause IS the missing link: offer the fix, not a dead-end draft.
+    const best = pickBestPerson(peopleAct);
+    if (!best) {
+      return {
+        label: "Link contact",
+        action: "link_contact",
+        payload: { entityId: s.entityId, entityType: s.entityType, orgNotionId: s.orgNotionId },
+      };
+    }
+    return {
+      label: "Draft check-in",
+      action: "draft_checkin",
+      payload: {
+        entityId: s.entityId,
+        entityType: s.entityType,
+        personId: best.notion_id,
+        personName: best.full_name,
+      },
+    };
   }
   if (s.reason === "ball_with_them") {
     return { label: "Draft reminder", action: "draft_followup", payload: { entityId: s.entityId, entityType: s.entityType, kind: "chase" } };

@@ -1,15 +1,20 @@
 /**
  * POST /api/reap-stale-drafts
  *
- * Phase 2.0 Step 4 — daily cleanup of stale agent drafts.
+ * Daily cleanup of stale agent drafts — CANONICAL `agent_drafts` table.
  *
- * Two-tier model:
- *   - Drafts in non-terminal status (Pending Review, Revision Requested,
- *     Draft Created) untouched for 48h+: set staled_at = now()
- *   - Drafts already staled for 5d+: status = 'Auto-archived' (preserves
- *     the row; UI hides them from the active list)
+ * (Until 2026-06-10 this swept the `notion_agent_drafts` MIRROR, which froze
+ * at the Notion cutoff — so the canonical queue accumulated a 37-draft
+ * graveyard going back to 2026-05-06 while the reaper polished a dead table.)
  *
- * Approved status is NOT staled — those are waiting for an explicit Send.
+ * Tier model (canonical has no staled_at column; updated_at is the clock):
+ *   - Pending Review / Revision Requested untouched for 14d+ → Auto-archived.
+ *     A draft nobody approved in two weeks is dead — keeping it "pending"
+ *     just buries the fresh ones.
+ *   - Approved / Draft Created untouched for 21d+ → Auto-archived.
+ *     Approved-but-never-sent for three weeks means the moment passed.
+ *
+ * Rows are preserved (status flip only); nothing is deleted.
  *
  * Auth: x-agent-key OR Authorization: Bearer <CRON_SECRET>.
  * Cron: 03:30 UTC daily (vercel.json).
@@ -19,10 +24,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { withRoutineLog } from "@/lib/routine-log";
 
-const STALE_AFTER_HOURS = 48;
-const ARCHIVE_AFTER_DAYS_STALED = 5;
-
-const STALEABLE_STATUSES = ["Pending Review", "Revision Requested", "Draft Created"];
+const PENDING_ARCHIVE_DAYS = 14;
+const APPROVED_ARCHIVE_DAYS = 21;
 
 function isAuthorized(req: NextRequest): boolean {
   const expected = process.env.CRON_SECRET;
@@ -34,90 +37,49 @@ function isAuthorized(req: NextRequest): boolean {
   return false;
 }
 
+async function archiveOlderThan(
+  statuses: string[],
+  cutoffIso: string,
+): Promise<{ archived: number; error?: string }> {
+  const sb = getSupabaseServerClient();
+  const { data, error } = await sb
+    .from("agent_drafts")
+    .update({ status: "Auto-archived", updated_at: new Date().toISOString() })
+    .in("status", statuses)
+    .lt("updated_at", cutoffIso)
+    .select("id");
+  if (error) return { archived: 0, error: error.message };
+  return { archived: (data ?? []).length };
+}
+
 async function _POST(req: NextRequest) {
   if (!isAuthorized(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const sb = getSupabaseServerClient();
-  const now = new Date();
-  const staleCutoff   = new Date(now.getTime() - STALE_AFTER_HOURS * 3_600_000).toISOString();
-  const archiveCutoff = new Date(now.getTime() - ARCHIVE_AFTER_DAYS_STALED * 86_400_000).toISOString();
+  const now = Date.now();
+  const pendingCutoff  = new Date(now - PENDING_ARCHIVE_DAYS * 86_400_000).toISOString();
+  const approvedCutoff = new Date(now - APPROVED_ARCHIVE_DAYS * 86_400_000).toISOString();
 
-  // Pass 1: mark drafts stale
-  // - non-terminal status
-  // - last_edited_at older than cutoff (or NULL)
-  // - staled_at not yet set
-  const { data: stalingRows, error: stalingErr } = await sb
-    .from("notion_agent_drafts")
-    .select("id, last_edited_at")
-    .in("status", STALEABLE_STATUSES)
-    .is("staled_at", null)
-    .or(`last_edited_at.lt.${staleCutoff},last_edited_at.is.null`)
-    .limit(500);
+  const pending  = await archiveOlderThan(["Pending Review", "Revision Requested"], pendingCutoff);
+  const approved = await archiveOlderThan(["Approved", "Draft Created"], approvedCutoff);
 
-  if (stalingErr) {
+  const errors = [pending.error, approved.error].filter(Boolean) as string[];
+  if (errors.length > 0) {
     return NextResponse.json(
-      { error: "stale lookup failed", detail: stalingErr.message },
+      { error: "reap failed", detail: errors.join(" · ") },
       { status: 500 },
     );
   }
 
-  const stalingIds = (stalingRows ?? []).map((r: { id: string }) => r.id);
-  let staled = 0;
-  if (stalingIds.length > 0) {
-    const { error: updateErr } = await sb
-      .from("notion_agent_drafts")
-      .update({ staled_at: now.toISOString() })
-      .in("id", stalingIds);
-    if (updateErr) {
-      return NextResponse.json(
-        { error: "stale update failed", detail: updateErr.message },
-        { status: 500 },
-      );
-    }
-    staled = stalingIds.length;
-  }
-
-  // Pass 2: auto-archive long-staled drafts
-  const { data: archiveRows, error: archiveErr } = await sb
-    .from("notion_agent_drafts")
-    .select("id")
-    .lt("staled_at", archiveCutoff)
-    .neq("status", "Auto-archived")
-    .neq("status", "Sent")
-    .limit(500);
-
-  if (archiveErr) {
-    return NextResponse.json(
-      { error: "archive lookup failed", detail: archiveErr.message },
-      { status: 500 },
-    );
-  }
-
-  const archiveIds = (archiveRows ?? []).map((r: { id: string }) => r.id);
-  let archived = 0;
-  if (archiveIds.length > 0) {
-    const { error: updateErr } = await sb
-      .from("notion_agent_drafts")
-      .update({ status: "Auto-archived" })
-      .in("id", archiveIds);
-    if (updateErr) {
-      return NextResponse.json(
-        { error: "archive update failed", detail: updateErr.message },
-        { status: 500 },
-      );
-    }
-    archived = archiveIds.length;
-  }
-
+  const archived = pending.archived + approved.archived;
   return NextResponse.json({
     ok: true,
-    records_read: (stalingRows?.length ?? 0) + (archiveRows?.length ?? 0),
-    records_written: staled + archived,
-    staled,
-    archived,
-    notes: `staled ${staled}, archived ${archived}`,
+    records_read: archived,
+    records_written: archived,
+    archived_pending: pending.archived,
+    archived_approved: approved.archived,
+    notes: `auto-archived ${pending.archived} pending(>${PENDING_ARCHIVE_DAYS}d) + ${approved.archived} approved(>${APPROVED_ARCHIVE_DAYS}d)`,
   });
 }
 

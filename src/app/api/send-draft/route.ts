@@ -118,7 +118,18 @@ export async function POST(req: NextRequest) {
 
   const fromEmail = process.env.GMAIL_USER_EMAIL ?? "me";
   const recipient = await resolveRecipient(relatedId);
-  const to        = recipient ?? fromEmail; // fallback: send to self if no recipient found
+  // Fail loud when the recipient can't be resolved. The old fallback silently
+  // addressed the email to Jose himself — the UI showed "sent" while the
+  // counterpart never received anything.
+  if (!recipient) {
+    return NextResponse.json({
+      ok: false,
+      reason: relatedId
+        ? "El contacto vinculado no se pudo resolver (sin email). Reasigna el contacto antes de enviar."
+        : "Este borrador no tiene contacto asignado. Usa «Assign contact» antes de enviar.",
+    }, { status: 422 });
+  }
+  const to = recipient;
   const subject   = title || `${draftType} — Common House`;
   const sendMode  = process.env.GMAIL_SEND_MODE ?? "draft";
 
