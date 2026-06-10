@@ -34,9 +34,16 @@ export const XERO_CONNECTIONS_URL = "https://api.xero.com/connections";
 
 // offline_access → mints a refresh token. The rest are read-only Accounting
 // scopes — Phase A never writes to Xero.
+//
+// NOTE (2026-06): apps created after 2026-03-02 cannot request the broad
+// accounting.transactions(.read) scope — Xero replaced it with granular
+// scopes and returns `invalid_scope` at the consent screen otherwise. The
+// sync only reads ACCREC invoices, so accounting.invoices.read is the exact
+// granular replacement. contacts/settings read scopes were already granular
+// and remain valid for all apps.
 export const XERO_SCOPES = [
   "offline_access",
-  "accounting.transactions.read",
+  "accounting.invoices.read",
   "accounting.contacts.read",
   "accounting.settings.read",
 ];
