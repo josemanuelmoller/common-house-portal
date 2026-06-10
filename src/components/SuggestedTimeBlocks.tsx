@@ -13,6 +13,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PrepBriefModal, type BriefResponse } from "./PrepBriefModal";
+import { errorText, errorCode } from "@/lib/error-text";
 
 type Suggestion = {
   id: string;
@@ -74,14 +75,15 @@ export function SuggestedTimeBlocks() {
     setEmpty(null);
     try {
       const res = await fetch(`/api/suggested-time-blocks${force ? "?force=1" : ""}`, { cache: "no-store" });
-      const data = (await res.json()) as ApiResponse;
+      // Coerce platform-shaped errors ({code,id,message} from Vercel timeouts)
+      // to strings before they ever reach setError → JSX (React #31 guard).
+      const data = (await res.json().catch(() => ({ error: `HTTP ${res.status}` }))) as ApiResponse | { error: unknown; message?: unknown };
       if ("error" in data) {
-        if (data.error === "calendar_scope_missing") {
-          setError("__consent_needed__");
-        } else if (data.error === "calendar_auth_revoked") {
+        const code = errorCode(data.error);
+        if (code === "calendar_scope_missing" || code === "calendar_auth_revoked") {
           setError("__consent_needed__");
         } else {
-          setError(data.message || data.error);
+          setError(errorText(data.message, data.error, `HTTP ${res.status}`));
         }
         setItems([]);
         return;

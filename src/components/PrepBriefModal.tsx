@@ -15,6 +15,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
+import { errorText, errorCode } from "@/lib/error-text";
 
 type BriefProse = {
   briefing:     string;
@@ -63,11 +64,12 @@ export function PrepBriefModal({ eventId, meetingTitle, onClose, cachedBrief, on
   const [loading, setLoading]   = useState(!cachedBrief);
   const [error, setError]       = useState<string | null>(null);
   const [showFacts, setShowFacts] = useState(false);
-  const ranRef = useRef(false);
+  const [attempt, setAttempt]   = useState(0);
+  const ranForAttempt = useRef(-1);
 
   useEffect(() => {
-    if (cachedBrief || ranRef.current) return;
-    ranRef.current = true;
+    if (cachedBrief || ranForAttempt.current === attempt) return;
+    ranForAttempt.current = attempt;
     (async () => {
       try {
         const res = await fetch("/api/prep-meeting-brief", {
@@ -76,12 +78,23 @@ export function PrepBriefModal({ eventId, meetingTitle, onClose, cachedBrief, on
           body:    JSON.stringify({ eventId }),
           cache:   "no-store",
         });
-        const data = (await res.json()) as BriefResponse;
+        // `data.error` is NOT always a string: when the function exceeds its
+        // time limit, the Vercel PLATFORM responds with
+        // {"error":{"code":"FUNCTION_INVOCATION_TIMEOUT","id","message"}}.
+        // Rendering that object as JSX crashed the whole dashboard (React #31,
+        // prod 2026-06-10) — always coerce through errorText().
+        const data = (await res.json().catch(() => ({}))) as Omit<BriefResponse, "error"> & { error?: unknown };
         if (!res.ok || data.error) {
-          if (data.error === "calendar_scope_missing") {
+          const code = errorCode(data.error);
+          if (code === "calendar_scope_missing") {
             setError("__consent_needed__");
+          } else if (res.status === 504 || (code ?? "").includes("TIMEOUT")) {
+            setError(
+              "El brief tardó más del límite de 60s del servidor y se cortó a mitad de camino. " +
+              "Suele completarse al reintentar.",
+            );
           } else {
-            setError(data.message || data.error || "Unknown error generating brief.");
+            setError(errorText(data.message, data.error, `HTTP ${res.status}`));
           }
           return;
         }
@@ -95,7 +108,13 @@ export function PrepBriefModal({ eventId, meetingTitle, onClose, cachedBrief, on
         setLoading(false);
       }
     })();
-  }, [eventId, cachedBrief, onBriefFetched]);
+  }, [eventId, cachedBrief, onBriefFetched, attempt]);
+
+  function retry() {
+    setError(null);
+    setLoading(true);
+    setAttempt(a => a + 1);
+  }
 
   return (
     <div
@@ -159,8 +178,14 @@ export function PrepBriefModal({ eventId, meetingTitle, onClose, cachedBrief, on
           )}
 
           {error && error !== "__consent_needed__" && (
-            <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3">
-              <p className="text-[11px] text-red-700">{error}</p>
+            <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex items-center gap-3">
+              <p className="text-[11px] text-red-700 flex-1">{error}</p>
+              <button
+                onClick={retry}
+                className="text-[9px] font-bold uppercase tracking-widest text-red-700 hover:text-red-900 shrink-0"
+              >
+                Reintentar →
+              </button>
             </div>
           )}
 

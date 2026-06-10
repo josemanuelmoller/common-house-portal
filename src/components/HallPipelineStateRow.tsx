@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { SerializedPipelineRow } from "./HallPipelineState";
+import { errorText } from "@/lib/error-text";
 
 const REASON_COLOR: Record<SerializedPipelineRow["reason"], string> = {
   pre_meeting:    "var(--hall-warn)",
@@ -50,9 +51,11 @@ export function HallPipelineStateRow({ row }: { row: SerializedPipelineRow }) {
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) {
-        // Prefer the human-readable `note` (honest failure detail) over the code.
-        const o = (j && typeof j === "object") ? j as { note?: string; error?: string } : {};
-        const errorMsg = o.note ?? o.error ?? `HTTP ${res.status}`;
+        // Prefer the human-readable `note` (honest failure detail) over the
+        // code. errorText() guards against platform-shaped error OBJECTS
+        // ({code,id,message} on Vercel timeouts) reaching JSX (React #31).
+        const o = (j && typeof j === "object") ? j as { note?: unknown; error?: unknown } : {};
+        const errorMsg = errorText(o.note, o.error, `HTTP ${res.status}`);
         setErr(errorMsg);
         return { ok: false, error: errorMsg };
       }
