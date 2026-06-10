@@ -1,12 +1,16 @@
 /**
- * Cron — morning digest push at 06:30 UK (BST).
+ * Cron — morning digest push at 06:30 UK (BST). The team's standup, delivered
+ * to Jose's phone: every count is a DECISION waiting for him, not a vanity
+ * metric. The work travels to Jose — he doesn't have to visit pages.
  *
  * Schedule: "30 5 * * *" (UTC) ≈ 06:30 BST. In winter (GMT) this fires at
  * 05:30 local — minor drift acceptable for a daily digest.
  *
  * Composition (kept terse — push body has limited room):
+ *   • open decision_items (proposals from agents awaiting his call)
+ *   • proposed content_pitches (comms ideas awaiting approve/reject)
+ *   • inbox threads waiting on him (action_items gmail/ball=jose)
  *   • bandeja items waiting (inbox_items in new / needs_review)
- *   • open tasks (chief_of_staff_tasks task_status='Open')
  *   • agents that failed overnight (routine_runs status='failed' since 18:00 prev)
  *
  * Auth: CRON_SECRET (Bearer or x-agent-key).
@@ -42,15 +46,25 @@ async function handle(req: Request) {
   const yesterdayEvening = new Date();
   yesterdayEvening.setUTCHours(yesterdayEvening.getUTCHours() - 12);
 
-  const [inboxRes, tasksRes, failsRes] = await Promise.all([
+  const [decisionsRes, pitchesRes, mailRes, capturaRes, failsRes] = await Promise.all([
+    sb
+      .from("decision_items")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "Open"),
+    sb
+      .from("content_pitches")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "proposed"),
+    sb
+      .from("action_items")
+      .select("id", { count: "exact", head: true })
+      .eq("source_type", "gmail")
+      .eq("ball_in_court", "jose")
+      .eq("status", "open"),
     sb
       .from("inbox_items")
       .select("id", { count: "exact", head: true })
       .in("status", ["new", "needs_review"]),
-    sb
-      .from("chief_of_staff_tasks")
-      .select("id", { count: "exact", head: true })
-      .eq("task_status", "Open"),
     sb
       .from("routine_runs")
       .select("id", { count: "exact", head: true })
@@ -58,25 +72,31 @@ async function handle(req: Request) {
       .gte("started_at", yesterdayEvening.toISOString()),
   ]);
 
-  const inboxCount = inboxRes.count ?? 0;
-  const taskCount = tasksRes.count ?? 0;
+  const decisionCount = decisionsRes.count ?? 0;
+  const pitchCount = pitchesRes.count ?? 0;
+  const mailCount = mailRes.count ?? 0;
+  const capturaCount = capturaRes.count ?? 0;
   const failCount = failsRes.count ?? 0;
 
   // Skip if absolutely nothing to say (avoid daily spam)
-  if (inboxCount === 0 && taskCount === 0 && failCount === 0) {
+  if (decisionCount === 0 && pitchCount === 0 && mailCount === 0 && capturaCount === 0 && failCount === 0) {
     return NextResponse.json({
       ok: true,
       skipped: "no_signal",
-      inboxCount,
-      taskCount,
+      decisionCount,
+      pitchCount,
+      mailCount,
+      capturaCount,
       failCount,
     });
   }
 
   const parts: string[] = [];
-  if (inboxCount > 0) parts.push(`${inboxCount} en bandeja`);
-  if (taskCount > 0) parts.push(`${taskCount} tareas abiertas`);
-  if (failCount > 0) parts.push(`${failCount} agentes con error`);
+  if (decisionCount > 0) parts.push(`${decisionCount} decisión${decisionCount === 1 ? "" : "es"}`);
+  if (pitchCount > 0) parts.push(`${pitchCount} pitch${pitchCount === 1 ? "" : "es"}`);
+  if (mailCount > 0) parts.push(`${mailCount} inbox`);
+  if (capturaCount > 0) parts.push(`${capturaCount} en bandeja`);
+  if (failCount > 0) parts.push(`⚠ ${failCount} agente${failCount === 1 ? "" : "s"} con error`);
 
   const body = parts.join(" · ");
 
@@ -88,8 +108,10 @@ async function handle(req: Request) {
 
   return NextResponse.json({
     ok: true,
-    inboxCount,
-    taskCount,
+    decisionCount,
+    pitchCount,
+    mailCount,
+    capturaCount,
     failCount,
     pushResult: result,
   });

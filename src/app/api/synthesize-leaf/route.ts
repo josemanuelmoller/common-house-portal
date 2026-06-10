@@ -74,11 +74,12 @@ async function _POST(req: NextRequest) {
   const path   = body.path as string | undefined;
   const dryRun = Boolean(body.dry_run);
 
-  if (!nodeId && !path) {
-    return NextResponse.json({ error: "node_id or path required" }, { status: 400 });
-  }
-
-  // Fetch the node
+  // Fetch the node. With NO node_id/path (the weekly cron path), self-select
+  // the leaf that most needs a playbook refresh: enough material (≥5 bullets,
+  // enforced below via sourceCount gate at 0 — we pre-filter in SQL) AND
+  // evidence newer than its playbook (or no playbook at all). One leaf per
+  // run keeps the Sonnet synthesis inside the function time budget; the
+  // weekly cadence rotates through the tree over a month.
   const sb = getSupabaseServerClient();
   let node: KnowledgeNode | null = null;
   if (nodeId) {
@@ -86,6 +87,24 @@ async function _POST(req: NextRequest) {
     node = (data as KnowledgeNode) ?? null;
   } else if (path) {
     node = await getNodeByPath(path);
+  } else {
+    const { data: candidates } = await sb
+      .from("knowledge_nodes")
+      .select("*")
+      .not("body_md", "is", null)
+      .order("last_evidence_at", { ascending: false, nullsFirst: false })
+      .limit(20);
+    const eligible = ((candidates ?? []) as KnowledgeNode[]).filter(n => {
+      if (countBullets(n.body_md ?? "") < 5) return false;
+      if (!n.playbook_md) return true;                       // never synthesised
+      if (!n.playbook_generated_at) return true;
+      if (!n.last_evidence_at) return false;
+      return new Date(n.last_evidence_at) > new Date(n.playbook_generated_at); // stale playbook
+    });
+    node = eligible[0] ?? null;
+    if (!node) {
+      return NextResponse.json({ ok: true, skipped: "no_leaf_needs_synthesis" });
+    }
   }
   if (!node) return NextResponse.json({ error: "Node not found" }, { status: 404 });
 

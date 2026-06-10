@@ -227,6 +227,16 @@ ${Object.entries(functionHeat).map(([k, v]) => `- ${k}: ${v}`).join("\n") || "�
 === Relevant knowledge leaves to refresh ===
 ${relevantLeaves.map(l => `- ${l.path} | ${l.title} — ${l.summary}`).join("\n") || "—"}
 
+${(() => {
+  // Playbook excerpt for the TOP-scoring leaf — the distilled operational
+  // intelligence (e.g. the Algramo Slack playbooks) was sitting unread in
+  // playbook_md. The strongest match gets its narrative injected so the
+  // brief can cite hard-won lessons, not just leaf titles.
+  const top = relevantLeaves.find(l => (l as { playbook_md?: string | null }).playbook_md);
+  if (!top) return "";
+  const pb = ((top as { playbook_md?: string | null }).playbook_md ?? "").slice(0, 2500);
+  return `=== PLAYBOOK — ${top.title} (distilled domain knowledge; cite relevant lessons) ===\n${pb}\n`;
+})()}
 Write the brief now.`;
 
   const res = await anthropic.messages.create({

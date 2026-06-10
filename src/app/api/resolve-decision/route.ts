@@ -1,77 +1,95 @@
 /**
- * Resolve a decision item from the portal.
+ * Resolve a decision item from the portal (Hall "Needs your call" queue +
+ * /admin/os intake).
  *
- * Phase 2 pattern: Supabase mirror is updated immediately (instant UI feedback);
- * the same change is queued as `pending_notion_push` and pushed to Notion
- * best-effort in the same request. If the Notion push fails, the cron retry
- * route (/api/cron/push-pending-to-notion) will retry it.
+ * Writes the CANONICAL decision_items table. (Until 2026-06-10 this went
+ * through applyMirrorEdit → notion_decision_items, whose write path was
+ * no-op'd at the Notion cutoff — every resolve/dismiss from the portal
+ * silently did nothing, which is why the queue froze in April.)
+ *
+ * Body: { id: string; action?: "resolve" | "dismiss"; note?: string }
+ * Auth: admin session (Clerk).
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { currentUser } from "@clerk/nextjs/server";
 import { adminGuardApi } from "@/lib/require-admin";
-import { applyMirrorEdit, pushPending } from "@/lib/notion-mirror-push";
+import { getSupabaseServerClient } from "@/lib/supabase-server";
+import { logHallEvent } from "@/lib/hall-events";
 
-function corsHeaders() {
-  return {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-  };
-}
-
-export async function OPTIONS() {
-  return new NextResponse(null, { status: 204, headers: corsHeaders() });
-}
+const UUIDish = /^[0-9a-f-]{32,36}$/i;
 
 export async function POST(req: NextRequest) {
   const guard = await adminGuardApi();
   if (guard) return guard;
+
+  const user = await currentUser();
+  const email = user?.primaryEmailAddress?.emailAddress ?? null;
 
   const body = await req.json().catch(() => ({}));
   const id: string = body.id ?? "";
   const action: string = body.action ?? "resolve"; // "resolve" | "dismiss"
   const note: string = body.note ?? "";
 
-  if (!id) {
+  if (!id || !UUIDish.test(id)) {
+    return NextResponse.json({ error: "valid id is required" }, { status: 400 });
+  }
+
+  const newStatus = action === "dismiss" ? "Dismissed" : "Resolved";
+  const nowIso = new Date().toISOString();
+
+  const sb = getSupabaseServerClient();
+
+  // Locate the row — callers may hold either the canonical uuid or notion_id.
+  const { data: row, error: findErr } = await sb
+    .from("decision_items")
+    .select("id, payload")
+    .or(`id.eq.${id},notion_id.eq.${id}`)
+    .maybeSingle();
+  if (findErr || !row) {
     return NextResponse.json(
-      { error: "id is required" },
-      { status: 400, headers: corsHeaders() }
+      { error: "Decision not found", detail: findErr?.message },
+      { status: 404 },
     );
   }
 
-  const statusMap: Record<string, string> = {
-    resolve: "Resolved",
-    dismiss: "Dismissed",
+  const changes: Record<string, unknown> = {
+    status: newStatus,
+    updated_at: nowIso,
   };
-  const newStatus = statusMap[action] ?? "Resolved";
+  if (newStatus === "Resolved") {
+    changes.approved_at = nowIso;
+    changes.approved_by = email;
+  } else {
+    // rejected_at feeds the promotion-scan 30-day dedupe — a dismissed
+    // proposal stays quiet instead of re-proposing tomorrow.
+    changes.rejected_at = nowIso;
+    changes.rejected_by = email;
+  }
+  if (note) {
+    const payload = (row.payload && typeof row.payload === "object") ? row.payload as Record<string, unknown> : {};
+    changes.payload = { ...payload, resolution_note: note, resolved_via: "portal" };
+  }
 
-  // 1) Update Supabase mirror — UI sees the new state instantly on refresh.
-  const changes: Record<string, unknown> = { status: newStatus };
-  if (note) changes.resolution_note = note;
-
-  const apply = await applyMirrorEdit({
-    table:   "notion_decision_items",
-    id,
-    changes,
-  });
-  if (!apply.ok) {
+  const { error: updErr } = await sb
+    .from("decision_items")
+    .update(changes)
+    .eq("id", row.id as string);
+  if (updErr) {
     return NextResponse.json(
-      { error: "Mirror update failed", detail: apply.error },
-      { status: 500, headers: corsHeaders() }
+      { error: "Update failed", detail: updErr.message },
+      { status: 500 },
     );
   }
 
-  // 2) Best-effort push to Notion. Failure here is non-fatal — the cron retry
-  //    will pick it up. We surface the error in the response for visibility.
-  const push = await pushPending("notion_decision_items", id);
+  // Telemetry: decisions made FROM the flow (Hall/OS) — the metric that says
+  // the portal is working as a team, not as a website.
+  logHallEvent({
+    source: "decisions",
+    type: "decision_resolved_from_flow",
+    user_email: email ?? "unknown",
+    metadata: { action: newStatus, decision_id: row.id as string },
+  });
 
-  return NextResponse.json(
-    {
-      ok: true,
-      id,
-      status: newStatus,
-      notion_push: push.ok ? "ok" : "pending_retry",
-      notion_error: push.ok ? undefined : push.error,
-    },
-    { headers: corsHeaders() }
-  );
+  return NextResponse.json({ ok: true, id: row.id, status: newStatus });
 }

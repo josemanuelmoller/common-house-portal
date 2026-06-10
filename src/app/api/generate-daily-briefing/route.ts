@@ -24,6 +24,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
+// TODO phase-6: migrate read source to Supabase (projects, opportunities,
+// decision_items, agent_drafts, content_pipeline, people, insight_briefs)
 import { Client } from "@notionhq/client";
 import { currentUser } from "@clerk/nextjs/server";
 import { isAdminUser, isAdminEmail } from "@/lib/clients";
@@ -236,6 +238,35 @@ async function fetchRecentInsightBriefs() {
   });
 }
 
+// ─── Knowledge hot leaves (Supabase) ─────────────────────────────────────────
+//
+// The knowledge-curator appends domain insights to the tree every weekday at
+// 03:30 — and until 2026-06-10 NOTHING surfaced that work to Jose (the only
+// consumer was the manually-triggered prep brief). The briefing is where he
+// looks every morning, so the freshest leaves get a seat here.
+
+async function fetchHotKnowledgeLeaves(): Promise<Array<{ path: string; title: string; recent: string }>> {
+  const sb = getSupabaseServerClient();
+  const since = new Date(Date.now() - 7 * 86_400_000).toISOString();
+  const { data } = await sb
+    .from("knowledge_nodes")
+    .select("path, title, body_md, last_evidence_at")
+    .gte("last_evidence_at", since)
+    .not("body_md", "is", null)
+    .order("last_evidence_at", { ascending: false })
+    .limit(3);
+  return ((data ?? []) as Array<{ path: string; title: string; body_md: string | null }>).map(n => {
+    // Curator APPENDs at the end of sections — the tail bullets are the
+    // freshest material. Grab the last 3 bullet lines as the digest seed.
+    const bullets = (n.body_md ?? "")
+      .split(/\r?\n/)
+      .map(l => l.trim())
+      .filter(l => /^[-*•]\s+\S/.test(l));
+    const recent = bullets.slice(-3).map(b => b.replace(/^[-*•]\s+/, "")).join(" | ").slice(0, 400);
+    return { path: n.path, title: n.title, recent: recent || "(updated)" };
+  });
+}
+
 // ─── Check for existing briefing today ───────────────────────────────────────
 
 async function findExistingBriefing(dateStr: string): Promise<string | null> {
@@ -257,7 +288,7 @@ async function _POST(req: NextRequest) {
   const today = new Date().toISOString().slice(0, 10);
 
   // Fetch all data in parallel
-  const [projects, followUps, decisions, drafts, readyContent, coldPeople, recentBriefs] =
+  const [projects, followUps, decisions, drafts, readyContent, coldPeople, recentBriefs, hotLeaves] =
     await Promise.all([
       fetchActiveProjects().catch(() => []),
       fetchFollowUpOpportunities().catch(() => []),
@@ -266,6 +297,7 @@ async function _POST(req: NextRequest) {
       fetchReadyContent().catch(() => []),
       fetchColdPeople().catch(() => []),
       fetchRecentInsightBriefs().catch(() => []),
+      fetchHotKnowledgeLeaves().catch(() => []),
     ]);
 
   // Build context for Claude
@@ -294,6 +326,9 @@ ${coldPeople.slice(0, 8).map(p => `- ${p.name} [${p.warmth}]`).join("\n") || "No
 ${recentBriefs.map(b =>
   `- "${b.title}" [${b.theme.join(", ") || "no-theme"}${b.relevance.length ? " · rel: " + b.relevance.join(", ") : ""}]: ${b.summary || "(no summary)"}`
 ).join("\n") || "None"}
+
+## Knowledge tree — leaves updated this week (curator output)
+${hotLeaves.map(l => `- ${l.path} — ${l.title}: ${l.recent}`).join("\n") || "None"}
 `.trim();
 
   // Claude Haiku generates the briefing sections
@@ -305,7 +340,7 @@ Write concise, actionable text for each section. No headers. No markdown. Plain 
 Be direct — assume the reader (Jose, the founder) knows the context. Max 2-3 sentences per section.`,
     messages: [{
       role: "user",
-      content: `Based on this OS snapshot, write the 7 sections of today's daily briefing.
+      content: `Based on this OS snapshot, write the 8 sections of today's daily briefing.
 
 ${context}
 
@@ -317,7 +352,8 @@ Return EXACTLY this JSON (no extra keys, no markdown):
   "follow_up_queue": "list of opportunities needing follow-up, or 'No follow-ups needed' if none",
   "agent_queue": "summary of pending drafts to review, or 'Agent queue clear' if none",
   "market_signals": "3-5 external market signals drawn ONLY from the Insight Briefs above. Cover three kinds when evidence allows: (a) portfolio moves (iRefill, SUFI, Yenxa, Auto Mercado, Greenleaf), (b) CH-vertical shifts (retail refill, financial inclusion, sustainable food, agritech, circular economy), (c) competitor or ecosystem moves (who raised, launched, pivoted, or entered CH's space). Return STRICTLY this format — one signal per block, blank line between blocks, no preamble, no numbering: '[Tag] Headline in one sentence.\\n· Why it matters in one sentence.' Tag MUST be one of: Policy | Funding | Market Move | Sector Trend | Competitor | Ecosystem | Portfolio. If the brief list is empty or irrelevant, return exactly 'No recent briefs logged — run the Insight Engine to pull sector signals.'",
-  "ready_to_publish": "list of content ready to go live, or 'Nothing ready to publish' if none"
+  "ready_to_publish": "list of content ready to go live, or 'Nothing ready to publish' if none",
+  "knowledge_hot": "1-2 sentences on what the knowledge tree learned this week (name the leaves, cite the most useful insight), or 'Knowledge tree quiet this week' if no leaves updated"
 }`,
     }],
   });
@@ -387,6 +423,7 @@ Return EXACTLY this JSON (no extra keys, no markdown):
     agent_queue:      sections.agent_queue ?? "",
     market_signals:   sections.market_signals ?? "",
     ready_to_publish: sections.ready_to_publish ?? "",
+    knowledge_hot:    sections.knowledge_hot ?? "",
   };
   const bodyMd = [
     `## Focus of the Day\n${sectionMap.focus_of_day}`,
@@ -396,6 +433,7 @@ Return EXACTLY this JSON (no extra keys, no markdown):
     `## Agent Queue\n${sectionMap.agent_queue}`,
     `## Market Signals\n${sectionMap.market_signals}`,
     `## Ready to Publish\n${sectionMap.ready_to_publish}`,
+    ...(sectionMap.knowledge_hot ? [`## Knowledge Hot\n${sectionMap.knowledge_hot}`] : []),
   ].join("\n\n");
 
   // Upsert keyed on briefing_date — single row per day per freeze §3.4.

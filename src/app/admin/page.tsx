@@ -75,6 +75,9 @@ import { SafeServerSection } from "@/components/SafeServerSection";
 import { getAgentsOnlineCount } from "@/lib/hall-agents-count";
 import { getInboxActionsWithDrafts, countOpenGmailActions, getCoSActions } from "@/lib/action-items";
 import { fetchOpenCommitmentRows, inferEffort, type CommitmentRow } from "@/lib/time-block-candidates";
+import { getSupabaseServerClient } from "@/lib/supabase-server";
+import { HallDecisionQueue } from "@/components/HallDecisionQueue";
+import { HallPitchQueue, type HallPitch } from "@/components/HallPitchQueue";
 import { getObjectivesForYear } from "@/lib/plan";
 import { logServerError } from "@/lib/debug-log";
 
@@ -968,6 +971,27 @@ export default async function AdminPage({ searchParams }: { searchParams?: Promi
   } catch (e) {
     await logServerError("admin/page:loader:fetchOpenCommitmentRows", e);
   }
+
+  // Content pitches awaiting approve/reject — brought into the Hall flow so
+  // the monthly proposal cron stops filling a queue nobody visits.
+  let proposedPitches: HallPitch[] = [];
+  try {
+    const sbPitches = getSupabaseServerClient();
+    const { data: pitchRows } = await sbPitches
+      .from("content_pitches")
+      .select("id, headline, angle, proposed_for_date")
+      .eq("status", "proposed")
+      .order("proposed_for_date", { ascending: true })
+      .limit(10);
+    proposedPitches = ((pitchRows ?? []) as Array<{ id: string; headline: string | null; angle: string | null; proposed_for_date: string | null }>).map(p => ({
+      id: p.id,
+      headline: p.headline,
+      angle: p.angle,
+      proposedForDate: p.proposed_for_date,
+    }));
+  } catch (e) {
+    await logServerError("admin/page:loader:proposedPitches", e);
+  }
   const focusOpportunities = [...opportunities.ch, ...opportunities.portfolio];
   const focusRec = computeFocusRecommendation(
     cosTasks,
@@ -1071,6 +1095,8 @@ export default async function AdminPage({ searchParams }: { searchParams?: Promi
             ).length;
             const parts: string[] = [];
             parts.push(focusRec ? "1 focus" : "sin focus");
+            if (openDecisions.length > 0) parts.push(`${openDecisions.length} decisión${openDecisions.length === 1 ? "" : "es"}`);
+            if (proposedPitches.length > 0) parts.push(`${proposedPitches.length} pitch${proposedPitches.length === 1 ? "" : "es"}`);
             if (sessionWork > 0) parts.push(`${sessionWork} trabajo${sessionWork === 1 ? "" : "s"} de sesión`);
             if (inboxN > 0) parts.push(`${inboxN} inbox${inboxWithDraft > 0 ? ` (${inboxWithDraft} con borrador)` : ""}`);
             if (quickSweep > 0) parts.push(`${quickSweep} rápidos para barrer`);
@@ -1316,6 +1342,24 @@ export default async function AdminPage({ searchParams }: { searchParams?: Promi
                 <Suspense fallback={<HallSkeleton lines={2} />}><HallManualTriggers /></Suspense>
               </HallSection>
 
+              {/* ── Needs your call — agent proposals awaiting decision ────
+                  decision_items in the flow: approve/dismiss inline, execute-
+                  gated ones hand off to /admin/os. */}
+              {openDecisions.length > 0 && (
+                <HallSection title="Needs your " flourish="call" meta={`${openDecisions.length} OPEN`}>
+                  <HallDecisionQueue
+                    items={openDecisions.map(d => ({
+                      id: d.id,
+                      title: d.title,
+                      priority: d.priority,
+                      sourceAgent: d.sourceAgent,
+                      requiresExecute: d.requiresExecute,
+                      dueDate: d.dueDate,
+                    }))}
+                  />
+                </HallSection>
+              )}
+
               {/* ── Today's agenda — next meeting rich + rest compact ────── */}
               <HallSection title="Today's " flourish="agenda">
                 <Suspense fallback={<HallSkeleton lines={6} />}>
@@ -1441,6 +1485,11 @@ export default async function AdminPage({ searchParams }: { searchParams?: Promi
                 the manual agent triggers Jose uses when feeds go stale. ── */}
           <div data-hall-tab="signals" className="hall-today-grid">
             <div className="hall-today-col-left">
+              {/* ── Content pitches — approve here, draft lands in your queue ── */}
+              <HallSection title="Content " flourish="pitches" meta={proposedPitches.length > 0 ? `${proposedPitches.length} WAITING` : undefined}>
+                <HallPitchQueue pitches={proposedPitches} />
+              </HallSection>
+
               <HallSection title="Market " flourish="signals" meta={marketSignalBriefs.length > 0 ? `${marketSignalBriefs.length} NEW` : undefined}>
                 <MarketSignalsPanel
                   text={latestMarketSignals?.text ?? null}

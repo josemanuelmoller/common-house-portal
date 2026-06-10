@@ -30,6 +30,9 @@ export type HallEventType =
   | "stb_accept_error"
   | "stb_dismiss"
   | "stb_snooze"
+  // Decisions resolved from the flow (Hall "Needs your call" / OS intake) —
+  // the operating-model success metric: work travelled to Jose, he decided.
+  | "decision_resolved_from_flow"
   // Reserved for future Hall surfaces
   | "hall_other";
 
