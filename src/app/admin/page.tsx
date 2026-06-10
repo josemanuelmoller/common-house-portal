@@ -1168,7 +1168,7 @@ export default async function AdminPage({ searchParams }: { searchParams?: Promi
               {/* ── Today's agenda — next meeting rich + rest compact ────── */}
               <HallSection title="Today's " flourish="agenda">
                 <Suspense fallback={<HallSkeleton lines={6} />}>
-                  <SafeServerSection name="HallTodayAgenda" render={() => HallTodayAgenda()} />
+                  <SafeServerSection name="HallTodayAgenda" render={() => HallTodayAgenda({ userEmail: adminUser.primaryEmailAddress?.emailAddress ?? "" })} />
                 </Suspense>
               </HallSection>
 

@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { getSelfEmails } from "@/lib/hall-self";
 import { getContactsByEmails } from "@/lib/contacts";
+import { getHallPreferences } from "@/lib/hall-preferences";
 
 type CalRow = {
   event_id: string;
@@ -31,6 +32,12 @@ type CompactMeeting = {
   attendeeNames: string[];
   htmlLink: string | null;
 };
+
+// Calendar-date key in the user's timezone (en-CA → "2026-06-10"). Server runs
+// in UTC, so date comparisons and labels must never use the process timezone.
+function dayKey(d: Date, tz: string): string {
+  return d.toLocaleDateString("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" });
+}
 
 function formatAway(startMs: number): string {
   const diff = startMs - Date.now();
@@ -81,9 +88,11 @@ async function generateTalkingPoints(
   }
 }
 
-export async function HallTodayAgenda() {
+export async function HallTodayAgenda({ userEmail }: { userEmail?: string } = {}) {
   const sb = getSupabaseServerClient();
   const selfSet = await getSelfEmails();
+  const prefs = await getHallPreferences(userEmail ?? "");
+  const tz = prefs.timezone;
 
   const now = new Date();
   const windowEnd = new Date(now);
@@ -104,9 +113,9 @@ export async function HallTodayAgenda() {
 
   const rows = allRows;
 
-  // Show date label when the first meeting is not today
-  const todayStr = now.toDateString();
-  const isFallback = rows.length > 0 && new Date(rows[0].event_start).toDateString() !== todayStr;
+  // Show date label when the first meeting is not today (in the user's timezone)
+  const todayStr = dayKey(now, tz);
+  const isFallback = rows.length > 0 && dayKey(new Date(rows[0].event_start), tz) !== todayStr;
 
   if (rows.length === 0) {
     return (
@@ -161,7 +170,7 @@ export async function HallTodayAgenda() {
     title:      cleanTitle(nextRow.event_title, nextAttendees),
     startMs:    nextStartMs,
     startLocal: new Date(nextRow.event_start).toLocaleString("en-GB", {
-      weekday: "short", hour: "2-digit", minute: "2-digit", day: "numeric", month: "short",
+      timeZone: tz, weekday: "short", hour: "2-digit", minute: "2-digit", day: "numeric", month: "short",
     }),
     attendees:  nextAttendees,
     lastTouch,
@@ -181,7 +190,7 @@ export async function HallTodayAgenda() {
       eventId:       r.event_id,
       title:         r.event_title,
       startMs,
-      timeLabel:     new Date(r.event_start).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }),
+      timeLabel:     new Date(r.event_start).toLocaleTimeString("en-GB", { timeZone: tz, hour: "2-digit", minute: "2-digit" }),
       attendeeCount: others.length,
       attendeeNames: names.slice(0, 3),
       htmlLink:      r.html_link ?? null,
@@ -198,7 +207,7 @@ export async function HallTodayAgenda() {
           className="text-[8.5px] font-bold uppercase tracking-widest mb-2"
           style={{ color: "var(--hall-muted-3)", fontFamily: "var(--font-hall-mono)" }}
         >
-          Next · {new Date(nextRow.event_start).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}
+          Next · {new Date(nextRow.event_start).toLocaleDateString("en-GB", { timeZone: tz, weekday: "short", day: "numeric", month: "short" })}
         </p>
       )}
       <div
@@ -288,7 +297,7 @@ export async function HallTodayAgenda() {
             </p>
             <p className="text-[11px] leading-snug" style={{ color: "var(--hall-muted-2)" }}>
               <span className="font-semibold" style={{ color: "var(--hall-ink-3)" }}>{next.lastTouch.kind}</span>
-              <span> · {next.lastTouch.at.slice(0, 10)} · </span>
+              <span> · {dayKey(new Date(next.lastTouch.at), tz)} · </span>
               <span className="line-clamp-1">{next.lastTouch.title}</span>
             </p>
           </div>
@@ -321,7 +330,7 @@ export async function HallTodayAgenda() {
         const groups: { dateLabel: string; meetings: CompactMeeting[] }[] = [];
         for (const m of rest) {
           const d = new Date(m.startMs);
-          const label = d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
+          const label = d.toLocaleDateString("en-GB", { timeZone: tz, weekday: "short", day: "numeric", month: "short" });
           const last = groups[groups.length - 1];
           if (last && last.dateLabel === label) last.meetings.push(m);
           else groups.push({ dateLabel: label, meetings: [m] });
