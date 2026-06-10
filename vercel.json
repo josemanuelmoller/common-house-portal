@@ -40,7 +40,11 @@
     },
     {
       "path": "/api/ingest-meetings",
-      "schedule": "0 0,18 * * *"
+      "schedule": "0 18 * * 1-5"
+    },
+    {
+      "path": "/api/ingest-meetings",
+      "schedule": "0 0 * * 2-6"
     },
     {
       "path": "/api/extract-meeting-evidence",
@@ -120,27 +124,59 @@
     },
     {
       "path": "/api/ingest/gmail",
-      "schedule": "0 8,12,16,20 * * *"
+      "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/ingest/gmail",
+      "schedule": "0 12 * * *"
+    },
+    {
+      "path": "/api/ingest/gmail",
+      "schedule": "0 16 * * *"
+    },
+    {
+      "path": "/api/ingest/gmail",
+      "schedule": "0 20 * * *"
     },
     {
       "path": "/api/diagnose-agent-errors",
-      "schedule": "30 8,17 * * *"
+      "schedule": "30 8 * * *"
+    },
+    {
+      "path": "/api/diagnose-agent-errors",
+      "schedule": "30 17 * * *"
     },
     {
       "path": "/api/ingest/fireflies",
-      "schedule": "30 9,18 * * *"
+      "schedule": "30 9 * * *"
+    },
+    {
+      "path": "/api/ingest/fireflies",
+      "schedule": "30 18 * * *"
     },
     {
       "path": "/api/ingest/loops",
-      "schedule": "45 9,18 * * *"
+      "schedule": "45 9 * * *"
+    },
+    {
+      "path": "/api/ingest/loops",
+      "schedule": "45 18 * * *"
     },
     {
       "path": "/api/ingest/calendar",
-      "schedule": "0 7,19 * * *"
+      "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/ingest/calendar",
+      "schedule": "0 19 * * *"
     },
     {
       "path": "/api/ingest/whatsapp",
-      "schedule": "15 8,17 * * *"
+      "schedule": "15 8 * * *"
+    },
+    {
+      "path": "/api/ingest/whatsapp",
+      "schedule": "15 17 * * *"
     },
     {
       "path": "/api/ingest/drive",
@@ -160,7 +196,15 @@
     },
     {
       "path": "/api/sweep-replied-threads",
-      "schedule": "15 9,13,17 * * 1-5"
+      "schedule": "15 9 * * 1-5"
+    },
+    {
+      "path": "/api/sweep-replied-threads",
+      "schedule": "15 13 * * 1-5"
+    },
+    {
+      "path": "/api/sweep-replied-threads",
+      "schedule": "15 17 * * 1-5"
     },
     {
       "path": "/api/portfolio-health",
