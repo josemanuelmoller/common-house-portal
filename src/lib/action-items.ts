@@ -117,7 +117,9 @@ export async function getInboxActions(limit = DEFAULT_INBOX_LIMIT): Promise<Inbo
       isUnread: score >= 70,
       label,
       reason: r.subject,
-      gmailUrl: r.source_url ?? "",
+      gmailUrl: r.source_id
+        ? `https://mail.google.com/mail/u/0/#all/${r.source_id}`
+        : (r.source_url ?? ""),
       summary: nextAction || null,
     };
   });

@@ -424,7 +424,7 @@ async function fetchThreadsSince(
       toEmails: parseEmailList(toRaw),
       ccEmails: parseEmailList(ccRaw),
       snippet: (last.snippet ?? "").slice(0, 280),
-      permalink: `https://mail.google.com/mail/u/0/#inbox/${threadId}`,
+      permalink: `https://mail.google.com/mail/u/0/#all/${threadId}`,
     });
   }
   return out;
