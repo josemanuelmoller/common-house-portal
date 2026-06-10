@@ -3,14 +3,21 @@
  *
  * Returns the current set of Suggested Time Blocks for the signed-in admin.
  * Regenerates the set when the stored one is stale (no future suggestions,
- * all acted on, or older than 4 hours).
+ * all acted on, or older than 4 hours), or when ?force=1.
  *
- * Regeneration pipeline:
+ * Regeneration pipeline (v2 — evidence-backed):
  *   1. Pull busy blocks + upcoming meetings from Google Calendar
  *   2. Compute open slots (working hours, buffers, lunch, slot buckets)
- *   3. Build candidates from loops + opportunities + meetings
- *   4. Remove candidates whose fingerprint is dismissed or snoozed for this user
- *   5. Greedy match → top 3-5 suggestions
+ *   3. Build candidates from:
+ *        - open commitments (action_items extracted from meeting transcripts
+ *          / email — session/focused effort only; quick items batch-sweep)
+ *        - evidence-gated meeting preps (open items with attendee / real
+ *          agenda / VIP — never "every meeting deserves prep")
+ *        - loops + opportunities (already content-based)
+ *      A meeting with no extracted commitments produces NO follow-up block.
+ *   4. Remove candidates whose fingerprint is dismissed or snoozed for this
+ *      user (meeting-prep dismissals suppress the recurring series for 7d)
+ *   5. Greedy match with confidence floor → up to 5 suggestions (cap, not quota)
  *   6. Persist new rows; mark outdated "suggested" rows as "expired"
  *   7. Return the fresh set
  *
@@ -31,7 +38,9 @@ import {
   candidatesFromLoops,
   candidatesFromOpportunities,
   candidatesFromMeetings,
-  candidatesFromRecentMeetings,
+  candidatesFromCommitments,
+  fetchOpenCommitmentRows,
+  quickBatchCandidate,
   loopCoveredEntityIds,
 } from "@/lib/time-block-candidates";
 import { matchCandidatesToSlots } from "@/lib/time-block-matcher";
@@ -69,13 +78,16 @@ type StoredBlock = {
   gcal_event_link: string | null;
 };
 
-export async function GET(_req: NextRequest) {
+export async function GET(req: NextRequest) {
   const guard = await adminGuardApi();
   if (guard) return guard;
 
   const user = await currentUser();
   const email = user?.primaryEmailAddress?.emailAddress;
   if (!email) return NextResponse.json({ error: "No email" }, { status: 400 });
+
+  // ?force=1 — sent by the UI "Re-scan" button; bypasses the 4h freshness cache.
+  const force = new URL(req.url).searchParams.get("force") === "1";
 
   const sb = getSupabaseServerClient();
   const nowIso = new Date().toISOString();
@@ -96,6 +108,7 @@ export async function GET(_req: NextRequest) {
   const existingRows = (existing ?? []) as StoredBlock[];
   const newestGeneratedAt = existingRows[0]?.generated_at;
   const isFresh =
+    !force &&
     existingRows.length > 0 &&
     newestGeneratedAt &&
     Date.now() - new Date(newestGeneratedAt).getTime() < FRESH_WINDOW_MS;
@@ -135,33 +148,40 @@ export async function GET(_req: NextRequest) {
       });
     }
 
-    // Pull candidates
+    // Pull candidates. Open commitments (extracted from meeting transcripts /
+    // email at ingest time) are the primary evidence source — a meeting that
+    // produced no commitments produces no block.
     const covered = await loopCoveredEntityIds();
-    const [loopCands, oppCands] = await Promise.all([
+    const [loopCands, oppCands, openCommitments] = await Promise.all([
       candidatesFromLoops(20),
       candidatesFromOpportunities(covered, 15),
+      fetchOpenCommitmentRows(50),
     ]);
-    // Recent meetings for follow-up: we need meetings that ENDED in the last
-    // 24h; upcoming.list only returns future. Fetch past separately via a second
-    // events.list call embedded here to keep surface area small.
-    const recent = await listPastMeetings(1);
 
-    // Attendee enrichment — look up who's in each meeting and observe new
-    // emails so Jose can classify them later from /admin/hall/contacts.
-    // is_personal meetings skip prep/follow-up entirely; VIP meetings get
-    // an urgency boost. Upsert is fire-and-forget best-effort.
+    // Recent meetings are fetched only to observe attendees (so Jose can
+    // classify them in /admin/hall/contacts). They no longer generate blanket
+    // "Follow up on X" blocks — follow-up work surfaces through the
+    // commitments extracted from the meeting's transcript instead.
+    const recent = await listPastMeetings(1);
     const attendeeEmails = collectNonSelfEmails([...upcoming, ...recent]);
     const attendeeLookup = await loadAttendeeClasses(attendeeEmails);
     void observeAttendees([...upcoming, ...recent]);
 
-    const prepCands      = await candidatesFromMeetings(upcoming, now, attendeeLookup);
-    const followUpCands  = candidatesFromRecentMeetings(recent, now, attendeeLookup);
+    const commitmentCands = candidatesFromCommitments(openCommitments, upcoming, now, prefs.timezone);
+    const batchCand       = quickBatchCandidate(openCommitments);
+    const prepCands       = candidatesFromMeetings(upcoming, now, attendeeLookup, {
+      timezone:        prefs.timezone,
+      openCommitments,
+    });
 
     // L-011 fix: dismissed fingerprints are suppressed FOREVER. The previous
     // 24h cutoff meant the same loop reappeared every day after dismiss —
     // the user reported dismissing the same suggestion 5x in 16 days.
     // A new fingerprint (new loop / new content) is the only legitimate
     // resurrection path; same fingerprint must stay buried.
+    // Meeting-prep fingerprints are series-keyed (recurring event instances
+    // share one fingerprint), so dismissing a weekly sync's prep permanently
+    // silences the whole series — "Not now" (snooze) is the temporal option.
     // Snoozed fingerprints still respect their snoozed_until (by design).
     const { data: blocks } = await sb
       .from("suggested_time_blocks")
@@ -179,10 +199,11 @@ export async function GET(_req: NextRequest) {
     }
 
     const allCands = [
-      ...followUpCands,              // follow-ups decay fastest → first in pool
+      ...commitmentCands,            // evidence-backed commitments lead the pool
       ...prepCands,
       ...loopCands,
       ...oppCands,
+      ...(batchCand ? [batchCand] : []),
     ].filter(c => !suppressed.has(c.fingerprint));
 
     const matches = matchCandidatesToSlots(allCands, slots, now, MAX_SUGGESTIONS, {
@@ -193,13 +214,15 @@ export async function GET(_req: NextRequest) {
     logHallEvent({
       source: "suggested-time-blocks", type: "stb_suggestions_generated", user_email: email,
       metadata: {
-        slots_found:          slots.length,
-        candidates_considered: allCands.length,
-        loop_candidates:       loopCands.length,
+        slots_found:            slots.length,
+        candidates_considered:  allCands.length,
+        loop_candidates:        loopCands.length,
         opportunity_candidates: oppCands.length,
-        prep_candidates:       prepCands.length,
-        followup_candidates:   followUpCands.length,
-        suppressed_count:      suppressed.size,
+        prep_candidates:        prepCands.length,
+        commitment_candidates:  commitmentCands.length,
+        open_commitments:       openCommitments.length,
+        quick_batch:            batchCand ? 1 : 0,
+        suppressed_count:       suppressed.size,
       },
     });
 
@@ -211,7 +234,7 @@ export async function GET(_req: NextRequest) {
       return NextResponse.json({
         mode: "empty",
         suggestions: [],
-        reason: "No candidates matched available slots.",
+        reason: "Nothing needs a dedicated block right now — open items are quick-dispatch (see Commitments / Inbox).",
       });
     }
 

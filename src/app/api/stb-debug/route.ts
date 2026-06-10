@@ -20,6 +20,9 @@ import {
   candidatesFromLoops,
   candidatesFromOpportunities,
   candidatesFromMeetings,
+  candidatesFromCommitments,
+  fetchOpenCommitmentRows,
+  quickBatchCandidate,
   loopCoveredEntityIds,
 } from "@/lib/time-block-candidates";
 import {
@@ -48,14 +51,26 @@ export async function GET() {
   const slots = findOpenSlots(now, 7, busy, upcoming, prefs);
 
   const covered = await loopCoveredEntityIds();
-  const [loopCands, oppCands] = await Promise.all([
+  const [loopCands, oppCands, openCommitments] = await Promise.all([
     candidatesFromLoops(20),
     candidatesFromOpportunities(covered, 15),
+    fetchOpenCommitmentRows(50),
   ]);
   const lookup = await loadAttendeeClasses(collectNonSelfEmails(upcoming));
-  const prepCands = await candidatesFromMeetings(upcoming, now, lookup);
+  const commitmentCands = candidatesFromCommitments(openCommitments, upcoming, now, prefs.timezone);
+  const batchCand = quickBatchCandidate(openCommitments);
+  const prepCands = candidatesFromMeetings(upcoming, now, lookup, {
+    timezone: prefs.timezone,
+    openCommitments,
+  });
 
-  const allCands = [...loopCands, ...oppCands, ...prepCands];
+  const allCands = [
+    ...commitmentCands,
+    ...prepCands,
+    ...loopCands,
+    ...oppCands,
+    ...(batchCand ? [batchCand] : []),
+  ];
 
   // Compute per-slot scores the matcher would assign to each candidate.
   // Keep it minimal; do not invoke the real matcher (we want raw visibility).

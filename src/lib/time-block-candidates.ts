@@ -15,13 +15,14 @@
 import { getSupabaseServerClient } from "./supabase-server";
 import type { UpcomingMeeting } from "./calendar-slots";
 import { classifyMeeting, type AttendeeLookup } from "./meeting-classifier";
+import type { Effort } from "./ingestors/types";
 
-export type TaskType = "deep_work" | "follow_up" | "prep" | "decision" | "admin";
+export type TaskType = "deep_work" | "follow_up" | "prep" | "decision" | "admin" | "commitment";
 
 export type Candidate = {
   /** Specific action sentence. Not vague. */
   title: string;
-  entity_type: "loop" | "opportunity" | "project" | "meeting_prep" | "meeting_follow_up";
+  entity_type: "loop" | "opportunity" | "project" | "meeting_prep" | "meeting_follow_up" | "commitment" | "quick_batch";
   entity_id: string;
   entity_label: string;
   duration_min: number;
@@ -241,202 +242,355 @@ export async function candidatesFromOpportunities(
   return out;
 }
 
-// ─── Meetings → Prep + Follow-up Candidates ─────────────────────────────────
+// ─── Open Commitments → Candidates ──────────────────────────────────────────
+//
+// The intelligence core of Suggested Time Blocks v2. A block is suggested only
+// when a real, content-derived commitment (extracted from meeting transcripts
+// / email by the ingestors into `action_items`) needs a dedicated work
+// session. Three tests gate every candidate:
+//   1. Effort   — the work itself needs a session (effort='session'), or a
+//                 focused slot under concrete pressure (effort='focused').
+//   2. Window   — an open calendar slot fits it (enforced by the matcher).
+//   3. Pressure — deadline / accountability meeting / staleness shape urgency.
+// Quick items (≤15 min) never earn an individual block: they are dispatched
+// from the Inbox / Commitments ledger, or swept by ONE batch block when they
+// accumulate (see quickBatchCandidate). A meeting with no extracted
+// commitments produces NO block — the empty state is the correct output.
 
-/**
- * Signal gate: for each attendee email, returns whether the counterpart has
- * enough historical signal that a prep brief would produce something useful.
- * Bar is intentionally low — we only want to suppress the "total strangers
- * with 2 emails" case. Passing the gate doesn't guarantee a great brief, it
- * guarantees it won't be generic.
- *
- * Pass conditions (ANY one is enough):
- *   - person_classification = Internal (founders, team — always prep-worthy)
- *   - contact_warmth = Hot or Warm
- *   - At least 1 WhatsApp message exists in conversation_messages FK'd to
- *     this person_id
- *
- * Fail: external contact with no WA history, no warmth mark, not internal.
- */
-async function counterpartsWithPrepSignal(emails: string[]): Promise<Set<string>> {
-  const ok = new Set<string>();
-  if (emails.length === 0) return ok;
-  const sb = getSupabaseServerClient();
-  const lowerEmails = emails.map(e => e.toLowerCase());
+export type CommitmentRow = {
+  id:                string;
+  subject:           string;
+  counterparty:      string | null;
+  next_action:       string | null;
+  intent:            string;
+  effort:            string | null;
+  deadline:          string | null;
+  priority_score:    number;
+  last_motion_at:    string;
+  first_surfaced_at: string | null;
+  source_type:       string;
+  source_url:        string | null;
+};
 
-  // Single-table query against unified `people`. Pass conditions (any):
-  //   - Meaningful relationship_class / relationship_classes (human-classified
-  //     Partner/Investor/Client/Team/Portfolio/Funder/Vendor/VIP)
-  //   - Hot or Warm warmth
-  //   - Legacy Internal classification (pre-migration)
-  //   - Whatsapp messages linked to this person (sender_person_id)
-  const { data: people } = await sb
-    .from("people")
-    .select("id, email, person_classification, contact_warmth, relationship_class, relationship_classes")
-    .in("email", lowerEmails);
+/** Intents that can justify an individual time block. `reply` belongs to the
+ *  Inbox, `prep` to the meeting-prep generator, `chase`/`nurture` are quick
+ *  by nature (a nudge is a message, not a session). */
+const BLOCK_INTENTS = new Set(["deliver", "decide", "approve", "review"]);
 
-  const MEANINGFUL = new Set(["partner", "investor", "funder", "client", "portfolio", "vendor", "team", "vip"]);
-  const personIdByEmail = new Map<string, string>();
-  for (const p of (people ?? []) as Array<{
-    id: string;
-    email: string | null;
-    person_classification: string | null;
-    contact_warmth:        string | null;
-    relationship_class:    string | null;
-    relationship_classes:  string[] | null;
-  }>) {
-    const em = (p.email ?? "").toLowerCase();
-    if (!em) continue;
-    personIdByEmail.set(em, p.id);
+/** Verbs/nouns that signal the next action produces an artifact. */
+const PRODUCTION_RE = /(document|draft|write|prepare|create|build|design|develop|finali[sz]e|set up|structure|plan|proposal|deck|presentation|report|agreement|contract|budget|model|analysis|spreadsheet|tracking|system|documentar|redactar|preparar|crear|propuesta|informe|acuerdo|presupuesto)/i;
 
-    const cls       = (p.person_classification ?? "").toLowerCase();
-    const warmth    = (p.contact_warmth ?? "").toLowerCase();
-    const primary   = (p.relationship_class ?? "").toLowerCase();
-    const allClasses = (p.relationship_classes ?? []).map(c => (c ?? "").toLowerCase());
-    const hasMeaningfulClass = [primary, ...allClasses].some(c => MEANINGFUL.has(c));
-
-    if (cls === "internal" || warmth === "hot" || warmth === "warm" || hasMeaningfulClass) {
-      ok.add(em);
-    }
-  }
-
-  // Secondary pass: WhatsApp FK. A person with linked WA messages has
-  // substantive signal regardless of classification.
-  const idsToCheck = [...personIdByEmail.entries()]
-    .filter(([em]) => !ok.has(em))
-    .map(([, id]) => id);
-  if (idsToCheck.length > 0) {
-    const { data: waLinked } = await sb
-      .from("conversation_messages")
-      .select("sender_person_id")
-      .eq("platform", "whatsapp")
-      .in("sender_person_id", idsToCheck)
-      .limit(idsToCheck.length * 2);
-    const linkedIds = new Set(
-      (waLinked ?? []).map(r => (r as { sender_person_id: string | null }).sender_person_id).filter(Boolean) as string[]
-    );
-    for (const [em, id] of personIdByEmail.entries()) {
-      if (linkedIds.has(id)) ok.add(em);
-    }
-  }
-
-  return ok;
+/** Fallback when action_items.effort is NULL (rows older than the classifier,
+ *  or sources without one). Mirrors the SQL backfill heuristic. */
+export function inferEffort(intent: string, text: string): Effort {
+  if (["chase", "reply", "nurture", "close_loop", "follow_up"].includes(intent)) return "quick";
+  if (["decide", "approve", "review", "prep"].includes(intent)) return "focused";
+  if (intent === "deliver") return PRODUCTION_RE.test(text) ? "session" : "focused";
+  return "focused";
 }
 
-export async function candidatesFromMeetings(
+function effortOf(r: CommitmentRow): Effort {
+  if (r.effort === "quick" || r.effort === "focused" || r.effort === "session") return r.effort;
+  return inferEffort(r.intent, `${r.next_action ?? ""} ${r.subject}`);
+}
+
+/**
+ * Open commitments owned by Jose, from content-bearing sources.
+ * `loops` is intentionally excluded — candidatesFromLoops reads the loops
+ * table directly with richer loop-type logic; including the mirrored
+ * action_items rows would double-surface the same work.
+ */
+export async function fetchOpenCommitmentRows(limit = 50): Promise<CommitmentRow[]> {
+  const sb = getSupabaseServerClient();
+  const { data, error } = await sb
+    .from("action_items")
+    .select("id, subject, counterparty, next_action, intent, effort, deadline, priority_score, last_motion_at, first_surfaced_at, source_type, source_url")
+    .eq("status", "open")
+    .eq("ball_in_court", "jose")
+    .in("source_type", ["fireflies", "gmail", "drive", "evidence_derived"])
+    .in("intent", ["deliver", "decide", "approve", "review", "chase", "follow_up", "close_loop"])
+    .order("priority_score", { ascending: false })
+    .order("last_motion_at", { ascending: false })
+    .limit(limit);
+  if (error || !data) return [];
+  return data as unknown as CommitmentRow[];
+}
+
+/** Accent-insensitive tokens, ≥3 chars, for name/title matching. */
+function normTokens(s: string | null | undefined): string[] {
+  return (s ?? "")
+    .normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter(t => t.length >= 3);
+}
+
+/**
+ * Does this commitment involve this meeting? True when the counterparty name
+ * matches an attendee (display name or email local part) or the meeting
+ * title, or when the meeting title overlaps the commitment subject on ≥2
+ * meaningful tokens (catches org/project-named meetings).
+ */
+function commitmentMatchesMeeting(r: CommitmentRow, m: UpcomingMeeting): boolean {
+  const cpTokens = normTokens(r.counterparty);
+  const titleTokens = normTokens(m.title);
+  const titleSet = new Set(titleTokens);
+
+  if (cpTokens.length > 0) {
+    for (const a of m.attendees) {
+      if (a.self) continue;
+      const hay = new Set(normTokens(`${a.displayName ?? ""} ${a.email.split("@")[0].replace(/[._-]/g, " ")}`));
+      if (cpTokens.some(t => hay.has(t))) return true;
+    }
+    if (cpTokens.some(t => titleSet.has(t))) return true;
+  }
+
+  const subjSet = new Set(normTokens(r.subject));
+  const overlap = titleTokens.filter(t => subjSet.has(t)).length;
+  return overlap >= 2;
+}
+
+/** Earliest upcoming meeting (≤7d) where this commitment will be on the table. */
+function findAccountabilityMeeting(
+  r: CommitmentRow,
   meetings: UpcomingMeeting[],
   now: Date,
-  lookup: AttendeeLookup = new Map(),
-): Promise<Candidate[]> {
-  const out: Candidate[] = [];
-
-  // Pre-compute prep-signal gate for all non-self attendees across all meetings
-  // in one batch, so we don't make per-meeting DB calls.
-  const allAttendeeEmails = new Set<string>();
-  for (const m of meetings) {
-    for (const a of m.attendees) {
-      if (!a.self && a.email) allAttendeeEmails.add(a.email.toLowerCase());
-    }
-  }
-  const prepWorthy = await counterpartsWithPrepSignal([...allAttendeeEmails]);
-
-  for (const m of meetings) {
+): UpcomingMeeting | null {
+  const sorted = [...meetings].sort((a, b) => a.start.getTime() - b.start.getTime());
+  for (const m of sorted) {
     const msUntil = m.start.getTime() - now.getTime();
-    const daysUntil = msUntil / 86_400_000;
-    if (msUntil <= 0) continue;                                // only upcoming
-    if (daysUntil > 7) continue;
+    if (msUntil <= 0 || msUntil > 7 * 86_400_000) continue;
+    if (commitmentMatchesMeeting(r, m)) return m;
+  }
+  return null;
+}
 
-    const cls = classifyMeeting(m, lookup);
+function fmtMeetingTime(d: Date, tz: string): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: tz, weekday: "short", hour: "2-digit", minute: "2-digit", hour12: false,
+  }).format(d);
+}
 
-    // is_personal = every non-self attendee is Family/Personal Service/Friend.
-    // Skip prep entirely — the event stays busy on the calendar for slot
-    // finding, but no prep/follow-up task is emitted.
-    if (cls.is_personal) continue;
+function commitmentOutcome(r: CommitmentRow): string {
+  const to = r.counterparty ? ` and sent to ${r.counterparty}` : "";
+  switch (r.intent) {
+    case "decide":
+    case "approve": return `Decision made${r.counterparty ? ` and communicated to ${r.counterparty}` : " and recorded"}.`;
+    case "review":  return `Reviewed; verdict${to || " recorded"}.`;
+    default:        return `Deliverable produced${to} — commitment closed.`;
+  }
+}
 
-    // Context gate: prep only makes sense when there is something to prepare
-    // from. Skip prep when the meeting has no agenda/description AND is not
-    // high-stakes (no VIP) AND is a small invite list. Solo calls, quick 1:1s
-    // with no notes, and generic catch-ups do not benefit from a prep block.
-    const hasDescription    = (m.description ?? "").length >= 30;
-    const isMultiParty      = cls.confirmed_count + cls.tentative_count >= 3;
-    const hasContext        = hasDescription || cls.has_vip || isMultiParty;
+export function candidatesFromCommitments(
+  rows: CommitmentRow[],
+  upcomingMeetings: UpcomingMeeting[],
+  now: Date,
+  tz: string,
+): Candidate[] {
+  const out: Candidate[] = [];
+  for (const r of rows) {
+    if (!BLOCK_INTENTS.has(r.intent)) continue;
+    const effort = effortOf(r);
+    if (effort === "quick") continue;                            // Test 1 fail
 
-    // Signal gate: pass if EITHER at least one non-self attendee passes the
-    // contact-signal check (they're Internal / Warm+ / have WA linked) OR
-    // the meeting itself carries strong context (long description, VIP, or
-    // a multi-party coordination). The second path avoids over-suppressing
-    // real high-stakes meetings where attendees simply aren't populated in
-    // the people table yet (a common state for external partners).
-    const nonSelf         = m.attendees.filter(a => !a.self && a.email);
-    const hasContactSignal = nonSelf.some(a => prepWorthy.has(a.email.toLowerCase()));
-    const strongContext    = (m.description ?? "").length >= 200
-                             || cls.has_vip
-                             || cls.confirmed_count >= 3;
-    const hasSignal        = hasContactSignal || strongContext;
+    const sinceIso = r.first_surfaced_at ?? r.last_motion_at;
+    const daysOpen = Math.max(0, Math.floor((now.getTime() - new Date(sinceIso).getTime()) / 86_400_000));
+    const deadlineDays = r.deadline
+      ? Math.floor((new Date(r.deadline).getTime() - now.getTime()) / 86_400_000)
+      : null;
+    const meeting = findAccountabilityMeeting(r, upcomingMeetings, now);
+    const meetingDays = meeting ? (meeting.start.getTime() - now.getTime()) / 86_400_000 : null;
 
-    // Prep candidate: needed if meeting is in next 3 days, has attendees, AND
-    // we actually have signal on at least one of them.
-    if (daysUntil <= 3 && hasContext && hasSignal) {
-      // VIP boost: any non-self attendee in Investor / Funder / Portfolio
-      const baseUrgency = daysUntil <= 1 ? 85 : 70;
-      const vipBoost    = cls.has_vip ? 15 : 0;
-      // Attendee-confirmation weighting: heavier signal when most attendees have
-      // already accepted. Raw count scales slightly so big confirmed meetings win.
-      const confirmBoost = Math.min(5, cls.confirmed_count);
-      const urgency = Math.min(100, baseUrgency + vipBoost + confirmBoost);
+    // Test 3 gate for focused work: a 30-60 min task earns a block only under
+    // concrete pressure. Session work earns one by its size alone.
+    const hasPressure =
+      (deadlineDays !== null && deadlineDays <= 10) ||
+      meeting !== null ||
+      daysOpen >= 10;
+    if (effort === "focused" && !hasPressure) continue;
 
-      const whyParts: string[] = [
-        `Meeting ${new Intl.DateTimeFormat("en-GB", { timeZone: "America/Costa_Rica", weekday: "short", hour: "2-digit", minute: "2-digit", hour12: false }).format(m.start)}`,
-        `${cls.confirmed_count} confirmed${cls.tentative_count ? ` + ${cls.tentative_count} tentative` : ""}`,
-      ];
-      if (cls.has_vip) whyParts.push("VIP attendee — high-stakes");
-
-      out.push({
-        title:            `Prep for "${m.title}"`,
-        entity_type:      "meeting_prep",
-        entity_id:        m.id,
-        entity_label:     m.title,
-        duration_min:     45,
-        task_type:        "prep",
-        urgency_score:    urgency,
-        confidence_score: 80,
-        why_now:          whyParts.join(" · ") + ".",
-        expected_outcome: `Review open commitments with counterpart; walk in with prep actions decided.`,
-        fingerprint:      `meeting_prep:${m.id}:prep`,
-        hard_time_constraint: { kind: "before", reference: m.start, withinMs: 24 * 3600_000 },
-      });
+    let urgency = Math.min(70, Math.max(35, r.priority_score));
+    if (deadlineDays !== null) {
+      if (deadlineDays < 0)       urgency += 25;
+      else if (deadlineDays <= 2) urgency += 20;
+      else if (deadlineDays <= 7) urgency += 12;
     }
+    if (meetingDays !== null) urgency += meetingDays <= 3 ? 15 : 8;
+    urgency = Math.min(100, urgency + Math.min(12, Math.floor(daysOpen / 7) * 4));
+
+    // Evidence quality: transcript/evidence-derived items beat heuristics.
+    let confidence = r.source_type === "fireflies" || r.source_type === "evidence_derived" ? 80 : 70;
+    if (!r.effort) confidence -= 10;                             // effort was inferred
+
+    const why: string[] = [];
+    why.push(daysOpen <= 0 ? "Committed today" : daysOpen === 1 ? "Committed yesterday" : `Open commitment for ${daysOpen}d`);
+    if (deadlineDays !== null) {
+      why.push(
+        deadlineDays < 0 ? `${-deadlineDays}d past due`
+        : deadlineDays === 0 ? "due today"
+        : `due in ${deadlineDays}d`,
+      );
+    }
+    if (meeting) why.push(`you meet ${r.counterparty ?? "them"} ${fmtMeetingTime(meeting.start, tz)}`);
+    if (deadlineDays === null && !meeting) {
+      why.push(effort === "session" ? "needs a dedicated work session" : "aging — schedule it or drop it");
+    }
+
+    const title = (r.next_action ?? r.subject).trim();
+    const label = r.counterparty && r.subject.trim() !== title
+      ? `${r.counterparty} · ${r.subject}`
+      : (r.counterparty ?? r.subject);
+
+    out.push({
+      title,
+      entity_type:      "commitment",
+      entity_id:        r.id,
+      entity_label:     label,
+      duration_min:     effort === "session" ? 90 : 45,
+      task_type:        "commitment",
+      urgency_score:    urgency,
+      confidence_score: confidence,
+      why_now:          why.join(" · ") + ".",
+      expected_outcome: commitmentOutcome(r),
+      fingerprint:      `commitment:${r.id}`,
+      // Bind to "before the accountability meeting" only when there is enough
+      // room to actually find a slot; binding a meeting <48h out would drop
+      // the candidate entirely whenever the day is already packed.
+      ...(meeting && meetingDays !== null && meetingDays >= 2
+        ? { hard_time_constraint: { kind: "before" as const, reference: meeting.start, withinMs: meeting.start.getTime() - now.getTime() } }
+        : {}),
+    });
   }
   return out;
 }
 
-export function candidatesFromRecentMeetings(
-  recentMeetings: UpcomingMeeting[],
+/**
+ * One aggregated block when quick items pile up. Individually none of them
+ * deserves calendar time (each is ≤15 min); collectively the backlog does.
+ * Never more than one such block; below the threshold, quick items live only
+ * in the Commitments ledger / Inbox.
+ */
+export function quickBatchCandidate(rows: CommitmentRow[]): Candidate | null {
+  const quick = rows.filter(r => r.intent !== "reply" && effortOf(r) === "quick");
+  if (quick.length < 4) return null;
+
+  const names = [...new Set(quick.map(r => (r.counterparty ?? "").trim().split(/\s+/)[0]).filter(Boolean))];
+  const preview = names.slice(0, 3).join(", ");
+  const n = quick.length;
+
+  return {
+    title:            `Batch-clear ${n} quick pendings`,
+    entity_type:      "quick_batch",
+    entity_id:        "quick_batch",
+    entity_label:     `${n} items${preview ? ` · ${preview}${names.length > 3 ? ` +${names.length - 3}` : ""}` : ""}`,
+    duration_min:     n >= 8 ? 45 : 30,
+    task_type:        "admin",
+    urgency_score:    Math.min(75, 50 + n * 2),
+    confidence_score: 75,
+    why_now:          `${n} sub-15-min items accumulated (nudges, confirmations, short replies) — one sweep clears them all.`,
+    expected_outcome: `Each quick item actioned: short message sent or marked done in the Commitments ledger.`,
+    fingerprint:      "quick_batch:admin",
+  };
+}
+
+// ─── Meetings → Prep Candidates ──────────────────────────────────────────────
+
+/** Recurring Google Calendar instances carry ids like `<seriesId>_<timestamp>`.
+ *  Fingerprinting on the series id makes a dismissal cover the whole series
+ *  (this week's dismissed weekly prep doesn't respawn next week). */
+function seriesKey(eventId: string): string {
+  return eventId.split("_")[0];
+}
+
+/** A description counts as a real agenda only after stripping HTML and URLs
+ *  (a bare Zoom link is not an agenda). Bullet/numbered lines count even
+ *  when short. */
+function hasRealAgenda(desc: string | null | undefined): boolean {
+  const raw = desc ?? "";
+  const text = raw
+    .replace(/<[^>]+>/g, " ")
+    .replace(/https?:\/\/\S+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (text.length >= 120) return true;
+  const lines = raw.split(/\r?\n/).map(l => l.trim());
+  return lines.filter(l => /^([-*•·]|\d+[.)])\s+\S/.test(l)).length >= 2;
+}
+
+export type PrepOptions = {
+  timezone: string;
+  /** Open commitments (fetchOpenCommitmentRows) — material gate A. */
+  openCommitments: CommitmentRow[];
+};
+
+/**
+ * Prep candidates — only when there is something concrete to prepare FROM.
+ * Material gates (any):
+ *   A. Open commitments involving an attendee / this meeting's subject —
+ *      "you walk in owing them something".
+ *   B. A real agenda in the event description.
+ *   C. A VIP attendee (explicit human 'VIP' tag — high stakes by definition).
+ * A recurring internal sync with none of the above gets NO prep block.
+ */
+export function candidatesFromMeetings(
+  meetings: UpcomingMeeting[],
   now: Date,
   lookup: AttendeeLookup = new Map(),
+  opts: PrepOptions,
 ): Candidate[] {
-  // "recent" = ended in the last 24 hours
   const out: Candidate[] = [];
-  for (const m of recentMeetings) {
-    const endedAgoMs = now.getTime() - m.end.getTime();
-    if (endedAgoMs < 0 || endedAgoMs > 24 * 3600_000) continue;
-    // Skip personal meetings — never queue a follow-up for a therapy
-    // appointment, family dinner, etc.
+
+  for (const m of meetings) {
+    const msUntil = m.start.getTime() - now.getTime();
+    const daysUntil = msUntil / 86_400_000;
+    if (msUntil <= 0 || daysUntil > 3) continue;
+
     const cls = classifyMeeting(m, lookup);
+    // is_personal = every non-self attendee is Family/Personal Service/Friend.
+    // The event stays busy for slot-finding, but no prep task is emitted.
     if (cls.is_personal) continue;
+
+    const owed   = opts.openCommitments.filter(r => commitmentMatchesMeeting(r, m));
+    const agenda = hasRealAgenda(m.description);
+    const vip    = cls.has_vip;
+    if (owed.length === 0 && !agenda && !vip) continue;          // no material → no prep
+
+    const timeLabel = fmtMeetingTime(m.start, opts.timezone);
+    const whyParts: string[] = [];
+    let confidence = 0;
+    let urgency = daysUntil <= 1 ? 75 : 62;
+
+    if (owed.length > 0) {
+      const first = owed[0];
+      const firstTitle = (first.next_action ?? first.subject).trim();
+      const shortTitle = firstTitle.length > 60 ? firstTitle.slice(0, 57) + "…" : firstTitle;
+      whyParts.push(`Open with ${first.counterparty ?? "the counterpart"}: "${shortTitle}"${owed.length > 1 ? ` +${owed.length - 1} more` : ""}`);
+      confidence = Math.max(confidence, 85);
+      urgency += 12;
+    }
+    if (agenda) { whyParts.push("agenda set"); confidence = Math.max(confidence, 70); }
+    if (vip)    { whyParts.push("VIP attendee — high stakes"); confidence = Math.max(confidence, 65); urgency += 8; }
+    whyParts.push(`meeting ${timeLabel} · ${cls.confirmed_count} confirmed`);
+
+    const outcome = owed.length > 0
+      ? `Walk in with the ${owed.length} open item${owed.length === 1 ? "" : "s"} addressed or an answer ready.`
+      : agenda
+      ? "Agenda reviewed; a position decided for each item."
+      : "Context reviewed; objectives for the meeting decided.";
+
     out.push({
-      title:            `Follow up on "${m.title}"`,
-      entity_type:      "meeting_follow_up",
+      title:            `Prep for "${m.title}"`,
+      entity_type:      "meeting_prep",
       entity_id:        m.id,
       entity_label:     m.title,
-      duration_min:     30,
-      task_type:        "follow_up",
-      urgency_score:    80,
-      confidence_score: 70,
-      why_now:          `Meeting ended ${Math.round(endedAgoMs / 3600_000)}h ago — follow-up decays fast.`,
-      expected_outcome: `Action items confirmed; one follow-up email sent to ${m.attendeeCount} attendee${m.attendeeCount === 1 ? "" : "s"}.`,
-      fingerprint:      `meeting_follow_up:${m.id}:follow_up`,
-      hard_time_constraint: { kind: "after", reference: m.end, withinMs: 48 * 3600_000 },
+      duration_min:     owed.length >= 2 || agenda ? 45 : 40,
+      task_type:        "prep",
+      urgency_score:    Math.min(100, urgency),
+      confidence_score: confidence,
+      why_now:          whyParts.join(" · ") + ".",
+      expected_outcome: outcome,
+      fingerprint:      `meeting_prep:${seriesKey(m.id)}:prep`,
+      hard_time_constraint: { kind: "before", reference: m.start, withinMs: 24 * 3600_000 },
     });
   }
   return out;

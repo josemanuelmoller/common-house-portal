@@ -23,7 +23,7 @@ type Suggestion = {
   start: string;
   end: string;
   duration_min: number;
-  task_type: "deep_work" | "follow_up" | "prep" | "decision" | "admin";
+  task_type: "deep_work" | "follow_up" | "prep" | "decision" | "admin" | "commitment";
   urgency_score: number;
   confidence_score: number;
   why_now: string;
@@ -39,19 +39,21 @@ type ApiResponse =
   | { error: string; message?: string };
 
 const TASK_TYPE_LABEL: Record<string, string> = {
-  deep_work: "Deep work",
-  follow_up: "Follow-up",
-  prep:      "Prep",
-  decision:  "Decision",
-  admin:     "Admin",
+  deep_work:  "Deep work",
+  follow_up:  "Follow-up",
+  prep:       "Prep",
+  decision:   "Decision",
+  admin:      "Admin",
+  commitment: "Commitment",
 };
 
 const TASK_TYPE_CLASS: Record<string, string> = {
-  deep_work: "bg-[#0a0a0a] text-[#c6f24a]",
-  follow_up: "bg-amber-50 text-amber-700 border border-amber-200",
-  prep:      "bg-blue-50 text-blue-700 border border-blue-200",
-  decision:  "bg-red-50 text-red-600 border border-red-200",
-  admin:     "bg-[#f4f4ef] text-[#0a0a0a]/60 border border-[#e4e4dd]",
+  deep_work:  "bg-[#0a0a0a] text-[#c6f24a]",
+  follow_up:  "bg-amber-50 text-amber-700 border border-amber-200",
+  prep:       "bg-blue-50 text-blue-700 border border-blue-200",
+  decision:   "bg-red-50 text-red-600 border border-red-200",
+  admin:      "bg-[#f4f4ef] text-[#0a0a0a]/60 border border-[#e4e4dd]",
+  commitment: "bg-amber-50 text-amber-700 border border-amber-200",
 };
 
 export function SuggestedTimeBlocks() {

@@ -185,6 +185,9 @@ export async function persistActionSignal(signal: ActionSignal): Promise<{
         ingested_at:      signal.emitted_at,
         deadline:         signal.payload.deadline,
         consequence:      signal.payload.consequence,
+        // Only overwrite effort when the signal carries one — a null/absent
+        // effort must not erase a value set by backfill or a prior classifier.
+        ...(signal.payload.effort ? { effort: signal.payload.effort } : {}),
       })
       .eq("id", existing.id as string);
     if (updErr) throw new Error(`persistActionSignal update: ${updErr.message}`);
@@ -240,6 +243,7 @@ export async function persistActionSignal(signal: ActionSignal): Promise<{
           ingested_at:      signal.emitted_at,
           deadline:         signal.payload.deadline,
           consequence:      signal.payload.consequence,
+          ...(signal.payload.effort ? { effort: signal.payload.effort } : {}),
         })
         .eq("id", closed.id as string);
       if (reErr) throw new Error(`persistActionSignal reopen: ${reErr.message}`);
@@ -305,6 +309,7 @@ export async function persistActionSignal(signal: ActionSignal): Promise<{
             ingested_at:      signal.emitted_at,
             deadline:         signal.payload.deadline,
             consequence:      signal.payload.consequence,
+            ...(signal.payload.effort ? { effort: signal.payload.effort } : {}),
           })
           .eq("id", bestMatch.id);
         if (updErr) throw new Error(`persistActionSignal fuzzy-update: ${updErr.message}`);
@@ -336,6 +341,7 @@ export async function persistActionSignal(signal: ActionSignal): Promise<{
     deadline:                signal.payload.deadline,
     last_motion_at:          signal.payload.last_motion_at,
     consequence:             signal.payload.consequence,
+    effort:                  signal.payload.effort ?? null,
     priority_score,
     priority_factors:        signal.payload.priority_factors,
     status:                  "open",

@@ -30,6 +30,18 @@ export type Intent =
 
 export type BallInCourt = "jose" | "them" | "team" | "unknown";
 
+/**
+ * Estimated work size for an action item. Set at ingest time (classifier or
+ * static mapping). Drives Suggested Time Blocks eligibility:
+ *   quick   — ≤15 min (reply, confirm, nudge). Dispatched from Inbox/ledger,
+ *             never earns an individual time block (only the batch block).
+ *   focused — 30–60 min (review a doc, prepare notes, substantial email).
+ *             Earns a block only under time pressure (deadline / meeting).
+ *   session — 90 min+ of production work (draft a document, build a model).
+ *             Always block-eligible while open.
+ */
+export type Effort = "quick" | "focused" | "session";
+
 export type Warmth = "hot" | "warm" | "cool" | "dormant";
 
 /** Audit trail for priority_score — see priority.ts. */
@@ -79,6 +91,8 @@ export type ActionSignal = SignalEnvelope & {
     last_motion_at: string;
     consequence: string | null;
     priority_factors: PriorityFactors;
+    /** Estimated work size. Optional — persist leaves the column untouched when absent. */
+    effort?: Effort | null;
   };
 };
 

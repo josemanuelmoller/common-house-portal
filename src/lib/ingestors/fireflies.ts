@@ -46,7 +46,7 @@ import type {
   Signal,
 } from "./types";
 
-const INGESTOR_VERSION = "fireflies@1.1.0";
+const INGESTOR_VERSION = "fireflies@1.2.0";
 const SOURCE_TYPE = "fireflies" as const;
 const DEFAULT_MAX_ITEMS = 60;
 const DEFAULT_BACKFILL_DAYS = 14;
@@ -82,6 +82,7 @@ type Classification = {
   counterparty: string | null;
   intent: "deliver" | "chase" | "follow_up" | "skip";
   next_action: string | null;
+  effort: "quick" | "focused" | "session";
 };
 
 export async function runFirefliesIngestor(input: IngestInput): Promise<IngestResult> {
@@ -187,6 +188,7 @@ export async function runFirefliesIngestor(input: IngestInput): Promise<IngestRe
             ball_in_court: ball,
             owner_person_id: null,
             founder_owned: false,
+            effort: cls.effort,
             next_action: cls.next_action,
             subject: row.title || row.meeting_title || "(untitled)",
             counterparty: cls.actor === "jose" ? null : cls.counterparty,
@@ -434,6 +436,11 @@ For each item, output a JSON object with:
   - counterparty (string or null): the name of the other-party actor if actor="counterparty"; null otherwise.
   - intent: "deliver" (Jose will do), "chase" (someone owes Jose, Jose should nudge), "follow_up" (a loose open thread Jose should revisit), or "skip" (not actionable).
   - next_action (string or null): ONE imperative sentence telling Jose what to do next (max 14 words, starts with a verb, no trailing period). Null if intent="skip".
+  - effort: estimated work size for Jose's next action:
+      "quick"   = ≤15 minutes (send a short message, confirm, nudge, schedule something)
+      "focused" = 30–60 minutes (review a document, prepare meeting notes, write a substantial email)
+      "session" = 90+ minutes of production work (draft a document/proposal/agreement, build a model/plan/deck, structure a system)
+    Use "quick" when intent="chase" unless the chase itself requires producing material first.
 
 Rules:
 - A "Dependency" or "Outcome" without a named actor → is_actionable=false, intent=skip.
@@ -446,7 +453,7 @@ Rules:
 Items:
 ${JSON.stringify(items, null, 2)}
 
-Return ONLY a JSON array: [{"index": <int>, "is_actionable": <bool>, "actor": "...", "counterparty": ..., "intent": "...", "next_action": ...}]. No prose.`;
+Return ONLY a JSON array: [{"index": <int>, "is_actionable": <bool>, "actor": "...", "counterparty": ..., "intent": "...", "next_action": ..., "effort": "..."}]. No prose.`;
 
   try {
     const res = await anthropic.messages.create({
@@ -466,6 +473,7 @@ Return ONLY a JSON array: [{"index": <int>, "is_actionable": <bool>, "actor": ".
       counterparty: string | null;
       intent: string;
       next_action: string | null;
+      effort?: string | null;
     }>;
     for (const row of parsed) {
       const r = rows[row.index];
@@ -474,12 +482,16 @@ Return ONLY a JSON array: [{"index": <int>, "is_actionable": <bool>, "actor": ".
       const intent = (["deliver", "chase", "follow_up", "skip"] as const).includes(row.intent as never)
         ? (row.intent as Classification["intent"])
         : "skip";
+      const effort = (["quick", "focused", "session"] as const).includes(row.effort as never)
+        ? (row.effort as Classification["effort"])
+        : intent === "chase" || intent === "follow_up" ? "quick" : "focused";
       out.set(r.id, {
         is_actionable: !!row.is_actionable,
         actor:         actor as Classification["actor"],
         counterparty:  row.counterparty ?? null,
         intent,
         next_action:   (row.next_action ?? "").trim() || null,
+        effort,
       });
     }
   } catch (err: unknown) {

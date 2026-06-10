@@ -30,23 +30,35 @@ export const DEFAULT_MATCH_OPTIONS: MatchOptions = {
 };
 
 const TASK_TYPE_SLOT_MIN_MIN: Record<TaskType, number> = {
-  deep_work: 90,
-  decision:  40,
-  prep:      40,
-  follow_up: 20,
-  admin:     20,
+  deep_work:  90,
+  decision:   40,
+  prep:       40,
+  follow_up:  20,
+  admin:      20,
+  commitment: 40,
 };
 
 const TASK_TYPE_SLOT_MAX_MIN: Record<TaskType, number> = {
-  deep_work: 180,
-  decision:   90,
-  prep:       90,
-  follow_up:  45,
-  admin:      45,
+  deep_work:  180,
+  decision:    90,
+  prep:        90,
+  follow_up:   45,
+  admin:       45,
+  commitment: 180,
 };
 
+/**
+ * Confidence floor: candidates below this are dropped, not padded in. The
+ * 5-suggestion limit is a CAP, not a quota — one well-evidenced block beats
+ * five fillers, and an empty section is a valid output.
+ */
+const MIN_CONFIDENCE = 60;
+
 function slotFits(c: Candidate, s: Slot): boolean {
-  const min = TASK_TYPE_SLOT_MIN_MIN[c.task_type];
+  // The slot must hold both the task-type minimum AND this candidate's own
+  // estimated duration (a 90-min session must not be squeezed into a 45-min
+  // gap and silently truncated by the insert-time cap).
+  const min = Math.max(TASK_TYPE_SLOT_MIN_MIN[c.task_type], c.duration_min);
   if (s.durationMin < min) return false;
   // No upper bound — a short task is allowed to land inside a larger open
   // window (the persisted block is later capped to candidate.duration_min + 15,
@@ -95,8 +107,9 @@ function slotScore(c: Candidate, s: Slot, now: Date, opts: MatchOptions): number
     if (gap <= 2 * 3600_000) score += 10;
   }
 
-  // Deep work bonus for morning slots (opt-in via preferences)
-  if (c.task_type === "deep_work" && opts.prefer_morning_for_deep_work) {
+  // Deep work bonus for morning slots (opt-in via preferences). Session-sized
+  // commitments (90 min+) are deep work in practice and get the same bias.
+  if ((c.task_type === "deep_work" || (c.task_type === "commitment" && c.duration_min >= 90)) && opts.prefer_morning_for_deep_work) {
     const hour = Number(
       new Intl.DateTimeFormat("en-GB", {
         timeZone: opts.timezone,
@@ -116,12 +129,15 @@ export function matchCandidatesToSlots(
   limit = 5,
   opts: MatchOptions = DEFAULT_MATCH_OPTIONS,
 ): Match[] {
-  // Sort candidates by urgency DESC, then confidence DESC. Highest-urgency work
-  // gets first pick of the earliest slots.
-  const pool = [...candidates].sort((a, b) => {
-    if (b.urgency_score !== a.urgency_score) return b.urgency_score - a.urgency_score;
-    return b.confidence_score - a.confidence_score;
-  });
+  // Confidence floor first: low-evidence candidates never reach a slot.
+  // Then sort by urgency DESC, confidence DESC. Highest-urgency work gets
+  // first pick of the earliest slots.
+  const pool = candidates
+    .filter(c => c.confidence_score >= MIN_CONFIDENCE)
+    .sort((a, b) => {
+      if (b.urgency_score !== a.urgency_score) return b.urgency_score - a.urgency_score;
+      return b.confidence_score - a.confidence_score;
+    });
 
   // Sort slots EARLIEST FIRST. Iterating in ascending time order means any
   // later slot needs a strictly higher score to beat an earlier one — the

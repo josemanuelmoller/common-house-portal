@@ -276,6 +276,10 @@ export async function runGmailIngestor(input: IngestInput): Promise<IngestResult
           ball_in_court: "jose",
           owner_person_id: null,
           founder_owned: founderOwned,
+          // Replies are dispatched from the Inbox in minutes. If a reply
+          // actually requires producing material first, the Fireflies/
+          // evidence path captures that as its own deliver item.
+          effort: "quick",
           next_action: nextAction,
           subject: t.subject || "(no subject)",
           counterparty: t.fromName || t.fromEmail || null,

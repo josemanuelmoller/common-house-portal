@@ -75,6 +75,20 @@ function mapLoopTypeToIntent(loopType: string | null): Intent {
   }
 }
 
+function mapLoopTypeToEffort(loopType: string | null): "quick" | "focused" | "session" {
+  switch ((loopType ?? "").toLowerCase()) {
+    case "commitment":     return "session";  // a committed deliverable is production work
+    case "blocker":        return "focused";
+    case "decision":       return "focused";
+    case "review":         return "focused";
+    case "prep":           return "focused";
+    case "follow_up":
+    case "follow-up":
+    case "close_loop":     return "quick";
+    default:               return "quick";
+  }
+}
+
 type LoopRow = {
   id:                 string;
   title:              string;
@@ -216,6 +230,7 @@ export async function runLoopsIngestor(input: IngestInput): Promise<IngestResult
           ball_in_court: "jose",
           owner_person_id: null,
           founder_owned: founderOwned,
+          effort: mapLoopTypeToEffort(r.loop_type),
           next_action: title,
           subject,
           counterparty: entity,
