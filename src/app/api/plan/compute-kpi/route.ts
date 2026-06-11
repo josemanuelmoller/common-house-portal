@@ -111,7 +111,7 @@ type MetricParams = Record<string, string | number | undefined>;
 
 async function handleRevenueSum(db: SupabaseClient, p: MetricParams): Promise<number> {
   const stage = (p.stage as string) ?? "paid";
-  let q = db.from("revenue_events").select("amount, paid_amount, stage").eq("stage", stage);
+  let q = db.from("revenue_events").select("amount, paid_amount, stage").eq("stage", stage).is("superseded_at", null);
   if (p.year !== undefined) q = q.eq("year", p.year);
   if (p.quarter !== undefined) q = q.eq("quarter", p.quarter);
   const { data, error } = await q;

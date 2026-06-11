@@ -24,7 +24,7 @@ async function loadColdOpps(): Promise<ColdOpp[]> {
     .select("notion_id, title, org_name, review_url, opportunity_type, status, follow_up_status, priority, value_estimate, next_meeting_at, updated_at")
     .eq("is_active", true)
     .eq("is_archived", false)
-    .in("status", ["New", "Qualifying", "Active"])
+    .in("status", ["New", "Qualifying", "Active", "Proposal Sent"])
     .not("opportunity_type", "eq", "Grant")
     .limit(120);
 

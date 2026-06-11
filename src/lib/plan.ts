@@ -66,7 +66,8 @@ export async function getRevenueEventsForYear(year: number): Promise<RevenueEven
   const { data, error } = await supabaseAdmin()
     .from("revenue_events")
     .select("*")
-    .eq("year", year);
+    .eq("year", year)
+    .is("superseded_at", null);
   if (error) throw new Error(`getRevenueEventsForYear: ${error.message}`);
   return (data ?? []) as RevenueEvent[];
 }

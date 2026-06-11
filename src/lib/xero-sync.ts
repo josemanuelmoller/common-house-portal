@@ -41,6 +41,8 @@ export type XeroSyncResult = {
   upserted: number;
   skipped: number;
   linked_orgs: number;
+  /** hall 'sold' placeholders replaced by a real invoice this run */
+  superseded: number;
   tenant: string | null;
   errors: string[];
 };
@@ -122,7 +124,7 @@ async function fetchAccRecInvoices(
 
 export async function syncXeroRevenue(): Promise<XeroSyncResult> {
   const errors: string[] = [];
-  const empty = { fetched: 0, upserted: 0, skipped: 0, linked_orgs: 0, tenant: null };
+  const empty = { fetched: 0, upserted: 0, skipped: 0, linked_orgs: 0, superseded: 0, tenant: null };
 
   const access = await getXeroAccess();
   if (!access.ok) {
@@ -218,6 +220,38 @@ export async function syncXeroRevenue(): Promise<XeroSyncResult> {
     else upserted = rows.length;
   }
 
+  // Reconciliation: a "won" placeholder from the Hall (source='hall', stage
+  // 'sold') counts against the target only until the real invoice exists.
+  // When an invoiced/paid Xero row for the same organization lands, supersede
+  // the placeholder so the card and KPIs don't double-count. Date guard: only
+  // invoices dated on/after the placeholder was created can supersede it — an
+  // old phase-1 invoice re-syncing must not eat a new phase-2 commitment.
+  let superseded = 0;
+  if (upserted > 0) {
+    const invoiceRows = rows.filter(
+      r => r.organization_id && (r.stage === "invoiced" || r.stage === "paid") && r.invoice_date
+    );
+    for (const inv of invoiceRows) {
+      const { data: hits, error: supErr } = await db
+        .from("revenue_events")
+        .update({ superseded_at: nowIso, superseded_by: String(inv.external_ref), updated_at: nowIso })
+        .eq("source", "hall")
+        .eq("stage", "sold")
+        .is("superseded_at", null)
+        .eq("organization_id", inv.organization_id as string)
+        .lte("created_at", `${inv.invoice_date}T23:59:59Z`)
+        .select("id");
+      if (supErr) {
+        errors.push(`supersede after ${inv.invoice_number ?? inv.external_ref}: ${supErr.message}`);
+      } else if (hits && hits.length > 0) {
+        superseded += hits.length;
+        console.warn(
+          `[xero-sync] superseded ${hits.length} hall sold event(s) via invoice ${inv.invoice_number ?? inv.external_ref}`
+        );
+      }
+    }
+  }
+
   // Only advance the cursor on a clean write — otherwise we'd skip rows we failed
   // to persist on the next run.
   if (errors.length === 0) await markSynced();
@@ -228,6 +262,7 @@ export async function syncXeroRevenue(): Promise<XeroSyncResult> {
     upserted,
     skipped,
     linked_orgs: linkedOrgs,
+    superseded,
     tenant: access.tenantName,
     errors,
   };
