@@ -11,10 +11,11 @@
  *   3. Build candidates from:
  *        - open commitments (action_items extracted from meeting transcripts
  *          / email — session/focused effort only; quick items batch-sweep)
- *        - evidence-gated meeting preps (open items with attendee / real
- *          agenda / VIP — never "every meeting deserves prep")
+ *        - owed-work meeting preps (ONLY when an open commitment involves an
+ *          attendee / the meeting subject — agenda or VIP alone never creates
+ *          a block; those meetings get a Retoma card in the Hall agenda)
  *        - loops + opportunities (already content-based)
- *      A meeting with no extracted commitments produces NO follow-up block.
+ *      A meeting with no extracted commitments produces NO prep/follow-up block.
  *   4. Remove candidates whose fingerprint is dismissed or snoozed for this
  *      user (meeting-prep dismissals suppress the recurring series for 7d)
  *   5. Greedy match with confidence floor → up to 5 suggestions (cap, not quota)
@@ -45,6 +46,7 @@ import {
   loopCoveredEntityIds,
 } from "@/lib/time-block-candidates";
 import { matchCandidatesToSlots } from "@/lib/time-block-matcher";
+import { resolveProjectContexts } from "@/lib/project-context";
 import { getHallPreferences } from "@/lib/hall-preferences";
 import { classifyGoogleError } from "@/lib/google-auth";
 import { logHallEvent } from "@/lib/hall-events";
@@ -77,6 +79,10 @@ type StoredBlock = {
   status: string;
   generated_at: string;
   gcal_event_link: string | null;
+  project_name: string | null;
+  objective_title: string | null;
+  objective_tier: string | null;
+  project_source: string | null;
 };
 
 export async function GET(req: NextRequest) {
@@ -99,7 +105,7 @@ export async function GET(req: NextRequest) {
   // ── Step 1: check if stored set is still fresh ──────────────────────────
   const { data: existing } = await sb
     .from("suggested_time_blocks")
-    .select("id,title,linked_entity_type,linked_entity_id,linked_entity_label,suggested_start_time,suggested_end_time,duration_minutes,task_type,urgency_score,confidence_score,why_now,expected_outcome,fingerprint,status,generated_at,gcal_event_link")
+    .select("id,title,linked_entity_type,linked_entity_id,linked_entity_label,suggested_start_time,suggested_end_time,duration_minutes,task_type,urgency_score,confidence_score,why_now,expected_outcome,fingerprint,status,generated_at,gcal_event_link,project_name,objective_title,objective_tier,project_source")
     .eq("user_email", email)
     .eq("status", "suggested")
     .gte("suggested_start_time", nowIso)
@@ -257,6 +263,10 @@ export async function GET(req: NextRequest) {
       .eq("user_email", email)
       .eq("status", "suggested");
 
+    // Project / objective context — so each block answers "which project,
+    // what tier of the plan" without Jose having to guess priority.
+    const projectContexts = await resolveProjectContexts(matches.map(m => m.candidate));
+
     // Insert fresh rows — cap the actual start/end to the right-sized block so
     // the Google Calendar event we later create is never the full open slot.
     // Without this cap, a 45-minute prep task dropped into a 4-hour slot would
@@ -265,6 +275,7 @@ export async function GET(req: NextRequest) {
       const cappedMin  = Math.min(m.slot.durationMin, m.candidate.duration_min + 15);
       const startDate  = m.slot.start;
       const endDate    = new Date(startDate.getTime() + cappedMin * 60_000);
+      const ctx        = projectContexts.get(m.candidate.fingerprint);
       return {
         user_email:           email,
         title:                m.candidate.title,
@@ -281,12 +292,16 @@ export async function GET(req: NextRequest) {
         expected_outcome:     m.candidate.expected_outcome,
         fingerprint:          m.candidate.fingerprint,
         status:               "suggested",
+        project_name:         ctx?.project_name ?? null,
+        objective_title:      ctx?.objective_title ?? null,
+        objective_tier:       ctx?.objective_tier ?? null,
+        project_source:       ctx?.project_source ?? null,
       };
     });
     const { data: saved, error: insertErr } = await sb
       .from("suggested_time_blocks")
       .insert(inserted)
-      .select("id,title,linked_entity_type,linked_entity_id,linked_entity_label,suggested_start_time,suggested_end_time,duration_minutes,task_type,urgency_score,confidence_score,why_now,expected_outcome,fingerprint,status,generated_at,gcal_event_link");
+      .select("id,title,linked_entity_type,linked_entity_id,linked_entity_label,suggested_start_time,suggested_end_time,duration_minutes,task_type,urgency_score,confidence_score,why_now,expected_outcome,fingerprint,status,generated_at,gcal_event_link,project_name,objective_title,objective_tier,project_source");
 
     if (insertErr) {
       return NextResponse.json({ error: "insert_failed", message: insertErr.message }, { status: 500 });
@@ -395,6 +410,10 @@ function formatForClient(row: StoredBlock, tz: string) {
     expected_outcome:   row.expected_outcome,
     status:             row.status,
     gcal_event_link:    row.gcal_event_link,
+    project_name:       row.project_name,
+    objective_title:    row.objective_title,
+    objective_tier:     row.objective_tier,
+    project_source:     row.project_source,
     slot_label:         formatSlotLabel({
       start: new Date(row.suggested_start_time),
       end:   new Date(row.suggested_end_time),

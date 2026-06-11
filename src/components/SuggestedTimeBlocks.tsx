@@ -32,6 +32,10 @@ type Suggestion = {
   status: string;
   gcal_event_link: string | null;
   slot_label: string;
+  project_name: string | null;
+  objective_title: string | null;
+  objective_tier: string | null;     // 'high' | 'mid' | 'low'
+  project_source: string | null;     // 'explicit' | 'inferred'
 };
 
 type ApiResponse =
@@ -291,6 +295,29 @@ export function SuggestedTimeBlocks() {
                 >
                   {item.entity_label}
                 </p>
+                {(item.project_name || item.objective_tier) && (
+                  <p
+                    className="mt-1 truncate"
+                    style={{ fontFamily: "var(--font-hall-mono)", fontSize: 9.5, letterSpacing: "0.06em", color: "var(--hall-muted-2)" }}
+                    title={item.objective_title ? `Objective: ${item.objective_title}` : undefined}
+                  >
+                    <span
+                      style={{
+                        textTransform: "uppercase",
+                        background: "var(--hall-fill-soft)",
+                        padding: "1px 6px",
+                        borderRadius: 2,
+                        color: "var(--hall-ink-3)",
+                      }}
+                    >
+                      {item.project_name ?? "—"}
+                      {item.objective_tier && ` · ${item.objective_tier} tier`}
+                    </span>
+                    {item.project_source === "inferred" && (
+                      <span className="ml-1.5" style={{ color: "var(--hall-muted-3)" }}>~</span>
+                    )}
+                  </p>
+                )}
                 <p
                   className="text-[10.5px] sm:text-[11px] mt-1.5 leading-[1.5]"
                   style={{ color: "var(--hall-muted-2)" }}

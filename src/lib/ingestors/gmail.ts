@@ -13,8 +13,11 @@
  * Out of scope (later):
  *  - chase intent (Jose sent last + >7d old)
  *  - deadline extraction from body
- *  - objective_link via project mapping
  *  - CH Sources conversation_id linkage (left null)
+ *
+ * Project linkage (v1.4): related_ids.project_id is stamped conservatively —
+ * name inference on the subject first, else the sender's CH People projects
+ * when they resolve to exactly ONE active project. See project-linkage.ts.
  */
 
 import Anthropic from "@anthropic-ai/sdk";
@@ -29,6 +32,7 @@ import {
   effectiveProjectFor,
   passesManagementGate,
 } from "./project-roles";
+import { loadProjectLinkage, resolveProjectIdForSignal } from "./project-linkage";
 import {
   getWatermark,
   startIngestorRun,
@@ -48,7 +52,7 @@ import type {
   Signal,
 } from "./types";
 
-const INGESTOR_VERSION = "gmail@1.3.0";
+const INGESTOR_VERSION = "gmail@1.4.0";
 const SOURCE_TYPE = "gmail" as const;
 const DEFAULT_MAX_ITEMS = 100;
 const DEFAULT_BACKFILL_DAYS = 7;
@@ -210,6 +214,9 @@ export async function runGmailIngestor(input: IngestInput): Promise<IngestResult
       ? await Promise.all([loadProjectRoles(), loadPersonProjectMap()])
       : [new Map(), new Map()];
 
+    // Active-project map for related_ids.project_id stamping (v1.4).
+    const projectLinkage = actionableThreads.length > 0 ? await loadProjectLinkage() : null;
+
     // ─── Build ActionSignals ────────────────────────────────────────────
     for (const t of actionableThreads) {
       // Haiku SKIP = drop. If next_action is null the LLM decided this isn't
@@ -261,6 +268,13 @@ export async function runGmailIngestor(input: IngestInput): Promise<IngestResult
         mentorshipPenalty,
       });
 
+      // Project linkage: subject-name inference first; else the sender's
+      // CH People projects when they collapse to exactly one active project.
+      const projectId = resolveProjectIdForSignal(projectLinkage, {
+        inferText: t.subject,
+        counterpartyProjectNotionIds: peopleProjectMap.get(t.fromEmail.toLowerCase()) ?? null,
+      });
+
       const signal: ActionSignal = {
         kind: "action",
         source_type: SOURCE_TYPE,
@@ -270,6 +284,7 @@ export async function runGmailIngestor(input: IngestInput): Promise<IngestResult
         ingestor_version: INGESTOR_VERSION,
         related_ids: {
           contact_id: contact?.id ?? undefined,
+          ...(projectId ? { project_id: projectId } : {}),
         },
         payload: {
           intent: "reply",

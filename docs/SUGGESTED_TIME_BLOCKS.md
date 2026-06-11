@@ -4,6 +4,43 @@ Feature that proposes **when** to execute the top priorities surfaced in
 the Hall. Reads Google Calendar availability + Supabase loops/opportunities
 + upcoming meetings → returns 3–5 specific time blocks with clear outcomes.
 
+## Meeting decision model (2026-06-11)
+
+One question decides whether a meeting costs calendar time: **is there work
+of Jose's to produce?**
+
+| Owed? (open commitment matches) | Material? (history with attendees) | Result |
+|---|---|---|
+| Yes | — | **PREP block** in STB (agenda/VIP only boost it) |
+| No  | Yes | **Retoma card** in the Hall agenda — auto punteo, zero calendar time (`src/lib/meeting-retomas.ts`) |
+| No  | No  | **Nothing** — VIP included. No material → no block, per STB v2's founding rule |
+
+Prep and retoma share the same commitment rows and the same matcher
+(`commitmentMatchesMeeting`), so they can never both fire for one meeting.
+Retomas are deterministic (no LLM): last touch + transcript-summary bullets
+(`sources.processed_summary`) + open chase items.
+
+## Project context chip
+
+Every persisted block carries `project_name` / `objective_title` /
+`objective_tier` / `project_source` (migration `20260611130000`), resolved at
+generation time by `src/lib/project-context.ts`: explicit FK linkage when the
+source row has it, conservative unambiguous name inference otherwise
+(`project_source = 'inferred'`, rendered with a `~`). Tier is never inferred —
+it only appears through explicit `strategic_objective_id` or
+`strategic_objectives.linked_projects` linkage.
+
+Explicit linkage is populated at INGEST time (2026-06-11): the Fireflies and
+Gmail ingestors stamp `action_items.project_id` via
+`src/lib/ingestors/project-linkage.ts` (explicit `evidence.project_notion_id`
+→ same conservative name matcher → unambiguous single-project counterparty),
+and `persist.ts` fill-only patches linkage onto existing open rows as new
+motion arrives. One-shot catch-up for old rows:
+`POST /api/backfill-action-item-projects` (dry-run by default).
+`strategic_objectives.linked_projects` is curated by hand in the
+`/admin/plan` objective drawer ("Proyectos vinculados") — that linkage is the
+only path that activates tier on the chips.
+
 ## Status
 
 - **Implemented, deployed, type-clean, observability in place.**

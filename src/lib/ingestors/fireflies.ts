@@ -19,7 +19,10 @@
  * Out of scope (later):
  *  - Deadline extraction (evidence doesn't store deadlines structurally)
  *  - Cross-source dedup tuning beyond the dedup_key default
- *  - Project/objective linkage (project_id filled when evidence has one)
+ *
+ * Project linkage (v1.3): related_ids.project_id is stamped from
+ * evidence.project_notion_id (explicit), falling back to conservative name
+ * inference over title + statement + meeting title. See project-linkage.ts.
  */
 
 import Anthropic from "@anthropic-ai/sdk";
@@ -27,6 +30,7 @@ import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { getSelfEmails } from "@/lib/hall-self";
 import { buildFactors } from "./priority";
 import { loadProjectRoles, passesManagementGate } from "./project-roles";
+import { loadProjectLinkage, resolveProjectIdForSignal } from "./project-linkage";
 import {
   getWatermark,
   startIngestorRun,
@@ -46,7 +50,7 @@ import type {
   Signal,
 } from "./types";
 
-const INGESTOR_VERSION = "fireflies@1.2.0";
+const INGESTOR_VERSION = "fireflies@1.3.0";
 const SOURCE_TYPE = "fireflies" as const;
 const DEFAULT_MAX_ITEMS = 60;
 const DEFAULT_BACKFILL_DAYS = 14;
@@ -116,8 +120,12 @@ export async function runFirefliesIngestor(input: IngestInput): Promise<IngestRe
     const sb = getSupabaseServerClient();
     const selfSet = await getSelfEmails();
 
-    // Management-level gate (Phase 11). Loaded once per run.
-    const projectRoles = await loadProjectRoles();
+    // Management-level gate (Phase 11) + project linkage map (v1.3).
+    // Loaded once per run.
+    const [projectRoles, projectLinkage] = await Promise.all([
+      loadProjectRoles(),
+      loadProjectLinkage(),
+    ]);
 
     // ─── Fetch evidence since watermark ─────────────────────────────────
     const rows = await fetchFirefliesEvidenceSince(since, input.maxItems ?? DEFAULT_MAX_ITEMS);
@@ -175,6 +183,13 @@ export async function runFirefliesIngestor(input: IngestInput): Promise<IngestRe
           founderOwned: false,
         });
 
+        // Project linkage: explicit evidence.project_notion_id first, then
+        // conservative name inference over the evidence text. Ambiguous → null.
+        const projectId = resolveProjectIdForSignal(projectLinkage, {
+          projectNotionId: row.project_notion_id,
+          inferText: `${row.title} ${row.evidence_statement ?? ""} ${row.meeting_title ?? ""}`,
+        });
+
         const signal: ActionSignal = {
           kind: "action",
           source_type: SOURCE_TYPE,
@@ -182,7 +197,7 @@ export async function runFirefliesIngestor(input: IngestInput): Promise<IngestRe
           source_url: row.source_url ?? "",
           emitted_at: new Date().toISOString(),
           ingestor_version: INGESTOR_VERSION,
-          related_ids: {},
+          related_ids: projectId ? { project_id: projectId } : {},
           payload: {
             intent,
             ball_in_court: ball,
