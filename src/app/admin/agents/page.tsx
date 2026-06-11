@@ -142,8 +142,10 @@ export default async function AgentsPage() {
   const runMap = new Map<string, AgentLatestRunRow>(runData.map((r) => [r.agent_name, r]));
   const hasTelemetry = runData.length > 0;
 
-  // Cataloged routines — known agents with metadata
+  // Cataloged routines — known agents with metadata (retired ones excluded
+  // from the registry, but kept in the catalog so they don't show as orphans)
   const catalog = Object.entries(ROUTINE_CATALOG)
+    .filter(([, meta]) => !meta.retired)
     .map(([name, meta]) => ({ name, ...meta, run: runMap.get(name) }))
     .sort((a, b) => a.priority - b.priority || a.name.localeCompare(b.name));
 

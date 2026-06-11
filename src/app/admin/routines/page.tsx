@@ -117,11 +117,16 @@ export default async function RoutinesPage() {
   await requireAdmin();
   const latestRuns = await fetchLatestRuns();
 
-  const rows: Row[] = Object.entries(ROUTINE_CATALOG).map(([name, catalog]) => {
-    const run = latestRuns.get(name) ?? null;
-    const { freshness, staleReason } = classifyFreshness(run, catalog);
-    return { name, catalog, run, freshness, staleReason };
-  });
+  const allEntries = Object.entries(ROUTINE_CATALOG);
+  const retired = allEntries.filter(([, c]) => c.retired);
+
+  const rows: Row[] = allEntries
+    .filter(([, c]) => !c.retired)
+    .map(([name, catalog]) => {
+      const run = latestRuns.get(name) ?? null;
+      const { freshness, staleReason } = classifyFreshness(run, catalog);
+      return { name, catalog, run, freshness, staleReason };
+    });
 
   const order = { error: 0, stale: 1, never: 2, fresh: 3 } as const;
   rows.sort((a, b) => {
@@ -376,6 +381,37 @@ export default async function RoutinesPage() {
               <em>no data</em>. Expected cadence is inferred from the schedule string; stale = no run within 1.5× the schedule window.
             </p>
           </section>
+
+          {retired.length > 0 && (
+            <section>
+              <div
+                className="flex items-baseline justify-between gap-3 pb-2 mb-3.5"
+                style={{ borderBottom: "1px solid var(--hall-line-soft)" }}
+              >
+                <h2
+                  className="text-[15px] font-bold leading-none"
+                  style={{ letterSpacing: "-0.02em", color: "var(--hall-muted-2)" }}
+                >
+                  Retired <em className="hall-flourish">routines</em>
+                </h2>
+                <span
+                  style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--hall-muted-3)", letterSpacing: "0.06em" }}
+                >
+                  {retired.length} RETIRED · NOT COUNTED IN HEALTH
+                </span>
+              </div>
+              <ul className="space-y-1.5">
+                {retired.map(([name, c]) => (
+                  <li key={name} className="text-xs flex flex-wrap items-baseline gap-x-2">
+                    <span className="font-semibold" style={{ color: "var(--hall-muted-2)" }}>{name}</span>
+                    <span style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-3)" }}>
+                      {c.reads} → {c.writes} · {c.retired}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
 
           <div>
             <Link

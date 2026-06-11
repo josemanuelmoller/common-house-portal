@@ -194,6 +194,8 @@ export type RoutineCatalogEntry = {
   output_surface: string;      // where users see the effect (or "No consumer")
   visible_in_product: boolean; // false = output exists but no UI reads it
   priority: 1 | 2 | 3;         // 1 = critical, 2 = standard, 3 = low-volume
+  retired?: string;            // set when the cron was removed on purpose —
+                               // dashboards must not count it toward health
 };
 
 export const ROUTINE_CATALOG: Record<string, RoutineCatalogEntry> = {
@@ -204,6 +206,7 @@ export const ROUTINE_CATALOG: Record<string, RoutineCatalogEntry> = {
     output_surface: "sync-loops (Supabase-first evidence path)",
     visible_in_product: true,
     priority: 1,
+    retired: "2026-06-10 — Notion cutoff: cron removed, Supabase is canonical",
   },
   "sync-opportunities": {
     schedule: "09:00 Mon-Fri",
@@ -212,6 +215,7 @@ export const ROUTINE_CATALOG: Record<string, RoutineCatalogEntry> = {
     output_surface: "/admin/opportunities, /admin/ops-mirror",
     visible_in_product: true,
     priority: 1,
+    retired: "2026-06-10 — Notion cutoff: cron removed, Supabase is canonical",
   },
   "sync-loops": {
     schedule: "08:00 Mon-Fri",
@@ -228,6 +232,7 @@ export const ROUTINE_CATALOG: Record<string, RoutineCatalogEntry> = {
     output_surface: "No UI reader yet (pre-provisioned)",
     visible_in_product: false,
     priority: 3,
+    retired: "2026-06-10 — Notion cutoff: cron removed, Supabase is canonical",
   },
   "sync-sources": {
     schedule: "11:00 Mon-Fri",
@@ -236,6 +241,7 @@ export const ROUTINE_CATALOG: Record<string, RoutineCatalogEntry> = {
     output_surface: "scan-opportunity-candidates (processed_summary)",
     visible_in_product: true,
     priority: 2,
+    retired: "2026-06-10 — Notion cutoff: cron removed, Supabase is canonical",
   },
   "sync-organizations": {
     schedule: "12:00 Mon-Fri",
@@ -244,6 +250,7 @@ export const ROUTINE_CATALOG: Record<string, RoutineCatalogEntry> = {
     output_surface: "No UI reader yet (pre-provisioned)",
     visible_in_product: false,
     priority: 3,
+    retired: "2026-06-10 — Notion cutoff: cron removed, Supabase is canonical",
   },
   "sync-people": {
     schedule: "12:00 Mon-Fri",
@@ -252,6 +259,7 @@ export const ROUTINE_CATALOG: Record<string, RoutineCatalogEntry> = {
     output_surface: "/api/people-list, draft-checkin, delegate-to-desk",
     visible_in_product: true,
     priority: 1,
+    retired: "2026-06-10 — Notion cutoff: cron removed, Supabase is canonical",
   },
   "ingest-gmail": {
     schedule: "07:00 Mon-Fri",
@@ -264,7 +272,7 @@ export const ROUTINE_CATALOG: Record<string, RoutineCatalogEntry> = {
   "ingest-meetings": {
     schedule: "18:00 Mon-Fri + 00:00 Tue-Sat",
     reads: "Fireflies API",
-    writes: "Notion Agent Drafts, People",
+    writes: "Supabase agent_drafts, people (last_contact_date)",
     output_surface: "/admin AgentQueueSection",
     visible_in_product: true,
     priority: 1,
@@ -372,5 +380,13 @@ export const ROUTINE_CATALOG: Record<string, RoutineCatalogEntry> = {
     output_surface: "/admin/inbox (auto-clears already-handled threads)",
     visible_in_product: true,
     priority: 1,
+  },
+  "xero-sync": {
+    schedule: "Chained before plan-compute-kpi (03:15 daily) + manual",
+    reads: "Xero Accounting API (ACCREC invoices)",
+    writes: "Supabase revenue_events (source=xero)",
+    output_surface: "/admin/plan revenue KPIs (revenue_sum)",
+    visible_in_product: true,
+    priority: 2,
   },
 };
