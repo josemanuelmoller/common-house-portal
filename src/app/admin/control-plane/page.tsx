@@ -196,7 +196,7 @@ export default async function ControlPlanePage() {
   // P1 stale: P1 routines that have not run in the last 24h (excluding clearly
   // weekly ones — we approximate "should have run by now" by Daily/Mon-Fri).
   const staleP1 = Object.entries(ROUTINE_CATALOG)
-    .filter(([, meta]) => meta.priority === 1)
+    .filter(([, meta]) => meta.priority === 1 && !meta.retired)
     .map(([name, meta]) => ({
       name,
       meta,

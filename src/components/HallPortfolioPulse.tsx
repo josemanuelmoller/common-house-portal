@@ -144,9 +144,7 @@ function PulseRow({ entry }: { entry: PortfolioEntry }) {
   return (
     <li style={{ borderTop: "1px solid var(--hall-line-soft)" }}>
       <a
-        href={p.notion_id ? `https://www.notion.so/${p.notion_id.replace(/-/g, "")}` : "#"}
-        target="_blank"
-        rel="noopener noreferrer"
+        href={undefined}
         className="flex items-center gap-3 py-2.5"
       >
         <span

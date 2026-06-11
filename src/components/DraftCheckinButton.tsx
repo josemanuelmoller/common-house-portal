@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { liveHref } from "@/lib/links";
 
 export function DraftCheckinButton({
   personId,
@@ -45,12 +46,12 @@ export function DraftCheckinButton({
   if (state === "error") {
     return (
       <a
-        href={notionUrl}
+        href={liveHref(notionUrl) ?? undefined}
         target="_blank"
         rel="noopener noreferrer"
         className="text-[9px] font-bold text-red-400 shrink-0"
       >
-        Error ↗
+        Error
       </a>
     );
   }

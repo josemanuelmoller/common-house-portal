@@ -710,14 +710,6 @@ export default function CommsView({ pillars, audiences, channels, pitches, outco
 
                                 {status === "drafted" && p.draft_notion_id && (
                                   <div className="flex flex-col items-end gap-1 mt-1">
-                                    <a
-                                      href={`https://www.notion.so/${p.draft_notion_id.replace(/-/g, "")}`}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-[10px] font-bold text-[#0a0a0a] hover:text-[#0a0a0a]/70 transition-colors"
-                                    >
-                                      Open in Notion ↗
-                                    </a>
                                     <button
                                       onClick={() => openOutcome(p)}
                                       className="text-[10px] font-bold text-[#0a0a0a]/60 hover:text-[#0a0a0a] border border-[#e4e4dd] rounded px-2 py-1 transition-colors"

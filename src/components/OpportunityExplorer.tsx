@@ -40,12 +40,9 @@ function OppRow({ opp }: { opp: OpportunityItem }) {
       className="flex items-center gap-3 py-2.5 group"
       style={{ borderTop: "1px solid var(--hall-line-soft)" }}
     >
-      <a
-        href={opp.notionUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="flex-1 min-w-0"
-      >
+      {/* Post-Notion-cutoff: opportunities have no live external page, so the
+          card is plain text (no dead notion.so deep-link). */}
+      <div className="flex-1 min-w-0">
         <p
           className="text-[11.5px] font-semibold truncate"
           style={{ color: "var(--hall-ink-0)" }}
@@ -59,7 +56,7 @@ function OppRow({ opp }: { opp: OpportunityItem }) {
           {opp.stage}{opp.type ? ` · ${opp.type}` : ""}
           {opp.orgName ? ` · ${opp.orgName}` : ""}
         </p>
-      </a>
+      </div>
 
       {/* Follow-up status badge */}
       {isAlreadyFlagged && flagState !== "done" && (

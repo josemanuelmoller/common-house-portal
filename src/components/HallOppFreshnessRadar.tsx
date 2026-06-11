@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
+import { liveHref } from "@/lib/links";
 
 /**
  * Opps going cold — ranks open opportunities by a staleness × value score
@@ -124,8 +125,8 @@ function OppRow({ opp }: { opp: ColdOpp }) {
   // Some opportunities have no notion_id (Supabase-native rows). Fall back
   // to reviewUrl alone — if both are missing the row links nowhere, which
   // is fine; it never crashes the page.
-  const href = opp.reviewUrl
-    ?? (opp.id ? `https://www.notion.so/${opp.id.replace(/-/g, "")}` : "#");
+  // Post-Notion-cutoff: only a real (non-Notion) review URL is navigable.
+  const href = liveHref(opp.reviewUrl) ?? undefined;
   return (
     <li style={{ borderTop: "1px solid var(--hall-line-soft)" }}>
       <a

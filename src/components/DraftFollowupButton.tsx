@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { liveHref } from "@/lib/links";
 
 export function DraftFollowupButton({
   opportunityId,
@@ -45,12 +46,12 @@ export function DraftFollowupButton({
   if (state === "error") {
     return (
       <a
-        href={notionUrl}
+        href={liveHref(notionUrl) ?? undefined}
         target="_blank"
         rel="noopener noreferrer"
         className="text-[10px] font-bold text-red-500 shrink-0"
       >
-        Error — open Notion
+        Error
       </a>
     );
   }

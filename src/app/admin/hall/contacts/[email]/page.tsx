@@ -667,9 +667,8 @@ export default async function ContactDrawerPage({ params }: Props) {
                     const range = sameDay
                       ? formatWhen(clip.last_ts)
                       : `${formatWhen(clip.first_ts)} → ${formatWhen(clip.last_ts)}`;
-                    const notionHref = clip.notion_id
-                      ? `https://www.notion.so/${clip.notion_id.replace(/-/g, "")}`
-                      : null;
+                    // Notion deprecated post-cutoff — WhatsApp clips have no live external page.
+                    const notionHref: string | null = null;
                     return (
                       <li
                         key={clip.source_id}

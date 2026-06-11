@@ -209,19 +209,8 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
           <HallSection
             title="House"
             flourish="configuration"
-            meta="WORKSPACE ASSIGNMENT · SET IN NOTION"
+            meta="WORKSPACE ASSIGNMENT"
           >
-            <div className="flex items-center justify-end mb-3">
-              <a
-                href={`https://www.notion.so/${project.id.replace(/-/g, "")}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[10px] font-bold uppercase tracking-widest"
-                style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}
-              >
-                Edit in Notion ↗
-              </a>
-            </div>
             <div className="grid grid-cols-4 gap-4">
               {/* Primary Workspace */}
               <div>

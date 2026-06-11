@@ -3,6 +3,7 @@
 import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { safeHref } from "@/lib/safe-href";
+import { liveHref } from "@/lib/links";
 
 export type CompetitiveIntelRow = {
   id: string;
@@ -363,7 +364,7 @@ function SignalSlidePanel({ signal, onClose }: { signal: CompetitiveIntelRow; on
             ) : null;
           })()}
           <a
-            href={signal.notionUrl}
+            href={liveHref(signal.notionUrl) ?? undefined}
             target="_blank"
             rel="noopener noreferrer"
             className="flex-1 text-center py-2 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-opacity hover:opacity-70"

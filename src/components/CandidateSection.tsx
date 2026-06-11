@@ -246,14 +246,6 @@ export function CandidateSection({ candidates }: Props) {
                 >
                   Ignore
                 </button>
-                <a
-                  href={c.notionUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-[9px] font-bold text-[#0a0a0a]/25 hover:text-[#0a0a0a]/60 transition-colors ml-auto"
-                >
-                  Notion →
-                </a>
               </div>
               {actionErr?.id === c.id && (
                 <p className="text-[10px] text-red-500 mt-1">

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useCallback, useRef } from "react"
+import { liveHref } from "@/lib/links"
 import {
   approveDecision, resolveDecision, resolveWithNote,
   resolveAndUpdate, resolveAndUpdateMulti,
@@ -557,8 +558,8 @@ export function DecisionActions({
           className="text-[11px] text-[#0a0a0a]/38 border border-transparent rounded-md px-3 py-1 cursor-pointer disabled:opacity-50 hover:text-[#0a0a0a]/60 transition-colors">
           {loading === "dismiss" ? "…" : cfg.dismissLabel}
         </button>
-        {notionUrl && (
-          <a href={notionUrl} target="_blank" rel="noopener noreferrer"
+        {liveHref(notionUrl) && (
+          <a href={liveHref(notionUrl)!} target="_blank" rel="noopener noreferrer"
             className="text-[10px] text-[#0a0a0a]/25 hover:text-[#0a0a0a]/50 transition-colors ml-auto">
             Notion →
           </a>

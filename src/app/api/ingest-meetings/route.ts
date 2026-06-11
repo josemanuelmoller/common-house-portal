@@ -23,18 +23,13 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-// notion-cutoff-2026-06-02: Notion client retained for read-only fallback on
-// people email lookup. Agent Drafts + People last-contact writes are now
-// canonical Supabase writes (agent_drafts, people).
-import { Client } from "@notionhq/client";
 import Anthropic from "@anthropic-ai/sdk";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
+import { withRoutineLog } from "@/lib/routine-log";
 
-const notion    = new Client({ auth: process.env.NOTION_API_KEY });
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 const FIREFLIES_API   = "https://api.fireflies.ai/graphql";
-const PEOPLE_DB       = "1bc0f96f33ca4a9e9ff26844377e81de";
 
 // ─── Fireflies GraphQL ────────────────────────────────────────────────────────
 
@@ -143,8 +138,7 @@ ${meetingBlocks}`;
 }
 
 // ─── Update CH People Last Contact Date ───────────────────────────────────────
-// Supabase-first: look up page ID by email, then write to Notion.
-// Notion fallback per email if not yet synced (noon sync may lag).
+// Supabase canonical (Notion fallback removed 2026-05-15, post Phase 2 backfill).
 
 async function updatePeopleLastContact(
   emails: string[],
@@ -160,7 +154,6 @@ async function updatePeopleLastContact(
       let pageId: string | null = null;
       let personRowId: string | null = null;
 
-      // Supabase lookup — canonical post-cutoff
       try {
         const { data: sbPerson } = await sb
           .from("people")
@@ -170,17 +163,7 @@ async function updatePeopleLastContact(
         if (sbPerson?.notion_id) pageId = sbPerson.notion_id;
         if (sbPerson?.id) personRowId = sbPerson.id as string;
       } catch {
-        // PGRST116 (no rows) or network error — fall through to Notion
-      }
-
-      // Notion fallback (read only): person not yet synced to Supabase
-      if (!pageId && !personRowId) {
-        const res = await notion.databases.query({
-          database_id: PEOPLE_DB,
-          filter: { property: "Email", email: { equals: email } },
-          page_size: 1,
-        });
-        if (res.results.length > 0) pageId = res.results[0].id;
+        // PGRST116 (no rows) or network error — skip this email
       }
 
       if (!pageId && !personRowId) continue;
@@ -263,7 +246,7 @@ async function writeAgentDraft(
 
 // ─── Main handler ─────────────────────────────────────────────────────────────
 
-export async function POST(req: NextRequest) {
+async function handler(req: NextRequest) {
   // Auth: agent key or Vercel cron secret. Both branches must fail closed when env unset.
   const agentKey = req.headers.get("x-agent-key");
   const cronSecret = req.headers.get("authorization");
@@ -291,10 +274,12 @@ export async function POST(req: NextRequest) {
 
     if (transcripts.length === 0) {
       return NextResponse.json({
-        ok:       true,
-        meetings: 0,
-        message:  "No new meetings in window",
-        window:   `${fromDate.toISOString()} → ${now.toISOString()}`,
+        ok:              true,
+        meetings:        0,
+        records_read:    0,
+        records_written: 0,
+        message:         "No new meetings in window",
+        window:          `${fromDate.toISOString()} → ${now.toISOString()}`,
       });
     }
 
@@ -318,11 +303,13 @@ export async function POST(req: NextRequest) {
     );
 
     return NextResponse.json({
-      ok:             true,
-      meetings:       transcripts.length,
-      people_updated: peopleUpdated,
-      draft_url:      draftUrl,
-      window:         `${fromDate.toISOString()} → ${now.toISOString()}`,
+      ok:              true,
+      meetings:        transcripts.length,
+      records_read:    transcripts.length,
+      records_written: peopleUpdated + (draftUrl ? 1 : 0),
+      people_updated:  peopleUpdated,
+      draft_url:       draftUrl,
+      window:          `${fromDate.toISOString()} → ${now.toISOString()}`,
     });
   } catch (e) {
     console.error("ingest-meetings error:", e);
@@ -333,7 +320,6 @@ export async function POST(req: NextRequest) {
   }
 }
 
+export const POST = withRoutineLog("ingest-meetings", handler);
 // Allow Vercel cron (GET) to trigger
-export async function GET(req: NextRequest) {
-  return POST(req);
-}
+export const GET = POST;
