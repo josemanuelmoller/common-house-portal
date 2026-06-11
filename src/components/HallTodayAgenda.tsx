@@ -4,6 +4,7 @@ import { getSelfEmails } from "@/lib/hall-self";
 import { getContactsByEmails } from "@/lib/contacts";
 import { getHallPreferences } from "@/lib/hall-preferences";
 import { logServerError } from "@/lib/debug-log";
+import { buildRetomas, type Retoma } from "@/lib/meeting-retomas";
 
 type CalRow = {
   event_id: string;
@@ -32,6 +33,9 @@ type CompactMeeting = {
   attendeeCount: number;
   attendeeNames: string[];
   htmlLink: string | null;
+  /** Read-before-you-walk-in pointer. Only set when the meeting has prior
+   *  history and nothing owed (owed → STB prep block instead). */
+  retoma: Retoma | null;
 };
 
 // Calendar-date key in the user's timezone (en-CA → "2026-06-10"). Server runs
@@ -255,6 +259,15 @@ export async function HallTodayAgenda({ userEmail }: { userEmail?: string } = {}
   };
 
   // ── Compact data for the rest of today ───────────────────────────────────
+  // Retomas: deterministic "lo último que se habló" pointers for repeat
+  // meetings ≤48h out with nothing owed (owed work gets an STB prep block).
+  const retomas = await buildRetomas(restRows.map(r => ({
+    eventId:        r.event_id,
+    title:          r.event_title,
+    startMs:        new Date(r.event_start).getTime(),
+    attendeeEmails: (r.attendee_emails ?? []).filter(e => e && !selfSet.has(e.toLowerCase())),
+  })));
+
   const rest: CompactMeeting[] = restRows.map(r => {
     const others = (r.attendee_emails ?? []).filter(e => e && !selfSet.has(e.toLowerCase()));
     const names = others.map(e => {
@@ -270,6 +283,7 @@ export async function HallTodayAgenda({ userEmail }: { userEmail?: string } = {}
       attendeeCount: others.length,
       attendeeNames: names.slice(0, 3),
       htmlLink:      r.html_link ?? null,
+      retoma:        retomas.get(r.event_id) ?? null,
     };
   });
 
@@ -459,6 +473,39 @@ export async function HallTodayAgenda({ userEmail }: { userEmail?: string } = {}
                             {m.attendeeNames.join(", ")}
                             {m.attendeeCount > 3 && ` +${m.attendeeCount - 3}`}
                           </p>
+                        )}
+                        {m.retoma && (
+                          <div
+                            className="mt-2 pl-2.5 py-1.5 pr-2"
+                            style={{ borderLeft: "2px solid var(--hall-stroke-0)", background: "var(--hall-paper-1)", borderRadius: "0 4px 4px 0" }}
+                          >
+                            <p
+                              className="font-bold uppercase mb-1"
+                              style={{ fontSize: 8, letterSpacing: "0.18em", color: "var(--hall-muted-3)", fontFamily: "var(--font-hall-mono)" }}
+                            >
+                              Retoma · {m.retoma.lastTouch.kind === "Meeting" ? "last met" : "last email"} {dayKey(new Date(m.retoma.lastTouch.at), tz)}
+                            </p>
+                            {m.retoma.bullets.length > 0 ? (
+                              <ul className="flex flex-col gap-0.5">
+                                {m.retoma.bullets.map((b, i) => (
+                                  <li key={i} className="text-[10.5px] leading-[1.45] pl-3 relative" style={{ color: "var(--hall-ink-3)" }}>
+                                    <span className="absolute left-0" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-3)" }}>·</span>
+                                    {b}
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <p className="text-[10.5px] leading-snug line-clamp-1" style={{ color: "var(--hall-ink-3)" }}>
+                                {m.retoma.lastTouch.title}
+                              </p>
+                            )}
+                            {m.retoma.waitingOnThem.length > 0 && (
+                              <p className="text-[10px] mt-1 leading-snug" style={{ color: "var(--hall-muted-2)" }}>
+                                <span className="font-semibold" style={{ color: "var(--hall-ink-3)" }}>Waiting on them: </span>
+                                {m.retoma.waitingOnThem.join(" · ")}
+                              </p>
+                            )}
+                          </div>
                         )}
                       </div>
                       <span

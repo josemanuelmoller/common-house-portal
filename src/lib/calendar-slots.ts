@@ -41,9 +41,9 @@ export type MeetingAttendee = {
 export type UpcomingMeeting = {
   id: string;
   title: string;
-  /** Raw meeting description from Google Calendar. Used to gate prep tasks:
-   * a meeting with no context (no description, no VIP, no multi-party invite
-   * list) does not deserve a prep block. */
+  /** Raw meeting description from Google Calendar. A real agenda here boosts
+   * an owed-work prep block (duration/why-now) but never creates one on its
+   * own — see candidatesFromMeetings in time-block-candidates.ts. */
   description: string;
   start: Date;
   end: Date;

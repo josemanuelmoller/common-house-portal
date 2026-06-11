@@ -35,6 +35,14 @@ export type Candidate = {
   fingerprint: string;
   /** If set, the assigned slot must satisfy this window. Used for prep/follow-up. */
   hard_time_constraint?: { kind: "before" | "after"; reference: Date; withinMs: number };
+  /** Hints for resolveProjectContexts — explicit FK ids when the source row
+   *  carries them, free text for conservative name inference otherwise. */
+  project_ref?: {
+    project_id?: string | null;
+    objective_id?: string | null;
+    name_hint?: string | null;
+    infer_text?: string | null;
+  };
 };
 
 // ─── Loops → Candidates ──────────────────────────────────────────────────────
@@ -52,6 +60,7 @@ type LoopRow = {
   linked_entity_name: string;
   review_url: string | null;
   intervention_moment: string;
+  parent_project_name: string | null;
 };
 
 function loopDuration(loopType: string): number {
@@ -122,7 +131,7 @@ export async function candidatesFromLoops(limit = 20): Promise<Candidate[]> {
   const sb = getSupabaseServerClient();
   const { data, error } = await sb
     .from("loops")
-    .select("id,title,loop_type,status,priority_score,founder_owned,due_at,linked_entity_type,linked_entity_id,linked_entity_name,review_url,intervention_moment")
+    .select("id,title,loop_type,status,priority_score,founder_owned,due_at,linked_entity_type,linked_entity_id,linked_entity_name,review_url,intervention_moment,parent_project_name")
     .in("status", ["open", "in_progress", "reopened"])
     .order("priority_score", { ascending: false, nullsFirst: false })
     .limit(limit);
@@ -178,6 +187,10 @@ export async function candidatesFromLoops(limit = 20): Promise<Candidate[]> {
       why_now:          loopWhyNow(l, dueSoonDays),
       expected_outcome: loopExpectedOutcome(l),
       fingerprint:      `loop:${l.id}:${loopTaskType(l.loop_type)}`,
+      project_ref:      {
+        name_hint:  l.parent_project_name,
+        infer_text: `${l.title} ${l.linked_entity_name}`,
+      },
     });
   }
   return out;
@@ -237,6 +250,7 @@ export async function candidatesFromOpportunities(
       why_now:          `Active opportunity (score ${o.opportunity_score ?? "—"}/100)${o.follow_up_status === "Needed" ? " · follow-up flagged" : ""}.`,
       expected_outcome: `Next step executed: ${step.length > 140 ? step.slice(0, 140) + "…" : step}`,
       fingerprint:      `opportunity:${o.notion_id}:deep_work`,
+      project_ref:      { infer_text: `${o.title} ${o.org_name ?? ""}` },
     });
   }
   return out;
@@ -270,6 +284,8 @@ export type CommitmentRow = {
   first_surfaced_at: string | null;
   source_type:       string;
   source_url:        string | null;
+  project_id:        string | null;
+  strategic_objective_id: string | null;
 };
 
 /** Intents that can justify an individual time block. `reply` belongs to the
@@ -304,7 +320,7 @@ export async function fetchOpenCommitmentRows(limit = 50): Promise<CommitmentRow
   const sb = getSupabaseServerClient();
   const { data, error } = await sb
     .from("action_items")
-    .select("id, subject, counterparty, next_action, intent, effort, deadline, priority_score, last_motion_at, first_surfaced_at, source_type, source_url")
+    .select("id, subject, counterparty, next_action, intent, effort, deadline, priority_score, last_motion_at, first_surfaced_at, source_type, source_url, project_id, strategic_objective_id")
     .eq("status", "open")
     .eq("ball_in_court", "jose")
     .in("source_type", ["fireflies", "gmail", "drive", "evidence_derived"])
@@ -330,8 +346,11 @@ function normTokens(s: string | null | undefined): string[] {
  * matches an attendee (display name or email local part) or the meeting
  * title, or when the meeting title overlaps the commitment subject on ≥2
  * meaningful tokens (catches org/project-named meetings).
+ *
+ * Exported for meeting-retomas, which uses the SAME matcher so the
+ * prep-vs-retoma split can never disagree about whether something is owed.
  */
-function commitmentMatchesMeeting(r: CommitmentRow, m: UpcomingMeeting): boolean {
+export function commitmentMatchesMeeting(r: CommitmentRow, m: UpcomingMeeting): boolean {
   const cpTokens = normTokens(r.counterparty);
   const titleTokens = normTokens(m.title);
   const titleSet = new Set(titleTokens);
@@ -453,6 +472,11 @@ export function candidatesFromCommitments(
       why_now:          why.join(" · ") + ".",
       expected_outcome: commitmentOutcome(r),
       fingerprint:      `commitment:${r.id}`,
+      project_ref:      {
+        project_id:   r.project_id,
+        objective_id: r.strategic_objective_id,
+        infer_text:   `${r.subject} ${r.next_action ?? ""} ${r.counterparty ?? ""}`,
+      },
       // Bind to "before the accountability meeting" only when there is enough
       // room to actually find a slot; binding a meeting <48h out would drop
       // the candidate entirely whenever the day is already packed.
@@ -524,13 +548,19 @@ export type PrepOptions = {
 };
 
 /**
- * Prep candidates — only when there is something concrete to prepare FROM.
- * Material gates (any):
- *   A. Open commitments involving an attendee / this meeting's subject —
- *      "you walk in owing them something".
- *   B. A real agenda in the event description.
- *   C. A VIP attendee (explicit human 'VIP' tag — high stakes by definition).
- * A recurring internal sync with none of the above gets NO prep block.
+ * Prep candidates — emitted ONLY when Jose walks in owing the meeting
+ * something concrete: an open commitment involving an attendee or this
+ * meeting's subject. Owed work is the one honest reason to reserve
+ * calendar time, because it is the only case where there is both material
+ * to prepare FROM and an output of Jose's to prepare.
+ *
+ * An agenda alone or a VIP attendee does NOT create a block any more:
+ * with no task of Jose's there is nothing to prepare, and the old blocks
+ * degenerated into generic filler ("Agenda reviewed; a position decided").
+ * Those meetings get a Retoma card next to the day's agenda instead
+ * (src/lib/meeting-retomas.ts) — a read-before-you-walk-in pointer that
+ * costs zero calendar time. Agenda and VIP survive only as boosters on
+ * blocks that earned their place through owed work.
  */
 export function candidatesFromMeetings(
   meetings: UpcomingMeeting[],
@@ -550,33 +580,23 @@ export function candidatesFromMeetings(
     // The event stays busy for slot-finding, but no prep task is emitted.
     if (cls.is_personal) continue;
 
-    const owed   = opts.openCommitments.filter(r => commitmentMatchesMeeting(r, m));
-    const agenda = hasRealAgenda(m.description);
-    const vip    = cls.has_vip;
-    if (owed.length === 0 && !agenda && !vip) continue;          // no material → no prep
+    const owed = opts.openCommitments.filter(r => commitmentMatchesMeeting(r, m));
+    if (owed.length === 0) continue;             // nothing owed → no prep block
+
+    const agenda = hasRealAgenda(m.description); // booster, never a gate
+    const vip    = cls.has_vip;                  // booster, never a gate
 
     const timeLabel = fmtMeetingTime(m.start, opts.timezone);
     const whyParts: string[] = [];
-    let confidence = 0;
-    let urgency = daysUntil <= 1 ? 75 : 62;
+    let urgency = (daysUntil <= 1 ? 75 : 62) + 12;
 
-    if (owed.length > 0) {
-      const first = owed[0];
-      const firstTitle = (first.next_action ?? first.subject).trim();
-      const shortTitle = firstTitle.length > 60 ? firstTitle.slice(0, 57) + "…" : firstTitle;
-      whyParts.push(`Open with ${first.counterparty ?? "the counterpart"}: "${shortTitle}"${owed.length > 1 ? ` +${owed.length - 1} more` : ""}`);
-      confidence = Math.max(confidence, 85);
-      urgency += 12;
-    }
-    if (agenda) { whyParts.push("agenda set"); confidence = Math.max(confidence, 70); }
-    if (vip)    { whyParts.push("VIP attendee — high stakes"); confidence = Math.max(confidence, 65); urgency += 8; }
+    const first = owed[0];
+    const firstTitle = (first.next_action ?? first.subject).trim();
+    const shortTitle = firstTitle.length > 60 ? firstTitle.slice(0, 57) + "…" : firstTitle;
+    whyParts.push(`Open with ${first.counterparty ?? "the counterpart"}: "${shortTitle}"${owed.length > 1 ? ` +${owed.length - 1} more` : ""}`);
+    if (agenda) whyParts.push("agenda set");
+    if (vip)    { whyParts.push("VIP attendee — high stakes"); urgency += 8; }
     whyParts.push(`meeting ${timeLabel} · ${cls.confirmed_count} confirmed`);
-
-    const outcome = owed.length > 0
-      ? `Walk in with the ${owed.length} open item${owed.length === 1 ? "" : "s"} addressed or an answer ready.`
-      : agenda
-      ? "Agenda reviewed; a position decided for each item."
-      : "Context reviewed; objectives for the meeting decided.";
 
     out.push({
       title:            `Prep for "${m.title}"`,
@@ -586,11 +606,16 @@ export function candidatesFromMeetings(
       duration_min:     owed.length >= 2 || agenda ? 45 : 40,
       task_type:        "prep",
       urgency_score:    Math.min(100, urgency),
-      confidence_score: confidence,
+      confidence_score: 85,
       why_now:          whyParts.join(" · ") + ".",
-      expected_outcome: outcome,
+      expected_outcome: `Walk in with the ${owed.length} open item${owed.length === 1 ? "" : "s"} addressed or an answer ready.`,
       fingerprint:      `meeting_prep:${seriesKey(m.id)}:prep`,
       hard_time_constraint: { kind: "before", reference: m.start, withinMs: 24 * 3600_000 },
+      project_ref:      {
+        project_id: first.project_id,
+        objective_id: first.strategic_objective_id,
+        infer_text: `${m.title} ${first.subject}`,
+      },
     });
   }
   return out;
