@@ -23,11 +23,15 @@ const METRICS: ObjectiveMetricType[] = [
   "milestone_binary", "event_attended", "asset_published", "mou_signed", "custom_sql",
 ];
 
+export type ProjectOption = { id: string; name: string };
+
 type Props = {
   objectives2026: StrategicObjective[];
   objectives2027: StrategicObjective[];
   revenue2026: QuarterRevenueSummary[];
   currentQuarter: number;
+  /** Active projects, for the linked_projects curation selector. */
+  projectOptions: ProjectOption[];
 };
 
 type TabKey = "annual-2026" | "q1-2026" | "q2-2026" | "q3-2026" | "q4-2026" | "q1-2027";
@@ -280,7 +284,7 @@ function AnnualAdjustedCell({ summaries }: { summaries: QuarterRevenueSummary[] 
 
 // ─── Main component ──────────────────────────────────────────────────────────
 
-export default function PlanView({ objectives2026, objectives2027, revenue2026, currentQuarter }: Props) {
+export default function PlanView({ objectives2026, objectives2027, revenue2026, currentQuarter, projectOptions }: Props) {
   const router = useRouter();
   const [tab, setTab] = useState<TabKey>(
     currentQuarter >= 1 && currentQuarter <= 4 ? (`q${currentQuarter}-2026` as TabKey) : "q2-2026"
@@ -432,6 +436,7 @@ export default function PlanView({ objectives2026, objectives2027, revenue2026, 
       {selected && (
         <ObjectiveDrawer
           obj={selected}
+          projectOptions={projectOptions}
           onClose={() => setSelected(null)}
           onSaved={(updated) => {
             setSelected(updated);
@@ -460,11 +465,12 @@ export default function PlanView({ objectives2026, objectives2027, revenue2026, 
 
 type DrawerProps = {
   obj: StrategicObjective;
+  projectOptions: ProjectOption[];
   onClose: () => void;
   onSaved: (updated: StrategicObjective) => void;
 };
 
-function ObjectiveDrawer({ obj, onClose, onSaved }: DrawerProps) {
+function ObjectiveDrawer({ obj, projectOptions, onClose, onSaved }: DrawerProps) {
   const [mode, setMode] = useState<"view" | "edit">("view");
   const progress =
     obj.target_value && obj.current_value != null
@@ -525,6 +531,7 @@ function ObjectiveDrawer({ obj, onClose, onSaved }: DrawerProps) {
         {mode === "edit" ? (
           <EditObjectiveForm
             obj={obj}
+            projectOptions={projectOptions}
             onCancel={() => setMode("view")}
             onSaved={(updated) => {
               onSaved(updated);
@@ -532,14 +539,24 @@ function ObjectiveDrawer({ obj, onClose, onSaved }: DrawerProps) {
             }}
           />
         ) : (
-          <ViewObjectiveBody obj={obj} progress={progress} />
+          <ViewObjectiveBody obj={obj} progress={progress} projectOptions={projectOptions} />
         )}
       </aside>
     </>
   );
 }
 
-function ViewObjectiveBody({ obj, progress }: { obj: StrategicObjective; progress: number | null }) {
+function ViewObjectiveBody({
+  obj,
+  progress,
+  projectOptions,
+}: {
+  obj: StrategicObjective;
+  progress: number | null;
+  projectOptions: ProjectOption[];
+}) {
+  const projectName = (id: string) =>
+    projectOptions.find((p) => p.id === id)?.name ?? `${id.slice(0, 8)}…`;
   return (
         <div className="px-7 py-6 space-y-5">
           <DrawerField label="Descripción" value={obj.description} />
@@ -628,8 +645,15 @@ function ViewObjectiveBody({ obj, progress }: { obj: StrategicObjective; progres
               {obj.linked_projects.length > 0 && (
                 <div className="mb-1.5">
                   <span className="text-[10px] text-[#0a0a0a]/60">Projects: </span>
-                  <span className="text-[11px] font-semibold text-[#0a0a0a]">
-                    {obj.linked_projects.length}
+                  <span className="inline-flex flex-wrap gap-1 align-middle">
+                    {obj.linked_projects.map((pid) => (
+                      <span
+                        key={pid}
+                        className="text-[10px] font-semibold px-2 py-0.5 rounded bg-[#f4f4ef] text-[#0a0a0a]"
+                      >
+                        {projectName(pid)}
+                      </span>
+                    ))}
                   </span>
                 </div>
               )}
@@ -663,10 +687,12 @@ function ViewObjectiveBody({ obj, progress }: { obj: StrategicObjective; progres
 
 function EditObjectiveForm({
   obj,
+  projectOptions,
   onCancel,
   onSaved,
 }: {
   obj: StrategicObjective;
+  projectOptions: ProjectOption[];
   onCancel: () => void;
   onSaved: (updated: StrategicObjective) => void;
 }) {
@@ -686,6 +712,8 @@ function EditObjectiveForm({
     JSON.stringify(obj.metric_params ?? {}, null, 2)
   );
   const [notes, setNotes] = useState(obj.notes ?? "");
+  const [linkedProjects, setLinkedProjects] = useState<string[]>(obj.linked_projects ?? []);
+  const [projectFilter, setProjectFilter] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -717,6 +745,7 @@ function EditObjectiveForm({
           target_unit: targetUnit.trim() || null,
           metric_type: metricType,
           metric_params: parsedParams,
+          linked_projects: linkedProjects,
           notes: notes.trim() || null,
         }),
       });
@@ -881,6 +910,56 @@ function EditObjectiveForm({
           />
         </FormField>
       )}
+
+      <FormField label={`Proyectos vinculados (${linkedProjects.length})`}>
+        <p className="text-[10px] text-[#0a0a0a]/50 mb-1.5 leading-snug">
+          Esta vinculación activa el tier del objetivo en los chips de Suggested
+          Time Blocks — el tier nunca se infiere, solo viaja por acá.
+        </p>
+        {projectOptions.length === 0 ? (
+          <p className="text-[11px] text-[#0a0a0a]/40">No hay proyectos activos disponibles.</p>
+        ) : (
+          <>
+            <input
+              value={projectFilter}
+              onChange={(e) => setProjectFilter(e.target.value)}
+              placeholder="Filtrar proyectos…"
+              className="w-full text-[12px] px-3 py-1.5 mb-1.5 border border-[#e4e4dd] rounded-md focus:outline-none focus:border-[#0a0a0a]"
+            />
+            <div className="max-h-44 overflow-y-auto border border-[#e4e4dd] rounded-md divide-y divide-[#f4f4ef]">
+              {projectOptions
+                .filter((p) =>
+                  // selected projects always visible so unticking is one click
+                  linkedProjects.includes(p.id) ||
+                  p.name.toLowerCase().includes(projectFilter.toLowerCase())
+                )
+                .map((p) => {
+                  const checked = linkedProjects.includes(p.id);
+                  return (
+                    <label
+                      key={p.id}
+                      className={`flex items-center gap-2 px-3 py-1.5 cursor-pointer text-[11.5px] ${
+                        checked ? "bg-[#c6f24a]/15 font-semibold" : "hover:bg-[#f4f4ef]"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() =>
+                          setLinkedProjects((prev) =>
+                            checked ? prev.filter((id) => id !== p.id) : [...prev, p.id]
+                          )
+                        }
+                        className="accent-[#0a0a0a]"
+                      />
+                      <span className="truncate">{p.name}</span>
+                    </label>
+                  );
+                })}
+            </div>
+          </>
+        )}
+      </FormField>
 
       <FormField label="Notas">
         <textarea

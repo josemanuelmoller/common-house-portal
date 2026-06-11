@@ -30,6 +30,17 @@ source row has it, conservative unambiguous name inference otherwise
 it only appears through explicit `strategic_objective_id` or
 `strategic_objectives.linked_projects` linkage.
 
+Explicit linkage is populated at INGEST time (2026-06-11): the Fireflies and
+Gmail ingestors stamp `action_items.project_id` via
+`src/lib/ingestors/project-linkage.ts` (explicit `evidence.project_notion_id`
+→ same conservative name matcher → unambiguous single-project counterparty),
+and `persist.ts` fill-only patches linkage onto existing open rows as new
+motion arrives. One-shot catch-up for old rows:
+`POST /api/backfill-action-item-projects` (dry-run by default).
+`strategic_objectives.linked_projects` is curated by hand in the
+`/admin/plan` objective drawer ("Proyectos vinculados") — that linkage is the
+only path that activates tier on the chips.
+
 ## Status
 
 - **Implemented, deployed, type-clean, observability in place.**

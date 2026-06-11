@@ -131,6 +131,23 @@ export async function finishIngestorRun(params: {
 
 // ─── action_items ─────────────────────────────────────────────────────────
 /**
+ * Fill-only linkage patch: stamp project / objective ids from the signal
+ * when the existing row has none. Never overwrites a non-null linkage —
+ * curation and backfill decisions win over re-ingestion.
+ */
+function linkagePatch(
+  signal: ActionSignal,
+  existing: { project_id?: string | null; strategic_objective_id?: string | null },
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  const pid = signal.related_ids?.project_id;
+  const oid = signal.related_ids?.objective_id;
+  if (pid && !existing.project_id) out.project_id = pid;
+  if (oid && !existing.strategic_objective_id) out.strategic_objective_id = oid;
+  return out;
+}
+
+/**
  * Upsert an ActionSignal into action_items.
  *
  * Behaviour:
@@ -158,7 +175,7 @@ export async function persistActionSignal(signal: ActionSignal): Promise<{
   // Look for an existing open row with the same dedup_key
   const { data: existing, error: selErr } = await sb
     .from("action_items")
-    .select("id, last_motion_at")
+    .select("id, last_motion_at, project_id, strategic_objective_id")
     .eq("dedup_key", dedup_key)
     .eq("status", "open")
     .maybeSingle();
@@ -188,6 +205,7 @@ export async function persistActionSignal(signal: ActionSignal): Promise<{
         // Only overwrite effort when the signal carries one — a null/absent
         // effort must not erase a value set by backfill or a prior classifier.
         ...(signal.payload.effort ? { effort: signal.payload.effort } : {}),
+        ...linkagePatch(signal, existing),
       })
       .eq("id", existing.id as string);
     if (updErr) throw new Error(`persistActionSignal update: ${updErr.message}`);
@@ -209,7 +227,7 @@ export async function persistActionSignal(signal: ActionSignal): Promise<{
   //      manual_dismiss are eligible
   const { data: closed } = await sb
     .from("action_items")
-    .select("id, status, resolved_at, resolved_reason, last_motion_at")
+    .select("id, status, resolved_at, resolved_reason, last_motion_at, project_id, strategic_objective_id")
     .eq("dedup_key", dedup_key)
     .in("status", ["resolved", "dismissed", "stale"])
     .order("resolved_at", { ascending: false })
@@ -244,6 +262,7 @@ export async function persistActionSignal(signal: ActionSignal): Promise<{
           deadline:         signal.payload.deadline,
           consequence:      signal.payload.consequence,
           ...(signal.payload.effort ? { effort: signal.payload.effort } : {}),
+          ...linkagePatch(signal, closed),
         })
         .eq("id", closed.id as string);
       if (reErr) throw new Error(`persistActionSignal reopen: ${reErr.message}`);
@@ -262,7 +281,7 @@ export async function persistActionSignal(signal: ActionSignal): Promise<{
   const FUZZY_THRESHOLD = 0.5;
   let fuzzyMatchQuery = sb
     .from("action_items")
-    .select("id, subject, last_motion_at")
+    .select("id, subject, last_motion_at, project_id, strategic_objective_id")
     .eq("status", "open")
     .eq("intent", signal.payload.intent)
     .limit(20);
@@ -280,7 +299,10 @@ export async function persistActionSignal(signal: ActionSignal): Promise<{
   if (fuzzyCandidates && fuzzyCandidates.length > 0) {
     const incomingFp = actionItemFingerprint(signal.payload.subject);
     if (incomingFp) {
-      let bestMatch: { id: string; lastMotion: string; similarity: number } | null = null;
+      let bestMatch: {
+        id: string; lastMotion: string; similarity: number;
+        project_id: string | null; strategic_objective_id: string | null;
+      } | null = null;
       for (const c of fuzzyCandidates) {
         const sim = overlapCoefficient(incomingFp, actionItemFingerprint(c.subject as string));
         if (sim >= FUZZY_THRESHOLD && (!bestMatch || sim > bestMatch.similarity)) {
@@ -288,6 +310,8 @@ export async function persistActionSignal(signal: ActionSignal): Promise<{
             id:         c.id as string,
             lastMotion: c.last_motion_at as string,
             similarity: sim,
+            project_id: (c.project_id as string | null) ?? null,
+            strategic_objective_id: (c.strategic_objective_id as string | null) ?? null,
           };
         }
       }
@@ -310,6 +334,7 @@ export async function persistActionSignal(signal: ActionSignal): Promise<{
             deadline:         signal.payload.deadline,
             consequence:      signal.payload.consequence,
             ...(signal.payload.effort ? { effort: signal.payload.effort } : {}),
+            ...linkagePatch(signal, bestMatch),
           })
           .eq("id", bestMatch.id);
         if (updErr) throw new Error(`persistActionSignal fuzzy-update: ${updErr.message}`);

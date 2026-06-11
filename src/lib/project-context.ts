@@ -31,11 +31,16 @@ export type ProjectContext = {
   project_source: "explicit" | "inferred" | null;
 };
 
-type ProjectRow = {
+/** Minimal project shape the matching primitives operate on. Exported so
+ *  ingestors and backfills can run the SAME conservative inference that
+ *  powers the STB chips — one matcher, one behaviour. */
+export type MatchableProject = {
   id: string;
   notion_id: string | null;
   name: string;
 };
+
+type ProjectRow = MatchableProject;
 
 type ObjectiveRow = {
   id: string;
@@ -77,7 +82,7 @@ function projectMatchesText(project: ProjectRow, textSquash: string, textTokens:
 /** When several projects match, accept only the family case where every
  *  match is an extension of one shortest base name ("Kinko" + "Kinko —
  *  Pre-sale…" → "Kinko"). Genuinely distinct matches → ambiguous → null. */
-function disambiguate(matches: ProjectRow[]): ProjectRow | null {
+function disambiguate(matches: MatchableProject[]): MatchableProject | null {
   if (matches.length === 0) return null;
   if (matches.length === 1) return matches[0];
   const sorted = [...matches].sort((a, b) => squash(primaryName(a.name)).length - squash(primaryName(b.name)).length);
@@ -88,6 +93,33 @@ function disambiguate(matches: ProjectRow[]): ProjectRow | null {
 const EMPTY_CONTEXT: ProjectContext = {
   project_name: null, objective_title: null, objective_tier: null, project_source: null,
 };
+
+/** Active (non-dead) projects, fetched once per caller run. Throws on DB
+ *  error — callers decide their own fail-soft policy. */
+export async function loadActiveProjects(): Promise<MatchableProject[]> {
+  const sb = getSupabaseServerClient();
+  // Status filter runs in JS: SQL `NOT IN` silently drops NULL-status rows.
+  const { data, error } = await sb.from("projects").select("id,notion_id,name,project_status");
+  if (error) throw new Error(`loadActiveProjects: ${error.message}`);
+  const deadProj = new Set(["Archived", "Completed", "Closed", "Cancelled"]);
+  return ((data ?? []) as (MatchableProject & { project_status: string | null })[])
+    .filter(p => !deadProj.has(p.project_status ?? ""));
+}
+
+/**
+ * Conservative name inference: returns the single unambiguous project whose
+ * primary name appears in `text`, or null. Two genuinely distinct matches →
+ * null (a missing link beats a wrong one). Same matcher the STB chips use.
+ */
+export function inferProjectFromText(
+  projects: MatchableProject[],
+  text: string,
+): MatchableProject | null {
+  if (!text.trim() || projects.length === 0) return null;
+  const textSquash = squash(text);
+  const textTokens = tokens(text);
+  return disambiguate(projects.filter(p => projectMatchesText(p, textSquash, textTokens)));
+}
 
 /**
  * Batch-resolve project context for a set of candidates.
@@ -105,15 +137,13 @@ export async function resolveProjectContexts(
   let objectives: ObjectiveRow[] = [];
   try {
     const sb = getSupabaseServerClient();
-    // Status filters run in JS: SQL `NOT IN` silently drops NULL-status rows.
-    const [projRes, objRes] = await Promise.all([
-      sb.from("projects").select("id,notion_id,name,project_status"),
+    // Status filter runs in JS: SQL `NOT IN` silently drops NULL-status rows.
+    const [projList, objRes] = await Promise.all([
+      loadActiveProjects(),
       sb.from("strategic_objectives").select("id,title,tier,status,linked_projects"),
     ]);
-    const deadProj = new Set(["Archived", "Completed", "Closed", "Cancelled"]);
-    const deadObj  = new Set(["achieved", "dropped"]);
-    projects = ((projRes.data ?? []) as (ProjectRow & { project_status: string | null })[])
-      .filter(p => !deadProj.has(p.project_status ?? ""));
+    const deadObj = new Set(["achieved", "dropped"]);
+    projects = projList;
     objectives = ((objRes.data ?? []) as (ObjectiveRow & { status: string | null })[])
       .filter(o => !deadObj.has(o.status ?? ""));
   } catch (e) {
@@ -160,9 +190,7 @@ export async function resolveProjectContexts(
         continue;
       }
     } else if (ref.infer_text) {
-      const textSquash = squash(ref.infer_text);
-      const textTokens = tokens(ref.infer_text);
-      project = disambiguate(projects.filter(p => projectMatchesText(p, textSquash, textTokens)));
+      project = inferProjectFromText(projects, ref.infer_text);
       source = project ? "inferred" : null;
     }
 

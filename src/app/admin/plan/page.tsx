@@ -6,6 +6,7 @@ import {
   summarizeRevenue,
   currentQuarter,
 } from "@/lib/plan";
+import { loadActiveProjects } from "@/lib/project-context";
 import PlanView from "@/components/plan/PlanView";
 import { PlanNav } from "@/components/plan/PlanNav";
 
@@ -14,11 +15,15 @@ export const dynamic = "force-dynamic";
 export default async function PlanPage() {
   await requireAdmin();
 
-  const [objectives2026, objectives2027, revenueEvents2026] = await Promise.all([
+  const [objectives2026, objectives2027, revenueEvents2026, activeProjects] = await Promise.all([
     getObjectivesForYear(2026),
     getObjectivesForYear(2027),
     getRevenueEventsForYear(2026),
+    loadActiveProjects().catch(() => []),
   ]);
+  const projectOptions = activeProjects
+    .map(p => ({ id: p.id, name: p.name }))
+    .sort((a, b) => a.name.localeCompare(b.name, "es"));
 
   const revenue2026 = summarizeRevenue(objectives2026, revenueEvents2026);
   const { quarter } = currentQuarter();
@@ -97,6 +102,7 @@ export default async function PlanPage() {
             objectives2027={objectives2027}
             revenue2026={revenue2026}
             currentQuarter={quarter ?? 2}
+            projectOptions={projectOptions}
           />
         </div>
       </main>
