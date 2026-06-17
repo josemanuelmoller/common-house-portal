@@ -118,6 +118,9 @@ export function CompetitiveIntelPanel({ rows, lastScanAt }: Props) {
   sortBucket(buckets.Sector);
   sortBucket(buckets.Other);
 
+  // The scan runs ~2-3 min server-side. Fire it in background mode so the
+  // request returns immediately (no browser-fetch timeout), then auto-refresh
+  // once it has had time to finish.
   const runMonitor = () => {
     setMsg(null);
     startTransition(async () => {
@@ -125,13 +128,12 @@ export function CompetitiveIntelPanel({ rows, lastScanAt }: Props) {
         const res = await fetch("/api/competitive-monitor", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ mode: "execute", lookback_days: 7 }),
+          body: JSON.stringify({ mode: "execute", lookback_days: 7, background: true }),
         });
         const body = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`);
-        const created = body.created ?? body.records_written ?? body.count ?? 0;
-        setMsg(`Scanned · ${created} new signal${created === 1 ? "" : "s"}`);
-        router.refresh();
+        setMsg("Scan started · results in ~2-3 min");
+        setTimeout(() => router.refresh(), 180_000);
       } catch (e) {
         setMsg(e instanceof Error ? e.message : String(e));
       }
