@@ -20,13 +20,12 @@
  * there is a real product surface reading the writes.
  */
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 // TODO phase-6: migrate read source to Supabase watchlist_entities + competitive_intel
 import { Client } from "@notionhq/client";
 import { currentUser } from "@clerk/nextjs/server";
 import { isAdminUser, isAdminEmail } from "@/lib/clients";
-import { withRoutineLog } from "@/lib/routine-log";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 
 export const maxDuration = 300;
@@ -309,17 +308,24 @@ After the JSON array, add a brief human-readable summary section with:
   return { signals, rawReport: rawText };
 }
 
-// ─── Main handler ─────────────────────────────────────────────────────────────
+// ─── Scan core ──────────────────────────────────────────────────────────────
 
-async function _POST(req: NextRequest): Promise<Response> {
-  if (!await authCheck(req)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+type ScanOutcome = {
+  results: {
+    total: number;
+    created: number;
+    duplicate_skipped: number;
+    dry_run_proposed: number;
+    p1_signals: string[];
+    errors: number;
+  };
+  rawReport: string;
+  competitors: WatchlistEntry[];
+  sectorOrgs: WatchlistEntry[];
+};
 
-  const body = await req.json().catch(() => ({}));
-  const mode         = body.mode         ?? "dry_run";
-  const lookbackDays = body.lookback_days ?? 30;
-
+/** Runs the full scan. Throws "No active Watchlist entries found" if empty. */
+async function runScan(mode: string, lookbackDays: number): Promise<ScanOutcome> {
   // 1. Fetch watchlist entries
   const [competitors, sectorOrgs] = await Promise.all([
     fetchWatchlist(["Competitor"]).catch(() => [] as WatchlistEntry[]),
@@ -327,7 +333,7 @@ async function _POST(req: NextRequest): Promise<Response> {
   ]);
 
   if (competitors.length === 0 && sectorOrgs.length === 0) {
-    return NextResponse.json({ error: "No active Watchlist entries found" }, { status: 400 });
+    throw new Error("No active Watchlist entries found");
   }
 
   // 2. Run competitive search with Claude + web search
@@ -378,15 +384,6 @@ async function _POST(req: NextRequest): Promise<Response> {
   // 4. Update Last Scan dates (execute only)
   if (mode === "execute") {
     const allEntries = [...competitors, ...sectorOrgs];
-    // notion-cutoff-2026-06-02: removed; canonical write is now to watchlist_entities (Supabase).
-    // await Promise.allSettled(
-    //   allEntries.map(e =>
-    //     notion.pages.update({
-    //       page_id: e.id,
-    //       properties: { "Last Scan": { date: { start: new Date().toISOString().slice(0, 10) } } },
-    //     })
-    //   )
-    // );
     const sb = getSupabaseServerClient();
     const todayIso = new Date().toISOString();
     const todayDate = todayIso.slice(0, 10);
@@ -412,29 +409,105 @@ async function _POST(req: NextRequest): Promise<Response> {
     );
   }
 
-  return NextResponse.json({
-    ok:             true,
-    mode,
-    lookback_days:  lookbackDays,
-    run_date:       new Date().toISOString(),
-    // Top-level count fields so UI clients have a stable contract without
-    // reaching into `results`. Both consumers (CompetitiveIntelClient reads
-    // `signalsCreated`, CompetitiveIntelPanel reads `created`) resolve here.
-    created:        results.created,
-    signalsCreated: results.created,
-    entities: {
-      competitors: competitors.map(c => c.name),
-      sector:      sectorOrgs.map(s => s.name),
-    },
-    results,
-    report: rawReport,
-  });
+  return { results, rawReport, competitors, sectorOrgs };
 }
 
-export const POST = withRoutineLog("competitive-monitor", _POST);
+/**
+ * Runs a scan and records one routine_runs row (success or error) so both the
+ * synchronous cron path and the background button path stay visible in the
+ * routines health panel. Re-throws so the caller can map the error to a status.
+ * (Replaces the old withRoutineLog wrapper, which would have logged the instant
+ * 202 of the background path instead of the real work.)
+ */
+async function runScanAndLog(mode: string, lookbackDays: number): Promise<ScanOutcome> {
+  const startedAt = new Date();
+  const t0 = Date.now();
+  let status: "success" | "error" = "success";
+  let errorMessage: string | null = null;
+  let outcome: ScanOutcome | null = null;
+  try {
+    outcome = await runScan(mode, lookbackDays);
+    return outcome;
+  } catch (err) {
+    status = "error";
+    errorMessage = err instanceof Error ? err.message : String(err);
+    throw err;
+  } finally {
+    try {
+      const sb = getSupabaseServerClient();
+      await sb.from("routine_runs").insert({
+        routine_name:    "competitive-monitor",
+        started_at:      startedAt.toISOString(),
+        finished_at:     new Date().toISOString(),
+        duration_ms:     Date.now() - t0,
+        status,
+        http_status:     status === "success" ? 200 : 500,
+        records_read:    outcome ? outcome.competitors.length + outcome.sectorOrgs.length : null,
+        records_written: outcome ? outcome.results.created : null,
+        error_message:   errorMessage,
+      });
+    } catch (e) {
+      console.error("[competitive-monitor] routine_runs insert failed:", e instanceof Error ? e.message : String(e));
+    }
+  }
+}
 
-// Vercel cron calls GET — invoke execute mode with 7-day lookback through
-// the same wrapped handler so runs are captured in routine_runs.
+// ─── Main handler ─────────────────────────────────────────────────────────────
+
+export async function POST(req: NextRequest): Promise<Response> {
+  if (!await authCheck(req)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const body = await req.json().catch(() => ({}));
+  const mode         = body.mode          ?? "dry_run";
+  const lookbackDays = body.lookback_days ?? 30;
+  const background   = body.background === true;
+
+  // Background mode: the web-search scan runs ~2-3 min — longer than a browser
+  // fetch reliably stays open (the "Error de red" the UI used to hit). Schedule
+  // the work with after() so it continues server-side (up to maxDuration) after
+  // we return immediately. routine_runs is still written inside runScanAndLog.
+  if (background) {
+    after(async () => {
+      try { await runScanAndLog(mode, lookbackDays); }
+      catch { /* already logged in runScanAndLog */ }
+    });
+    return NextResponse.json({ ok: true, started: true, mode });
+  }
+
+  // Synchronous mode — Vercel cron GET (server-to-server, no browser timeout).
+  try {
+    const out = await runScanAndLog(mode, lookbackDays);
+    return NextResponse.json({
+      ok:             true,
+      mode,
+      lookback_days:  lookbackDays,
+      run_date:       new Date().toISOString(),
+      // Top-level count fields so UI clients have a stable contract without
+      // reaching into `results`. Both consumers (CompetitiveIntelClient reads
+      // `signalsCreated`, CompetitiveIntelPanel reads `created`) resolve here.
+      created:        out.results.created,
+      signalsCreated: out.results.created,
+      entities: {
+        competitors: out.competitors.map(c => c.name),
+        sector:      out.sectorOrgs.map(s => s.name),
+      },
+      results: out.results,
+      report:  out.rawReport,
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "";
+    if (msg.includes("No active Watchlist")) {
+      return NextResponse.json({ error: "No active Watchlist entries found" }, { status: 400 });
+    }
+    console.error("[competitive-monitor] scan failed:", msg);
+    return NextResponse.json({ error: "Internal error" }, { status: 500 });
+  }
+}
+
+// Vercel cron calls GET — invoke execute mode with 7-day lookback through the
+// synchronous path so the run is captured in routine_runs (runScanAndLog).
 export async function GET(req: NextRequest) {
   const wrapped = new Request(req.url, {
     method:  "POST",
