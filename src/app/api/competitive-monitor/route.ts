@@ -417,6 +417,11 @@ async function _POST(req: NextRequest): Promise<Response> {
     mode,
     lookback_days:  lookbackDays,
     run_date:       new Date().toISOString(),
+    // Top-level count fields so UI clients have a stable contract without
+    // reaching into `results`. Both consumers (CompetitiveIntelClient reads
+    // `signalsCreated`, CompetitiveIntelPanel reads `created`) resolve here.
+    created:        results.created,
+    signalsCreated: results.created,
     entities: {
       competitors: competitors.map(c => c.name),
       sector:      sectorOrgs.map(s => s.name),
