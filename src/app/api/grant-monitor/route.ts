@@ -25,9 +25,10 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+// TODO phase-6: migrate read source to Supabase opportunities + projects
 import { Client } from "@notionhq/client";
-import { auth } from "@clerk/nextjs/server";
-import { isAdminUser } from "@/lib/clients";
+import { currentUser } from "@clerk/nextjs/server";
+import { isAdminUser, isAdminEmail } from "@/lib/clients";
 import { withRoutineLog } from "@/lib/routine-log";
 import { createPageWithMirror } from "@/lib/notion-mirror-push";
 
@@ -50,8 +51,13 @@ async function authCheck(req: NextRequest): Promise<boolean> {
   if (expected && agentKey === expected) return true;
   if (expected && cronToken === `Bearer ${expected}`) return true;
   try {
-    const { userId } = await auth();
-    if (userId && isAdminUser(userId)) return true;
+    // Check id AND email — the production Clerk userId differs from dev, so
+    // admin access must also resolve via ADMIN_EMAILS (mirrors adminGuardApi).
+    const user = await currentUser();
+    if (user) {
+      const email = user.primaryEmailAddress?.emailAddress ?? "";
+      if (isAdminUser(user.id) || isAdminEmail(email)) return true;
+    }
   } catch { /* no-op */ }
   return false;
 }
