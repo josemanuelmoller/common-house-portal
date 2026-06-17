@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useRouter } from "next/navigation";
 import type { CompetitiveIntelRow, WatchlistEntity } from "@/lib/notion/competitive";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -671,11 +672,15 @@ function StatsBar({ entityCount, totalSignals, newCount }: { entityCount: number
 // ─── Root client component ────────────────────────────────────────────────────
 
 export function CompetitiveIntelClient({ signals, entityStats, entityCount, newCount }: Props) {
+  const router = useRouter();
   const [activeTab, setActiveTab]       = useState<"actividad" | "senales" | "relaciones">("actividad");
   const [selectedEntity, setSelectedEntity] = useState<EntityStat | null>(null);
   const [scanning, setScanning]         = useState(false);
   const [scanMsg, setScanMsg]           = useState<string | null>(null);
 
+  // The scan runs ~2-3 min server-side. We fire it in background mode so the
+  // request returns immediately (no browser-fetch timeout), then auto-refresh
+  // once it has had time to finish so new signals appear without a manual reload.
   const handleScan = useCallback(async () => {
     setScanning(true);
     setScanMsg(null);
@@ -683,16 +688,21 @@ export function CompetitiveIntelClient({ signals, entityStats, entityCount, newC
       const res = await fetch("/api/competitive-monitor", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode: "execute" }),
+        body: JSON.stringify({ mode: "execute", background: true }),
       });
-      const data = await res.json();
-      setScanMsg(res.ok ? `Scan completado · ${data.signalsCreated ?? "?"} señales nuevas` : data.error ?? "Error en scan");
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setScanMsg("Scan iniciado · los resultados aparecen en ~2-3 min");
+        setTimeout(() => router.refresh(), 180_000);
+      } else {
+        setScanMsg(data.error ?? "Error al iniciar el scan");
+      }
     } catch {
       setScanMsg("Error de red — intenta de nuevo");
     } finally {
       setScanning(false);
     }
-  }, []);
+  }, [router]);
 
   const TABS = [
     { id: "actividad"  as const, label: "Actividad" },
