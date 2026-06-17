@@ -15,6 +15,7 @@
 import Link from "next/link";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { getHallConfig } from "@/lib/hall-config";
+import { HallPipelineActions } from "@/components/HallPipelineActions";
 
 type RevRow = {
   stage: string;
@@ -25,6 +26,16 @@ type RevRow = {
   invoice_number: string | null;
   notes: string | null;
   quarter: number | null;
+};
+
+type PipeRow = {
+  id: string;
+  title: string;
+  org_name: string | null;
+  status: string;
+  value_estimate: number | string | null;
+  expected_close_date: string | null;
+  probability: string | null;
 };
 
 const CCY_SYMBOL: Record<string, string> = { USD: "$", GBP: "£", EUR: "€" };
@@ -76,18 +87,31 @@ export async function HallRevenueCard() {
   const quarter = Math.floor(now.getUTCMonth() / 3) + 1;
 
   const sb = getSupabaseServerClient();
-  const [ratesRes, eventsRes, targetRes] = await Promise.all([
+  const [ratesRes, eventsRes, targetRes, pipeRes] = await Promise.all([
     getUsdRates(),
     sb.from("revenue_events")
       .select("stage, amount, currency, due_date, invoice_date, invoice_number, notes, quarter")
-      .eq("year", year),
+      .eq("year", year)
+      .is("superseded_at", null),
     sb.from("strategic_objectives")
       .select("target_value")
       .eq("objective_type", "revenue")
       .eq("year", year)
       .eq("quarter", quarter)
       .maybeSingle(),
+    // Pipeline "Por cerrar": proposal out the door, or an active deal with a
+    // real number attached. Everything else lives in /admin/opportunities.
+    sb.from("opportunities")
+      .select("id, title, org_name, status, value_estimate, expected_close_date, probability")
+      .in("status", ["Proposal Sent", "Active"])
+      .eq("is_legacy", false)
+      .eq("is_archived", false)
+      .order("expected_close_date", { ascending: true, nullsFirst: false }),
   ]);
+
+  const pipeline = ((pipeRes.data ?? []) as PipeRow[]).filter(
+    p => p.status === "Proposal Sent" || Number(p.value_estimate ?? 0) > 0
+  );
 
   const rates = ratesRes;
   const yearRows = (eventsRes.data ?? []) as RevRow[];
@@ -127,7 +151,7 @@ export async function HallRevenueCard() {
     .map(([c, n]) => `${c} ${n.toLocaleString("en-US")}`)
     .join(" + ");
 
-  if (rows.length === 0 && target === 0) {
+  if (rows.length === 0 && target === 0 && pipeline.length === 0) {
     return (
       <p className="text-[11px]" style={{ color: "var(--hall-muted-3)" }}>
         Sin datos de revenue este trimestre — el sync de Xero corre cada madrugada.
@@ -202,6 +226,57 @@ export async function HallRevenueCard() {
                 >
                   {stage.label}
                 </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Por cerrar — propuestas enviadas y deals activos con monto. ✓ Ganada
+          crea el revenue_event 'sold' (suma al % de arriba); ✗ Perdida lo
+          saca del pipeline dejando el histórico. */}
+      {pipeline.length > 0 && (
+        <div className="mt-1.5 flex flex-col">
+          <p
+            className="uppercase tracking-[0.08em] font-bold mb-1"
+            style={{ fontFamily: "var(--font-hall-mono)", fontSize: 8.5, color: "var(--hall-muted-3)" }}
+          >
+            Por cerrar
+          </p>
+          {pipeline.map(p => {
+            const isProposal = p.status === "Proposal Sent";
+            const amount = Number(p.value_estimate ?? 0);
+            const meta = p.expected_close_date
+              ? `cierre ${p.expected_close_date.slice(5, 10)}`
+              : isProposal
+              ? "en espera"
+              : "por proponer";
+            return (
+              <div
+                key={p.id}
+                className="flex items-baseline gap-2 py-1"
+                style={{ borderTop: "1px solid var(--hall-line-soft)" }}
+              >
+                <span className="flex-1 min-w-0 truncate text-[10.5px]" style={{ color: "var(--hall-ink-2)" }}>
+                  {p.org_name ?? p.title}
+                  <span className="ml-1.5" style={{ fontFamily: "var(--font-hall-mono)", fontSize: 8.5, color: "var(--hall-muted-3)" }}>
+                    {meta}
+                  </span>
+                </span>
+                <span className="shrink-0 text-[10.5px] font-semibold" style={{ color: "var(--hall-ink-0)" }}>
+                  {amount > 0 ? fmtUsd(amount) : "—"}
+                </span>
+                <span
+                  className="shrink-0 uppercase tracking-[0.06em] font-bold"
+                  style={{
+                    fontFamily: "var(--font-hall-mono)",
+                    fontSize: 8,
+                    color: isProposal ? "var(--hall-warn)" : "var(--hall-muted-2)",
+                  }}
+                >
+                  {isProposal ? "propuesta" : "activa"}
+                </span>
+                <HallPipelineActions id={p.id} title={p.org_name ?? p.title} amount={amount > 0 ? amount : null} />
               </div>
             );
           })}

@@ -187,7 +187,7 @@ export async function getPipelineState(): Promise<PipelineStateResult> {
       )
       .eq("is_active", true)
       .eq("is_archived", false)
-      .in("status", ["New", "Qualifying", "Active"])
+      .in("status", ["New", "Qualifying", "Active", "Proposal Sent"])
       .neq("opportunity_type", "Grant"),
   ]);
 
