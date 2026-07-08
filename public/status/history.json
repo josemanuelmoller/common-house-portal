@@ -1,9 +1,5 @@
 [
   {
-    "ts": "2026-06-26T12:04:02Z",
-    "overall": "degraded"
-  },
-  {
     "ts": "2026-06-26T14:44:08Z",
     "overall": "degraded"
   },
@@ -573,6 +569,10 @@
   },
   {
     "ts": "2026-07-08T11:26:10Z",
+    "overall": "degraded"
+  },
+  {
+    "ts": "2026-07-08T12:59:08Z",
     "overall": "degraded"
   }
 ]
