@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminGuardApi } from "@/lib/require-admin";
+// TODO phase-6: migrate read source to Supabase opportunities + organizations
 import { Client } from "@notionhq/client";
 import Anthropic from "@anthropic-ai/sdk";
 import { createPageWithMirror } from "@/lib/notion-mirror-push";
+import { getProposalFeedbackContext } from "@/lib/proposal-feedback";
 
 const notion = new Client({ auth: process.env.NOTION_API_KEY });
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -62,6 +64,12 @@ export async function POST(req: NextRequest) {
   // 3. Generate draft with Anthropic
   const today = new Date().toISOString().slice(0, 10);
 
+  // Feedback loop: past follow-up drafts José rejected / rewrote. Empty until data exists.
+  const feedbackContext = await getProposalFeedbackContext({
+    proposalType: "agent_draft",
+    agentName: "Follow-up Email",
+  });
+
   const prompt = `You are drafting a follow-up email for José Manuel Moller (JMM) about a business opportunity.
 
 Opportunity details:
@@ -79,6 +87,7 @@ Write a short, professional follow-up email (max 6 sentences). Rules:
 - Include a Subject line (format: Subject: ...)
 - Sign off as "José Manuel"
 
+${feedbackContext}
 Output ONLY the email (Subject + body). Nothing else.`;
 
   let draftText = "";
