@@ -33,6 +33,7 @@ const STATE_MODEL = "claude-sonnet-4-6";
 const DEFAULT_LOOKBACK_DAYS = 30;
 const MAX_EVIDENCE_PER_PROJECT = 40;
 const DAY_MS = 86_400_000;
+const ZERO_UUID = "00000000-0000-0000-0000-000000000000";
 
 // ─── Contract sets (validated against the DB check constraints) ───────────────
 
@@ -63,7 +64,10 @@ export type EvidenceDeltaRow = {
   dateCaptured: string | null;
   resolutionStatus: string | null;
   createdAt: string;
+  updatedAt: string;
 };
+
+type EvidenceCursor = { at: string; id: string };
 
 type ActiveItem = {
   id: string;
@@ -125,46 +129,57 @@ function isoDaysAgo(days: number): string {
 // ─── Delta boundary + evidence read ───────────────────────────────────────────
 
 /**
- * The window start is the most recent of: the last accepted state revision, and
- * the end of the last proposal window (so pending, un-accepted proposals are not
- * regenerated every run). Falls back to a lookback when neither exists — the
- * migration-seeded last_state_change_at is intentionally NOT used as a boundary
- * because it was stamped `now()` at migration time and marks no evidence review.
+ * The per-project keyset cursor over (updated_at, id) of Validated evidence. On
+ * the first run (no cursor row) it starts at a lookback so we don't reprocess the
+ * project's entire history. The migration-seeded last_state_change_at is NOT used
+ * as a boundary — it was stamped now() at migration time and marks no evidence
+ * review. updated_at (not validated_at) is deliberate: it moves on any
+ * operational change while the evidence stays Validated, so a later
+ * resolve/revert/correction is re-seen — the reversal we want to detect.
  */
-async function resolveWindowStart(projectId: string, lookbackDays: number): Promise<string> {
-  const sb = supabaseAdmin();
-  const [revision, proposal] = await Promise.all([
-    sb.from("project_state_revisions")
-      .select("created_at").eq("project_id", projectId)
-      .order("created_at", { ascending: false }).limit(1).maybeSingle(),
-    sb.from("project_state_proposals")
-      .select("evidence_window_end").eq("project_id", projectId)
-      .not("evidence_window_end", "is", null)
-      .order("evidence_window_end", { ascending: false }).limit(1).maybeSingle(),
-  ]);
-  const candidates = [
-    revision.data?.created_at as string | undefined,
-    proposal.data?.evidence_window_end as string | undefined,
-  ].filter((v): v is string => typeof v === "string");
-  if (candidates.length === 0) return isoDaysAgo(lookbackDays);
-  return candidates.sort().at(-1)!;
+async function resolveCursor(projectId: string, lookbackDays: number): Promise<EvidenceCursor> {
+  const { data, error } = await supabaseAdmin()
+    .from("project_evidence_cursors")
+    .select("cursor_updated_at, cursor_id")
+    .eq("project_id", projectId)
+    .maybeSingle();
+  if (error) throw new Error(`cursor read failed: ${error.message}`);
+  if (!data) return { at: isoDaysAgo(lookbackDays), id: ZERO_UUID };
+  return { at: data.cursor_updated_at as string, id: (data.cursor_id as string) ?? ZERO_UUID };
+}
+
+/**
+ * Persist the cursor at the max (updated_at, id) actually processed. Never
+ * advances to now(), so any evidence beyond the batch cap is picked up next run.
+ */
+async function advanceCursor(projectId: string, cursor: EvidenceCursor): Promise<void> {
+  const now = new Date().toISOString();
+  const { error } = await supabaseAdmin()
+    .from("project_evidence_cursors")
+    .upsert({
+      project_id: projectId,
+      cursor_updated_at: cursor.at,
+      cursor_id: cursor.id,
+      last_run_at: now,
+      updated_at: now,
+    }, { onConflict: "project_id" });
+  if (error) throw new Error(`cursor advance failed: ${error.message}`);
 }
 
 export async function getEvidenceDelta(
   projectNotionId: string,
-  windowStart: string,
+  cursor: EvidenceCursor,
 ): Promise<EvidenceDeltaRow[]> {
-  const sb = supabaseAdmin();
-  const { data, error } = await sb
-    .from("evidence")
-    .select("id, evidence_type, title, evidence_statement, confidence_level, date_captured, resolution_status, created_at")
-    .eq("project_notion_id", projectNotionId)
-    .eq("validation_status", "Validated")
-    .gt("created_at", windowStart)
-    .order("created_at", { ascending: false })
-    .limit(MAX_EVIDENCE_PER_PROJECT);
+  // Keyset read via RPC: (updated_at, id) > cursor, ascending, capped. Row-value
+  // comparison is correct at the boundary and index-backed.
+  const { data, error } = await supabaseAdmin().rpc("next_evidence_batch", {
+    p_project_notion_id: projectNotionId,
+    p_cursor_at: cursor.at,
+    p_cursor_id: cursor.id,
+    p_limit: MAX_EVIDENCE_PER_PROJECT,
+  });
   if (error) throw new Error(`evidence delta read failed: ${error.message}`);
-  return (data ?? []).map((row) => ({
+  return ((data ?? []) as Record<string, unknown>[]).map((row) => ({
     id: row.id as string,
     type: (row.evidence_type as string | null) ?? "",
     title: (row.title as string | null) ?? "",
@@ -173,6 +188,7 @@ export async function getEvidenceDelta(
     dateCaptured: (row.date_captured as string | null) ?? null,
     resolutionStatus: (row.resolution_status as string | null) ?? null,
     createdAt: row.created_at as string,
+    updatedAt: row.updated_at as string,
   }));
 }
 
@@ -483,42 +499,54 @@ export async function runStateRefreshForProject(
   opts: { lookbackDays?: number; anthropic: Anthropic; usageAcc: AnthropicUsage },
 ): Promise<ProjectRefreshResult> {
   const lookbackDays = opts.lookbackDays ?? DEFAULT_LOOKBACK_DAYS;
-  const windowEnd = new Date().toISOString();
+  const nowIso = new Date().toISOString();
   const ctx = await loadProjectContext(projectId);
   if (!ctx) {
-    return { projectId, projectName: "(unknown)", windowStart: windowEnd, windowEnd, evidenceConsidered: 0, modelProposed: 0, proposalsCreated: 0, skippedReason: "project not found" };
+    return { projectId, projectName: "(unknown)", windowStart: nowIso, windowEnd: nowIso, evidenceConsidered: 0, modelProposed: 0, proposalsCreated: 0, skippedReason: "project not found" };
   }
-  const base = { projectId, projectName: ctx.name, windowEnd };
-
+  const base = { projectId, projectName: ctx.name };
   if (!ctx.notionId) {
-    return { ...base, windowStart: windowEnd, evidenceConsidered: 0, modelProposed: 0, proposalsCreated: 0, skippedReason: "no notion_id link for evidence lookup" };
+    return { ...base, windowStart: nowIso, windowEnd: nowIso, evidenceConsidered: 0, modelProposed: 0, proposalsCreated: 0, skippedReason: "no notion_id link for evidence lookup" };
   }
 
-  const windowStart = await resolveWindowStart(projectId, lookbackDays);
-  const evidence = await getEvidenceDelta(ctx.notionId, windowStart);
+  const cursor = await resolveCursor(projectId, lookbackDays);
+  const evidence = await getEvidenceDelta(ctx.notionId, cursor);
   if (evidence.length === 0) {
-    return { ...base, windowStart, evidenceConsidered: 0, modelProposed: 0, proposalsCreated: 0, skippedReason: "no new validated evidence" };
+    // Nothing new — cursor stays exactly where it was.
+    return { ...base, windowStart: cursor.at, windowEnd: cursor.at, evidenceConsidered: 0, modelProposed: 0, proposalsCreated: 0, skippedReason: "no new validated evidence" };
   }
 
+  // Evidence is ascending; the last row is the max (updated_at, id) in this batch.
+  const last = evidence[evidence.length - 1];
+  const next: EvidenceCursor = { at: last.updatedAt, id: last.id };
+
+  // If the model call throws (e.g. truncation), we do NOT advance — the batch is
+  // retried next run rather than silently skipped.
   const raw = await proposeStateChanges(ctx, evidence, opts.anthropic, opts.usageAcc);
 
   const labelToItemId = new Map<string, string>();
   ctx.items.forEach((it, i) => labelToItemId.set(`A${i + 1}`, it.id));
 
   const inserts = raw
-    .map((p) => normalizeProposal(p, ctx, evidence, labelToItemId, windowStart, windowEnd))
+    .map((p) => normalizeProposal(p, ctx, evidence, labelToItemId, cursor.at, next.at))
     .filter((v): v is ProposalInsert => v !== null);
 
+  if (inserts.length > 0) {
+    const { error } = await supabaseAdmin().from("project_state_proposals").insert(inserts);
+    if (error) throw new Error(`proposal insert failed: ${error.message}`);
+  }
+
+  // The batch was considered; advance the cursor whether or not it yielded
+  // proposals, so this evidence is not re-read next run.
+  await advanceCursor(projectId, next);
+
+  const result = { ...base, windowStart: cursor.at, windowEnd: next.at, evidenceConsidered: evidence.length, modelProposed: raw.length, proposalsCreated: inserts.length };
   if (inserts.length === 0) {
     // modelProposed > 0 here means the model proposed but everything failed
     // validation — a signal to inspect the contract, not a healthy "nothing new".
-    return { ...base, windowStart, evidenceConsidered: evidence.length, modelProposed: raw.length, proposalsCreated: 0, skippedReason: raw.length > 0 ? "proposals failed validation" : "no material proposals" };
+    return { ...result, skippedReason: raw.length > 0 ? "proposals failed validation" : "no material proposals" };
   }
-
-  const { error } = await supabaseAdmin().from("project_state_proposals").insert(inserts);
-  if (error) throw new Error(`proposal insert failed: ${error.message}`);
-
-  return { ...base, windowStart, evidenceConsidered: evidence.length, modelProposed: raw.length, proposalsCreated: inserts.length };
+  return result;
 }
 
 /**

@@ -22,6 +22,7 @@ timestamp, `name` = repo-file slug; repo files keep their planned timestamps).
 | `20260717130000_project_memory_state.sql` | `project_memory_state` | `project_states` (21 rows seeded `draft` from `status_summary`), `project_state_items`, `project_learning_items`, `project_state_revisions`. |
 | `20260717140000_project_state_proposals.sql` | `project_state_proposals` | Human-gated proposal store for the incremental state-refresh job. |
 | `20260717150000_apply_state_proposal_rpc.sql` | `apply_state_proposal_rpc` | `apply_state_proposal(proposal_id, project_id, actor)` — atomic acceptance: lock + not-pending conflict, project scoping and enum/payload re-validation before mutation, `system_refresh` revision snapshot, `security definer set search_path=public`, execute granted only to `service_role`. |
+| `20260717160000_evidence_cursor.sql` | `evidence_cursor` | `project_evidence_cursors` (per-project keyset cursor) + partial keyset index on `evidence(project_notion_id, updated_at, id) where Validated` + `next_evidence_batch(...)` RPC. Fixes the delta: keyset on `(updated_at, id)`, advance only to the max processed (never `now()`), so >cap batches are never skipped and late-updated/reverted evidence is re-seen. |
 
 All new tables are RLS-enabled and service-role only (`revoke all` from
 anon/authenticated). Security advisors clean (only the expected INFO
@@ -31,8 +32,10 @@ anon/authenticated). Security advisors clean (only the expected INFO
 ### Incremental state-refresh job (`/api/state-refresh`)
 
 Reads only NEW `Validated` evidence (joined by `evidence.project_notion_id =
-projects.notion_id`) since the last accepted state revision, and writes PROPOSALS
-to `project_state_proposals` at `status='pending'`. It never mutates
+projects.notion_id`) via a per-project keyset cursor on `(updated_at, id)` — see
+`project_evidence_cursors` / `next_evidence_batch`, which advances only to the max
+row processed so nothing is skipped past the batch cap — and writes PROPOSALS to
+`project_state_proposals` at `status='pending'`. It never mutates
 `project_states` / `project_state_items`, and never promotes to `knowledge_assets`
 — acceptance in the UI is the only path that mutates state (and records a
 `system_refresh` revision).

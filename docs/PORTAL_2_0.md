@@ -79,10 +79,14 @@ It must preserve source references, set `stale_after`, and create a revision. It
 
 ## Incremental state-refresh job
 
-`/api/state-refresh` reads only the validated evidence that is new since the last
-accepted state revision (joined by `evidence.project_notion_id = projects.notion_id`,
-`validation_status = 'Validated'`) and writes rows to `project_state_proposals` at
-`status = 'pending'`. It obeys the automation guardrails above: proposal-first (it
+`/api/state-refresh` reads only the validated evidence that is new since it last
+ran, using a per-project keyset cursor on `(updated_at, id)` over
+`validation_status = 'Validated'` rows (`project_evidence_cursors` +
+`next_evidence_batch`). The cursor advances only to the max row actually
+processed — never to `now()` — so a project with more new evidence than the batch
+cap loses nothing, and because it keys on `updated_at` (not a one-time
+`validated_at`) a later resolve/revert/correction re-enters the stream. It writes
+rows to `project_state_proposals` at `status = 'pending'`. It obeys the automation guardrails above: proposal-first (it
 never mutates `project_states` / `project_state_items`), source-preserving (each
 proposal carries the evidence IDs that justify it), and it never creates a knowledge
 asset. The model references existing claims and evidence by safe labels that are
