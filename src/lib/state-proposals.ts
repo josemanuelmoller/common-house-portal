@@ -1,6 +1,7 @@
 import "server-only";
 
 import { supabaseAdmin } from "@/lib/supabase";
+import { linkStateSubject } from "@/lib/entity-links";
 
 /**
  * Read + accept/reject helpers for project_state_proposals.
@@ -90,7 +91,32 @@ export async function acceptProposal(projectId: string, proposalId: string, acto
     if (/^invalid |requires /i.test(msg)) return { ok: false, error: msg, status: 400 };
     return { ok: false, error: msg, status: 502 };
   }
-  const applied = (Array.isArray(data) ? data[0] : data) as { proposal_kind?: string } | null;
+  const applied = (Array.isArray(data) ? data[0] : data) as {
+    proposal_kind?: string; applied_item_id?: string | null; project_id?: string;
+  } | null;
+
+  // Phase 6: resolve the applied item's owner/stakeholder labels to typed entity
+  // links. Best-effort — a resolution failure never fails the acceptance, and the
+  // backfill endpoint can rebuild links later.
+  if (applied?.applied_item_id && applied.project_id
+      && (applied.proposal_kind === "add_item" || applied.proposal_kind === "update_item")) {
+    try {
+      const { data: item } = await supabaseAdmin()
+        .from("project_state_items")
+        .select("owner_label, stakeholder_label")
+        .eq("id", applied.applied_item_id)
+        .maybeSingle();
+      if (item) {
+        await linkStateSubject(
+          applied.project_id, "state_item", applied.applied_item_id,
+          (item.owner_label as string | null) ?? null,
+          (item.stakeholder_label as string | null) ?? null,
+          actor,
+        );
+      }
+    } catch { /* non-fatal: links are rebuildable via backfill */ }
+  }
+
   return { ok: true, kind: applied?.proposal_kind ?? "unknown" };
 }
 

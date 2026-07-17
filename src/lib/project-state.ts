@@ -2,6 +2,7 @@ import "server-only";
 
 import { supabaseAdmin } from "@/lib/supabase";
 import { resolveClientRoomProject } from "@/lib/client-room";
+import { getLinksForSubjects, type LinkedEntity } from "@/lib/entity-links";
 
 export type ProjectState = {
   projectId: string;
@@ -33,6 +34,7 @@ export type ProjectStateItem = {
   resolutionNote: string | null;
   visibility: string;
   updatedAt: string;
+  linkedEntities: LinkedEntity[];
 };
 
 export type ProjectLearningItem = {
@@ -99,12 +101,15 @@ export async function getProjectStateView(identifier: string): Promise<ProjectSt
     updatedAt: row.updated_at as string,
   } : null;
 
+  const itemRows = itemResult.data ?? [];
+  const linksBySubject = await getLinksForSubjects(itemRows.map((r) => r.id as string));
+
   return {
     projectId: project.id,
     projectName: project.name ?? "Untitled project",
     organizationId: project.organization_id,
     state,
-    items: (itemResult.data ?? []).map((item) => ({
+    items: itemRows.map((item) => ({
       id: item.id as string,
       itemType: item.item_type as string,
       statement: item.statement as string,
@@ -119,6 +124,7 @@ export async function getProjectStateView(identifier: string): Promise<ProjectSt
       resolutionNote: (item.resolution_note as string | null) ?? null,
       visibility: item.visibility as string,
       updatedAt: item.updated_at as string,
+      linkedEntities: linksBySubject.get(item.id as string) ?? [],
     })),
     learnings: (learningResult.data ?? []).map((item) => ({
       id: item.id as string,
