@@ -22,6 +22,7 @@ import { adminGuardApi } from "@/lib/require-admin";
 import { supabaseAdmin } from "@/lib/supabase";
 import { currentUser } from "@clerk/nextjs/server";
 import { apiError } from "@/lib/api-error";
+import { shareDriveFolderWithEmail } from "@/lib/drive";
 
 async function findClerkUserIdByEmail(email: string): Promise<string | null> {
   try {
@@ -34,21 +35,25 @@ async function findClerkUserIdByEmail(email: string): Promise<string | null> {
   }
 }
 
-async function getProjectIdBySlug(slug: string): Promise<string | null> {
+async function getProjectBySlug(slug: string): Promise<{ id: string; driveFolderId: string | null } | null> {
   const sb = supabaseAdmin();
   const { data } = await sb
     .from("projects")
-    .select("id")
+    .select("id, drive_folder_id")
     .eq("hall_slug", slug)
     .maybeSingle();
-  return (data?.id as string | undefined) ?? null;
+  if (!data?.id) return null;
+  return {
+    id: data.id as string,
+    driveFolderId: (data.drive_folder_id as string | null) ?? null,
+  };
 }
 
 export async function POST(req: NextRequest) {
   const guard = await adminGuardApi();
   if (guard) return guard;
 
-  let body: { email?: string; slug?: string; role?: string; expiresAt?: string };
+  let body: { email?: string; slug?: string; role?: string; expiresAt?: string; invite?: boolean; shareDrive?: boolean };
   try {
     body = await req.json();
   } catch {
@@ -57,7 +62,11 @@ export async function POST(req: NextRequest) {
 
   const email = (body.email ?? "").trim().toLowerCase();
   const slug = (body.slug ?? "").trim().toLowerCase();
-  const role = body.role === "collaborator" ? "collaborator" : "viewer";
+  const role = body.role === "approver"
+    ? "approver"
+    : body.role === "collaborator"
+      ? "collaborator"
+      : "viewer";
   const expiresAt = body.expiresAt ?? null;
 
   if (!email || !slug) {
@@ -68,8 +77,8 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const projectId = await getProjectIdBySlug(slug);
-    if (!projectId) {
+    const project = await getProjectBySlug(slug);
+    if (!project) {
       return NextResponse.json(
         { error: `No project found with slug: ${slug}` },
         { status: 404 }
@@ -77,15 +86,6 @@ export async function POST(req: NextRequest) {
     }
 
     const clerkUserId = await findClerkUserIdByEmail(email);
-    if (!clerkUserId) {
-      return NextResponse.json(
-        {
-          error:
-            "No Clerk user found for that email. The user must sign up to Clerk first (via the portal sign-up page) or you must invite them through the Clerk dashboard before granting access.",
-        },
-        { status: 404 }
-      );
-    }
 
     const me = await currentUser();
     const grantedBy =
@@ -97,7 +97,7 @@ export async function POST(req: NextRequest) {
       .insert({
         clerk_user_id: clerkUserId,
         granted_email: email,
-        project_id: projectId,
+        project_id: project.id,
         role,
         granted_by: grantedBy,
         expires_at: expiresAt,
@@ -116,7 +116,48 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 502 });
     }
 
-    return NextResponse.json({ ok: true, id: data.id, projectId, clerkUserId });
+    let invitationSent = false;
+    let invitationWarning: string | null = null;
+    if (!clerkUserId && body.invite !== false) {
+      try {
+        const client = await clerkClient();
+        await client.invitations.createInvitation({
+          emailAddress: email,
+          notify: true,
+          ignoreExisting: true,
+          redirectUrl: `${req.nextUrl.origin}/hall/${slug}`,
+        });
+        invitationSent = true;
+      } catch (err) {
+        invitationWarning = `Access is ready, but the invitation email failed: ${err instanceof Error ? err.message : String(err)}`;
+      }
+    }
+
+    let driveShared = false;
+    let driveWarning: string | null = null;
+    if (body.shareDrive === true) {
+      if (!project.driveFolderId) {
+        driveWarning = "Access granted, but this project has no Drive folder configured.";
+      } else {
+        try {
+          await shareDriveFolderWithEmail(project.driveFolderId, email);
+          driveShared = true;
+        } catch (err) {
+          driveWarning = `Access granted, but Drive sharing failed: ${err instanceof Error ? err.message : String(err)}`;
+        }
+      }
+    }
+
+    return NextResponse.json({
+      ok: true,
+      id: data.id,
+      projectId: project.id,
+      clerkUserId,
+      invitationSent,
+      invitationWarning,
+      driveShared,
+      driveWarning,
+    });
   } catch (err) {
     return apiError(err, { route: "[/api/admin/client-access POST]" });
   }
@@ -139,15 +180,10 @@ export async function DELETE(req: NextRequest) {
   }
 
   try {
-    const projectId = await getProjectIdBySlug(slug);
-    if (!projectId) {
+    const project = await getProjectBySlug(slug);
+    if (!project) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
-    const clerkUserId = await findClerkUserIdByEmail(email);
-    if (!clerkUserId) {
-      return NextResponse.json({ error: "Clerk user not found" }, { status: 404 });
-    }
-
     const me = await currentUser();
     const revokedBy =
       me?.primaryEmailAddress?.emailAddress ?? me?.id ?? "unknown-admin";
@@ -160,8 +196,8 @@ export async function DELETE(req: NextRequest) {
         revoked_by: revokedBy,
         revoked_reason: reason,
       }, { count: "exact" })
-      .eq("clerk_user_id", clerkUserId)
-      .eq("project_id", projectId)
+      .ilike("granted_email", email)
+      .eq("project_id", project.id)
       .is("revoked_at", null);
 
     if (error) return NextResponse.json({ error: error.message }, { status: 502 });
@@ -182,8 +218,8 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const projectId = await getProjectIdBySlug(slug);
-    if (!projectId) {
+    const project = await getProjectBySlug(slug);
+    if (!project) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
     const sb = supabaseAdmin();
@@ -192,7 +228,7 @@ export async function GET(req: NextRequest) {
       .select(
         "id, clerk_user_id, granted_email, role, granted_by, granted_at, expires_at, revoked_at, revoked_by, revoked_reason"
       )
-      .eq("project_id", projectId)
+      .eq("project_id", project.id)
       .order("granted_at", { ascending: false });
 
     if (error) return NextResponse.json({ error: error.message }, { status: 502 });
