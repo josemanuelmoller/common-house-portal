@@ -10,6 +10,43 @@ Legacy Vercel project:       `legacy-common-house-app` — quarantined, crons di
 
 ---
 
+## Portal 2.0 — applied to canonical Supabase (2026-07-17)
+
+Three additive migrations applied to `rjcsasbaxihaubkkkxrt` via the Supabase MCP
+`apply_migration` (this project's convention: recorded `version` = apply-time
+timestamp, `name` = repo-file slug; repo files keep their planned timestamps).
+
+| Migration (repo file) | Recorded name | What it adds |
+|---|---|---|
+| `20260717120000_portal_v2_client_room.sql` | `portal_v2_client_room` | Client-room columns on `projects`; `project_materials`, `project_agreements`, `project_agreement_events`; `respond_to_project_agreement()` RPC (atomic, version-checked, service_role only); `client_access` gains `approver` role + nullable `clerk_user_id` (email grants) + corrected partial-unique active indexes. |
+| `20260717130000_project_memory_state.sql` | `project_memory_state` | `project_states` (21 rows seeded `draft` from `status_summary`), `project_state_items`, `project_learning_items`, `project_state_revisions`. |
+| `20260717140000_project_state_proposals.sql` | `project_state_proposals` | Human-gated proposal store for the incremental state-refresh job. |
+
+All new tables are RLS-enabled and service-role only (`revoke all` from
+anon/authenticated). Security advisors clean (only the expected INFO
+`rls_enabled_no_policy`, matching every other service-role table here). `tsc
+--noEmit` clean.
+
+### Incremental state-refresh job (`/api/state-refresh`)
+
+Reads only NEW `Validated` evidence (joined by `evidence.project_notion_id =
+projects.notion_id`) since the last accepted state revision, and writes PROPOSALS
+to `project_state_proposals` at `status='pending'`. It never mutates
+`project_states` / `project_state_items`, and never promotes to `knowledge_assets`
+— acceptance in the UI is the only path that mutates state (and records a
+`system_refresh` revision).
+
+- Auth: `requireCronAuth` (CRON_SECRET / x-agent-key). Cron: `30 5 * * 1-5`
+  (after `project-operator` 05:00; evidence validated by `validation-operator` 03:00).
+- Model: `claude-sonnet-4-6`, forced tool-use for structured output, `max_tokens: 8000`.
+- Admin single-project trigger: `POST /api/admin/projects/[id]/state/refresh`.
+- Accept/reject: `PATCH /api/admin/projects/[id]/state/proposals/[proposalId]`.
+- Verified 2026-07-17 against real evidence: iRefill → model proposed 27, 24 stored
+  (3 correctly dropped by validation), every proposal carries resolvable evidence
+  `source_refs`. Auto Mercado Fase 2 (summary already evidence-complete) → 0, correct.
+
+---
+
 ## Migration Map
 
 | System / DB | Source of Truth | Supabase Target | Status | Notes |

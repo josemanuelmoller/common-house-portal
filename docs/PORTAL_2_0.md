@@ -72,14 +72,37 @@ It must preserve source references, set `stale_after`, and create a revision. It
 
 ## Implemented surfaces
 
-- `/admin/projects/[id]/state` — edit current state; manage claims and implementation learning.
+- `/admin/projects/[id]/state` — review proposed updates; edit current state; manage claims and implementation learning.
 - `/admin/projects/[id]/client-room` — configure the room, sync Drive, curate materials, grant/invite access and share agreements.
-- `/admin/now` — the small operating queue: state health, expiring claims, unanswered client agreements and only high-threshold inbox items, beside the next 48 hours of meetings.
+- `/admin/now` — the small operating queue: state health, expiring claims, pending state proposals, unanswered client agreements and only high-threshold inbox items, beside the next 48 hours of meetings.
 - `/hall/[slug]` — client-scoped project room.
+
+## Incremental state-refresh job
+
+`/api/state-refresh` reads only the validated evidence that is new since the last
+accepted state revision (joined by `evidence.project_notion_id = projects.notion_id`,
+`validation_status = 'Validated'`) and writes rows to `project_state_proposals` at
+`status = 'pending'`. It obeys the automation guardrails above: proposal-first (it
+never mutates `project_states` / `project_state_items`), source-preserving (each
+proposal carries the evidence IDs that justify it), and it never creates a knowledge
+asset. The model references existing claims and evidence by safe labels that are
+mapped back to IDs server-side, and every model-provided type/status is
+whitelist-validated before it is stored.
+
+Acceptance is the only path that mutates state: `PATCH …/state/proposals/[id]`
+with `action: 'accept'` applies the change (add/update/resolve a claim, revise the
+summary, or record an implementation learning) and writes a `system_refresh`
+revision; `action: 'reject'` dismisses it. Acceptance uses a claim-then-apply guard
+so a double click can never apply the same proposal twice.
+
+- Cron: `30 5 * * 1-5` (after `project-operator`; evidence is validated at 03:00).
+- Auth: `requireCronAuth` (CRON_SECRET / x-agent-key). Model: `claude-sonnet-4-6`,
+  forced tool-use, `max_tokens: 8000`. `modelProposed` vs `proposalsCreated` is
+  returned so a truncated or over-filtered run is observable rather than silent.
+- Admin single-project trigger: `POST /api/admin/projects/[id]/state/refresh`.
 
 ## Next increments
 
-1. Add an incremental state-refresh job that consumes validated evidence after extraction and proposes (never blindly applies) state changes.
-2. Link state items and learning items to people/organizations as typed relations, not only labels.
-3. Add a reviewed promotion flow from confirmed implementation learning to knowledge assets/playbooks.
-4. Test the complete flow in production with real Clerk, Supabase and Drive credentials before onboarding the first client.
+1. Link state items and learning items to people/organizations as typed relations, not only labels.
+2. Add a reviewed promotion flow from confirmed implementation learning to knowledge assets/playbooks.
+3. Test the complete flow in production with real Clerk, Supabase and Drive credentials before onboarding the first client.
