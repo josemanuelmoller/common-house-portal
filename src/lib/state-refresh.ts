@@ -34,6 +34,15 @@ const DEFAULT_LOOKBACK_DAYS = 30;
 const MAX_EVIDENCE_PER_PROJECT = 40;
 const DAY_MS = 86_400_000;
 const ZERO_UUID = "00000000-0000-0000-0000-000000000000";
+// Calibration: at most this many proposals per project per run, and the trigram
+// similarity at/above which an add_item is treated as a duplicate.
+const MAX_PROPOSALS_PER_RUN = 8;
+const SIMILARITY_THRESHOLD = 0.5;
+const IMPACT_RANK: Record<string, number> = { critical: 3, high: 2, medium: 1, low: 0 };
+
+function normalizeStatement(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9áéíóúñü ]+/gi, "").replace(/\s+/g, " ").trim();
+}
 
 // ─── Contract sets (validated against the DB check constraints) ───────────────
 
@@ -100,6 +109,8 @@ export type ProjectRefreshResult = {
   evidenceConsidered: number;
   /** How many proposals the model returned before server-side validation. */
   modelProposed: number;
+  /** Dropped after validation by dedup (duplicate of an active claim / pending proposal) or the per-run cap. */
+  suppressed: number;
   proposalsCreated: number;
   skippedReason?: string;
 };
@@ -492,6 +503,38 @@ function normalizeProposal(
   };
 }
 
+/**
+ * Calibration gate applied after validation, before insert:
+ *  - drop an add_item whose statement duplicates an active claim or a pending
+ *    add_item proposal (trigram, server-side), or duplicates another add_item
+ *    already kept in this same batch (normalized-string guard);
+ *  - keep only the highest-impact / highest-confidence proposals up to the
+ *    per-run cap so a single run cannot flood the review queue.
+ */
+async function dedupeAndCap(projectId: string, inserts: ProposalInsert[]): Promise<ProposalInsert[]> {
+  const sb = supabaseAdmin();
+  const kept: ProposalInsert[] = [];
+  const keptStatements: string[] = [];
+  for (const ins of inserts) {
+    if (ins.proposal_kind === "add_item") {
+      const statement = typeof ins.payload.statement === "string" ? ins.payload.statement : "";
+      if (statement) {
+        const norm = normalizeStatement(statement);
+        if (keptStatements.includes(norm)) continue; // duplicate within this batch
+        const { data, error } = await sb.rpc("similar_state_claim", {
+          p_project_id: projectId, p_statement: statement, p_threshold: SIMILARITY_THRESHOLD,
+        });
+        if (error) throw new Error(`dedup check failed: ${error.message}`);
+        if (data === true) continue; // duplicate of an existing active claim / pending proposal
+        keptStatements.push(norm);
+      }
+    }
+    kept.push(ins);
+  }
+  kept.sort((a, b) => (IMPACT_RANK[b.impact] - IMPACT_RANK[a.impact]) || (b.confidence - a.confidence));
+  return kept.slice(0, MAX_PROPOSALS_PER_RUN);
+}
+
 // ─── Orchestration ────────────────────────────────────────────────────────────
 
 export async function runStateRefreshForProject(
@@ -502,18 +545,18 @@ export async function runStateRefreshForProject(
   const nowIso = new Date().toISOString();
   const ctx = await loadProjectContext(projectId);
   if (!ctx) {
-    return { projectId, projectName: "(unknown)", windowStart: nowIso, windowEnd: nowIso, evidenceConsidered: 0, modelProposed: 0, proposalsCreated: 0, skippedReason: "project not found" };
+    return { projectId, projectName: "(unknown)", windowStart: nowIso, windowEnd: nowIso, evidenceConsidered: 0, modelProposed: 0, suppressed: 0, proposalsCreated: 0, skippedReason: "project not found" };
   }
   const base = { projectId, projectName: ctx.name };
   if (!ctx.notionId) {
-    return { ...base, windowStart: nowIso, windowEnd: nowIso, evidenceConsidered: 0, modelProposed: 0, proposalsCreated: 0, skippedReason: "no notion_id link for evidence lookup" };
+    return { ...base, windowStart: nowIso, windowEnd: nowIso, evidenceConsidered: 0, modelProposed: 0, suppressed: 0, proposalsCreated: 0, skippedReason: "no notion_id link for evidence lookup" };
   }
 
   const cursor = await resolveCursor(projectId, lookbackDays);
   const evidence = await getEvidenceDelta(ctx.notionId, cursor);
   if (evidence.length === 0) {
     // Nothing new — cursor stays exactly where it was.
-    return { ...base, windowStart: cursor.at, windowEnd: cursor.at, evidenceConsidered: 0, modelProposed: 0, proposalsCreated: 0, skippedReason: "no new validated evidence" };
+    return { ...base, windowStart: cursor.at, windowEnd: cursor.at, evidenceConsidered: 0, modelProposed: 0, suppressed: 0, proposalsCreated: 0, skippedReason: "no new validated evidence" };
   }
 
   // Evidence is ascending; the last row is the max (updated_at, id) in this batch.
@@ -527,9 +570,11 @@ export async function runStateRefreshForProject(
   const labelToItemId = new Map<string, string>();
   ctx.items.forEach((it, i) => labelToItemId.set(`A${i + 1}`, it.id));
 
-  const inserts = raw
+  const validated = raw
     .map((p) => normalizeProposal(p, ctx, evidence, labelToItemId, cursor.at, next.at))
     .filter((v): v is ProposalInsert => v !== null);
+  const inserts = await dedupeAndCap(projectId, validated);
+  const suppressed = validated.length - inserts.length;
 
   if (inserts.length > 0) {
     const { error } = await supabaseAdmin().from("project_state_proposals").insert(inserts);
@@ -540,11 +585,14 @@ export async function runStateRefreshForProject(
   // proposals, so this evidence is not re-read next run.
   await advanceCursor(projectId, next);
 
-  const result = { ...base, windowStart: cursor.at, windowEnd: next.at, evidenceConsidered: evidence.length, modelProposed: raw.length, proposalsCreated: inserts.length };
+  const result = { ...base, windowStart: cursor.at, windowEnd: next.at, evidenceConsidered: evidence.length, modelProposed: raw.length, suppressed, proposalsCreated: inserts.length };
   if (inserts.length === 0) {
-    // modelProposed > 0 here means the model proposed but everything failed
-    // validation — a signal to inspect the contract, not a healthy "nothing new".
-    return { ...result, skippedReason: raw.length > 0 ? "proposals failed validation" : "no material proposals" };
+    // modelProposed > 0 with everything suppressed/failed is observable, not a
+    // silent "nothing new".
+    const reason = raw.length === 0 ? "no material proposals"
+      : validated.length === 0 ? "proposals failed validation"
+      : "all proposals were duplicates or capped";
+    return { ...result, skippedReason: reason };
   }
   return result;
 }

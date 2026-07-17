@@ -96,6 +96,9 @@ export async function getOperatingSignals(limit = 12): Promise<OperatingSignal[]
     const key = row.project_id as string;
     const proj = (Array.isArray(row.projects) ? row.projects[0] : row.projects) as { id?: string; notion_id?: string; name?: string } | null;
     const impact = (["low", "medium", "high", "critical"].includes(row.impact as string) ? row.impact : "medium") as keyof typeof IMPACT_RANK;
+    // Materiality floor: low-impact proposals wait on the state page and never
+    // drive the operating queue.
+    if (impact === "low") continue;
     const prev = byProject.get(key);
     if (!prev) byProject.set(key, { count: 1, impact, project: proj, name: proj?.name ?? null, at: row.updated_at as string | null });
     else {
