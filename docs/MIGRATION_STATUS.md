@@ -21,6 +21,7 @@ timestamp, `name` = repo-file slug; repo files keep their planned timestamps).
 | `20260717120000_portal_v2_client_room.sql` | `portal_v2_client_room` | Client-room columns on `projects`; `project_materials`, `project_agreements`, `project_agreement_events`; `respond_to_project_agreement()` RPC (atomic, version-checked, service_role only); `client_access` gains `approver` role + nullable `clerk_user_id` (email grants) + corrected partial-unique active indexes. |
 | `20260717130000_project_memory_state.sql` | `project_memory_state` | `project_states` (21 rows seeded `draft` from `status_summary`), `project_state_items`, `project_learning_items`, `project_state_revisions`. |
 | `20260717140000_project_state_proposals.sql` | `project_state_proposals` | Human-gated proposal store for the incremental state-refresh job. |
+| `20260717150000_apply_state_proposal_rpc.sql` | `apply_state_proposal_rpc` | `apply_state_proposal(proposal_id, project_id, actor)` — atomic acceptance: lock + not-pending conflict, project scoping and enum/payload re-validation before mutation, `system_refresh` revision snapshot, `security definer set search_path=public`, execute granted only to `service_role`. |
 
 All new tables are RLS-enabled and service-role only (`revoke all` from
 anon/authenticated). Security advisors clean (only the expected INFO

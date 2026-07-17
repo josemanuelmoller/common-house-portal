@@ -92,8 +92,13 @@ whitelist-validated before it is stored.
 Acceptance is the only path that mutates state: `PATCH …/state/proposals/[id]`
 with `action: 'accept'` applies the change (add/update/resolve a claim, revise the
 summary, or record an implementation learning) and writes a `system_refresh`
-revision; `action: 'reject'` dismisses it. Acceptance uses a claim-then-apply guard
-so a double click can never apply the same proposal twice.
+revision; `action: 'reject'` dismisses it. Acceptance runs entirely inside the
+`apply_state_proposal` RPC — one transaction that locks the proposal
+(`SELECT … FOR UPDATE`), scopes to the project and re-validates every enum/payload
+field before mutating, writes the revision with a snapshot of the affected state
+plus the applied entity, and returns the closed proposal. A non-pending proposal
+conflicts (409), so a double click can never apply the same proposal twice, and a
+mid-run crash can never leave state half-applied.
 
 - Cron: `30 5 * * 1-5` (after `project-operator`; evidence is validated at 03:00).
 - Auth: `requireCronAuth` (CRON_SECRET / x-agent-key). Model: `claude-sonnet-4-6`,
