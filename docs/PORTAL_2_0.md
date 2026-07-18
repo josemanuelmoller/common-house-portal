@@ -70,9 +70,27 @@ An automated state refresh may propose updates only when it sees a material delt
 
 It must preserve source references, set `stale_after`, and create a revision. It must not revive expired items without fresh evidence, overwrite a human-edited state without a reviewable proposal, or create knowledge from a single observation.
 
+## Decision queue (`/admin/now`)
+
+`/admin/now` is an operating decision queue, not a link list. State proposals are
+grouped into per-project **packages** that show the material subset (top by impact
+then confidence) plus the total; expanding a package reveals the proposals with
+inline **Accept / Dismiss** (the atomic `apply_state_proposal` flow) and a
+**Review all** link to the project state page. Active claims due or stale within 7
+days appear with inline **Confirm / Resolve**. Remaining project/inbox signals
+render as links. Nothing mutates state until you accept it.
+
+## Learning → knowledge flow
+
+The stages are explicit: **Observed → Review → Confirmed → Promote**. Every new or
+accepted learning gets a `stale_after` review date. `Confirmed` is only reachable
+from `Review`, and `promote_learning_item` requires status=review AND
+transferability=confirmed AND at least one evidence source — a `candidate` or a
+one-off never promotes, and an observation never becomes knowledge automatically.
+
 ## Implemented surfaces
 
-- `/admin/projects/[id]/state` — review proposed updates; edit current state; manage claims and implementation learning.
+- `/admin/projects/[id]/state` — review proposed updates; edit current state; manage claims and implementation learning (with linked entities on claims and learnings).
 - `/admin/projects/[id]/client-room` — configure the room, sync Drive, curate materials, grant/invite access and share agreements.
 - `/admin/now` — the small operating queue: state health, expiring claims, pending state proposals, unanswered client agreements and only high-threshold inbox items, beside the next 48 hours of meetings.
 - `/hall/[slug]` — client-scoped project room.
