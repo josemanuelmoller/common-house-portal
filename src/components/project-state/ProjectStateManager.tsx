@@ -99,9 +99,25 @@ export function StateItemsManager({ view }: { view: ProjectStateView }) {
 }
 
 function LearningRow({ projectId, learning }: { projectId: string; learning: ProjectLearningItem }) {
-  const router = useRouter(); const [busy, setBusy] = useState(false);
-  async function update(payload: Record<string, string>) { setBusy(true); try { await api(`/api/admin/projects/${projectId}/learning/${learning.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }); router.refresh(); } finally { setBusy(false); } }
-  return <article className="py-3" style={{ borderBottom: "1px solid var(--hall-line-soft)" }}><div className="flex flex-wrap items-start gap-3"><div className="flex-1 min-w-[230px]"><p className="text-[10px] uppercase tracking-[0.07em]" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}>{learning.area || "Implementation"} · {learning.learningType.replaceAll("_", " ")} · {learning.transferability}</p><p className="mt-1 text-[13px] font-semibold">{learning.title}</p><p className="mt-1 text-[11px] leading-relaxed" style={{ color: "var(--hall-ink-3)" }}>{learning.observation}</p>{learning.implication && <p className="mt-1 text-[11px]" style={{ color: "var(--hall-muted-2)" }}>So what: {learning.implication}</p>}</div><div className="flex gap-2"><button className="hall-btn-ghost" type="button" disabled={busy} onClick={() => void update({ status: "review" })}>Review</button><button className="hall-btn-ghost" type="button" disabled={busy} onClick={() => void update({ transferability: "candidate" })}>Candidate</button></div></div></article>;
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+  async function update(payload: Record<string, string>) {
+    setBusy(true); setMessage(null);
+    try { await api(`/api/admin/projects/${projectId}/learning/${learning.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }); router.refresh(); }
+    catch (error) { setFailed(true); setMessage(error instanceof Error ? error.message : String(error)); }
+    finally { setBusy(false); }
+  }
+  async function promote() {
+    setBusy(true); setMessage(null);
+    try { const body = await api(`/api/admin/projects/${projectId}/learning/${learning.id}/promote`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }); setFailed(false); setMessage(`Promoted to knowledge: ${body.assetTitle || "asset"}`); router.refresh(); }
+    catch (error) { setFailed(true); setMessage(error instanceof Error ? error.message : String(error)); }
+    finally { setBusy(false); }
+  }
+  const promoted = learning.status === "promoted";
+  const canPromote = learning.transferability === "candidate" || learning.transferability === "confirmed";
+  return <article className="py-3" style={{ borderBottom: "1px solid var(--hall-line-soft)" }}><div className="flex flex-wrap items-start gap-3"><div className="flex-1 min-w-[230px]"><p className="text-[10px] uppercase tracking-[0.07em]" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}>{learning.area || "Implementation"} · {learning.learningType.replaceAll("_", " ")} · {learning.transferability} · {learning.status}</p><p className="mt-1 text-[13px] font-semibold">{learning.title}</p><p className="mt-1 text-[11px] leading-relaxed" style={{ color: "var(--hall-ink-3)" }}>{learning.observation}</p>{learning.implication && <p className="mt-1 text-[11px]" style={{ color: "var(--hall-muted-2)" }}>So what: {learning.implication}</p>}{message && <p className="mt-1 text-[10px]" style={{ color: failed ? "var(--hall-danger)" : "var(--hall-muted-2)" }}>{message}</p>}</div>{promoted ? <span className="hall-chip-outline">Promoted ✓</span> : <div className="flex gap-2"><button className="hall-btn-ghost" type="button" disabled={busy} onClick={() => void update({ status: "review" })}>Review</button><button className="hall-btn-ghost" type="button" disabled={busy} onClick={() => void update({ transferability: "candidate" })}>Candidate</button>{canPromote && <button className="hall-btn-primary" type="button" disabled={busy} onClick={() => void promote()}>Promote →</button>}</div>}</div></article>;
 }
 
 export function LearningManager({ view }: { view: ProjectStateView }) {
