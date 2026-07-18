@@ -125,11 +125,18 @@ export async function getOperatingSignals(limit = 12): Promise<OperatingSignal[]
   return signals.sort((a, b) => rank[a.urgency] - rank[b.urgency] || new Date(a.occurredAt ?? 0).getTime() - new Date(b.occurredAt ?? 0).getTime()).slice(0, limit);
 }
 
-// Google's per-event html_link (eid) only resolves when the viewer is signed
-// into the calendar/account that owns the event; opening an event that lives on
-// a secondary calendar from a different account yields "event not found". The
-// day-view URL always resolves in whatever account the user is viewing and still
-// surfaces the event, so it is the reliable target for the operating queue.
+// The calendar is synced from the Common House work Google account, so the
+// event's html_link only resolves when opened in THAT account. Google picks the
+// account from the `authuser` param; without it the browser opens the user's
+// default (personal) account and reports "event not found". Force the work
+// account. Overridable via env for a different operator.
+const CALENDAR_ACCOUNT_EMAIL = process.env.PORTAL_CALENDAR_ACCOUNT || "josemanuel@wearecommonhouse.com";
+
+function withAuthUser(url: string): string {
+  const sep = url.includes("?") ? "&" : "?";
+  return `${url}${sep}authuser=${encodeURIComponent(CALENDAR_ACCOUNT_EMAIL)}`;
+}
+
 function googleCalendarDayHref(iso: string): string {
   const d = new Date(iso);
   return `https://calendar.google.com/calendar/r/day/${d.getUTCFullYear()}/${d.getUTCMonth() + 1}/${d.getUTCDate()}`;
@@ -139,13 +146,16 @@ export async function getUpcomingMeetings(limit = 5): Promise<UpcomingMeeting[]>
   const now = new Date();
   const end = new Date(now.getTime() + 2 * 86_400_000);
   const { data } = await getSupabaseServerClient().from("hall_calendar_events")
-    .select("event_id, event_title, event_start")
+    .select("event_id, event_title, event_start, html_link")
     .gte("event_start", now.toISOString()).lte("event_start", end.toISOString())
     .eq("is_cancelled", false).order("event_start", { ascending: true }).limit(limit);
-  return (data ?? []).map((row) => ({
-    id: row.event_id as string,
-    title: row.event_title as string,
-    startsAt: row.event_start as string,
-    href: googleCalendarDayHref(row.event_start as string),
-  }));
+  return (data ?? []).map((row) => {
+    const link = (row.html_link as string | null) || googleCalendarDayHref(row.event_start as string);
+    return {
+      id: row.event_id as string,
+      title: row.event_title as string,
+      startsAt: row.event_start as string,
+      href: withAuthUser(link),
+    };
+  });
 }
