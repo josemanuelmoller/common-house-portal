@@ -9,6 +9,7 @@ import {
   ClientRoomSettings,
 } from "@/components/client-room/ClientRoomManager";
 import { getClientRoomAdminData } from "@/lib/client-room";
+import { getOnboardingReadiness } from "@/lib/portal-health";
 import { requireAdmin } from "@/lib/require-admin";
 
 export const dynamic = "force-dynamic";
@@ -18,6 +19,9 @@ export default async function ClientRoomAdminPage({ params }: { params: Promise<
   const { id } = await params;
   const room = await getClientRoomAdminData(id);
   if (!room) redirect("/admin/workrooms");
+  const readiness = await getOnboardingReadiness(id);
+  const readyCount = readiness ? readiness.checks.filter((c) => c.ok).length : 0;
+  const readyTotal = readiness ? readiness.checks.length : 0;
 
   return (
     <PortalShell
@@ -30,6 +34,25 @@ export default async function ClientRoomAdminPage({ params }: { params: Promise<
       narrow
       bodySpacing={8}
     >
+      {readiness && (
+        <HallSection title="Onboarding" flourish="readiness" meta={`${readyCount}/${readyTotal} READY`}>
+          <p className="text-[12px] mb-3" style={{ color: readiness.ready ? "var(--hall-muted-2)" : "var(--hall-ink-3)" }}>
+            {readiness.ready
+              ? "This room clears the checklist — safe to invite the client."
+              : "Complete these before inviting a client. Nothing here sends anything on its own."}
+          </p>
+          <div>
+            {readiness.checks.map((c) => (
+              <div key={c.key} className="flex flex-wrap items-center gap-3 py-2.5" style={{ borderBottom: "1px solid var(--hall-line-soft)" }}>
+                <span className={c.ok ? "hall-chip-dark" : "hall-chip-outline"}>{c.ok ? "✓" : "—"}</span>
+                <strong className="flex-1 min-w-[180px] text-[13px]">{c.label}</strong>
+                <span className="text-[10px] uppercase tracking-[0.06em]" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}>{c.detail}</span>
+              </div>
+            ))}
+          </div>
+        </HallSection>
+      )}
+
       <HallSection title="Room" flourish="settings" meta={room.slug ? `/${room.slug}` : "NO SLUG"}>
         <ClientRoomSettings room={room} />
       </HallSection>

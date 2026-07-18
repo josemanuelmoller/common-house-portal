@@ -110,8 +110,9 @@ mid-run crash can never leave state half-applied.
   returned so a truncated or over-filtered run is observable rather than silent.
 - Admin single-project trigger: `POST /api/admin/projects/[id]/state/refresh`.
 
-## Next increments
+## Increment status
 
-1. Link state items and learning items to people/organizations as typed relations, not only labels.
-2. Add a reviewed promotion flow from confirmed implementation learning to knowledge assets/playbooks.
-3. Test the complete flow in production with real Clerk, Supabase and Drive credentials before onboarding the first client.
+1. **Done** — incremental state-refresh job (keyset cursor, atomic acceptance, dedup/cap).
+2. **Done** — typed relations from state/learning to people/organizations (`project_entity_links`, resolver RPC, cross-project entity view at `/admin/entities/[type]/[id]`).
+3. **Done** — reviewed promotion flow from confirmed implementation learning to knowledge assets (`promote_learning_item`, guarded + atomic).
+4. **In progress (needs infra + a real client)** — safe release and first-client onboarding. Health/readiness probes shipped (`/api/portal-2/health`, per-project onboarding checklist). Remaining steps and what only a human can do are in `docs/PHASE_8_RELEASE.md`.
