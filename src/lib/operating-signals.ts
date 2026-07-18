@@ -125,12 +125,27 @@ export async function getOperatingSignals(limit = 12): Promise<OperatingSignal[]
   return signals.sort((a, b) => rank[a.urgency] - rank[b.urgency] || new Date(a.occurredAt ?? 0).getTime() - new Date(b.occurredAt ?? 0).getTime()).slice(0, limit);
 }
 
+// Google's per-event html_link (eid) only resolves when the viewer is signed
+// into the calendar/account that owns the event; opening an event that lives on
+// a secondary calendar from a different account yields "event not found". The
+// day-view URL always resolves in whatever account the user is viewing and still
+// surfaces the event, so it is the reliable target for the operating queue.
+function googleCalendarDayHref(iso: string): string {
+  const d = new Date(iso);
+  return `https://calendar.google.com/calendar/r/day/${d.getUTCFullYear()}/${d.getUTCMonth() + 1}/${d.getUTCDate()}`;
+}
+
 export async function getUpcomingMeetings(limit = 5): Promise<UpcomingMeeting[]> {
   const now = new Date();
   const end = new Date(now.getTime() + 2 * 86_400_000);
   const { data } = await getSupabaseServerClient().from("hall_calendar_events")
-    .select("event_id, event_title, event_start, html_link")
+    .select("event_id, event_title, event_start")
     .gte("event_start", now.toISOString()).lte("event_start", end.toISOString())
     .eq("is_cancelled", false).order("event_start", { ascending: true }).limit(limit);
-  return (data ?? []).map((row) => ({ id: row.event_id as string, title: row.event_title as string, startsAt: row.event_start as string, href: (row.html_link as string | null) ?? null }));
+  return (data ?? []).map((row) => ({
+    id: row.event_id as string,
+    title: row.event_title as string,
+    startsAt: row.event_start as string,
+    href: googleCalendarDayHref(row.event_start as string),
+  }));
 }
