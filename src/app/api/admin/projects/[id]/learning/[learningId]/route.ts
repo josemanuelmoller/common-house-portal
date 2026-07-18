@@ -23,6 +23,16 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   }
   if (body.transferability) {
     if (!TRANSFERABILITY.has(body.transferability)) return NextResponse.json({ error: "Invalid transferability" }, { status: 400 });
+    // Enforce the explicit flow: only a learning already in review can be confirmed.
+    if (body.transferability === "confirmed" && body.status !== "review") {
+      const { data: cur } = await supabaseAdmin()
+        .from("project_learning_items").select("status")
+        .eq("id", learningId).eq("project_id", project.id).maybeSingle();
+      if (!cur) return NextResponse.json({ error: "Learning item not found" }, { status: 404 });
+      if (cur.status !== "review") {
+        return NextResponse.json({ error: "Mark the learning for review before confirming (Observed → Review → Confirmed)" }, { status: 400 });
+      }
+    }
     update.transferability = body.transferability;
   }
   if (typeof body.staleAfter === "string") update.stale_after = body.staleAfter || null;
