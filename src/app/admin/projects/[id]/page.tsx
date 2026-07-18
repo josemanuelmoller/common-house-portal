@@ -118,6 +118,22 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
               </Link>
             )}
             <Link
+              href={`/admin/projects/${project.id}/state`}
+              className="uppercase tracking-widest"
+              style={{ color: "var(--hall-ink-0)", fontWeight: 700 }}
+              title="Review the current project state and implementation learning"
+            >
+              Project State
+            </Link>
+            <Link
+              href={`/admin/projects/${project.id}/client-room`}
+              className="uppercase tracking-widest"
+              style={{ color: "var(--hall-ink-0)", fontWeight: 700 }}
+              title="Manage the project client room"
+            >
+              Client Room
+            </Link>
+            <Link
               href={`/admin/projects/${project.id}/hall-compose`}
               className="uppercase tracking-widest"
               style={{ color: "var(--hall-ink-0)", fontWeight: 700 }}

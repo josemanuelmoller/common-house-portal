@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { UserButton, useUser, SignOutButton } from "@clerk/nextjs";
 import { BrandLogo } from "./BrandLogo";
 
@@ -38,6 +38,7 @@ type NavEntry = NavGroup | NavLink;
 // ── Admin nav definition (mirrors platform-admin.html sidebar exactly) ───────
 
 export const ADMIN_NAV_V2: NavEntry[] = [
+  { kind: "link",  label: "Now",         href: "/admin/now",     icon: "✦" },
   { kind: "link",  label: "The Hall",    href: "/admin",         icon: "◈" },
   { kind: "link",  label: "The Plan",    href: "/admin/plan",    icon: "◆" },
   { kind: "link",  label: "Residents",   href: "/residents",     icon: "◍" },
@@ -126,11 +127,6 @@ export function Sidebar({ items, projectName, isAdmin, adminNav }: Props) {
 
   const [open, setOpen] = useState<Record<string, boolean>>(initialOpen);
   const [mobileOpen, setMobileOpen] = useState(false);
-
-  // Close the mobile drawer whenever the route changes.
-  useEffect(() => {
-    setMobileOpen(false);
-  }, [pathname]);
 
   const toggle = (label: string) =>
     setOpen((prev) => ({ ...prev, [label]: !prev[label] }));

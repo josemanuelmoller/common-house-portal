@@ -183,13 +183,29 @@ export async function createProjectFolders(
     })
   );
 
-  // Make root folder accessible to anyone with link (viewer)
-  await drive.permissions.create({
-    fileId: rootFolderId,
-    requestBody: { role: "reader", type: "anyone" },
-  });
-
   return { rootFolderId, subfolders };
+}
+
+/**
+ * Explicitly share a project folder with one client email. Project folders are
+ * private by default; never fall back to "anyone with the link" for client data.
+ */
+export async function shareDriveFolderWithEmail(
+  folderId: string,
+  email: string
+): Promise<{ permissionId: string | null }> {
+  const drive = getDriveClient();
+  const result = await drive.permissions.create({
+    fileId: folderId,
+    sendNotificationEmail: true,
+    requestBody: {
+      role: "reader",
+      type: "user",
+      emailAddress: email.trim().toLowerCase(),
+    },
+    fields: "id",
+  });
+  return { permissionId: result.data.id ?? null };
 }
 
 // ─── Get subfolder ID by name ─────────────────────────────────────────────────
@@ -255,13 +271,7 @@ export async function uploadFileToDrive(
 
   const fileId = uploaded.data.id!;
 
-  // Make file publicly viewable
-  await drive.permissions.create({
-    fileId,
-    requestBody: { role: "reader", type: "anyone" },
-  });
-
-  // Get the public link
+  // The parent project folder owns access. Do not create a public-link grant.
   const file = await drive.files.get({
     fileId,
     fields: "webViewLink",
@@ -316,5 +326,19 @@ export async function listProjectFiles(rootFolderId: string): Promise<DriveFile[
     })
   );
 
-  return filesByFolder.flat();
+  const rootFilesRes = await drive.files.list({
+    q: `'${rootFolderId}' in parents and mimeType != 'application/vnd.google-apps.folder' and trashed = false`,
+    fields: "files(id, name, webViewLink, mimeType, modifiedTime)",
+    orderBy: "modifiedTime desc",
+  });
+  const rootFiles = (rootFilesRes.data.files ?? []).map((f) => ({
+    id: f.id!,
+    name: f.name!,
+    folder: "Unfiled",
+    webViewLink: f.webViewLink ?? `https://drive.google.com/file/d/${f.id}/view`,
+    mimeType: f.mimeType ?? "",
+    modifiedTime: f.modifiedTime ?? null,
+  }));
+
+  return [...rootFiles, ...filesByFolder.flat()];
 }

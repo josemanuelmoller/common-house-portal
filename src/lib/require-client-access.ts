@@ -16,16 +16,57 @@ import { NextResponse } from "next/server";
 import { isAdminUser, isAdminEmail } from "./clients";
 import { supabaseAdmin } from "./supabase";
 
+export type ClientRole = "viewer" | "collaborator" | "approver";
+
 export type ClientGrant = {
   projectId: string;
   hallSlug: string | null;
-  role: "viewer" | "collaborator";
+  role: ClientRole;
 };
 
 export type AccessOutcome =
   | { kind: "admin"; userId: string; email: string }
   | { kind: "client"; userId: string; email: string; grant: ClientGrant }
   | { kind: "denied"; reason: "unauthenticated" | "no-access" };
+
+type GrantRow = {
+  project_id: string;
+  role: ClientRole;
+  expires_at: string | null;
+  projects?: { hall_slug: string | null } | { hall_slug: string | null }[] | null;
+};
+
+function verifiedPrimaryEmail(user: Awaited<ReturnType<typeof currentUser>>): string | null {
+  const primary = user?.primaryEmailAddress;
+  if (!primary || primary.verification?.status !== "verified") return null;
+  return primary.emailAddress.trim().toLowerCase();
+}
+
+async function grantForProject(
+  userId: string,
+  verifiedEmail: string | null,
+  projectId: string
+): Promise<{ role: ClientRole; expires_at: string | null } | null> {
+  const sb = supabaseAdmin();
+  const { data: direct } = await sb
+    .from("client_access")
+    .select("role, expires_at")
+    .eq("clerk_user_id", userId)
+    .eq("project_id", projectId)
+    .is("revoked_at", null)
+    .maybeSingle();
+  if (direct) return direct as { role: ClientRole; expires_at: string | null };
+  if (!verifiedEmail) return null;
+
+  const { data: pending } = await sb
+    .from("client_access")
+    .select("role, expires_at")
+    .ilike("granted_email", verifiedEmail)
+    .eq("project_id", projectId)
+    .is("revoked_at", null)
+    .maybeSingle();
+  return (pending as { role: ClientRole; expires_at: string | null } | null) ?? null;
+}
 
 /**
  * List every active grant for the current Clerk user.
@@ -36,20 +77,32 @@ export async function listGrantsForCurrentUser(): Promise<ClientGrant[]> {
   const user = await currentUser();
   if (!user) return [];
   const sb = supabaseAdmin();
-  const { data } = await sb
+  const select = "project_id, role, expires_at, projects(hall_slug)";
+  const { data: direct } = await sb
     .from("client_access")
-    .select("project_id, role, expires_at, projects(hall_slug)")
+    .select(select)
     .eq("clerk_user_id", user.id)
     .is("revoked_at", null);
-  if (!data) return [];
+  const email = verifiedPrimaryEmail(user);
+  const { data: emailRows } = email
+    ? await sb
+      .from("client_access")
+      .select(select)
+      .ilike("granted_email", email)
+      .is("revoked_at", null)
+    : { data: [] };
+  const uniqueRows = new Map<string, GrantRow>();
+  for (const row of [...(emailRows ?? []), ...(direct ?? [])] as GrantRow[]) {
+    uniqueRows.set(row.project_id, row);
+  }
   const now = Date.now();
-  return data
-    .filter((row: { expires_at?: string | null }) => {
+  return [...uniqueRows.values()]
+    .filter((row) => {
       const exp = row.expires_at;
       if (!exp) return true;
       return new Date(exp).getTime() > now;
     })
-    .map((row: { project_id: string; role: "viewer" | "collaborator"; projects?: { hall_slug: string | null } | { hall_slug: string | null }[] | null }) => {
+    .map((row) => {
       // Supabase nested select returns the joined row as either an object or an array
       // depending on the relationship cardinality; normalize to a single value.
       const proj = Array.isArray(row.projects) ? row.projects[0] : row.projects;
@@ -79,14 +132,7 @@ export async function findGrantForSlug(
     .maybeSingle();
   if (!data) return null;
   const projectId = data.id as string;
-
-  const { data: grant } = await sb
-    .from("client_access")
-    .select("role, expires_at")
-    .eq("clerk_user_id", user.id)
-    .eq("project_id", projectId)
-    .is("revoked_at", null)
-    .maybeSingle();
+  const grant = await grantForProject(user.id, verifiedPrimaryEmail(user), projectId);
   if (!grant) return null;
   if (grant.expires_at && new Date(grant.expires_at).getTime() <= Date.now()) {
     return null;
@@ -94,7 +140,7 @@ export async function findGrantForSlug(
   return {
     projectId,
     hallSlug: data.hall_slug as string | null,
-    role: grant.role as "viewer" | "collaborator",
+    role: grant.role as ClientRole,
   };
 }
 
@@ -142,7 +188,8 @@ export async function requireClientAccessForSlug(slug: string): Promise<AccessOu
  * Use exactly like adminGuardApi() but for client-scoped routes.
  */
 export async function clientAccessGuardApi(
-  projectId: string
+  projectId: string,
+  options?: { roles?: ClientRole[] }
 ): Promise<NextResponse | null> {
   const user = await currentUser();
   if (!user) {
@@ -151,19 +198,15 @@ export async function clientAccessGuardApi(
   const email = user.primaryEmailAddress?.emailAddress ?? "";
   if (isAdminUser(user.id) || isAdminEmail(email)) return null;
 
-  const sb = supabaseAdmin();
-  const { data } = await sb
-    .from("client_access")
-    .select("role, expires_at")
-    .eq("clerk_user_id", user.id)
-    .eq("project_id", projectId)
-    .is("revoked_at", null)
-    .maybeSingle();
+  const data = await grantForProject(user.id, verifiedPrimaryEmail(user), projectId);
   if (!data) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   if (data.expires_at && new Date(data.expires_at).getTime() <= Date.now()) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+  if (options?.roles && !options.roles.includes(data.role as ClientRole)) {
+    return NextResponse.json({ error: "Insufficient project role" }, { status: 403 });
   }
   return null;
 }

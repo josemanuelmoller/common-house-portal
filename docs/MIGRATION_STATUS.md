@@ -10,6 +10,50 @@ Legacy Vercel project:       `legacy-common-house-app` — quarantined, crons di
 
 ---
 
+## Portal 2.0 — applied to canonical Supabase (2026-07-17)
+
+Three additive migrations applied to `rjcsasbaxihaubkkkxrt` via the Supabase MCP
+`apply_migration` (this project's convention: recorded `version` = apply-time
+timestamp, `name` = repo-file slug; repo files keep their planned timestamps).
+
+| Migration (repo file) | Recorded name | What it adds |
+|---|---|---|
+| `20260717120000_portal_v2_client_room.sql` | `portal_v2_client_room` | Client-room columns on `projects`; `project_materials`, `project_agreements`, `project_agreement_events`; `respond_to_project_agreement()` RPC (atomic, version-checked, service_role only); `client_access` gains `approver` role + nullable `clerk_user_id` (email grants) + corrected partial-unique active indexes. |
+| `20260717130000_project_memory_state.sql` | `project_memory_state` | `project_states` (21 rows seeded `draft` from `status_summary`), `project_state_items`, `project_learning_items`, `project_state_revisions`. |
+| `20260717140000_project_state_proposals.sql` | `project_state_proposals` | Human-gated proposal store for the incremental state-refresh job. |
+| `20260717150000_apply_state_proposal_rpc.sql` | `apply_state_proposal_rpc` | `apply_state_proposal(proposal_id, project_id, actor)` — atomic acceptance: lock + not-pending conflict, project scoping and enum/payload re-validation before mutation, `system_refresh` revision snapshot, `security definer set search_path=public`, execute granted only to `service_role`. |
+| `20260717160000_evidence_cursor.sql` | `evidence_cursor` | `project_evidence_cursors` (per-project keyset cursor) + partial keyset index on `evidence(project_notion_id, updated_at, id) where Validated` + `next_evidence_batch(...)` RPC. Fixes the delta: keyset on `(updated_at, id)`, advance only to the max processed (never `now()`), so >cap batches are never skipped and late-updated/reverted evidence is re-seen. |
+| `20260717170000_state_refresh_calibration.sql` | `state_refresh_calibration` | `pg_trgm` + statement trigram index + `similar_state_claim(...)` RPC. Job now drops `add_item` proposals that duplicate an active claim / pending proposal (trigram + intra-batch normalized guard), caps proposals per run (`MAX_PROPOSALS_PER_RUN=8`, highest impact/confidence first), and low-impact proposals no longer drive `/admin/now`. `suppressed` telemetry added. |
+| `20260718090000_entity_links.sql` | `entity_links` | Phase 6 typed relations: `project_entity_links` (state/learning item → person/org, typed relation) + trigram indexes on `people.full_name`/`organizations.name` + `link_subject_entities(...)` resolver RPC. Acceptance links owner/stakeholder labels best-effort; `/api/admin/state/backfill-entity-links` rebuilds; `/admin/entities/[type]/[id]` is the cross-project entity view. |
+| `20260718100000_promote_learning.sql` | `promote_learning` | Phase 7 knowledge promotion: `promote_learning_item(learning_id, project_id, actor, target_asset_id?)` RPC — guarded (must be candidate/confirmed AND source-backed; refuses one-offs and unsourced), atomic, creates or appends a `knowledge_assets` row and backlinks the learning (`promoted_knowledge_asset_id`). `POST …/learning/[id]/promote` route + Promote button on the state page. |
+
+All new tables are RLS-enabled and service-role only (`revoke all` from
+anon/authenticated). Security advisors clean (only the expected INFO
+`rls_enabled_no_policy`, matching every other service-role table here). `tsc
+--noEmit` clean.
+
+### Incremental state-refresh job (`/api/state-refresh`)
+
+Reads only NEW `Validated` evidence (joined by `evidence.project_notion_id =
+projects.notion_id`) via a per-project keyset cursor on `(updated_at, id)` — see
+`project_evidence_cursors` / `next_evidence_batch`, which advances only to the max
+row processed so nothing is skipped past the batch cap — and writes PROPOSALS to
+`project_state_proposals` at `status='pending'`. It never mutates
+`project_states` / `project_state_items`, and never promotes to `knowledge_assets`
+— acceptance in the UI is the only path that mutates state (and records a
+`system_refresh` revision).
+
+- Auth: `requireCronAuth` (CRON_SECRET / x-agent-key). Cron: `30 5 * * 1-5`
+  (after `project-operator` 05:00; evidence validated by `validation-operator` 03:00).
+- Model: `claude-sonnet-4-6`, forced tool-use for structured output, `max_tokens: 8000`.
+- Admin single-project trigger: `POST /api/admin/projects/[id]/state/refresh`.
+- Accept/reject: `PATCH /api/admin/projects/[id]/state/proposals/[proposalId]`.
+- Verified 2026-07-17 against real evidence: iRefill → model proposed 27, 24 stored
+  (3 correctly dropped by validation), every proposal carries resolvable evidence
+  `source_refs`. Auto Mercado Fase 2 (summary already evidence-complete) → 0, correct.
+
+---
+
 ## Migration Map
 
 | System / DB | Source of Truth | Supabase Target | Status | Notes |
