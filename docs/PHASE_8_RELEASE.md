@@ -79,6 +79,31 @@ have not been removed. Retiring them is a product-judgment call and was left
 untouched. Retire or simplify them only once `/admin/now` has run on real cron
 cadence for long enough to trust its signal — not before.
 
+## MPS Proposal Room — remaining manual steps (first real client)
+
+The MPS room is built and populated **internal-only** (org `Maritime Procurement
+Services`, project `MPS`, room `/hall/mps`). Nothing is client-visible and no
+invitation has been sent. Admin surfaces:
+- Client view (admin preview): `/hall/mps`
+- Admin controls: `/admin/projects/5d94ae10-c944-4a58-ab37-c8c6f051b15c/client-room`
+
+What only you should do, in order:
+1. **Review "Lo que escuchamos"** (currently DRAFT/internal, sourced to the 15 Jul 2026
+   Fireflies meeting). Edit if needed, then use **"Share for response"** to publish it
+   (draft → shared/client). Until then the client sees "preparing the first synthesis".
+2. **Provide the current proposal file** (Drive). It will be indexed as a client-visible
+   `proposal_budget` material with version/date; the "Our proposal" section links to it.
+3. **(Optional) MPS Drive folder**: set the room's Drive folder id and sync, then mark
+   only the correct files `visibility=client`. Client data (ops xlsx) and Fireflies
+   summary/transcript stay `internal`.
+4. **Grant + invite** `atrillo@maritimeps.com` and `jvaldivia@maritimeps.com` (role
+   viewer or collaborator) via `ClientAccessManager` — this is the real invitation
+   (sends a Clerk email); do it only when ready. The grant activates when Clerk reports
+   the email as verified.
+5. **Rehearse** with a non-admin email first if you want to see it exactly as MPS will.
+
+Do not skip step 1/2 review — publishing is what makes content client-visible.
+
 ## Status
 
 - Phases 0–7: code-complete, deployed, verified. Migrations `portal_v2_client_room`
