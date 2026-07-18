@@ -63,6 +63,97 @@ export async function listPendingProposals(projectId: string): Promise<StateProp
   });
 }
 
+// ─── /admin/now decision-queue packages ──────────────────────────────────────
+
+const IMPACT_RANK: Record<string, number> = { critical: 3, high: 2, medium: 1, low: 0 };
+
+export type NowProposalCard = {
+  id: string;
+  kind: StateProposal["proposalKind"];
+  itemType: string | null;
+  summary: string;
+  rationale: string;
+  impact: StateProposal["impact"];
+  confidence: number;
+  sourceCount: number;
+  targetStatement: string | null;
+  preview: string | null;
+};
+
+export type NowProposalPackage = {
+  projectId: string;
+  projectName: string;
+  projectHref: string;
+  total: number;
+  maxImpact: StateProposal["impact"];
+  top: NowProposalCard[];
+};
+
+function proposalPreview(kind: string, payload: Record<string, unknown>): string | null {
+  const s = (k: string) => (typeof payload[k] === "string" ? (payload[k] as string) : null);
+  switch (kind) {
+    case "add_item": return s("statement");
+    case "update_item":
+    case "resolve_item": return [s("status"), s("resolution_note"), s("owner_label")].filter(Boolean).join(" · ") || null;
+    case "state_summary": return [s("current_summary"), s("current_phase"), s("current_focus"), s("health")].filter(Boolean).join(" · ") || null;
+    case "add_learning": return [s("title"), s("observation")].filter(Boolean).join(" — ") || null;
+    default: return null;
+  }
+}
+
+/**
+ * Pending proposals grouped into per-project packages for /admin/now. Each
+ * package surfaces the material subset (top by impact then confidence) plus the
+ * total, so the queue shows what to decide without flooding the screen.
+ */
+export async function getNowProposalPackages(perProjectCap = 3): Promise<NowProposalPackage[]> {
+  const sb = supabaseAdmin();
+  const { data, error } = await sb
+    .from("project_state_proposals")
+    .select("id, project_id, proposal_kind, item_type, summary, rationale, impact, confidence, source_refs, payload, project_state_items!project_state_proposals_target_item_id_fkey(statement), projects(id, notion_id, name)")
+    .eq("status", "pending")
+    .order("created_at", { ascending: false })
+    .limit(500);
+  if (error) throw new Error(`now proposals read failed: ${error.message}`);
+
+  const byProject = new Map<string, { name: string; href: string; cards: NowProposalCard[] }>();
+  for (const row of data ?? []) {
+    const proj = (Array.isArray(row.projects) ? row.projects[0] : row.projects) as { id?: string; notion_id?: string; name?: string } | null;
+    const pid = (row.project_id as string);
+    const href = `/admin/projects/${proj?.id || proj?.notion_id || pid}/state`;
+    const target = Array.isArray(row.project_state_items) ? row.project_state_items[0] : row.project_state_items;
+    const card: NowProposalCard = {
+      id: row.id as string,
+      kind: row.proposal_kind as StateProposal["proposalKind"],
+      itemType: (row.item_type as string | null) ?? null,
+      summary: row.summary as string,
+      rationale: row.rationale as string,
+      impact: row.impact as StateProposal["impact"],
+      confidence: row.confidence as number,
+      sourceCount: Array.isArray(row.source_refs) ? (row.source_refs as string[]).length : 0,
+      targetStatement: (target?.statement as string | undefined) ?? null,
+      preview: proposalPreview(row.proposal_kind as string, (row.payload as Record<string, unknown>) ?? {}),
+    };
+    const entry = byProject.get(pid) ?? { name: proj?.name ?? "Untitled project", href, cards: [] };
+    entry.cards.push(card);
+    byProject.set(pid, entry);
+  }
+
+  const packages: NowProposalPackage[] = [];
+  for (const [projectId, entry] of byProject) {
+    const sorted = entry.cards.sort((a, b) => (IMPACT_RANK[b.impact] - IMPACT_RANK[a.impact]) || (b.confidence - a.confidence));
+    packages.push({
+      projectId,
+      projectName: entry.name,
+      projectHref: entry.href,
+      total: sorted.length,
+      maxImpact: sorted[0]?.impact ?? "medium",
+      top: sorted.slice(0, perProjectCap),
+    });
+  }
+  return packages.sort((a, b) => (IMPACT_RANK[b.maxImpact] - IMPACT_RANK[a.maxImpact]) || (b.total - a.total));
+}
+
 export async function pendingProposalCount(projectId?: string): Promise<number> {
   const sb = supabaseAdmin();
   let query = sb.from("project_state_proposals").select("id", { count: "exact", head: true }).eq("status", "pending");
@@ -94,15 +185,15 @@ export async function acceptProposal(projectId: string, proposalId: string, acto
     return { ok: false, error: msg, status: 502 };
   }
   const applied = (Array.isArray(data) ? data[0] : data) as {
-    proposal_kind?: string; applied_item_id?: string | null; project_id?: string;
+    proposal_kind?: string; applied_item_id?: string | null; applied_learning_id?: string | null; project_id?: string;
   } | null;
 
-  // Phase 6: resolve the applied item's owner/stakeholder labels to typed entity
-  // links. Best-effort — a resolution failure never fails the acceptance, and the
+  // Phase 6: resolve the applied entity's labels to typed entity links.
+  // Best-effort — a resolution failure never fails the acceptance, and the
   // backfill endpoint can rebuild links later.
-  if (applied?.applied_item_id && applied.project_id
-      && (applied.proposal_kind === "add_item" || applied.proposal_kind === "update_item")) {
-    try {
+  try {
+    if (applied?.project_id && applied.applied_item_id
+        && (applied.proposal_kind === "add_item" || applied.proposal_kind === "update_item")) {
       const { data: item } = await supabaseAdmin()
         .from("project_state_items")
         .select("owner_label, stakeholder_label")
@@ -116,8 +207,18 @@ export async function acceptProposal(projectId: string, proposalId: string, acto
           actor,
         );
       }
-    } catch { /* non-fatal: links are rebuildable via backfill */ }
-  }
+    } else if (applied?.project_id && applied.applied_learning_id && applied.proposal_kind === "add_learning") {
+      // Learnings have no owner/stakeholder — resolve the `area` as a stakeholder.
+      const { data: learning } = await supabaseAdmin()
+        .from("project_learning_items")
+        .select("area")
+        .eq("id", applied.applied_learning_id)
+        .maybeSingle();
+      if (learning?.area) {
+        await linkStateSubject(applied.project_id, "learning_item", applied.applied_learning_id, null, learning.area as string, actor);
+      }
+    }
+  } catch { /* non-fatal: links are rebuildable via backfill */ }
 
   return { ok: true, kind: applied?.proposal_kind ?? "unknown" };
 }

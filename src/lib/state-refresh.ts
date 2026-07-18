@@ -159,23 +159,10 @@ async function resolveCursor(projectId: string, lookbackDays: number): Promise<E
   return { at: data.cursor_updated_at as string, id: (data.cursor_id as string) ?? ZERO_UUID };
 }
 
-/**
- * Persist the cursor at the max (updated_at, id) actually processed. Never
- * advances to now(), so any evidence beyond the batch cap is picked up next run.
- */
-async function advanceCursor(projectId: string, cursor: EvidenceCursor): Promise<void> {
-  const now = new Date().toISOString();
-  const { error } = await supabaseAdmin()
-    .from("project_evidence_cursors")
-    .upsert({
-      project_id: projectId,
-      cursor_updated_at: cursor.at,
-      cursor_id: cursor.id,
-      last_run_at: now,
-      updated_at: now,
-    }, { onConflict: "project_id" });
-  if (error) throw new Error(`cursor advance failed: ${error.message}`);
-}
+// Cursor advance is no longer a separate write: commit_state_proposals inserts
+// the proposals AND advances the cursor in one transaction (advisory-locked +
+// optimistic), so a crash between the two is impossible and concurrent runs can't
+// double-insert. See runStateRefreshForProject.
 
 export async function getEvidenceDelta(
   projectNotionId: string,
@@ -576,17 +563,28 @@ export async function runStateRefreshForProject(
   const inserts = await dedupeAndCap(projectId, validated);
   const suppressed = validated.length - inserts.length;
 
-  if (inserts.length > 0) {
-    const { error } = await supabaseAdmin().from("project_state_proposals").insert(inserts);
-    if (error) throw new Error(`proposal insert failed: ${error.message}`);
+  // Atomic commit: insert the (deduped/capped) proposals AND advance the cursor
+  // in one transaction, under a per-project advisory lock + optimistic cursor
+  // check. If a concurrent run already advanced past our cursor, the RPC aborts
+  // and we skip — no duplicates. An empty proposal set still advances the cursor.
+  const { data: committed, error } = await supabaseAdmin().rpc("commit_state_proposals", {
+    p_project_id: projectId,
+    p_expected_cursor_at: cursor.at,
+    p_expected_cursor_id: cursor.id,
+    p_next_cursor_at: next.at,
+    p_next_cursor_id: next.id,
+    p_proposals: inserts,
+  });
+  if (error) {
+    if (error.code === "55000" || /cursor moved/i.test(error.message)) {
+      return { ...base, windowStart: cursor.at, windowEnd: cursor.at, evidenceConsidered: evidence.length, modelProposed: raw.length, suppressed, proposalsCreated: 0, skippedReason: "concurrent run handled this delta" };
+    }
+    throw new Error(`commit failed: ${error.message}`);
   }
+  const proposalsCreated = (committed as number | null) ?? inserts.length;
 
-  // The batch was considered; advance the cursor whether or not it yielded
-  // proposals, so this evidence is not re-read next run.
-  await advanceCursor(projectId, next);
-
-  const result = { ...base, windowStart: cursor.at, windowEnd: next.at, evidenceConsidered: evidence.length, modelProposed: raw.length, suppressed, proposalsCreated: inserts.length };
-  if (inserts.length === 0) {
+  const result = { ...base, windowStart: cursor.at, windowEnd: next.at, evidenceConsidered: evidence.length, modelProposed: raw.length, suppressed, proposalsCreated };
+  if (proposalsCreated === 0) {
     // modelProposed > 0 with everything suppressed/failed is observable, not a
     // silent "nothing new".
     const reason = raw.length === 0 ? "no material proposals"

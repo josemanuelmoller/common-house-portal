@@ -40,7 +40,10 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     transferability,
     confidence,
     source_refs: refs(body.sourceRefs),
-    stale_after: typeof body.staleAfter === "string" ? body.staleAfter || null : null,
+    // Every learning gets a review-by date so observations don't linger unreviewed.
+    stale_after: (typeof body.staleAfter === "string" && body.staleAfter)
+      ? body.staleAfter
+      : new Date(Date.now() + 45 * 86_400_000).toISOString(),
     created_by: actor,
     updated_by: actor,
   }).select("*").single();

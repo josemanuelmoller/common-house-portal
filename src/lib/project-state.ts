@@ -51,6 +51,7 @@ export type ProjectLearningItem = {
   lastSeenAt: string | null;
   staleAfter: string | null;
   updatedAt: string;
+  linkedEntities: LinkedEntity[];
 };
 
 export type ProjectStateView = {
@@ -102,7 +103,11 @@ export async function getProjectStateView(identifier: string): Promise<ProjectSt
   } : null;
 
   const itemRows = itemResult.data ?? [];
-  const linksBySubject = await getLinksForSubjects(itemRows.map((r) => r.id as string));
+  const learningRows = learningResult.data ?? [];
+  const linksBySubject = await getLinksForSubjects([
+    ...itemRows.map((r) => r.id as string),
+    ...learningRows.map((r) => r.id as string),
+  ]);
 
   return {
     projectId: project.id,
@@ -126,7 +131,7 @@ export async function getProjectStateView(identifier: string): Promise<ProjectSt
       updatedAt: item.updated_at as string,
       linkedEntities: linksBySubject.get(item.id as string) ?? [],
     })),
-    learnings: (learningResult.data ?? []).map((item) => ({
+    learnings: learningRows.map((item) => ({
       id: item.id as string,
       learningType: item.learning_type as string,
       area: (item.area as string | null) ?? null,
@@ -140,6 +145,7 @@ export async function getProjectStateView(identifier: string): Promise<ProjectSt
       lastSeenAt: (item.last_seen_at as string | null) ?? null,
       staleAfter: (item.stale_after as string | null) ?? null,
       updatedAt: item.updated_at as string,
+      linkedEntities: linksBySubject.get(item.id as string) ?? [],
     })),
   };
 }

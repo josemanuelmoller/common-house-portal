@@ -87,6 +87,17 @@ export async function backfillEntityLinks(projectId?: string): Promise<{ subject
   const { data: items, error: itemErr } = await itemQ;
   if (itemErr) throw new Error(`backfill items read failed: ${itemErr.message}`);
 
+  // Learnings carry no owner/stakeholder labels — resolve their `area` (a team /
+  // function) as a stakeholder. With the hardened resolver most areas stay
+  // unresolved, which is the intended conservative behavior.
+  let learnQ = sb.from("project_learning_items")
+    .select("id, project_id, area")
+    .not("status", "in", "(promoted,rejected)")
+    .not("area", "is", null);
+  if (projectId) learnQ = learnQ.eq("project_id", projectId);
+  const { data: learnings, error: learnErr } = await learnQ;
+  if (learnErr) throw new Error(`backfill learnings read failed: ${learnErr.message}`);
+
   let subjects = 0;
   let linksCreated = 0;
   for (const it of items ?? []) {
@@ -94,6 +105,14 @@ export async function backfillEntityLinks(projectId?: string): Promise<{ subject
     linksCreated += await linkStateSubject(
       it.project_id as string, "state_item", it.id as string,
       (it.owner_label as string | null) ?? null, (it.stakeholder_label as string | null) ?? null,
+      "backfill",
+    );
+  }
+  for (const lr of learnings ?? []) {
+    subjects += 1;
+    linksCreated += await linkStateSubject(
+      lr.project_id as string, "learning_item", lr.id as string,
+      null, (lr.area as string | null) ?? null,
       "backfill",
     );
   }
