@@ -80,6 +80,10 @@ export function ClientRoomView({ room, role, adminPreview }: { room: ClientRoomP
     role === "collaborator" && agreementType !== "commercial" && agreementType !== "purchase_order"
   );
   const openAgreements = room.agreements.filter((item) => item.status === "shared" || item.status === "changes_requested");
+  // "What we heard" (understanding) renders in its own section as a curated,
+  // source-referenced synthesis; keep it out of the generic Agreements list.
+  const understandingAgreements = room.agreements.filter((item) => item.agreementType === "understanding");
+  const otherAgreements = room.agreements.filter((item) => item.agreementType !== "understanding");
   const heardFields = [
     ["The challenge", room.whatWeHeard.challenge],
     ["What matters most", room.whatWeHeard.mattersMost],
@@ -116,15 +120,20 @@ export function ClientRoomView({ room, role, adminPreview }: { room: ClientRoomP
         </section>
 
         <Section id="heard" title="What we" flourish="heard">
-          {heardFields.length === 0 && room.whatWeHeard.heard.length === 0 ? <p className="text-[12px]" style={{ color: "var(--hall-muted-2)" }}>Common House is preparing the first synthesis.</p> : <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-6">{heardFields.map(([label, value]) => <div key={label}><p className="text-[10px] uppercase tracking-[0.08em] mb-2" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}>{label}</p><p className="text-[14px] leading-[1.65]">{value}</p></div>)}{room.whatWeHeard.heard.map((item, index) => <div key={`${item.point}-${index}`}><p className="text-[10px] uppercase tracking-[0.08em] mb-2" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}>From the conversation</p><p className="text-[14px] leading-[1.65]">{item.point}</p>{item.speakerName && <p className="mt-1 text-[10px]" style={{ color: "var(--hall-muted-3)" }}>— {item.speakerName}</p>}</div>)}</div>}
+          {understandingAgreements.length === 0 && heardFields.length === 0 && room.whatWeHeard.heard.length === 0
+            ? <p className="text-[12px]" style={{ color: "var(--hall-muted-2)" }}>Common House is preparing the first synthesis.</p>
+            : <div className="space-y-8">
+                {understandingAgreements.map((a) => <div key={a.id}>{a.summary && <p className="text-[14px] leading-[1.7] max-w-3xl" style={{ whiteSpace: "pre-line" }}>{a.summary}</p>}</div>)}
+                {(heardFields.length > 0 || room.whatWeHeard.heard.length > 0) && <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-6">{heardFields.map(([label, value]) => <div key={label}><p className="text-[10px] uppercase tracking-[0.08em] mb-2" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}>{label}</p><p className="text-[14px] leading-[1.65]">{value}</p></div>)}{room.whatWeHeard.heard.map((item, index) => <div key={`${item.point}-${index}`}><p className="text-[10px] uppercase tracking-[0.08em] mb-2" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}>From the conversation</p><p className="text-[14px] leading-[1.65]">{item.point}</p>{item.speakerName && <p className="mt-1 text-[10px]" style={{ color: "var(--hall-muted-3)" }}>— {item.speakerName}</p>}</div>)}</div>}
+              </div>}
         </Section>
 
         <Section id="proposal" title="Our" flourish="proposal">
           <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-5 items-start"><div><span className="hall-chip-outline">{room.proposal.status}</span><p className="mt-4 max-w-3xl text-[14px] leading-[1.65]">{room.proposal.summary || "The proposal is being prepared from what we heard."}</p></div>{room.proposal.file_url && <a className="hall-btn-primary" href={room.proposal.file_url} target="_blank" rel="noreferrer">Open {room.proposal.file_name || "proposal"} ↗</a>}</div>
         </Section>
 
-        <Section id="agreements" title="Agreements" flourish="and approvals">
-          {room.agreements.length === 0 ? <p className="text-[12px]" style={{ color: "var(--hall-muted-2)" }}>No shared agreements yet.</p> : <div>{room.agreements.map((agreement) => <article key={agreement.id} className="py-4" style={{ borderBottom: "1px solid var(--hall-line-soft)" }}><div className="flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-5"><div className="flex-1"><p className="text-[10px] uppercase tracking-[0.08em] mb-1" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}>{agreement.agreementType.replaceAll("_", " ")} · v{agreement.version}</p><h3 className="text-[15px] font-bold">{agreement.title}</h3>{agreement.summary && <p className="mt-1.5 text-[12px] leading-relaxed" style={{ color: "var(--hall-ink-3)" }}>{agreement.summary}</p>}</div><span className="hall-chip-outline">{agreement.status.replaceAll("_", " ")}</span></div>{(agreement.status === "shared" || agreement.status === "changes_requested") && <AgreementResponseActions agreementId={agreement.id} version={agreement.version} agreementType={agreement.agreementType} canRespond={canRespondTo(agreement.agreementType)} />}{agreement.respondedAt && <p className="mt-3 text-[10px]" style={{ color: "var(--hall-muted-3)" }}>Responded {displayDate(agreement.respondedAt)}{agreement.respondedEmail ? ` · ${agreement.respondedEmail}` : ""}</p>}</article>)}</div>}
+        <Section id="agreements" title="Agreements" flourish="and next steps">
+          {otherAgreements.length === 0 ? <p className="text-[12px]" style={{ color: "var(--hall-muted-2)" }}>No shared agreements yet. Confirmed decisions and next steps will appear here.</p> : <div>{otherAgreements.map((agreement) => <article key={agreement.id} className="py-4" style={{ borderBottom: "1px solid var(--hall-line-soft)" }}><div className="flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-5"><div className="flex-1"><p className="text-[10px] uppercase tracking-[0.08em] mb-1" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}>{agreement.agreementType.replaceAll("_", " ")} · v{agreement.version}</p><h3 className="text-[15px] font-bold">{agreement.title}</h3>{agreement.summary && <p className="mt-1.5 text-[12px] leading-relaxed" style={{ color: "var(--hall-ink-3)" }}>{agreement.summary}</p>}</div><span className="hall-chip-outline">{agreement.status.replaceAll("_", " ")}</span></div>{(agreement.status === "shared" || agreement.status === "changes_requested") && <AgreementResponseActions agreementId={agreement.id} version={agreement.version} agreementType={agreement.agreementType} canRespond={canRespondTo(agreement.agreementType)} />}{agreement.respondedAt && <p className="mt-3 text-[10px]" style={{ color: "var(--hall-muted-3)" }}>Responded {displayDate(agreement.respondedAt)}{agreement.respondedEmail ? ` · ${agreement.respondedEmail}` : ""}</p>}</article>)}</div>}
         </Section>
 
         <Section id="plan" title="Plan" flourish="and progress">
