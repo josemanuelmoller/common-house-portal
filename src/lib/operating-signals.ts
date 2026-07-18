@@ -23,7 +23,10 @@ export type UpcomingMeeting = {
 
 function projectLink(project: { id?: string | null; notion_id?: string | null } | { id?: string | null; notion_id?: string | null }[] | null | undefined) {
   const row = Array.isArray(project) ? project[0] : project;
-  const id = row?.notion_id || row?.id || null;
+  // Use the Supabase uuid — the whole /admin/projects/[id] route family is keyed
+  // by it (workrooms, health, my-rooms…), and the state page's "← Project" back
+  // link relies on it too. notion_id is only a fallback.
+  const id = row?.id || row?.notion_id || null;
   return id ? { projectId: id, href: `/admin/projects/${id}/state` } : { projectId: null, href: "/admin/workrooms" };
 }
 

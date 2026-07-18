@@ -35,7 +35,9 @@ export async function listPendingProposals(projectId: string): Promise<StateProp
   const sb = supabaseAdmin();
   const { data, error } = await sb
     .from("project_state_proposals")
-    .select("id, project_id, proposal_kind, target_item_id, item_type, summary, rationale, impact, confidence, source_refs, payload, status, created_at, project_state_items(statement)")
+    // project_state_proposals has two FKs to project_state_items (target_item_id
+    // and applied_item_id); disambiguate the embed to the target item explicitly.
+    .select("id, project_id, proposal_kind, target_item_id, item_type, summary, rationale, impact, confidence, source_refs, payload, status, created_at, project_state_items!project_state_proposals_target_item_id_fkey(statement)")
     .eq("project_id", projectId)
     .eq("status", "pending")
     .order("created_at", { ascending: false });
