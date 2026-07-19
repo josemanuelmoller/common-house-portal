@@ -8,6 +8,8 @@ import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { HallOrganizationTagEditor } from "@/components/HallOrganizationTagEditor";
 import { HallContactRow } from "@/components/HallContactRow";
 import { OrganizationEditor } from "@/components/OrganizationEditor";
+import { OrganizationRelationships } from "@/components/OrganizationRelationships";
+import { listOrgRelationships } from "@/lib/relational-model";
 import { HallSection } from "@/components/HallSection";
 
 export const dynamic = "force-dynamic";
@@ -80,6 +82,9 @@ export default async function OrganizationDrawer({ params }: Props) {
       .maybeSingle();
     orgFullRow = (data as OrgFullRow | null) ?? null;
   }
+
+  // ADR-001 durable relationships (canonical) for this org.
+  const orgRelationships = orgFullRow ? await listOrgRelationships(orgFullRow.id) : [];
 
   // Warmth + role breakdown from contacts list
   const warmthBreakdown = contacts.reduce((acc, c) => {
@@ -405,6 +410,17 @@ export default async function OrganizationDrawer({ params }: Props) {
                   engagement_value: orgFullRow.engagement_value,
                 }}
               />
+            </HallSection>
+          )}
+
+          {/* Durable relationships with Common House (ADR-001 canonical) */}
+          {orgFullRow && (
+            <HallSection
+              title="Relationships"
+              flourish="with Common House"
+              meta={`${orgRelationships.filter((r) => !r.ended_at).length} ACTIVE`}
+            >
+              <OrganizationRelationships orgId={orgFullRow.id} initial={orgRelationships} />
             </HallSection>
           )}
 
