@@ -12,6 +12,7 @@
  * Nothing here mutates existing rows. Approvals only ADD canonical relationships.
  */
 
+import Link from "next/link";
 import { requireAdmin } from "@/lib/require-admin";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { PortalShell } from "@/components/PortalShell";
@@ -53,6 +54,7 @@ type PresaleRow = {
   client_room_enabled: boolean;
   engagement_model: string | null;
   organization_id: string | null;
+  hall_slug: string | null;
 };
 
 function ProjectRows({ items }: { items: PresaleRow[] }) {
@@ -73,15 +75,27 @@ function ProjectRows({ items }: { items: PresaleRow[] }) {
           <span className="text-[10px] uppercase tracking-wide" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}>
             {p.project_status ?? "no status"}{p.current_stage ? ` · ${p.current_stage}` : ""}
           </span>
-          {p.client_room_enabled && (
-            <span
-              className="text-[8.5px] px-1.5 py-0.5 uppercase tracking-[0.06em]"
-              style={{ fontFamily: "var(--font-hall-mono)", fontWeight: 700, color: "var(--hall-warn)", border: "1px solid var(--hall-warn)" }}
-              title="Has a Client Room"
-            >
-              room
-            </span>
-          )}
+          {p.client_room_enabled &&
+            (p.hall_slug ? (
+              <Link
+                href={`/hall/${p.hall_slug}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[8.5px] px-1.5 py-0.5 uppercase tracking-[0.06em] hover:opacity-70"
+                style={{ fontFamily: "var(--font-hall-mono)", fontWeight: 700, color: "var(--hall-warn)", border: "1px solid var(--hall-warn)" }}
+                title="Open the client room"
+              >
+                room ↗
+              </Link>
+            ) : (
+              <span
+                className="text-[8.5px] px-1.5 py-0.5 uppercase tracking-[0.06em]"
+                style={{ fontFamily: "var(--font-hall-mono)", fontWeight: 700, color: "var(--hall-muted-3)", border: "1px solid var(--hall-line)" }}
+                title="Client Room enabled but no public slug yet"
+              >
+                room
+              </span>
+            ))}
         </li>
       ))}
     </ul>
@@ -95,7 +109,7 @@ export default async function RelationalReviewPage() {
   const [orgsRes, relsRes, presaleRes] = await Promise.all([
     sb.from("organizations").select("id, name, org_category, relationship_stage"),
     sb.from("organization_relationships").select("organization_id, relationship_type").is("ended_at", null),
-    sb.from("projects").select("id, name, project_status, current_stage, client_room_enabled, engagement_model, organization_id"),
+    sb.from("projects").select("id, name, project_status, current_stage, client_room_enabled, engagement_model, organization_id, hall_slug"),
   ]);
 
   const PRESALE_STATUSES = new Set(["Proposed", "Not started"]);
