@@ -8,6 +8,9 @@ import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { HallOrganizationTagEditor } from "@/components/HallOrganizationTagEditor";
 import { HallContactRow } from "@/components/HallContactRow";
 import { OrganizationEditor } from "@/components/OrganizationEditor";
+import { OrganizationRelationships } from "@/components/OrganizationRelationships";
+import { OpportunityStageControl } from "@/components/OpportunityStageControl";
+import { listOrgRelationships } from "@/lib/relational-model";
 import { HallSection } from "@/components/HallSection";
 
 export const dynamic = "force-dynamic";
@@ -80,6 +83,9 @@ export default async function OrganizationDrawer({ params }: Props) {
       .maybeSingle();
     orgFullRow = (data as OrgFullRow | null) ?? null;
   }
+
+  // ADR-001 durable relationships (canonical) for this org.
+  const orgRelationships = orgFullRow ? await listOrgRelationships(orgFullRow.id) : [];
 
   // Warmth + role breakdown from contacts list
   const warmthBreakdown = contacts.reduce((acc, c) => {
@@ -323,11 +329,7 @@ export default async function OrganizationDrawer({ params }: Props) {
               <ul className="flex flex-col">
                 {crossRef.opportunities.map(o => (
                   <li key={o.id} style={{ borderTop: "1px solid var(--hall-line-soft)" }}>
-                    <Link
-                      href={`/admin/opportunities?highlight=${encodeURIComponent(o.id)}`}
-                      prefetch={false}
-                      className="flex items-start gap-4 py-3 transition-colors hover:bg-[var(--hall-fill-soft)] px-1"
-                    >
+                    <div className="flex items-start gap-4 py-3 px-1">
                       <div className="flex-1 min-w-0">
                         <p className="text-[12.5px] font-semibold truncate" style={{ color: "var(--hall-ink-0)" }}>{o.title}</p>
                         <p
@@ -344,13 +346,16 @@ export default async function OrganizationDrawer({ params }: Props) {
                           <p className="text-[10.5px] mt-0.5 truncate italic" style={{ color: "var(--hall-ink-3)" }}>→ {o.suggested_next_step}</p>
                         )}
                       </div>
-                      <span
-                        className="text-[9px] uppercase tracking-[0.08em] shrink-0 self-center"
+                      <OpportunityStageControl id={o.id} status={o.status} canonical_stage={o.canonical_stage} />
+                      <Link
+                        href={`/admin/opportunities?highlight=${encodeURIComponent(o.id)}`}
+                        prefetch={false}
+                        className="text-[9px] uppercase tracking-[0.08em] shrink-0 self-center hover:underline"
                         style={{ fontFamily: "var(--font-hall-mono)", fontWeight: 700, color: "var(--hall-muted-2)" }}
                       >
                         Open →
-                      </span>
-                    </Link>
+                      </Link>
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -405,6 +410,17 @@ export default async function OrganizationDrawer({ params }: Props) {
                   engagement_value: orgFullRow.engagement_value,
                 }}
               />
+            </HallSection>
+          )}
+
+          {/* Durable relationships with Common House (ADR-001 canonical) */}
+          {orgFullRow && (
+            <HallSection
+              title="Relationships"
+              flourish="with Common House"
+              meta={`${orgRelationships.filter((r) => !r.ended_at).length} ACTIVE`}
+            >
+              <OrganizationRelationships orgId={orgFullRow.id} initial={orgRelationships} />
             </HallSection>
           )}
 
