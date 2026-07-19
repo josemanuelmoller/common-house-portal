@@ -3,21 +3,18 @@
  *
  * Generates a structured delegation brief and saves it to Agent Drafts [OS v2].
  *
- * Assignee lookup: Supabase-first since Wave 5 (2026-04-17).
- * Falls back to Notion databases.query if assignee not yet synced.
+ * Assignee lookup: Supabase canonical (Notion fallback removed 2026-05-15,
+ * post Phase 2 backfill).
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { adminGuardApi } from "@/lib/require-admin";
-import { Client } from "@notionhq/client";
 import Anthropic from "@anthropic-ai/sdk";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 
-const notion = new Client({ auth: process.env.NOTION_API_KEY });
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 const AGENT_DRAFTS_DB = "9844ece875ea4c618f616e8cc97d5a90";
-const PEOPLE_DB = "1bc0f96f33ca4a9e9ff26844377e81de";
 
 function corsHeaders() {
   return {
@@ -55,8 +52,7 @@ export async function POST(req: NextRequest) {
   let assigneePageId = "";
 
   if (assigneeName) {
-    // Supabase-first person search
-    let sbHit = false;
+    // Supabase canonical person search (Notion fallback removed post-cutoff)
     try {
       const sb = getSupabaseServerClient();
       const { data: sbPerson } = await sb
@@ -71,35 +67,9 @@ export async function POST(req: NextRequest) {
         assigneeRole     = sbPerson.job_title  ?? "";
         assigneeEmail    = sbPerson.email      ?? "";
         assigneePageId   = sbPerson.notion_id  ?? "";
-        sbHit = true;
       }
     } catch {
-      // Supabase lookup failed or no match — fall through to Notion
-    }
-
-    if (!sbHit) {
-      // Fallback: person not yet synced to Supabase
-      try {
-        const peopleRes = await notion.databases.query({
-          database_id: PEOPLE_DB,
-          filter: { property: "Full Name", rich_text: { contains: assigneeName } },
-          page_size: 1,
-        });
-        if (peopleRes.results.length > 0) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const person = peopleRes.results[0] as any;
-          const props = person.properties;
-          resolvedAssignee =
-            props["Full Name"]?.rich_text?.[0]?.plain_text ??
-            props["Name"]?.title?.[0]?.plain_text ??
-            assigneeName;
-          assigneeRole   = props["Job Title / Role"]?.rich_text?.[0]?.plain_text ?? "";
-          assigneeEmail  = props["Email"]?.email ?? "";
-          assigneePageId = person.id;
-        }
-      } catch {
-        // People lookup failed — proceed with name as-is
-      }
+      // Supabase lookup failed or no match — proceed with name as-is
     }
   }
 

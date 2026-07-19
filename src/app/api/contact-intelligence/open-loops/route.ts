@@ -17,6 +17,7 @@ import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { adminGuardApi } from "@/lib/require-admin";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
+import { buildPromptPrefix } from "@/lib/user-context";
 
 export const maxDuration = 60;
 export const dynamic     = "force-dynamic";
@@ -171,13 +172,16 @@ export async function POST(req: NextRequest) {
   const name = p.full_name ?? p.display_name ?? p.email ?? "the contact";
   const userPrompt = `Contact: ${name}\n\nRecent conversation material (last 6 weeks):\n${items.slice(0, 60).join("\n\n")}\n\nReturn open loops as JSON.`;
 
+  const prefix = await buildPromptPrefix({ personId: p.id, context: "open_loops" });
+  const systemWithContext = prefix ? `${prefix}\n${SYSTEM_PROMPT}` : SYSTEM_PROMPT;
+
   let loops: OpenLoop[] = [];
   try {
     const resp = await anthropic.messages.create({
       model:      "claude-haiku-4-5-20251001",
       max_tokens: 800,
       temperature: 0,
-      system:     SYSTEM_PROMPT,
+      system:     systemWithContext,
       messages:   [{ role: "user", content: userPrompt }],
     });
     const block = resp.content[0];

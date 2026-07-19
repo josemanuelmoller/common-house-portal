@@ -24,10 +24,6 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-// notion-cutoff-2026-06-02: removed; canonical writes target the `organizations` Supabase table.
-// import { Client } from "@notionhq/client";
-// const notion = new Client({ auth: process.env.NOTION_API_KEY });
-// const ORGS_DB = "bef1bb86ab2b4cd280b6b33f9034b96c";
 import { adminGuardApi } from "@/lib/require-admin";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { logServerError } from "@/lib/debug-log";

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminGuardApi } from "@/lib/require-admin";
+// TODO phase-6: migrate read source to Supabase insight_briefs + knowledge_assets
 import { Client } from "@notionhq/client";
 import Anthropic from "@anthropic-ai/sdk";
 import { createPageWithMirror } from "@/lib/notion-mirror-push";

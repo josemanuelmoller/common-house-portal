@@ -6,6 +6,21 @@
  * Drop-in replacements: same return shapes as the original `@/lib/notion/*`
  * functions, so the Hall just swaps the import. Notion remains the system of
  * record — agents and skills still write to Notion. The mirror is read-only.
+ *
+ * ⚠️  DEPRECATION — Phase 6 deletion target, cutoff 2026-06-02.
+ * See docs/SUPABASE_CONSOLIDATION_FREEZE.md §3.6 and §3.7.
+ *
+ * Phase 6 sequence (do NOT skip steps):
+ *   1. Migrate `src/lib/notion-cached.ts` to import canonical reads from
+ *      `@/lib/notion-canonical.ts` (or equivalent) that hit the canonical
+ *      Supabase tables (`decision_items`, `daily_briefings`, `agent_drafts`,
+ *      `insight_briefs`, `content_pipeline_items`, `watchlist_entities`,
+ *      `competitive_intel`).
+ *   2. Verify Hall pages (`admin/page.tsx`, `workrooms/page.tsx`,
+ *      `competitive-intel/page.tsx`) render correctly without this file.
+ *   3. Delete this file.
+ *   4. Delete `src/lib/notion-sync.ts` and `src/app/api/cron/sync-notion-mirror/`.
+ *   5. Apply `supabase/migrations/20260602230000_phase6_drop_notion_mirror_tables.sql`.
  */
 
 import { getSupabaseServerClient } from "@/lib/supabase-server";
@@ -97,7 +112,7 @@ function parseDecisionNotes(raw: string | null) {
 
 export async function getDecisionItems(statusFilter?: string): Promise<DecisionItem[]> {
   const sb = getSupabaseServerClient();
-  let q = sb.from("notion_decision_items")
+  let q = sb.from("decision_items")
     .select("*")
     .order("priority", { ascending: true });
   if (statusFilter) q = q.eq("status", statusFilter);
@@ -109,7 +124,9 @@ export async function getDecisionItems(statusFilter?: string): Promise<DecisionI
   return (data ?? []).map((r: Record<string, unknown>) => {
     const parsed = parseDecisionNotes(r.notes_raw as string | null);
     return {
-      id:               r.id as string,
+      // Hall callers expect Notion page_id as the row id; expose `notion_id`
+      // when present, fall back to uuid id for net-new canonical rows.
+      id:               (r.notion_id as string | null) ?? (r.id as string),
       title:            (r.title as string) ?? "Untitled",
       decisionType:     (r.decision_type as string) ?? "",
       priority:         (r.priority as string) ?? "",
@@ -127,29 +144,49 @@ export async function getDecisionItems(statusFilter?: string): Promise<DecisionI
 
 // ─── Daily briefings ──────────────────────────────────────────────────────────
 
+// Canonical `daily_briefings` stores the 7 named sections inside
+// `payload.sections` per the generate-daily-briefing post-migration shape.
+// `status` and `generated_at` also live in payload.
+type DailyBriefingPayload = {
+  status?: string | null;
+  generated_at?: string | null;
+  sections?: Partial<Record<
+    "focus_of_day" | "meeting_prep" | "my_commitments" |
+    "follow_up_queue" | "agent_queue" | "market_signals" | "ready_to_publish",
+    string | null
+  >>;
+};
+
+function sectionsOf(payload: unknown): DailyBriefingPayload {
+  if (!payload || typeof payload !== "object") return {};
+  return payload as DailyBriefingPayload;
+}
+
 export async function getDailyBriefing(dateStr?: string): Promise<DailyBriefing | null> {
   const sb = getSupabaseServerClient();
   const target = dateStr ?? new Date().toISOString().slice(0, 10);
   const { data, error } = await sb
-    .from("notion_daily_briefings")
-    .select("*")
-    .eq("brief_date", target)
+    .from("daily_briefings")
+    .select("id, notion_id, briefing_date, body_md, payload, updated_at")
+    .eq("briefing_date", target)
     .limit(1)
     .maybeSingle();
   if (error || !data) return null;
   const r = data as Record<string, unknown>;
+  const p = sectionsOf(r.payload);
+  const sec = p.sections ?? {};
   return {
-    id:             r.id as string,
-    date:           (r.brief_date as string | null) ?? null,
-    focusOfDay:     (r.focus_of_day as string) ?? "",
-    meetingPrep:    (r.meeting_prep as string) ?? "",
-    myCommitments:  (r.my_commitments as string) ?? "",
-    followUpQueue:  (r.follow_up_queue as string) ?? "",
-    agentQueue:     (r.agent_queue as string) ?? "",
-    marketSignals:  (r.market_signals as string) ?? "",
-    readyToPublish: (r.ready_to_publish as string) ?? "",
-    generatedAt:    (r.generated_at as string | null) ?? null,
-    status:         (r.status as string) ?? "",
+    id:             ((r.notion_id as string | null) ?? (r.id as string)),
+    date:           (r.briefing_date as string | null) ?? null,
+    focusOfDay:     sec.focus_of_day     ?? "",
+    meetingPrep:    sec.meeting_prep     ?? "",
+    myCommitments:  sec.my_commitments   ?? "",
+    followUpQueue:  sec.follow_up_queue  ?? "",
+    agentQueue:     sec.agent_queue      ?? "",
+    marketSignals:  sec.market_signals   ?? "",
+    readyToPublish: sec.ready_to_publish ?? "",
+    generatedAt:    p.generated_at ?? null,
+    status:         p.status       ?? "",
   };
 }
 
@@ -158,17 +195,19 @@ export async function getDailyBriefing(dateStr?: string): Promise<DailyBriefing 
 export async function getLatestMarketSignals(): Promise<{ text: string; date: string | null; generatedAt: string | null } | null> {
   const sb = getSupabaseServerClient();
   const { data, error } = await sb
-    .from("notion_daily_briefings")
-    .select("market_signals, brief_date, generated_at, last_edited_at")
-    .order("brief_date", { ascending: false })
+    .from("daily_briefings")
+    .select("payload, briefing_date, updated_at")
+    .order("briefing_date", { ascending: false })
     .limit(14);
   if (error) return null;
-  for (const row of (data ?? []) as { market_signals: string | null; brief_date: string | null; generated_at: string | null; last_edited_at: string | null }[]) {
-    if (row.market_signals && row.market_signals.trim().length > 0) {
+  for (const row of (data ?? []) as { payload: unknown; briefing_date: string | null; updated_at: string | null }[]) {
+    const p = sectionsOf(row.payload);
+    const signals = p.sections?.market_signals ?? null;
+    if (signals && signals.trim().length > 0) {
       return {
-        text:        row.market_signals,
-        date:        row.brief_date,
-        generatedAt: row.generated_at ?? row.last_edited_at ?? null,
+        text:        signals,
+        date:        row.briefing_date,
+        generatedAt: p.generated_at ?? row.updated_at ?? null,
       };
     }
   }
@@ -177,78 +216,120 @@ export async function getLatestMarketSignals(): Promise<{ text: string; date: st
 
 // ─── Recent insight brief sources strip ──────────────────────────────────────
 
+// Canonical `insight_briefs` keeps title + brief_type as columns; source_link,
+// theme, notion_url live under `payload`.
+type InsightBriefPayload = {
+  source_link?: string | null;
+  theme?: string | null;
+  notion_url?: string | null;
+};
+
 export async function getRecentInsightBriefBriefs(): Promise<MarketSignalBrief[]> {
   const sb = getSupabaseServerClient();
   const since = new Date(Date.now() - 14 * 86400_000).toISOString();
   const { data, error } = await sb
-    .from("notion_insight_briefs")
-    .select("id, title, source_link, notion_url, theme, source_type, last_edited_at")
-    .gte("last_edited_at", since)
-    .order("last_edited_at", { ascending: false })
+    .from("insight_briefs")
+    .select("id, notion_id, title, brief_type, payload, updated_at")
+    .gte("updated_at", since)
+    .order("updated_at", { ascending: false })
     .limit(20);
   if (error || !data) return [];
-  return data.map((r: Record<string, unknown>) => ({
-    id:         r.id as string,
-    title:      (r.title as string) || "Untitled",
-    sourceLink: (r.source_link as string | null) ?? null,
-    notionUrl:  (r.notion_url as string) ?? "",
-    theme:      r.theme ? [r.theme as string] : [],
-    sourceType: (r.source_type as string | null) ?? null,
-  }));
+  return data.map((r: Record<string, unknown>) => {
+    const p = (r.payload && typeof r.payload === "object" ? r.payload : {}) as InsightBriefPayload;
+    return {
+      id:         ((r.notion_id as string | null) ?? (r.id as string)),
+      title:      (r.title as string) || "Untitled",
+      sourceLink: p.source_link ?? null,
+      notionUrl:  p.notion_url ?? notionUrlFromId(r.notion_id as string | null),
+      theme:      p.theme ? [p.theme] : [],
+      sourceType: (r.brief_type as string | null) ?? null,
+    };
+  });
 }
 
 // ─── Recent competitive intel ────────────────────────────────────────────────
+
+// Canonical `competitive_intel` renames summary→body_md, source_url→url,
+// date_captured→signal_date. status / relevance / entity_* under payload.
+type CompetitiveIntelPayload = {
+  status?: string | null;
+  relevance?: string | null;
+  entity_id?: string | null;
+  entity_name?: string | null;
+  entity_type?: string | null;
+  notion_url?: string | null;
+};
 
 export async function getRecentCompetitiveIntel(lookbackDays = 30): Promise<CompetitiveIntelRow[]> {
   const sb = getSupabaseServerClient();
   const since = new Date(Date.now() - lookbackDays * 86400_000).toISOString().slice(0, 10);
   const { data, error } = await sb
-    .from("notion_competitive_intel")
-    .select("*")
-    .neq("status", "Archived")
-    .gte("date_captured", since)
-    .order("date_captured", { ascending: false })
+    .from("competitive_intel")
+    .select("id, notion_id, title, body_md, signal_type, url, signal_date, payload")
+    .gte("signal_date", since)
+    .order("signal_date", { ascending: false })
     .limit(50);
   if (error || !data) return [];
-  return data.map((r: Record<string, unknown>) => ({
-    id:           r.id as string,
-    notionUrl:    (r.notion_url as string) ?? "",
-    title:        (r.title as string) || "Untitled signal",
-    summary:      (r.summary as string) ?? "",
-    signalType:   (r.signal_type as string | null) ?? null,
-    relevance:    (r.relevance as string | null) ?? null,
-    status:       (r.status as string | null) ?? null,
-    sourceUrl:    (r.source_url as string | null) ?? null,
-    dateCaptured: (r.date_captured as string | null) ?? null,
-    entityName:   (r.entity_name as string | null) ?? null,
-    entityType:   (r.entity_type as string | null) ?? null,
-  }));
+  return (data as Record<string, unknown>[])
+    .map(r => {
+      const p = (r.payload && typeof r.payload === "object" ? r.payload : {}) as CompetitiveIntelPayload;
+      return {
+        id:           ((r.notion_id as string | null) ?? (r.id as string)),
+        notionUrl:    p.notion_url ?? notionUrlFromId(r.notion_id as string | null),
+        title:        (r.title as string) || "Untitled signal",
+        summary:      (r.body_md as string) ?? "",
+        signalType:   (r.signal_type as string | null) ?? null,
+        relevance:    p.relevance ?? null,
+        status:       p.status ?? null,
+        sourceUrl:    (r.url as string | null) ?? null,
+        dateCaptured: (r.signal_date as string | null) ?? null,
+        entityName:   p.entity_name ?? null,
+        entityType:   p.entity_type ?? null,
+      };
+    })
+    // Match the previous "neq Archived" filter post-migration since status now lives in payload.
+    .filter(row => row.status !== "Archived");
 }
 
 // ─── Agent drafts ─────────────────────────────────────────────────────────────
 
+// Canonical `agent_drafts` renames draft_text→body_md, created_date→
+// notion_created_at. voice / platform / related_entity_id / opportunity_id /
+// notion_url live in payload.
+type AgentDraftPayload = {
+  voice?: string | null;
+  platform?: string | null;
+  related_entity_id?: string | null;
+  opportunity_id?: string | null;
+  notion_url?: string | null;
+};
+
 export async function getAgentDrafts(statusFilter = "Pending Review"): Promise<AgentDraft[]> {
   const sb = getSupabaseServerClient();
   const { data, error } = await sb
-    .from("notion_agent_drafts")
-    .select("*")
+    .from("agent_drafts")
+    .select("id, notion_id, title, draft_type, status, body_md, payload, notion_created_at, created_at, target_person_notion_id, target_org_notion_id")
     .eq("status", statusFilter)
-    .order("created_date", { ascending: false })
+    .order("notion_created_at", { ascending: false, nullsFirst: false })
+    .order("created_at",       { ascending: false })
     .limit(20);
   if (error || !data) return [];
-  return data.map((r: Record<string, unknown>) => ({
-    id:              r.id as string,
-    title:           (r.title as string) || "Untitled",
-    draftType:       (r.draft_type as string) ?? "",
-    status:          (r.status as string) ?? "",
-    voice:           (r.voice as string) ?? "",
-    platform:        (r.platform as string) ?? "",
-    draftText:       (r.draft_text as string) ?? "",
-    relatedEntityId: (r.related_entity_id as string | null) ?? null,
-    opportunityId:   (r.opportunity_id as string | null) ?? null,
-    createdDate:     (r.created_date as string | null) ?? null,
-    notionUrl:       (r.notion_url as string) ?? "",
-  }));
+  return (data as Record<string, unknown>[]).map(r => {
+    const p = (r.payload && typeof r.payload === "object" ? r.payload : {}) as AgentDraftPayload;
+    return {
+      id:              ((r.notion_id as string | null) ?? (r.id as string)),
+      title:           (r.title as string) || "Untitled",
+      draftType:       (r.draft_type as string) ?? "",
+      status:          (r.status as string) ?? "",
+      voice:           p.voice ?? "",
+      platform:        p.platform ?? "",
+      draftText:       (r.body_md as string) ?? "",
+      relatedEntityId: p.related_entity_id ?? (r.target_person_notion_id as string | null) ?? (r.target_org_notion_id as string | null) ?? null,
+      opportunityId:   p.opportunity_id ?? null,
+      createdDate:     (r.notion_created_at as string | null) ?? (r.created_at as string | null) ?? null,
+      notionUrl:       p.notion_url ?? notionUrlFromId(r.notion_id as string | null),
+    };
+  });
 }
 
 export async function getOutboxDrafts(): Promise<AgentDraft[]> {
@@ -261,11 +342,11 @@ export async function getOutboxDrafts(): Promise<AgentDraft[]> {
 // Reads from the existing `projects` (Wave 5 ingestor populated) + `evidence` +
 // `sources` tables. Computes per-project counts in JS after a single batch fetch.
 
-const NOTION_PAGE_BASE = "https://www.notion.so/";
-
-function notionUrlFromId(notionId: string | null): string {
-  if (!notionId) return "";
-  return NOTION_PAGE_BASE + notionId.replace(/-/g, "");
+function notionUrlFromId(_notionId: string | null): string {
+  // Notion is deprecated/read-only post-cutoff (2026-06-02). Never emit a
+  // Notion deep-link — those pages are gone / access-revoked. Kept as a no-op
+  // so existing callers don't break; consumers should guard with liveHref().
+  return "";
 }
 
 // Statuses included by getProjectsOverview. Most surfaces only want Active;
@@ -403,6 +484,7 @@ export async function getOpportunitiesByScope(): Promise<{ ch: OpportunityItem[]
     .from("opportunities")
     .select("notion_id, title, status, scope, follow_up_status, opportunity_type, opportunity_score, qualification_status, org_name, updated_at")
     .not("status", "in", '("Closed Won","Closed Lost","Stalled")')
+    .eq("is_archived", false)
     .order("updated_at", { ascending: false })
     .limit(50);
   if (error || !data) return { ch: [], portfolio: [] };
@@ -510,21 +592,33 @@ export async function getColdRelationships(): Promise<WarmthRecord[]> {
 
 // ─── Ready-to-publish content ────────────────────────────────────────────────
 
+// Canonical `content_pipeline_items` keeps channel + scheduled_for as columns;
+// platform / content_type / publish_window / notion_url live in payload.
+type ContentPipelinePayload = {
+  platform?: string | null;
+  content_type?: string | null;
+  publish_window?: string | null;
+  notion_url?: string | null;
+};
+
 export async function getReadyContent(): Promise<ReadyContent[]> {
   const sb = getSupabaseServerClient();
   const { data, error } = await sb
-    .from("notion_content_pipeline")
-    .select("id, title, platform, channel, content_type, publish_window, publish_date, notion_url")
+    .from("content_pipeline_items")
+    .select("id, notion_id, title, channel, scheduled_for, payload, updated_at")
     .eq("status", "Ready to Publish")
-    .order("last_edited_at", { ascending: false })
+    .order("updated_at", { ascending: false })
     .limit(10);
   if (error || !data) return [];
-  return data.map((r: Record<string, unknown>) => ({
-    id:            (r.id as string),
-    title:         (r.title as string) || "Untitled",
-    platform:      (r.platform as string) || (r.channel as string) || "",
-    contentType:   (r.content_type as string) ?? "",
-    publishWindow: (r.publish_window as string) || (r.publish_date as string) || "",
-    notionUrl:     (r.notion_url as string) ?? "",
-  }));
+  return (data as Record<string, unknown>[]).map(r => {
+    const p = (r.payload && typeof r.payload === "object" ? r.payload : {}) as ContentPipelinePayload;
+    return {
+      id:            ((r.notion_id as string | null) ?? (r.id as string)),
+      title:         (r.title as string) || "Untitled",
+      platform:      p.platform ?? (r.channel as string | null) ?? "",
+      contentType:   p.content_type ?? "",
+      publishWindow: p.publish_window ?? (r.scheduled_for as string | null) ?? "",
+      notionUrl:     p.notion_url ?? notionUrlFromId(r.notion_id as string | null),
+    };
+  });
 }

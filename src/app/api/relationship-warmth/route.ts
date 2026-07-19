@@ -23,25 +23,20 @@
 
 /**
  * POST /api/relationship-warmth
- * (header updated 2026-04-17: people read switched to Supabase-first)
+ * (updated 2026-05-15: Notion import removed — Supabase canonical post-cutoff)
  *
- * People read: Supabase-first since Wave 5 follow-on (2026-04-17).
- * Notion fallback preserved. Write path (Contact Warmth + Last Contact Date)
- * unchanged — still writes to Notion. Noon sync picks up new values.
+ * People read+write: Supabase canonical. Notion client and PEOPLE_DB removed
+ * 2026-05-15 (post Phase 2 backfill); contact warmth + last contact date are
+ * authoritative in Supabase.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { withRoutineLog } from "@/lib/routine-log";
 import { google } from "googleapis";
 import type { gmail_v1 } from "googleapis";
-import { Client } from "@notionhq/client";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 
 export const maxDuration = 120;
-
-const notion = new Client({ auth: process.env.NOTION_API_KEY });
-
-const PEOPLE_DB = "1bc0f96f33ca4a9e9ff26844377e81de";
 
 const LOOKBACK_DAYS   = 60;
 const HOT_DAYS        = 14;

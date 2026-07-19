@@ -12,9 +12,6 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-// notion-cutoff-2026-06-02: removed; canonical write is now to projects (Supabase).
-// import { Client } from "@notionhq/client";
-// const notion = new Client({ auth: process.env.NOTION_API_KEY });
 import { adminGuardApi } from "@/lib/require-admin";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 
@@ -37,18 +34,6 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // notion-cutoff-2026-06-02: replaced by canonical write to projects (Supabase).
-    // Notion → Supabase column mapping:
-    //   "Status Summary"         → status_summary
-    //   "Draft Status Update"    → draft_status_update
-    //   "Project Update Needed?" → update_needed
-    //
-    // const properties: Record<string, any> = { "Project Update Needed?": { checkbox: false } };
-    // if (action === "approve" && draftText) {
-    //   properties["Status Summary"] = { rich_text: [{ type: "text", text: { content: draftText.slice(0, 2000) } }] };
-    //   properties["Draft Status Update"] = { rich_text: [] };
-    // }
-    // await notion.pages.update({ page_id: projectId, properties });
     const sb = getSupabaseServerClient();
     const update: Record<string, unknown> = {
       update_needed: false,

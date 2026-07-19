@@ -106,9 +106,22 @@ export function HallManualTriggers() {
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok || j?.ok === false) {
+        // Surface upstream-provider rate-limits with their retry time instead
+        // of the bare "HTTP 5xx" code. Server returns 429 with retryAt ISO.
+        let summary = j?.reason ?? j?.error ?? `HTTP ${res.status}`;
+        if (j?.error === "rate_limited" && typeof j?.retryAt === "string") {
+          const retryDate = new Date(j.retryAt);
+          if (!Number.isNaN(retryDate.getTime())) {
+            const hh = retryDate.getUTCHours().toString().padStart(2, "0");
+            const mm = retryDate.getUTCMinutes().toString().padStart(2, "0");
+            summary = `rate-limited · retry ${hh}:${mm} UTC`;
+          } else {
+            summary = "rate-limited";
+          }
+        }
         setState(s => ({
           ...s,
-          [t.id]: { ...s[t.id], status: "error", summary: j?.reason ?? j?.error ?? `HTTP ${res.status}` },
+          [t.id]: { ...s[t.id], status: "error", summary },
         }));
         return;
       }

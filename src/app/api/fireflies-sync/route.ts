@@ -186,6 +186,26 @@ async function _POST(req: NextRequest) {
     transcripts = await getTranscripts(fromIso, toIso);
   } catch (err) {
     const e = err as FirefliesError;
+    // Recognise Fireflies' "too_many_requests" GraphQL error and surface it
+    // with a structured shape the UI can render as "retry @ HH:mm UTC"
+    // instead of "HTTP 502". Fireflies returns retryAfter as an epoch in ms.
+    const detail = Array.isArray(e.detail) ? e.detail : null;
+    const rateLimit = detail?.find(
+      (d): d is { code?: string; extensions?: { metadata?: { retryAfter?: number } } } =>
+        !!d && typeof d === "object" && (d as { code?: string }).code === "too_many_requests",
+    );
+    if (rateLimit) {
+      const retryAfterMs = rateLimit.extensions?.metadata?.retryAfter ?? null;
+      const retryAt = retryAfterMs ? new Date(retryAfterMs).toISOString() : null;
+      return NextResponse.json({
+        ok: false,
+        error: "rate_limited",
+        provider: "fireflies",
+        retryAt,
+        message: "Fireflies daily API quota exhausted",
+        mode: days === 1 ? "delta" : `backfill-${days}d`,
+      }, { status: 429 });
+    }
     return NextResponse.json({
       ok: false,
       error: "fireflies_api_error",
