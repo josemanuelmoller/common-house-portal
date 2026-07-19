@@ -147,6 +147,24 @@ Claude MUST explicitly state where verification was performed:
 If localhost and production differ:
 → production is the source of truth
 → continue debugging until production matches expected behavior
+
+### Verification tool — always use Claude-in-Chrome when possible
+
+Whenever it is available, production verification MUST be done through the
+**Claude-in-Chrome** browser tools (`mcp__claude-in-chrome__*` —
+`navigate` + `computer` screenshot + `read_page` / `read_console_messages`),
+driving the owner's already-authenticated Chrome session against
+https://portal.wearecommonhouse.com.
+
+Why: admin/Hall surfaces sit behind Clerk, and **localhost cannot authenticate**
+(production Clerk keys are domain-locked to `wearecommonhouse.com`, so the Clerk
+widget will not even mount on `localhost`). Claude-in-Chrome reuses the owner's
+live prod session, so it is the only reliable way to see authenticated,
+user-visible behavior end to end.
+
+- Prefer Claude-in-Chrome over any localhost preview for confirming a fix.
+- If Claude-in-Chrome is not connected/available, say so explicitly and treat
+  the verification as incomplete (do not silently downgrade to localhost).
 <!-- END:runtime-verification-rule -->
 
 <!-- BEGIN:production-domain-and-env-verification-rule -->
