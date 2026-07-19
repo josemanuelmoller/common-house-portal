@@ -23,7 +23,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { google } from "googleapis";
 import Anthropic from "@anthropic-ai/sdk";
-import { Client } from "@notionhq/client";
 import { adminGuardApi } from "@/lib/require-admin";
 import { getRecentMeetingSources } from "@/lib/notion/sources";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
@@ -32,9 +31,7 @@ export const maxDuration = 120;
 export const dynamic = "force-dynamic";
 
 const JOSE_EMAIL = process.env.GMAIL_USER_EMAIL ?? "josemanuel@wearecommonhouse.com";
-const DB_OPPORTUNITIES = "687caa98594a41b595c9960c141be0c0";
 
-const notion    = new Client({ auth: process.env.NOTION_API_KEY });
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
@@ -115,7 +112,7 @@ async function getExistingOpportunityData(): Promise<{
   candidates: ExistingCandidate[];      // Status="New" → enrich Trigger/Signal only
   activePipelineOpps: ActivePipelineOpp[]; // Status="Active"|"Qualifying" → enrich + set Follow-up=Needed
 }> {
-  // ── Supabase-first (opportunities synced 9am weekdays) ────────────────────
+  // Supabase canonical (Notion fallback removed 2026-05-15, post Phase 2 backfill).
   try {
     const sb = getSupabaseServerClient();
     const { data, error } = await sb
@@ -159,56 +156,10 @@ async function getExistingOpportunityData(): Promise<{
       return { activeTokens, candidates, activePipelineOpps };
     }
   } catch {
-    // Supabase unavailable — fall through to Notion
+    // Supabase unavailable — return empty
   }
 
-  // ── Notion fallback ────────────────────────────────────────────────────────
-  try {
-    // Verified field names: "Opportunity Status" (not "Stage") — schema 2026-04-13
-    const res = await notion.databases.query({
-      database_id: DB_OPPORTUNITIES,
-      filter: {
-        and: [
-          { property: "Opportunity Status", select: { does_not_equal: "Closed Won"  } },
-          { property: "Opportunity Status", select: { does_not_equal: "Closed Lost" } },
-          { property: "Opportunity Status", select: { does_not_equal: "Stalled"     } },
-        ],
-      },
-      page_size: 150,
-    });
-
-    const activeTokens    = new Set<string>();
-    const candidates: ExistingCandidate[]       = [];
-    const activePipelineOpps: ActivePipelineOpp[] = [];
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    for (const page of res.results as any[]) {
-      const stage = (page.properties["Opportunity Status"]?.select?.name ?? "") as string;
-      const name  = (page.properties["Opportunity Name"]?.title?.[0]?.plain_text ?? "").toLowerCase();
-      // "Account / Organization" is a relation — use opportunity name tokens only for dedup
-      const tokens = name.split(/[\s,·\-–]+/).filter((w: string) => w.length >= 4);
-      tokens.forEach((t: string) => activeTokens.add(t));
-
-      const triggerSignal = page.properties["Trigger / Signal"]?.rich_text?.[0]?.plain_text ?? "";
-      const existingOrigins: string[] = [];
-      if (triggerSignal.startsWith("SIGNALS:")) {
-        const signalPart = triggerSignal.split("|")[0].slice("SIGNALS:".length);
-        existingOrigins.push(...signalPart.split(",").map((s: string) => s.trim()));
-      }
-
-      if (stage === "New") {
-        // Unreviewed candidate — enrich Trigger/Signal (no status change)
-        candidates.push({ id: page.id, orgTokens: tokens, pendingAction: triggerSignal, signalOrigins: existingOrigins });
-      } else if (stage === "Active" || stage === "Qualifying") {
-        // Live pipeline opportunity — enrich + auto-set Follow-up=Needed so it surfaces in CoS
-        activePipelineOpps.push({ id: page.id, orgTokens: tokens, pendingAction: triggerSignal, signalOrigins: existingOrigins, stage });
-      }
-      // Other stages (e.g. "Proposal Sent", "Negotiation") — dedup only, no enrichment
-    }
-    return { activeTokens, candidates, activePipelineOpps };
-  } catch {
-    return { activeTokens: new Set(), candidates: [], activePipelineOpps: [] };
-  }
+  return { activeTokens: new Set(), candidates: [], activePipelineOpps: [] };
 }
 
 // ─── Signal types ─────────────────────────────────────────────────────────────

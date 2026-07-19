@@ -16,9 +16,6 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { google } from "googleapis";
-// notion-cutoff-2026-06-02: Notion client retained for read-only dedup fallback
-// only. New Source rows are written to Supabase `sources`.
-import { Client } from "@notionhq/client";
 import { currentUser } from "@clerk/nextjs/server";
 import { isAdminUser, isAdminEmail } from "@/lib/clients";
 import { withRoutineLog } from "@/lib/routine-log";
@@ -38,11 +35,6 @@ function splitAddressList(header: string): string[] {
   // Simple heuristic: comma-separate, trim, keep what has '@'.
   return header.split(",").map(s => extractEmail(s)).filter(e => /.+@.+\..+/.test(e));
 }
-
-const notion = new Client({ auth: process.env.NOTION_API_KEY });
-
-const SOURCES_DB  = "d88aff1b019d4110bcefab7f5bfbd0ae";
-const PROJECTS_DB = "49d59b18095f46588960f2e717832c5f";
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
@@ -75,8 +67,8 @@ function resolveProjectId(headers: { name?: string | null; value?: string | null
 }
 
 // ─── Dedup — check if a thread ID already exists as a source ─────────────────
-// Supabase-first: dedup_key is the canonical de-dup contract (`gmail:<threadId>`).
-// Notion fallback retained until cutoff so pre-Phase-2 rows still de-dup.
+// Supabase canonical: dedup_key is `gmail:<threadId>` (Notion fallback removed
+// 2026-05-15, post Phase 2 backfill).
 
 async function threadAlreadyIngested(threadId: string): Promise<boolean> {
   try {
@@ -89,21 +81,9 @@ async function threadAlreadyIngested(threadId: string): Promise<boolean> {
       .limit(1);
     if (!error && data && data.length > 0) return true;
   } catch {
-    /* fall through to Notion */
+    /* non-fatal */
   }
-  try {
-    const res = await notion.databases.query({
-      database_id: SOURCES_DB,
-      filter: {
-        property: "Source URL",
-        url: { contains: threadId },
-      },
-      page_size: 1,
-    });
-    return res.results.length > 0;
-  } catch {
-    return false;
-  }
+  return false;
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
@@ -287,7 +267,6 @@ async function _POST(req: NextRequest) {
         observedContacts += obs.incremented;
       } catch { /* observer errors are non-critical */ }
 
-      void notion; // suppress unused warning
     } catch (err) {
       errors.push(`Thread ${threadId}: ${err instanceof Error ? err.message : String(err)}`);
     }

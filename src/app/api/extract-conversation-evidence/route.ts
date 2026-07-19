@@ -19,10 +19,6 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-// notion-cutoff-2026-06-02: Notion client retained for read-only dedup
-// fallback only. Evidence rows + sources.evidence_extracted now write
-// canonically to Supabase.
-import { Client } from "@notionhq/client";
 import { createClient } from "@supabase/supabase-js";
 import Anthropic from "@anthropic-ai/sdk";
 import { withRoutineLog } from "@/lib/routine-log";
@@ -32,10 +28,7 @@ const HAIKU_MODEL = "claude-haiku-4-5-20251001";
 
 export const maxDuration = 120;
 
-const notion    = new Client({ auth: process.env.NOTION_API_KEY });
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
-const EVIDENCE_DB = "fa28124978d043039d8932ac9964ccf5";
 
 function getSupabase() {
   return createClient(
@@ -217,7 +210,7 @@ Return ONLY a JSON array (no markdown, no code fences):
 async function loadExistingTitles(dateStr: string): Promise<Set<string>> {
   const out = new Set<string>();
 
-  // Supabase-first (canonical post-cutoff)
+  // Supabase canonical (Notion fallback removed 2026-05-15, post Phase 2 backfill).
   try {
     const sb = getSupabase();
     const { data } = await sb
@@ -228,25 +221,6 @@ async function loadExistingTitles(dateStr: string): Promise<Set<string>> {
       .limit(500);
     for (const row of (data ?? []) as { title: string | null }[]) {
       if (row.title) out.add(row.title.toLowerCase());
-    }
-  } catch { /* non-fatal — fall through to Notion */ }
-
-  // Notion fallback retained until cutoff so pre-Phase-2 rows still de-dup.
-  try {
-    const res = await notion.databases.query({
-      database_id: EVIDENCE_DB,
-      filter: {
-        and: [
-          { property: "Date Captured",   date:   { equals: dateStr } },
-          { property: "Legacy Source DB", select: { equals: "CH Sources [OS v2]" } },
-        ],
-      },
-      page_size: 100,
-    });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    for (const page of res.results as any[]) {
-      const title = page.properties?.["Evidence Title"]?.title?.[0]?.plain_text ?? "";
-      if (title) out.add(title.toLowerCase());
     }
   } catch { /* non-fatal */ }
   return out;

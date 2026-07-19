@@ -54,13 +54,20 @@ const REDIRECT_URI = `http://localhost:${PORT}/oauth2-callback`;
 
 const oauth2 = new google.auth.OAuth2(CLIENT_ID, CLIENT_SECRET, REDIRECT_URI);
 
-// BOTH scopes — Gmail (existing) + Calendar (new). The issued token replaces
-// the current GMAIL_REFRESH_TOKEN.
+// Full scope set — matches what /api/google/auth asks for. Covers Gmail
+// (read/send), Calendar (read + write), Drive, and Contacts (used by
+// Contact Intelligence surfaces). The issued token REPLACES the current
+// GMAIL_REFRESH_TOKEN in .env.local and Vercel.
+//
+// calendar.readonly is REQUIRED for freebusy.query (used by
+// /api/suggested-time-blocks). calendar.events alone is not enough.
 const SCOPES = [
   "https://www.googleapis.com/auth/gmail.modify",
+  "https://www.googleapis.com/auth/calendar.readonly",
   "https://www.googleapis.com/auth/calendar.events",
-  // Drive kept for compatibility if the same token gets reused elsewhere
   "https://www.googleapis.com/auth/drive",
+  "https://www.googleapis.com/auth/contacts",
+  "https://www.googleapis.com/auth/contacts.other.readonly",
 ].join(" ");
 
 const authParams = new URLSearchParams({

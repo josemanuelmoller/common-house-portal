@@ -11,18 +11,13 @@
  * Body: { draftId: string, personId: string }
  * Auth: admin session (Clerk).
  *
- * Person lookup: Supabase-first since Wave 5 (2026-04-17).
- * Falls back to Notion pages.retrieve if person not yet synced.
+ * Person lookup: Supabase canonical post-cutoff (Notion fallback removed
+ * 2026-05-15 after Phase 2 backfill completed 2026-05-13).
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { adminGuardApi } from "@/lib/require-admin";
-// notion-cutoff-2026-06-02: write removed; canonical writes are now to agent_drafts + opportunities (Supabase).
-// The Notion read fallback for unsynced people is preserved as a degraded path.
-import { Client } from "@notionhq/client";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
-
-const notion = new Client({ auth: process.env.NOTION_API_KEY });
 
 export async function POST(req: NextRequest) {
   const guard = await adminGuardApi();
@@ -36,7 +31,7 @@ export async function POST(req: NextRequest) {
 
   const sb = getSupabaseServerClient();
 
-  // 1. Fetch person name + email — Supabase-first, Notion fallback
+  // 1. Fetch person name + email — Supabase canonical (Notion fallback removed post-cutoff)
   let personName = "Unknown";
   let personEmail = "";
 
@@ -50,20 +45,9 @@ export async function POST(req: NextRequest) {
     if (person) {
       personName  = person.full_name  ?? "Unknown";
       personEmail = person.email      ?? "";
-    } else {
-      // Fallback: person not yet synced to Supabase
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const personPage = await notion.pages.retrieve({ page_id: personId }) as any;
-      const pp = personPage.properties;
-      personName =
-        pp["Full Name"]?.title?.[0]?.plain_text ??
-        pp["Full Name"]?.rich_text?.[0]?.plain_text ??
-        pp["Name"]?.title?.[0]?.plain_text ??
-        "Unknown";
-      personEmail = pp["Email"]?.email ?? "";
     }
   } catch {
-    // If both paths fail, proceed with defaults — the draft write is more important
+    // If lookup fails, proceed with defaults — the draft write is more important
   }
 
   // 2. Fetch the draft from agent_drafts (Supabase canonical) to get linked opportunity.

@@ -14,8 +14,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
-// notion-cutoff-2026-06-02: write removed; canonical write is now to knowledge_assets (Supabase).
-// The Notion read path (Evidence DB query) is preserved until the read source is migrated.
+// TODO phase-6: migrate read source to Supabase evidence
 import { Client } from "@notionhq/client";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { requireCronAuth } from "@/lib/require-cron";
