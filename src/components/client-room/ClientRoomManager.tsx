@@ -8,7 +8,10 @@ import type {
   ClientRoomAgreement,
   ClientRoomMaterial,
   ClientRoomMaterialCategory,
+  ClientRoomTimelineEvent,
 } from "@/lib/client-room";
+
+const TIMELINE_KINDS = ["meeting", "milestone", "document", "exchange"] as const;
 
 const fieldStyle: CSSProperties = {
   width: "100%",
@@ -241,6 +244,7 @@ function MaterialEditor({ projectId, material }: { projectId: string; material: 
 export function ClientMaterialsManager({ room }: { room: ClientRoomAdminData }) {
   const router = useRouter();
   const [syncing, setSyncing] = useState(false);
+  const [creating, setCreating] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
   async function syncDrive() {
@@ -257,11 +261,154 @@ export function ClientMaterialsManager({ room }: { room: ClientRoomAdminData }) 
     }
   }
 
+  async function createFolder() {
+    setCreating(true);
+    setMessage(null);
+    try {
+      await apiJson(`/api/admin/projects/${room.id}/client-room/drive-folder`, { method: "POST" });
+      setMessage("Drive folder created (Finanzas · Documentación · Presentaciones · Multimedia). Drop files in and sync.");
+      router.refresh();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setCreating(false);
+    }
+  }
+
   return (
     <div>
-      <div className="flex flex-wrap items-center gap-3 mb-4"><button type="button" className="hall-btn-primary" disabled={syncing || !room.driveFolderId} onClick={() => void syncDrive()}>{syncing ? "Syncing…" : "Sync Google Drive"}</button>{room.driveFolderUrl && <a className="hall-btn-ghost" href={room.driveFolderUrl} target="_blank" rel="noreferrer">Open Drive ↗</a>}<Feedback message={message} /></div>
-      {!room.driveFolderId && <p className="text-[11px]" style={{ color: "var(--hall-warn)" }}>Configure a Drive folder above before syncing.</p>}
+      <div className="flex flex-wrap items-center gap-3 mb-4">
+        {room.driveFolderId
+          ? <button type="button" className="hall-btn-primary" disabled={syncing} onClick={() => void syncDrive()}>{syncing ? "Syncing…" : "Sync Google Drive"}</button>
+          : <button type="button" className="hall-btn-primary" disabled={creating} onClick={() => void createFolder()}>{creating ? "Creating…" : "Create Drive folder"}</button>}
+        {room.driveFolderUrl && <a className="hall-btn-ghost" href={room.driveFolderUrl} target="_blank" rel="noreferrer">Open Drive ↗</a>}
+        <Feedback message={message} />
+      </div>
+      {!room.driveFolderId && <p className="text-[11px]" style={{ color: "var(--hall-muted-2)" }}>No Drive folder yet. Create one to hold this room&apos;s documents (NDA, proposal, contracts). It stays private until you share it at invite time.</p>}
       {room.materials.length === 0 ? <p className="text-[11px]" style={{ color: "var(--hall-muted-2)" }}>No indexed materials yet.</p> : room.materials.map((material) => <MaterialEditor key={material.id} projectId={room.id} material={material} />)}
+    </div>
+  );
+}
+
+function TimelineEventEditor({ projectId, event }: { projectId: string; event: ClientRoomTimelineEvent }) {
+  const router = useRouter();
+  const [eventDate, setEventDate] = useState(event.eventDate);
+  const [kind, setKind] = useState(event.kind);
+  const [title, setTitle] = useState(event.title);
+  const [attendees, setAttendees] = useState(event.attendees.join(", "));
+  const [summary, setSummary] = useState(event.summary ?? "");
+  const [visibility, setVisibility] = useState(event.visibility);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+
+  async function save() {
+    setBusy(true);
+    setMessage(null);
+    try {
+      await apiJson(`/api/admin/projects/${projectId}/client-room/timeline/${event.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          eventDate, kind, title, summary, visibility,
+          attendees: attendees.split(",").map((s) => s.trim()).filter(Boolean),
+        }),
+      });
+      setMessage("Saved");
+      router.refresh();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function remove() {
+    if (!window.confirm(`Delete "${title}" from the timeline?`)) return;
+    setBusy(true);
+    setMessage(null);
+    try {
+      await apiJson(`/api/admin/projects/${projectId}/client-room/timeline/${event.id}`, { method: "DELETE" });
+      router.refresh();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error));
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="py-3" style={{ borderBottom: "1px solid var(--hall-line-soft)" }}>
+      <div className="grid grid-cols-1 sm:grid-cols-[130px_140px_1fr] gap-2 mb-2">
+        <input type="date" aria-label="Event date" style={fieldStyle} value={eventDate} onChange={(e) => setEventDate(e.target.value)} />
+        <select aria-label="Kind" style={fieldStyle} value={kind} onChange={(e) => setKind(e.target.value as ClientRoomTimelineEvent["kind"])}>{TIMELINE_KINDS.map((k) => <option key={k} value={k}>{k}</option>)}</select>
+        <input aria-label="Title" style={fieldStyle} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" />
+      </div>
+      <input aria-label="Attendees" style={{ ...fieldStyle, marginBottom: 8 }} value={attendees} onChange={(e) => setAttendees(e.target.value)} placeholder="Attendees, comma-separated — e.g. José Moller (Common House), Javier Valdivia (MPS)" />
+      <textarea aria-label="Summary" style={{ ...fieldStyle, marginBottom: 8, minHeight: 52 }} value={summary} onChange={(e) => setSummary(e.target.value)} placeholder="Summary" />
+      <div className="flex flex-wrap items-center gap-2">
+        <select aria-label="Visibility" style={{ ...fieldStyle, width: 130 }} value={visibility} onChange={(e) => setVisibility(e.target.value)}>{["internal", "client", "archived"].map((v) => <option key={v} value={v}>{v}</option>)}</select>
+        <button type="button" className="hall-btn-ghost" disabled={busy} onClick={() => void save()}>{busy ? "Saving…" : "Save"}</button>
+        <button type="button" className="hall-btn-ghost" disabled={busy} onClick={() => void remove()} style={{ color: "var(--hall-danger)" }}>Delete</button>
+        {visibility === "internal" && <span className="text-[10px]" style={{ color: "var(--hall-muted-2)" }}>Not visible to client</span>}
+        <Feedback message={message} />
+      </div>
+    </div>
+  );
+}
+
+export function TimelineManager({ room }: { room: ClientRoomAdminData }) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState({ eventDate: "", kind: "meeting" as ClientRoomTimelineEvent["kind"], title: "", attendees: "", location: "", summary: "" });
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+
+  async function add(e: FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setMessage(null);
+    try {
+      await apiJson(`/api/admin/projects/${room.id}/client-room/timeline`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...form,
+          attendees: form.attendees.split(",").map((s) => s.trim()).filter(Boolean),
+        }),
+      });
+      setForm({ eventDate: "", kind: "meeting", title: "", attendees: "", location: "", summary: "" });
+      setOpen(false);
+      router.refresh();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div>
+      <div className="flex flex-wrap items-center gap-3 mb-4">
+        <button type="button" className="hall-btn-primary" onClick={() => setOpen((v) => !v)}>{open ? "Close" : "Add event"}</button>
+        <span className="text-[11px]" style={{ color: "var(--hall-muted-2)" }}>Meetings, signed documents and milestones. Every event stays internal until you set it to client.</span>
+        <Feedback message={message} />
+      </div>
+      {open && (
+        <form onSubmit={(e) => void add(e)} className="mb-5 p-3" style={{ border: "1px solid var(--hall-line)", borderRadius: 4 }}>
+          <div className="grid grid-cols-1 sm:grid-cols-[130px_140px_1fr] gap-2 mb-2">
+            <div><label style={labelStyle}>Date</label><input type="date" required style={fieldStyle} value={form.eventDate} onChange={(e) => setForm({ ...form, eventDate: e.target.value })} /></div>
+            <div><label style={labelStyle}>Kind</label><select style={fieldStyle} value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value as ClientRoomTimelineEvent["kind"] })}>{TIMELINE_KINDS.map((k) => <option key={k} value={k}>{k}</option>)}</select></div>
+            <div><label style={labelStyle}>Title</label><input required style={fieldStyle} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="e.g. Discovery session — MPS × Common House" /></div>
+          </div>
+          <label style={labelStyle}>Attendees (comma-separated)</label>
+          <input style={{ ...fieldStyle, marginBottom: 8 }} value={form.attendees} onChange={(e) => setForm({ ...form, attendees: e.target.value })} placeholder="José Moller (Common House), Javier Valdivia (MPS)" />
+          <label style={labelStyle}>Summary</label>
+          <textarea style={{ ...fieldStyle, marginBottom: 8, minHeight: 52 }} value={form.summary} onChange={(e) => setForm({ ...form, summary: e.target.value })} />
+          <button type="submit" className="hall-btn-primary" disabled={busy}>{busy ? "Adding…" : "Add to timeline"}</button>
+        </form>
+      )}
+      {room.timelineEvents.length === 0
+        ? <p className="text-[11px]" style={{ color: "var(--hall-muted-2)" }}>No timeline events yet.</p>
+        : room.timelineEvents.map((event) => <TimelineEventEditor key={event.id} projectId={room.id} event={event} />)}
     </div>
   );
 }

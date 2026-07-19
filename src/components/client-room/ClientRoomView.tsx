@@ -20,6 +20,13 @@ const CATEGORY_LABELS: Record<string, string> = {
   other: "Other",
 };
 
+const TIMELINE_KIND_LABELS: Record<string, string> = {
+  meeting: "Meeting",
+  milestone: "Milestone",
+  document: "Document",
+  exchange: "Exchange",
+};
+
 function displayDate(value: string | null) {
   if (!value) return "—";
   return new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(value));
@@ -103,7 +110,7 @@ export function ClientRoomView({ room, role, adminPreview }: { room: ClientRoomP
 
       <nav className="px-4 sm:px-8 overflow-x-auto" style={{ borderBottom: "1px solid var(--hall-line)", background: "var(--hall-paper-1)" }}>
         <div className="max-w-6xl mx-auto flex gap-5 min-w-max text-[11px] font-semibold">
-          {[["overview", "Overview"], ["heard", "What we heard"], ["proposal", "Proposal"], ["agreements", "Agreements"], ["plan", "Plan"], ["materials", "Materials"], ["commercial", "Commercial"]].map(([href, label]) => <a key={href} href={`#${href}`} className="py-3.5 hover:underline">{label}{href === "agreements" && openAgreements.length > 0 ? ` ${openAgreements.length}` : ""}</a>)}
+          {[["overview", "Overview"], ["together", "Working together"], ["heard", "What we heard"], ["proposal", "Proposal"], ["agreements", "Agreements"], ["plan", "Plan"], ["materials", "Materials"], ["commercial", "Commercial"]].map(([href, label]) => <a key={href} href={`#${href}`} className="py-3.5 hover:underline">{label}{href === "agreements" && openAgreements.length > 0 ? ` ${openAgreements.length}` : ""}</a>)}
         </div>
       </nav>
 
@@ -118,6 +125,24 @@ export function ClientRoomView({ room, role, adminPreview }: { room: ClientRoomP
             <div className="py-4 sm:pl-5" style={{ borderLeft: "1px solid var(--hall-line)" }}><p className="text-[10px] uppercase tracking-[0.08em]" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}>Needs your input</p><p className="mt-2 text-[14px] font-semibold">{openAgreements.length === 0 ? "Nothing open" : `${openAgreements.length} item${openAgreements.length === 1 ? "" : "s"}`}</p></div>
           </div>
         </section>
+
+        <Section id="together" title="Working" flourish="together">
+          {room.timelineEvents.length === 0
+            ? <p className="text-[12px]" style={{ color: "var(--hall-muted-2)" }}>Meetings, signed documents and milestones from our work together will appear here.</p>
+            : <div>{room.timelineEvents.map((ev) => (
+                <div key={ev.id} className="grid grid-cols-[76px_1fr] sm:grid-cols-[110px_1fr] gap-3 sm:gap-5 py-4" style={{ borderBottom: "1px solid var(--hall-line-soft)" }}>
+                  <span className="text-[10px] pt-0.5" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}>{displayDate(ev.eventDate)}</span>
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="hall-chip-outline">{TIMELINE_KIND_LABELS[ev.kind] ?? ev.kind}</span>
+                      <strong className="text-[14px]">{ev.title}</strong>
+                    </div>
+                    {ev.attendees.length > 0 && <p className="mt-1.5 text-[11px]" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}>{ev.attendees.join("  ·  ")}</p>}
+                    {ev.summary && <p className="mt-1.5 text-[13px] leading-[1.6]" style={{ color: "var(--hall-ink-3)" }}>{ev.summary}</p>}
+                  </div>
+                </div>
+              ))}</div>}
+        </Section>
 
         <Section id="heard" title="What we" flourish="heard">
           {understandingAgreements.length === 0 && heardFields.length === 0 && room.whatWeHeard.heard.length === 0

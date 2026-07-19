@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Manrope:wght@200;400;500;600;700&display=swap');
+html,body{margin:0;padding:0;background:#000;}
+a{color:#005046;text-decoration:none;}a:hover{color:#000;}
+image-slot{--is-bg:rgba(255,255,255,.04);}
+</style>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<script src="./image-slot.js"></script>
+</helmet>
+<x-import component-from-global-scope="deck-stage" from="./deck-stage.js" width="1920" height="1080" hint-size="100%,100%" data-uneditable="">
+
+<section data-label="Portada" data-screen-label="01" data-speaker-notes="Portada. Reunión de decisión. Presentamos una estrategia para que MPS lidere la prevención de residuos en cruceros, no solo la gestión. Logos en igual jerarquía: esta es una colaboración entre pares." style="background:#000;color:#f3f4ef;font-family:'Manrope',sans-serif;overflow:hidden;">
+  <div style="position:absolute;inset:0;z-index:0;"><image-slot id="cover-photo" shape="rect" placeholder="Arrastra una foto: buque de crucero en puerto mexicano al amanecer"></image-slot></div>
+  <div style="position:absolute;inset:0;z-index:1;background:linear-gradient(180deg,rgba(0,0,0,.30) 0%,rgba(0,0,0,.42) 45%,rgba(0,0,0,.78) 100%);pointer-events:none;"></div>
+  <div style="position:absolute;inset:0;z-index:2;padding:72px 100px 76px;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between;pointer-events:none;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:16px;letter-spacing:.12em;text-transform:uppercase;color:rgba(243,244,239,.85);">Zero Waste Studio · Londres</div>
+      <div style="display:flex;align-items:center;gap:28px;pointer-events:auto;">
+        <img src="assets/logo-blanco.png" alt="Common House" style="height:40px;width:auto;">
+        <div style="width:1px;height:40px;background:rgba(243,244,239,.35);"></div>
+        <div style="width:150px;height:40px;"><image-slot id="mps-logo-cover" shape="rounded" radius="4" placeholder="logo MPS"></image-slot></div>
+      </div>
+    </div>
+    <div>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:18px;letter-spacing:.12em;text-transform:uppercase;color:#c9ff87;margin-bottom:26px;">Propuesta de colaboración</div>
+      <h1 style="font-weight:500;font-size:100px;line-height:1.0;letter-spacing:-.03em;margin:0;max-width:1400px;">Estrategia Upstream MPS<span style="color:#c9ff87;">_</span></h1>
+      <p style="font-size:34px;font-weight:400;line-height:1.2;color:rgba(243,244,239,.9);margin:26px 0 0;max-width:1100px;">Liderar la transición zero waste desde la operación.</p>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:16px;color:rgba(243,244,239,.6);margin-top:40px;">Common House × Maritime Procurement Services · Julio 2026</div>
+    </div>
+  </div>
+</section>
+
+<section data-label="Contexto 2026" data-screen-label="02" data-speaker-notes="2026 es el año en que los residuos entran al centro de la agenda: COP31, el Tratado de Plásticos, regulación en cascada y una sociedad organizada. La presión ya no es futura, es de este año." style="display:flex;flex-direction:column;padding:128px 100px 96px;box-sizing:border-box;background:#f3f4ef;color:#000;font-family:'Manrope',sans-serif;overflow:hidden;">
+  <div style="position:absolute;left:100px;top:56px;font-family:'IBM Plex Mono',monospace;font-size:17px;letter-spacing:.02em;color:#000;opacity:.8;">02_ Contexto 2026</div>
+  <img src="assets/logo-negro.png" alt="Common House" style="position:absolute;right:100px;top:50px;height:28px;width:auto;">
+  <div style="position:absolute;left:100px;bottom:52px;font-family:'IBM Plex Mono',monospace;font-size:14px;color:#000;opacity:.5;">wearecommonhouse.com</div>
+  <div style="position:absolute;right:100px;bottom:52px;font-family:'IBM Plex Mono',monospace;font-size:14px;color:#000;opacity:.5;">02 / 17</div>
+  <h2 style="font-weight:500;font-size:60px;line-height:1.05;letter-spacing:-.02em;max-width:1480px;margin:0;">El mundo llegó al límite del modelo de gestionar residuos<span style="color:#c9ff87;">_</span></h2>
+  <p style="font-size:24px;line-height:1.45;color:#3a3a3a;max-width:1120px;margin:24px 0 0;">Nunca había existido tanta presión regulatoria, social y comercial sobre los residuos, y el turismo está en el centro.</p>
+  <div style="margin-top:48px;display:flex;flex-direction:column;">
+    <div style="display:grid;grid-template-columns:440px 1fr;gap:56px;align-items:baseline;padding:26px 0;border-top:1px solid rgba(0,0,0,.16);">
+      <div><div style="font-family:'IBM Plex Mono',monospace;font-size:14px;color:#8a8a8a;letter-spacing:.06em;margin-bottom:8px;">TÜRKIYE · NOV 2026</div><div style="font-size:27px;font-weight:600;">COP31</div></div>
+      <div style="font-size:22px;line-height:1.42;color:#3a3a3a;">El zero waste es tema insignia de la presidencia. Los residuos entran por primera vez al centro de la agenda climática global.</div>
+    </div>
+    <div style="display:grid;grid-template-columns:440px 1fr;gap:56px;align-items:baseline;padding:26px 0;border-top:1px solid rgba(0,0,0,.16);">
+      <div><div style="font-family:'IBM Plex Mono',monospace;font-size:14px;color:#8a8a8a;letter-spacing:.06em;margin-bottom:8px;">ONU · EN NEGOCIACIÓN</div><div style="font-size:27px;font-weight:600;">Tratado Global de Plásticos</div></div>
+      <div style="font-size:22px;line-height:1.42;color:#3a3a3a;">Producción, diseño y prevención pasan a ser materia de derecho internacional.</div>
+    </div>
+    <div style="display:grid;grid-template-columns:440px 1fr;gap:56px;align-items:baseline;padding:26px 0;border-top:1px solid rgba(0,0,0,.16);">
+      <div><div style="font-family:'IBM Plex Mono',monospace;font-size:14px;color:#8a8a8a;letter-spacing:.06em;margin-bottom:8px;">UE · AGO 2026 → MX</div><div style="font-size:27px;font-weight:600;">Regulación en cascada</div></div>
+      <div style="font-size:22px;line-height:1.42;color:#3a3a3a;">La UE aplica metas obligatorias de prevención y reuso de envases (PPWR). México avanza en su marco de economía circular.</div>
+    </div>
+    <div style="display:grid;grid-template-columns:440px 1fr;gap:56px;align-items:baseline;padding:26px 0;border-top:1px solid rgba(0,0,0,.16);border-bottom:1px solid rgba(0,0,0,.16);">
+      <div><div style="font-family:'IBM Plex Mono',monospace;font-size:14px;color:#8a8a8a;letter-spacing:.06em;margin-bottom:8px;">SOCIEDAD CIVIL</div><div style="font-size:27px;font-weight:600;">La sociedad se organizó</div></div>
+      <div style="font-size:22px;line-height:1.42;color:#3a3a3a;">Día Internacional Zero Waste (ONU), comunidades costeras movilizadas, consumidores y prensa auditando cada claim ambiental.</div>
+    </div>
+  </div>
+</section>
+
+<section data-label="Riesgos" data-screen-label="03" data-speaker-notes="Lámina de tensión. No moverse no es neutro: las comunidades bloquean proyectos, la credibilidad ya es riesgo legal, y el espacio upstream lo pueden ocupar otros. El caso de Quintana Roo no nombra a nadie: el afectado es cliente de MPS." style="display:flex;flex-direction:column;padding:128px 100px 96px;box-sizing:border-box;background:#000;color:#f3f4ef;font-family:'Manrope',sans-serif;overflow:hidden;">
+  <div style="position:absolute;left:100px;top:56px;font-family:'IBM Plex Mono',monospace;font-size:17px;letter-spacing:.02em;color:#f3f4ef;opacity:.85;">03_ Riesgos</div>
+  <img src="assets/logo-blanco.png" alt="Common House" style="position:absolute;right:100px;top:50px;height:28px;width:auto;">
+  <div style="position:absolute;left:100px;bottom:52px;font-family:'IBM Plex Mono',monospace;font-size:14px;color:#f3f4ef;opacity:.55;">wearecommonhouse.com</div>
+  <div style="position:absolute;right:100px;bottom:52px;font-family:'IBM Plex Mono',monospace;font-size:14px;color:#f3f4ef;opacity:.55;">03 / 17</div>
+  <div style="font-family:'IBM Plex Mono',monospace;font-size:16px;letter-spacing:.12em;text-transform:uppercase;color:#d97452;margin-bottom:20px;">El costo de no moverse</div>
+  <h2 style="font-weight:500;font-size:58px;line-height:1.06;letter-spacing:-.02em;max-width:1420px;margin:0;">El statu quo no es neutro: es pérdida de terreno<span style="color:#d97452;">_</span></h2>
+  <div style="margin-top:auto;display:grid;grid-template-columns:1fr 1fr 1fr;gap:56px;">
+    <div style="border-top:2px solid #d97452;padding-top:24px;">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:15px;color:#d97452;margin-bottom:18px;">01</div>
+      <h3 style="font-weight:500;font-size:30px;line-height:1.12;margin:0 0 18px;">Las comunidades bloquean proyectos</h3>
+      <p style="font-size:20px;line-height:1.48;color:rgba(243,244,239,.74);margin:0;">Un desarrollo turístico de USD 800 millones fue frenado en Quintana Roo en 2025, con los residuos entre las causas y millones de firmas en contra. La licencia social ya define qué se construye.</p>
+    </div>
+    <div style="border-top:2px solid #d97452;padding-top:24px;">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:15px;color:#d97452;margin-bottom:18px;">02</div>
+      <h3 style="font-weight:500;font-size:30px;line-height:1.12;margin:0 0 18px;">La credibilidad se volvió riesgo legal</h3>
+      <p style="font-size:20px;line-height:1.48;color:rgba(243,244,239,.74);margin:0;">En Europa ya hay sanciones por publicidad ambiental engañosa a operadores turísticos globales. Los claims sin datos verificables pasaron de marketing a pasivo legal.</p>
+    </div>
+    <div style="border-top:2px solid #d97452;padding-top:24px;">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:15px;color:#d97452;margin-bottom:18px;">03</div>
+      <h3 style="font-weight:500;font-size:30px;line-height:1.12;margin:0 0 18px;">El espacio se puede ocupar</h3>
+      <p style="font-size:20px;line-height:1.48;color:rgba(243,244,239,.74);margin:0;">Consultoras globales y waste-techs ya venden prevención directamente a las navieras. Quien no ofrezca la capa upstream a sus clientes, la verá pasar por encima.</p>
+    </div>
+  </div>
+</section>
+
+<section data-label="Punto ciego" data-screen-label="04" data-speaker-notes="La industria de cruceros mide decenas de tecnologías ambientales, pero casi nada de residuos sólidos. Ese punto ciego es la oportunidad: MPS tiene la báscula, la data de generación real en territorio." style="display:flex;flex-direction:column;padding:128px 100px 96px;box-sizing:border-box;background:#f3f4ef;color:#000;font-family:'Manrope',sans-serif;overflow:hidden;">
+  <div style="position:absolute;left:100px;top:56px;font-family:'IBM Plex Mono',monospace;font-size:17px;letter-spacing:.02em;color:#000;opacity:.8;">04_ El punto ciego</div>
+  <img src="assets/logo-negro.png" alt="Common House" style="position:absolute;right:100px;top:50px;height:28px;width:auto;">
+  <div style="position:absolute;left:100px;bottom:52px;font-family:'IBM Plex Mono',monospace;font-size:14px;color:#000;opacity:.5;">wearecommonhouse.com</div>
+  <div style="position:absolute;right:100px;bottom:52px;font-family:'IBM Plex Mono',monospace;font-size:14px;color:#000;opacity:.5;">04 / 17</div>
+  <h2 style="font-weight:500;font-size:56px;line-height:1.06;letter-spacing:-.02em;max-width:1380px;margin:0 0 40px;">La industria de cruceros mide todo, menos los residuos<span style="color:#d97452;">_</span></h2>
+  <div style="display:grid;grid-template-columns:1.3fr 1.3fr .8fr;gap:40px;padding:0 0 12px;border-bottom:1px solid rgba(0,0,0,.2);">
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:14px;letter-spacing:.08em;text-transform:uppercase;color:#8a8a8a;">Fuente</div>
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:14px;letter-spacing:.08em;text-transform:uppercase;color:#8a8a8a;">Qué mide</div>
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:14px;letter-spacing:.08em;text-transform:uppercase;color:#8a8a8a;text-align:right;">Residuos sólidos</div>
+  </div>
+  <div style="display:grid;grid-template-columns:1.3fr 1.3fr .8fr;gap:40px;align-items:center;padding:22px 0;border-bottom:1px solid rgba(0,0,0,.12);">
+    <div style="font-size:23px;font-weight:600;">Inventario ambiental CLIA 2025</div>
+    <div style="font-size:21px;color:#3a3a3a;">+30 tecnologías monitoreadas</div>
+    <div style="text-align:right;font-weight:500;color:#d97452;font-size:56px;line-height:.9;">0<div style="font-size:15px;font-family:'IBM Plex Mono',monospace;font-weight:400;">categorías</div></div>
+  </div>
+  <div style="display:grid;grid-template-columns:1.3fr 1.3fr .8fr;gap:40px;align-items:center;padding:22px 0;border-bottom:1px solid rgba(0,0,0,.12);">
+    <div style="font-size:23px;font-weight:600;">Reporte de sostenibilidad MSC 2024</div>
+    <div style="font-size:21px;color:#3a3a3a;">8 logros destacados</div>
+    <div style="text-align:right;font-weight:500;color:#d97452;font-size:56px;line-height:.9;">—<div style="font-size:15px;font-family:'IBM Plex Mono',monospace;font-weight:400;">ninguno</div></div>
+  </div>
+  <div style="display:grid;grid-template-columns:1.3fr 1.3fr .8fr;gap:40px;align-items:center;padding:22px 0;border-bottom:1px solid rgba(0,0,0,.12);">
+    <div style="font-size:23px;font-weight:600;">Verificación independiente NCL</div>
+    <div style="font-size:21px;color:#3a3a3a;">Emisiones auditadas por terceros</div>
+    <div style="text-align:right;font-weight:600;color:#d97452;font-size:24px;">La basura<br>no se audita</div>
+  </div>
+  <div style="display:grid;grid-template-columns:1.3fr 1.3fr .8fr;gap:40px;align-items:center;padding:22px 0;border-bottom:1px solid rgba(0,0,0,.12);">
+    <div style="font-size:23px;font-weight:600;">Carnival "Less Left Over"</div>
+    <div style="font-size:21px;color:#3a3a3a;">El único programa medido</div>
+    <div style="text-align:right;font-weight:600;color:#d97452;font-size:24px;">Solo comida,<br>nada de packaging</div>
+  </div>
+  <div style="margin-top:auto;display:flex;justify-content:space-between;align-items:flex-end;gap:48px;">
+    <p style="font-weight:500;font-size:38px;line-height:1.1;letter-spacing:-.01em;margin:0;max-width:1200px;">La industria entera tiene un punto ciego. MPS tiene la báscula.</p>
+    <p style="font-family:'IBM Plex Mono',monospace;font-size:13px;line-height:1.5;color:#8a8a8a;margin:0;max-width:420px;text-align:right;">Fuentes: CLIA Environmental Technologies &amp; Practices 2025; MSC Sustainability Report 2024; NCL Sail &amp; Sustain; Carnival Corporation.</p>
+  </div>
+</section>
+
+<section data-label="Liderar" data-screen-label="05" data-speaker-notes="Pico emocional. La transición la liderarán quienes tocan el residuo todos los días, no quienes escriben reportes. MPS tiene puertos, servicios, relación con las líneas y permisos que nadie replica. Puede ser el primero del continente en liderar la prevención desde el ejemplo." style="display:flex;flex-direction:column;padding:128px 100px 96px;box-sizing:border-box;background:#005046;color:#f3f4ef;font-family:'Manrope',sans-serif;overflow:hidden;">
+  <div style="position:absolute;left:100px;top:56px;font-family:'IBM Plex Mono',monospace;font-size:17px;letter-spacing:.02em;color:#f3f4ef;opacity:.8;">05_ Liderar</div>
+  <img src="assets/logo-blanco.png" alt="Common House" style="position:absolute;right:100px;top:50px;height:28px;width:auto;">
+  
+  <div style="position:absolute;left:100px;bottom:52px;font-family:'IBM Plex Mono',monospace;font-size:14px;color:#f3f4ef;opacity:.55;">wearecommonhouse.com</div>
+  <div style="position:absolute;right:100px;bottom:52px;font-family:'IBM Plex Mono',monospace;font-size:14px;color:#f3f4ef;opacity:.55;">05 / 17</div>
+  <div style="flex:1;display:flex;align-items:center;">
+    <h2 style="font-weight:500;font-size:66px;line-height:1.08;letter-spacing:-.02em;margin:0;max-width:1560px;">La transición zero waste no la liderarán los que escriben reportes. La liderarán los que tocan el residuo todos los días<span style="color:#c9ff87;">.</span></h2>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:40px;border-top:1px solid rgba(243,244,239,.28);padding-top:28px;">
+    <div><div style="font-weight:500;font-size:46px;line-height:1;letter-spacing:-.02em;color:#c9ff87;">14</div><div style="font-size:18px;color:rgba(243,244,239,.8);margin-top:10px;">puertos en ambas costas</div></div>
+    <div><div style="font-weight:500;font-size:46px;line-height:1;letter-spacing:-.02em;color:#c9ff87;">2,461</div><div style="font-size:18px;color:rgba(243,244,239,.8);margin-top:10px;">servicios en 2025</div></div>
+    <div><div style="font-weight:500;font-size:46px;line-height:1;letter-spacing:-.02em;color:#c9ff87;">~80%</div><div style="font-size:18px;color:rgba(243,244,239,.8);margin-top:10px;">del mercado mundial: las 7 líneas con las que ya opera</div></div>
+    <div><div style="font-weight:500;font-size:46px;line-height:1;letter-spacing:-.02em;color:#c9ff87;">Únicos</div><div style="font-size:18px;color:rgba(243,244,239,.8);margin-top:10px;">permisos y capacidad instalada que nadie puede replicar</div></div>
+  </div>
+</section>
+
+<section data-label="La ambición" data-screen-label="06" data-speaker-notes="La ambición: que evitar residuos sea mejor negocio que gestionarlos. Hoy MPS gana con más volumen; con esta estrategia gana también con menos, cobrando por estrategia, equipamiento y verificación. Es el único que puede cobrar por ambas cosas." style="display:flex;flex-direction:column;padding:128px 100px 96px;box-sizing:border-box;background:#f3f4ef;color:#000;font-family:'Manrope',sans-serif;overflow:hidden;">
+  <div style="position:absolute;left:100px;top:56px;font-family:'IBM Plex Mono',monospace;font-size:17px;letter-spacing:.02em;color:#000;opacity:.8;">06_ La ambición</div>
+  <img src="assets/logo-negro.png" alt="Common House" style="position:absolute;right:100px;top:50px;height:28px;width:auto;">
+  <div style="position:absolute;left:100px;bottom:52px;font-family:'IBM Plex Mono',monospace;font-size:14px;color:#000;opacity:.5;">wearecommonhouse.com</div>
+  <div style="position:absolute;right:100px;bottom:52px;font-family:'IBM Plex Mono',monospace;font-size:14px;color:#000;opacity:.5;">06 / 17</div>
+  <h2 style="font-weight:500;font-size:56px;line-height:1.06;letter-spacing:-.02em;max-width:1380px;margin:0 0 44px;">Que evitar residuos sea mejor negocio que gestionarlos<span style="color:#c9ff87;">_</span></h2>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:stretch;">
+    <div style="border:1px solid rgba(0,0,0,.2);padding:34px 36px;">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:15px;letter-spacing:.06em;text-transform:uppercase;color:#8a8a8a;margin-bottom:8px;">Hoy</div>
+      <h3 style="font-weight:500;font-size:30px;margin:0 0 26px;">El negocio de gestionar</h3>
+      <div style="display:flex;flex-direction:column;gap:16px;font-size:20px;line-height:1.4;color:#3a3a3a;">
+        <div>Ingreso atado al volumen.</div>
+        <div>Margen de logística, presionado por costos de disposición.</div>
+        <div>Escala con camiones, plantas y CAPEX.</div>
+        <div>Commodity: se compite por precio.</div>
+      </div>
+    </div>
+    <div style="border:1.5px solid #005046;background:#eaffc4;padding:34px 36px;">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:15px;letter-spacing:.06em;text-transform:uppercase;color:#005046;margin-bottom:8px;">La ambición</div>
+      <h3 style="font-weight:500;font-size:30px;margin:0 0 26px;color:#005046;">El negocio de prevenir</h3>
+      <div style="display:flex;flex-direction:column;gap:16px;font-size:20px;line-height:1.4;color:#1c2b26;">
+        <div>Ingreso por estrategia, equipamiento y verificación: no depende del volumen.</div>
+        <div>Margen de servicios y recurrencia anual.</div>
+        <div>Escala con método: se replica por cliente y por vertical (cruceros, hoteles, industria, retail, aeropuertos).</div>
+        <div>Categoría nueva: se define el precio.</div>
+      </div>
+    </div>
+  </div>
+  <p style="margin-top:auto;font-weight:500;font-size:30px;line-height:1.22;letter-spacing:-.01em;max-width:1500px;">Hoy MPS gana cuando hay más residuos. Con esta estrategia, gana también cuando hay menos, y es el único que puede cobrar por ambas cosas.</p>
+</section>
+
+<section data-label="El modelo" data-screen-label="06" data-speaker-notes="Este modelo no es inventado: la eficiencia energética, el textil como servicio, la prevención de desperdicio de comida, el reuso de pallets y la gestión por desempeño ya funcionan en otras industrias. Lo estamos trayendo a los residuos." style="display:flex;flex-direction:column;padding:128px 100px 96px;box-sizing:border-box;background:#f3f4ef;color:#000;font-family:'Manrope',sans-serif;overflow:hidden;">
+  <div style="position:absolute;left:100px;top:56px;font-family:'IBM Plex Mono',monospace;font-size:17px;letter-spacing:.02em;color:#000;opacity:.8;">07_ El modelo</div>
+  <img src="assets/logo-negro.png" alt="Common House" style="position:absolute;right:100px;top:50px;height:28px;width:auto;">
+  <div style="position:absolute;left:100px;bottom:52px;font-family:'IBM Plex Mono',monospace;font-size:14px;color:#000;opacity:.5;">wearecommonhouse.com</div>
+  <div style="position:absolute;right:100px;bottom:52px;font-family:'IBM Plex Mono',monospace;font-size:14px;color:#000;opacity:.5;">07 / 17</div>
+  <h2 style="font-weight:500;font-size:52px;line-height:1.08;letter-spacing:-.02em;max-width:1500px;margin:0 0 40px;">No estamos inventando el modelo. Lo estamos trayendo a los residuos<span style="color:#c9ff87;">_</span></h2>
+  <div style="display:flex;flex-direction:column;">
+    <div style="display:grid;grid-template-columns:300px 1fr;gap:48px;align-items:baseline;padding:22px 0;border-top:1px solid rgba(0,0,0,.16);">
+      <div><div style="font-family:'IBM Plex Mono',monospace;font-size:14px;color:#8a8a8a;letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px;">Energía</div><div style="font-size:26px;font-weight:600;">ESCOs</div></div>
+      <div style="font-size:21px;line-height:1.42;color:#3a3a3a;">Las empresas de eficiencia energética cobran un porcentaje del ahorro que generan. Industria global probada hace 30 años.</div>
+    </div>
+    <div style="display:grid;grid-template-columns:300px 1fr;gap:48px;align-items:baseline;padding:22px 0;border-top:1px solid rgba(0,0,0,.16);">
+      <div><div style="font-family:'IBM Plex Mono',monospace;font-size:14px;color:#8a8a8a;letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px;">Textil</div><div style="font-size:26px;font-weight:600;">Elis, Lindström</div></div>
+      <div style="font-size:21px;line-height:1.42;color:#3a3a3a;">De vender sábanas a cobrar por uso: el proveedor gana cuando el producto dura más. Estándar en hotelería europea.</div>
+    </div>
+    <div style="display:grid;grid-template-columns:300px 1fr;gap:48px;align-items:baseline;padding:22px 0;border-top:1px solid rgba(0,0,0,.16);">
+      <div><div style="font-family:'IBM Plex Mono',monospace;font-size:14px;color:#8a8a8a;letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px;">Alimentos</div><div style="font-size:26px;font-weight:600;">Winnow</div></div>
+      <div style="font-size:21px;line-height:1.42;color:#3a3a3a;">Software de prevención de desperdicio que se paga del ahorro del cliente. Ya opera en cruceros de Carnival y Costa.</div>
+    </div>
+    <div style="display:grid;grid-template-columns:300px 1fr;gap:48px;align-items:baseline;padding:22px 0;border-top:1px solid rgba(0,0,0,.16);">
+      <div><div style="font-family:'IBM Plex Mono',monospace;font-size:14px;color:#8a8a8a;letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px;">Logística</div><div style="font-size:26px;font-weight:600;">CHEP</div></div>
+      <div style="font-size:21px;line-height:1.42;color:#3a3a3a;">Nadie compra pallets: todos pagan por ciclo de uso. Infraestructura de reuso como servicio.</div>
+    </div>
+    <div style="display:grid;grid-template-columns:300px 1fr;gap:48px;align-items:baseline;padding:22px 0;border-top:1px solid rgba(0,0,0,.16);border-bottom:1px solid rgba(0,0,0,.16);">
+      <div><div style="font-family:'IBM Plex Mono',monospace;font-size:14px;color:#8a8a8a;letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px;">Residuos</div><div style="font-size:26px;font-weight:600;">Veolia</div></div>
+      <div style="font-size:21px;line-height:1.42;color:#3a3a3a;">El gestor más grande del mundo ya migra de "waste management" a "resource management" con contratos por desempeño.</div>
+    </div>
+  </div>
+</section>
+
+<section data-label="Hospitalidad" data-screen-label="08" data-speaker-notes="En hospitalidad prevenir ya es marca y utilidad. Iberostar eliminó 692 toneladas de plástico y bajó 80% el residuo a vertedero; Marriott eliminó 500 millones de botellitas al año. Los hoteles flotantes son los únicos que aún no lo hacen." style="display:flex;flex-direction:column;padding:128px 100px 96px;box-sizing:border-box;background:#000;color:#f3f4ef;font-family:'Manrope',sans-serif;overflow:hidden;">
+  <div style="position:absolute;left:100px;top:56px;font-family:'IBM Plex Mono',monospace;font-size:17px;letter-spacing:.02em;color:#f3f4ef;opacity:.85;">08_ Hospitalidad</div>
+  <img src="assets/logo-blanco.png" alt="Common House" style="position:absolute;right:100px;top:50px;height:28px;width:auto;">
+  <div style="position:absolute;left:100px;bottom:52px;font-family:'IBM Plex Mono',monospace;font-size:14px;color:#f3f4ef;opacity:.55;">wearecommonhouse.com</div>
+  <div style="position:absolute;right:100px;bottom:52px;font-family:'IBM Plex Mono',monospace;font-size:14px;color:#f3f4ef;opacity:.55;">08 / 17</div>
+  <h2 style="font-weight:500;font-size:56px;line-height:1.06;letter-spacing:-.02em;max-width:1400px;margin:0 0 42px;">En hospitalidad, prevenir ya es marca y es utilidad<span style="color:#c9ff87;">_</span></h2>
+  <div style="display:grid;grid-template-columns:1.5fr 1fr;gap:64px;flex:1;">
+    <div style="border-top:2px solid #c9ff87;padding-top:26px;">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:15px;letter-spacing:.06em;text-transform:uppercase;color:#c9ff87;margin-bottom:22px;">Iberostar · Wave of Change</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:36px 48px;">
+        <div><div style="font-weight:500;font-size:64px;line-height:.95;letter-spacing:-.02em;color:#c9ff87;">692</div><div style="font-size:19px;color:rgba(243,244,239,.78);margin-top:8px;">toneladas de plástico de un solo uso eliminadas desde 2018</div></div>
+        <div><div style="font-weight:500;font-size:64px;line-height:.95;letter-spacing:-.02em;color:#c9ff87;">-80%</div><div style="font-size:19px;color:rgba(243,244,239,.78);margin-top:8px;">residuo a vertedero (2021–2025)</div></div>
+        <div><div style="font-weight:500;font-size:64px;line-height:.95;letter-spacing:-.02em;color:#c9ff87;">250+</div><div style="font-size:19px;color:rgba(243,244,239,.78);margin-top:8px;">personas en su equipo de circularidad</div></div>
+        <div><div style="font-weight:500;font-size:40px;line-height:1;letter-spacing:-.02em;color:#c9ff87;">TIME100</div><div style="font-size:19px;color:rgba(243,244,239,.78);margin-top:8px;">empresas más influyentes (2025)</div></div>
+      </div>
+    </div>
+    <div style="border-top:1px solid rgba(243,244,239,.3);padding-top:26px;">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:15px;letter-spacing:.06em;text-transform:uppercase;color:rgba(243,244,239,.7);margin-bottom:22px;">Marriott</div>
+      <div style="margin-bottom:32px;"><div style="font-weight:500;font-size:64px;line-height:.95;letter-spacing:-.02em;color:#c9ff87;">500M</div><div style="font-size:19px;color:rgba(243,244,239,.78);margin-top:8px;">botellitas de amenities eliminadas por año al migrar a dispensadores</div></div>
+      <div style="font-size:20px;line-height:1.45;color:rgba(243,244,239,.78);">Ahorro directo por hotel desde el primer año.</div>
+    </div>
+  </div>
+  <p style="margin-top:40px;font-weight:500;font-size:34px;line-height:1.15;letter-spacing:-.01em;">Los hoteles flotantes son los únicos que aún no lo hacen.</p>
+</section>
+
+<section data-label="Cruceros" data-screen-label="09" data-speaker-notes="Los pioneros en cruceros ya se movieron: Virgin sin buffet ni botellas, Hurtigruten con circuito cerrado, Carnival ahorró 250 millones. Pero ninguno ataca el packaging que embarca ni puede verificar por buque en territorio. Ese es el espacio de MPS." style="display:flex;flex-direction:column;padding:128px 100px 96px;box-sizing:border-box;background:#000;color:#f3f4ef;font-family:'Manrope',sans-serif;overflow:hidden;">
+  <div style="position:absolute;left:100px;top:56px;font-family:'IBM Plex Mono',monospace;font-size:17px;letter-spacing:.02em;color:#f3f4ef;opacity:.85;">09_ Cruceros</div>
+  <img src="assets/logo-blanco.png" alt="Common House" style="position:absolute;right:100px;top:50px;height:28px;width:auto;">
+  <div style="position:absolute;right:100px;bottom:52px;font-family:'IBM Plex Mono',monospace;font-size:14px;color:#f3f4ef;opacity:.55;">09 / 17</div>
+  <h2 style="font-weight:500;font-size:54px;line-height:1.06;letter-spacing:-.02em;max-width:1420px;margin:0 0 36px;">Los pioneros ya se movieron. El estándar sigue incompleto<span style="color:#c9ff87;">_</span></h2>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:48px;flex:1;">
+    <div style="border-top:2px solid #c9ff87;padding-top:22px;">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:14px;letter-spacing:.06em;text-transform:uppercase;color:#c9ff87;margin-bottom:20px;">Virgin Voyages</div>
+      <div style="font-weight:500;font-size:22px;line-height:1.2;margin-bottom:24px;">Prevención por diseño</div>
+      <div style="margin-bottom:22px;"><div style="font-weight:500;font-size:44px;line-height:1;letter-spacing:-.02em;color:#c9ff87;">~225 t</div><div style="font-size:18px;color:rgba(243,244,239,.75);margin-top:6px;">comida evitada por barco/año — sin buffet</div></div>
+      <div><div style="font-weight:500;font-size:44px;line-height:1;letter-spacing:-.02em;color:#c9ff87;">+2M</div><div style="font-size:18px;color:rgba(243,244,239,.75);margin-top:6px;">botellas plásticas evitadas por barco/año</div></div>
+    </div>
+    <div style="border-top:2px solid #c9ff87;padding-top:22px;">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:14px;letter-spacing:.06em;text-transform:uppercase;color:#c9ff87;margin-bottom:20px;">Hurtigruten</div>
+      <div style="font-weight:500;font-size:22px;line-height:1.2;margin-bottom:24px;">Circuito cerrado a bordo</div>
+      <p style="font-size:19px;line-height:1.45;color:rgba(243,244,239,.78);margin:0 0 22px;">Aceite de cocina convertido en jabón a bordo y compostaje en circuito cerrado con granjas locales.</p>
+      <div><div style="font-weight:500;font-size:44px;line-height:1;letter-spacing:-.02em;color:#c9ff87;">#1</div><div style="font-size:18px;color:rgba(243,244,239,.75);margin-top:6px;">sostenibilidad marítima, 4 años seguidos (ranking NABU)</div></div>
+    </div>
+    <div style="border-top:2px solid #c9ff87;padding-top:22px;">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:14px;letter-spacing:.06em;text-transform:uppercase;color:#c9ff87;margin-bottom:20px;">Carnival</div>
+      <div style="font-weight:500;font-size:22px;line-height:1.2;margin-bottom:24px;">Rentable a escala</div>
+      <div><div style="font-weight:500;font-size:52px;line-height:1;letter-spacing:-.02em;color:#c9ff87;">USD 250M</div><div style="font-size:18px;color:rgba(243,244,239,.75);margin-top:6px;">ahorrados en 5 años reduciendo desperdicio de comida en toda la flota. La prueba de que prevenir es rentable a escala.</div></div>
+    </div>
+  </div>
+  <div style="margin:36px -100px -96px;background:#d97452;color:#160a05;padding:30px 100px 34px;">
+    <p style="font-weight:600;font-size:28px;line-height:1.2;margin:0;max-width:1560px;">Ninguno ataca el packaging que embarca. Ninguno puede verificar por buque en territorio. Ese es el espacio de MPS.</p>
+  </div>
+</section>
+
+<section data-label="Common House" data-screen-label="10" data-speaker-notes="Por qué Common House: 15 años implementando sistemas de reuso a escala global, liderazgo de la agenda zero waste rumbo a COP31, una red de especialistas integrados y un portafolio propio de tecnología con founders involucrados." style="display:flex;flex-direction:column;padding:128px 100px 96px;box-sizing:border-box;background:#f3f4ef;color:#000;font-family:'Manrope',sans-serif;overflow:hidden;">
+  <div style="position:absolute;left:100px;top:56px;font-family:'IBM Plex Mono',monospace;font-size:17px;letter-spacing:.02em;color:#000;opacity:.8;">10_ Common House</div>
+  <img src="assets/logo-negro.png" alt="Common House" style="position:absolute;right:100px;top:50px;height:28px;width:auto;">
+  <div style="position:absolute;left:100px;bottom:52px;font-family:'IBM Plex Mono',monospace;font-size:14px;color:#000;opacity:.5;">wearecommonhouse.com</div>
+  <div style="position:absolute;right:100px;bottom:52px;font-family:'IBM Plex Mono',monospace;font-size:14px;color:#000;opacity:.5;">10 / 17</div>
+  <h2 style="font-weight:500;font-size:54px;line-height:1.06;letter-spacing:-.02em;max-width:1460px;margin:0 0 48px;">Common House: construimos la transición, no la describimos<span style="color:#c9ff87;">_</span></h2>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:40px;flex:1;">
+    <div style="border-top:2px solid #005046;padding-top:24px;">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:15px;color:#005046;margin-bottom:18px;">01</div>
+      <h3 style="font-weight:500;font-size:27px;line-height:1.12;margin:0 0 16px;">15 años implementando</h3>
+      <p style="font-size:19px;line-height:1.45;color:#3a3a3a;margin:0;">Nacimos de construir sistemas de reuso y zero waste a escala global (Algramo: Chile, EE.UU., Reino Unido, Indonesia). Sabemos lo que funciona porque lo hemos operado.</p>
+    </div>
+    <div style="border-top:2px solid #005046;padding-top:24px;">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:15px;color:#005046;margin-bottom:18px;">02</div>
+      <h3 style="font-weight:500;font-size:27px;line-height:1.12;margin:0 0 16px;">La agenda global en la mano</h3>
+      <p style="font-size:19px;line-height:1.45;color:#3a3a3a;margin:0;">Lideramos la agenda zero waste rumbo a COP31 junto a la Zero Waste Foundation, con acceso directo a multilaterales, ciudades y fondos climáticos.</p>
+    </div>
+    <div style="border-top:2px solid #005046;padding-top:24px;">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:15px;color:#005046;margin-bottom:18px;">03</div>
+      <h3 style="font-weight:500;font-size:27px;line-height:1.12;margin:0 0 16px;">Red de especialistas integrados</h3>
+      <p style="font-size:19px;line-height:1.45;color:#3a3a3a;margin:0;">Modelo "powered by": firmas expertas en diseño, investigación y economía circular trabajando bajo una sola dirección.</p>
+    </div>
+    <div style="border-top:2px solid #005046;padding-top:24px;">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:15px;color:#005046;margin-bottom:18px;">04</div>
+      <h3 style="font-weight:500;font-size:27px;line-height:1.12;margin:0 0 16px;">Portafolio de tecnología propio</h3>
+      <p style="font-size:19px;line-height:1.45;color:#3a3a3a;margin:0;">Startups de prevención validadas, con sus fundadores involucrados en cada proyecto.</p>
+    </div>
+  </div>
+</section>
+
+<section data-label="Tecnología" data-screen-label="11" data-speaker-notes="El matching de tecnología no es un benchmark: es tecnología asegurada. YENXA convierte aceite en producto, Beeok da trazabilidad y cumplimiento, iRefill elimina envases de un solo uso. Common House responde por el fit; los fundadores validan cada implementación." style="display:flex;flex-direction:column;padding:128px 100px 96px;box-sizing:border-box;background:#f3f4ef;color:#000;font-family:'Manrope',sans-serif;overflow:hidden;">
+  <div style="position:absolute;left:100px;top:56px;font-family:'IBM Plex Mono',monospace;font-size:17px;letter-spacing:.02em;color:#000;opacity:.8;">11_ Tecnología</div>
+  <img src="assets/logo-negro.png" alt="Common House" style="position:absolute;right:100px;top:50px;height:28px;width:auto;">
+  <div style="position:absolute;left:100px;bottom:52px;font-family:'IBM Plex Mono',monospace;font-size:14px;color:#000;opacity:.5;">wearecommonhouse.com</div>
+  <div style="position:absolute;right:100px;bottom:52px;font-family:'IBM Plex Mono',monospace;font-size:14px;color:#000;opacity:.5;">11 / 17</div>
+  <h2 style="font-weight:500;font-size:54px;line-height:1.06;letter-spacing:-.02em;max-width:1440px;margin:0 0 40px;">El matching no es un benchmark: es tecnología asegurada<span style="color:#c9ff87;">_</span></h2>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:40px;flex:1;">
+    <div style="border:1px solid rgba(0,0,0,.2);padding:32px 34px;display:flex;flex-direction:column;">
+      <div style="height:52px;width:150px;margin-bottom:26px;"><image-slot id="logo-yenxa" shape="rounded" radius="4" placeholder="logo YENXA"></image-slot></div>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:14px;letter-spacing:.06em;text-transform:uppercase;color:#8a8a8a;margin-bottom:10px;">Aceite → producto</div>
+      <h3 style="font-weight:600;font-size:30px;margin:0 0 16px;">YENXA</h3>
+      <p style="font-size:19px;line-height:1.45;color:#3a3a3a;margin:0;">Convierte aceite de cocina usado en limpiadores en el punto de generación. Premio Global a la Innovación de la Zero Waste Foundation (2025).</p>
+    </div>
+    <div style="border:1px solid rgba(0,0,0,.2);padding:32px 34px;display:flex;flex-direction:column;">
+      <div style="height:52px;width:150px;margin-bottom:26px;"><image-slot id="logo-beeok" shape="rounded" radius="4" placeholder="logo Beeok"></image-slot></div>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:14px;letter-spacing:.06em;text-transform:uppercase;color:#8a8a8a;margin-bottom:10px;">Trazabilidad</div>
+      <h3 style="font-weight:600;font-size:30px;margin:0 0 16px;">Beeok</h3>
+      <p style="font-size:19px;line-height:1.45;color:#3a3a3a;margin:0;">SaaS de trazabilidad de residuos y cumplimiento ambiental operando en México, con clientes como PepsiCo, Coca-Cola y Bayer.</p>
+    </div>
+    <div style="border:1px solid rgba(0,0,0,.2);padding:32px 34px;display:flex;flex-direction:column;">
+      <div style="height:52px;width:150px;margin-bottom:26px;"><image-slot id="logo-irefill" shape="rounded" radius="4" placeholder="logo iRefill"></image-slot></div>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:14px;letter-spacing:.06em;text-transform:uppercase;color:#8a8a8a;margin-bottom:10px;">Dispensado y refill</div>
+      <h3 style="font-weight:600;font-size:30px;margin:0 0 16px;">iRefill</h3>
+      <p style="font-size:19px;line-height:1.45;color:#3a3a3a;margin:0;">Sistemas de recarga para eliminar envases de un solo uso en bebestibles y consumibles.</p>
+    </div>
+  </div>
+  <div style="margin-top:32px;display:flex;justify-content:space-between;align-items:flex-end;gap:40px;">
+    <p style="font-weight:500;font-size:26px;line-height:1.25;margin:0;max-width:1200px;">Common House responde por el fit de cada tecnología. Los fundadores validan cada implementación.</p>
+    <p style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#8a8a8a;margin:0;max-width:340px;text-align:right;">[Placeholder logos: confirmar autorización de uso con cada founder antes de circular.]</p>
+  </div>
+</section>
+
+<section data-label="La estrategia" data-screen-label="12" data-speaker-notes="Qué vamos a construir: una estrategia madre (modelo de negocio de prevención, arquitectura de dependencia, marco de despliegue por vertical, eje regulatorio) y el primer despliegue en el vertical cruceros (baseline upstream, estrategia por corriente, kit comercial). Siete entregables." style="display:flex;flex-direction:column;padding:120px 100px 88px;box-sizing:border-box;background:#f3f4ef;color:#000;font-family:'Manrope',sans-serif;overflow:hidden;">
+  <div style="position:absolute;left:100px;top:56px;font-family:'IBM Plex Mono',monospace;font-size:17px;letter-spacing:.02em;color:#000;opacity:.8;">12_ La estrategia</div>
+  <img src="assets/logo-negro.png" alt="Common House" style="position:absolute;right:100px;top:50px;height:28px;width:auto;">
+  <div style="position:absolute;left:100px;bottom:48px;font-family:'IBM Plex Mono',monospace;font-size:14px;color:#000;opacity:.5;">wearecommonhouse.com</div>
+  <div style="position:absolute;right:100px;bottom:48px;font-family:'IBM Plex Mono',monospace;font-size:14px;color:#000;opacity:.5;">12 / 17</div>
+  <h2 style="font-weight:500;font-size:52px;line-height:1.05;letter-spacing:-.02em;margin:0 0 34px;">Qué vamos a construir juntos<span style="color:#c9ff87;">_</span></h2>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:56px;flex:1;">
+    <div style="border-top:2px solid #005046;padding-top:22px;">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:14px;letter-spacing:.06em;text-transform:uppercase;color:#005046;margin-bottom:6px;">Bloque A</div>
+      <h3 style="font-weight:500;font-size:28px;line-height:1.12;margin:0 0 24px;">Estrategia madre: el modelo MPS de prevención</h3>
+      <div style="display:flex;flex-direction:column;gap:18px;">
+        <div style="display:grid;grid-template-columns:34px 1fr;gap:14px;"><span style="font-family:'IBM Plex Mono',monospace;font-size:16px;color:#005046;">01</span><div><div style="font-weight:600;font-size:19px;">Modelo de negocio de la prevención</div><div style="font-size:17px;line-height:1.4;color:#3a3a3a;">Cómo cobra MPS por evitar, con proyecciones y análisis de transición.</div></div></div>
+        <div style="display:grid;grid-template-columns:34px 1fr;gap:14px;"><span style="font-family:'IBM Plex Mono',monospace;font-size:16px;color:#005046;">02</span><div><div style="font-weight:600;font-size:19px;">Arquitectura de dependencia</div><div style="font-size:17px;line-height:1.4;color:#3a3a3a;">El sistema de trazabilidad y verificación que hace a MPS irreemplazable.</div></div></div>
+        <div style="display:grid;grid-template-columns:34px 1fr;gap:14px;"><span style="font-family:'IBM Plex Mono',monospace;font-size:16px;color:#005046;">03</span><div><div style="font-weight:600;font-size:19px;">Marco de despliegue por vertical</div><div style="font-size:17px;line-height:1.4;color:#3a3a3a;">El método replicable para abordar cualquier cliente (crucero, hotel, industria, retail, aeropuerto).</div></div></div>
+        <div style="display:grid;grid-template-columns:34px 1fr;gap:14px;"><span style="font-family:'IBM Plex Mono',monospace;font-size:16px;color:#005046;">04</span><div><div style="font-weight:600;font-size:19px;">Eje regulatorio y reputacional</div><div style="font-size:17px;line-height:1.4;color:#3a3a3a;">Palancas normativas y calendario de posicionamiento.</div></div></div>
+      </div>
+    </div>
+    <div style="border-top:2px solid #005046;padding-top:22px;">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:14px;letter-spacing:.06em;text-transform:uppercase;color:#005046;margin-bottom:6px;">Bloque B</div>
+      <h3 style="font-weight:500;font-size:28px;line-height:1.12;margin:0 0 24px;">Vertical cruceros: el primer despliegue</h3>
+      <div style="display:flex;flex-direction:column;gap:18px;">
+        <div style="display:grid;grid-template-columns:34px 1fr;gap:14px;"><span style="font-family:'IBM Plex Mono',monospace;font-size:16px;color:#005046;">05</span><div><div style="font-weight:600;font-size:19px;">Baseline upstream</div><div style="font-size:17px;line-height:1.4;color:#3a3a3a;">La data de MPS estructurada con lente de prevención. El primer baseline de la industria.</div></div></div>
+        <div style="display:grid;grid-template-columns:34px 1fr;gap:14px;"><span style="font-family:'IBM Plex Mono',monospace;font-size:16px;color:#005046;">06</span><div><div style="font-weight:600;font-size:19px;">Estrategia de prevención por corriente</div><div style="font-size:17px;line-height:1.4;color:#3a3a3a;">Con tecnologías validadas, a bordo y en sitios de arribo.</div></div></div>
+        <div style="display:grid;grid-template-columns:34px 1fr;gap:14px;"><span style="font-family:'IBM Plex Mono',monospace;font-size:16px;color:#005046;">07</span><div><div style="font-weight:600;font-size:19px;">Kit comercial</div><div style="font-size:17px;line-height:1.4;color:#3a3a3a;">La oferta empaquetada con la que MPS sale a vender a las líneas.</div></div></div>
+      </div>
+      <div style="margin-top:32px;background:#eaffc4;border-left:3px solid #005046;padding:18px 22px;font-size:18px;line-height:1.4;color:#1c2b26;">7 entregables · una estrategia madre replicable + su primer despliegue vivo.</div>
+    </div>
+  </div>
+</section>
+
+<section data-label="Resultados MPS" data-screen-label="13" data-speaker-notes="Al cierre de la Fase 1, MPS tiene una línea de negocio nueva con precio, el primer baseline de prevención de la industria, tecnologías aseguradas, el sistema de verificación por cliente, el kit comercial y el método replicable a otros verticales." style="display:flex;flex-direction:column;padding:128px 100px 96px;box-sizing:border-box;background:#000;color:#f3f4ef;font-family:'Manrope',sans-serif;overflow:hidden;">
+  <div style="position:absolute;left:100px;top:56px;font-family:'IBM Plex Mono',monospace;font-size:17px;letter-spacing:.02em;color:#f3f4ef;opacity:.85;">13_ Resultados MPS</div>
+  <img src="assets/logo-blanco.png" alt="Common House" style="position:absolute;right:100px;top:50px;height:28px;width:auto;">
+  <div style="position:absolute;left:100px;bottom:52px;font-family:'IBM Plex Mono',monospace;font-size:14px;color:#f3f4ef;opacity:.55;">wearecommonhouse.com</div>
+  <div style="position:absolute;right:100px;bottom:52px;font-family:'IBM Plex Mono',monospace;font-size:14px;color:#f3f4ef;opacity:.55;">13 / 17</div>
+  <h2 style="font-weight:500;font-size:56px;line-height:1.06;letter-spacing:-.02em;margin:0 0 44px;">Al cierre de la estrategia, MPS tiene<span style="color:#c9ff87;">:</span></h2>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:30px 72px;flex:1;align-content:center;">
+    <div style="display:grid;grid-template-columns:44px 1fr;gap:20px;align-items:start;border-top:1px solid rgba(243,244,239,.18);padding-top:22px;"><i data-lucide="check" style="color:#c9ff87;width:34px;height:34px;stroke-width:2.4;"></i><div style="font-size:25px;line-height:1.28;">Una línea de negocio nueva, con precio y estructura de cobro definidos.</div></div>
+    <div style="display:grid;grid-template-columns:44px 1fr;gap:20px;align-items:start;border-top:1px solid rgba(243,244,239,.18);padding-top:22px;"><i data-lucide="check" style="color:#c9ff87;width:34px;height:34px;stroke-width:2.4;"></i><div style="font-size:25px;line-height:1.28;">El primer baseline de prevención de la industria de cruceros, sobre data que solo MPS posee.</div></div>
+    <div style="display:grid;grid-template-columns:44px 1fr;gap:20px;align-items:start;border-top:1px solid rgba(243,244,239,.18);padding-top:22px;"><i data-lucide="check" style="color:#c9ff87;width:34px;height:34px;stroke-width:2.4;"></i><div style="font-size:25px;line-height:1.28;">Tecnologías de prevención aseguradas, con responsables técnicos identificados.</div></div>
+    <div style="display:grid;grid-template-columns:44px 1fr;gap:20px;align-items:start;border-top:1px solid rgba(243,244,239,.18);padding-top:22px;"><i data-lucide="check" style="color:#c9ff87;width:34px;height:34px;stroke-width:2.4;"></i><div style="font-size:25px;line-height:1.28;">El sistema de verificación por cliente: la respuesta a la crisis de credibilidad del sector.</div></div>
+    <div style="display:grid;grid-template-columns:44px 1fr;gap:20px;align-items:start;border-top:1px solid rgba(243,244,239,.18);padding-top:22px;"><i data-lucide="check" style="color:#c9ff87;width:34px;height:34px;stroke-width:2.4;"></i><div style="font-size:25px;line-height:1.28;">El kit comercial para salir a vender, con Common House al lado.</div></div>
+    <div style="display:grid;grid-template-columns:44px 1fr;gap:20px;align-items:start;border-top:1px solid rgba(243,244,239,.18);padding-top:22px;"><i data-lucide="check" style="color:#c9ff87;width:34px;height:34px;stroke-width:2.4;"></i><div style="font-size:25px;line-height:1.28;">El método replicable para hoteles, industria, retail y aeropuertos.</div></div>
+  </div>
+</section>
+
+<section data-label="Calendario" data-screen-label="14" data-speaker-notes="El calendario del anuncio: julio firma y kick-off, agosto inmersión en México, septiembre vertical cruceros y kit comercial, primera semana de octubre estrategia final y lanzamiento en Mexico Climate Week, y en noviembre MPS se presenta al mundo en COP31 con su primer cliente encaminado." style="display:flex;flex-direction:column;padding:128px 100px 96px;box-sizing:border-box;background:#005046;color:#f3f4ef;font-family:'Manrope',sans-serif;overflow:hidden;">
+  <div style="position:absolute;left:100px;top:56px;font-family:'IBM Plex Mono',monospace;font-size:17px;letter-spacing:.02em;color:#f3f4ef;opacity:.8;">14_ Calendario</div>
+  <img src="assets/logo-blanco.png" alt="Common House" style="position:absolute;right:100px;top:50px;height:28px;width:auto;">
+  <div style="position:absolute;left:100px;bottom:52px;font-family:'IBM Plex Mono',monospace;font-size:14px;color:#f3f4ef;opacity:.55;">wearecommonhouse.com</div>
+  <div style="position:absolute;right:100px;bottom:52px;font-family:'IBM Plex Mono',monospace;font-size:14px;color:#f3f4ef;opacity:.55;">14 / 17</div>
+  <h2 style="font-weight:500;font-size:58px;line-height:1.06;letter-spacing:-.02em;max-width:1400px;margin:0 0 20px;">2026 termina con MPS anunciándole esto al mundo<span style="color:#c9ff87;">_</span></h2>
+  <div style="flex:1;display:flex;align-items:center;">
+    <div style="width:100%;">
+      <div style="height:2px;background:rgba(243,244,239,.3);position:relative;margin:0 0 0;">
+        <div style="position:absolute;left:0;right:40%;top:0;height:2px;background:rgba(243,244,239,.3);"></div>
+        <div style="position:absolute;left:60%;right:0;top:0;height:2px;background:#c9ff87;"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:32px;margin-top:-9px;">
+        <div><div style="width:16px;height:16px;border-radius:50%;background:#f3f4ef;margin-bottom:22px;"></div><div style="font-family:'IBM Plex Mono',monospace;font-size:15px;color:rgba(243,244,239,.8);margin-bottom:10px;">JULIO</div><div style="font-weight:500;font-size:24px;line-height:1.15;margin-bottom:8px;">Firma y kick-off</div><div style="font-size:17px;line-height:1.4;color:rgba(243,244,239,.72);">Inicio del baseline.</div></div>
+        <div><div style="width:16px;height:16px;border-radius:50%;background:#f3f4ef;margin-bottom:22px;"></div><div style="font-family:'IBM Plex Mono',monospace;font-size:15px;color:rgba(243,244,239,.8);margin-bottom:10px;">AGOSTO</div><div style="font-weight:500;font-size:24px;line-height:1.15;margin-bottom:8px;">Inmersión en México</div><div style="font-size:17px;line-height:1.4;color:rgba(243,244,239,.72);">Estrategia madre en construcción.</div></div>
+        <div><div style="width:16px;height:16px;border-radius:50%;background:#f3f4ef;margin-bottom:22px;"></div><div style="font-family:'IBM Plex Mono',monospace;font-size:15px;color:rgba(243,244,239,.8);margin-bottom:10px;">SEPTIEMBRE</div><div style="font-weight:500;font-size:24px;line-height:1.15;margin-bottom:8px;">Vertical cruceros y kit comercial</div><div style="font-size:17px;line-height:1.4;color:rgba(243,244,239,.72);">Borrador completo.</div></div>
+        <div><div style="width:18px;height:18px;border-radius:50%;background:#c9ff87;margin-bottom:21px;"></div><div style="font-family:'IBM Plex Mono',monospace;font-size:15px;color:#c9ff87;margin-bottom:10px;">1ª SEM. OCTUBRE</div><div style="font-weight:500;font-size:24px;line-height:1.15;margin-bottom:8px;color:#c9ff87;">Estrategia final</div><div style="font-size:17px;line-height:1.4;color:rgba(243,244,239,.82);">Lanzamiento en Mexico Climate Week.</div></div>
+        <div><div style="width:18px;height:18px;border-radius:50%;background:#c9ff87;margin-bottom:21px;"></div><div style="font-family:'IBM Plex Mono',monospace;font-size:15px;color:#c9ff87;margin-bottom:10px;">NOVIEMBRE · COP31</div><div style="font-weight:500;font-size:24px;line-height:1.15;margin-bottom:8px;color:#c9ff87;">MPS se presenta al mundo</div><div style="font-size:17px;line-height:1.4;color:rgba(243,244,239,.82);">El partner upstream de residuos de la industria, con su primer cliente encaminado.</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section data-label="Fase 2" data-screen-label="15" data-speaker-notes="Después de la estrategia viene el vehículo conjunto MPS × Common House para implementar tecnologías, equipamiento y verificación en cruceros y en clientes industriales, hoteleros y retail. La estructura y los términos se diseñan al cierre de la Fase 1." style="display:flex;flex-direction:column;padding:128px 100px 96px;box-sizing:border-box;background:#f3f4ef;color:#000;font-family:'Manrope',sans-serif;overflow:hidden;">
+  <div style="position:absolute;left:100px;top:56px;font-family:'IBM Plex Mono',monospace;font-size:17px;letter-spacing:.02em;color:#000;opacity:.8;">15_ Fase 2</div>
+  <img src="assets/logo-negro.png" alt="Common House" style="position:absolute;right:100px;top:50px;height:28px;width:auto;">
+  <div style="position:absolute;left:100px;bottom:52px;font-family:'IBM Plex Mono',monospace;font-size:14px;color:#000;opacity:.5;">wearecommonhouse.com</div>
+  <div style="position:absolute;right:100px;bottom:52px;font-family:'IBM Plex Mono',monospace;font-size:14px;color:#000;opacity:.5;">15 / 17</div>
+  <h2 style="font-weight:500;font-size:56px;line-height:1.06;letter-spacing:-.02em;margin:0 0 12px;">Fase 2: implementar juntos<span style="color:#c9ff87;">_</span></h2>
+  <div style="display:grid;grid-template-columns:1fr 1.1fr;gap:72px;flex:1;align-items:center;">
+    <div>
+      <p style="font-size:24px;line-height:1.5;color:#3a3a3a;margin:0 0 28px;max-width:640px;">La estrategia define el qué. La implementación se hace en sociedad: un vehículo conjunto MPS × Common House para desplegar tecnologías, equipamiento y el sistema de verificación en cruceros y en clientes industriales, hoteleros y retail.</p>
+      <p style="font-family:'IBM Plex Mono',monospace;font-size:15px;line-height:1.5;color:#8a8a8a;margin:0;">Estructura y términos se diseñan al cierre de la Fase 1.</p>
+    </div>
+    <div style="position:relative;height:400px;width:640px;margin:0 auto;">
+      <div style="position: absolute; left: -82px; top: 30px; width: 422px; height: 422px; border-radius: 50%; background: rgba(0,80,70,.12); border: 1.5px solid #005046; box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; padding-left: 36px; padding-right: 150px">
+        <div style="font-weight:600;font-size:26px;color:#005046;margin-bottom:12px;">MPS</div>
+        <div style="font-size:17px;line-height:1.4;color:#1c2b26;">Operación, relación comercial, territorio, permisos.</div>
+      </div>
+      <div style="position: absolute; left: 215px; top: 30px; width: 420px; height: 420px; border-radius: 50%; background: rgba(201, 255, 135, 0.4); border: 1.5px solid rgb(0, 80, 70); box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; align-items: flex-end; text-align: right; padding-right: 36px; padding-left: 150px">
+        <div style="font-weight:600;font-size:26px;color:#005046;margin-bottom:12px;">Common House</div>
+        <div style="font-size:17px;line-height:1.4;color:#1c2b26;">Método, tecnología, red global, verificación.</div>
+      </div>
+      <div style="position:absolute;left:278px;top:240px;transform:translate(-50%,-50%);text-align:center;z-index:2;width:150px;">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#005046;margin-bottom:4px;">Vehículo conjunto</div>
+        <div style="font-weight:700;font-size:34px;color:#000;line-height:1;">JV</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#005046;margin-top:4px;">Futuro</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section data-label="Inversión" data-screen-label="16" data-speaker-notes="Inversión Fase 1: USD 115,000, fixed fee por los 7 entregables. Pago por hitos 30/40/30. Viajes y gastos presenciales por separado a costo real. Duración 10 a 12 semanas desde el kick-off." style="display:flex;flex-direction:column;padding:128px 100px 96px;box-sizing:border-box;background:#f3f4ef;color:#000;font-family:'Manrope',sans-serif;overflow:hidden;">
+  <div style="position:absolute;left:100px;top:56px;font-family:'IBM Plex Mono',monospace;font-size:17px;letter-spacing:.02em;color:#000;opacity:.8;">16_ Inversión</div>
+  <img src="assets/logo-negro.png" alt="Common House" style="position:absolute;right:100px;top:50px;height:28px;width:auto;">
+  <div style="position:absolute;left:100px;bottom:52px;font-family:'IBM Plex Mono',monospace;font-size:14px;color:#000;opacity:.5;">wearecommonhouse.com</div>
+  <div style="position:absolute;right:100px;bottom:52px;font-family:'IBM Plex Mono',monospace;font-size:14px;color:#000;opacity:.5;">16 / 17</div>
+  <div style="font-family:'IBM Plex Mono',monospace;font-size:16px;letter-spacing:.1em;text-transform:uppercase;color:#8a8a8a;margin-bottom:12px;">Inversión Fase 1 · Estrategia Upstream MPS</div>
+  <div style="flex:1;display:flex;flex-direction:column;justify-content:center;">
+    <div style="font-weight:500;font-size:190px;line-height:.9;letter-spacing:-.03em;">USD 115,000</div>
+    <div style="font-size:28px;color:#3a3a3a;margin-top:24px;max-width:900px;">Fixed fee por la totalidad de los 7 entregables (Bloques A y B).</div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:40px;border-top:1px solid rgba(0,0,0,.18);padding-top:28px;">
+    <div><div style="font-weight:500;font-size:56px;line-height:.9;letter-spacing:-.02em;">30<span style="font-size:28px;color:#8a8a8a;">%</span></div><div style="font-size:18px;color:#3a3a3a;margin-top:12px;">a la firma</div></div>
+    <div><div style="font-weight:500;font-size:56px;line-height:.9;letter-spacing:-.02em;">40<span style="font-size:28px;color:#8a8a8a;">%</span></div><div style="font-size:18px;color:#3a3a3a;margin-top:12px;">a la entrega del borrador completo</div></div>
+    <div><div style="font-weight:500;font-size:56px;line-height:.9;letter-spacing:-.02em;">30<span style="font-size:28px;color:#8a8a8a;">%</span></div><div style="font-size:18px;color:#3a3a3a;margin-top:12px;">a la entrega final</div></div>
+  </div>
+  <p style="font-family:'IBM Plex Mono',monospace;font-size:13px;line-height:1.5;color:#8a8a8a;margin:22px 0 0;max-width:1400px;">Viajes y gastos de instancias presenciales se facturan por separado a costo real. Valores netos de retenciones e impuestos aplicables. Duración: 10–12 semanas desde el kick-off.</p>
+</section>
+
+<section data-label="Próximos pasos" data-screen-label="17" data-speaker-notes="Para empezar esta semana: confirmar alcance y firma, kick-off remoto con la data fuente, fijar la inmersión de agosto en México, y anunciar juntos el inicio. El zero waste va a llegar a esta industria con o sin nosotros; la pregunta es si MPS lo vende o lo sufre." style="display:flex;flex-direction:column;padding:120px 100px 88px;box-sizing:border-box;background:#005046;color:#f3f4ef;font-family:'Manrope',sans-serif;overflow:hidden;">
+  <div style="position:absolute;left:100px;top:56px;font-family:'IBM Plex Mono',monospace;font-size:17px;letter-spacing:.02em;color:#f3f4ef;opacity:.8;">17_ Próximos pasos</div>
+  <img src="assets/logo-blanco.png" alt="Common House" style="position:absolute;right:100px;top:50px;height:28px;width:auto;">
+  
+  <h2 style="font-weight:500;font-size:52px;line-height:1.05;letter-spacing:-.02em;margin:0 0 34px;">Para empezar esta semana<span style="color:#c9ff87;">_</span></h2>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:36px;border-top:1px solid rgba(243,244,239,.28);padding-top:26px;">
+    <div><div style="font-family:'IBM Plex Mono',monospace;font-size:15px;color:#c9ff87;margin-bottom:16px;">01</div><div style="font-size:21px;line-height:1.28;">Confirmación de alcance y firma.</div></div>
+    <div><div style="font-family:'IBM Plex Mono',monospace;font-size:15px;color:#c9ff87;margin-bottom:16px;">02</div><div style="font-size:21px;line-height:1.28;">Kick-off remoto y entrega de data fuente.</div></div>
+    <div><div style="font-family:'IBM Plex Mono',monospace;font-size:15px;color:#c9ff87;margin-bottom:16px;">03</div><div style="font-size:21px;line-height:1.28;">Fecha de inmersión presencial en México (agosto).</div></div>
+    <div><div style="font-family:'IBM Plex Mono',monospace;font-size:15px;color:#c9ff87;margin-bottom:16px;">04</div><div style="font-size:21px;line-height:1.28;">Anuncio conjunto del inicio de la colaboración.</div></div>
+  </div>
+  <div style="flex:1;display:flex;align-items:center;">
+    <p style="font-weight:500;font-size:46px;line-height:1.14;letter-spacing:-.02em;margin:0;max-width:1560px;">El zero waste va a llegar a esta industria con o sin nosotros. La pregunta es si MPS lo vende o lo sufre<span style="color:#c9ff87;">.</span></p>
+  </div>
+  <div style="display:flex;justify-content:space-between;align-items:flex-end;border-top:1px solid rgba(243,244,239,.28);padding-top:22px;">
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:15px;color:rgba(243,244,239,.85);">José Manuel Moller · Common House · [email] · wearecommonhouse.com</div>
+    <img src="assets/logo-blanco.png" alt="Common House" style="height:30px;width:auto;opacity:.9;">
+  </div>
+</section>
+
+</x-import>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  componentDidMount() {
+    const draw = () => { if (window.lucide) window.lucide.createIcons(); };
+    [120, 400, 900, 1600, 2600].forEach(t => setTimeout(draw, t));
+  }
+}
+</script>
+</body>
+</html>
