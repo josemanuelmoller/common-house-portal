@@ -36,6 +36,20 @@ export type ClientRoomMaterial = {
   modifiedAt: string | null;
 };
 
+export type ClientRoomTimelineEvent = {
+  id: string;
+  eventDate: string;
+  kind: "meeting" | "milestone" | "document" | "exchange";
+  title: string;
+  summary: string | null;
+  attendees: string[];
+  location: string | null;
+  visibility: string;
+  sourceId: string | null;
+  materialId: string | null;
+  agreementId: string | null;
+};
+
 export type ClientRoomAgreement = {
   id: string;
   agreementType: string;
@@ -78,6 +92,7 @@ export type ClientRoomProject = {
   };
   proposal: HallDraftProposal;
   timeline: HallDraftTimelineItem[];
+  timelineEvents: ClientRoomTimelineEvent[];
   materials: ClientRoomMaterial[];
   agreements: ClientRoomAgreement[];
 };
@@ -202,12 +217,39 @@ async function loadAgreements(projectId: string, includeInternal: boolean): Prom
   }));
 }
 
+async function loadTimelineEvents(projectId: string, includeInternal: boolean): Promise<ClientRoomTimelineEvent[]> {
+  let query = supabaseAdmin()
+    .from("project_timeline_events")
+    .select("id, event_date, kind, title, summary, attendees, location, visibility, source_id, material_id, agreement_id")
+    .eq("project_id", projectId)
+    .neq("visibility", "archived")
+    .order("event_date", { ascending: false })
+    .order("sort_order", { ascending: true });
+  if (!includeInternal) query = query.eq("visibility", "client");
+  const { data, error } = await query;
+  if (error) throw new Error(`client-room timeline read failed: ${error.message}`);
+  return (data ?? []).map((row) => ({
+    id: row.id as string,
+    eventDate: row.event_date as string,
+    kind: row.kind as ClientRoomTimelineEvent["kind"],
+    title: row.title as string,
+    summary: (row.summary as string | null) ?? null,
+    attendees: (row.attendees as string[] | null) ?? [],
+    location: (row.location as string | null) ?? null,
+    visibility: row.visibility as string,
+    sourceId: (row.source_id as string | null) ?? null,
+    materialId: (row.material_id as string | null) ?? null,
+    agreementId: (row.agreement_id as string | null) ?? null,
+  }));
+}
+
 async function assembleRoom(row: ProjectRow, includeInternal: boolean): Promise<ClientRoomProject> {
   const hero = row.hall_hero ? withDraftDefaults(row.hall_hero) : null;
-  const [orgName, materials, agreements] = await Promise.all([
+  const [orgName, materials, agreements, timelineEvents] = await Promise.all([
     organizationName(row.organization_id),
     loadMaterials(row.id, includeInternal),
     loadAgreements(row.id, includeInternal),
+    loadTimelineEvents(row.id, includeInternal),
   ]);
   return {
     id: row.id,
@@ -245,6 +287,7 @@ async function assembleRoom(row: ProjectRow, includeInternal: boolean): Promise<
       status: "draft", summary: null, file_url: null, file_name: null, sent_at: null,
     },
     timeline: hero?.timeline ?? [],
+    timelineEvents,
     materials,
     agreements,
   };
