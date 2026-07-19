@@ -14,6 +14,8 @@ import { ActivityBar } from "@/components/ActivityBar";
 import { MeetingsSection } from "@/components/MeetingsSection";
 import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { ProjectStatusEditor } from "@/components/ProjectStatusEditor";
+import { ProjectOrganizationRoles } from "@/components/ProjectOrganizationRoles";
+import { listProjectOrgRoles } from "@/lib/relational-model";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 
 export const dynamic = "force-dynamic";
@@ -45,6 +47,16 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
       .maybeSingle();
     return data;
   })();
+
+  // ADR-001 participating organizations + roles (canonical). Needs the project uuid.
+  const projectRoles = sbProject ? await listProjectOrgRoles(sbProject.id) : [];
+  const orgOptions = sbProject
+    ? await (async () => {
+        const sb = getSupabaseServerClient();
+        const { data } = await sb.from("organizations").select("id, name").order("name");
+        return ((data as { id: string; name: string }[] | null) ?? []).filter((o) => o.name);
+      })()
+    : [];
 
   // Optional registered deck slug stored on the project's hall_draft.proposal.
   // When present, render an "Open deck" link in the page header that opens the
@@ -453,6 +465,21 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
               otherOrgs={people.otherOrgs}
             />
           </CollapsibleSection>
+
+          {/* Participating organizations + roles (ADR-001 canonical) */}
+          {sbProject && (
+            <HallSection
+              title="Participating"
+              flourish="organizations"
+              meta={`${projectRoles.filter((r) => !r.ended_at).length} ROLES`}
+            >
+              <ProjectOrganizationRoles
+                projectId={sbProject.id}
+                initial={projectRoles}
+                orgs={orgOptions}
+              />
+            </HallSection>
+          )}
 
           {/* Status Summary */}
           {project.statusSummary && (
