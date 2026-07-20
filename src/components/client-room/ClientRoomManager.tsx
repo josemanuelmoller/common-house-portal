@@ -4,12 +4,20 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import type {
+  BillingAccount,
   ClientRoomAdminData,
   ClientRoomAgreement,
   ClientRoomMaterial,
   ClientRoomMaterialCategory,
   ClientRoomTimelineEvent,
 } from "@/lib/client-room";
+
+const BANK_TEMPLATES: BillingAccount[] = [
+  { title: "GBP · Local", details: "Destinatario:\nSort code:\nNúmero de cuenta:\nBanco:\nDirección del banco:" },
+  { title: "GBP · Internacional (SWIFT/IBAN)", details: "Destinatario:\nIBAN:\nBIC (SWIFT):\nBIC intermediario:\nBanco:\nDirección del banco:" },
+  { title: "USD · Local (ACH)", details: "Destinatario:\nRouting (ACH):\nNúmero de cuenta:\nBanco:" },
+  { title: "USD · Internacional (SWIFT/IBAN)", details: "Destinatario:\nIBAN:\nBIC (SWIFT):\nBIC intermediario:\nBanco:\nDirección del banco:" },
+];
 
 const TIMELINE_KINDS = ["meeting", "milestone", "document", "exchange"] as const;
 
@@ -420,12 +428,13 @@ export function BillingManager({ room }: { room: ClientRoomAdminData }) {
   const router = useRouter();
   const [f, setF] = useState({
     legalName: room.billing.legalName ?? "",
-    taxId: room.billing.taxId ?? "",
+    companyNumber: room.billing.companyNumber ?? "",
+    vatNumber: room.billing.vatNumber ?? "",
     address: room.billing.address ?? "",
     billingEmail: room.billing.billingEmail ?? "",
-    bankDetails: room.billing.bankDetails ?? "",
     publicNote: room.billing.publicNote ?? "",
   });
+  const [accounts, setAccounts] = useState<BillingAccount[]>(room.billing.bankAccounts.length ? room.billing.bankAccounts : BANK_TEMPLATES);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const set = (k: keyof typeof f) => (v: string) => setF((p) => ({ ...p, [k]: v }));
@@ -434,7 +443,8 @@ export function BillingManager({ room }: { room: ClientRoomAdminData }) {
     setBusy(true);
     setMessage(null);
     try {
-      await apiJson(`/api/admin/company-billing`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(f) });
+      const bankAccounts = accounts.map((a) => ({ title: a.title.trim(), details: a.details.trim() })).filter((a) => a.title || a.details);
+      await apiJson(`/api/admin/company-billing`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...f, bankAccounts }) });
       setMessage("Guardado");
       router.refresh();
     } catch (error) {
@@ -446,15 +456,29 @@ export function BillingManager({ room }: { room: ClientRoomAdminData }) {
 
   return (
     <div>
-      <p className="text-[11px] mb-4" style={{ color: "var(--hall-muted-2)" }}>Datos de pago de Common House — los mismos para todos los clientes. Los datos bancarios solo los ve el rol <strong>approver</strong> en el room. Tú cargas los números.</p>
+      <p className="text-[11px] mb-4" style={{ color: "var(--hall-muted-2)" }}>Datos de pago de Common House Ltd (UK) — los mismos para todos los clientes. Las cuentas bancarias solo las ve el rol <strong>approver</strong> en el room. Tú cargas los valores.</p>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3">
         <NarrativeField label="Razón social" value={f.legalName} onChange={set("legalName")} />
-        <NarrativeField label="Tax ID / RUT" value={f.taxId} onChange={set("taxId")} />
-        <NarrativeField label="Dirección" value={f.address} onChange={set("address")} />
+        <NarrativeField label="N.º de registro (company number)" value={f.companyNumber} onChange={set("companyNumber")} />
+        <NarrativeField label="VAT number" value={f.vatNumber} onChange={set("vatNumber")} />
         <NarrativeField label="Email de facturación" value={f.billingEmail} onChange={set("billingEmail")} />
       </div>
-      <label style={labelStyle}>Datos bancarios (solo approver)</label>
-      <textarea style={{ ...fieldStyle, minHeight: 84, marginBottom: 8 }} value={f.bankDetails} onChange={(e) => set("bankDetails")(e.target.value)} placeholder={"Banco: …\nCuenta: …\nSWIFT / IBAN: …\nBeneficiario: …"} />
+      <NarrativeField label="Dirección registrada" value={f.address} onChange={set("address")} />
+
+      <div className="flex items-center justify-between mt-4 mb-2">
+        <p className="text-[11px] font-semibold" style={{ fontFamily: "var(--font-hall-mono)", textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--hall-muted-2)" }}>Cuentas bancarias (solo approver)</p>
+        <button type="button" className="hall-btn-ghost" onClick={() => setAccounts((a) => [...a, { title: "", details: "" }])}>+ Cuenta</button>
+      </div>
+      {accounts.map((acc, i) => (
+        <div key={i} className="mb-3 p-3" style={{ border: "1px solid var(--hall-line)", borderRadius: 6 }}>
+          <div className="flex items-center gap-2 mb-2">
+            <input aria-label="Título de la cuenta" style={fieldStyle} placeholder="ej. GBP · Local" value={acc.title} onChange={(e) => setAccounts((a) => a.map((x, j) => j === i ? { ...x, title: e.target.value } : x))} />
+            <button type="button" className="hall-btn-ghost" style={{ color: "var(--hall-danger)" }} onClick={() => setAccounts((a) => a.filter((_, j) => j !== i))}>×</button>
+          </div>
+          <textarea aria-label="Detalles de la cuenta" style={{ ...fieldStyle, minHeight: 96 }} value={acc.details} onChange={(e) => setAccounts((a) => a.map((x, j) => j === i ? { ...x, details: e.target.value } : x))} />
+        </div>
+      ))}
+
       <NarrativeField label="Nota (visible a todos los invitados)" value={f.publicNote} onChange={set("publicNote")} area />
       <div className="flex items-center gap-3 mt-2">
         <button type="button" className="hall-btn-primary" disabled={busy} onClick={() => void save()}>{busy ? "Guardando…" : "Guardar datos de pago"}</button>

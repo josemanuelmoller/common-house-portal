@@ -36,13 +36,16 @@ export type ClientRoomMaterial = {
   modifiedAt: string | null;
 };
 
+export type BillingAccount = { title: string; details: string };
+
 export type ClientRoomBilling = {
   legalName: string | null;
-  taxId: string | null;
+  companyNumber: string | null;
+  vatNumber: string | null;
   address: string | null;
   billingEmail: string | null;
   publicNote: string | null;
-  bankDetails: string | null; // populated only when the viewer may see banking (admin or approver)
+  bankAccounts: BillingAccount[]; // populated only when the viewer may see banking (admin or approver)
 };
 
 export type ClientRoomTimelineEvent = {
@@ -258,16 +261,21 @@ async function loadTimelineEvents(projectId: string, includeInternal: boolean): 
 async function loadBilling(canSeeBank: boolean): Promise<ClientRoomBilling> {
   const { data } = await supabaseAdmin()
     .from("company_billing")
-    .select("legal_name, tax_id, address, billing_email, public_note, bank_details")
+    .select("legal_name, tax_id, vat_number, address, billing_email, public_note, bank_accounts")
     .eq("id", 1)
     .maybeSingle();
+  const rawAccounts = (data?.bank_accounts as Array<{ title?: string; details?: string }> | null) ?? [];
+  const accounts: BillingAccount[] = Array.isArray(rawAccounts)
+    ? rawAccounts.map((a) => ({ title: String(a?.title ?? "").trim(), details: String(a?.details ?? "").trim() })).filter((a) => a.title || a.details)
+    : [];
   return {
     legalName: (data?.legal_name as string | null) ?? null,
-    taxId: (data?.tax_id as string | null) ?? null,
+    companyNumber: (data?.tax_id as string | null) ?? null,
+    vatNumber: (data?.vat_number as string | null) ?? null,
     address: (data?.address as string | null) ?? null,
     billingEmail: (data?.billing_email as string | null) ?? null,
     publicNote: (data?.public_note as string | null) ?? null,
-    bankDetails: canSeeBank ? ((data?.bank_details as string | null) ?? null) : null,
+    bankAccounts: canSeeBank ? accounts : [],
   };
 }
 

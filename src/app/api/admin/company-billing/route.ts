@@ -17,12 +17,17 @@ export async function PATCH(req: NextRequest) {
   const str = (v: unknown) => (typeof v === "string" ? v.trim() || null : undefined);
   const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
   const cols: Array<[string, string]> = [
-    ["legalName", "legal_name"], ["taxId", "tax_id"], ["address", "address"],
-    ["billingEmail", "billing_email"], ["bankDetails", "bank_details"], ["publicNote", "public_note"],
+    ["legalName", "legal_name"], ["companyNumber", "tax_id"], ["vatNumber", "vat_number"], ["address", "address"],
+    ["billingEmail", "billing_email"], ["publicNote", "public_note"],
   ];
   for (const [key, col] of cols) {
     const v = str(body[key]);
     if (v !== undefined) update[col] = v;
+  }
+  if (Array.isArray(body.bankAccounts)) {
+    update.bank_accounts = (body.bankAccounts as Array<{ title?: unknown; details?: unknown }>)
+      .map((a) => ({ title: String(a?.title ?? "").trim(), details: String(a?.details ?? "").trim() }))
+      .filter((a) => a.title || a.details);
   }
 
   const { error } = await supabaseAdmin().from("company_billing").update(update).eq("id", 1);

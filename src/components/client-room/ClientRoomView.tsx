@@ -26,6 +26,17 @@ function displayDate(value: string | null) {
   return new Intl.DateTimeFormat("es-ES", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(value));
 }
 
+function KindIcon({ kind }: { kind: string }) {
+  const p = { fill: "none", stroke: "currentColor", strokeWidth: 1.4, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+  const glyphs: Record<string, ReactNode> = {
+    meeting: <><rect x="2.5" y="5" width="9" height="8" rx="1.5" {...p} /><path d="M11.5 8.3l3.5-2v5.4l-3.5-2z" {...p} /></>,
+    document: <><path d="M4.5 2.5h5l4 4v9h-9z" {...p} /><path d="M9.5 2.5v4h4" {...p} /><path d="M6.5 9.5h5M6.5 12h5" {...p} /></>,
+    milestone: <><path d="M5 2.5v13" {...p} /><path d="M5 3.5h8l-2 3 2 3H5" {...p} /></>,
+    exchange: <><path d="M3 6.5h10l-2.5-2.5" {...p} /><path d="M15 11.5H5l2.5 2.5" {...p} /></>,
+  };
+  return <svg width="14" height="14" viewBox="0 0 18 18" aria-hidden="true" style={{ display: "block" }}>{glyphs[kind] ?? glyphs.milestone}</svg>;
+}
+
 function isEmbeddableHtml(url: string) {
   return url.startsWith("/mps-deck/") || url.startsWith("/decks/");
 }
@@ -72,10 +83,11 @@ export function ClientRoomView({ room, role, adminPreview }: { room: ClientRoomP
   const documents = room.materials.filter((item) => !["invoice", "purchase_order", "proposal_budget"].includes(item.category));
   const adminMaterials = room.materials.filter((item) => ["invoice", "purchase_order"].includes(item.category));
   const b = room.billing;
-  const billingLines = [b.legalName, b.taxId ? `Tax ID: ${b.taxId}` : null, b.address, b.billingEmail ? `Facturación: ${b.billingEmail}` : null].filter((x): x is string => !!x);
+  const billingLines = [b.legalName, b.companyNumber ? `N.º de registro: ${b.companyNumber}` : null, b.vatNumber ? `VAT: ${b.vatNumber}` : null, b.address, b.billingEmail ? `Facturación: ${b.billingEmail}` : null].filter((x): x is string => !!x);
   const hasCompany = billingLines.length > 0;
-  const copyText = hasCompany ? ["Common House", ...billingLines].join("\n") : "";
-  const hasAdmin = hasCompany || !!b.bankDetails || !!b.publicNote || adminMaterials.length > 0;
+  const copyText = hasCompany ? billingLines.join("\n") : "";
+  const hasBank = b.bankAccounts.length > 0;
+  const hasAdmin = hasCompany || hasBank || !!b.publicNote || adminMaterials.length > 0;
   const presentations = room.materials.filter((m) => m.category === "presentation" && (isEmbeddableHtml(m.url) || isPdf(m) || isSlides(m)));
   // The room preview (hero) is the presentation marked 'current'; fall back to any
   // non-superseded, then the newest. Only one deck is ever featured.
@@ -181,10 +193,9 @@ export function ClientRoomView({ room, role, adminPreview }: { room: ClientRoomP
                 ? <p className="text-[12px]" style={{ color: "var(--hall-muted-2)" }}>Reuniones, documentos e hitos aparecerán aquí.</p>
                 : <div>{room.timelineEvents.map((ev, index) => {
                     const last = index === room.timelineEvents.length - 1;
-                    const dot = ev.kind === "document" ? "var(--hall-ok)" : ev.kind === "meeting" ? "var(--hall-lime)" : "var(--hall-ink-0)";
                     return (
-                      <div key={ev.id} className="relative pl-5 pb-4" style={{ borderLeft: last ? "1px solid transparent" : "1px solid var(--hall-line)" }}>
-                        <span className="absolute rounded-full" style={{ left: -5, top: 3, width: 9, height: 9, background: dot, boxShadow: ev.kind === "meeting" ? "0 0 0 3px var(--hall-lime-paper)" : "none" }} />
+                      <div key={ev.id} className="relative pl-7 pb-4" style={{ borderLeft: last ? "1px solid transparent" : "1px solid var(--hall-line)" }}>
+                        <span className="absolute flex items-center justify-center rounded-full" style={{ left: -11, top: 0, width: 22, height: 22, background: "var(--hall-paper-0)", border: "1px solid var(--hall-line-strong)", color: "var(--hall-ink-0)" }}><KindIcon kind={ev.kind} /></span>
                         <p className="text-[10px]" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}>{displayDate(ev.eventDate)} · {TIMELINE_KIND_LABELS[ev.kind] ?? ev.kind}</p>
                         <p className="text-[13px] font-semibold mt-0.5">{ev.title}</p>
                         {ev.attendees.length > 0 && <p className="text-[10.5px] mt-0.5" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted)" }}>{ev.attendees.join("  ·  ")}</p>}
@@ -205,14 +216,14 @@ export function ClientRoomView({ room, role, adminPreview }: { room: ClientRoomP
               {!hasAdmin
                 ? <p className="text-[12px]" style={{ color: "var(--hall-muted-2)" }}>Aquí verás la facturación y los datos de pago.</p>
                 : <div className="space-y-4">
-                    {(hasCompany || b.bankDetails || b.publicNote) && (
+                    {(hasCompany || hasBank || b.publicNote) && (
                       <div>
                         <div className="flex items-center justify-between gap-3 mb-2">
                           <p className="text-[10px] uppercase tracking-[0.07em]" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}>Datos de pago</p>
                           {copyText && <CopyButton text={copyText} label="Copiar todo" />}
                         </div>
                         {hasCompany && <div className="text-[13px] leading-[1.6]" style={{ whiteSpace: "pre-line" }}>{["Common House", ...billingLines].join("\n")}</div>}
-                        {b.bankDetails && <BankReveal details={b.bankDetails} />}
+                        {hasBank && <BankReveal accounts={b.bankAccounts} />}
                         {b.publicNote && <p className="mt-2 text-[11px]" style={{ color: "var(--hall-muted)" }}>{b.publicNote}</p>}
                       </div>
                     )}
