@@ -5,6 +5,7 @@ import { BrandLogo } from "@/components/BrandLogo";
 import { AgreementResponseActions } from "@/components/client-room/AgreementResponseActions";
 import { DeckEmbed } from "@/components/client-room/DeckEmbed";
 import { PdfEmbed } from "@/components/client-room/PdfEmbed";
+import { SlidesEmbed } from "@/components/client-room/SlidesEmbed";
 import type { ClientRole } from "@/lib/require-client-access";
 import type { ClientRoomMaterial, ClientRoomProject } from "@/lib/client-room";
 
@@ -29,6 +30,13 @@ function isEmbeddableHtml(url: string) {
 }
 function isPdf(m: ClientRoomMaterial) {
   return m.mimeType === "application/pdf" || (m.url.includes("/materials/") && m.url.endsWith("/file"));
+}
+function slidesId(url: string): string | null {
+  const m = url.match(/docs\.google\.com\/presentation\/d\/([a-zA-Z0-9_-]+)/);
+  return m ? m[1] : null;
+}
+function isSlides(m: ClientRoomMaterial) {
+  return slidesId(m.url) !== null;
 }
 
 function Card({ id, title, flourish, meta, children }: { id?: string; title: string; flourish?: string; meta?: ReactNode; children: ReactNode }) {
@@ -62,7 +70,7 @@ export function ClientRoomView({ room, role, adminPreview }: { room: ClientRoomP
   const otherAgreements = room.agreements.filter((item) => item.agreementType !== "understanding");
   const documents = room.materials.filter((item) => !["invoice", "purchase_order", "proposal_budget"].includes(item.category));
   const commercialMaterials = room.materials.filter((item) => ["invoice", "purchase_order", "proposal_budget"].includes(item.category));
-  const featured = room.materials.find((m) => m.category === "presentation" && (isEmbeddableHtml(m.url) || isPdf(m)));
+  const featured = room.materials.find((m) => m.category === "presentation" && (isEmbeddableHtml(m.url) || isPdf(m) || isSlides(m)));
   const heardFields = [
     ["El reto", room.whatWeHeard.challenge],
     ["Lo que más importa", room.whatWeHeard.mattersMost],
@@ -118,7 +126,11 @@ export function ClientRoomView({ room, role, adminPreview }: { room: ClientRoomP
         <div className="grid grid-cols-1 lg:grid-cols-[1.65fr_1fr] gap-5 items-start mt-5">
           <div className="flex flex-col gap-5">
             <Card id="proposal" title="Nuestra" flourish="propuesta" meta={room.proposal.status}>
-              {featured && <div className="mb-4">{isPdf(featured) ? <PdfEmbed url={featured.url} title={featured.title} /> : <DeckEmbed url={featured.url} title={featured.title} />}</div>}
+              {featured && <div className="mb-4">{
+                isPdf(featured) ? <PdfEmbed url={featured.url} title={featured.title} />
+                : isSlides(featured) ? <SlidesEmbed embedUrl={`https://docs.google.com/presentation/d/${slidesId(featured.url)}/embed?start=false&loop=false&rm=minimal`} openUrl={featured.url} title={featured.title} />
+                : <DeckEmbed url={featured.url} title={featured.title} />
+              }</div>}
               <p className="text-[14px] leading-[1.6] max-w-2xl">{room.proposal.summary || "La propuesta se está preparando a partir de lo que escuchamos."}</p>
               {!featured && room.proposal.file_url && <a className="hall-btn-primary inline-flex mt-4" href={room.proposal.file_url} target="_blank" rel="noreferrer">Abrir {room.proposal.file_name || "propuesta"} ↗</a>}
             </Card>

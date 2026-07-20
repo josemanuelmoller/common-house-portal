@@ -29,7 +29,7 @@ function buildCsp(frameAncestors: string) {
     "img-src 'self' data: blob: https:",
     "font-src 'self' data:",
     "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.clerk.accounts.dev https://*.clerk.com https://clerk.wearecommonhouse.com",
-    "frame-src 'self' https://*.clerk.accounts.dev https://*.clerk.com",
+    "frame-src 'self' https://*.clerk.accounts.dev https://*.clerk.com https://docs.google.com",
     `frame-ancestors ${frameAncestors}`,
     "worker-src 'self' blob:",
     "manifest-src 'self'",
