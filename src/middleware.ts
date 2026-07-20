@@ -28,5 +28,9 @@ export const config = {
     "/((?!_next/|.*\\.(?:ico|png|jpe?g|gif|svg|webp|css|js|json|webmanifest|woff2?|ttf|otf|map|txt|xml|pdf|mp4|webm|html)$).*)",
     "/",
     "/(api|trpc)(.*)",
+    // Force Clerk on the gated proposal-deck route even for asset URLs ending in
+    // .js/.woff2/.png etc. — the static-extension exclusion above must NOT strip
+    // auth here, or the deck assets would be reachable without a session.
+    "/proposal-deck/(.*)",
   ],
 };

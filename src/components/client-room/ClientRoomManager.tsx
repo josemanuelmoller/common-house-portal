@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState, type CSSProperties, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { isEmbeddableDeckUrl, proposalDeckIndexPath } from "@/lib/deck-embed";
 import type {
   ClientRoomAdminData,
   ClientRoomAgreement,
@@ -204,8 +205,10 @@ export function ClientAccessManager({ slug, hasDrive }: { slug: string; hasDrive
   );
 }
 
-function MaterialEditor({ projectId, material }: { projectId: string; material: ClientRoomMaterial }) {
+function MaterialEditor({ projectId, slug, material }: { projectId: string; slug: string; material: ClientRoomMaterial }) {
   const router = useRouter();
+  // Deck bundles are gated: link the admin to the protected route, never the raw bundle url.
+  const openHref = isEmbeddableDeckUrl(material.url) && slug ? proposalDeckIndexPath(slug) : material.url;
   const [visibility, setVisibility] = useState(material.visibility);
   const [status, setStatus] = useState(material.documentStatus);
   const [category, setCategory] = useState<ClientRoomMaterialCategory>(material.category);
@@ -232,7 +235,7 @@ function MaterialEditor({ projectId, material }: { projectId: string; material: 
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[minmax(220px,1fr)_180px_135px_120px_auto] gap-2 lg:items-center py-3" style={{ borderBottom: "1px solid var(--hall-line-soft)" }}>
-      <div className="min-w-0"><a className="text-[12px] font-semibold hover:underline" href={material.url} target="_blank" rel="noreferrer">{material.title} ↗</a><p className="text-[10px] truncate" style={{ color: "var(--hall-muted-2)" }}>{material.folderName || "Unfiled"}{message ? ` · ${message}` : ""}</p></div>
+      <div className="min-w-0"><a className="text-[12px] font-semibold hover:underline" href={openHref} target="_blank" rel="noreferrer">{material.title} ↗</a><p className="text-[10px] truncate" style={{ color: "var(--hall-muted-2)" }}>{material.folderName || "Unfiled"}{message ? ` · ${message}` : ""}</p></div>
       <select aria-label={`Category for ${material.title}`} style={fieldStyle} value={category} onChange={(event) => setCategory(event.target.value as ClientRoomMaterialCategory)}>{CATEGORIES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select>
       <select aria-label={`Status for ${material.title}`} style={fieldStyle} value={status} onChange={(event) => setStatus(event.target.value)}>{["draft", "in_review", "current", "approved", "superseded", "archived"].map((item) => <option key={item} value={item}>{item.replaceAll("_", " ")}</option>)}</select>
       <select aria-label={`Visibility for ${material.title}`} style={fieldStyle} value={visibility} onChange={(event) => setVisibility(event.target.value)}>{["internal", "proposed", "client", "restricted", "archived"].map((item) => <option key={item} value={item}>{item}</option>)}</select>
@@ -285,7 +288,7 @@ export function ClientMaterialsManager({ room }: { room: ClientRoomAdminData }) 
         <Feedback message={message} />
       </div>
       {!room.driveFolderId && <p className="text-[11px]" style={{ color: "var(--hall-muted-2)" }}>No Drive folder yet. Create one to hold this room&apos;s documents (NDA, proposal, contracts). It stays private until you share it at invite time.</p>}
-      {room.materials.length === 0 ? <p className="text-[11px]" style={{ color: "var(--hall-muted-2)" }}>No indexed materials yet.</p> : room.materials.map((material) => <MaterialEditor key={material.id} projectId={room.id} material={material} />)}
+      {room.materials.length === 0 ? <p className="text-[11px]" style={{ color: "var(--hall-muted-2)" }}>No indexed materials yet.</p> : room.materials.map((material) => <MaterialEditor key={material.id} projectId={room.id} slug={room.slug} material={material} />)}
     </div>
   );
 }

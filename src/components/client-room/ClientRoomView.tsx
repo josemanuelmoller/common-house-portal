@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { BrandLogo } from "@/components/BrandLogo";
 import { AgreementResponseActions } from "@/components/client-room/AgreementResponseActions";
 import { DeckEmbed } from "@/components/client-room/DeckEmbed";
+import { isEmbeddableDeckUrl, proposalDeckIndexPath } from "@/lib/deck-embed";
 import type { ClientRole } from "@/lib/require-client-access";
 import type { ClientRoomMaterial, ClientRoomProject } from "@/lib/client-room";
 
@@ -21,10 +22,6 @@ const TIMELINE_KIND_LABELS: Record<string, string> = {
 function displayDate(value: string | null) {
   if (!value) return "—";
   return new Intl.DateTimeFormat("es-ES", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(value));
-}
-
-function isEmbeddable(url: string) {
-  return url.startsWith("/mps-deck/") || url.startsWith("/decks/");
 }
 
 function Card({ id, title, flourish, meta, children }: { id?: string; title: string; flourish?: string; meta?: ReactNode; children: ReactNode }) {
@@ -56,9 +53,15 @@ export function ClientRoomView({ room, role, adminPreview }: { room: ClientRoomP
   const openAgreements = room.agreements.filter((item) => item.status === "shared" || item.status === "changes_requested");
   const understandingAgreements = room.agreements.filter((item) => item.agreementType === "understanding");
   const otherAgreements = room.agreements.filter((item) => item.agreementType !== "understanding");
-  const documents = room.materials.filter((item) => !["invoice", "purchase_order", "proposal_budget"].includes(item.category));
+  // The deck bytes are NOT served from the material url (which points at the
+  // private bundle name); they are served only through the Client-Room-gated
+  // /proposal-deck/<slug> route. Embed that protected URL, never the raw asset.
+  const deckMaterial = room.materials.find((m) => m.category === "presentation" && isEmbeddableDeckUrl(m.url));
+  const deckSrc = deckMaterial && room.slug ? proposalDeckIndexPath(room.slug) : null;
+  // The embeddable deck is rendered as the embed above; keep it out of the
+  // documents list so its raw (gated) bundle url is never surfaced as a link.
+  const documents = room.materials.filter((item) => !["invoice", "purchase_order", "proposal_budget"].includes(item.category) && item !== deckMaterial);
   const commercialMaterials = room.materials.filter((item) => ["invoice", "purchase_order", "proposal_budget"].includes(item.category));
-  const deck = room.materials.find((m) => m.category === "presentation" && isEmbeddable(m.url));
   const heardFields = [
     ["El reto", room.whatWeHeard.challenge],
     ["Lo que más importa", room.whatWeHeard.mattersMost],
@@ -110,9 +113,9 @@ export function ClientRoomView({ room, role, adminPreview }: { room: ClientRoomP
         <div className="grid grid-cols-1 lg:grid-cols-[1.65fr_1fr] gap-5 items-start mt-5">
           <div className="flex flex-col gap-5">
             <Card id="proposal" title="Nuestra" flourish="propuesta" meta={room.proposal.status}>
-              {deck && <div className="mb-4"><DeckEmbed url={deck.url} title={deck.title} /></div>}
+              {deckSrc && deckMaterial && <div className="mb-4"><DeckEmbed url={deckSrc} title={deckMaterial.title} /></div>}
               <p className="text-[14px] leading-[1.6] max-w-2xl">{room.proposal.summary || "La propuesta se está preparando a partir de lo que escuchamos."}</p>
-              {!deck && room.proposal.file_url && <a className="hall-btn-primary inline-flex mt-4" href={room.proposal.file_url} target="_blank" rel="noreferrer">Abrir {room.proposal.file_name || "propuesta"} ↗</a>}
+              {!deckSrc && room.proposal.file_url && <a className="hall-btn-primary inline-flex mt-4" href={room.proposal.file_url} target="_blank" rel="noreferrer">Abrir {room.proposal.file_name || "propuesta"} ↗</a>}
             </Card>
 
             <Card id="heard" title="Lo que" flourish="escuchamos">

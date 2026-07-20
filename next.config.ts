@@ -18,9 +18,11 @@ import type { NextConfig } from "next";
 //     applied under /api/*).
 //   - Anthropic + Notion calls happen server-side only, so they don't need
 //     connect-src grants.
-// frameAncestors: 'none' everywhere except embeddable presentation bundles
-// (public/mps-deck and future /decks/*), which the room embeds same-origin in
-// a preview iframe. 'self' keeps external framing (clickjacking) blocked.
+// frameAncestors: 'none' everywhere except the gated proposal-deck route
+// (/proposal-deck/<slug>/*), which the room embeds same-origin in a preview
+// iframe. 'self' keeps external framing (clickjacking) blocked. The deck bytes
+// live in a private deck-content/ dir (never public/) and are served only
+// through the Client-Room-authorised route handler.
 function buildCsp(frameAncestors: string) {
   return [
     "default-src 'self'",
@@ -63,11 +65,20 @@ const embeddableHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // The proposal-deck route reads bundle files from deck-content/ at runtime.
+  // Force-include that dir in the route's serverless function so the files ship
+  // with the deployment (they are outside public/, so tracing won't add them
+  // automatically).
+  // Key is a picomatch route glob: use "**" rather than the literal
+  // "[slug]/[[...asset]]" (unescaped brackets would be read as a character class
+  // and silently fail to match, leaving the deck files out of the bundle).
+  outputFileTracingIncludes: {
+    "/proposal-deck/**": ["./deck-content/**/*"],
+  },
   async headers() {
     return [
-      { source: "/mps-deck/:path*", headers: embeddableHeaders },
-      { source: "/decks/:path*", headers: embeddableHeaders },
-      { source: "/((?!mps-deck/|decks/).*)", headers: securityHeaders },
+      { source: "/proposal-deck/:path*", headers: embeddableHeaders },
+      { source: "/((?!proposal-deck/).*)", headers: securityHeaders },
     ];
   },
 };
