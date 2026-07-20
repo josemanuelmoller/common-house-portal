@@ -70,7 +70,11 @@ export function ClientRoomView({ room, role, adminPreview }: { room: ClientRoomP
   const documents = room.materials.filter((item) => !["invoice", "purchase_order", "proposal_budget"].includes(item.category));
   const commercialMaterials = room.materials.filter((item) => ["invoice", "purchase_order", "proposal_budget"].includes(item.category));
   const presentations = room.materials.filter((m) => m.category === "presentation" && (isEmbeddableHtml(m.url) || isPdf(m) || isSlides(m)));
-  const featured = presentations.find((m) => m.documentStatus !== "superseded") ?? presentations[0];
+  // The room preview (hero) is the presentation marked 'current'; fall back to any
+  // non-superseded, then the newest. Only one deck is ever featured.
+  const featured = presentations.find((m) => m.documentStatus === "current")
+    ?? presentations.find((m) => m.documentStatus !== "superseded")
+    ?? presentations[0];
   const previousVersions = room.materials.filter((m) => m.category === "presentation" && m.documentStatus === "superseded" && m.id !== featured?.id);
   const heardFields = [
     ["El reto", room.whatWeHeard.challenge],
