@@ -70,7 +70,9 @@ export function ClientRoomView({ room, role, adminPreview }: { room: ClientRoomP
   const otherAgreements = room.agreements.filter((item) => item.agreementType !== "understanding");
   const documents = room.materials.filter((item) => !["invoice", "purchase_order", "proposal_budget"].includes(item.category));
   const commercialMaterials = room.materials.filter((item) => ["invoice", "purchase_order", "proposal_budget"].includes(item.category));
-  const featured = room.materials.find((m) => m.category === "presentation" && (isEmbeddableHtml(m.url) || isPdf(m) || isSlides(m)));
+  const presentations = room.materials.filter((m) => m.category === "presentation" && (isEmbeddableHtml(m.url) || isPdf(m) || isSlides(m)));
+  const featured = presentations.find((m) => m.documentStatus !== "superseded") ?? presentations[0];
+  const previousVersions = room.materials.filter((m) => m.category === "presentation" && m.documentStatus === "superseded" && m.id !== featured?.id);
   const heardFields = [
     ["El reto", room.whatWeHeard.challenge],
     ["Lo que más importa", room.whatWeHeard.mattersMost],
@@ -133,6 +135,17 @@ export function ClientRoomView({ room, role, adminPreview }: { room: ClientRoomP
               }</div>}
               <p className="text-[14px] leading-[1.6] max-w-2xl">{room.proposal.summary || "La propuesta se está preparando a partir de lo que escuchamos."}</p>
               {!featured && room.proposal.file_url && <a className="hall-btn-primary inline-flex mt-4" href={room.proposal.file_url} target="_blank" rel="noreferrer">Abrir {room.proposal.file_name || "propuesta"} ↗</a>}
+              {previousVersions.length > 0 && (
+                <div className="mt-5 pt-4" style={{ borderTop: "1px solid var(--hall-line-soft)" }}>
+                  <p className="text-[10px] uppercase tracking-[0.07em] mb-2" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}>Versiones anteriores</p>
+                  {previousVersions.map((m) => (
+                    <a key={m.id} href={m.url} target="_blank" rel="noreferrer" className="flex items-center justify-between gap-3 py-1.5 hover:opacity-70">
+                      <span className="text-[12.5px]" style={{ color: "var(--hall-muted-2)" }}>{m.title}</span>
+                      <span className="text-[10.5px]" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-3)" }}>{m.versionLabel || "anterior"} ↗</span>
+                    </a>
+                  ))}
+                </div>
+              )}
             </Card>
 
             <Card id="heard" title="Lo que" flourish="escuchamos">
