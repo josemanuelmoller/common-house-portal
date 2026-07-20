@@ -18,6 +18,9 @@ import { getSupabaseServerClient } from "@/lib/supabase-server";
 
 export const dynamic = "force-dynamic";
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const keyCol = (id: string) => (UUID_RE.test(id) ? "id" : "notion_id");
+
 export async function PATCH(
   req: NextRequest,
   ctx: { params: Promise<{ id: string }> },
@@ -40,7 +43,7 @@ export async function PATCH(
       hall_draft_status: "pending_review",
       updated_at:        new Date().toISOString(),
     })
-    .eq("notion_id", id);
+    .eq(keyCol(id), id);
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
 
   return NextResponse.json({ ok: true });
@@ -63,7 +66,7 @@ export async function DELETE(
       hall_draft_status: "discarded",
       updated_at:        new Date().toISOString(),
     })
-    .eq("notion_id", id);
+    .eq(keyCol(id), id);
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
 
   return NextResponse.json({ ok: true });

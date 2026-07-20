@@ -290,6 +290,99 @@ export function ClientMaterialsManager({ room }: { room: ClientRoomAdminData }) 
   );
 }
 
+function NarrativeField({ label, value, onChange, area }: { label: string; value: string; onChange: (v: string) => void; area?: boolean }) {
+  return (
+    <div className="mb-3">
+      <label style={labelStyle}>{label}</label>
+      {area
+        ? <textarea style={{ ...fieldStyle, minHeight: 58 }} value={value} onChange={(e) => onChange(e.target.value)} />
+        : <input style={fieldStyle} value={value} onChange={(e) => onChange(e.target.value)} />}
+    </div>
+  );
+}
+
+export function NarrativeManager({ room }: { room: ClientRoomAdminData }) {
+  const router = useRouter();
+  const [f, setF] = useState({
+    welcomeNote: room.welcomeNote ?? "",
+    currentFocus: room.currentFocus ?? "",
+    nextMilestone: room.nextMilestone ?? "",
+    challenge: room.whatWeHeard.challenge ?? "",
+    mattersMost: room.whatWeHeard.mattersMost ?? "",
+    obstacles: room.whatWeHeard.obstacles ?? "",
+    success: room.whatWeHeard.success ?? "",
+    proposalStatus: room.proposal.status ?? "",
+    proposalSummary: room.proposal.summary ?? "",
+  });
+  const [plan, setPlan] = useState<Array<{ date: string; label: string; type: string }>>(
+    room.timeline.map((t) => ({ date: t.date ?? "", label: t.label ?? "", type: t.type ?? "future" }))
+  );
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const set = (k: keyof typeof f) => (v: string) => setF((prev) => ({ ...prev, [k]: v }));
+
+  async function save() {
+    setBusy(true);
+    setMessage(null);
+    try {
+      await apiJson(`/api/admin/projects/${room.id}/client-room/content`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...f, plan: plan.filter((p) => p.label.trim()) }),
+      });
+      setMessage("Guardado");
+      router.refresh();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div>
+      <p className="text-[11px] mb-4" style={{ color: "var(--hall-muted-2)" }}>Edita a mano lo que muestra el room. Todo queda interno hasta que compartas / publiques.</p>
+      <NarrativeField label="Nota de bienvenida" value={f.welcomeNote} onChange={set("welcomeNote")} area />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3">
+        <NarrativeField label="Foco actual" value={f.currentFocus} onChange={set("currentFocus")} />
+        <NarrativeField label="Próximo hito" value={f.nextMilestone} onChange={set("nextMilestone")} />
+      </div>
+
+      <p className="mt-4 mb-2 text-[11px] font-semibold" style={{ fontFamily: "var(--font-hall-mono)", textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--hall-muted-2)" }}>Lo que escuchamos</p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3">
+        <NarrativeField label="El reto" value={f.challenge} onChange={set("challenge")} area />
+        <NarrativeField label="Lo que más importa" value={f.mattersMost} onChange={set("mattersMost")} area />
+        <NarrativeField label="Lo que puede estorbar" value={f.obstacles} onChange={set("obstacles")} area />
+        <NarrativeField label="Cómo se ve el éxito" value={f.success} onChange={set("success")} area />
+      </div>
+
+      <p className="mt-4 mb-2 text-[11px] font-semibold" style={{ fontFamily: "var(--font-hall-mono)", textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--hall-muted-2)" }}>Propuesta</p>
+      <div className="grid grid-cols-1 sm:grid-cols-[160px_1fr] gap-x-3">
+        <NarrativeField label="Estado" value={f.proposalStatus} onChange={set("proposalStatus")} />
+        <NarrativeField label="Resumen" value={f.proposalSummary} onChange={set("proposalSummary")} area />
+      </div>
+
+      <div className="flex items-center justify-between mt-4 mb-2">
+        <p className="text-[11px] font-semibold" style={{ fontFamily: "var(--font-hall-mono)", textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--hall-muted-2)" }}>Plan</p>
+        <button type="button" className="hall-btn-ghost" onClick={() => setPlan((p) => [...p, { date: "", label: "", type: "future" }])}>+ Hito</button>
+      </div>
+      {plan.map((row, i) => (
+        <div key={i} className="grid grid-cols-[120px_1fr_120px_auto] gap-2 mb-2 items-center">
+          <input aria-label="Fecha" style={fieldStyle} placeholder="Q3 2026" value={row.date} onChange={(e) => setPlan((p) => p.map((r, j) => j === i ? { ...r, date: e.target.value } : r))} />
+          <input aria-label="Hito" style={fieldStyle} placeholder="Descripción del hito" value={row.label} onChange={(e) => setPlan((p) => p.map((r, j) => j === i ? { ...r, label: e.target.value } : r))} />
+          <select aria-label="Tipo" style={fieldStyle} value={row.type} onChange={(e) => setPlan((p) => p.map((r, j) => j === i ? { ...r, type: e.target.value } : r))}>{["past", "today", "future"].map((t) => <option key={t} value={t}>{t}</option>)}</select>
+          <button type="button" className="hall-btn-ghost" style={{ color: "var(--hall-danger)" }} onClick={() => setPlan((p) => p.filter((_, j) => j !== i))}>×</button>
+        </div>
+      ))}
+
+      <div className="flex items-center gap-3 mt-4">
+        <button type="button" className="hall-btn-primary" disabled={busy} onClick={() => void save()}>{busy ? "Guardando…" : "Guardar relato"}</button>
+        <Feedback message={message} />
+      </div>
+    </div>
+  );
+}
+
 function TimelineEventEditor({ projectId, event }: { projectId: string; event: ClientRoomTimelineEvent }) {
   const router = useRouter();
   const [eventDate, setEventDate] = useState(event.eventDate);

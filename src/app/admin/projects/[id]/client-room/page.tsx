@@ -7,6 +7,7 @@ import {
   ClientAccessManager,
   ClientMaterialsManager,
   ClientRoomSettings,
+  NarrativeManager,
   TimelineManager,
 } from "@/components/client-room/ClientRoomManager";
 import { getClientRoomAdminData } from "@/lib/client-room";
@@ -56,6 +57,10 @@ export default async function ClientRoomAdminPage({ params }: { params: Promise<
 
       <HallSection title="Room" flourish="settings" meta={room.slug ? `/${room.slug}` : "NO SLUG"}>
         <ClientRoomSettings room={room} />
+      </HallSection>
+
+      <HallSection title="Narrative" flourish="the story" meta="ROOM CONTENT">
+        <NarrativeManager room={room} />
       </HallSection>
 
       <HallSection title="Client" flourish="access" meta="PROJECT SCOPED">

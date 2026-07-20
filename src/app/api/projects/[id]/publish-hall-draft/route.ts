@@ -37,13 +37,22 @@ export async function POST(
   } catch { /* no body — use stored draft */ }
 
   const sb = getSupabaseServerClient();
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  const { data: proj } = await sb
+    .from("projects")
+    .select("id")
+    .eq(UUID_RE.test(id) ? "id" : "notion_id", id)
+    .maybeSingle();
+  if (!proj) return NextResponse.json({ ok: false, error: "project not found" }, { status: 404 });
+  const projId = proj.id as string;
+
   let draftToPublish: HallDraft | null = bodyDraft;
 
   if (!draftToPublish) {
     const { data: row } = await sb
       .from("projects")
       .select("hall_draft")
-      .eq("notion_id", id)
+      .eq("id", projId)
       .maybeSingle();
     draftToPublish = (row?.hall_draft as HallDraft | null) ?? null;
   }
@@ -74,7 +83,7 @@ export async function POST(
       hall_success:        ht.success,
       updated_at:          nowIso,
     })
-    .eq("notion_id", id);
+    .eq("id", projId);
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
 
   // Bust the Hall page cache so the new hero shows immediately.
