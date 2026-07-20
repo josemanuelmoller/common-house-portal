@@ -128,10 +128,10 @@ export function ClientRoomView({ room, role, adminPreview }: { room: ClientRoomP
                 ? <p className="text-[12px]" style={{ color: "var(--hall-muted-2)" }}>Common House está preparando la primera síntesis.</p>
                 : <div className="space-y-6">
                     {understandingAgreements.map((a) => a.summary && <p key={a.id} className="text-[14px] leading-[1.7] max-w-2xl" style={{ whiteSpace: "pre-line" }}>{a.summary}</p>)}
-                    {(heardFields.length > 0 || room.whatWeHeard.heard.length > 0) && <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-5">
+                    {heardFields.length > 0 && <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-5">
                       {heardFields.map(([label, value]) => <div key={label}><p className="text-[10px] uppercase tracking-[0.07em] mb-1.5" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}>{label}</p><p className="text-[13.5px] leading-[1.55]">{value}</p></div>)}
-                      {room.whatWeHeard.heard.map((item, index) => <div key={`${item.point}-${index}`}><p className="text-[10px] uppercase tracking-[0.07em] mb-1.5" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}>De la conversación</p><p className="text-[13.5px] leading-[1.55]">{item.point}</p>{item.speakerName && <p className="mt-1 text-[10px]" style={{ color: "var(--hall-muted-3)" }}>— {item.speakerName}</p>}</div>)}
                     </div>}
+                    {room.whatWeHeard.heard.length > 0 && <div><p className="text-[10px] uppercase tracking-[0.07em] mb-2" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}>De la conversación</p><div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3">{room.whatWeHeard.heard.map((item, index) => <p key={`${item.point}-${index}`} className="text-[13.5px] leading-[1.55]">{item.point}{item.speakerName && <span style={{ color: "var(--hall-muted-3)" }}> — {item.speakerName}</span>}</p>)}</div></div>}
                   </div>}
             </Card>
 
