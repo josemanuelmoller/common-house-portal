@@ -195,9 +195,12 @@ export async function shareDriveFolderWithEmail(
   email: string
 ): Promise<{ permissionId: string | null }> {
   const drive = getDriveClient();
+  // No notification email: the service-account sender (…iam.gserviceaccount.com)
+  // looks like phishing to clients. Access is granted silently; the client reaches
+  // documents through the room, not a raw Drive email.
   const result = await drive.permissions.create({
     fileId: folderId,
-    sendNotificationEmail: true,
+    sendNotificationEmail: false,
     requestBody: {
       role: "reader",
       type: "user",
