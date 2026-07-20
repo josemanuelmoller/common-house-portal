@@ -28,7 +28,7 @@ function isEmbeddableHtml(url: string) {
   return url.startsWith("/mps-deck/") || url.startsWith("/decks/");
 }
 function isPdf(m: ClientRoomMaterial) {
-  return m.mimeType === "application/pdf" || (m.url.includes("/materials/") && m.url.endsWith("/file"));
+  return m.mimeType === "application/pdf" || (m.mimeType == null && m.url.toLowerCase().endsWith(".pdf"));
 }
 function slidesId(url: string): string | null {
   const m = url.match(/docs\.google\.com\/presentation\/d\/([a-zA-Z0-9_-]+)/);
