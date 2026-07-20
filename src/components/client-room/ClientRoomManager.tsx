@@ -416,6 +416,54 @@ export function NarrativeManager({ room }: { room: ClientRoomAdminData }) {
   );
 }
 
+export function BillingManager({ room }: { room: ClientRoomAdminData }) {
+  const router = useRouter();
+  const [f, setF] = useState({
+    legalName: room.billing.legalName ?? "",
+    taxId: room.billing.taxId ?? "",
+    address: room.billing.address ?? "",
+    billingEmail: room.billing.billingEmail ?? "",
+    bankDetails: room.billing.bankDetails ?? "",
+    publicNote: room.billing.publicNote ?? "",
+  });
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const set = (k: keyof typeof f) => (v: string) => setF((p) => ({ ...p, [k]: v }));
+
+  async function save() {
+    setBusy(true);
+    setMessage(null);
+    try {
+      await apiJson(`/api/admin/company-billing`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(f) });
+      setMessage("Guardado");
+      router.refresh();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div>
+      <p className="text-[11px] mb-4" style={{ color: "var(--hall-muted-2)" }}>Datos de pago de Common House — los mismos para todos los clientes. Los datos bancarios solo los ve el rol <strong>approver</strong> en el room. Tú cargas los números.</p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3">
+        <NarrativeField label="Razón social" value={f.legalName} onChange={set("legalName")} />
+        <NarrativeField label="Tax ID / RUT" value={f.taxId} onChange={set("taxId")} />
+        <NarrativeField label="Dirección" value={f.address} onChange={set("address")} />
+        <NarrativeField label="Email de facturación" value={f.billingEmail} onChange={set("billingEmail")} />
+      </div>
+      <label style={labelStyle}>Datos bancarios (solo approver)</label>
+      <textarea style={{ ...fieldStyle, minHeight: 84, marginBottom: 8 }} value={f.bankDetails} onChange={(e) => set("bankDetails")(e.target.value)} placeholder={"Banco: …\nCuenta: …\nSWIFT / IBAN: …\nBeneficiario: …"} />
+      <NarrativeField label="Nota (visible a todos los invitados)" value={f.publicNote} onChange={set("publicNote")} area />
+      <div className="flex items-center gap-3 mt-2">
+        <button type="button" className="hall-btn-primary" disabled={busy} onClick={() => void save()}>{busy ? "Guardando…" : "Guardar datos de pago"}</button>
+        <Feedback message={message} />
+      </div>
+    </div>
+  );
+}
+
 function TimelineEventEditor({ projectId, event }: { projectId: string; event: ClientRoomTimelineEvent }) {
   const router = useRouter();
   const [eventDate, setEventDate] = useState(event.eventDate);

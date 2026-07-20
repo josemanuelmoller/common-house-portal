@@ -4,6 +4,7 @@ import { PortalShell } from "@/components/PortalShell";
 import { HallSection } from "@/components/HallSection";
 import {
   AgreementsManager,
+  BillingManager,
   ClientAccessManager,
   ClientMaterialsManager,
   ClientRoomSettings,
@@ -77,6 +78,10 @@ export default async function ClientRoomAdminPage({ params }: { params: Promise<
 
       <HallSection title="Project" flourish="materials" meta={`${room.materials.length} INDEXED`}>
         <ClientMaterialsManager room={room} />
+      </HallSection>
+
+      <HallSection title="Administrative" flourish="billing" meta="GLOBAL · APPROVER-GATED">
+        <BillingManager room={room} />
       </HallSection>
     </PortalShell>
   );

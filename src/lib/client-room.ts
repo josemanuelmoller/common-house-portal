@@ -36,6 +36,15 @@ export type ClientRoomMaterial = {
   modifiedAt: string | null;
 };
 
+export type ClientRoomBilling = {
+  legalName: string | null;
+  taxId: string | null;
+  address: string | null;
+  billingEmail: string | null;
+  publicNote: string | null;
+  bankDetails: string | null; // populated only when the viewer may see banking (admin or approver)
+};
+
 export type ClientRoomTimelineEvent = {
   id: string;
   eventDate: string;
@@ -96,6 +105,7 @@ export type ClientRoomProject = {
   timelineEvents: ClientRoomTimelineEvent[];
   materials: ClientRoomMaterial[];
   agreements: ClientRoomAgreement[];
+  billing: ClientRoomBilling;
 };
 
 export type ClientRoomAdminData = ClientRoomProject & {
@@ -245,13 +255,30 @@ async function loadTimelineEvents(projectId: string, includeInternal: boolean): 
   }));
 }
 
-async function assembleRoom(row: ProjectRow, includeInternal: boolean): Promise<ClientRoomProject> {
+async function loadBilling(canSeeBank: boolean): Promise<ClientRoomBilling> {
+  const { data } = await supabaseAdmin()
+    .from("company_billing")
+    .select("legal_name, tax_id, address, billing_email, public_note, bank_details")
+    .eq("id", 1)
+    .maybeSingle();
+  return {
+    legalName: (data?.legal_name as string | null) ?? null,
+    taxId: (data?.tax_id as string | null) ?? null,
+    address: (data?.address as string | null) ?? null,
+    billingEmail: (data?.billing_email as string | null) ?? null,
+    publicNote: (data?.public_note as string | null) ?? null,
+    bankDetails: canSeeBank ? ((data?.bank_details as string | null) ?? null) : null,
+  };
+}
+
+async function assembleRoom(row: ProjectRow, includeInternal: boolean, canSeeBank = false): Promise<ClientRoomProject> {
   const hero = row.hall_hero ? withDraftDefaults(row.hall_hero) : null;
-  const [orgName, materials, agreements, timelineEvents] = await Promise.all([
+  const [orgName, materials, agreements, timelineEvents, billing] = await Promise.all([
     organizationName(row.organization_id),
     loadMaterials(row.id, includeInternal),
     loadAgreements(row.id, includeInternal),
     loadTimelineEvents(row.id, includeInternal),
+    loadBilling(canSeeBank),
   ]);
   return {
     id: row.id,
@@ -293,19 +320,20 @@ async function assembleRoom(row: ProjectRow, includeInternal: boolean): Promise<
     timelineEvents,
     materials,
     agreements,
+    billing,
   };
 }
 
-export async function getClientRoomBySlug(slug: string): Promise<ClientRoomProject | null> {
+export async function getClientRoomBySlug(slug: string, opts?: { canSeeBank?: boolean }): Promise<ClientRoomProject | null> {
   const row = await resolveClientRoomProject(slug, "slug");
   if (!row || !row.client_room_enabled) return null;
-  return assembleRoom(row, false);
+  return assembleRoom(row, false, opts?.canSeeBank ?? false);
 }
 
 export async function getClientRoomAdminData(identifier: string): Promise<ClientRoomAdminData | null> {
   const row = await resolveClientRoomProject(identifier, "id");
   if (!row) return null;
-  const room = await assembleRoom(row, true);
+  const room = await assembleRoom(row, true, true);
   return {
     ...room,
     driveFolderId: row.drive_folder_id,

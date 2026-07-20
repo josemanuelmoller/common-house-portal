@@ -5,6 +5,7 @@ import { AgreementResponseActions } from "@/components/client-room/AgreementResp
 import { DeckEmbed } from "@/components/client-room/DeckEmbed";
 import { PdfEmbed } from "@/components/client-room/PdfEmbed";
 import { SlidesEmbed } from "@/components/client-room/SlidesEmbed";
+import { CopyButton } from "@/components/client-room/CopyButton";
 import type { ClientRole } from "@/lib/require-client-access";
 import type { ClientRoomMaterial, ClientRoomProject } from "@/lib/client-room";
 
@@ -68,7 +69,12 @@ export function ClientRoomView({ room, role, adminPreview }: { room: ClientRoomP
   const understandingAgreements = room.agreements.filter((item) => item.agreementType === "understanding");
   const otherAgreements = room.agreements.filter((item) => item.agreementType !== "understanding");
   const documents = room.materials.filter((item) => !["invoice", "purchase_order", "proposal_budget"].includes(item.category));
-  const commercialMaterials = room.materials.filter((item) => ["invoice", "purchase_order", "proposal_budget"].includes(item.category));
+  const adminMaterials = room.materials.filter((item) => ["invoice", "purchase_order"].includes(item.category));
+  const b = room.billing;
+  const billingLines = [b.legalName, b.taxId ? `Tax ID: ${b.taxId}` : null, b.address, b.billingEmail ? `Facturación: ${b.billingEmail}` : null].filter((x): x is string => !!x);
+  const hasCompany = billingLines.length > 0;
+  const copyText = [...(hasCompany ? ["Common House", ...billingLines] : []), b.bankDetails ?? ""].filter(Boolean).join("\n").trim();
+  const hasAdmin = hasCompany || !!b.bankDetails || !!b.publicNote || adminMaterials.length > 0;
   const presentations = room.materials.filter((m) => m.category === "presentation" && (isEmbeddableHtml(m.url) || isPdf(m) || isSlides(m)));
   // The room preview (hero) is the presentation marked 'current'; fall back to any
   // non-superseded, then the newest. Only one deck is ever featured.
@@ -91,7 +97,7 @@ export function ClientRoomView({ room, role, adminPreview }: { room: ClientRoomP
 
   const navItems: Array<[string, string]> = [
     ["overview", "Resumen"], ["together", "Trabajo juntos"], ["proposal", "Propuesta"],
-    ["heard", "Lo que escuchamos"], ["agreements", "Acuerdos"], ["plan", "Plan"], ["documents", "Documentos"],
+    ["heard", "Lo que escuchamos"], ["agreements", "Acuerdos"], ["plan", "Plan"], ["documents", "Documentos"], ["admin", "Administrativo"],
   ];
 
   return (
@@ -194,11 +200,34 @@ export function ClientRoomView({ room, role, adminPreview }: { room: ClientRoomP
               {otherAgreements.length === 0 ? <p className="text-[12px]" style={{ color: "var(--hall-muted-2)" }}>Las decisiones y siguientes pasos aparecerán aquí.</p> : <div className="space-y-4">{otherAgreements.map((agreement) => <article key={agreement.id} style={(agreement.status === "shared" || agreement.status === "changes_requested") ? { background: "var(--hall-lime-paper)", border: "1px solid var(--hall-lime)", borderRadius: 10, padding: "12px 14px" } : undefined}><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="text-[10px] uppercase tracking-[0.07em] mb-0.5" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}>{agreement.agreementType.replaceAll("_", " ")} · v{agreement.version}</p><h3 className="text-[14px] font-bold">{agreement.title}</h3>{agreement.summary && <p className="mt-1 text-[12px] leading-relaxed" style={{ color: "var(--hall-ink-3)" }}>{agreement.summary}</p>}</div><span className="hall-chip-outline shrink-0">{agreement.status.replaceAll("_", " ")}</span></div>{(agreement.status === "shared" || agreement.status === "changes_requested") && <AgreementResponseActions agreementId={agreement.id} version={agreement.version} agreementType={agreement.agreementType} canRespond={canRespondTo(agreement.agreementType)} />}{agreement.respondedAt && <p className="mt-2 text-[10px]" style={{ color: "var(--hall-muted-3)" }}>Respondido {displayDate(agreement.respondedAt)}{agreement.respondedEmail ? ` · ${agreement.respondedEmail}` : ""}</p>}</article>)}</div>}
             </Card>
 
-            {(commercialMaterials.length > 0 || room.agreements.some((i) => i.agreementType === "commercial" || i.agreementType === "purchase_order")) && (
-              <Card title="Comercial" meta={commercialMaterials.length || undefined}>
-                {commercialMaterials.length === 0 ? <p className="text-[12px]" style={{ color: "var(--hall-muted-2)" }}>Propuestas, órdenes y facturas aparecerán aquí.</p> : <div>{commercialMaterials.map((m, i) => <a key={m.id} href={m.url} target="_blank" rel="noreferrer" className="flex items-center justify-between gap-3 py-2.5 hover:opacity-70" style={{ borderBottom: i === commercialMaterials.length - 1 ? "none" : "1px solid var(--hall-line-soft)" }}><div className="min-w-0"><p className="text-[13px] font-semibold truncate">{m.title}</p><p className="text-[10px]" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted)" }}>{CATEGORY_LABELS[m.category] ?? m.category}</p></div><span aria-hidden="true" style={{ color: "var(--hall-muted)" }}>↗</span></a>)}</div>}
-              </Card>
-            )}
+            <Card id="admin" title="Administrativo">
+              {!hasAdmin
+                ? <p className="text-[12px]" style={{ color: "var(--hall-muted-2)" }}>Aquí verás la facturación y los datos de pago.</p>
+                : <div className="space-y-4">
+                    {(hasCompany || b.bankDetails || b.publicNote) && (
+                      <div>
+                        <div className="flex items-center justify-between gap-3 mb-2">
+                          <p className="text-[10px] uppercase tracking-[0.07em]" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}>Datos de pago</p>
+                          {copyText && <CopyButton text={copyText} label="Copiar todo" />}
+                        </div>
+                        {hasCompany && <div className="text-[13px] leading-[1.6]" style={{ whiteSpace: "pre-line" }}>{["Common House", ...billingLines].join("\n")}</div>}
+                        {b.bankDetails && (
+                          <div className="mt-3 p-3" style={{ background: "var(--hall-lime-paper)", border: "1px solid var(--hall-lime)", borderRadius: 8 }}>
+                            <p className="text-[10px] uppercase tracking-[0.07em] mb-1.5" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-lime-ink)" }}>Datos bancarios</p>
+                            <div className="text-[12.5px] leading-[1.6]" style={{ whiteSpace: "pre-line" }}>{b.bankDetails}</div>
+                          </div>
+                        )}
+                        {b.publicNote && <p className="mt-2 text-[11px]" style={{ color: "var(--hall-muted)" }}>{b.publicNote}</p>}
+                      </div>
+                    )}
+                    {adminMaterials.length > 0 && (
+                      <div>
+                        <p className="text-[10px] uppercase tracking-[0.07em] mb-1" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}>Facturación</p>
+                        {adminMaterials.map((m, i) => <a key={m.id} href={m.url} target="_blank" rel="noreferrer" className="flex items-center justify-between gap-3 py-2.5 hover:opacity-70" style={{ borderBottom: i === adminMaterials.length - 1 ? "none" : "1px solid var(--hall-line-soft)" }}><div className="min-w-0"><p className="text-[13px] font-semibold truncate">{m.title}</p><p className="text-[10px]" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted)" }}>{CATEGORY_LABELS[m.category] ?? m.category}{m.versionLabel ? ` · ${m.versionLabel}` : ""}</p></div><span aria-hidden="true" style={{ color: "var(--hall-muted)" }}>↗</span></a>)}
+                      </div>
+                    )}
+                  </div>}
+            </Card>
           </div>
         </div>
       </main>
