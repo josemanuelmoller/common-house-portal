@@ -459,6 +459,14 @@ function TimelineEventEditor({ projectId, event }: { projectId: string; event: C
     }
   }
 
+  const dirty =
+    eventDate !== event.eventDate ||
+    kind !== event.kind ||
+    title !== event.title ||
+    attendees !== event.attendees.join(", ") ||
+    summary !== (event.summary ?? "") ||
+    visibility !== event.visibility;
+
   return (
     <div className="py-3" style={{ borderBottom: "1px solid var(--hall-line-soft)" }}>
       <div className="grid grid-cols-1 sm:grid-cols-[130px_140px_1fr] gap-2 mb-2">
@@ -470,8 +478,9 @@ function TimelineEventEditor({ projectId, event }: { projectId: string; event: C
       <textarea aria-label="Summary" style={{ ...fieldStyle, marginBottom: 8, minHeight: 52 }} value={summary} onChange={(e) => setSummary(e.target.value)} placeholder="Summary" />
       <div className="flex flex-wrap items-center gap-2">
         <select aria-label="Visibility" style={{ ...fieldStyle, width: 130 }} value={visibility} onChange={(e) => setVisibility(e.target.value)}>{["internal", "client", "archived"].map((v) => <option key={v} value={v}>{v}</option>)}</select>
-        <button type="button" className="hall-btn-ghost" disabled={busy} onClick={() => void save()}>{busy ? "Saving…" : "Save"}</button>
+        <button type="button" className="hall-btn-primary" disabled={busy || !dirty} onClick={() => void save()}>{busy ? "Saving…" : dirty ? "Save changes" : "Saved"}</button>
         <button type="button" className="hall-btn-ghost" disabled={busy} onClick={() => void remove()} style={{ color: "var(--hall-danger)" }}>Delete</button>
+        {dirty && <span className="text-[10px] font-semibold" style={{ color: "var(--hall-warn)" }}>● Unsaved changes</span>}
         {visibility === "internal" && <span className="text-[10px]" style={{ color: "var(--hall-muted-2)" }}>Not visible to client</span>}
         <Feedback message={message} />
       </div>
