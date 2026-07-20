@@ -6,6 +6,7 @@ import { DeckEmbed } from "@/components/client-room/DeckEmbed";
 import { PdfEmbed } from "@/components/client-room/PdfEmbed";
 import { SlidesEmbed } from "@/components/client-room/SlidesEmbed";
 import { CopyButton } from "@/components/client-room/CopyButton";
+import { BankReveal } from "@/components/client-room/BankReveal";
 import type { ClientRole } from "@/lib/require-client-access";
 import type { ClientRoomMaterial, ClientRoomProject } from "@/lib/client-room";
 
@@ -73,7 +74,7 @@ export function ClientRoomView({ room, role, adminPreview }: { room: ClientRoomP
   const b = room.billing;
   const billingLines = [b.legalName, b.taxId ? `Tax ID: ${b.taxId}` : null, b.address, b.billingEmail ? `Facturación: ${b.billingEmail}` : null].filter((x): x is string => !!x);
   const hasCompany = billingLines.length > 0;
-  const copyText = [...(hasCompany ? ["Common House", ...billingLines] : []), b.bankDetails ?? ""].filter(Boolean).join("\n").trim();
+  const copyText = hasCompany ? ["Common House", ...billingLines].join("\n") : "";
   const hasAdmin = hasCompany || !!b.bankDetails || !!b.publicNote || adminMaterials.length > 0;
   const presentations = room.materials.filter((m) => m.category === "presentation" && (isEmbeddableHtml(m.url) || isPdf(m) || isSlides(m)));
   // The room preview (hero) is the presentation marked 'current'; fall back to any
@@ -211,12 +212,7 @@ export function ClientRoomView({ room, role, adminPreview }: { room: ClientRoomP
                           {copyText && <CopyButton text={copyText} label="Copiar todo" />}
                         </div>
                         {hasCompany && <div className="text-[13px] leading-[1.6]" style={{ whiteSpace: "pre-line" }}>{["Common House", ...billingLines].join("\n")}</div>}
-                        {b.bankDetails && (
-                          <div className="mt-3 p-3" style={{ background: "var(--hall-lime-paper)", border: "1px solid var(--hall-lime)", borderRadius: 8 }}>
-                            <p className="text-[10px] uppercase tracking-[0.07em] mb-1.5" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-lime-ink)" }}>Datos bancarios</p>
-                            <div className="text-[12.5px] leading-[1.6]" style={{ whiteSpace: "pre-line" }}>{b.bankDetails}</div>
-                          </div>
-                        )}
+                        {b.bankDetails && <BankReveal details={b.bankDetails} />}
                         {b.publicNote && <p className="mt-2 text-[11px]" style={{ color: "var(--hall-muted)" }}>{b.publicNote}</p>}
                       </div>
                     )}

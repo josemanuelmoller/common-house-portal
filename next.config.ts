@@ -67,7 +67,9 @@ const nextConfig: NextConfig = {
     return [
       { source: "/mps-deck/:path*", headers: embeddableHeaders },
       { source: "/decks/:path*", headers: embeddableHeaders },
-      { source: "/((?!mps-deck/|decks/).*)", headers: securityHeaders },
+      // Room document files (PDF) are previewed in a same-origin iframe.
+      { source: "/api/projects/:id/materials/:materialId/file", headers: embeddableHeaders },
+      { source: "/((?!mps-deck/|decks/|api/projects/).*)", headers: securityHeaders },
     ];
   },
 };
