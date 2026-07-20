@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { SignOutButton } from "@clerk/nextjs";
 import type { ReactNode } from "react";
 import { BrandLogo } from "@/components/BrandLogo";
@@ -200,7 +199,7 @@ export function ClientRoomView({ room, role, adminPreview }: { room: ClientRoomP
         </div>
       </main>
 
-      <footer className="px-4 sm:px-8 py-7" style={{ borderTop: "1px solid var(--hall-ink-0)", background: "var(--hall-paper-0)" }}><div className="max-w-6xl mx-auto flex flex-wrap justify-between gap-3 text-[10px] uppercase tracking-[0.07em]" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}><span>Preparado por Common House</span><span><Link href="/trust">Confianza</Link> · <Link href="/status">Estado</Link> · <Link href="/security">Seguridad</Link></span></div></footer>
+      <footer className="px-4 sm:px-8 py-7" style={{ borderTop: "1px solid var(--hall-ink-0)", background: "var(--hall-paper-0)" }}><div className="max-w-6xl mx-auto flex flex-wrap justify-between gap-3 text-[10px] uppercase tracking-[0.07em]" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}><span>Preparado por Common House</span><span>Confidencial{room.organizationName ? ` · ${room.organizationName}` : ""}</span></div></footer>
     </div>
   );
 }
