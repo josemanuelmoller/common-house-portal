@@ -493,7 +493,22 @@ export function TimelineManager({ room }: { room: ClientRoomAdminData }) {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ eventDate: "", kind: "meeting" as ClientRoomTimelineEvent["kind"], title: "", attendees: "", location: "", summary: "" });
   const [busy, setBusy] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+
+  async function syncCalendar() {
+    setSyncing(true);
+    setMessage(null);
+    try {
+      const r = await apiJson(`/api/admin/projects/${room.id}/client-room/timeline/sync-calendar`, { method: "POST" });
+      setMessage(`Calendar: ${r.created ?? 0} nuevas · ${r.updated ?? 0} actualizadas (${r.matched ?? 0} reuniones con ${(r.domains ?? []).join(", ")}). Quedan internal — borra las que no correspondan.`);
+      router.refresh();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setSyncing(false);
+    }
+  }
 
   async function add(e: FormEvent) {
     e.preventDefault();
@@ -522,6 +537,7 @@ export function TimelineManager({ room }: { room: ClientRoomAdminData }) {
     <div>
       <div className="flex flex-wrap items-center gap-3 mb-4">
         <button type="button" className="hall-btn-primary" onClick={() => setOpen((v) => !v)}>{open ? "Close" : "Add event"}</button>
+        <button type="button" className="hall-btn-ghost" disabled={syncing} onClick={() => void syncCalendar()}>{syncing ? "Syncing…" : "Sync calendar"}</button>
         <span className="text-[11px]" style={{ color: "var(--hall-muted-2)" }}>Meetings, signed documents and milestones. Every event stays internal until you set it to client.</span>
         <Feedback message={message} />
       </div>
