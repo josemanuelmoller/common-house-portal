@@ -79,6 +79,7 @@ export type ClientRoomProject = {
   currentStage: string | null;
   geography: string | null;
   themes: string | null;
+  clientLogoUrl: string | null;
   welcomeNote: string | null;
   currentFocus: string | null;
   nextMilestone: string | null;
@@ -115,6 +116,7 @@ type ProjectRow = {
   current_stage: string | null;
   geography: string | null;
   themes: string | null;
+  client_logo_url: string | null;
   hall_hero: HallDraft | null;
   hall_welcome_note: string | null;
   hall_current_focus: string | null;
@@ -130,7 +132,7 @@ type ProjectRow = {
 const PROJECT_SELECT = [
   "id", "notion_id", "hall_slug", "name", "organization_id",
   "client_room_label", "client_room_status", "client_room_enabled",
-  "project_status", "current_stage", "geography", "themes", "hall_hero",
+  "project_status", "current_stage", "geography", "themes", "client_logo_url", "hall_hero",
   "hall_welcome_note", "hall_current_focus", "hall_next_milestone",
   "hall_challenge", "hall_matters_most", "hall_obstacles", "hall_success",
   "drive_folder_id", "drive_folder_url",
@@ -264,6 +266,7 @@ async function assembleRoom(row: ProjectRow, includeInternal: boolean): Promise<
     currentStage: row.current_stage,
     geography: row.geography,
     themes: row.themes,
+    clientLogoUrl: row.client_logo_url,
     welcomeNote: row.hall_welcome_note,
     currentFocus: row.hall_current_focus,
     nextMilestone: row.hall_next_milestone,

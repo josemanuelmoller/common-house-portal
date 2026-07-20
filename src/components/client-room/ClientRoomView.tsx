@@ -99,6 +99,10 @@ export function ClientRoomView({ room, role, adminPreview }: { room: ClientRoomP
 
       <main className="max-w-6xl mx-auto px-4 sm:px-8 pb-16">
         <section id="overview" className="scroll-mt-24 pt-10 sm:pt-12 pb-2">
+          {room.clientLogoUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={room.clientLogoUrl} alt={room.organizationName ?? "Client"} className="mb-5" style={{ height: 52, width: "auto", maxWidth: 260 }} />
+          )}
           <p className="text-[10px] uppercase tracking-[0.1em] mb-2" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}>{room.organizationName ?? "Common House"} · {room.currentStage ?? room.projectStatus ?? room.roomStatus}</p>
           <h1 className="text-[38px] sm:text-[52px] leading-[1] tracking-[-0.025em]" style={{ fontFamily: "var(--font-hall-display)", fontWeight: 400 }}>{room.name}</h1>
           {room.welcomeNote && <p className="mt-4 max-w-2xl text-[15px] leading-[1.6]" style={{ color: "var(--hall-muted-2)" }}>{room.welcomeNote}</p>}
