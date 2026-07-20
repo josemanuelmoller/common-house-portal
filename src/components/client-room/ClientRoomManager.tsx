@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState, type CSSProperties, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import type {
   ClientRoomAdminData,
@@ -275,12 +275,43 @@ export function ClientMaterialsManager({ room }: { room: ClientRoomAdminData }) 
     }
   }
 
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  async function uploadFile(e: FormEvent) {
+    e.preventDefault();
+    const input = fileRef.current;
+    if (!input?.files?.[0]) { setMessage("Choose a PDF or PPTX first"); return; }
+    setUploading(true);
+    setMessage(null);
+    try {
+      const fd = new FormData();
+      fd.append("file", input.files[0]);
+      fd.append("category", "presentation");
+      const res = await fetch(`/api/admin/projects/${room.id}/client-room/materials/upload`, { method: "POST", body: fd });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(payload.error || `Upload failed (${res.status})`);
+      setMessage("Uploaded — previews inline in the room. Stays internal until you set it to client.");
+      if (input) input.value = "";
+      router.refresh();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setUploading(false);
+    }
+  }
+
   return (
     <div>
+      <form onSubmit={(e) => void uploadFile(e)} className="flex flex-wrap items-center gap-2 mb-3 p-3" style={{ border: "1px solid var(--hall-line)", borderRadius: 6 }}>
+        <span className="text-[11px] font-semibold" style={{ color: "var(--hall-muted-2)" }}>Upload PDF / PPTX</span>
+        <input ref={fileRef} type="file" accept=".pdf,.pptx,application/pdf" className="text-[11px]" />
+        <button type="submit" className="hall-btn-primary" disabled={uploading}>{uploading ? "Uploading…" : "Upload"}</button>
+        <span className="text-[10px]" style={{ color: "var(--hall-muted-2)" }}>PDF shows an inline preview + download in the room. Max 25MB.</span>
+      </form>
       <div className="flex flex-wrap items-center gap-3 mb-4">
         {room.driveFolderId
-          ? <button type="button" className="hall-btn-primary" disabled={syncing} onClick={() => void syncDrive()}>{syncing ? "Syncing…" : "Sync Google Drive"}</button>
-          : <button type="button" className="hall-btn-primary" disabled={creating} onClick={() => void createFolder()}>{creating ? "Creating…" : "Create Drive folder"}</button>}
+          ? <button type="button" className="hall-btn-ghost" disabled={syncing} onClick={() => void syncDrive()}>{syncing ? "Syncing…" : "Sync Google Drive"}</button>
+          : <button type="button" className="hall-btn-ghost" disabled={creating} onClick={() => void createFolder()}>{creating ? "Creating…" : "Create Drive folder"}</button>}
         {room.driveFolderUrl && <a className="hall-btn-ghost" href={room.driveFolderUrl} target="_blank" rel="noreferrer">Open Drive ↗</a>}
         <Feedback message={message} />
       </div>
