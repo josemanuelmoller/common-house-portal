@@ -40,9 +40,9 @@ function isSlides(m: ClientRoomMaterial) {
 
 function Card({ id, title, flourish, meta, children }: { id?: string; title: string; flourish?: string; meta?: ReactNode; children: ReactNode }) {
   return (
-    <section id={id} className="scroll-mt-24" style={{ background: "var(--hall-paper-0)", border: "1px solid var(--hall-line)", borderRadius: 14, padding: "20px 22px" }}>
+    <section id={id} className="scroll-mt-24 hall-room-card" style={{ background: "var(--hall-paper-0)", border: "1px solid var(--hall-line)", borderRadius: 14, padding: "20px 22px" }}>
       <div className="flex items-baseline justify-between gap-3 pb-2.5 mb-4" style={{ borderBottom: "1px solid var(--hall-ink-0)" }}>
-        <h2 className="text-[16px] font-bold tracking-[-0.01em]">{title}{flourish && <> <em style={{ fontFamily: "var(--font-hall-display)", fontWeight: 400 }}>{flourish}</em></>}</h2>
+        <h2 className="text-[16px] font-bold tracking-[-0.01em]">{title}{flourish && <> <em className="hall-room-flourish">{flourish}</em></>}</h2>
         {meta && <span className="text-[10px] uppercase tracking-[0.06em] shrink-0" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted)" }}>{meta}</span>}
       </div>
       {children}
@@ -52,8 +52,8 @@ function Card({ id, title, flourish, meta, children }: { id?: string; title: str
 
 function Stat({ label, value, sub, flag }: { label: string; value: string; sub?: string; flag?: boolean }) {
   return (
-    <div className="p-4 sm:p-[18px]" style={{ background: flag ? "var(--hall-warn-paper)" : "var(--hall-paper-0)" }}>
-      <p className="text-[10px] uppercase tracking-[0.07em]" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}>{label}</p>
+    <div className="p-4 sm:p-[18px]" style={{ background: flag ? "var(--hall-lime-paper)" : "var(--hall-paper-0)", borderTop: "3px solid var(--hall-lime)" }}>
+      <p className="text-[10px] uppercase tracking-[0.07em]" style={{ fontFamily: "var(--font-hall-mono)", color: flag ? "var(--hall-lime-ink)" : "var(--hall-muted-2)" }}>{label}</p>
       <p className="text-[16px] sm:text-[18px] font-semibold mt-2 leading-[1.25]">{value}</p>
       {sub && <p className="text-[11px] mt-1" style={{ color: "var(--hall-muted)" }}>{sub}</p>}
     </div>
@@ -105,23 +105,23 @@ export function ClientRoomView({ room, role, adminPreview }: { room: ClientRoomP
       </header>
 
       <nav className="px-4 sm:px-8 overflow-x-auto" style={{ borderBottom: "1px solid var(--hall-line)", background: "var(--hall-paper-2)" }}>
-        <div className="max-w-6xl mx-auto flex gap-5 min-w-max text-[11px] font-semibold">
+        <div className="max-w-6xl mx-auto flex gap-5 min-w-max text-[11px] font-semibold hall-room-links">
           {navItems.map(([href, label]) => <a key={href} href={`#${href}`} className="py-3.5 hover:underline">{label}{href === "agreements" && openAgreements.length > 0 ? ` ${openAgreements.length}` : ""}</a>)}
         </div>
       </nav>
 
       <main className="max-w-6xl mx-auto px-4 sm:px-8 pb-16">
-        <section id="overview" className="scroll-mt-24 pt-10 sm:pt-12 pb-2">
+        <section id="overview" className="scroll-mt-24 pt-10 sm:pt-12 pb-2 hall-room-fade">
           {room.clientLogoUrl && (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={room.clientLogoUrl} alt={room.organizationName ?? "Client"} className="mb-5" style={{ height: 52, width: "auto", maxWidth: 260 }} />
           )}
           <p className="text-[10px] uppercase tracking-[0.1em] mb-2" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}>{room.organizationName ?? "Common House"} · {room.currentStage ?? room.projectStatus ?? room.roomStatus}</p>
-          <h1 className="text-[38px] sm:text-[52px] leading-[1] tracking-[-0.025em]" style={{ fontFamily: "var(--font-hall-display)", fontWeight: 400 }}>{room.name}</h1>
+          <h1 className="text-[38px] sm:text-[52px] leading-[1] tracking-[-0.025em]" style={{ fontFamily: "var(--font-hall-display)", fontWeight: 400 }}>{room.name}<span style={{ color: "var(--hall-lime)" }}>_</span></h1>
           {room.welcomeNote && <p className="mt-4 max-w-2xl text-[15px] leading-[1.6]" style={{ color: "var(--hall-muted-2)" }}>{room.welcomeNote}</p>}
         </section>
 
-        <section className="grid grid-cols-2 md:grid-cols-4 mt-6 mb-2" style={{ gap: 1, background: "var(--hall-line)", border: "1px solid var(--hall-line)", borderRadius: 14, overflow: "hidden" }}>
+        <section className="grid grid-cols-2 md:grid-cols-4 mt-6 mb-2 hall-room-fade" style={{ gap: 1, background: "var(--hall-line)", border: "1px solid var(--hall-line)", borderRadius: 14, overflow: "hidden" }}>
           <Stat label="Etapa" value={room.currentStage ?? room.projectStatus ?? room.roomStatus} sub={room.currentFocus ?? undefined} />
           <Stat label="Próximo hito" value={room.nextMilestone || "Por confirmar"} />
           <Stat label="Necesita tu input" value={openAgreements.length === 0 ? "Nada abierto" : `${openAgreements.length} acuerdo${openAgreements.length === 1 ? "" : "s"}`} flag={openAgreements.length > 0} />
@@ -174,10 +174,10 @@ export function ClientRoomView({ room, role, adminPreview }: { room: ClientRoomP
                 ? <p className="text-[12px]" style={{ color: "var(--hall-muted-2)" }}>Reuniones, documentos e hitos aparecerán aquí.</p>
                 : <div>{room.timelineEvents.map((ev, index) => {
                     const last = index === room.timelineEvents.length - 1;
-                    const dot = ev.kind === "document" ? "var(--hall-ok)" : ev.kind === "meeting" ? "var(--hall-warn)" : "var(--hall-ink-0)";
+                    const dot = ev.kind === "document" ? "var(--hall-ok)" : ev.kind === "meeting" ? "var(--hall-lime)" : "var(--hall-ink-0)";
                     return (
                       <div key={ev.id} className="relative pl-5 pb-4" style={{ borderLeft: last ? "1px solid transparent" : "1px solid var(--hall-line)" }}>
-                        <span className="absolute rounded-full" style={{ left: -5, top: 3, width: 9, height: 9, background: dot }} />
+                        <span className="absolute rounded-full" style={{ left: -5, top: 3, width: 9, height: 9, background: dot, boxShadow: ev.kind === "meeting" ? "0 0 0 3px var(--hall-lime-paper)" : "none" }} />
                         <p className="text-[10px]" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}>{displayDate(ev.eventDate)} · {TIMELINE_KIND_LABELS[ev.kind] ?? ev.kind}</p>
                         <p className="text-[13px] font-semibold mt-0.5">{ev.title}</p>
                         {ev.attendees.length > 0 && <p className="text-[10.5px] mt-0.5" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted)" }}>{ev.attendees.join("  ·  ")}</p>}
@@ -191,7 +191,7 @@ export function ClientRoomView({ room, role, adminPreview }: { room: ClientRoomP
             </Card>
 
             <Card id="agreements" title="Acuerdos" meta={otherAgreements.length || undefined}>
-              {otherAgreements.length === 0 ? <p className="text-[12px]" style={{ color: "var(--hall-muted-2)" }}>Las decisiones y siguientes pasos aparecerán aquí.</p> : <div className="space-y-4">{otherAgreements.map((agreement) => <article key={agreement.id}><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="text-[10px] uppercase tracking-[0.07em] mb-0.5" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}>{agreement.agreementType.replaceAll("_", " ")} · v{agreement.version}</p><h3 className="text-[14px] font-bold">{agreement.title}</h3>{agreement.summary && <p className="mt-1 text-[12px] leading-relaxed" style={{ color: "var(--hall-ink-3)" }}>{agreement.summary}</p>}</div><span className="hall-chip-outline shrink-0">{agreement.status.replaceAll("_", " ")}</span></div>{(agreement.status === "shared" || agreement.status === "changes_requested") && <AgreementResponseActions agreementId={agreement.id} version={agreement.version} agreementType={agreement.agreementType} canRespond={canRespondTo(agreement.agreementType)} />}{agreement.respondedAt && <p className="mt-2 text-[10px]" style={{ color: "var(--hall-muted-3)" }}>Respondido {displayDate(agreement.respondedAt)}{agreement.respondedEmail ? ` · ${agreement.respondedEmail}` : ""}</p>}</article>)}</div>}
+              {otherAgreements.length === 0 ? <p className="text-[12px]" style={{ color: "var(--hall-muted-2)" }}>Las decisiones y siguientes pasos aparecerán aquí.</p> : <div className="space-y-4">{otherAgreements.map((agreement) => <article key={agreement.id} style={(agreement.status === "shared" || agreement.status === "changes_requested") ? { background: "var(--hall-lime-paper)", border: "1px solid var(--hall-lime)", borderRadius: 10, padding: "12px 14px" } : undefined}><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="text-[10px] uppercase tracking-[0.07em] mb-0.5" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}>{agreement.agreementType.replaceAll("_", " ")} · v{agreement.version}</p><h3 className="text-[14px] font-bold">{agreement.title}</h3>{agreement.summary && <p className="mt-1 text-[12px] leading-relaxed" style={{ color: "var(--hall-ink-3)" }}>{agreement.summary}</p>}</div><span className="hall-chip-outline shrink-0">{agreement.status.replaceAll("_", " ")}</span></div>{(agreement.status === "shared" || agreement.status === "changes_requested") && <AgreementResponseActions agreementId={agreement.id} version={agreement.version} agreementType={agreement.agreementType} canRespond={canRespondTo(agreement.agreementType)} />}{agreement.respondedAt && <p className="mt-2 text-[10px]" style={{ color: "var(--hall-muted-3)" }}>Respondido {displayDate(agreement.respondedAt)}{agreement.respondedEmail ? ` · ${agreement.respondedEmail}` : ""}</p>}</article>)}</div>}
             </Card>
 
             {(commercialMaterials.length > 0 || room.agreements.some((i) => i.agreementType === "commercial" || i.agreementType === "purchase_order")) && (
@@ -203,7 +203,9 @@ export function ClientRoomView({ room, role, adminPreview }: { room: ClientRoomP
         </div>
       </main>
 
-      <footer className="px-4 sm:px-8 py-7" style={{ borderTop: "1px solid var(--hall-ink-0)", background: "var(--hall-paper-0)" }}><div className="max-w-6xl mx-auto flex flex-wrap justify-between gap-3 text-[10px] uppercase tracking-[0.07em]" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}><span>Preparado por Common House</span><span>Confidencial{room.organizationName ? ` · ${room.organizationName}` : ""}</span></div></footer>
+      <footer className="px-4 sm:px-8 py-7" style={{ borderTop: "1px solid var(--hall-ink-0)", background: "var(--hall-paper-0)" }}><div className="max-w-6xl mx-auto flex flex-wrap justify-between gap-3 text-[10px] uppercase tracking-[0.07em]" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}><span>Preparado por Common House</span><span className="flex items-center gap-4">Confidencial{room.organizationName ? ` · ${room.organizationName}` : ""}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/brand/isotipo-lime.png" alt="" style={{ height: 22, width: "auto" }} /></span></div></footer>
     </div>
   );
 }
