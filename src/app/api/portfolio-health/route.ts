@@ -22,8 +22,6 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-// TODO phase-6: migrate read source to Supabase opportunities
-import { Client } from "@notionhq/client";
 import { currentUser } from "@clerk/nextjs/server";
 import { isAdminUser, isAdminEmail } from "@/lib/clients";
 import { withRoutineLog } from "@/lib/routine-log";
@@ -32,10 +30,6 @@ import { createPageWithMirror } from "@/lib/notion-mirror-push";
 
 export const maxDuration = 180;
 export const dynamic = "force-dynamic";
-
-const notion = new Client({ auth: process.env.NOTION_API_KEY });
-
-const DB_OPPORTUNITIES = "687caa98594a41b595c9960c141be0c0";
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
@@ -56,15 +50,6 @@ async function authCheck(req: NextRequest): Promise<boolean> {
   } catch { /* no-op */ }
   return false;
 }
-
-// ─── Notion helpers ───────────────────────────────────────────────────────────
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const text = (p: any): string => p?.title?.[0]?.plain_text ?? p?.rich_text?.[0]?.plain_text ?? "";
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const sel  = (p: any): string => p?.select?.name ?? "";
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const relIds = (p: any): string[] => Array.isArray(p?.relation) ? p.relation.map((r: { id: string }) => r.id) : [];
 
 // ─── Data fetchers ────────────────────────────────────────────────────────────
 
@@ -145,31 +130,37 @@ async function fetchOpenOpportunities(types: string[]): Promise<OppRow[]> {
   const OPEN = new Set(["New", "Qualifying", "Active", "Engaged", "Proposal Sent"]);
   const today = Date.now();
 
-  // Fetch all open opps in matching types.
+  if (types.length === 0) return [];
+
+  const sb = getSupabaseServerClient();
+  const { data, error } = await sb
+    .from("opportunities")
+    .select("notion_id, title, opportunity_type, status, scope, follow_up_status, org_notion_id, notion_created_at, created_at")
+    .in("opportunity_type", types);
+
+  if (error) {
+    console.error("[portfolio-health] opportunities fetch failed:", error.message);
+    return [];
+  }
+
   const all: OppRow[] = [];
-  for (const t of types) {
-    const res = await notion.databases.query({
-      database_id: DB_OPPORTUNITIES,
-      filter: { property: "Opportunity Type", select: { equals: t } },
-      page_size: 100,
+  for (const o of (data ?? [])) {
+    const status = (o.status as string) ?? "";
+    // Preserve legacy behaviour: drop rows with a non-open status; keep blanks.
+    if (status && !OPEN.has(status)) continue;
+    const createdTime = (o.notion_created_at as string) ?? (o.created_at as string) ?? new Date().toISOString();
+    const orgId = (o.org_notion_id as string) ?? null;
+    all.push({
+      id:               (o.notion_id as string),
+      name:             (o.title as string) ?? "",
+      type:             (o.opportunity_type as string) ?? "",
+      status,
+      scope:            (o.scope as string) ?? "",
+      followUp:         (o.follow_up_status as string) ?? "",
+      createdTime,
+      ageDays:          Math.round((today - new Date(createdTime).getTime()) / 86400_000),
+      organisationIds:  orgId ? [orgId] : [],
     });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    for (const p of (res.results as any[])) {
-      const status = sel(p.properties["Opportunity Status"]);
-      if (status && !OPEN.has(status)) continue;
-      const createdTime = p.created_time ?? new Date().toISOString();
-      all.push({
-        id:               p.id,
-        name:             text(p.properties["Opportunity Name"]),
-        type:             sel(p.properties["Opportunity Type"]),
-        status,
-        scope:            sel(p.properties["Scope"]),
-        followUp:         sel(p.properties["Follow-up Status"]),
-        createdTime,
-        ageDays:          Math.round((today - new Date(createdTime).getTime()) / 86400_000),
-        organisationIds:  relIds(p.properties["Organization"]),
-      });
-    }
   }
   return all;
 }

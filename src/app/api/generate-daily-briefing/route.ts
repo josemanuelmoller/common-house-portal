@@ -24,9 +24,6 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
-// TODO phase-6: migrate read source to Supabase (projects, opportunities,
-// decision_items, agent_drafts, content_pipeline, people, insight_briefs)
-import { Client } from "@notionhq/client";
 import { currentUser } from "@clerk/nextjs/server";
 import { isAdminUser, isAdminEmail } from "@/lib/clients";
 import { withRoutineLog } from "@/lib/routine-log";
@@ -37,20 +34,7 @@ const HAIKU_MODEL = "claude-haiku-4-5-20251001";
 
 export const maxDuration = 120;
 
-const notion    = new Client({ auth: process.env.NOTION_API_KEY });
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
-const DB = {
-  projects:       "49d59b18095f46588960f2e717832c5f",
-  opportunities:  "687caa98594a41b595c9960c141be0c0",
-  decisions:      "6b801204c4de49c7b6179e04761a285a",
-  agentDrafts:    "9844ece875ea4c618f616e8cc97d5a90",
-  contentPipeline:"3bf5cf81f45c4db2840590f3878bfdc0",
-  people:         "1bc0f96f33ca4a9e9ff26844377e81de",
-  dailyBriefings: "d206d6cdb09040d3ac2f34a977ad9f2a",
-  evidence:       "fa28124978d043039d8932ac9964ccf5",
-  insightBriefs:  "04bed3a3fd1a4b3a99643cd21562e08a",
-};
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
@@ -75,127 +59,91 @@ async function authCheck(req: NextRequest): Promise<boolean> {
   return false;
 }
 
-// ─── Notion helpers ───────────────────────────────────────────────────────────
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const text  = (p: any): string => p?.title?.[0]?.plain_text ?? p?.rich_text?.[0]?.plain_text ?? "";
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const sel   = (p: any): string => p?.select?.name ?? "";
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const prop  = (page: any, name: string) => page.properties?.[name];
-
-// ─── Data fetchers ────────────────────────────────────────────────────────────
+// ─── Data fetchers (Supabase canonical) ──────────────────────────────────────
 
 async function fetchActiveProjects() {
-  const ACTIVE = new Set(["Discovery", "Validation", "Execution", "Active"]);
-  const res = await notion.databases.query({ database_id: DB.projects, page_size: 30 });
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (res.results as any[])
-    .filter(p => ACTIVE.has(sel(prop(p, "Current Stage"))))
-    .map(p => ({
-      name:   text(prop(p, "Project Name")),
-      stage:  sel(prop(p, "Current Stage")),
-      status: text(prop(p, "Status Summary")),
-    }));
+  const sb = getSupabaseServerClient();
+  const { data } = await sb
+    .from("projects")
+    .select("name, current_stage, status_summary")
+    .eq("project_status", "Active")
+    .limit(30);
+  return (data ?? []).map(p => ({
+    name:   (p.name as string) ?? "",
+    stage:  (p.current_stage as string) ?? "",
+    status: (p.status_summary as string) ?? "",
+  }));
 }
 
 async function fetchFollowUpOpportunities() {
-  const res = await notion.databases.query({
-    database_id: DB.opportunities,
-    filter: { property: "Follow-up Status", select: { equals: "Needed" } },
-    page_size: 15,
-  });
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const raw = (res.results as any[]).map(p => ({
-    id:     p.id,
-    name:   text(prop(p, "Opportunity Name")),
-    stage:  sel(prop(p, "Opportunity Status")),
-    type:   sel(prop(p, "Opportunity Type")),
-    org:    p.properties?.["Organization"]?.relation?.[0]?.id ?? null,
-  }));
-
+  const sb = getSupabaseServerClient();
+  const { data } = await sb
+    .from("opportunities")
+    .select("notion_id, title, status, opportunity_type, org_notion_id, is_followed")
+    .eq("follow_up_status", "Needed")
+    .limit(15);
   // Grant activation gate: unfollowed grants must NOT enter the daily briefing.
-  // Cross-check against Supabase is_followed (source of truth for human activation).
-  const grantIds = raw.filter(r => r.type === "Grant").map(r => r.id);
-  const followedGrantIds = new Set<string>();
-  if (grantIds.length > 0) {
-    try {
-      const { getSupabaseServerClient } = await import("@/lib/supabase-server");
-      const sb = getSupabaseServerClient();
-      const { data } = await sb
-        .from("opportunities")
-        .select("notion_id")
-        .in("notion_id", grantIds)
-        .eq("is_followed", true);
-      for (const r of (data ?? []) as { notion_id: string }[]) followedGrantIds.add(r.notion_id);
-    } catch { /* if Supabase unreachable, fail closed: drop all grants */ }
-  }
-
-  return raw
-    .filter(r => r.type !== "Grant" || followedGrantIds.has(r.id))
-    .map(({ name, stage, org }) => ({ name, stage, org }));
+  // is_followed is the source of truth for human activation.
+  return (data ?? [])
+    .filter(r => r.opportunity_type !== "Grant" || r.is_followed === true)
+    .map(r => ({
+      name:  (r.title as string) ?? "",
+      stage: (r.status as string) ?? "",
+      org:   (r.org_notion_id as string) ?? null,
+    }));
 }
 
 async function fetchPendingDecisions() {
-  const res = await notion.databases.query({
-    database_id: DB.decisions,
-    filter: {
-      and: [
-        { property: "Status", select: { equals: "Open" } },
-        { property: "Priority", select: { equals: "P1 Critical" } },
-      ],
-    },
-    page_size: 10,
-  });
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (res.results as any[]).map(p => ({
-    title: text(prop(p, "Title")) || text(prop(p, "Name")),
-    type:  sel(prop(p, "Type")),
+  const sb = getSupabaseServerClient();
+  const { data } = await sb
+    .from("decision_items")
+    .select("title, decision_type")
+    .eq("status", "Open")
+    .eq("priority", "P1 Critical")
+    .limit(10);
+  return (data ?? []).map(d => ({
+    title: (d.title as string) ?? "",
+    type:  (d.decision_type as string) ?? "",
   }));
 }
 
 async function fetchPendingDrafts() {
-  const res = await notion.databases.query({
-    database_id: DB.agentDrafts,
-    filter: { property: "Status", select: { equals: "Pending Review" } },
-    sorts: [{ timestamp: "created_time", direction: "descending" }],
-    page_size: 10,
-  });
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (res.results as any[]).map(p => ({
-    title: text(prop(p, "Draft Title")),  // canonical title field for Agent Drafts DB
-    type:  sel(prop(p, "Type")),
+  const sb = getSupabaseServerClient();
+  const { data } = await sb
+    .from("agent_drafts")
+    .select("title, draft_type, notion_created_at")
+    .eq("status", "Pending Review")
+    .order("notion_created_at", { ascending: false })
+    .limit(10);
+  return (data ?? []).map(d => ({
+    title: (d.title as string) ?? "",
+    type:  (d.draft_type as string) ?? "",
   }));
 }
 
 async function fetchReadyContent() {
-  const res = await notion.databases.query({
-    database_id: DB.contentPipeline,
-    filter: { property: "Status", select: { equals: "Ready to Publish" } },
-    page_size: 10,
-  });
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (res.results as any[]).map(p => ({
-    title:    text(prop(p, "Title")) || text(prop(p, "Name")),
-    platform: sel(prop(p, "Platform")),
+  const sb = getSupabaseServerClient();
+  const { data } = await sb
+    .from("content_pipeline_items")
+    .select("title, channel")
+    .eq("status", "Ready to Publish")
+    .limit(10);
+  return (data ?? []).map(c => ({
+    title:    (c.title as string) ?? "",
+    platform: (c.channel as string) ?? "",
   }));
 }
 
 async function fetchColdPeople() {
-  const res = await notion.databases.query({
-    database_id: DB.people,
-    filter: {
-      or: [
-        { property: "Contact Warmth", select: { equals: "Cold" } },
-        { property: "Contact Warmth", select: { equals: "Dormant" } },
-      ],
-    },
-    page_size: 15,
-  });
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (res.results as any[]).map(p => ({
-    name:   text(prop(p, "Full Name")),
-    warmth: sel(prop(p, "Contact Warmth")),
+  const sb = getSupabaseServerClient();
+  const { data } = await sb
+    .from("people")
+    .select("full_name, contact_warmth")
+    .in("contact_warmth", ["Cold", "Dormant"])
+    .limit(15);
+  return (data ?? []).map(p => ({
+    name:   (p.full_name as string) ?? "",
+    warmth: (p.contact_warmth as string) ?? "",
   }));
 }
 
@@ -203,39 +151,27 @@ async function fetchColdPeople() {
 // capture sector reports, competitor moves, funding announcements, and
 // ecosystem news curated into CH's Insight Engine. Internal CH Evidence is
 // about decisions/blockers/tasks — NOT market intel — so it is not read here.
+//
+// Fidelity note: the legacy Notion source exposed Executive Summary / Theme /
+// Relevance properties. The canonical `insight_briefs` table carries the body
+// in body_md and a single brief_type tag — so summary is drawn from body_md
+// and theme from brief_type; per-brief Relevance is not modelled in Supabase.
 async function fetchRecentInsightBriefs() {
   const since = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
-  const res = await notion.databases.query({
-    database_id: DB.insightBriefs,
-    filter: {
-      timestamp: "last_edited_time",
-      last_edited_time: { on_or_after: since },
-    },
-    sorts: [{ timestamp: "last_edited_time", direction: "descending" }],
-    page_size: 20,
-  });
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (res.results as any[]).map(p => {
-    const richText = (name: string) =>
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (p.properties?.[name]?.rich_text ?? []).map((r: any) => r.plain_text).join("");
-    const multi = (name: string) =>
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (p.properties?.[name]?.multi_select ?? []).map((r: any) => r.name);
-    // Prefer Executive Summary; fall back to Key Insights, then Key Facts.
-    const summary =
-      richText("Executive Summary")
-      || richText("Key Insights")
-      || richText("Key Facts")
-      || "";
-    return {
-      title:     text(prop(p, "Brief Title")) || text(prop(p, "Name")) || "Untitled",
-      summary:   summary.slice(0, 400),
-      theme:     multi("Theme"),
-      relevance: multi("Relevance"),
-      status:    sel(prop(p, "Status")),
-    };
-  });
+  const sb = getSupabaseServerClient();
+  const { data } = await sb
+    .from("insight_briefs")
+    .select("title, brief_type, body_md, status, updated_at")
+    .gte("updated_at", since)
+    .order("updated_at", { ascending: false })
+    .limit(20);
+  return (data ?? []).map(b => ({
+    title:     (b.title as string) || "Untitled",
+    summary:   ((b.body_md as string) ?? "").slice(0, 400),
+    theme:     b.brief_type ? [b.brief_type as string] : ([] as string[]),
+    relevance: [] as string[],
+    status:    (b.status as string) ?? "",
+  }));
 }
 
 // ─── Knowledge hot leaves (Supabase) ─────────────────────────────────────────
@@ -265,17 +201,6 @@ async function fetchHotKnowledgeLeaves(): Promise<Array<{ path: string; title: s
     const recent = bullets.slice(-3).map(b => b.replace(/^[-*•]\s+/, "")).join(" | ").slice(0, 400);
     return { path: n.path, title: n.title, recent: recent || "(updated)" };
   });
-}
-
-// ─── Check for existing briefing today ───────────────────────────────────────
-
-async function findExistingBriefing(dateStr: string): Promise<string | null> {
-  const res = await notion.databases.query({
-    database_id: DB.dailyBriefings,
-    filter: { property: "Date", date: { equals: dateStr } },
-    page_size: 1,
-  });
-  return res.results.length > 0 ? res.results[0].id : null;
 }
 
 // ─── Main handler ─────────────────────────────────────────────────────────────
@@ -369,9 +294,8 @@ Return EXACTLY this JSON (no extra keys, no markdown):
   }
 
   // Upsert: update if exists, create if not.
-  // Existence check now consults Supabase (canonical) first; the Notion
-  // read remains as a fallback observability hint until the Notion archive
-  // is taken read-only at cutoff.
+  // Existence check consults Supabase (canonical) — the daily_briefings table
+  // is the single source of truth post-cutoff.
   const now = new Date().toISOString();
   const sb = getSupabaseServerClient();
   let existingId: string | null = null;
@@ -382,10 +306,7 @@ Return EXACTLY this JSON (no extra keys, no markdown):
       .eq("briefing_date", today)
       .maybeSingle();
     existingId = (existingRow?.id as string | undefined) ?? null;
-  } catch { /* fall through to Notion read */ }
-  if (!existingId) {
-    existingId = await findExistingBriefing(today).catch(() => null);
-  }
+  } catch { /* no-op: treat as new briefing */ }
 
   // notion-cutoff-2026-06-02: replaced by canonical write to daily_briefings
   // The previous Notion write block (kept here for reference until Phase 6

@@ -1,30 +1,6 @@
 import { NextResponse } from "next/server";
 import { adminGuardApi } from "@/lib/require-admin";
-import { notion, DB } from "@/lib/notion";
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnyPage = any;
-
-function titleOf(page: AnyPage): string {
-  for (const val of Object.values(page.properties ?? {}) as AnyPage[]) {
-    if (val?.type === "title" && val?.title?.[0]?.plain_text) {
-      return val.title[0].plain_text;
-    }
-  }
-  return "Untitled";
-}
-
-function sel(p: AnyPage): string {
-  return p?.select?.name ?? "";
-}
-
-function text(p: AnyPage): string {
-  return p?.rich_text?.[0]?.plain_text ?? "";
-}
-
-function dt(p: AnyPage): string | null {
-  return p?.date?.start ?? null;
-}
+import { getSupabaseServerClient } from "@/lib/supabase-server";
 
 function relDate(iso: string | null): string {
   if (!iso) return "";
@@ -49,31 +25,39 @@ export async function GET() {
   if (guard) return guard;
 
   try {
-    const res = await notion.databases.query({
-      database_id: DB.decisions,
-      filter: { property: "Status", select: { equals: "Open" } },
-      sorts: [{ property: "Priority", direction: "ascending" }],
-      page_size: 20,
-    });
+    // Read migrated OFF Notion → Supabase `decision_items` (post-cutoff).
+    const sb = getSupabaseServerClient();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await sb
+      .from("decision_items")
+      .select(
+        "notion_id, title, priority, decision_type, status, source_agent, notes_raw, notion_url, project_notion_id, created_at"
+      )
+      .eq("status", "Open")
+      .limit(20);
+
+    if (error) throw error;
 
     // Priority values in Decision Items [OS v2]: "P1 Critical" | "High" | "Medium" | "Low"
     const PRIORITY_ORDER: Record<string, number> = { "P1 Critical": 0, High: 1, Medium: 2, Low: 3 };
 
-    const items = (res.results as AnyPage[])
-      .map(page => {
-        const p = page.properties;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const items = ((data ?? []) as Record<string, any>[])
+      .map(r => {
+        const notionId: string | null = r.notion_id ?? null;
         return {
-          id: page.id,
-          title: titleOf(page),
-          priority: sel(p["Priority"]) || "Normal",
-          type: sel(p["Decision Type"]) || "",
-          status: sel(p["Status"]) || "Open",
-          // "Source Agent" is a select property — use sel(), not text()
-          agent: sel(p["Source Agent"]) || sel(p["Agent"]) || "",
-          question: text(p["Proposed Action"]) || text(p["Suggested Value / Draft Text"]) || "",
-          projectName: p["Project"]?.relation?.[0]?.id ? "linked" : "",
-          createdAt: relDate(dt(p["Created"]) || page.created_time),
-          notionUrl: page.url ?? "",
+          id: notionId ?? (r.id as string),
+          title: (r.title as string) || "Untitled",
+          priority: (r.priority as string) || "Normal",
+          type: (r.decision_type as string) || "",
+          status: (r.status as string) || "Open",
+          agent: (r.source_agent as string) || "",
+          question: (r.notes_raw as string) || "",
+          projectName: r.project_notion_id ? "linked" : "",
+          createdAt: relDate((r.created_at as string | null) ?? null),
+          notionUrl:
+            (r.notion_url as string) ||
+            (notionId ? `https://www.notion.so/${notionId.replace(/-/g, "")}` : ""),
         };
       })
       .sort((a, b) => (PRIORITY_ORDER[a.priority] ?? 3) - (PRIORITY_ORDER[b.priority] ?? 3));
@@ -83,9 +67,7 @@ export async function GET() {
       { headers: corsHeaders() }
     );
   } catch (err) {
-    // Do not echo `String(err)` — Notion error messages contain database IDs
-    // and property names. Log the detail server-side; return a stable code to
-    // the caller.
+    // Do not echo `String(err)` — log detail server-side; return a stable code.
     console.error("[decisions-queue]", err);
     return NextResponse.json(
       { error: "Failed to fetch decisions" },

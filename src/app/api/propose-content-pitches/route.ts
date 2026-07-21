@@ -18,12 +18,11 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
-// TODO phase-6: migrate read source to Supabase insight_briefs
-import { Client } from "@notionhq/client";
 import { adminGuardApi } from "@/lib/require-admin";
 import { withRoutineLog } from "@/lib/routine-log";
 import { computeAnthropicCost } from "@/lib/anthropic-cost";
 import { getProposalFeedbackContext } from "@/lib/proposal-feedback";
+import { getInsightBriefs } from "@/lib/notion";
 import {
   getActivePillars,
   getActiveAudiences,
@@ -34,9 +33,6 @@ import {
 } from "@/lib/comms-strategy";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-const notion    = new Client({ auth: process.env.NOTION_API_KEY });
-
-const INSIGHT_BRIEFS_DB = "04bed3a3fd1a4b3a99643cd21562e08a";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -49,23 +45,12 @@ function isLastFridayOfMonth(d: Date): boolean {
 
 async function recentInsightBriefsSummary(): Promise<string> {
   try {
-    const res = await notion.databases.query({
-      database_id: INSIGHT_BRIEFS_DB,
-      page_size: 8,
-      sorts: [{ timestamp: "last_edited_time", direction: "descending" }],
-    });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const lines = res.results.map((p: any) => {
-      const props = p.properties;
-      const title =
-        props["Brief Title"]?.title?.[0]?.plain_text ??
-        props["Name"]?.title?.[0]?.plain_text ?? "";
-      const summary =
-        props["Executive Summary"]?.rich_text?.[0]?.plain_text ??
-        props["Summary"]?.rich_text?.[0]?.plain_text ?? "";
-      if (!title) return null;
-      return `- ${title}${summary ? `: ${summary.slice(0, 200)}` : ""}`;
-    }).filter(Boolean);
+    // Read migrated OFF Notion → Supabase `insight_briefs` (post-cutoff).
+    const briefs = await getInsightBriefs();
+    const lines = briefs
+      .slice(0, 8)
+      .filter(b => b.title && b.title !== "Untitled")
+      .map(b => `- ${b.title}${b.theme.length ? ` (${b.theme.join(", ")})` : ""}`);
     return lines.length > 0 ? lines.join("\n") : "No recent briefs.";
   } catch {
     return "Insight Briefs unavailable.";

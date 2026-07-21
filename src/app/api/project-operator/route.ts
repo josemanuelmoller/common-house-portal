@@ -18,8 +18,6 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
-// TODO phase-6: migrate read source to Supabase projects + evidence
-import { Client } from "@notionhq/client";
 import { withRoutineLog } from "@/lib/routine-log";
 import { computeAnthropicCost, makeUsageAccumulator, addUsage, type AnthropicUsage } from "@/lib/anthropic-cost";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
@@ -27,11 +25,7 @@ import { requireCronAuth } from "@/lib/require-cron";
 
 const HAIKU_MODEL = "claude-haiku-4-5";
 
-const notion    = new Client({ auth: process.env.NOTION_API_KEY });
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
-const PROJECTS_DB = "49d59b18095f46588960f2e717832c5f";
-const EVIDENCE_DB = "fa28124978d043039d8932ac9964ccf5";
 
 const ACTIVE_STATUSES = ["Active", "Paused"] as const;
 
@@ -57,62 +51,46 @@ interface EvidenceRow {
 // ─── Fetch active projects ────────────────────────────────────────────────────
 
 async function fetchActiveProjects(): Promise<ProjectRow[]> {
-  const statusFilters = ACTIVE_STATUSES.map(s => ({
-    property: "Project Status", select: { equals: s },
+  const sb = getSupabaseServerClient();
+  const { data } = await sb
+    .from("projects")
+    .select("notion_id, name, current_stage, last_status_update, update_needed")
+    .in("project_status", ACTIVE_STATUSES as unknown as string[])
+    .limit(50);
+
+  return (data ?? []).map(p => ({
+    id:           (p.notion_id as string),
+    name:         (p.name as string) ?? "Untitled",
+    stage:        (p.current_stage as string) ?? "",
+    lastUpdate:   (p.last_status_update as string) ?? null,
+    updateNeeded: (p.update_needed as boolean) ?? false,
   }));
-
-  const res = await notion.databases.query({
-    database_id: PROJECTS_DB,
-    filter: { or: statusFilters },
-    page_size: 50,
-  });
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (res.results as any[]).map(page => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const p = (name: string) => page.properties[name] as any;
-    return {
-      id:           page.id,
-      name:         p("Project Name")?.title?.map((r: any) => r.plain_text).join("") ?? "Untitled",
-      stage:        p("Current Stage")?.select?.name ?? "",
-      lastUpdate:   p("Last Status Update")?.date?.start ?? null,
-      updateNeeded: p("Project Update Needed?")?.checkbox ?? false,
-    };
-  });
 }
 
 // ─── Fetch evidence for a project ────────────────────────────────────────────
 
 async function fetchProjectEvidence(projectId: string, since: string | null): Promise<EvidenceRow[]> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const filters: any[] = [
-    { property: "Linked Projects", relation: { contains: projectId } },
-    { property: "Validation Status", select: { equals: "Validated" } },
-  ];
-  if (since) {
-    filters.push({ property: "Date Captured", date: { on_or_after: since } });
-  }
-
   try {
-    const res = await notion.databases.query({
-      database_id: EVIDENCE_DB,
-      filter: { and: filters },
-      page_size: 30,
-    });
+    const sb = getSupabaseServerClient();
+    let q = sb
+      .from("evidence")
+      .select("notion_id, title, evidence_type, evidence_statement, validation_status, date_captured")
+      .eq("project_notion_id", projectId)
+      .eq("validation_status", "Validated")
+      .limit(30);
+    if (since) {
+      q = q.gte("date_captured", since);
+    }
+    const { data } = await q;
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (res.results as any[]).map(page => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const p = (name: string) => page.properties[name] as any;
-      return {
-        id:               page.id,
-        title:            p("Evidence Title")?.title?.map((r: any) => r.plain_text).join("") ?? "",
-        type:             p("Evidence Type")?.select?.name ?? "",
-        statement:        p("Evidence Statement")?.rich_text?.map((r: any) => r.plain_text).join("") ?? "",
-        validationStatus: p("Validation Status")?.select?.name ?? "",
-        dateCaptured:     p("Date Captured")?.date?.start ?? null,
-      };
-    });
+    return (data ?? []).map(e => ({
+      id:               (e.notion_id as string),
+      title:            (e.title as string) ?? "",
+      type:             (e.evidence_type as string) ?? "",
+      statement:        (e.evidence_statement as string) ?? "",
+      validationStatus: (e.validation_status as string) ?? "",
+      dateCaptured:     (e.date_captured as string) ?? null,
+    }));
   } catch {
     return [];
   }

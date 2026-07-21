@@ -1,9 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
-// notion-cutoff-2026-06-02: write removed; canonical write is now to content_pipeline_items (Supabase).
-// `notion` is retained for the read of the source brief (Title/Content Type/Platform)
-// until that read source migrates. `DB.contentPipeline` constant removed alongside
-// the deprecated `ensureSlideHtmlProperty` shim.
-import { notion } from "@/lib/notion";
+// notion-cutoff-2026-06-02: both the write and the source-brief read are now
+// Supabase-backed (content_pipeline_items). The `notion` client import was
+// removed alongside the deprecated `ensureSlideHtmlProperty` shim.
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -375,14 +373,22 @@ const AUDIENCE_INSTRUCTIONS: Record<string, string> = {
 
 export async function generateDraft(pageId: string, audience?: string, outputMode?: "slides" | "document"): Promise<void> {
   try {
-    // 1. Read the page
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const page = await notion.pages.retrieve({ page_id: pageId }) as any;
-    const props = page.properties;
+    // 1. Read the source brief from content_pipeline_items (Supabase canonical).
+    //    Match by uuid `id` or the `notion_id` backref, mirroring the write helper.
+    const sb = getSupabaseServerClient();
+    const isUuid = /^[0-9a-f-]{36}$/i.test(pageId);
+    const matchColumn = isUuid ? "id" : "notion_id";
+    const { data: page } = await sb
+      .from("content_pipeline_items")
+      .select("title, channel, payload")
+      .eq(matchColumn, pageId)
+      .maybeSingle();
 
-    const brief       = props["Title"]?.title?.[0]?.plain_text ?? "";
-    const contentType = props["Content Type"]?.select?.name ?? "";
-    const platform    = props["Platform"]?.select?.name ?? "";
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const payload = (page?.payload as Record<string, any> | null | undefined) ?? {};
+    const brief       = page?.title ?? "";
+    const contentType = (payload.content_type as string) ?? "";
+    const platform    = (page?.channel as string | null) ?? (payload.platform as string) ?? "";
 
     if (!brief) return;
 

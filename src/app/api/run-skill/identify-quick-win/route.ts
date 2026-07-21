@@ -3,26 +3,19 @@
  *
  * Scans OS v2 surfaces for quick-win actions and generates a draft report.
  *
- * Opportunities read: Supabase-first since Wave 5 follow-on (2026-04-17).
- * Decisions, Content, People: still read from Notion (not in Supabase or
- * missing required fields — Follow-up Status not synced to people table).
+ * All signal reads are Supabase-backed (Notion read cutoff).
+ * Opportunities, decisions, content, and people all read from Supabase.
+ * Note: the people query filters by contact_warmth only — the legacy
+ * "Follow-up Status = Needed" filter has no column in the people table.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { adminGuardApi } from "@/lib/require-admin";
-// TODO phase-6: migrate read source to Supabase decision_items + content_pipeline + people
-import { Client } from "@notionhq/client";
 import Anthropic from "@anthropic-ai/sdk";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { createPageWithMirror } from "@/lib/notion-mirror-push";
 
-const notion = new Client({ auth: process.env.NOTION_API_KEY });
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
-const AGENT_DRAFTS_DB  = "9844ece875ea4c618f616e8cc97d5a90";
-const DECISIONS_DB     = "6b801204c4de49c7b6179e04761a285a";
-const CONTENT_DB       = "3bf5cf81f45c4db2840590f3878bfdc0";
-const PEOPLE_DB        = "1bc0f96f33ca4a9e9ff26844377e81de";
 
 function corsHeaders() {
   return {
@@ -35,58 +28,44 @@ export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: corsHeaders() });
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function titleOf(page: any): string {
-  for (const val of Object.values(page.properties ?? {}) as any[]) {
-    if (val?.type === "title" && val?.title?.[0]?.plain_text) {
-      return val.title[0].plain_text;
-    }
-  }
-  return "Untitled";
-}
-
 export async function POST(_req: NextRequest) {
   const guard = await adminGuardApi();
   if (guard) return guard;
 
   const today = new Date().toISOString().slice(0, 10);
 
-  // 1. Pull signals from all relevant surfaces in parallel
-  //    Opportunities: Supabase-first (synced 9am weekdays)
-  //    Decisions / Content / People: Notion (not in Supabase or missing Follow-up Status field)
-  const [decisionsRes, contentRes, peopleRes, sbOpps] = await Promise.all([
-    notion.databases.query({
-      database_id: DECISIONS_DB,
-      filter: { property: "Status", select: { equals: "Open" } },
-      sorts: [{ property: "Priority", direction: "ascending" }],
-      page_size: 8,
-    }).catch(() => ({ results: [], has_more: false })),
-
-    notion.databases.query({
-      database_id: CONTENT_DB,
-      filter: {
-        or: [
-          { property: "Status", select: { equals: "Review" } },
-          { property: "Status", select: { equals: "Approved" } },
-        ],
-      },
-      page_size: 5,
-    }).catch(() => ({ results: [], has_more: false })),
-
-    notion.databases.query({
-      database_id: PEOPLE_DB,
-      filter: {
-        and: [
-          { property: "Contact Warmth", select: { equals: "Hot" } },
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          { property: "Follow-up Status", select: { equals: "Needed" } } as any,
-        ],
-      },
-      page_size: 5,
-    }).catch(() => ({ results: [] })),
+  // 1. Pull signals from all relevant surfaces in parallel (all Supabase-backed)
+  const sb = getSupabaseServerClient();
+  const [decisionRows, contentRows, peopleRows, sbOpps] = await Promise.all([
+    (async () => {
+      const { data } = await sb
+        .from("decision_items")
+        .select("title, priority, decision_type")
+        .eq("status", "Open")
+        .order("priority", { ascending: true })
+        .limit(8);
+      return data ?? [];
+    })().catch(() => []),
 
     (async () => {
-      const sb = getSupabaseServerClient();
+      const { data } = await sb
+        .from("content_pipeline_items")
+        .select("title, status, payload")
+        .in("status", ["Review", "Approved"])
+        .limit(5);
+      return data ?? [];
+    })().catch(() => []),
+
+    (async () => {
+      const { data } = await sb
+        .from("people")
+        .select("full_name")
+        .eq("contact_warmth", "Hot")
+        .limit(5);
+      return data ?? [];
+    })().catch(() => []),
+
+    (async () => {
       const { data } = await sb
         .from("opportunities")
         .select("title, status, org_notion_id")
@@ -99,34 +78,26 @@ export async function POST(_req: NextRequest) {
 
   // 2. Build context strings
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const decisions = decisionsRes.results.map((p: any) => {
-    const props = p.properties;
-    const title    = titleOf(p);
-    const priority = props["Priority"]?.select?.name ?? "Normal";
-    const type     = props["Type"]?.select?.name ?? "";
-    return `[${priority}] ${title}${type ? ` (${type})` : ""}`;
+  const decisions = decisionRows.map((d: any) => {
+    const priority = d.priority ?? "Normal";
+    const type     = d.decision_type ?? "";
+    return `[${priority}] ${d.title ?? "Untitled"}${type ? ` (${type})` : ""}`;
   });
 
-  const opportunities = sbOpps.map(o =>
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const opportunities = sbOpps.map((o: any) =>
     `${o.title} · ${o.status}${o.org_notion_id ? " · org linked" : ""}`
   );
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const content = contentRes.results.map((p: any) => {
-    const props = p.properties;
-    const name   = titleOf(p);
-    const status = props["Status"]?.select?.name ?? "";
-    const type   = props["Content Type"]?.select?.name ?? "";
-    return `${name}${type ? ` (${type})` : ""} — ${status}`;
+  const content = contentRows.map((c: any) => {
+    const status = c.status ?? "";
+    const type   = c.payload?.content_type ?? "";
+    return `${c.title ?? "Untitled"}${type ? ` (${type})` : ""} — ${status}`;
   });
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const hotContacts = peopleRes.results.map((p: any) => {
-    const props = p.properties;
-    return props["Full Name"]?.rich_text?.[0]?.plain_text
-      ?? props["Name"]?.title?.[0]?.plain_text
-      ?? "Unknown";
-  });
+  const hotContacts = peopleRows.map((p: any) => p.full_name ?? "Unknown");
 
   // 3. Generate quick wins with Anthropic
   const contextBlock = [

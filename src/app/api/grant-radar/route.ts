@@ -17,8 +17,6 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
-// TODO phase-6: migrate read source to Supabase projects
-import { Client } from "@notionhq/client";
 import { currentUser } from "@clerk/nextjs/server";
 import { isAdminUser, isAdminEmail } from "@/lib/clients";
 import { withRoutineLog } from "@/lib/routine-log";
@@ -27,12 +25,7 @@ import { getSupabaseServerClient } from "@/lib/supabase-server";
 export const maxDuration = 300;
 export const dynamic = "force-dynamic";
 
-// Notion read client retained for project read-path until Phase 4 read migration
-// (active projects are read-only here; writes are no longer Notion-bound).
-const notion    = new Client({ auth: process.env.NOTION_API_KEY });
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
-const DB_PROJECTS      = "49d59b18095f46588960f2e717832c5f";
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
@@ -54,13 +47,6 @@ async function authCheck(req: NextRequest): Promise<boolean> {
   return false;
 }
 
-// ─── Notion helpers ───────────────────────────────────────────────────────────
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const text = (p: any) => p?.title?.[0]?.plain_text ?? p?.rich_text?.[0]?.plain_text ?? "";
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const sel  = (p: any) => p?.select?.name ?? "";
-
 interface ProjectSummary {
   id: string;
   name: string;
@@ -73,21 +59,24 @@ interface ProjectSummary {
 async function fetchActiveProjects(): Promise<{ ch: ProjectSummary[]; startups: ProjectSummary[] }> {
   const ACTIVE = new Set(["Discovery", "Validation", "Execution", "Active"]);
 
-  const res = await notion.databases.query({
-    database_id: DB_PROJECTS,
-    page_size: 40,
-  });
+  const sb = getSupabaseServerClient();
+  const { data, error } = await sb
+    .from("projects")
+    .select("notion_id, name, current_stage, themes")
+    .limit(40);
+  if (error) throw new Error(error.message);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const all = (res.results as any[])
-    .filter(p => ACTIVE.has(sel(p.properties["Stage"])))
+  const all = (data ?? [])
+    .filter(p => ACTIVE.has((p.current_stage as string) ?? ""))
     .map(p => ({
-      id:            p.id,
-      name:          text(p.properties["Project Name"]),
-      stage:         sel(p.properties["Stage"]),
-      workspace:     sel(p.properties["Primary Workspace"]) || "hall",
-      statusSummary: text(p.properties["Status Summary"]).slice(0, 200),
-      sector:        sel(p.properties["Sector"]) || sel(p.properties["Tags"]) || "",
+      id:            p.notion_id as string,
+      name:          (p.name as string) ?? "",
+      stage:         (p.current_stage as string) ?? "",
+      // No workspace column in the Supabase schema; default to "hall".
+      workspace:     "hall",
+      // No status-summary column in the Supabase schema.
+      statusSummary: "",
+      sector:        Array.isArray(p.themes) ? (p.themes as string[]).join(", ") : "",
     }));
 
   return {

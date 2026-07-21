@@ -19,7 +19,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { google } from "googleapis";
 import { adminGuardApi } from "@/lib/require-admin";
-import { notion, DB } from "@/lib/notion";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { logServerError } from "@/lib/debug-log";
 
@@ -56,11 +55,15 @@ function buildRawEmail(opts: {
 
 async function resolveRecipient(relatedEntityId: string | null): Promise<string | null> {
   if (!relatedEntityId) return null;
+  // Read migrated OFF Notion → Supabase `people` (post-cutoff).
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const page = await notion.pages.retrieve({ page_id: relatedEntityId }) as any;
-    const emailProp = page.properties?.["Email"] ?? page.properties?.["Work Email"];
-    return emailProp?.email ?? emailProp?.rich_text?.[0]?.plain_text ?? null;
+    const sb = getSupabaseServerClient();
+    const { data } = await sb
+      .from("people")
+      .select("email")
+      .eq("notion_id", relatedEntityId)
+      .maybeSingle();
+    return (data?.email as string | undefined) ?? null;
   } catch {
     return null;
   }
@@ -75,22 +78,22 @@ export async function POST(req: NextRequest) {
   const { draftId } = await req.json() as { draftId: string };
   if (!draftId) return NextResponse.json({ error: "draftId required" }, { status: 400 });
 
-  // Fetch the draft from Notion
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const page = await notion.pages.retrieve({ page_id: draftId }) as any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const p = (name: string) => page.properties[name] as any;
+  // Fetch the draft from Supabase `agent_drafts` (read migrated OFF Notion).
+  const sb0 = getSupabaseServerClient();
+  const { data: draftRow } = await sb0
+    .from("agent_drafts")
+    .select("draft_type, status, title, body_md, target_person_notion_id")
+    .eq("notion_id", draftId)
+    .maybeSingle();
+  if (!draftRow) {
+    return NextResponse.json({ ok: false, reason: "Draft not found." }, { status: 404 });
+  }
 
-  const draftType   = p("Type")?.select?.name ?? "";
-  const status      = p("Status")?.select?.name ?? "";
-  // "Content" is the canonical body field — all Agent Draft write paths use this name.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const draftText   = (p("Content")?.rich_text ?? []).map((r: any) => r.plain_text).join("");
-  // "Draft Title" is the canonical title property — all Agent Draft write paths use this name.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const title       = p("Draft Title")?.title?.map((r: any) => r.plain_text).join("") ?? "";
-  const relatedId   = p("Related Entity")?.relation?.[0]?.id ?? null;
-  const voice       = p("Voice")?.select?.name ?? "CH";
+  const draftType   = (draftRow.draft_type as string | null) ?? "";
+  const status      = (draftRow.status as string | null) ?? "";
+  const draftText   = (draftRow.body_md as string | null) ?? "";
+  const title       = (draftRow.title as string | null) ?? "";
+  const relatedId   = (draftRow.target_person_notion_id as string | null) ?? null;
 
   // Only email-type drafts
   if (!["Follow-up Email", "Check-in Email"].includes(draftType)) {

@@ -22,8 +22,6 @@
 
 import { NextRequest, NextResponse, after } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
-// TODO phase-6: migrate read source to Supabase watchlist_entities + competitive_intel
-import { Client } from "@notionhq/client";
 import { currentUser } from "@clerk/nextjs/server";
 import { isAdminUser, isAdminEmail } from "@/lib/clients";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
@@ -31,12 +29,7 @@ import { getSupabaseServerClient } from "@/lib/supabase-server";
 export const maxDuration = 300;
 export const dynamic = "force-dynamic";
 
-const notion    = new Client({ auth: process.env.NOTION_API_KEY });
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
-// Page IDs (from Notion URL) — NOT collection IDs
-const DB_WATCHLIST     = "d5fad9978ed0436baae4964a0ad0e211"; // CH Watchlist [OS v2]
-const DB_INTEL         = "af8d7edb750b4131b3b55ef5ee83556a"; // CH Competitive Intel [OS v2]
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
@@ -58,15 +51,6 @@ async function authCheck(req: NextRequest): Promise<boolean> {
   return false;
 }
 
-// ─── Notion helpers ───────────────────────────────────────────────────────────
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const text = (p: any) => p?.title?.[0]?.plain_text ?? p?.rich_text?.[0]?.plain_text ?? "";
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const sel  = (p: any) => p?.select?.name ?? "";
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const url  = (p: any) => p?.url ?? "";
-
 interface WatchlistEntry {
   id: string;
   name: string;
@@ -79,45 +63,37 @@ interface WatchlistEntry {
 }
 
 async function fetchWatchlist(types: string[]): Promise<WatchlistEntry[]> {
-  const res = await notion.databases.query({
-    database_id: DB_WATCHLIST,
-    filter: {
-      and: [
-        { property: "Active", checkbox: { equals: true } },
-        {
-          or: types.map(t => ({ property: "Type", select: { equals: t } })),
-        },
-      ],
-    },
-    page_size: 20,
-  });
+  const sb = getSupabaseServerClient();
+  const { data, error } = await sb
+    .from("watchlist_entities")
+    .select("notion_id, name, watch_type, url, notes")
+    .in("watch_type", types)
+    .limit(20);
+  if (error) throw new Error(error.message);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (res.results as any[]).map(p => ({
-    id:            p.id,
-    name:          text(p.properties["Name"]),
-    type:          sel(p.properties["Type"]),
-    website:       url(p.properties["Website"]),
-    twitterX:      text(p.properties["Twitter / X"]),
-    linkedInUrl:   url(p.properties["LinkedIn URL"]),
-    scanFrequency: sel(p.properties["Scan Frequency"]),
-    notes:         text(p.properties["Notes"]),
+  return (data ?? []).map(p => ({
+    id:            p.notion_id as string,
+    name:          (p.name as string) ?? "",
+    type:          (p.watch_type as string) ?? "",
+    website:       (p.url as string) ?? "",
+    // No Twitter/X, LinkedIn, or Scan Frequency columns in the Supabase schema.
+    twitterX:      "",
+    linkedInUrl:   "",
+    scanFrequency: "",
+    notes:         (p.notes as string) ?? "",
   }));
 }
 
 async function dedupeCheck(watchlistPageId: string, title: string): Promise<boolean> {
   try {
-    const res = await notion.databases.query({
-      database_id: DB_INTEL,
-      filter: {
-        and: [
-          { property: "Watchlist Entry", relation: { contains: watchlistPageId } },
-          { property: "Title", title: { contains: title.slice(0, 50) } },
-        ],
-      },
-      page_size: 1,
-    });
-    return res.results.length > 0;
+    const sb = getSupabaseServerClient();
+    const { data } = await sb
+      .from("competitive_intel")
+      .select("id")
+      .eq("watchlist_entity_notion_id", watchlistPageId)
+      .ilike("title", `%${title.slice(0, 50)}%`)
+      .limit(1);
+    return !!(data && data.length > 0);
   } catch {
     return false;
   }
