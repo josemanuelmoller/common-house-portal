@@ -30,6 +30,9 @@ import { cleanHeaderName, isEmailLikeName } from "@/lib/people-names";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+// The Gmail harvest makes many sequential API calls; match the other backfill
+// routes (up to 300s) so a batch doesn't hit the default function timeout.
+export const maxDuration = 300;
 
 const DEFAULT_LIMIT = 400;
 const CANDIDATE_CAP = 2000;
