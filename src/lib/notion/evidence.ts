@@ -1,25 +1,41 @@
-import { notion, DB, prop, text, select, date, relationFirst } from "./core";
+// ─── Evidence queries (Supabase-backed) ───────────────────────────────────────
+//
+// This module reads exclusively from Supabase (public.evidence). No Notion.
+// The `id` field on every returned record is the row's `notion_id` — the stable
+// id used by call sites and for URL reconstruction.
 
-// ─── Evidence queries ─────────────────────────────────────────────────────────
+const EVIDENCE_COLUMNS =
+  "notion_id, title, evidence_statement, evidence_type, validation_status, confidence_level, reusability_level, date_captured, source_excerpt, project_notion_id";
 
-// Internal: full evidence cursor scan — no filter, paginates until all records
-// are fetched. Used only by getProjectsOverview (projects.ts) to build per-project
-// evidence counts. Prefer getEvidenceForProject or getAllEvidence for filtered queries.
+// Internal: full evidence scan — no filter, paginates until all rows are fetched.
+// Used only by getProjectsOverview (projects.ts) to build per-project evidence
+// counts. Prefer getEvidenceForProject or getAllEvidence for filtered queries.
+// Returns raw Supabase rows (project_notion_id / validation_status / evidence_type
+// / reusability_level / date_captured) consumed by projects.ts.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function fetchAllEvidence(): Promise<any[]> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const all: any[] = [];
-  let cursor: string | undefined;
-  do {
-    const res = await notion.databases.query({
-      database_id: DB.evidence,
-      page_size: 100,
-      ...(cursor ? { start_cursor: cursor } : {}),
-    });
-    all.push(...res.results);
-    cursor = res.has_more ? (res.next_cursor ?? undefined) : undefined;
-  } while (cursor);
-  return all;
+  try {
+    const { getSupabaseServerClient } = await import("../supabase-server");
+    const sb = getSupabaseServerClient();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const all: any[] = [];
+    const pageSize = 1000;
+    let from = 0;
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const { data, error } = await sb
+        .from("evidence")
+        .select("notion_id, evidence_type, validation_status, reusability_level, date_captured, project_notion_id")
+        .range(from, from + pageSize - 1);
+      if (error || !data || data.length === 0) break;
+      all.push(...data);
+      if (data.length < pageSize) break;
+      from += pageSize;
+    }
+    return all;
+  } catch {
+    return [];
+  }
 }
 
 export type EvidenceItem = {
@@ -35,18 +51,10 @@ export type EvidenceItem = {
   projectName?: string;
 };
 
-async function getEvidenceForProjectFromSupabase(projectId: string): Promise<EvidenceItem[]> {
-  const { getSupabaseServerClient } = await import("../supabase-server");
-  const sb = getSupabaseServerClient();
-  const { data, error } = await sb
-    .from("evidence")
-    .select("id, title, evidence_statement, evidence_type, validation_status, confidence_level, reusability_level, date_captured, source_excerpt, project_notion_id")
-    .eq("project_notion_id", projectId)
-    .order("date_captured", { ascending: false, nullsFirst: false })
-    .limit(50);
-  if (error || !data) return [];
-  return data.map(r => ({
-    id:               (r.id as string),
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mapEvidenceRow(r: any): EvidenceItem {
+  return {
+    id:               (r.notion_id as string) ?? "",
     title:            ((r.title as string | null) ?? (r.evidence_statement as string | null) ?? "") || "",
     type:             (r.evidence_type as string | null) ?? "",
     validationStatus: (r.validation_status as string | null) ?? "",
@@ -55,60 +63,41 @@ async function getEvidenceForProjectFromSupabase(projectId: string): Promise<Evi
     dateCaptured:     (r.date_captured as string | null) ?? null,
     excerpt:          (r.source_excerpt as string | null) ?? "",
     projectId:        (r.project_notion_id as string | null) ?? null,
-  }));
+  };
 }
 
 export async function getEvidenceForProject(projectPageId: string): Promise<EvidenceItem[]> {
-  if (projectPageId.startsWith("local-")) {
-    return getEvidenceForProjectFromSupabase(projectPageId);
+  try {
+    const { getSupabaseServerClient } = await import("../supabase-server");
+    const sb = getSupabaseServerClient();
+    const { data, error } = await sb
+      .from("evidence")
+      .select(EVIDENCE_COLUMNS)
+      .eq("project_notion_id", projectPageId)
+      .order("date_captured", { ascending: false, nullsFirst: false })
+      .limit(50);
+    if (error || !data) return [];
+    return data.map(mapEvidenceRow);
+  } catch {
+    return [];
   }
-  const res = await notion.databases.query({
-    database_id: DB.evidence,
-    filter: { property: "Project", relation: { contains: projectPageId } },
-    sorts: [{ property: "Date Captured", direction: "descending" }],
-    page_size: 50,
-  });
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return res.results.map((page: any) => ({
-    id: page.id,
-    title: text(prop(page, "Evidence Title")),
-    type: select(prop(page, "Evidence Type")),
-    validationStatus: select(prop(page, "Validation Status")),
-    confidence: select(prop(page, "Confidence Level")),
-    reusability: select(prop(page, "Reusability Level")),
-    dateCaptured: date(prop(page, "Date Captured")),
-    excerpt: text(prop(page, "Source Excerpt")),
-    projectId: relationFirst(prop(page, "Project")),
-  }));
 }
 
 // All evidence — for OS queue, with optional validation status filter
 export async function getAllEvidence(validationStatus?: string): Promise<EvidenceItem[]> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const filter: any = validationStatus
-    ? { property: "Validation Status", select: { equals: validationStatus } }
-    : undefined;
-
-  const res = await notion.databases.query({
-    database_id: DB.evidence,
-    filter,
-    sorts: [{ property: "Date Captured", direction: "descending" }],
-    page_size: 100,
-  });
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return res.results.map((page: any) => ({
-    id: page.id,
-    title: text(prop(page, "Evidence Title")),
-    type: select(prop(page, "Evidence Type")),
-    validationStatus: select(prop(page, "Validation Status")),
-    confidence: select(prop(page, "Confidence Level")),
-    reusability: select(prop(page, "Reusability Level")),
-    dateCaptured: date(prop(page, "Date Captured")),
-    excerpt: text(prop(page, "Source Excerpt")),
-    projectId: relationFirst(prop(page, "Project")),
-  }));
+  try {
+    const { getSupabaseServerClient } = await import("../supabase-server");
+    const sb = getSupabaseServerClient();
+    let q = sb.from("evidence").select(EVIDENCE_COLUMNS);
+    if (validationStatus) q = q.eq("validation_status", validationStatus);
+    const { data, error } = await q
+      .order("date_captured", { ascending: false, nullsFirst: false })
+      .limit(100);
+    if (error || !data) return [];
+    return data.map(mapEvidenceRow);
+  } catch {
+    return [];
+  }
 }
 
 // Reusable + Canonical validated evidence — for Knowledge System.
@@ -116,33 +105,19 @@ export async function getAllEvidence(validationStatus?: string): Promise<Evidenc
 // produced by the OS engine's triage-knowledge skill). Filtering only "Reusable" would
 // silently omit the most important cross-cutting knowledge items.
 export async function getReusableEvidence(): Promise<EvidenceItem[]> {
-  const res = await notion.databases.query({
-    database_id: DB.evidence,
-    filter: {
-      and: [
-        {
-          or: [
-            { property: "Reusability Level", select: { equals: "Reusable" } },
-            { property: "Reusability Level", select: { equals: "Canonical" } },
-          ],
-        },
-        { property: "Validation Status", select: { equals: "Validated" } },
-      ],
-    },
-    sorts: [{ property: "Date Captured", direction: "descending" }],
-    page_size: 50,
-  });
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return res.results.map((page: any) => ({
-    id: page.id,
-    title: text(prop(page, "Evidence Title")),
-    type: select(prop(page, "Evidence Type")),
-    validationStatus: select(prop(page, "Validation Status")),
-    confidence: select(prop(page, "Confidence Level")),
-    reusability: select(prop(page, "Reusability Level")),
-    dateCaptured: date(prop(page, "Date Captured")),
-    excerpt: text(prop(page, "Source Excerpt")),
-    projectId: relationFirst(prop(page, "Project")),
-  }));
+  try {
+    const { getSupabaseServerClient } = await import("../supabase-server");
+    const sb = getSupabaseServerClient();
+    const { data, error } = await sb
+      .from("evidence")
+      .select(EVIDENCE_COLUMNS)
+      .in("reusability_level", ["Reusable", "Canonical"])
+      .eq("validation_status", "Validated")
+      .order("date_captured", { ascending: false, nullsFirst: false })
+      .limit(50);
+    if (error || !data) return [];
+    return data.map(mapEvidenceRow);
+  } catch {
+    return [];
+  }
 }

@@ -464,7 +464,12 @@ const TABLES: TableConfig[] = [
     table: "style_profiles",
     osv2DbId: DB.styleProfiles,
     titleField: "Name",
-    map: (p) => mapGeneric(p, "Name"),
+    // style_profiles uses `name` (not `title`) as its label column — remap.
+    map: (p) => {
+      const g = mapGeneric(p, "Name") as Record<string, unknown>;
+      const { title, ...rest } = g;
+      return { ...rest, name: title } as unknown as SimpleRow;
+    },
   },
   {
     table: "valuations",

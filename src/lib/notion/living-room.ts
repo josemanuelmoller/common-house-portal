@@ -1,11 +1,11 @@
-import { notion, DB, prop, text, select, multiSelect, date } from "./core";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 
 // ─── Living Room — community-safe queries ─────────────────────────────────────
 //
-// Reads still flow through Notion until the Living Room read paths are migrated.
-// All four write helpers below now hit canonical Supabase tables per the
-// 2026-06-02 cutoff (docs/SUPABASE_CONSOLIDATION_FREEZE.md §3).
+// notion-cutoff: reads and writes are now 100% Supabase. No @notionhq/client,
+// no Notion prop helpers. Every record's `id` is the row's `notion_id`.
+// Fields without a Supabase source (milestone type, community theme, theme
+// category) return sensible empty defaults rather than reaching for Notion.
 
 export type LivingRoomPerson = {
   id: string;
@@ -36,31 +36,26 @@ export type LivingRoomTheme = {
 
 export async function getLivingRoomPeople(): Promise<LivingRoomPerson[]> {
   try {
-    const res = await notion.databases.query({
-      database_id: DB.people,
-      filter: {
-        or: [
-          { property: "Visibility", select: { equals: "public-safe" } },
-          { property: "Visibility", select: { equals: "community" } },
-        ],
-      },
-      page_size: 50,
-    });
+    const sb = getSupabaseServerClient();
+    const { data } = await sb
+      .from("people")
+      .select("id, notion_id, full_name, job_title, country, city, relationship_roles, visibility, linkedin")
+      .in("visibility", ["public-safe", "community"])
+      .is("dismissed_at", null)
+      .limit(50);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (res.results as any[])
-      .map((page: any) => {
-        const country  = select(prop(page, "Country"));
-        const city     = text(prop(page, "City"));
-        const location = [city, country].filter(Boolean).join(", ");
+    return ((data ?? []) as Array<Record<string, unknown>>)
+      .map(r => {
+        const location = [r.city as string | null, r.country as string | null].filter(Boolean).join(", ");
         return {
-          id:         page.id,
-          name:       text(prop(page, "Full Name")),
-          jobTitle:   text(prop(page, "Job Title / Role")),
+          id:         (r.notion_id as string) || (r.id as string) || "",
+          name:       (r.full_name as string) || "",
+          jobTitle:   (r.job_title as string) || "",
           location:   location || undefined,
-          roles:      multiSelect(prop(page, "Relationship Roles")),
-          visibility: select(prop(page, "Visibility")),
-          linkedin:   page.properties?.["LinkedIn"]?.url ?? undefined,
+          // relationship_roles is a single TEXT column — wrap as [value] when present.
+          roles:      (r.relationship_roles as string) ? [r.relationship_roles as string] : [],
+          visibility: (r.visibility as string) || "",
+          linkedin:   (r.linkedin as string) || undefined,
         };
       })
       .filter(p => p.name.trim() !== "");
@@ -71,27 +66,25 @@ export async function getLivingRoomPeople(): Promise<LivingRoomPerson[]> {
 
 export async function getLivingRoomMilestones(): Promise<LivingRoomMilestone[]> {
   try {
-    const res = await notion.databases.query({
-      database_id: DB.projects,
-      filter: {
-        and: [
-          { property: "Project Status", select: { equals: "Active" } },
-          { property: "Share to Living Room", checkbox: { equals: true } },
-        ],
-      },
-      sorts: [{ property: "Last Status Update", direction: "descending" }],
-      page_size: 30,
-    });
+    const sb = getSupabaseServerClient();
+    const { data } = await sb
+      .from("projects")
+      .select("id, notion_id, name, project_status, current_stage, geography, last_status_update, share_to_living_room")
+      .eq("project_status", "Active")
+      .eq("share_to_living_room", true)
+      .order("last_status_update", { ascending: false, nullsFirst: false })
+      .limit(30);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (res.results as any[]).map((page: any) => ({
-      id:             page.id,
-      name:           text(prop(page, "Project Name")),
-      stage:          select(prop(page, "Current Stage")),
-      milestoneType:  select(prop(page, "Milestone Type")),
-      communityTheme: text(prop(page, "Community Theme")),
-      geography:      multiSelect(prop(page, "Geography")),
-      lastUpdate:     date(prop(page, "Last Status Update")),
+    return ((data ?? []) as Array<Record<string, unknown>>).map(r => ({
+      id:             (r.notion_id as string) || (r.id as string) || "",
+      name:           (r.name as string) || "",
+      stage:          (r.current_stage as string) || "",
+      // No Supabase source for these two on this branch → empty defaults.
+      milestoneType:  "",
+      communityTheme: "",
+      // geography is a single TEXT column — wrap as [value] when present.
+      geography:      (r.geography as string) ? [r.geography as string] : [],
+      lastUpdate:     (r.last_status_update as string | null) ?? null,
     }));
   } catch {
     return [];
@@ -100,19 +93,22 @@ export async function getLivingRoomMilestones(): Promise<LivingRoomMilestone[]> 
 
 export async function getLivingRoomThemes(): Promise<LivingRoomTheme[]> {
   try {
-    const res = await notion.databases.query({
-      database_id: DB.knowledge,
-      filter: { property: "Living Room Theme", checkbox: { equals: true } },
-      sorts: [{ timestamp: "last_edited_time", direction: "descending" }],
-      page_size: 20,
-    });
+    const sb = getSupabaseServerClient();
+    // Living Room theme flag lives in knowledge_assets.payload.living_room_theme
+    // (jsonb escape hatch — see updateKnowledgeAssetTheme below).
+    const { data } = await sb
+      .from("knowledge_assets")
+      .select("id, notion_id, title, asset_type, updated_at")
+      .eq("payload->>living_room_theme", "true")
+      .order("updated_at", { ascending: false, nullsFirst: false })
+      .limit(20);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (res.results as any[]).map((page: any) => ({
-      id:        page.id,
-      name:      text(prop(page, "Asset Name")) || "Untitled",
-      category:  multiSelect(prop(page, "Domain / Theme")).join(", "),
-      assetType: select(prop(page, "Asset Type")),
+    return ((data ?? []) as Array<Record<string, unknown>>).map(r => ({
+      id:        (r.notion_id as string) || (r.id as string) || "",
+      name:      (r.title as string) || "Untitled",
+      // No dedicated Domain/Theme column on this branch → empty default.
+      category:  "",
+      assetType: (r.asset_type as string) || "",
     }));
   } catch {
     return [];

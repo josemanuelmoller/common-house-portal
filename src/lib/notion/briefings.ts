@@ -1,6 +1,13 @@
-import { notion, DB, prop, text, select, date } from "./core";
-
 // ─── Hall v2 — Daily Briefing ─────────────────────────────────────────────────
+//
+// Supabase-backed (post-Notion cutoff). Reads the canonical `daily_briefings`
+// and `insight_briefs` tables. No Notion API usage. Return shapes are identical
+// to the pre-migration Notion reader so downstream callers are unaffected.
+//
+// `daily_briefings` stores the 7 named sections plus status + generated_at
+// under `payload` (payload.sections.{focus_of_day,…}, payload.status,
+// payload.generated_at). `insight_briefs` keeps title + brief_type as columns
+// with theme / source_link / notion_url under `payload`.
 
 export type DailyBriefing = {
   id: string;
@@ -16,29 +23,56 @@ export type DailyBriefing = {
   status: string;  // Fresh | Stale | Generating
 };
 
+type DailyBriefingPayload = {
+  status?: string | null;
+  generated_at?: string | null;
+  sections?: Partial<Record<
+    "focus_of_day" | "meeting_prep" | "my_commitments" |
+    "follow_up_queue" | "agent_queue" | "market_signals" | "ready_to_publish",
+    string | null
+  >>;
+};
+
+function sectionsOf(payload: unknown): DailyBriefingPayload {
+  if (!payload || typeof payload !== "object") return {};
+  return payload as DailyBriefingPayload;
+}
+
+/** Reconstruct a Notion deep-link from a stored notion_id (dashes stripped). */
+function notionUrlFromId(notionId: string | null | undefined): string {
+  if (!notionId) return "";
+  return `https://www.notion.so/${notionId.replace(/-/g, "")}`;
+}
+
 export async function getDailyBriefing(dateStr?: string): Promise<DailyBriefing | null> {
   try {
+    const { getSupabaseServerClient } = await import("../supabase-server");
+    const sb = getSupabaseServerClient();
+
     const target = dateStr ?? new Date().toISOString().slice(0, 10);
-    const res = await notion.databases.query({
-      database_id: DB.dailyBriefings,
-      filter: { property: "Date", date: { equals: target } },
-      page_size: 1,
-    });
-    if (!res.results.length) return null;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const page: any = res.results[0];
+    const { data, error } = await sb
+      .from("daily_briefings")
+      .select("id, notion_id, briefing_date, payload")
+      .eq("briefing_date", target)
+      .limit(1)
+      .maybeSingle();
+    if (error || !data) return null;
+
+    const r = data as Record<string, unknown>;
+    const p = sectionsOf(r.payload);
+    const sec = p.sections ?? {};
     return {
-      id:             page.id,
-      date:           date(prop(page, "Date")),
-      focusOfDay:     text(prop(page, "Focus of the Day")),
-      meetingPrep:    text(prop(page, "Meeting Prep")),
-      myCommitments:  text(prop(page, "My Commitments")),
-      followUpQueue:  text(prop(page, "Follow-up Queue")),
-      agentQueue:     text(prop(page, "Agent Queue")),
-      marketSignals:  text(prop(page, "Market Signals")),
-      readyToPublish: text(prop(page, "Ready to Publish")),
-      generatedAt:    date(prop(page, "Generated At")),
-      status:         select(prop(page, "Status")),
+      id:             ((r.notion_id as string | null) ?? (r.id as string)),
+      date:           (r.briefing_date as string | null) ?? null,
+      focusOfDay:     sec.focus_of_day     ?? "",
+      meetingPrep:    sec.meeting_prep     ?? "",
+      myCommitments:  sec.my_commitments   ?? "",
+      followUpQueue:  sec.follow_up_queue  ?? "",
+      agentQueue:     sec.agent_queue      ?? "",
+      marketSignals:  sec.market_signals   ?? "",
+      readyToPublish: sec.ready_to_publish ?? "",
+      generatedAt:    p.generated_at ?? null,
+      status:         p.status       ?? "",
     };
   } catch {
     return null;
@@ -56,29 +90,37 @@ export type MarketSignalBrief = {
   sourceType: string | null;   // "Report" | "Policy Doc" | "Article" | …
 };
 
+type InsightBriefPayload = {
+  source_link?: string | null;
+  theme?: string | null;
+  notion_url?: string | null;
+};
+
 export async function getRecentInsightBriefBriefs(): Promise<MarketSignalBrief[]> {
   try {
+    const { getSupabaseServerClient } = await import("../supabase-server");
+    const sb = getSupabaseServerClient();
+
     const since = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
-    const res = await notion.databases.query({
-      database_id: DB.insightBriefs,
-      filter: {
-        timestamp: "last_edited_time",
-        last_edited_time: { on_or_after: since },
-      },
-      sorts: [{ timestamp: "last_edited_time", direction: "descending" }],
-      page_size: 20,
-    });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (res.results as any[]).map(page => {
-      const url = page.properties?.["Source Link"]?.url ?? null;
-      const themeName = select(prop(page, "Theme"));
+    const { data, error } = await sb
+      .from("insight_briefs")
+      .select("id, notion_id, title, brief_type, payload, updated_at")
+      .gte("updated_at", since)
+      .order("updated_at", { ascending: false })
+      .limit(20);
+    if (error || !data) return [];
+
+    return (data as Record<string, unknown>[]).map(r => {
+      const notionId = (r.notion_id as string | null) ?? null;
+      const p = (r.payload && typeof r.payload === "object" ? r.payload : {}) as InsightBriefPayload;
+      const url = p.source_link ?? null;
       return {
-        id:         page.id,
-        title:      text(prop(page, "Title")) || "Untitled",
+        id:         (notionId ?? (r.id as string)),
+        title:      (r.title as string | null) || "Untitled",
         sourceLink: typeof url === "string" && url.length > 0 ? url : null,
-        notionUrl:  page.url ?? "",
-        theme:      themeName ? [themeName] : [],
-        sourceType: select(prop(page, "Source Type")) || null,
+        notionUrl:  p.notion_url ?? notionUrlFromId(notionId),
+        theme:      p.theme ? [p.theme] : [],
+        sourceType: (r.brief_type as string | null) || null,
       };
     });
   } catch {
@@ -90,24 +132,29 @@ export async function getRecentInsightBriefBriefs(): Promise<MarketSignalBrief[]
 // regardless of date. Used by the Hall so the panel always shows the last
 // known signals with a clear "generated on" timestamp.
 //
-// Timestamp logic: prefer the explicit "Generated At" property when populated;
-// otherwise fall back to the page's last_edited_time so the panel always has
-// a freshness cue, even if legacy briefings never set Generated At.
+// Timestamp logic: prefer the explicit payload.generated_at when populated;
+// otherwise fall back to the row's updated_at so the panel always has a
+// freshness cue, even if legacy briefings never set generated_at.
 export async function getLatestMarketSignals(): Promise<{ text: string; date: string | null; generatedAt: string | null } | null> {
   try {
-    const res = await notion.databases.query({
-      database_id: DB.dailyBriefings,
-      sorts: [{ property: "Date", direction: "descending" }],
-      page_size: 14, // look at the last ~2 weeks
-    });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    for (const page of res.results as any[]) {
-      const signals = text(prop(page, "Market Signals"));
+    const { getSupabaseServerClient } = await import("../supabase-server");
+    const sb = getSupabaseServerClient();
+
+    const { data, error } = await sb
+      .from("daily_briefings")
+      .select("briefing_date, payload, updated_at")
+      .order("briefing_date", { ascending: false })
+      .limit(14); // look at the last ~2 weeks
+    if (error || !data) return null;
+
+    for (const row of (data as Record<string, unknown>[])) {
+      const p = sectionsOf(row.payload);
+      const signals = p.sections?.market_signals ?? null;
       if (signals && signals.trim().length > 0) {
         return {
           text:        signals,
-          date:        date(prop(page, "Date")),
-          generatedAt: date(prop(page, "Generated At")) ?? page.last_edited_time ?? null,
+          date:        (row.briefing_date as string | null) ?? null,
+          generatedAt: p.generated_at ?? (row.updated_at as string | null) ?? null,
         };
       }
     }
