@@ -94,10 +94,6 @@
       "schedule": "0 7 * * 3"
     },
     {
-      "path": "/api/sync-loops",
-      "schedule": "0 8 * * 1-5"
-    },
-    {
       "path": "/api/cron/observe-calendar",
       "schedule": "0 6 * * *"
     },
