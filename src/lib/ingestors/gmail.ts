@@ -112,6 +112,8 @@ type ThreadInfo = {
   fromName: string;
   toEmails: string[];
   ccEmails: string[];
+  /** email(lower) → raw display name, harvested from From/To/Cc headers. */
+  recipientNames: Record<string, string>;
   snippet: string;
   permalink: string;
 };
@@ -179,9 +181,11 @@ export async function runGmailIngestor(input: IngestInput): Promise<IngestResult
         if (!senderIsSelf && !isBotSender) {
           relationshipTouches.push({ email: t.fromEmail, at: t.internalDate, direction: "inbound", name: t.fromName });
         } else if (senderIsSelf && t.toEmails.length > 0) {
-          // Outbound: recipient display name isn't parsed in the metadata path,
-          // so omit it (never guess). We still record the touch.
-          relationshipTouches.push({ email: t.toEmails[0], at: t.internalDate, direction: "outbound" });
+          // Outbound: use the recipient's To/Cc display name (when the header
+          // carried one) so people we email but who never reply still get
+          // named. cleanHeaderName (applied below) drops it if it isn't a name.
+          const toEmail = t.toEmails[0];
+          relationshipTouches.push({ email: toEmail, at: t.internalDate, direction: "outbound", name: t.recipientNames[toEmail] ?? null });
         }
 
         // Skip gates — counted as 'skipped' for observability
@@ -449,6 +453,7 @@ async function fetchThreadsSince(
       fromName: parseName(fromRaw) || parseEmail(fromRaw),
       toEmails: parseEmailList(toRaw),
       ccEmails: parseEmailList(ccRaw),
+      recipientNames: parseAddressNames([toRaw, ccRaw, fromRaw]),
       snippet: (last.snippet ?? "").slice(0, 280),
       permalink: gmailPermalink(threadId),
     });
@@ -484,7 +489,46 @@ function parseName(raw: string): string {
 
 function parseEmailList(raw: string): string[] {
   if (!raw) return [];
-  return raw.split(",").map(s => parseEmail(s.trim())).filter(Boolean);
+  // Comma-safe: a quoted "Last, First" display name must not split into two
+  // addresses (that used to leak the surname as a bogus "email").
+  return splitAddressList(raw).map(s => parseEmail(s)).filter(e => e.includes("@"));
+}
+
+/**
+ * Split an address-list header on top-level commas only — commas inside a
+ * quoted display name or angle-bracketed address are preserved.
+ */
+function splitAddressList(raw: string): string[] {
+  const out: string[] = [];
+  let cur = "", inQuote = false, inAngle = false;
+  for (const ch of raw) {
+    if (ch === '"') { inQuote = !inQuote; cur += ch; continue; }
+    if (ch === "<") { inAngle = true; cur += ch; continue; }
+    if (ch === ">") { inAngle = false; cur += ch; continue; }
+    if (ch === "," && !inQuote && !inAngle) { out.push(cur); cur = ""; continue; }
+    cur += ch;
+  }
+  if (cur.trim()) out.push(cur);
+  return out;
+}
+
+/**
+ * Harvest email(lower) → raw display name from one or more address-list
+ * headers (From/To/Cc). Entries without a display name are skipped; the first
+ * name seen for an email wins. Raw names are cleaned downstream by
+ * cleanHeaderName before any write.
+ */
+function parseAddressNames(raws: string[]): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const raw of raws) {
+    if (!raw) continue;
+    for (const part of splitAddressList(raw)) {
+      const email = parseEmail(part);
+      const name = parseName(part);
+      if (email.includes("@") && name && !out[email]) out[email] = name;
+    }
+  }
+  return out;
 }
 
 type ResolvedContact = {
