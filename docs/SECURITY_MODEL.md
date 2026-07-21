@@ -93,7 +93,7 @@ Located in `.github/workflows/security-gates.yml`:
 | `check-secrets` | Pattern-scans new/changed files for `ntn_*`, `sk_live_*`, `sk-ant-*`, `sk-proj-*`, `AIza*`, `GOCSPX-*`, `xox[abprs]-`, `ghp_*`/`github_pat_*`, `glpat-*`, `npm_*`, `AKIA*`, `dop_v1_*`, `rk_live_*`, `whsec_*`, JWTs, PEM keys, and known historical literals (`ch-os-agent-2024-secure`, `ch-agents-2026`). Wave 5 H13 extended the pattern set. | every PR + push to main |
 | `check-api-auth` | Every mutating `src/app/api/**/route.ts` must INVOKE (not merely reference) `adminGuardApi(...)`, `requireCronAuth(...)`, `isValidCronRequest(...)`, `currentUser(...)`, `requireAdminAction(...)`, `requireAdmin(...)`, `requireSameOriginRequest(...)`, or `requireNavigationOrSameOrigin(...)`. Comments + stale imports do NOT satisfy the gate (Wave 5 H1 hardening). | every PR + push to main |
 | `check-no-err-leak` | NEW routes that echo `err.message` / `String(err)` / `detail: err.message` to the client are rejected. Existing offenders are pinned in `scripts/err-leak-baseline.txt`; the gate fails on any addition. Wave 5 H7. | every PR + push to main |
-| `npm-audit` | Fails when `npm audit` reports more high/critical vulnerabilities than the documented baseline (5 high transitive in `d3-color`/`postcss` as of Wave 3). | every PR + push to main |
+| `npm-audit` | Fails when `npm audit` reports more high/critical vulnerabilities than the documented baseline (7 high, all transitive/dev: the `d3-color` cluster via `react-simple-maps` + `brace-expansion` via `eslint-config-next` + transitive `js-yaml`). | every PR + push to main |
 | `typecheck` | `tsc --noEmit` clean. | every PR + push to main |
 
 Pre-commit hook: `.husky/pre-commit` runs `scripts/check-secrets.sh` against the
