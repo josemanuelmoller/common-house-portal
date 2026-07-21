@@ -56,7 +56,10 @@ const PROMPT_VERSION = "hall-compose-v1";
 
 // ─── Source gathering ─────────────────────────────────────────────────────────
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 interface ProjectContext {
+  id:                      string;
   notion_id:               string;
   name:                    string;
   primary_org_notion_id:   string | null;
@@ -69,11 +72,13 @@ async function loadProjectContext(
   sb: SupabaseClient,
   projectId: string,
 ): Promise<ProjectContext | null> {
-  const { data: project } = await sb
+  let projectQuery = sb
     .from("projects")
-    .select("notion_id, name, primary_org_notion_id")
-    .eq("notion_id", projectId)
-    .maybeSingle();
+    .select("id, notion_id, name, primary_org_notion_id");
+  projectQuery = UUID_RE.test(projectId)
+    ? projectQuery.eq("id", projectId)
+    : projectQuery.eq("notion_id", projectId);
+  const { data: project } = await projectQuery.maybeSingle();
   if (!project) return null;
 
   let orgName: string | null = null;
@@ -103,6 +108,7 @@ async function loadProjectContext(
   }
 
   return {
+    id:        project.id as string,
     notion_id: project.notion_id as string,
     name:      project.name as string,
     primary_org_notion_id: project.primary_org_notion_id as string | null,
@@ -550,7 +556,7 @@ export async function composeHallDraft(
       hall_draft_generated_at:  new Date().toISOString(),
       updated_at:               new Date().toISOString(),
     })
-    .eq("notion_id", projectId);
+    .eq("id", ctx.id);
   if (upErr) return { ok: false, error: `db write failed: ${upErr.message}` };
 
   return { ok: true, draft, sources_used: all.length };

@@ -43,5 +43,17 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     .maybeSingle();
   if (error) return NextResponse.json({ error: error.message }, { status: 502 });
   if (!data) return NextResponse.json({ error: "Material not found" }, { status: 404 });
+
+  // One room preview only: promoting a presentation to 'current' demotes the
+  // other current presentations to 'superseded' so exactly one deck is featured.
+  if (update.document_status === "current" && data.category === "presentation") {
+    await supabaseAdmin().from("project_materials")
+      .update({ document_status: "superseded", updated_at: new Date().toISOString() })
+      .eq("project_id", project.id)
+      .eq("category", "presentation")
+      .eq("document_status", "current")
+      .neq("id", materialId);
+  }
+
   return NextResponse.json({ ok: true, material: data });
 }

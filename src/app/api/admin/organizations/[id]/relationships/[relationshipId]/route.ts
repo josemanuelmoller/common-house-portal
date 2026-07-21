@@ -7,6 +7,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { apiError } from "@/lib/api-error";
 import { currentUser } from "@clerk/nextjs/server";
 import { adminGuardApi } from "@/lib/require-admin";
 import { endOrgRelationship } from "@/lib/relational-model";
@@ -41,6 +42,6 @@ export async function DELETE(
     await endOrgRelationship(relationshipId, actor, reason);
     return NextResponse.json({ ok: true });
   } catch (e) {
-    return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status: 502 });
+    return apiError(e, { route: "[/api/admin/organizations/[id]/relationships/[relationshipId]]", status: 502 });
   }
 }

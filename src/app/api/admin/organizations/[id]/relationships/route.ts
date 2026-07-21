@@ -9,6 +9,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { apiError } from "@/lib/api-error";
 import { currentUser } from "@clerk/nextjs/server";
 import { adminGuardApi } from "@/lib/require-admin";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
@@ -54,7 +55,7 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
     const relationships = await listOrgRelationships(orgId, { includeEnded: true });
     return NextResponse.json({ ok: true, relationships });
   } catch (e) {
-    return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status: 502 });
+    return apiError(e, { route: "[/api/admin/organizations/[id]/relationships]", status: 502 });
   }
 }
 
@@ -95,8 +96,8 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     return NextResponse.json({ ok: true, relationship });
   } catch (e) {
     if (e instanceof RelationalValidationError) {
-      return NextResponse.json({ error: e.message }, { status: 400 });
+      return apiError(e, { route: "[/api/admin/organizations/[id]/relationships]", status: 400, publicMessage: e.message });
     }
-    return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status: 502 });
+    return apiError(e, { route: "[/api/admin/organizations/[id]/relationships]", status: 502 });
   }
 }

@@ -1,14 +1,25 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState, type CSSProperties, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import type {
+  BillingAccount,
   ClientRoomAdminData,
   ClientRoomAgreement,
   ClientRoomMaterial,
   ClientRoomMaterialCategory,
+  ClientRoomTimelineEvent,
 } from "@/lib/client-room";
+
+const BANK_TEMPLATES: BillingAccount[] = [
+  { title: "GBP · Local", details: "Destinatario:\nSort code:\nNúmero de cuenta:\nBanco:\nDirección del banco:" },
+  { title: "GBP · Internacional (SWIFT/IBAN)", details: "Destinatario:\nIBAN:\nBIC (SWIFT):\nBIC intermediario:\nBanco:\nDirección del banco:" },
+  { title: "USD · Local (ACH)", details: "Destinatario:\nRouting (ACH):\nNúmero de cuenta:\nBanco:" },
+  { title: "USD · Internacional (SWIFT/IBAN)", details: "Destinatario:\nIBAN:\nBIC (SWIFT):\nBIC intermediario:\nBanco:\nDirección del banco:" },
+];
+
+const TIMELINE_KINDS = ["meeting", "milestone", "document", "exchange"] as const;
 
 const fieldStyle: CSSProperties = {
   width: "100%",
@@ -229,7 +240,7 @@ function MaterialEditor({ projectId, material }: { projectId: string; material: 
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[minmax(220px,1fr)_180px_135px_120px_auto] gap-2 lg:items-center py-3" style={{ borderBottom: "1px solid var(--hall-line-soft)" }}>
-      <div className="min-w-0"><a className="text-[12px] font-semibold hover:underline" href={material.url} target="_blank" rel="noreferrer">{material.title} ↗</a><p className="text-[10px] truncate" style={{ color: "var(--hall-muted-2)" }}>{material.folderName || "Unfiled"}{message ? ` · ${message}` : ""}</p></div>
+      <div className="min-w-0"><a className="text-[12px] font-semibold hover:underline" href={material.url} target="_blank" rel="noreferrer">{material.title} ↗</a><p className="text-[10px] truncate" style={{ color: category === "presentation" && status === "current" ? "var(--hall-lime-ink)" : "var(--hall-muted-2)" }}>{material.folderName || "Unfiled"}{category === "presentation" && status === "current" ? " · ★ Preview del room" : ""}{message ? ` · ${message}` : ""}</p></div>
       <select aria-label={`Category for ${material.title}`} style={fieldStyle} value={category} onChange={(event) => setCategory(event.target.value as ClientRoomMaterialCategory)}>{CATEGORIES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select>
       <select aria-label={`Status for ${material.title}`} style={fieldStyle} value={status} onChange={(event) => setStatus(event.target.value)}>{["draft", "in_review", "current", "approved", "superseded", "archived"].map((item) => <option key={item} value={item}>{item.replaceAll("_", " ")}</option>)}</select>
       <select aria-label={`Visibility for ${material.title}`} style={fieldStyle} value={visibility} onChange={(event) => setVisibility(event.target.value)}>{["internal", "proposed", "client", "restricted", "archived"].map((item) => <option key={item} value={item}>{item}</option>)}</select>
@@ -241,6 +252,7 @@ function MaterialEditor({ projectId, material }: { projectId: string; material: 
 export function ClientMaterialsManager({ room }: { room: ClientRoomAdminData }) {
   const router = useRouter();
   const [syncing, setSyncing] = useState(false);
+  const [creating, setCreating] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
   async function syncDrive() {
@@ -257,11 +269,415 @@ export function ClientMaterialsManager({ room }: { room: ClientRoomAdminData }) 
     }
   }
 
+  async function createFolder() {
+    setCreating(true);
+    setMessage(null);
+    try {
+      await apiJson(`/api/admin/projects/${room.id}/client-room/drive-folder`, { method: "POST" });
+      setMessage("Drive folder created (Finanzas · Documentación · Presentaciones · Multimedia). Drop files in and sync.");
+      router.refresh();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadCategory, setUploadCategory] = useState<ClientRoomMaterialCategory>("presentation");
+  async function uploadFile(e: FormEvent) {
+    e.preventDefault();
+    const input = fileRef.current;
+    if (!input?.files?.[0]) { setMessage("Choose a PDF or PPTX first"); return; }
+    setUploading(true);
+    setMessage(null);
+    try {
+      const fd = new FormData();
+      fd.append("file", input.files[0]);
+      fd.append("category", uploadCategory);
+      const res = await fetch(`/api/admin/projects/${room.id}/client-room/materials/upload`, { method: "POST", body: fd });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(payload.error || `Upload failed (${res.status})`);
+      setMessage("Uploaded — previews inline in the room. Stays internal until you set it to client.");
+      if (input) input.value = "";
+      router.refresh();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setUploading(false);
+    }
+  }
+
   return (
     <div>
-      <div className="flex flex-wrap items-center gap-3 mb-4"><button type="button" className="hall-btn-primary" disabled={syncing || !room.driveFolderId} onClick={() => void syncDrive()}>{syncing ? "Syncing…" : "Sync Google Drive"}</button>{room.driveFolderUrl && <a className="hall-btn-ghost" href={room.driveFolderUrl} target="_blank" rel="noreferrer">Open Drive ↗</a>}<Feedback message={message} /></div>
-      {!room.driveFolderId && <p className="text-[11px]" style={{ color: "var(--hall-warn)" }}>Configure a Drive folder above before syncing.</p>}
+      <form onSubmit={(e) => void uploadFile(e)} className="flex flex-wrap items-center gap-2 mb-3 p-3" style={{ border: "1px solid var(--hall-line)", borderRadius: 6 }}>
+        <span className="text-[11px] font-semibold" style={{ color: "var(--hall-muted-2)" }}>Upload PDF / PPTX</span>
+        <input ref={fileRef} type="file" accept=".pdf,.pptx,application/pdf" className="text-[11px]" />
+        <select aria-label="Category" style={{ ...fieldStyle, width: 170 }} value={uploadCategory} onChange={(e) => setUploadCategory(e.target.value as ClientRoomMaterialCategory)}>{CATEGORIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}</select>
+        <button type="submit" className="hall-btn-primary" disabled={uploading}>{uploading ? "Uploading…" : "Upload"}</button>
+        <span className="text-[10px]" style={{ color: "var(--hall-muted-2)" }}>PDF previews inline; NDA/contracts → Contract. Max 25MB.</span>
+      </form>
+      <div className="flex flex-wrap items-center gap-3 mb-4">
+        {room.driveFolderId
+          ? <button type="button" className="hall-btn-ghost" disabled={syncing} onClick={() => void syncDrive()}>{syncing ? "Syncing…" : "Sync Google Drive"}</button>
+          : <button type="button" className="hall-btn-ghost" disabled={creating} onClick={() => void createFolder()}>{creating ? "Creating…" : "Create Drive folder"}</button>}
+        {room.driveFolderUrl && <a className="hall-btn-ghost" href={room.driveFolderUrl} target="_blank" rel="noreferrer">Open Drive ↗</a>}
+        <Feedback message={message} />
+      </div>
+      {!room.driveFolderId && <p className="text-[11px]" style={{ color: "var(--hall-muted-2)" }}>No Drive folder yet. Create one to hold this room&apos;s documents (NDA, proposal, contracts). It stays private until you share it at invite time.</p>}
       {room.materials.length === 0 ? <p className="text-[11px]" style={{ color: "var(--hall-muted-2)" }}>No indexed materials yet.</p> : room.materials.map((material) => <MaterialEditor key={material.id} projectId={room.id} material={material} />)}
+    </div>
+  );
+}
+
+function NarrativeField({ label, value, onChange, area }: { label: string; value: string; onChange: (v: string) => void; area?: boolean }) {
+  return (
+    <div className="mb-3">
+      <label style={labelStyle}>{label}</label>
+      {area
+        ? <textarea style={{ ...fieldStyle, minHeight: 58 }} value={value} onChange={(e) => onChange(e.target.value)} />
+        : <input style={fieldStyle} value={value} onChange={(e) => onChange(e.target.value)} />}
+    </div>
+  );
+}
+
+export function NarrativeManager({ room }: { room: ClientRoomAdminData }) {
+  const router = useRouter();
+  const [f, setF] = useState({
+    welcomeNote: room.welcomeNote ?? "",
+    currentFocus: room.currentFocus ?? "",
+    nextMilestone: room.nextMilestone ?? "",
+    challenge: room.whatWeHeard.challenge ?? "",
+    mattersMost: room.whatWeHeard.mattersMost ?? "",
+    obstacles: room.whatWeHeard.obstacles ?? "",
+    success: room.whatWeHeard.success ?? "",
+    proposalStatus: room.proposal.status ?? "",
+    proposalSummary: room.proposal.summary ?? "",
+  });
+  const [plan, setPlan] = useState<Array<{ date: string; label: string; type: string }>>(
+    room.timeline.map((t) => ({ date: t.date ?? "", label: t.label ?? "", type: t.type ?? "future" }))
+  );
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const set = (k: keyof typeof f) => (v: string) => setF((prev) => ({ ...prev, [k]: v }));
+
+  async function save() {
+    setBusy(true);
+    setMessage(null);
+    try {
+      await apiJson(`/api/admin/projects/${room.id}/client-room/content`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...f, plan: plan.filter((p) => p.label.trim()) }),
+      });
+      setMessage("Guardado");
+      router.refresh();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div>
+      <p className="text-[11px] mb-4" style={{ color: "var(--hall-muted-2)" }}>Edita a mano lo que muestra el room. Todo queda interno hasta que compartas / publiques.</p>
+      <NarrativeField label="Nota de bienvenida" value={f.welcomeNote} onChange={set("welcomeNote")} area />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3">
+        <NarrativeField label="Foco actual" value={f.currentFocus} onChange={set("currentFocus")} />
+        <NarrativeField label="Próximo hito" value={f.nextMilestone} onChange={set("nextMilestone")} />
+      </div>
+
+      <p className="mt-4 mb-2 text-[11px] font-semibold" style={{ fontFamily: "var(--font-hall-mono)", textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--hall-muted-2)" }}>Lo que escuchamos</p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3">
+        <NarrativeField label="El reto" value={f.challenge} onChange={set("challenge")} area />
+        <NarrativeField label="Lo que más importa" value={f.mattersMost} onChange={set("mattersMost")} area />
+        <NarrativeField label="Lo que puede estorbar" value={f.obstacles} onChange={set("obstacles")} area />
+        <NarrativeField label="Cómo se ve el éxito" value={f.success} onChange={set("success")} area />
+      </div>
+
+      <p className="mt-4 mb-2 text-[11px] font-semibold" style={{ fontFamily: "var(--font-hall-mono)", textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--hall-muted-2)" }}>Propuesta</p>
+      <div className="grid grid-cols-1 sm:grid-cols-[160px_1fr] gap-x-3">
+        <NarrativeField label="Estado" value={f.proposalStatus} onChange={set("proposalStatus")} />
+        <NarrativeField label="Resumen" value={f.proposalSummary} onChange={set("proposalSummary")} area />
+      </div>
+
+      <div className="flex items-center justify-between mt-4 mb-2">
+        <p className="text-[11px] font-semibold" style={{ fontFamily: "var(--font-hall-mono)", textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--hall-muted-2)" }}>Plan</p>
+        <button type="button" className="hall-btn-ghost" onClick={() => setPlan((p) => [...p, { date: "", label: "", type: "future" }])}>+ Hito</button>
+      </div>
+      {plan.map((row, i) => (
+        <div key={i} className="grid grid-cols-[120px_1fr_120px_auto] gap-2 mb-2 items-center">
+          <input aria-label="Fecha" style={fieldStyle} placeholder="Q3 2026" value={row.date} onChange={(e) => setPlan((p) => p.map((r, j) => j === i ? { ...r, date: e.target.value } : r))} />
+          <input aria-label="Hito" style={fieldStyle} placeholder="Descripción del hito" value={row.label} onChange={(e) => setPlan((p) => p.map((r, j) => j === i ? { ...r, label: e.target.value } : r))} />
+          <select aria-label="Tipo" style={fieldStyle} value={row.type} onChange={(e) => setPlan((p) => p.map((r, j) => j === i ? { ...r, type: e.target.value } : r))}>{["past", "today", "future"].map((t) => <option key={t} value={t}>{t}</option>)}</select>
+          <button type="button" className="hall-btn-ghost" style={{ color: "var(--hall-danger)" }} onClick={() => setPlan((p) => p.filter((_, j) => j !== i))}>×</button>
+        </div>
+      ))}
+
+      <div className="flex items-center gap-3 mt-4">
+        <button type="button" className="hall-btn-primary" disabled={busy} onClick={() => void save()}>{busy ? "Guardando…" : "Guardar relato"}</button>
+        <Feedback message={message} />
+      </div>
+    </div>
+  );
+}
+
+export function BillingManager({ room }: { room: ClientRoomAdminData }) {
+  const router = useRouter();
+  const [f, setF] = useState({
+    legalName: room.billing.legalName ?? "",
+    companyNumber: room.billing.companyNumber ?? "",
+    vatNumber: room.billing.vatNumber ?? "",
+    address: room.billing.address ?? "",
+    billingEmail: room.billing.billingEmail ?? "",
+    publicNote: room.billing.publicNote ?? "",
+  });
+  const [accounts, setAccounts] = useState<BillingAccount[]>(room.billing.bankAccounts.length ? room.billing.bankAccounts : BANK_TEMPLATES);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const set = (k: keyof typeof f) => (v: string) => setF((p) => ({ ...p, [k]: v }));
+
+  async function save() {
+    setBusy(true);
+    setMessage(null);
+    try {
+      const bankAccounts = accounts.map((a) => ({ title: a.title.trim(), details: a.details.trim() })).filter((a) => a.title || a.details);
+      await apiJson(`/api/admin/company-billing`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...f, bankAccounts }) });
+      setMessage("Guardado");
+      router.refresh();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div>
+      <p className="text-[11px] mb-4" style={{ color: "var(--hall-muted-2)" }}>Datos de pago de Common House Ltd (UK) — los mismos para todos los clientes. Las cuentas bancarias solo las ve el rol <strong>approver</strong> en el room. Tú cargas los valores.</p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3">
+        <NarrativeField label="Razón social" value={f.legalName} onChange={set("legalName")} />
+        <NarrativeField label="N.º de registro (company number)" value={f.companyNumber} onChange={set("companyNumber")} />
+        <NarrativeField label="VAT number" value={f.vatNumber} onChange={set("vatNumber")} />
+        <NarrativeField label="Email de facturación" value={f.billingEmail} onChange={set("billingEmail")} />
+      </div>
+      <NarrativeField label="Dirección registrada" value={f.address} onChange={set("address")} />
+
+      <div className="flex items-center justify-between mt-4 mb-2">
+        <p className="text-[11px] font-semibold" style={{ fontFamily: "var(--font-hall-mono)", textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--hall-muted-2)" }}>Cuentas bancarias (solo approver)</p>
+        <button type="button" className="hall-btn-ghost" onClick={() => setAccounts((a) => [...a, { title: "", details: "" }])}>+ Cuenta</button>
+      </div>
+      {accounts.map((acc, i) => (
+        <div key={i} className="mb-3 p-3" style={{ border: "1px solid var(--hall-line)", borderRadius: 6 }}>
+          <div className="flex items-center gap-2 mb-2">
+            <input aria-label="Título de la cuenta" style={fieldStyle} placeholder="ej. GBP · Local" value={acc.title} onChange={(e) => setAccounts((a) => a.map((x, j) => j === i ? { ...x, title: e.target.value } : x))} />
+            <button type="button" className="hall-btn-ghost" style={{ color: "var(--hall-danger)" }} onClick={() => setAccounts((a) => a.filter((_, j) => j !== i))}>×</button>
+          </div>
+          <textarea aria-label="Detalles de la cuenta" style={{ ...fieldStyle, minHeight: 96 }} value={acc.details} onChange={(e) => setAccounts((a) => a.map((x, j) => j === i ? { ...x, details: e.target.value } : x))} />
+        </div>
+      ))}
+
+      <NarrativeField label="Nota (visible a todos los invitados)" value={f.publicNote} onChange={set("publicNote")} area />
+      <div className="flex items-center gap-3 mt-2">
+        <button type="button" className="hall-btn-primary" disabled={busy} onClick={() => void save()}>{busy ? "Guardando…" : "Guardar datos de pago"}</button>
+        <Feedback message={message} />
+      </div>
+    </div>
+  );
+}
+
+export function ClientSubmittedBilling({ room }: { room: ClientRoomAdminData }) {
+  const cb = room.clientBilling;
+  const [copied, setCopied] = useState(false);
+  const rows: Array<[string, string | null]> = [
+    ["Razón social", cb?.legalName ?? null],
+    ["ID fiscal (RUT / VAT / N.º empresa)", cb?.taxId ?? null],
+    ["Dirección", cb?.address ?? null],
+    ["Email de facturación", cb?.billingEmail ?? null],
+    ["Contacto", cb?.billingContact ?? null],
+    ["Orden de compra / referencia", cb?.poReference ?? null],
+    ["Notas", cb?.notes ?? null],
+  ];
+  const filled = rows.filter((r): r is [string, string] => !!r[1]);
+
+  if (filled.length === 0) {
+    return <p className="text-[11px]" style={{ color: "var(--hall-muted-2)" }}>El cliente todavía no ha cargado sus datos de facturación. Aparecerán aquí cuando lo hagan desde el room (rol collaborator o approver).</p>;
+  }
+
+  const copyText = filled.map(([k, v]) => `${k}: ${v}`).join("\n");
+  async function copyAll() {
+    try { await navigator.clipboard.writeText(copyText); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch { /* ignore */ }
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-3 mb-3">
+        <p className="text-[11px]" style={{ color: "var(--hall-muted-2)" }}>Datos que el cliente cargó para que le factures. Solo lectura.</p>
+        <button type="button" className="hall-btn-ghost" onClick={() => void copyAll()}>{copied ? "✓ Copiado" : "Copiar todo"}</button>
+      </div>
+      <div className="space-y-2">
+        {filled.map(([label, value]) => (
+          <div key={label}>
+            <p style={labelStyle}>{label}</p>
+            <p className="text-[13px]" style={{ whiteSpace: "pre-line", color: "var(--hall-ink-0)" }}>{value}</p>
+          </div>
+        ))}
+      </div>
+      {(cb?.submittedByEmail || cb?.updatedAt) && (
+        <p className="text-[10px] mt-3" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}>
+          {cb?.submittedByEmail ? `Cargado por ${cb.submittedByEmail}` : ""}{cb?.submittedByEmail && cb?.updatedAt ? " · " : ""}{cb?.updatedAt ? new Date(cb.updatedAt).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" }) : ""}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function TimelineEventEditor({ projectId, event }: { projectId: string; event: ClientRoomTimelineEvent }) {
+  const router = useRouter();
+  const [eventDate, setEventDate] = useState(event.eventDate);
+  const [kind, setKind] = useState(event.kind);
+  const [title, setTitle] = useState(event.title);
+  const [attendees, setAttendees] = useState(event.attendees.join(", "));
+  const [summary, setSummary] = useState(event.summary ?? "");
+  const [visibility, setVisibility] = useState(event.visibility);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+
+  async function save() {
+    setBusy(true);
+    setMessage(null);
+    try {
+      await apiJson(`/api/admin/projects/${projectId}/client-room/timeline/${event.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          eventDate, kind, title, summary, visibility,
+          attendees: attendees.split(",").map((s) => s.trim()).filter(Boolean),
+        }),
+      });
+      setMessage("Saved");
+      router.refresh();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function remove() {
+    if (!window.confirm(`Delete "${title}" from the timeline?`)) return;
+    setBusy(true);
+    setMessage(null);
+    try {
+      await apiJson(`/api/admin/projects/${projectId}/client-room/timeline/${event.id}`, { method: "DELETE" });
+      router.refresh();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error));
+      setBusy(false);
+    }
+  }
+
+  const dirty =
+    eventDate !== event.eventDate ||
+    kind !== event.kind ||
+    title !== event.title ||
+    attendees !== event.attendees.join(", ") ||
+    summary !== (event.summary ?? "") ||
+    visibility !== event.visibility;
+
+  return (
+    <div className="py-3" style={{ borderBottom: "1px solid var(--hall-line-soft)" }}>
+      <div className="grid grid-cols-1 sm:grid-cols-[130px_140px_1fr] gap-2 mb-2">
+        <input type="date" aria-label="Event date" style={fieldStyle} value={eventDate} onChange={(e) => setEventDate(e.target.value)} />
+        <select aria-label="Kind" style={fieldStyle} value={kind} onChange={(e) => setKind(e.target.value as ClientRoomTimelineEvent["kind"])}>{TIMELINE_KINDS.map((k) => <option key={k} value={k}>{k}</option>)}</select>
+        <input aria-label="Title" style={fieldStyle} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" />
+      </div>
+      <input aria-label="Attendees" style={{ ...fieldStyle, marginBottom: 8 }} value={attendees} onChange={(e) => setAttendees(e.target.value)} placeholder="Attendees, comma-separated — e.g. José Moller (Common House), Javier Valdivia (MPS)" />
+      <textarea aria-label="Summary" style={{ ...fieldStyle, marginBottom: 8, minHeight: 52 }} value={summary} onChange={(e) => setSummary(e.target.value)} placeholder="Summary" />
+      <div className="flex flex-wrap items-center gap-2">
+        <select aria-label="Visibility" style={{ ...fieldStyle, width: 130 }} value={visibility} onChange={(e) => setVisibility(e.target.value)}>{["internal", "client", "archived"].map((v) => <option key={v} value={v}>{v}</option>)}</select>
+        <button type="button" className="hall-btn-primary" disabled={busy || !dirty} onClick={() => void save()}>{busy ? "Saving…" : dirty ? "Save changes" : "Saved"}</button>
+        <button type="button" className="hall-btn-ghost" disabled={busy} onClick={() => void remove()} style={{ color: "var(--hall-danger)" }}>Delete</button>
+        {dirty && <span className="text-[10px] font-semibold" style={{ color: "var(--hall-warn)" }}>● Unsaved changes</span>}
+        {visibility === "internal" && <span className="text-[10px]" style={{ color: "var(--hall-muted-2)" }}>Not visible to client</span>}
+        <Feedback message={message} />
+      </div>
+    </div>
+  );
+}
+
+export function TimelineManager({ room }: { room: ClientRoomAdminData }) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState({ eventDate: "", kind: "meeting" as ClientRoomTimelineEvent["kind"], title: "", attendees: "", location: "", summary: "" });
+  const [busy, setBusy] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+
+  async function syncCalendar() {
+    setSyncing(true);
+    setMessage(null);
+    try {
+      const r = await apiJson(`/api/admin/projects/${room.id}/client-room/timeline/sync-calendar`, { method: "POST" });
+      setMessage(`Calendar: ${r.created ?? 0} nuevas · ${r.updated ?? 0} actualizadas (${r.matched ?? 0} reuniones con ${(r.domains ?? []).join(", ")}). Quedan internal — borra las que no correspondan.`);
+      router.refresh();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  async function add(e: FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setMessage(null);
+    try {
+      await apiJson(`/api/admin/projects/${room.id}/client-room/timeline`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...form,
+          attendees: form.attendees.split(",").map((s) => s.trim()).filter(Boolean),
+        }),
+      });
+      setForm({ eventDate: "", kind: "meeting", title: "", attendees: "", location: "", summary: "" });
+      setOpen(false);
+      router.refresh();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div>
+      <div className="flex flex-wrap items-center gap-3 mb-4">
+        <button type="button" className="hall-btn-primary" onClick={() => setOpen((v) => !v)}>{open ? "Close" : "Add event"}</button>
+        <button type="button" className="hall-btn-ghost" disabled={syncing} onClick={() => void syncCalendar()}>{syncing ? "Syncing…" : "Sync calendar"}</button>
+        <span className="text-[11px]" style={{ color: "var(--hall-muted-2)" }}>Meetings, signed documents and milestones. Every event stays internal until you set it to client.</span>
+        <Feedback message={message} />
+      </div>
+      {open && (
+        <form onSubmit={(e) => void add(e)} className="mb-5 p-3" style={{ border: "1px solid var(--hall-line)", borderRadius: 4 }}>
+          <div className="grid grid-cols-1 sm:grid-cols-[130px_140px_1fr] gap-2 mb-2">
+            <div><label style={labelStyle}>Date</label><input type="date" required style={fieldStyle} value={form.eventDate} onChange={(e) => setForm({ ...form, eventDate: e.target.value })} /></div>
+            <div><label style={labelStyle}>Kind</label><select style={fieldStyle} value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value as ClientRoomTimelineEvent["kind"] })}>{TIMELINE_KINDS.map((k) => <option key={k} value={k}>{k}</option>)}</select></div>
+            <div><label style={labelStyle}>Title</label><input required style={fieldStyle} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="e.g. Discovery session — MPS × Common House" /></div>
+          </div>
+          <label style={labelStyle}>Attendees (comma-separated)</label>
+          <input style={{ ...fieldStyle, marginBottom: 8 }} value={form.attendees} onChange={(e) => setForm({ ...form, attendees: e.target.value })} placeholder="José Moller (Common House), Javier Valdivia (MPS)" />
+          <label style={labelStyle}>Summary</label>
+          <textarea style={{ ...fieldStyle, marginBottom: 8, minHeight: 52 }} value={form.summary} onChange={(e) => setForm({ ...form, summary: e.target.value })} />
+          <button type="submit" className="hall-btn-primary" disabled={busy}>{busy ? "Adding…" : "Add to timeline"}</button>
+        </form>
+      )}
+      {room.timelineEvents.length === 0
+        ? <p className="text-[11px]" style={{ color: "var(--hall-muted-2)" }}>No timeline events yet.</p>
+        : room.timelineEvents.map((event) => <TimelineEventEditor key={event.id} projectId={room.id} event={event} />)}
     </div>
   );
 }

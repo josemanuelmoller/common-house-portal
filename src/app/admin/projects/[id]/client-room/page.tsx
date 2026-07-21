@@ -1,14 +1,20 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { PortalShell } from "@/components/PortalShell";
-import { HallSection } from "@/components/HallSection";
+import { HallSection, CollapsibleHallSection } from "@/components/HallSection";
 import {
   AgreementsManager,
+  BillingManager,
   ClientAccessManager,
   ClientMaterialsManager,
   ClientRoomSettings,
+  ClientSubmittedBilling,
+  NarrativeManager,
+  TimelineManager,
 } from "@/components/client-room/ClientRoomManager";
+import { RoomAnalyticsPanel } from "@/components/client-room/RoomAnalyticsPanel";
 import { getClientRoomAdminData } from "@/lib/client-room";
+import { getRoomAnalytics } from "@/lib/room-analytics";
 import { getOnboardingReadiness } from "@/lib/portal-health";
 import { requireAdmin } from "@/lib/require-admin";
 
@@ -22,6 +28,7 @@ export default async function ClientRoomAdminPage({ params }: { params: Promise<
   const readiness = await getOnboardingReadiness(id);
   const readyCount = readiness ? readiness.checks.filter((c) => c.ok).length : 0;
   const readyTotal = readiness ? readiness.checks.length : 0;
+  const analytics = await getRoomAnalytics(room.id);
 
   return (
     <PortalShell
@@ -29,8 +36,8 @@ export default async function ClientRoomAdminPage({ params }: { params: Promise<
       title={room.name}
       period={false}
       subtitle="Control exactly what the client can see, respond to and approve. Drive files stay internal until you explicitly share them."
-      meta={<div className="flex items-center gap-3"><span>{room.roomEnabled ? "ROOM ON" : "ROOM OFF"}</span><Link href={`/admin/projects/${id}`} className="hover:underline">← Project</Link></div>}
-      metaMobile={<Link href={`/admin/projects/${id}`} className="text-[10px]">← Project</Link>}
+      meta={<div className="flex items-center gap-3"><span>{room.roomEnabled ? "ROOM ON" : "ROOM OFF"}</span>{room.slug && <a href={`/hall/${room.slug}`} target="_blank" rel="noreferrer" className="hover:underline">View as client ↗</a>}<Link href={`/admin/projects/${id}`} className="hover:underline">← Project</Link></div>}
+      metaMobile={<div className="flex items-center gap-3">{room.slug && <a href={`/hall/${room.slug}`} target="_blank" rel="noreferrer" className="text-[10px]">Client ↗</a>}<Link href={`/admin/projects/${id}`} className="text-[10px]">← Project</Link></div>}
       narrow
       bodySpacing={8}
     >
@@ -53,21 +60,41 @@ export default async function ClientRoomAdminPage({ params }: { params: Promise<
         </HallSection>
       )}
 
-      <HallSection title="Room" flourish="settings" meta={room.slug ? `/${room.slug}` : "NO SLUG"}>
-        <ClientRoomSettings room={room} />
-      </HallSection>
+      <CollapsibleHallSection title="Analytics" flourish="quién y qué mira" meta={`${analytics.totalVisits} VISITAS · ${analytics.uniqueVisitors} VISITANTES`} defaultOpen>
+        <RoomAnalyticsPanel data={analytics} />
+      </CollapsibleHallSection>
 
-      <HallSection title="Client" flourish="access" meta="PROJECT SCOPED">
+      <CollapsibleHallSection title="Client" flourish="access" meta="PROJECT SCOPED" defaultOpen>
         <ClientAccessManager slug={room.slug} hasDrive={!!room.driveFolderId} />
-      </HallSection>
+      </CollapsibleHallSection>
 
-      <HallSection title="Agreements" flourish="and approvals" meta={`${room.agreements.length} RECORDED`}>
+      <CollapsibleHallSection title="Room" flourish="settings" meta={room.slug ? `/${room.slug}` : "NO SLUG"}>
+        <ClientRoomSettings room={room} />
+      </CollapsibleHallSection>
+
+      <CollapsibleHallSection title="Narrative" flourish="the story" meta="ROOM CONTENT">
+        <NarrativeManager room={room} />
+      </CollapsibleHallSection>
+
+      <CollapsibleHallSection title="Working" flourish="together" meta={`${room.timelineEvents.length} EVENTS`}>
+        <TimelineManager room={room} />
+      </CollapsibleHallSection>
+
+      <CollapsibleHallSection title="Agreements" flourish="and approvals" meta={`${room.agreements.length} RECORDED`}>
         <AgreementsManager room={room} />
-      </HallSection>
+      </CollapsibleHallSection>
 
-      <HallSection title="Project" flourish="materials" meta={`${room.materials.length} INDEXED`}>
+      <CollapsibleHallSection title="Project" flourish="materials" meta={`${room.materials.length} INDEXED`}>
         <ClientMaterialsManager room={room} />
-      </HallSection>
+      </CollapsibleHallSection>
+
+      <CollapsibleHallSection title="Administrative" flourish="billing" meta="GLOBAL · APPROVER-GATED">
+        <BillingManager room={room} />
+      </CollapsibleHallSection>
+
+      <CollapsibleHallSection title="Client billing" flourish="their details" meta="CLIENT-SUBMITTED · READ ONLY">
+        <ClientSubmittedBilling room={room} />
+      </CollapsibleHallSection>
     </PortalShell>
   );
 }

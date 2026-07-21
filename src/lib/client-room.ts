@@ -36,6 +36,44 @@ export type ClientRoomMaterial = {
   modifiedAt: string | null;
 };
 
+export type BillingAccount = { title: string; details: string };
+
+export type ClientRoomBilling = {
+  legalName: string | null;
+  companyNumber: string | null;
+  vatNumber: string | null;
+  address: string | null;
+  billingEmail: string | null;
+  publicNote: string | null;
+  bankAccounts: BillingAccount[]; // populated only when the viewer may see banking (admin or approver)
+};
+
+export type ClientBillingProfile = {
+  legalName: string | null;
+  taxId: string | null;
+  address: string | null;
+  billingEmail: string | null;
+  billingContact: string | null;
+  poReference: string | null;
+  notes: string | null;
+  submittedByEmail: string | null;
+  updatedAt: string | null;
+};
+
+export type ClientRoomTimelineEvent = {
+  id: string;
+  eventDate: string;
+  kind: "meeting" | "milestone" | "document" | "exchange";
+  title: string;
+  summary: string | null;
+  attendees: string[];
+  location: string | null;
+  visibility: string;
+  sourceId: string | null;
+  materialId: string | null;
+  agreementId: string | null;
+};
+
 export type ClientRoomAgreement = {
   id: string;
   agreementType: string;
@@ -65,6 +103,7 @@ export type ClientRoomProject = {
   currentStage: string | null;
   geography: string | null;
   themes: string | null;
+  clientLogoUrl: string | null;
   welcomeNote: string | null;
   currentFocus: string | null;
   nextMilestone: string | null;
@@ -78,8 +117,11 @@ export type ClientRoomProject = {
   };
   proposal: HallDraftProposal;
   timeline: HallDraftTimelineItem[];
+  timelineEvents: ClientRoomTimelineEvent[];
   materials: ClientRoomMaterial[];
   agreements: ClientRoomAgreement[];
+  billing: ClientRoomBilling;
+  clientBilling: ClientBillingProfile | null;
 };
 
 export type ClientRoomAdminData = ClientRoomProject & {
@@ -100,6 +142,7 @@ type ProjectRow = {
   current_stage: string | null;
   geography: string | null;
   themes: string | null;
+  client_logo_url: string | null;
   hall_hero: HallDraft | null;
   hall_welcome_note: string | null;
   hall_current_focus: string | null;
@@ -115,7 +158,7 @@ type ProjectRow = {
 const PROJECT_SELECT = [
   "id", "notion_id", "hall_slug", "name", "organization_id",
   "client_room_label", "client_room_status", "client_room_enabled",
-  "project_status", "current_stage", "geography", "themes", "hall_hero",
+  "project_status", "current_stage", "geography", "themes", "client_logo_url", "hall_hero",
   "hall_welcome_note", "hall_current_focus", "hall_next_milestone",
   "hall_challenge", "hall_matters_most", "hall_obstacles", "hall_success",
   "drive_folder_id", "drive_folder_url",
@@ -202,12 +245,82 @@ async function loadAgreements(projectId: string, includeInternal: boolean): Prom
   }));
 }
 
-async function assembleRoom(row: ProjectRow, includeInternal: boolean): Promise<ClientRoomProject> {
+async function loadTimelineEvents(projectId: string, includeInternal: boolean): Promise<ClientRoomTimelineEvent[]> {
+  let query = supabaseAdmin()
+    .from("project_timeline_events")
+    .select("id, event_date, kind, title, summary, attendees, location, visibility, source_id, material_id, agreement_id")
+    .eq("project_id", projectId)
+    .neq("visibility", "archived")
+    .order("event_date", { ascending: false })
+    .order("sort_order", { ascending: true });
+  if (!includeInternal) query = query.eq("visibility", "client");
+  const { data, error } = await query;
+  if (error) throw new Error(`client-room timeline read failed: ${error.message}`);
+  return (data ?? []).map((row) => ({
+    id: row.id as string,
+    eventDate: row.event_date as string,
+    kind: row.kind as ClientRoomTimelineEvent["kind"],
+    title: row.title as string,
+    summary: (row.summary as string | null) ?? null,
+    attendees: (row.attendees as string[] | null) ?? [],
+    location: (row.location as string | null) ?? null,
+    visibility: row.visibility as string,
+    sourceId: (row.source_id as string | null) ?? null,
+    materialId: (row.material_id as string | null) ?? null,
+    agreementId: (row.agreement_id as string | null) ?? null,
+  }));
+}
+
+async function loadBilling(canSeeBank: boolean): Promise<ClientRoomBilling> {
+  const { data } = await supabaseAdmin()
+    .from("company_billing")
+    .select("legal_name, tax_id, vat_number, address, billing_email, public_note, bank_accounts")
+    .eq("id", 1)
+    .maybeSingle();
+  const rawAccounts = (data?.bank_accounts as Array<{ title?: string; details?: string }> | null) ?? [];
+  const accounts: BillingAccount[] = Array.isArray(rawAccounts)
+    ? rawAccounts.map((a) => ({ title: String(a?.title ?? "").trim(), details: String(a?.details ?? "").trim() })).filter((a) => a.title || a.details)
+    : [];
+  return {
+    legalName: (data?.legal_name as string | null) ?? null,
+    companyNumber: (data?.tax_id as string | null) ?? null,
+    vatNumber: (data?.vat_number as string | null) ?? null,
+    address: (data?.address as string | null) ?? null,
+    billingEmail: (data?.billing_email as string | null) ?? null,
+    publicNote: (data?.public_note as string | null) ?? null,
+    bankAccounts: canSeeBank ? accounts : [],
+  };
+}
+
+async function loadClientBilling(projectId: string): Promise<ClientBillingProfile | null> {
+  const { data } = await supabaseAdmin()
+    .from("client_billing_profiles")
+    .select("legal_name, tax_id, address, billing_email, billing_contact, po_reference, notes, submitted_by_email, updated_at")
+    .eq("project_id", projectId)
+    .maybeSingle();
+  if (!data) return null;
+  return {
+    legalName: (data.legal_name as string | null) ?? null,
+    taxId: (data.tax_id as string | null) ?? null,
+    address: (data.address as string | null) ?? null,
+    billingEmail: (data.billing_email as string | null) ?? null,
+    billingContact: (data.billing_contact as string | null) ?? null,
+    poReference: (data.po_reference as string | null) ?? null,
+    notes: (data.notes as string | null) ?? null,
+    submittedByEmail: (data.submitted_by_email as string | null) ?? null,
+    updatedAt: (data.updated_at as string | null) ?? null,
+  };
+}
+
+async function assembleRoom(row: ProjectRow, includeInternal: boolean, canSeeBank = false): Promise<ClientRoomProject> {
   const hero = row.hall_hero ? withDraftDefaults(row.hall_hero) : null;
-  const [orgName, materials, agreements] = await Promise.all([
+  const [orgName, materials, agreements, timelineEvents, billing, clientBilling] = await Promise.all([
     organizationName(row.organization_id),
     loadMaterials(row.id, includeInternal),
     loadAgreements(row.id, includeInternal),
+    loadTimelineEvents(row.id, includeInternal),
+    loadBilling(canSeeBank),
+    loadClientBilling(row.id),
   ]);
   return {
     id: row.id,
@@ -222,6 +335,7 @@ async function assembleRoom(row: ProjectRow, includeInternal: boolean): Promise<
     currentStage: row.current_stage,
     geography: row.geography,
     themes: row.themes,
+    clientLogoUrl: row.client_logo_url,
     welcomeNote: row.hall_welcome_note,
     currentFocus: row.hall_current_focus,
     nextMilestone: row.hall_next_milestone,
@@ -245,21 +359,24 @@ async function assembleRoom(row: ProjectRow, includeInternal: boolean): Promise<
       status: "draft", summary: null, file_url: null, file_name: null, sent_at: null,
     },
     timeline: hero?.timeline ?? [],
+    timelineEvents,
     materials,
     agreements,
+    billing,
+    clientBilling,
   };
 }
 
-export async function getClientRoomBySlug(slug: string): Promise<ClientRoomProject | null> {
+export async function getClientRoomBySlug(slug: string, opts?: { canSeeBank?: boolean }): Promise<ClientRoomProject | null> {
   const row = await resolveClientRoomProject(slug, "slug");
   if (!row || !row.client_room_enabled) return null;
-  return assembleRoom(row, false);
+  return assembleRoom(row, false, opts?.canSeeBank ?? false);
 }
 
 export async function getClientRoomAdminData(identifier: string): Promise<ClientRoomAdminData | null> {
   const row = await resolveClientRoomProject(identifier, "id");
   if (!row) return null;
-  const room = await assembleRoom(row, true);
+  const room = await assembleRoom(row, true, true);
   return {
     ...room,
     driveFolderId: row.drive_folder_id,

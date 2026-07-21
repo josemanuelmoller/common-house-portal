@@ -31,6 +31,11 @@ HELPER_CALLS=(
   "requireAdmin"
   "requireSameOriginRequest"
   "requireNavigationOrSameOrigin"
+  # Client-room access family (src/lib/require-client-access.ts). A room-scoped
+  # mutating route gates on the caller's grant/role via one of these.
+  "clientAccessGuardApi"
+  "requireClientAccessForSlug"
+  "resolveAccessForSlug"
 )
 
 # Env-var auth markers (legacy inline-style routes still using these are OK).

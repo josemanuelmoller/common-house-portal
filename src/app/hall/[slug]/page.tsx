@@ -10,7 +10,8 @@ export default async function HallSlugPage({ params }: { params: Promise<{ slug:
 
   // Authentication and project-scoped authorization happen before any room data is read.
   const access = await requireClientAccessForSlug(slug);
-  const room = await getClientRoomBySlug(slug);
+  const canSeeBank = access.kind === "admin" || (access.kind === "client" && access.grant.role === "approver");
+  const room = await getClientRoomBySlug(slug, { canSeeBank });
   if (!room) notFound();
 
   return (

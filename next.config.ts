@@ -18,37 +18,58 @@ import type { NextConfig } from "next";
 //     applied under /api/*).
 //   - Anthropic + Notion calls happen server-side only, so they don't need
 //     connect-src grants.
-const csp = [
-  "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.clerk.accounts.dev https://*.clerk.com https://clerk.wearecommonhouse.com",
-  "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob: https:",
-  "font-src 'self' data:",
-  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.clerk.accounts.dev https://*.clerk.com https://clerk.wearecommonhouse.com",
-  "frame-src 'self' https://*.clerk.accounts.dev https://*.clerk.com",
-  "frame-ancestors 'none'",
-  "worker-src 'self' blob:",
-  "manifest-src 'self'",
-  "base-uri 'self'",
-  "form-action 'self'",
-  "object-src 'none'",
-  "upgrade-insecure-requests",
-].join("; ");
+// frameAncestors: 'none' everywhere except embeddable presentation bundles
+// (public/mps-deck and future /decks/*), which the room embeds same-origin in
+// a preview iframe. 'self' keeps external framing (clickjacking) blocked.
+function buildCsp(frameAncestors: string) {
+  return [
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.clerk.accounts.dev https://*.clerk.com https://clerk.wearecommonhouse.com",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob: https:",
+    "font-src 'self' data:",
+    "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.clerk.accounts.dev https://*.clerk.com https://clerk.wearecommonhouse.com",
+    "frame-src 'self' https://*.clerk.accounts.dev https://*.clerk.com https://docs.google.com",
+    `frame-ancestors ${frameAncestors}`,
+    "worker-src 'self' blob:",
+    "manifest-src 'self'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "object-src 'none'",
+    "upgrade-insecure-requests",
+  ].join("; ");
+}
 
-const securityHeaders = [
+const baseHeaders = [
   { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
   { key: "X-Content-Type-Options", value: "nosniff" },
-  { key: "X-Frame-Options", value: "DENY" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), interest-cohort=(), payment=(), usb=(), serial=()" },
-  { key: "Content-Security-Policy", value: csp },
+];
+
+const securityHeaders = [
+  ...baseHeaders,
+  { key: "X-Frame-Options", value: "DENY" },
+  { key: "Content-Security-Policy", value: buildCsp("'none'") },
+];
+
+// Embeddable decks: same-origin framing allowed so the client room can preview
+// them inline. SAMEORIGIN + frame-ancestors 'self' still block external embeds.
+const embeddableHeaders = [
+  ...baseHeaders,
+  { key: "X-Frame-Options", value: "SAMEORIGIN" },
+  { key: "Content-Security-Policy", value: buildCsp("'self'") },
 ];
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   async headers() {
     return [
-      { source: "/:path*", headers: securityHeaders },
+      { source: "/mps-deck/:path*", headers: embeddableHeaders },
+      { source: "/decks/:path*", headers: embeddableHeaders },
+      // Room document files (PDF) are previewed in a same-origin iframe.
+      { source: "/api/projects/:id/materials/:materialId/file", headers: embeddableHeaders },
+      { source: "/((?!mps-deck/|decks/|api/projects/).*)", headers: securityHeaders },
     ];
   },
 };
