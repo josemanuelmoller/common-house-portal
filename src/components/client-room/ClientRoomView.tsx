@@ -7,6 +7,12 @@ import { PdfEmbed } from "@/components/client-room/PdfEmbed";
 import { SlidesEmbed } from "@/components/client-room/SlidesEmbed";
 import { CopyButton } from "@/components/client-room/CopyButton";
 import { BankReveal } from "@/components/client-room/BankReveal";
+import { ClientBillingForm } from "@/components/client-room/ClientBillingForm";
+import { RoomAnalytics } from "@/components/client-room/RoomAnalytics";
+
+// Stable list of section ids the analytics tracker observes (must match the
+// DOM ids rendered below). Module-level so the effect dependency stays stable.
+const ROOM_SECTION_IDS = ["overview", "heard", "proposal", "plan", "together", "documents", "agreements", "admin"];
 import type { ClientRole } from "@/lib/require-client-access";
 import type { ClientRoomMaterial, ClientRoomProject } from "@/lib/client-room";
 
@@ -63,10 +69,23 @@ function Card({ id, title, flourish, meta, children }: { id?: string; title: str
   );
 }
 
-function Stat({ label, value, sub, flag }: { label: string; value: string; sub?: string; flag?: boolean }) {
+function StatIcon({ name }: { name: string }) {
+  const p = { fill: "none", stroke: "currentColor", strokeWidth: 1.4, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+  const glyphs: Record<string, ReactNode> = {
+    stage: <><path d="M9 2.5l6 3-6 3-6-3z" {...p} /><path d="M3 9l6 3 6-3" {...p} /></>,
+    milestone: <><circle cx="9" cy="9" r="5.5" {...p} /><circle cx="9" cy="9" r="1.8" {...p} /></>,
+    work: <><rect x="2.5" y="5" width="9" height="8" rx="1.5" {...p} /><path d="M11.5 8.3l3.5-2v5.4l-3.5-2z" {...p} /></>,
+  };
+  return <svg width="15" height="15" viewBox="0 0 18 18" aria-hidden="true" style={{ display: "block" }}>{glyphs[name] ?? glyphs.stage}</svg>;
+}
+
+function Stat({ label, value, sub, flag, icon, span }: { label: string; value: string; sub?: string; flag?: boolean; icon?: string; span?: boolean }) {
   return (
-    <div className="p-4 sm:p-[18px]" style={{ background: flag ? "var(--hall-lime-paper)" : "var(--hall-paper-0)", borderTop: "3px solid var(--hall-lime)" }}>
-      <p className="text-[10px] uppercase tracking-[0.07em]" style={{ fontFamily: "var(--font-hall-mono)", color: flag ? "var(--hall-lime-ink)" : "var(--hall-muted-2)" }}>{label}</p>
+    <div className={`p-4 sm:p-[18px]${span ? " col-span-2" : ""}`} style={{ background: flag ? "var(--hall-lime-paper)" : "var(--hall-paper-0)", borderTop: "3px solid var(--hall-lime)" }}>
+      <div className="flex items-center gap-1.5" style={{ color: flag ? "var(--hall-lime-ink)" : "var(--hall-muted-2)" }}>
+        {icon && <StatIcon name={icon} />}
+        <p className="text-[10px] uppercase tracking-[0.07em]" style={{ fontFamily: "var(--font-hall-mono)" }}>{label}</p>
+      </div>
       <p className="text-[16px] sm:text-[18px] font-semibold mt-2 leading-[1.25]">{value}</p>
       {sub && <p className="text-[11px] mt-1" style={{ color: "var(--hall-muted)" }}>{sub}</p>}
     </div>
@@ -87,7 +106,12 @@ export function ClientRoomView({ room, role, adminPreview }: { room: ClientRoomP
   const hasCompany = billingLines.length > 0;
   const copyText = hasCompany ? billingLines.join("\n") : "";
   const hasBank = b.bankAccounts.length > 0;
-  const hasAdmin = hasCompany || hasBank || !!b.publicNote || adminMaterials.length > 0;
+  const canEditBilling = role === "collaborator" || role === "approver" || adminPreview;
+  const cb = room.clientBilling;
+  const hasClientBilling = !!cb && [cb.legalName, cb.taxId, cb.address, cb.billingEmail, cb.billingContact, cb.poReference, cb.notes].some(Boolean);
+  const showClientBilling = canEditBilling || hasClientBilling;
+  const hasPayInfo = hasCompany || hasBank || !!b.publicNote;
+  const hasAdmin = hasPayInfo || adminMaterials.length > 0 || showClientBilling;
   const presentations = room.materials.filter((m) => m.category === "presentation" && (isEmbeddableHtml(m.url) || isPdf(m) || isSlides(m)));
   // The room preview (hero) is the presentation marked 'current'; fall back to any
   // non-superseded, then the newest. Only one deck is ever featured.
@@ -115,6 +139,7 @@ export function ClientRoomView({ room, role, adminPreview }: { room: ClientRoomP
 
   return (
     <div className="min-h-screen" style={{ background: "var(--hall-paper-1)", color: "var(--hall-ink-0)", fontFamily: "var(--font-hall-sans)" }}>
+      <RoomAnalytics projectId={room.id} sectionIds={ROOM_SECTION_IDS} />
       <header className="px-4 sm:px-8 py-4 flex items-center justify-between gap-4" style={{ borderBottom: "1px solid var(--hall-ink-0)", background: "var(--hall-paper-0)" }}>
         <div className="flex items-center gap-4 min-w-0"><BrandLogo variant="black" height={28} /><span className="hidden sm:inline text-[10px] uppercase tracking-[0.08em] truncate" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}>{room.roomLabel} · {room.name}</span></div>
         <div className="flex items-center gap-3">
@@ -131,21 +156,54 @@ export function ClientRoomView({ room, role, adminPreview }: { room: ClientRoomP
 
       <main className="max-w-6xl mx-auto px-4 sm:px-8 pb-16">
         <section id="overview" className="scroll-mt-24 pt-10 sm:pt-12 pb-2 hall-room-fade">
-          {room.clientLogoUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={room.clientLogoUrl} alt={room.organizationName ?? "Client"} className="mb-5" style={{ height: 52, width: "auto", maxWidth: 260 }} />
-          )}
-          <p className="text-[10px] uppercase tracking-[0.1em] mb-2" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}>{room.organizationName ?? "Common House"} · {room.currentStage ?? room.projectStatus ?? room.roomStatus}</p>
-          <h1 className="text-[38px] sm:text-[52px] leading-[1] tracking-[-0.025em]" style={{ fontFamily: "var(--font-hall-display)", fontWeight: 400 }}>{room.name}<span style={{ color: "var(--hall-lime)" }}>_</span></h1>
-          {room.welcomeNote && <p className="mt-4 max-w-2xl text-[15px] leading-[1.6]" style={{ color: "var(--hall-muted-2)" }}>{room.welcomeNote}</p>}
+          <div className="flex flex-col-reverse sm:flex-row sm:items-center gap-5 sm:gap-8">
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] uppercase tracking-[0.1em] mb-2" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}>{room.organizationName ?? "Common House"} · {room.currentStage ?? room.projectStatus ?? room.roomStatus}</p>
+              <h1 className="text-[38px] sm:text-[52px] leading-[1] tracking-[-0.025em]" style={{ fontFamily: "var(--font-hall-display)", fontWeight: 400 }}>{room.name}<span style={{ color: "var(--hall-lime)" }}>_</span></h1>
+              {room.welcomeNote && <p className="mt-4 max-w-2xl text-[15px] leading-[1.6]" style={{ color: "var(--hall-muted-2)" }}>{room.welcomeNote}</p>}
+            </div>
+            {room.clientLogoUrl && (
+              <div className="shrink-0 flex items-center justify-center sm:min-w-[260px]">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={room.clientLogoUrl} alt={room.organizationName ?? "Client"} style={{ height: 132, width: "auto", maxWidth: 240 }} />
+              </div>
+            )}
+          </div>
         </section>
 
         <section className="grid grid-cols-2 md:grid-cols-4 mt-6 mb-2 hall-room-fade" style={{ gap: 1, background: "var(--hall-line)", border: "1px solid var(--hall-line)", borderRadius: 14, overflow: "hidden" }}>
-          <Stat label="Etapa" value={room.currentStage ?? room.projectStatus ?? room.roomStatus} sub={room.currentFocus ?? undefined} />
-          <Stat label="Próximo hito" value={room.nextMilestone || "Por confirmar"} />
-          <Stat label="Necesita tu input" value={openAgreements.length === 0 ? "Nada abierto" : `${openAgreements.length} acuerdo${openAgreements.length === 1 ? "" : "s"}`} flag={openAgreements.length > 0} />
-          <Stat label="Trabajo dedicado" value={workValue} sub={earliest ? `Desde ${displayDate(earliest)}` : undefined} />
+          <Stat icon="stage" label="Etapa" value={room.currentStage ?? room.projectStatus ?? room.roomStatus} sub={room.currentFocus ?? undefined} />
+          <Stat icon="milestone" label="Próximo hito" value={room.nextMilestone || "Por confirmar"} />
+          <Stat icon="work" span label="Trabajo dedicado" value={workValue} sub={earliest ? `Desde ${displayDate(earliest)}` : undefined} />
         </section>
+
+        {(understandingAgreements.length > 0 || heardFields.length > 0 || room.whatWeHeard.heard.length > 0) && (
+          <section id="heard" className="scroll-mt-24 mt-5 hall-room-fade" style={{ background: "var(--hall-paper-0)", border: "1px solid var(--hall-ink-0)", borderRadius: 16, borderTop: "4px solid var(--hall-lime)", padding: "26px 28px" }}>
+            <div className="flex items-baseline justify-between gap-3 pb-3 mb-6" style={{ borderBottom: "1px solid var(--hall-line)" }}>
+              <h2 className="text-[20px] sm:text-[26px] font-bold tracking-[-0.015em]">Lo que <em className="hall-room-flourish">escuchamos</em></h2>
+              <span className="text-[10px] uppercase tracking-[0.06em] shrink-0" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted)" }}>Síntesis del análisis</span>
+            </div>
+            {understandingAgreements.map((a) => a.summary && <p key={a.id} className="text-[15px] leading-[1.7] max-w-3xl mb-6" style={{ whiteSpace: "pre-line" }}>{a.summary}</p>)}
+            {heardFields.length > 0 && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-7 gap-y-6">
+                {heardFields.map(([label, value]) => (
+                  <div key={label} className="pt-3" style={{ borderTop: "2px solid var(--hall-lime)" }}>
+                    <p className="text-[10px] uppercase tracking-[0.07em] mb-1.5" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-lime-ink)" }}>{label}</p>
+                    <p className="text-[13.5px] leading-[1.6]">{value}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+            {room.whatWeHeard.heard.length > 0 && (
+              <div className="mt-6 pt-5" style={{ borderTop: "1px solid var(--hall-line-soft)" }}>
+                <p className="text-[10px] uppercase tracking-[0.07em] mb-2" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}>De la conversación</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-3">
+                  {room.whatWeHeard.heard.map((item, index) => <p key={`${item.point}-${index}`} className="text-[13.5px] leading-[1.55]">{item.point}{item.speakerName && <span style={{ color: "var(--hall-muted-3)" }}> — {item.speakerName}</span>}</p>)}
+                </div>
+              </div>
+            )}
+          </section>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-[1.65fr_1fr] gap-5 items-start mt-5">
           <div className="flex flex-col gap-5">
@@ -161,25 +219,13 @@ export function ClientRoomView({ room, role, adminPreview }: { room: ClientRoomP
                 <div className="mt-5 pt-4" style={{ borderTop: "1px solid var(--hall-line-soft)" }}>
                   <p className="text-[10px] uppercase tracking-[0.07em] mb-2" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}>Versiones anteriores</p>
                   {previousVersions.map((m) => (
-                    <a key={m.id} href={m.url} target="_blank" rel="noreferrer" className="flex items-center justify-between gap-3 py-1.5 hover:opacity-70">
+                    <a key={m.id} href={m.url} target="_blank" rel="noreferrer" data-track={`version:${m.title}`} className="flex items-center justify-between gap-3 py-1.5 hover:opacity-70">
                       <span className="text-[12.5px]" style={{ color: "var(--hall-muted-2)" }}>{m.title}</span>
                       <span className="text-[10.5px]" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-3)" }}>{m.versionLabel || "anterior"} ↗</span>
                     </a>
                   ))}
                 </div>
               )}
-            </Card>
-
-            <Card id="heard" title="Lo que" flourish="escuchamos">
-              {understandingAgreements.length === 0 && heardFields.length === 0 && room.whatWeHeard.heard.length === 0
-                ? <p className="text-[12px]" style={{ color: "var(--hall-muted-2)" }}>Common House está preparando la primera síntesis.</p>
-                : <div className="space-y-6">
-                    {understandingAgreements.map((a) => a.summary && <p key={a.id} className="text-[14px] leading-[1.7] max-w-2xl" style={{ whiteSpace: "pre-line" }}>{a.summary}</p>)}
-                    {heardFields.length > 0 && <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-5">
-                      {heardFields.map(([label, value]) => <div key={label}><p className="text-[10px] uppercase tracking-[0.07em] mb-1.5" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}>{label}</p><p className="text-[13.5px] leading-[1.55]">{value}</p></div>)}
-                    </div>}
-                    {room.whatWeHeard.heard.length > 0 && <div><p className="text-[10px] uppercase tracking-[0.07em] mb-2" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}>De la conversación</p><div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3">{room.whatWeHeard.heard.map((item, index) => <p key={`${item.point}-${index}`} className="text-[13.5px] leading-[1.55]">{item.point}{item.speakerName && <span style={{ color: "var(--hall-muted-3)" }}> — {item.speakerName}</span>}</p>)}</div></div>}
-                  </div>}
             </Card>
 
             <Card id="plan" title="Plan" flourish="y progreso" meta={room.timeline.length ? `${room.timeline.length} hitos` : undefined}>
@@ -205,7 +251,7 @@ export function ClientRoomView({ room, role, adminPreview }: { room: ClientRoomP
             </Card>
 
             <Card id="documents" title="Documentos" meta={documents.length || undefined}>
-              {documents.length === 0 ? <p className="text-[12px]" style={{ color: "var(--hall-muted-2)" }}>Nada compartido aún.</p> : <div>{documents.map((m, i) => <a key={m.id} href={m.url} target="_blank" rel="noreferrer" className="flex items-center justify-between gap-3 py-2.5 hover:opacity-70" style={{ borderBottom: i === documents.length - 1 ? "none" : "1px solid var(--hall-line-soft)" }}><div className="min-w-0"><p className="text-[13px] font-semibold truncate">{m.title}</p><p className="text-[10px]" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted)" }}>{CATEGORY_LABELS[m.category] ?? m.category}{m.versionLabel ? ` · ${m.versionLabel}` : ""}</p></div><span aria-hidden="true" style={{ color: "var(--hall-muted)" }}>↗</span></a>)}</div>}
+              {documents.length === 0 ? <p className="text-[12px]" style={{ color: "var(--hall-muted-2)" }}>Nada compartido aún.</p> : <div>{documents.map((m, i) => <a key={m.id} href={m.url} target="_blank" rel="noreferrer" data-track={`doc:${m.title}`} className="flex items-center justify-between gap-3 py-2.5 hover:opacity-70" style={{ borderBottom: i === documents.length - 1 ? "none" : "1px solid var(--hall-line-soft)" }}><div className="min-w-0"><p className="text-[13px] font-semibold truncate">{m.title}</p><p className="text-[10px]" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted)" }}>{CATEGORY_LABELS[m.category] ?? m.category}{m.versionLabel ? ` · ${m.versionLabel}` : ""}</p></div><span aria-hidden="true" style={{ color: "var(--hall-muted)" }}>↗</span></a>)}</div>}
             </Card>
 
             <Card id="agreements" title="Acuerdos" meta={otherAgreements.length || undefined}>
@@ -230,7 +276,13 @@ export function ClientRoomView({ room, role, adminPreview }: { room: ClientRoomP
                     {adminMaterials.length > 0 && (
                       <div>
                         <p className="text-[10px] uppercase tracking-[0.07em] mb-1" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}>Facturación</p>
-                        {adminMaterials.map((m, i) => <a key={m.id} href={m.url} target="_blank" rel="noreferrer" className="flex items-center justify-between gap-3 py-2.5 hover:opacity-70" style={{ borderBottom: i === adminMaterials.length - 1 ? "none" : "1px solid var(--hall-line-soft)" }}><div className="min-w-0"><p className="text-[13px] font-semibold truncate">{m.title}</p><p className="text-[10px]" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted)" }}>{CATEGORY_LABELS[m.category] ?? m.category}{m.versionLabel ? ` · ${m.versionLabel}` : ""}</p></div><span aria-hidden="true" style={{ color: "var(--hall-muted)" }}>↗</span></a>)}
+                        {adminMaterials.map((m, i) => <a key={m.id} href={m.url} target="_blank" rel="noreferrer" data-track={`admin-doc:${m.title}`} className="flex items-center justify-between gap-3 py-2.5 hover:opacity-70" style={{ borderBottom: i === adminMaterials.length - 1 ? "none" : "1px solid var(--hall-line-soft)" }}><div className="min-w-0"><p className="text-[13px] font-semibold truncate">{m.title}</p><p className="text-[10px]" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted)" }}>{CATEGORY_LABELS[m.category] ?? m.category}{m.versionLabel ? ` · ${m.versionLabel}` : ""}</p></div><span aria-hidden="true" style={{ color: "var(--hall-muted)" }}>↗</span></a>)}
+                      </div>
+                    )}
+                    {showClientBilling && (
+                      <div style={{ borderTop: hasPayInfo || adminMaterials.length > 0 ? "1px solid var(--hall-line-soft)" : undefined, paddingTop: hasPayInfo || adminMaterials.length > 0 ? 16 : 0 }}>
+                        <p className="text-[10px] uppercase tracking-[0.07em] mb-2" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}>Tus datos de facturación</p>
+                        <ClientBillingForm projectId={room.id} profile={cb} canEdit={canEditBilling} />
                       </div>
                     )}
                   </div>}

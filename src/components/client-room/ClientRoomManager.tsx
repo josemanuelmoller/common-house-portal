@@ -488,6 +488,52 @@ export function BillingManager({ room }: { room: ClientRoomAdminData }) {
   );
 }
 
+export function ClientSubmittedBilling({ room }: { room: ClientRoomAdminData }) {
+  const cb = room.clientBilling;
+  const [copied, setCopied] = useState(false);
+  const rows: Array<[string, string | null]> = [
+    ["Razón social", cb?.legalName ?? null],
+    ["ID fiscal (RUT / VAT / N.º empresa)", cb?.taxId ?? null],
+    ["Dirección", cb?.address ?? null],
+    ["Email de facturación", cb?.billingEmail ?? null],
+    ["Contacto", cb?.billingContact ?? null],
+    ["Orden de compra / referencia", cb?.poReference ?? null],
+    ["Notas", cb?.notes ?? null],
+  ];
+  const filled = rows.filter((r): r is [string, string] => !!r[1]);
+
+  if (filled.length === 0) {
+    return <p className="text-[11px]" style={{ color: "var(--hall-muted-2)" }}>El cliente todavía no ha cargado sus datos de facturación. Aparecerán aquí cuando lo hagan desde el room (rol collaborator o approver).</p>;
+  }
+
+  const copyText = filled.map(([k, v]) => `${k}: ${v}`).join("\n");
+  async function copyAll() {
+    try { await navigator.clipboard.writeText(copyText); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch { /* ignore */ }
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-3 mb-3">
+        <p className="text-[11px]" style={{ color: "var(--hall-muted-2)" }}>Datos que el cliente cargó para que le factures. Solo lectura.</p>
+        <button type="button" className="hall-btn-ghost" onClick={() => void copyAll()}>{copied ? "✓ Copiado" : "Copiar todo"}</button>
+      </div>
+      <div className="space-y-2">
+        {filled.map(([label, value]) => (
+          <div key={label}>
+            <p style={labelStyle}>{label}</p>
+            <p className="text-[13px]" style={{ whiteSpace: "pre-line", color: "var(--hall-ink-0)" }}>{value}</p>
+          </div>
+        ))}
+      </div>
+      {(cb?.submittedByEmail || cb?.updatedAt) && (
+        <p className="text-[10px] mt-3" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}>
+          {cb?.submittedByEmail ? `Cargado por ${cb.submittedByEmail}` : ""}{cb?.submittedByEmail && cb?.updatedAt ? " · " : ""}{cb?.updatedAt ? new Date(cb.updatedAt).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" }) : ""}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function TimelineEventEditor({ projectId, event }: { projectId: string; event: ClientRoomTimelineEvent }) {
   const router = useRouter();
   const [eventDate, setEventDate] = useState(event.eventDate);

@@ -28,6 +28,55 @@ type Props = {
   children: ReactNode;
 };
 
+/**
+ * CollapsibleHallSection — same head as HallSection but wrapped in a native
+ * <details> so the body can be folded away. No client JS needed (SSR-safe).
+ * Use in long admin pages to keep the page short; pass defaultOpen for the
+ * sections that should start expanded.
+ */
+export function CollapsibleHallSection({
+  title,
+  flourish,
+  meta,
+  defaultOpen,
+  children,
+}: Props & { defaultOpen?: boolean }) {
+  return (
+    <details className="mb-7 group" open={defaultOpen} style={{ fontFamily: "var(--font-hall-sans)" }}>
+      <summary
+        className="flex items-baseline justify-between gap-3 pb-2 mb-3.5 cursor-pointer list-none [&::-webkit-details-marker]:hidden"
+        style={{ borderBottom: "1px solid var(--hall-ink-0)" }}
+      >
+        <h2
+          className="text-[19px] font-bold leading-none flex items-baseline gap-2"
+          style={{ letterSpacing: "-0.02em", color: "var(--hall-ink-0)" }}
+        >
+          <span
+            aria-hidden="true"
+            className="text-[11px] transition-transform group-open:rotate-90"
+            style={{ color: "var(--hall-muted-2)" }}
+          >
+            ▸
+          </span>
+          <span>
+            {title}
+            {flourish && (
+              <>
+                {" "}
+                <em style={{ fontFamily: "var(--font-hall-display)", fontStyle: "italic", fontWeight: 400, color: "var(--hall-ink-0)" }}>{flourish}</em>
+              </>
+            )}
+          </span>
+        </h2>
+        {meta && (
+          <span className="text-[10px] tracking-[0.06em] whitespace-nowrap" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}>{meta}</span>
+        )}
+      </summary>
+      <div className="pt-1">{children}</div>
+    </details>
+  );
+}
+
 export function HallSection({ title, flourish, meta, tab, children }: Props) {
   return (
     <section

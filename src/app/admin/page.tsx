@@ -72,6 +72,7 @@ import { HallManualTriggers } from "@/components/HallManualTriggers";
 import { HallLiveClock } from "@/components/HallLiveClock";
 import { HallPipelineHealth } from "@/components/HallPipelineHealth";
 import { SafeServerSection } from "@/components/SafeServerSection";
+import { ClientRoomsOverview } from "@/components/ClientRoomsOverview";
 import { getAgentsOnlineCount } from "@/lib/hall-agents-count";
 import { getInboxActionsWithDrafts, countOpenGmailActions, getCoSActions } from "@/lib/action-items";
 import { fetchOpenCommitmentRows, inferEffort, type CommitmentRow } from "@/lib/time-block-candidates";
@@ -1056,6 +1057,14 @@ export default async function AdminPage({ searchParams }: { searchParams?: Promi
         <div className="px-9 pt-2">
           <Suspense fallback={null}>
             <HallPipelineHealth />
+          </Suspense>
+        </div>
+
+        {/* Client rooms — status (ready to share?) + light analytics roll-up.
+            Always visible above the tabs; self-isolating so it can't crash the Hall. */}
+        <div className="px-9 pt-4">
+          <Suspense fallback={null}>
+            <SafeServerSection name="ClientRoomsOverview" render={() => ClientRoomsOverview()} />
           </Suspense>
         </div>
 
