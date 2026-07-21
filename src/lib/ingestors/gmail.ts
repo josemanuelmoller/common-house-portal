@@ -23,6 +23,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { gmail_v1 } from "googleapis";
 import { getGoogleGmailClient } from "@/lib/google-gmail";
+import { cleanHeaderName } from "@/lib/people-names";
 import { getSelfEmails } from "@/lib/hall-self";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { buildFactors } from "./priority";
@@ -159,7 +160,10 @@ export async function runGmailIngestor(input: IngestInput): Promise<IngestResult
 
     // ─── Filter + build per-thread context ──────────────────────────────
     const actionableThreads: Array<ThreadInfo & { ball: "jose"; isPrimary: boolean }> = [];
-    const relationshipTouches: Array<{ email: string; at: Date; direction: "inbound" | "outbound" }> = [];
+    // `name` carries the counterparty display name harvested from the header so
+    // the relationship-persist path can fill an email-like people.full_name.
+    // Inbound → sender's From name; outbound → omitted (we don't parse To names).
+    const relationshipTouches: Array<{ email: string; at: Date; direction: "inbound" | "outbound"; name?: string | null }> = [];
     let maxInternalDate = since ? new Date(since) : new Date(0);
 
     for (const t of threads) {
@@ -173,8 +177,10 @@ export async function runGmailIngestor(input: IngestInput): Promise<IngestResult
         // Relationship touch regardless of outcome (if not bot/noreply sender)
         const isBotSender = NOISE_SENDER_PATTERNS.some(p => t.fromEmail.toLowerCase().includes(p));
         if (!senderIsSelf && !isBotSender) {
-          relationshipTouches.push({ email: t.fromEmail, at: t.internalDate, direction: "inbound" });
+          relationshipTouches.push({ email: t.fromEmail, at: t.internalDate, direction: "inbound", name: t.fromName });
         } else if (senderIsSelf && t.toEmails.length > 0) {
+          // Outbound: recipient display name isn't parsed in the metadata path,
+          // so omit it (never guess). We still record the touch.
           relationshipTouches.push({ email: t.toEmails[0], at: t.internalDate, direction: "outbound" });
         }
 
@@ -323,6 +329,11 @@ export async function runGmailIngestor(input: IngestInput): Promise<IngestResult
           contact_id: contact.id,
           direction: r.direction,
           at: r.at.toISOString(),
+          // Clean the header name here (we have both the raw name and the
+          // email). cleanHeaderName returns null when it isn't a real name —
+          // e.g. fromName fell back to the email — so persist only fills when
+          // there's a genuine name to write.
+          counterparty_name: cleanHeaderName(r.name, r.email),
         },
       };
       signals.push(rel);
