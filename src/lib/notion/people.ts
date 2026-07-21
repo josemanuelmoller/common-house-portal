@@ -62,6 +62,26 @@ const PEOPLE_COLS =
 
 // ─── Private mappers / resolvers (Supabase) ──────────────────────────────────
 
+// relationship_roles is stored as a JSON-encoded array string (e.g. '["Founder"]')
+// or occasionally a plain string. Parse defensively so `roles.includes("Founder")`
+// works downstream.
+function parseRoles(v: unknown): string[] {
+  if (Array.isArray(v)) return (v as unknown[]).map(String);
+  if (typeof v === "string" && v.trim() !== "") {
+    const s = v.trim();
+    if (s.startsWith("[")) {
+      try {
+        const a = JSON.parse(s);
+        return Array.isArray(a) ? a.map(String) : [s];
+      } catch {
+        return [s];
+      }
+    }
+    return [s];
+  }
+  return [];
+}
+
 function personRecordFromRow(r: Record<string, unknown>): PersonRecord {
   const classification = r.person_classification as string;
   return {
@@ -73,8 +93,7 @@ function personRecordFromRow(r: Record<string, unknown>): PersonRecord {
       classification === "Internal" || classification === "External"
         ? (classification as PersonRecord["classification"])
         : "",
-    // relationship_roles is a single TEXT column — wrap as [value] when present.
-    roles:          (r.relationship_roles as string) ? [r.relationship_roles as string] : [],
+    roles:          parseRoles(r.relationship_roles),
     rolInterno:     ((r.rol_interno as string) ?? "") as PersonRecord["rolInterno"],
     linkedin:       (r.linkedin as string) || undefined,
     location:       [r.city as string | null, r.country as string | null].filter(Boolean).join(", ") || undefined,
@@ -169,11 +188,15 @@ export async function getAllPeople(): Promise<PersonRecord[]> {
   try {
     const { getSupabaseServerClient } = await import("../supabase-server");
     const sb = getSupabaseServerClient();
+    // "All people" — the table has ~940 rows; do not cap at a Notion-page size,
+    // and order deterministically so downstream role/classification buckets are
+    // stable and complete.
     const { data } = await sb
       .from("people")
       .select(PEOPLE_COLS)
       .is("dismissed_at", null)
-      .limit(100);
+      .order("full_name", { ascending: true })
+      .limit(2000);
     return ((data ?? []) as Array<Record<string, unknown>>)
       .map(personRecordFromRow)
       .filter(p => p.name.trim() !== "");
