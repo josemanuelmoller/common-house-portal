@@ -12,6 +12,12 @@ import type { NextConfig } from "next";
 //   - 'unsafe-eval' is unavoidable because Tailwind v4 / some Next dev paths
 //     require it; revisit when those drop the dependency.
 //   - Clerk needs script + frame on its accounts subdomains.
+//   - Clerk's bot/sign-up protection renders a Cloudflare Turnstile CAPTCHA,
+//     whose script + iframe load from https://challenges.cloudflare.com. Without
+//     it in script-src AND frame-src the widget is blocked and Clerk shows
+//     "The CAPTCHA failed to load" — sign-up/sign-in cannot complete. Turnstile
+//     also posts back to that host, so it is in connect-src too.
+//     Ref: https://clerk.com/docs/guides/secure/best-practices/csp-headers
 //   - Supabase storage signed URLs live on *.supabase.co (img + connect).
 //   - frame-ancestors 'none' replaces X-Frame-Options for modern browsers and
 //     covers HTML pages (the prior X-Frame-Options DENY in vercel.json only
@@ -24,12 +30,12 @@ import type { NextConfig } from "next";
 function buildCsp(frameAncestors: string) {
   return [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.clerk.accounts.dev https://*.clerk.com https://clerk.wearecommonhouse.com",
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.clerk.accounts.dev https://*.clerk.com https://clerk.wearecommonhouse.com https://challenges.cloudflare.com",
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob: https:",
     "font-src 'self' data:",
-    "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.clerk.accounts.dev https://*.clerk.com https://clerk.wearecommonhouse.com",
-    "frame-src 'self' https://*.clerk.accounts.dev https://*.clerk.com https://docs.google.com",
+    "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.clerk.accounts.dev https://*.clerk.com https://clerk.wearecommonhouse.com https://challenges.cloudflare.com",
+    "frame-src 'self' https://*.clerk.accounts.dev https://*.clerk.com https://challenges.cloudflare.com https://docs.google.com",
     `frame-ancestors ${frameAncestors}`,
     "worker-src 'self' blob:",
     "manifest-src 'self'",
