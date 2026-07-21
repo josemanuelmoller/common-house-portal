@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { apiError } from "@/lib/api-error";
 import { adminGuardApi } from "@/lib/require-admin";
 import { backfillEntityLinks } from "@/lib/entity-links";
 
@@ -23,6 +24,6 @@ export async function POST(req: NextRequest) {
     const result = await backfillEntityLinks(typeof body.projectId === "string" ? body.projectId : undefined);
     return NextResponse.json({ ok: true, ...result });
   } catch (err) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : String(err) }, { status: 502 });
+    return apiError(err, { route: "[/api/admin/state/backfill-entity-links]", status: 502 });
   }
 }

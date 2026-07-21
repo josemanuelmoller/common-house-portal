@@ -18,6 +18,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { apiError } from "@/lib/api-error";
 import { adminGuardApi } from "@/lib/require-admin";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import {
@@ -97,8 +98,8 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     return NextResponse.json({ ok: true });
   } catch (e) {
     if (e instanceof RelationalValidationError) {
-      return NextResponse.json({ error: e.message }, { status: 400 });
+      return apiError(e, { route: "[/api/admin/opportunities/[id]]", status: 400, publicMessage: e.message });
     }
-    return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status: 502 });
+    return apiError(e, { route: "[/api/admin/opportunities/[id]]", status: 502 });
   }
 }

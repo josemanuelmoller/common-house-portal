@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { apiError } from "@/lib/api-error";
 import Anthropic from "@anthropic-ai/sdk";
 import { adminGuardApi } from "@/lib/require-admin";
 import { resolveClientRoomProject } from "@/lib/client-room";
@@ -36,6 +37,6 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     const result = await runStateRefreshForProject(project.id, { lookbackDays, anthropic, usageAcc });
     return NextResponse.json({ ok: true, ...result, costUsd: computeAnthropicCost(usageAcc, "claude-sonnet-4-6") });
   } catch (err) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : String(err) }, { status: 502 });
+    return apiError(err, { route: "[/api/admin/projects/[id]/state/refresh]", status: 502 });
   }
 }

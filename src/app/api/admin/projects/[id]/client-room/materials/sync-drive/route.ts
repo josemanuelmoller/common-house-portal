@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { apiError } from "@/lib/api-error";
 import { adminGuardApi } from "@/lib/require-admin";
 import { supabaseAdmin } from "@/lib/supabase";
 import { listProjectFiles } from "@/lib/drive";
@@ -45,6 +46,6 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string }>
     if (error) return NextResponse.json({ error: error.message }, { status: 502 });
     return NextResponse.json({ ok: true, synced: rows.length });
   } catch (err) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : String(err) }, { status: 502 });
+    return apiError(err, { route: "[/api/admin/projects/[id]/client-room/materials/sync-drive]", status: 502 });
   }
 }
