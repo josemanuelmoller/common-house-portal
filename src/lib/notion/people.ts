@@ -225,18 +225,21 @@ export async function getAllResidents(): Promise<ResidentRecord[]> {
       });
     }
 
-    // Fetch all people affiliated to any of those orgs in one query.
-    const orgIds = Array.from(orgToAffiliations.keys());
-    let people: Array<Record<string, unknown>> = [];
-    if (orgIds.length) {
-      const { data } = await sb
-        .from("people")
-        .select(PEOPLE_COLS)
-        .in("org_notion_id", orgIds)
-        .is("dismissed_at", null)
-        .limit(500);
-      people = (data ?? []) as Array<Record<string, unknown>>;
-    }
+    // Roster = CH-network humans (Internal classification OR an internal role).
+    // The old project↔person relation was a Notion page relation that never
+    // synced to Supabase, so base the roster on who the humans ARE, then enrich
+    // with best-effort project affiliation (org-based) below.
+    const { data } = await sb
+      .from("people")
+      .select(PEOPLE_COLS)
+      .or("person_classification.eq.Internal,rol_interno.not.is.null")
+      .is("dismissed_at", null)
+      .limit(500);
+    const people = ((data ?? []) as Array<Record<string, unknown>>).filter(
+      (r) =>
+        ((r.rol_interno as string | null)?.trim() ?? "") !== "" ||
+        (r.person_classification as string) === "Internal",
+    );
 
     // Aggregate per person across projects.
     const personMap = new Map<string, ResidentRecord>();
