@@ -1,7 +1,11 @@
-import { notion, DB, prop, text, select, multiSelect } from "./core";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 
 // ─── Knowledge Assets ─────────────────────────────────────────────────────────
+//
+// Migrated OFF Notion (2026-06 cutoff). Reads now come from the Supabase
+// `knowledge_assets` table. That table is currently empty (a backfill runs
+// later), so this getter returns [] gracefully until it is populated.
+// Record `id` is the row `notion_id`.
 
 export type KnowledgeAsset = {
   id: string;
@@ -15,24 +19,38 @@ export type KnowledgeAsset = {
 };
 
 export async function getKnowledgeAssets(): Promise<KnowledgeAsset[]> {
-  const res = await notion.databases.query({
-    database_id: DB.knowledge,
-    sorts: [{ timestamp: "last_edited_time", direction: "descending" }],
-    page_size: 50,
-  });
+  try {
+    const sb = getSupabaseServerClient();
+    const { data, error } = await sb
+      .from("knowledge_assets")
+      .select(
+        "notion_id, title, asset_type, status, last_evidence_at, notion_created_at, payload"
+      )
+      .order("last_evidence_at", { ascending: false, nullsFirst: false })
+      .limit(50);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return res.results.map((page: any) => ({
-    id: page.id,
-    name: text(prop(page, "Asset Name")) || "Untitled",
-    // "Domain / Theme" is the canonical field (multi_select). "Category"/"Asset Category" don't exist in the schema.
-    category: multiSelect(prop(page, "Domain / Theme")).join(", "),
-    assetType: select(prop(page, "Asset Type")) || "",
-    status: select(prop(page, "Status")) || "",
-    lastUpdated: page.last_edited_time ?? null,
-    portalVisibility: page.properties["Portal Visibility"]?.select?.name ?? "admin-only",
-    sourceFileUrl: page.properties["Source File URL"]?.url ?? null,
-  }));
+    if (error || !data) return [];
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (data as any[]).map((row) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const payload = (row.payload ?? {}) as Record<string, any>;
+      return {
+        id: row.notion_id,
+        name: row.title || "Untitled",
+        // No categorical/multi-select field survived the migration — surfaced
+        // via payload tags when present, otherwise empty.
+        category: Array.isArray(payload.tags) ? payload.tags.join(", ") : "",
+        assetType: row.asset_type ?? "",
+        status: row.status ?? "",
+        lastUpdated: row.last_evidence_at ?? row.notion_created_at ?? null,
+        portalVisibility: payload.portal_visibility ?? "admin-only",
+        sourceFileUrl: payload.source_file_url ?? undefined,
+      };
+    });
+  } catch {
+    return [];
+  }
 }
 
 // ─── Library ingest ───────────────────────────────────────────────────────────

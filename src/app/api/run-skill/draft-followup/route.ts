@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminGuardApi } from "@/lib/require-admin";
-// TODO phase-6: migrate read source to Supabase opportunities + organizations
-import { Client } from "@notionhq/client";
 import Anthropic from "@anthropic-ai/sdk";
 import { createPageWithMirror } from "@/lib/notion-mirror-push";
 import { getProposalFeedbackContext } from "@/lib/proposal-feedback";
+import { getSupabaseServerClient } from "@/lib/supabase-server";
 
-const notion = new Client({ auth: process.env.NOTION_API_KEY });
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 export async function POST(req: NextRequest) {
@@ -18,47 +16,41 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "opportunityId required" }, { status: 400 });
   }
 
-  // 1. Fetch opportunity from Notion
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let opp: any;
-  try {
-    opp = await notion.pages.retrieve({ page_id: opportunityId });
-  } catch {
+  // 1. Fetch opportunity from Supabase `opportunities` (read migrated OFF Notion).
+  const sb = getSupabaseServerClient();
+  const { data: opp } = await sb
+    .from("opportunities")
+    .select("title, status, scope, opportunity_type, org_notion_id, updated_at")
+    .eq("notion_id", opportunityId)
+    .maybeSingle();
+  if (!opp) {
     return NextResponse.json({ error: "Opportunity not found" }, { status: 404 });
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const prop = (name: string) => (opp as any).properties?.[name];
-  const richText = (p: { rich_text?: { plain_text: string }[] } | undefined) =>
-    p?.rich_text?.map((r) => r.plain_text).join("") ?? "";
-  const sel = (p: { select?: { name: string } } | undefined) => p?.select?.name ?? "";
-  const titleProp = (p: { title?: { plain_text: string }[] } | undefined) =>
-    p?.title?.map((r) => r.plain_text).join("") ?? "";
-  const dateVal = (p: { date?: { start: string } } | undefined) => p?.date?.start ?? null;
-  const relationFirst = (p: { relation?: { id: string }[] } | undefined) =>
-    p?.relation?.[0]?.id ?? null;
-
-  const oppName   = titleProp(prop("Name")) || richText(prop("Name")) || "this opportunity";
-  const stage     = sel(prop("Stage"));
-  const scope     = sel(prop("Scope"));
-  const oppType   = sel(prop("Type"));
-  const lastEdit  = dateVal(prop("Last Edited")) ?? opp.last_edited_time?.slice(0, 10) ?? null;
-  const orgId     = relationFirst(prop("Organisation"));
-  const contactId = relationFirst(prop("Key Contacts"));
+  const oppName   = (opp.title as string) || "this opportunity";
+  const stage     = (opp.status as string | null) ?? "";
+  const scope     = (opp.scope as string | null) ?? "";
+  const oppType   = (opp.opportunity_type as string | null) ?? "";
+  const lastEdit  = (opp.updated_at as string | null)?.slice(0, 10) ?? null;
+  const orgId     = (opp.org_notion_id as string | null) ?? null;
+  // "Key Contacts" is not synced to the Supabase opportunities table. Drafts are
+  // created without a linked contact; it can be assigned later via the inbox
+  // "Assign contact" action before sending.
+  const contactId: string | null = null;
 
   const lastEditDays = lastEdit
     ? Math.floor((Date.now() - new Date(lastEdit).getTime()) / 86400000)
     : null;
 
-  // 2. Optionally fetch org name
+  // 2. Optionally fetch org name from Supabase `organizations`.
   let orgName = "";
   if (orgId) {
-    try {
-      const orgPage = await notion.pages.retrieve({ page_id: orgId });
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const orgProps = (orgPage as any).properties;
-      orgName = orgProps?.["Name"]?.title?.[0]?.plain_text ?? "";
-    } catch { /* ignore */ }
+    const { data: org } = await sb
+      .from("organizations")
+      .select("name")
+      .eq("notion_id", orgId)
+      .maybeSingle();
+    orgName = (org?.name as string | null) ?? "";
   }
 
   // 3. Generate draft with Anthropic

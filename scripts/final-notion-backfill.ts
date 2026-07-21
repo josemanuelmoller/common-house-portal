@@ -359,11 +359,28 @@ type SimpleRow = {
  * TODO: Replace with table-specific mappers as Phase 1 schema lands. The
  * runbook documents which tables this currently covers.
  */
+// Extract the value of whichever property is the Notion `title` type,
+// regardless of its display name (DBs name it "Asset Name", "Brief Title",
+// "Funder / Programme", etc.). Falls back to the passed titleField / "Name".
+function titleOfPage(page: AnyPage, titleField: string): string {
+  const byField = text(prop(page, titleField)) || text(prop(page, "Name"));
+  if (byField) return byField;
+  const props = page.properties ?? {};
+  for (const key of Object.keys(props)) {
+    const p = props[key];
+    if (p?.type === "title") {
+      const t = (p.title ?? []).map((x: AnyPage) => x.plain_text).join("");
+      if (t) return t;
+    }
+  }
+  return "Untitled";
+}
+
 function mapGeneric(page: AnyPage, titleField: string): SimpleRow {
   return {
     notion_id: page.id,
     legacy_notion_id: null,
-    title: text(prop(page, titleField)) || text(prop(page, "Name")) || "Untitled",
+    title: titleOfPage(page, titleField),
     notion_created_at: page.created_time ?? null,
     updated_at: page.last_edited_time ?? new Date().toISOString(),
     payload: page.properties ?? {},
@@ -464,7 +481,12 @@ const TABLES: TableConfig[] = [
     table: "style_profiles",
     osv2DbId: DB.styleProfiles,
     titleField: "Name",
-    map: (p) => mapGeneric(p, "Name"),
+    // style_profiles uses `name` (not `title`) as its label column — remap.
+    map: (p) => {
+      const g = mapGeneric(p, "Name") as Record<string, unknown>;
+      const { title, ...rest } = g;
+      return { ...rest, name: title } as unknown as SimpleRow;
+    },
   },
   {
     table: "valuations",

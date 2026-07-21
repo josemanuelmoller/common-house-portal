@@ -1,6 +1,8 @@
-import { notion, DB, prop, text, select, date, relationFirst } from "./core";
-
 // ─── Hall v2 — Agent Drafts ───────────────────────────────────────────────────
+//
+// Migrated OFF Notion (2026-06 cutoff). All data now comes from the Supabase
+// `agent_drafts` table. Record `id` is the row `notion_id`; the Notion URL is
+// reconstructed from it for any legacy deep-link consumer.
 
 export type AgentDraft = {
   id: string;
@@ -30,31 +32,43 @@ export const OUTBOX_DRAFT_TYPES = new Set<string>([
   "Delegation Brief",
 ]);
 
+function notionUrlFrom(notionId: string): string {
+  return `https://www.notion.so/${notionId.replace(/-/g, "")}`;
+}
+
 export async function getAgentDrafts(statusFilter = "Pending Review"): Promise<AgentDraft[]> {
   try {
-    const res = await notion.databases.query({
-      database_id: DB.agentDrafts,
-      filter: { property: "Status", select: { equals: statusFilter } },
-      sorts: [{ timestamp: "created_time", direction: "descending" }],
-      page_size: 20,
-    });
+    const { getSupabaseServerClient } = await import("../supabase-server");
+    const sb = getSupabaseServerClient();
+
+    const { data, error } = await sb
+      .from("agent_drafts")
+      .select(
+        "notion_id, draft_type, status, title, body_md, target_person_notion_id, target_org_notion_id, notion_created_at"
+      )
+      .eq("status", statusFilter)
+      .order("notion_created_at", { ascending: false })
+      .limit(20);
+
+    if (error || !data) return [];
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (res.results as any[]).map(page => ({
-      id:              page.id,
-      // "Draft Title" is the canonical title property name — all write paths use this.
-      // "Content" is the canonical body field — all write paths use this.
-      title:           text(prop(page, "Draft Title")) || "Untitled",
-      draftType:       select(prop(page, "Type")),
-      status:          select(prop(page, "Status")),
-      voice:           select(prop(page, "Voice")),
-      platform:        select(prop(page, "Platform")),
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      draftText:       (prop(page, "Content")?.rich_text ?? []).map((r: any) => r.plain_text).join(""),
-      relatedEntityId: relationFirst(prop(page, "Related Entity")),
-      opportunityId:   relationFirst(prop(page, "Opportunity")),
-      createdDate:     date(prop(page, "Created Date")) ?? (page.created_time?.slice(0, 10) ?? null),
-      notionUrl:       page.url ?? "",
-    }));
+    return (data as any[]).map((row) => {
+      const createdAt: string | null = row.notion_created_at ?? null;
+      return {
+        id:              row.notion_id,
+        title:           row.title || "Untitled",
+        draftType:       row.draft_type ?? "",
+        status:          row.status ?? "",
+        voice:           "",
+        platform:        "",
+        draftText:       row.body_md ?? "",
+        relatedEntityId: row.target_person_notion_id ?? null,
+        opportunityId:   row.target_org_notion_id ?? null,
+        createdDate:     createdAt ? createdAt.slice(0, 10) : null,
+        notionUrl:       row.notion_id ? notionUrlFrom(row.notion_id) : "",
+      };
+    });
   } catch {
     return [];
   }

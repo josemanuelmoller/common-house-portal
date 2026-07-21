@@ -14,8 +14,6 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
-// TODO phase-6: migrate read source to Supabase evidence
-import { Client } from "@notionhq/client";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { requireCronAuth } from "@/lib/require-cron";
 import { withRoutineLog } from "@/lib/routine-log";
@@ -23,11 +21,7 @@ import { computeAnthropicCost, makeUsageAccumulator, addUsage, type AnthropicUsa
 
 const HAIKU_MODEL = "claude-haiku-4-5";
 
-const notion    = new Client({ auth: process.env.NOTION_API_KEY });
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
-const EVIDENCE_DB = "fa28124978d043039d8932ac9964ccf5";
-const KNOWLEDGE_DB = "0f4bfe95549d4710a3a9ab6e119a9b04";
 
 const VALID_ASSET_TYPES = new Set([
   "Playbook", "Pattern Library", "Method", "Checklist",
@@ -47,39 +41,43 @@ interface RawEvidence {
   dateCaptured: string | null;
 }
 
+// Multi-select values are mirrored into Supabase as JSON-encoded text arrays
+// (see sync-evidence). Parse defensively — fall back to [] on any malformation.
+function parseJsonArray(raw: unknown): string[] {
+  if (typeof raw !== "string" || !raw) return [];
+  try {
+    const v = JSON.parse(raw);
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
 async function fetchCanonicalEvidence(sinceDays = 7): Promise<RawEvidence[]> {
   const since = new Date(Date.now() - sinceDays * 86_400_000).toISOString();
 
-  const res = await notion.databases.query({
-    database_id: EVIDENCE_DB,
-    filter: {
-      and: [
-        {
-          or: [
-            { property: "Reusability Level", select: { equals: "Canonical" } },
-            { property: "Reusability Level", select: { equals: "Reusable" } },
-          ],
-        },
-        { property: "Validation Status", select: { equals: "Validated" } },
-        { property: "Date Captured", date: { on_or_after: since } },
-      ],
-    },
-    page_size: 50,
-  });
+  const sb = getSupabaseServerClient();
+  const { data } = await sb
+    .from("evidence")
+    .select("notion_id, title, evidence_type, evidence_statement, affected_theme, topics, reusability_level, date_captured")
+    .in("reusability_level", ["Canonical", "Reusable"])
+    .eq("validation_status", "Validated")
+    .gte("date_captured", since)
+    .limit(50);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (res.results as any[]).map(page => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const p = (name: string) => page.properties[name] as any;
+  return (data ?? []).map(e => {
+    // affected_theme is a JSON array in Supabase; the synthesiser groups on a
+    // single theme, so take the first tag (default "General").
+    const themes = parseJsonArray(e.affected_theme);
     return {
-      id:          page.id,
-      title:       p("Evidence Title")?.title?.map((r: any) => r.plain_text).join("") ?? "Untitled",
-      type:        p("Evidence Type")?.select?.name ?? "",
-      statement:   p("Statement")?.rich_text?.map((r: any) => r.plain_text).join("") ?? "",
-      theme:       p("Affected Theme")?.select?.name ?? "General",
-      topics:      (p("Topics")?.multi_select ?? []).map((o: any) => o.name as string),
-      reusability: p("Reusability Level")?.select?.name ?? "",
-      dateCaptured:p("Date Captured")?.date?.start ?? null,
+      id:           (e.notion_id as string),
+      title:        (e.title as string) ?? "Untitled",
+      type:         (e.evidence_type as string) ?? "",
+      statement:    (e.evidence_statement as string) ?? "",
+      theme:        themes[0] ?? "General",
+      topics:       parseJsonArray(e.topics),
+      reusability:  (e.reusability_level as string) ?? "",
+      dateCaptured: (e.date_captured as string) ?? null,
     };
   });
 }

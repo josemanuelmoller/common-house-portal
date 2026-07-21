@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { createProjectFolders } from "@/lib/drive";
 import { adminGuardApi } from "@/lib/require-admin";
-import { notion, DB } from "@/lib/notion";
+import { getSupabaseServerClient } from "@/lib/supabase-server";
 
 /**
  * POST /api/setup-all-drives
- * Admin-only. Creates Drive folder structure for ALL active projects in Notion.
+ * Admin-only. Creates Drive folder structure for ALL projects in Supabase.
  * Returns a mapping of projectId → { projectName, rootFolderId } so you can
  * paste the values into clients.ts.
  */
@@ -13,11 +13,13 @@ export async function POST() {
   const guard = await adminGuardApi();
   if (guard) return guard;
 
-  // Get all projects from Notion
-  const res = await notion.databases.query({
-    database_id: DB.projects,
-    sorts: [{ property: "Project Name", direction: "ascending" }],
-  });
+  // Get all projects from Supabase
+  const sb = getSupabaseServerClient();
+  const { data: projectRows } = await sb
+    .from("projects")
+    .select("notion_id, name")
+    .order("name", { ascending: true });
+  const rows = (projectRows ?? []) as Array<{ notion_id: string | null; name: string | null }>;
 
   const results: Array<{
     notionId: string;
@@ -28,17 +30,14 @@ export async function POST() {
     error?: string;
   }> = [];
 
-  for (const page of res.results) {
-    if (page.object !== "page") continue;
-    const props = (page as any).properties;
-
-    const nameProp = props["Project Name"]?.title?.[0]?.plain_text ?? "";
+  for (const row of rows) {
+    const nameProp = row.name ?? "";
     if (!nameProp) continue;
 
     try {
       const { rootFolderId } = await createProjectFolders(nameProp);
       results.push({
-        notionId: page.id,
+        notionId: row.notion_id ?? "",
         projectName: nameProp,
         rootFolderId,
         driveUrl: `https://drive.google.com/drive/folders/${rootFolderId}`,
@@ -46,7 +45,7 @@ export async function POST() {
       });
     } catch (err) {
       results.push({
-        notionId: page.id,
+        notionId: row.notion_id ?? "",
         projectName: nameProp,
         rootFolderId: "",
         driveUrl: "",
@@ -69,7 +68,7 @@ export async function POST() {
 
   return NextResponse.json({
     success: true,
-    total: res.results.length,
+    total: rows.length,
     created: results.filter(r => r.status === "created").length,
     errors: results.filter(r => r.status === "error").length,
     results,

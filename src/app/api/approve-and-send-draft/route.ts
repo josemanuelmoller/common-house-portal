@@ -17,7 +17,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { google } from "googleapis";
 import { adminGuardApi } from "@/lib/require-admin";
-import { notion } from "@/lib/notion";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { recordProposalOutcome } from "@/lib/proposal-outcomes";
 import { currentUser } from "@clerk/nextjs/server";
@@ -53,7 +52,7 @@ function buildRawEmail(opts: {
 
 async function resolveRecipient(relatedEntityId: string | null): Promise<string | null> {
   if (!relatedEntityId) return null;
-  // Supabase canonical first
+  // Read migrated OFF Notion → Supabase `people` (post-cutoff, canonical).
   try {
     const sb = getSupabaseServerClient();
     const { data } = await sb
@@ -62,16 +61,8 @@ async function resolveRecipient(relatedEntityId: string | null): Promise<string 
       .eq("notion_id", relatedEntityId)
       .maybeSingle();
     if (data?.email) return data.email as string;
-  } catch { /* fall through to Notion */ }
-  // Notion read fallback (tolerated read-only until Phase 6)
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const page = await notion.pages.retrieve({ page_id: relatedEntityId }) as any;
-    const emailProp = page.properties?.["Email"] ?? page.properties?.["Work Email"];
-    return emailProp?.email ?? emailProp?.rich_text?.[0]?.plain_text ?? null;
-  } catch {
-    return null;
-  }
+  } catch { /* people lookup unavailable */ }
+  return null;
 }
 
 export async function POST(req: NextRequest) {

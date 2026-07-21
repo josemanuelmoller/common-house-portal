@@ -4,6 +4,33 @@
 // Domain modules will be extracted incrementally; this file shrinks over time.
 export * from "./notion/core";
 import { notion, DB, prop, text, select, multiSelect, num, checkbox, date, relationFirst, relationIds } from "./notion/core";
+import { getSupabaseServerClient } from "@/lib/supabase-server";
+
+// ─── Supabase read helpers (Notion-cutoff migration) ─────────────────────────
+// Non-Garage getters below read canonical rows from Supabase instead of Notion.
+// A record's `id` is the source Notion page id (notion_id), falling back to the
+// row uuid only when notion_id is null. Notion URLs are reconstructed
+// deterministically from notion_id.
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function sbId(row: any): string {
+  return row?.notion_id ?? row?.id ?? "";
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function sbNotionUrl(row: any): string {
+  const nid: string | null = row?.notion_id ?? null;
+  return nid ? `https://www.notion.so/${String(nid).replace(/-/g, "")}` : "";
+}
+
+// Wrap a Supabase row's `payload` jsonb (raw Notion property objects) so the
+// existing prop()/text()/select()/date() helpers read it unchanged. Only valid
+// for tables whose payload preserves Notion-format properties (offers,
+// proposal_briefs, style_profiles). content_pipeline_items stores a flat payload.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function payloadPage(row: any): any {
+  return { properties: row?.payload ?? {} };
+}
 
 // ─── Agent Drafts ─────────────────────────────────────────────────────────────
 // Extracted to src/lib/notion/drafts.ts per docs/NOTION_LAYER_REFACTOR_PLAN.md.
@@ -92,38 +119,39 @@ export type ContentPipelineItem = {
 
 export async function getContentPipeline(statusFilter?: string): Promise<ContentPipelineItem[]> {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const filter: any = statusFilter
-      ? { property: "Status", select: { equals: statusFilter } }
-      : undefined;
+    const sb = getSupabaseServerClient();
+    let query = sb
+      .from("content_pipeline_items")
+      .select("*")
+      .order("updated_at", { ascending: false })
+      .limit(100);
+    if (statusFilter) query = query.eq("status", statusFilter);
 
-    const res = await notion.databases.query({
-      database_id: DB.contentPipeline,
-      filter,
-      sorts: [{ timestamp: "last_edited_time", direction: "descending" }],
-      page_size: 100,
+    const { data, error } = await query;
+    if (error || !data) return [];
+
+    // content_pipeline_items.payload is a FLAT object: { platform, notion_url,
+    // content_type, publish_window } — not Notion-format properties.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (data as any[]).map(row => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const p: any = row.payload ?? {};
+      return {
+        id:          sbId(row),
+        title:       row.title || "Untitled",
+        status:      row.status || "",
+        contentType: p.content_type ?? "",
+        channel:     row.channel ?? p.platform ?? "",
+        desk:        "",
+        projectId:   null,
+        projectName: "",
+        draftDate:   null,
+        publishDate: row.published_at ?? row.scheduled_for ?? null,
+        notionUrl:   sbNotionUrl(row),
+        draftText:   row.body_md ?? "",
+        slideHtml:   "",
+      };
     });
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (res.results as any[]).map(page => ({
-      id:          page.id,
-      title:       text(prop(page, "Title")) || text(prop(page, "Name")) || "Untitled",
-      status:      select(prop(page, "Status")),
-      contentType: select(prop(page, "Content Type")),
-      // "Platform" is the canonical channel field in Content Pipeline [OS v2].
-      // desk-request, generate-draft, and getReadyContent() all use "Platform".
-      channel:     select(prop(page, "Platform")),
-      desk:        select(prop(page, "Desk")),
-      projectId:   relationFirst(prop(page, "Projects")) ?? relationFirst(prop(page, "Project")),
-      projectName: text(prop(page, "Project Name")) || "",
-      draftDate:   date(prop(page, "Draft Date")) ?? date(prop(page, "Created Date")),
-      publishDate: date(prop(page, "Publish Date")) ?? date(prop(page, "Published Date")),
-      notionUrl:   page.url ?? "",
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      draftText:   (prop(page, "Draft Text")?.rich_text ?? []).map((r: any) => r.plain_text).join(""),
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      slideHtml:   (prop(page, "Slide HTML")?.rich_text ?? []).map((r: any) => r.plain_text).join(""),
-    }));
   } catch {
     return [];
   }
@@ -133,27 +161,38 @@ export async function getContentPipeline(statusFilter?: string): Promise<Content
 
 export async function getStyleProfiles(): Promise<StyleProfile[]> {
   try {
-    const res = await notion.databases.query({
-      database_id: DB.styleProfiles,
-      filter: { property: "Status", select: { equals: "Active" } },
-      sorts: [{ property: "Scope", direction: "ascending" }],
-      page_size: 50,
-    });
+    const sb = getSupabaseServerClient();
+    const { data, error } = await sb
+      .from("style_profiles")
+      .select("*")
+      .limit(200);
+    if (error || !data) return [];
+
+    // style_profiles.payload preserves Notion-format properties. Status is stored
+    // only inside payload (no dedicated column), so filter/sort in JS to preserve
+    // the original "Active only, ordered by Scope ascending" behavior.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (res.results as any[]).map(page => ({
-      id:                  page.id,
-      name:                text(prop(page, "Name")) || "Untitled",
-      styleType:           select(prop(page, "Style Type")),
-      scope:               select(prop(page, "Scope")),
-      status:              select(prop(page, "Status")),
-      masterPrompt:        text(prop(page, "Master Prompt")),
-      toneSummary:         text(prop(page, "Tone Summary")),
-      structuralRules:     text(prop(page, "Structural Rules")),
-      vocabularyPatterns:  text(prop(page, "Vocabulary Patterns")),
-      forbiddenPatterns:   text(prop(page, "Forbidden Patterns")),
-      ctaStyle:            text(prop(page, "CTA Style")),
-      firstPersonAllowed:  prop(page, "First Person Allowed")?.checkbox ?? false,
-    }));
+    const rows = (data as any[]).map(row => {
+      const pg = payloadPage(row);
+      return {
+        id:                  sbId(row),
+        name:                row.name || text(prop(pg, "Name")) || "Untitled",
+        styleType:           select(prop(pg, "Style Type")),
+        scope:               select(prop(pg, "Scope")),
+        status:              select(prop(pg, "Status")),
+        masterPrompt:        text(prop(pg, "Master Prompt")),
+        toneSummary:         text(prop(pg, "Tone Summary")),
+        structuralRules:     text(prop(pg, "Structural Rules")),
+        vocabularyPatterns:  text(prop(pg, "Vocabulary Patterns")),
+        forbiddenPatterns:   text(prop(pg, "Forbidden Patterns")),
+        ctaStyle:            text(prop(pg, "CTA Style")),
+        firstPersonAllowed:  prop(pg, "First Person Allowed")?.checkbox ?? false,
+      };
+    });
+
+    return rows
+      .filter(r => r.status === "Active")
+      .sort((a, b) => a.scope.localeCompare(b.scope));
   } catch {
     return [];
   }
@@ -454,23 +493,30 @@ export type CommercialOffer = {
 
 export async function getProposalBriefs(): Promise<ProposalBrief[]> {
   try {
-    const res = await notion.databases.query({
-      database_id: DB.proposalBriefs,
-      sorts: [{ timestamp: "last_edited_time", direction: "descending" }],
-      page_size: 50,
-    });
+    const sb = getSupabaseServerClient();
+    const { data, error } = await sb
+      .from("proposal_briefs")
+      .select("*")
+      .order("updated_at", { ascending: false })
+      .limit(50);
+    if (error || !data) return [];
+
+    // proposal_briefs.payload preserves Notion-format properties.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (res.results as any[]).map(page => ({
-      id:           page.id,
-      title:        text(prop(page, "Title")) || text(prop(page, "Name")) || "Untitled",
-      status:       select(prop(page, "Status")),
-      proposalType: select(prop(page, "Proposal Type")),
-      budgetRange:  select(prop(page, "Budget Range")),
-      clientName:   text(prop(page, "Client Name")) || text(prop(page, "Client")) || "",
-      geography:    select(prop(page, "Geography")) || select(prop(page, "Region")) || "",
-      createdDate:  date(prop(page, "Created Date")) ?? (page.created_time?.slice(0, 10) ?? null),
-      notionUrl:    page.url ?? "",
-    }));
+    return (data as any[]).map(row => {
+      const pg = payloadPage(row);
+      return {
+        id:           sbId(row),
+        title:        row.title || text(prop(pg, "Title")) || text(prop(pg, "Name")) || "Untitled",
+        status:       row.status || select(prop(pg, "Status")),
+        proposalType: select(prop(pg, "Proposal Type")),
+        budgetRange:  select(prop(pg, "Budget Range")),
+        clientName:   text(prop(pg, "Client Name")) || text(prop(pg, "Client")) || "",
+        geography:    select(prop(pg, "Geography")) || select(prop(pg, "Region")) || "",
+        createdDate:  (row.notion_created_at ?? row.created_at)?.slice(0, 10) ?? null,
+        notionUrl:    sbNotionUrl(row),
+      };
+    });
   } catch {
     return [];
   }
@@ -478,20 +524,29 @@ export async function getProposalBriefs(): Promise<ProposalBrief[]> {
 
 export async function getCommercialOffers(): Promise<CommercialOffer[]> {
   try {
-    const res = await notion.databases.query({
-      database_id: DB.offers,
-      filter: { property: "Offer Status", select: { does_not_equal: "Deprecated" } },
-      sorts: [{ timestamp: "last_edited_time", direction: "descending" }],
-      page_size: 50,
-    });
+    const sb = getSupabaseServerClient();
+    const { data, error } = await sb
+      .from("offers")
+      .select("*")
+      .order("updated_at", { ascending: false })
+      .limit(50);
+    if (error || !data) return [];
+
+    // offers.status column is unpopulated; the real Offer Status lives in payload
+    // (Notion-format). Filter out Deprecated in JS to preserve original behavior.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (res.results as any[]).map(page => ({
-      id:           page.id,
-      title:        text(prop(page, "Offer Name")) || text(prop(page, "Name")) || "Untitled",
-      offerStatus:  select(prop(page, "Offer Status")),
-      offerCategory: select(prop(page, "Offer Category")),
-      notionUrl:    page.url ?? "",
-    }));
+    return (data as any[])
+      .map(row => {
+        const pg = payloadPage(row);
+        return {
+          id:            sbId(row),
+          title:         row.title || text(prop(pg, "Offer Name")) || text(prop(pg, "Name")) || "Untitled",
+          offerStatus:   row.status || select(prop(pg, "Offer Status")),
+          offerCategory: select(prop(pg, "Offer Category")),
+          notionUrl:     sbNotionUrl(row),
+        };
+      })
+      .filter(o => o.offerStatus !== "Deprecated");
   } catch {
     return [];
   }
@@ -513,36 +568,38 @@ export type OpportunityItem = {
   qualificationStatus: string; // Qualified | Needs Review | Below Threshold | Not Scored
 };
 
+// Shared mapper: opportunities row (Supabase) → OpportunityItem.
+// `status` is the canonical stage field (canonical_stage is unpopulated).
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mapOpportunityRow(row: any): OpportunityItem {
+  return {
+    id:                   sbId(row),
+    name:                 row.title || "Untitled",
+    stage:                row.status ?? "",
+    scope:                row.scope ?? "",
+    followUpStatus:       row.follow_up_status ?? "",
+    type:                 row.opportunity_type ?? "",
+    orgName:              row.org_name ?? "",
+    lastEdited:           row.updated_at?.slice(0, 10) ?? null,
+    notionUrl:            sbNotionUrl(row),
+    score:                typeof row.opportunity_score === "number" ? row.opportunity_score : null,
+    qualificationStatus:  row.qualification_status || "Not Scored",
+  };
+}
+
 export async function getOpportunitiesByScope(): Promise<{ ch: OpportunityItem[]; portfolio: OpportunityItem[] }> {
   try {
-    const res = await notion.databases.query({
-      database_id: DB.opportunities,
-      filter: {
-        and: [
-          // Verified field name: "Opportunity Status" (not "Stage") — schema 2026-04-13
-          { property: "Opportunity Status", select: { does_not_equal: "Closed Won" } },
-          { property: "Opportunity Status", select: { does_not_equal: "Closed Lost" } },
-          { property: "Opportunity Status", select: { does_not_equal: "Stalled" } },
-        ],
-      },
-      sorts: [{ timestamp: "last_edited_time", direction: "descending" }],
-      page_size: 50,
-    });
+    const sb = getSupabaseServerClient();
+    const { data, error } = await sb
+      .from("opportunities")
+      .select("*")
+      .not("status", "in", "(Closed Won,Closed Lost,Stalled)")
+      .order("updated_at", { ascending: false })
+      .limit(50);
+    if (error || !data) return { ch: [], portfolio: [] };
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const all = (res.results as any[]).map(page => ({
-      id:                   page.id,
-      name:                 text(prop(page, "Opportunity Name")) || text(prop(page, "Name")) || "Untitled",
-      stage:                select(prop(page, "Opportunity Status")),
-      scope:                select(prop(page, "Scope")),
-      followUpStatus:       select(prop(page, "Follow-up Status")),
-      type:                 select(prop(page, "Opportunity Type")) || "",
-      orgName:              "",  // "Account / Organization" is a relation — not readable as plain text
-      lastEdited:           page.last_edited_time?.slice(0, 10) ?? null,
-      notionUrl:            page.url ?? "",
-      score:                num(prop(page, "Opportunity Score")),
-      qualificationStatus:  select(prop(page, "Qualification Status")) || "Not Scored",
-    }));
+    const all = (data as any[]).map(mapOpportunityRow);
 
     return {
       ch:        all.filter(o => o.scope === "CH" || o.scope === "Both"),
@@ -646,379 +703,10 @@ export type CoSTask = {
   loopStatus?: string;      // raw DB status: open | in_progress | waiting | reopened | …
 };
 
-function mapFollowUpStatus(raw: string): CoSTask["taskStatus"] {
-  switch (raw) {
-    case "In Progress": return "in-progress";
-    case "Waiting":
-    case "Sent":        return "waiting";
-    case "Done":        return "done";
-    case "Dropped":     return "dropped";
-    case "Needed":
-    default:            return "todo";
-  }
-}
-
-function computeCoSTask(opp: {
-  id: string;
-  name: string;
-  stage: string;
-  scope: string;
-  followUpStatus: string;
-  type: string;
-  orgName: string;
-  lastEdited: string | null;
-  notionUrl: string;
-  score: number | null;
-  qualificationStatus: string;
-  nextMeetingDate: string | null;
-  reviewUrl: string | null;
-  pendingAction: string | null;
-}): CoSTask {
-  const now = Date.now();
-
-  const meetingMs       = opp.nextMeetingDate ? new Date(opp.nextMeetingDate).getTime() : null;
-  const daysToMeeting   = meetingMs !== null ? Math.floor((meetingMs - now) / 86400000) : null;
-  const meetingImminent = daysToMeeting !== null && daysToMeeting >= 0 && daysToMeeting <= 7;
-  const meetingLabel    = opp.nextMeetingDate && daysToMeeting !== null
-    ? daysToMeeting === 0 ? "today"
-    : daysToMeeting === 1 ? "tomorrow"
-    : new Date(opp.nextMeetingDate).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })
-    : null;
-
-  const isNew   = opp.stage === "New";
-  const isGrant = opp.type === "Grant";
-
-  // An "explicit pending" is a human-written issue description — not scan-generated prefix.
-  // Must be at least 20 chars to carry meaningful content (filter out stub entries).
-  const hasExplicitPending = !!opp.pendingAction
-    && !opp.pendingAction.startsWith("SIGNALS:")
-    && !opp.pendingAction.startsWith("Inbox signal:")
-    && opp.pendingAction.trim().length >= 20;
-
-  // Source URL classification: Gmail thread (follow-up) vs real doc (review)
-  const reviewIsGmail = !!opp.reviewUrl && opp.reviewUrl.includes("mail.google.com");
-  const reviewIsDoc   = !!opp.reviewUrl && !reviewIsGmail;
-
-  // ─── Loop type + intervention moment ─────────────────────────────────────
-  // These drive the primary badge and hint text in the UI.
-  // Rule: a meeting is only the vehicle, never the loop itself.
-  // The loop is the SPECIFIC ISSUE being resolved through that meeting/email/doc.
-  let loopType: CoSTask["loopType"];
-  let interventionMoment: CoSTask["interventionMoment"];
-
-  if (meetingImminent && hasExplicitPending) {
-    // Issue + upcoming meeting = raise this specific thing in the meeting
-    loopType            = "prep";
-    interventionMoment  = "next_meeting";
-  } else if (meetingImminent && reviewIsDoc) {
-    loopType            = "review";
-    interventionMoment  = "next_meeting";
-  } else if (reviewIsDoc) {
-    loopType            = "review";
-    interventionMoment  = "review_this_week";
-  } else if (reviewIsGmail && isNew) {
-    loopType            = "decision";
-    interventionMoment  = "this_week";
-  } else if (reviewIsGmail) {
-    loopType            = "follow-up";
-    interventionMoment  = "email_this_week";
-  } else if (isNew && isGrant) {
-    loopType            = "decision";
-    interventionMoment  = "this_week";
-  } else if (isNew) {
-    loopType            = "decision";
-    interventionMoment  = "this_week";
-  } else if (opp.stage === "Active" && hasExplicitPending) {
-    loopType            = "commitment";
-    interventionMoment  = "this_week";
-  } else if (opp.stage === "Qualifying" && opp.followUpStatus === "Waiting") {
-    loopType            = "follow-up";
-    interventionMoment  = "email_this_week";
-  } else if (opp.stage === "Qualifying") {
-    loopType            = "follow-up";
-    interventionMoment  = "email_this_week";
-  } else {
-    loopType            = "follow-up";
-    interventionMoment  = "this_week";
-  }
-
-  // ─── Entry signal (internal, drives calendar block) ───────────────────────
-  let entrySignal: CoSTask["entrySignal"];
-  let signalReason: string;
-  if (meetingImminent && hasExplicitPending) {
-    entrySignal  = "meeting_soon";
-    signalReason = `Raise in ${meetingLabel} meeting`;
-  } else if (meetingImminent && reviewIsDoc) {
-    entrySignal  = "meeting_soon";
-    signalReason = `Review before ${meetingLabel} meeting`;
-  } else if (reviewIsDoc) {
-    entrySignal  = "review_needed";
-    signalReason = "Document needs review";
-  } else if (reviewIsGmail) {
-    entrySignal  = "inbound";
-    signalReason = isNew ? "Inbound — qualify or decline" : "Email thread — reply needed";
-  } else if (isNew && isGrant) {
-    entrySignal  = "inbound";
-    signalReason = "Grant match — decide fit";
-  } else if (isNew) {
-    entrySignal  = "inbound";
-    signalReason = "Inbound — qualify or decline";
-  } else if (opp.stage === "Active" && hasExplicitPending) {
-    entrySignal  = "negotiation";
-    signalReason = "Open action on active deal";
-  } else if (opp.stage === "Qualifying" && opp.followUpStatus === "Waiting") {
-    entrySignal  = "proposal_pending";
-    signalReason = "Awaiting reply";
-  } else if (opp.stage === "Qualifying") {
-    entrySignal  = "proposal_pending";
-    signalReason = "Follow-up due";
-  } else {
-    entrySignal  = "manual";
-    signalReason = "Follow-up flagged";
-  }
-
-  // ─── Task title — ISSUE FIRST, meeting second ─────────────────────────────
-  // A title must describe the specific unresolved issue.
-  // If there's a specific pending action written by a human, use it verbatim.
-  // If the meeting provides the intervention vehicle, append it.
-  // Never produce "Prepare for meeting — {name}" without a specific issue.
-  let taskTitle: string;
-  if (hasExplicitPending && meetingImminent) {
-    taskTitle = `Raise in ${meetingLabel} meeting: ${opp.pendingAction!.slice(0, 100)}`;
-  } else if (hasExplicitPending) {
-    taskTitle = opp.pendingAction!.slice(0, 140);
-  } else if (meetingImminent && reviewIsDoc) {
-    taskTitle = `Review doc before ${meetingLabel} meeting — ${opp.name}`;
-  } else if (reviewIsDoc) {
-    taskTitle = `Review document: ${opp.name}`;
-  } else if (reviewIsGmail) {
-    taskTitle = isNew
-      ? `Qualify inbound: ${opp.name.slice(0, 90)}`
-      : `Reply to email thread: ${opp.name.slice(0, 90)}`;
-  } else if (isNew && isGrant) {
-    const fitMatch = opp.pendingAction?.match(/fit score (\d+)\/100/);
-    const fitScore = fitMatch ? ` — fit ${fitMatch[1]}/100` : "";
-    taskTitle = `Decide on grant match${fitScore}: ${opp.name.slice(0, 70)}`;
-  } else if (isNew) {
-    taskTitle = `Qualify or decline: ${opp.name.slice(0, 90)}`;
-  } else if (opp.stage === "Qualifying" && opp.followUpStatus === "Waiting") {
-    taskTitle = `Chase reply — ${opp.name}`;
-  } else if (opp.stage === "Qualifying") {
-    taskTitle = `Send follow-up — ${opp.name}`;
-  } else {
-    taskTitle = `Follow up — ${opp.name}`;
-  }
-
-  // ─── Urgency ──────────────────────────────────────────────────────────────
-  let urgency: CoSTask["urgency"];
-  if (daysToMeeting !== null && daysToMeeting >= 0 && daysToMeeting <= 1) urgency = "critical";
-  else if (meetingImminent && hasExplicitPending) urgency = "high";
-  else if (meetingImminent && reviewIsDoc)         urgency = "high";
-  else if (opp.followUpStatus === "Needed" && hasExplicitPending) urgency = "high";
-  else urgency = "normal";
-
-  // ─── Calendar block ───────────────────────────────────────────────────────
-  const calendarBlockUrl = (reviewIsDoc || (meetingImminent && hasExplicitPending))
-    ? `https://calendar.google.com/calendar/r/eventedit?text=${encodeURIComponent(`Prep: ${opp.name}`)}&details=${encodeURIComponent(taskTitle)}&dur=0100`
-    : null;
-
-  return {
-    id:                 opp.id,
-    notionUrl:          opp.notionUrl,
-    taskTitle,
-    taskStatus:         mapFollowUpStatus(opp.followUpStatus),
-    dueDate:            opp.nextMeetingDate,
-    urgency,
-    loopType,
-    interventionMoment,
-    opportunityName:    opp.name,
-    opportunityStage:   opp.stage,
-    orgName:            opp.orgName,
-    opportunityType:    opp.type,
-    reviewUrl:          opp.reviewUrl,
-    entrySignal,
-    signalReason,
-    calendarBlockUrl,
-    pendingAction:      opp.pendingAction,
-    taskSource:         "opportunity",
-  };
-}
-
-// ─── Project-derived CoS tasks ────────────────────────────────────────────────
-//
-// Projects with Status="Active" that have drifted without an update are surfaced
-// as CoS tasks, exactly like Opportunity tasks. This ensures work tracked as
-// Projects (e.g. COP31, ZWF Forum — Neil) appears in the desk without manual flags.
-//
-// Rules:
-//   1. updateNeeded = true         → "Write project update" (high urgency)
-//   2. lastUpdate > 14d or null    → "Check in — {name}" (normal urgency)
-//
-// Garage-workspace projects are excluded — those surface through Garage agent cadence.
-// Hall and Workroom projects are included.
-
-async function getProjectCoSTasks(): Promise<CoSTask[]> {
-  // Open-loop model: only surface projects where a human explicitly flagged
-  // "Project Update Needed?" = true. Stale-date logic removed — age alone is not a loop.
-  // The open issue is derived from hallObstacles or hallChallenge fields; without content
-  // in those fields the task title falls back to "Write project update".
-  try {
-    const res = await notion.databases.query({
-      database_id: DB.projects,
-      filter: {
-        and: [
-          { property: "Project Status", select: { equals: "Active" } },
-          { property: "Project Update Needed?", checkbox: { equals: true } },
-        ],
-      },
-      sorts: [{ property: "Last Status Update", direction: "ascending" }],
-      page_size: 20,
-    });
-
-    const tasks: CoSTask[] = [];
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    for (const page of res.results as any[]) {
-      const workspace = select(prop(page, "Primary Workspace")) || "hall";
-      if (workspace === "garage") continue;  // Garage has its own cadence
-
-      const name       = text(prop(page, "Project Name")) || "Untitled Project";
-      const notionUrl  = page.url ?? "";
-
-      // Use obstacle / challenge content as the specific issue if available.
-      // hallObstacles and hallChallenge are rich_text fields (confirmed in projects.ts).
-      const obstacle = text(prop(page, "Hall Obstacles")) || "";
-      const challenge = text(prop(page, "Hall Challenge")) || "";
-      const issueContent = obstacle || challenge;
-
-      let taskTitle: string;
-      let signalReason: string;
-      let loopType: CoSTask["loopType"];
-
-      if (issueContent && issueContent.length >= 15) {
-        // Surface the specific unresolved issue — not just "write an update"
-        taskTitle    = issueContent.slice(0, 140);
-        signalReason = `Flagged update needed — ${name}`;
-        loopType     = issueContent.toLowerCase().includes("block")
-          ? "blocker"
-          : "commitment";
-      } else {
-        taskTitle    = `Write project update — ${name}`;
-        signalReason = "Project update flagged";
-        loopType     = "commitment";
-      }
-
-      tasks.push({
-        id:               page.id,
-        notionUrl,
-        taskTitle,
-        taskStatus:       "todo",
-        dueDate:          null,
-        urgency:          "high",
-        loopType,
-        interventionMoment: "this_week",
-        opportunityName:  name,
-        opportunityStage: "Project",
-        orgName:          "",
-        opportunityType:  "Project",
-        reviewUrl:        null,
-        entrySignal:      "manual",
-        signalReason,
-        calendarBlockUrl: null,
-        pendingAction:    issueContent || null,
-        taskSource:       "project",
-      });
-    }
-
-    return tasks;
-  } catch {
-    return [];
-  }
-}
-
-// ─── Evidence-derived open loops ─────────────────────────────────────────────
-// Surfaces CH Evidence records of type Blocker or Commitment that are Validated
-// and were captured recently (Blockers: 30d window; Commitments: 14d window).
-// These represent concrete unresolved issues extracted from real conversations —
-// the strongest signal that something needs Jose's attention.
-async function getEvidenceOpenLoops(): Promise<CoSTask[]> {
-  try {
-    const now = Date.now();
-    const THIRTY_DAYS_MS = 30 * 86400000;
-    const FOURTEEN_DAYS_MS = 14 * 86400000;
-
-    const res = await notion.databases.query({
-      database_id: DB.evidence,
-      filter: {
-        and: [
-          { property: "Validation Status", select: { equals: "Validated" } },
-          {
-            or: [
-              { property: "Evidence Type", select: { equals: "Blocker" } },
-              { property: "Evidence Type", select: { equals: "Commitment" } },
-            ],
-          },
-        ],
-      },
-      sorts: [{ property: "Date Captured", direction: "descending" }],
-      page_size: 20,
-    });
-
-    const tasks: CoSTask[] = [];
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    for (const page of res.results as any[]) {
-      const evidenceType = select(prop(page, "Evidence Type")) || "";
-      const dateCaptured = date(prop(page, "Date Captured"));
-      if (!dateCaptured) continue;
-
-      const ageMs = now - new Date(dateCaptured).getTime();
-      const windowMs = evidenceType === "Blocker" ? THIRTY_DAYS_MS : FOURTEEN_DAYS_MS;
-      if (ageMs > windowMs) continue;
-
-      const title   = text(prop(page, "Evidence Title")) || "Untitled evidence";
-      const excerpt = text(prop(page, "Source Excerpt")) || "";
-      const notionUrl = page.url ?? "";
-
-      const loopType: CoSTask["loopType"]           = evidenceType === "Blocker" ? "blocker" : "commitment";
-      const interventionMoment: CoSTask["interventionMoment"] =
-        evidenceType === "Blocker" ? "urgent" : "this_week";
-
-      const taskTitle = excerpt && excerpt.length >= 20
-        ? excerpt.slice(0, 140)
-        : title.slice(0, 140);
-
-      tasks.push({
-        id:               page.id,
-        notionUrl,
-        taskTitle,
-        taskStatus:       "todo",
-        dueDate:          null,
-        urgency:          evidenceType === "Blocker" ? "critical" : "high",
-        loopType,
-        interventionMoment,
-        opportunityName:  title,
-        opportunityStage: "Evidence",
-        orgName:          "",
-        opportunityType:  evidenceType,
-        reviewUrl:        null,
-        entrySignal:      "review_needed",
-        signalReason:     `Validated ${evidenceType.toLowerCase()} — ${dateCaptured}`,
-        calendarBlockUrl: null,
-        pendingAction:    excerpt || null,
-        taskSource:       "evidence",
-      });
-    }
-
-    return tasks;
-  } catch {
-    return [];
-  }
-}
-
-// ─── Supabase-first read ──────────────────────────────────────────────────────
-// Reads from the loops table (populated by /api/sync-loops). Falls back to the
-// Notion-derived path if Supabase is unavailable or the table is empty (cold start).
+// ─── Supabase read ────────────────────────────────────────────────────────────
+// Reads from the loops table (populated by /api/sync-loops). Returns null if
+// Supabase is unavailable or the table is empty (cold start); getCoSTasks then
+// yields an empty list.
 
 async function getCoSTasksFromLoops(): Promise<CoSTask[] | null> {
   try {
@@ -1123,136 +811,10 @@ export async function getParkedLoops(): Promise<CoSTask[]> {
 }
 
 export async function getCoSTasks(): Promise<CoSTask[]> {
-  // ── Supabase-first (Loop Engine) ────────────────────────────────────────────
+  // Supabase-only (Loop Engine). The loops table is the single source of truth;
+  // the former Notion-derived fallback has been removed.
   const fromLoops = await getCoSTasksFromLoops();
-  if (fromLoops !== null) return fromLoops;
-
-  // ── Notion fallback (heuristic path) ───────────────────────────────────────
-  try {
-    const res = await notion.databases.query({
-      database_id: DB.opportunities,
-      // Fetch all actionable stages — terminal state exclusion is handled client-side.
-      // A flat OR is used because Notion's compound AND+OR filter with does_not_equal
-      // returns 0 results in practice (confirmed in production 2026-04-15).
-      filter: {
-        or: [
-          // Note: "In Progress" omitted — that select option does not yet exist in Notion.
-          // Notion's databases.query throws if a filter references a non-existent select value.
-          // Once a record is set to "In Progress" via pages.update (which auto-creates the option),
-          // this filter can be extended to include it.
-          { property: "Follow-up Status", select: { equals: "Needed"  } },
-          { property: "Follow-up Status", select: { equals: "Waiting" } },
-          { property: "Follow-up Status", select: { equals: "Sent"    } },
-          { property: "Opportunity Status", select: { equals: "Active"     } },
-          { property: "Opportunity Status", select: { equals: "Qualifying" } },
-          { property: "Opportunity Status", select: { equals: "New"        } },
-        ],
-      },
-      sorts: [{ timestamp: "last_edited_time", direction: "ascending" }],
-      page_size: 30,
-    });
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const raw = (res.results as any[]).map(page => ({
-      id:                  page.id,
-      name:                text(prop(page, "Opportunity Name")) || text(prop(page, "Name")) || "Untitled",
-      stage:               select(prop(page, "Opportunity Status")),  // verified field name
-      scope:               select(prop(page, "Scope")),
-      followUpStatus:      select(prop(page, "Follow-up Status")),
-      type:                select(prop(page, "Opportunity Type")) || "",
-      orgName:             "",  // "Account / Organization" is a relation — not plain text
-      lastEdited:          page.last_edited_time?.slice(0, 10) ?? null,
-      notionUrl:           page.url ?? "",
-      score:               num(prop(page, "Opportunity Score")),
-      qualificationStatus: select(prop(page, "Qualification Status")) || "Not Scored",
-      nextMeetingDate:     date(prop(page, "Next Meeting Date")),      // optional; null if field absent
-      reviewUrl:           page.properties["Source URL"]?.url ?? null, // verified field name
-      pendingAction:       text(prop(page, "Trigger / Signal")) || null, // verified field name
-    }));
-
-    // ── Client-side signal gate ────────────────────────────────────────────────
-    // RULE: stage alone (Active, Qualifying, New) is NOT a sufficient condition.
-    // Every CoS task must have at least one concrete, verifiable action signal.
-    // This prevents long-running projects and stale pipeline records from showing
-    // as "tasks to do" just because they exist in the pipeline.
-    //
-    // Valid signals:
-    //   1. Explicit Follow-up Status = Needed / Waiting / Sent (human flag, OR auto-set by scan)
-    //   2. Next Meeting Date is set (time-bound prep action)
-    //   3. Source URL set (document to review)
-    //   4. Trigger/Signal text, recently edited, on a non-Grant record
-    //      — Grant records use this field for sourcing context, not actions.
-    //      — 30-day recency gate prevents stale context from surfacing.
-    //   5. (Safety net) Active opportunity with no edit in > 14 days — stale, needs check.
-    //      This catches deals that drift without action and have no other signal set.
-    //      Qualifying stage is intentionally excluded: those are in active correspondence
-    //      and usually surface through Follow-up Status.
-    const TERMINAL_STAGES  = new Set(["Closed Won", "Closed Lost", "Stalled"]);
-    const TERMINAL_STATUSES = new Set(["Done", "Dropped"]);
-    const filtered = raw.filter(opp => {
-      if (TERMINAL_STAGES.has(opp.stage))            return false;
-      if (TERMINAL_STATUSES.has(opp.followUpStatus)) return false;
-
-      const hasExplicitStatus = ["Needed", "Waiting", "Sent"].includes(opp.followUpStatus);
-      const hasReview         = !!opp.reviewUrl;
-
-      // Pending action is only valid when human-written (not scan-generated),
-      // on a non-Grant record (grant-radar fills this with sourcing context),
-      // and the record has been touched recently (< 30 days).
-      const daysSinceEdit = opp.lastEdited
-        ? Math.floor((Date.now() - new Date(opp.lastEdited).getTime()) / 86400000)
-        : 999;
-      const isGrant = opp.type === "Grant";
-      const hasActionablePending = !!opp.pendingAction
-        && !opp.pendingAction.startsWith("SIGNALS:")
-        && !opp.pendingAction.startsWith("Inbox signal:")
-        && !isGrant
-        && daysSinceEdit <= 30;
-
-      // A meeting date alone is NOT a task — it is only a vehicle.
-      // The task must be the specific issue being resolved through that meeting.
-      // Require an explicit pending action or status alongside the meeting.
-      const hasMeetingWithTopic = !!opp.nextMeetingDate && (hasActionablePending || hasExplicitStatus);
-
-      // isStaleActive removed: "haven't touched in 14 days" is not an open loop.
-      // Stale records with no issue content should not surface as tasks.
-
-      // Grants: only surface when there is real user signal (review URL or meeting).
-      // hasExplicitStatus is excluded because grant-radar auto-sets Follow-up = "Needed"
-      // without any founder intent — surfacing those creates noise not tasks.
-      if (isGrant) return hasReview || hasMeetingWithTopic;
-      return hasExplicitStatus || hasMeetingWithTopic || hasReview || hasActionablePending;
-    });
-
-    const oppTasks      = filtered.map(computeCoSTask);
-    const [projectTasks, evidenceTasks] = await Promise.all([
-      getProjectCoSTasks(),
-      getEvidenceOpenLoops(),
-    ]);
-
-    // Merge — blockers / evidence first (highest signal), then opportunity tasks,
-    // then project update flags. Dedup by Notion page ID.
-    const seen = new Set<string>();
-    const merged: CoSTask[] = [];
-    for (const t of [...evidenceTasks, ...oppTasks, ...projectTasks]) {
-      if (!seen.has(t.id)) { seen.add(t.id); merged.push(t); }
-    }
-
-    // Sort: critical → high → normal; within tier by due date proximity
-    const TIER: Record<string, number> = { critical: 0, high: 1, normal: 2 };
-    merged.sort((a, b) => {
-      const td = (TIER[a.urgency] ?? 2) - (TIER[b.urgency] ?? 2);
-      if (td !== 0) return td;
-      if (a.dueDate && b.dueDate) return a.dueDate.localeCompare(b.dueDate);
-      if (a.dueDate) return -1;
-      if (b.dueDate) return 1;
-      return 0;
-    });
-
-    return merged;
-  } catch {
-    return [];
-  }
+  return fromLoops ?? [];
 }
 
 // ─── Backward compat shims ────────────────────────────────────────────────────
@@ -1334,26 +896,29 @@ function parseSignalPrefix(raw: string | null): {
 
 export async function getCandidateOpportunities(): Promise<CandidateItem[]> {
   try {
-    // Verified field name: "Opportunity Status" = "New" maps to unreviewed candidates (schema 2026-04-13)
-    const res = await notion.databases.query({
-      database_id: DB.opportunities,
-      filter: { property: "Opportunity Status", select: { equals: "New" } },
-      sorts: [{ timestamp: "created_time", direction: "descending" }],
-      page_size: 15,
-    });
+    // status = "New" maps to unreviewed candidates (canonical stage field).
+    const sb = getSupabaseServerClient();
+    const { data, error } = await sb
+      .from("opportunities")
+      .select("*")
+      .eq("status", "New")
+      .order("notion_created_at", { ascending: false, nullsFirst: false })
+      .limit(15);
+    if (error || !data) return [];
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (res.results as any[]).map(page => {
-      const rawSignal = text(prop(page, "Trigger / Signal")) || null; // verified field name
+    return (data as any[]).map(row => {
+      const rawSignal = row.trigger_signal ?? null;
       const { origins, ref, signalDate, context } = parseSignalPrefix(rawSignal);
       return {
-        id:             page.id,
-        name:           text(prop(page, "Opportunity Name")) || text(prop(page, "Name")) || "Untitled",
-        orgName:        "",  // "Account / Organization" is a relation — not plain text
-        type:           select(prop(page, "Opportunity Type")) || "",
-        notionUrl:      page.url ?? "",
+        id:             sbId(row),
+        name:           row.title || "Untitled",
+        orgName:        row.org_name ?? "",
+        type:           row.opportunity_type ?? "",
+        notionUrl:      sbNotionUrl(row),
         signalContext:  context,
-        sourceUrl:      page.properties["Source URL"]?.url ?? null, // verified field name
-        createdTime:    page.created_time?.slice(0, 10) ?? null,
+        sourceUrl:      row.source_url ?? null,
+        createdTime:    (row.notion_created_at ?? row.created_at)?.slice(0, 10) ?? null,
         signalOrigins:  origins,
         signalRef:      ref,
         signalDate,
@@ -1379,59 +944,42 @@ export async function getPipelineOpportunities(): Promise<{
   recentlyClosed: PipelineOpportunity[]; // Won or Lost in last 30 days
 }> {
   try {
-    const res = await notion.databases.query({
-      database_id: DB.opportunities,
-      filter: {
-        or: [
-          { property: "Stage", select: { equals: "Active" } },
-          { property: "Stage", select: { equals: "Proposal Sent" } },
-          { property: "Stage", select: { equals: "Negotiation" } },
-          { property: "Stage", select: { equals: "Won" } },
-          { property: "Stage", select: { equals: "Lost" } },
-        ],
-      },
-      sorts: [{ property: "Opportunity Score", direction: "descending" }],
-      page_size: 100,
-    });
+    const sb = getSupabaseServerClient();
+    const { data, error } = await sb
+      .from("opportunities")
+      .select("*")
+      .in("status", ["Active", "Proposal Sent", "Negotiation", "Won", "Lost", "Closed Won", "Closed Lost"])
+      .order("opportunity_score", { ascending: false, nullsFirst: false })
+      .limit(100);
+    if (error || !data) return { active: [], proposalSent: [], negotiation: [], recentlyClosed: [] };
 
-    const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const cutoffMs = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    const CLOSED_STAGES = new Set(["Won", "Lost", "Closed Won", "Closed Lost"]);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const all: PipelineOpportunity[] = (res.results as any[]).map(page => ({
-      id:                  page.id,
-      name:                text(prop(page, "Opportunity Name")) || text(prop(page, "Name")) || "Untitled",
-      stage:               select(prop(page, "Stage")),
-      scope:               select(prop(page, "Scope")),
-      followUpStatus:      select(prop(page, "Follow-up Status")),
-      type:                select(prop(page, "Type")) || select(prop(page, "Opportunity Type")) || "",
-      orgName:             text(prop(page, "Organization")) || "",
-      lastEdited:          page.last_edited_time?.slice(0, 10) ?? null,
-      notionUrl:           page.url ?? "",
-      score:               num(prop(page, "Opportunity Score")),
-      qualificationStatus: select(prop(page, "Qualification Status")) || "Not Scored",
-      daysInStage:         page.last_edited_time
-        ? Math.floor((Date.now() - new Date(page.last_edited_time).getTime()) / 86400000)
-        : null,
-    }));
+    const all: PipelineOpportunity[] = (data as any[]).map(row => {
+      const editedMs = row.updated_at ? new Date(row.updated_at).getTime() : null;
+      return {
+        ...mapOpportunityRow(row),
+        daysInStage: editedMs !== null
+          ? Math.floor((Date.now() - editedMs) / 86400000)
+          : null,
+      };
+    });
 
     return {
       active:         all.filter(o => o.stage === "Active"),
       proposalSent:   all.filter(o => o.stage === "Proposal Sent"),
       negotiation:    all.filter(o => o.stage === "Negotiation"),
       recentlyClosed: all.filter(o =>
-        (o.stage === "Won" || o.stage === "Lost") &&
-        page_last_edited_after(res.results, o.id, cutoff)
+        CLOSED_STAGES.has(o.stage) &&
+        o.lastEdited !== null &&
+        new Date(o.lastEdited).getTime() >= cutoffMs
       ),
     };
   } catch {
     return { active: [], proposalSent: [], negotiation: [], recentlyClosed: [] };
   }
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function page_last_edited_after(results: any[], id: string, cutoff: string): boolean {
-  const page = results.find((p: any) => p.id === id);
-  return page ? page.last_edited_time >= cutoff : false;
 }
 
 // ─── Hall v2 — Content ready to publish ──────────────────────────────────────
@@ -1447,21 +995,29 @@ export type ReadyContent = {
 
 export async function getReadyContent(): Promise<ReadyContent[]> {
   try {
-    const res = await notion.databases.query({
-      database_id: DB.contentPipeline,
-      filter: { property: "Status", select: { equals: "Ready to Publish" } },
-      sorts: [{ timestamp: "last_edited_time", direction: "descending" }],
-      page_size: 10,
-    });
+    const sb = getSupabaseServerClient();
+    const { data, error } = await sb
+      .from("content_pipeline_items")
+      .select("*")
+      .eq("status", "Ready to Publish")
+      .order("updated_at", { ascending: false })
+      .limit(10);
+    if (error || !data) return [];
+
+    // content_pipeline_items.payload is flat: { platform, content_type, publish_window }.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (res.results as any[]).map(page => ({
-      id:            page.id,
-      title:         text(prop(page, "Title")) || text(prop(page, "Name")) || "Untitled",
-      platform:      select(prop(page, "Platform")) || select(prop(page, "Channel")) || "",
-      contentType:   select(prop(page, "Content Type")),
-      publishWindow: text(prop(page, "Publish Window")) || date(prop(page, "Publish Date")) || "",
-      notionUrl:     page.url ?? "",
-    }));
+    return (data as any[]).map(row => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const p: any = row.payload ?? {};
+      return {
+        id:            sbId(row),
+        title:         row.title || "Untitled",
+        platform:      row.channel ?? p.platform ?? "",
+        contentType:   p.content_type ?? "",
+        publishWindow: p.publish_window ?? (row.published_at ? String(row.published_at) : ""),
+        notionUrl:     sbNotionUrl(row),
+      };
+    });
   } catch {
     return [];
   }
@@ -1471,37 +1027,18 @@ export async function getReadyContent(): Promise<ReadyContent[]> {
 
 export async function getPortfolioOpportunities(orgName?: string): Promise<OpportunityItem[]> {
   try {
-    const res = await notion.databases.query({
-      database_id: DB.opportunities,
-      filter: {
-        and: [
-          {
-            or: [
-              { property: "Scope", select: { equals: "Portfolio" } },
-              { property: "Scope", select: { equals: "Both" } },
-            ],
-          },
-          { property: "Stage", select: { does_not_equal: "Archived" } },
-        ],
-      },
-      sorts: [{ timestamp: "last_edited_time", direction: "descending" }],
-      page_size: 50,
-    });
+    const sb = getSupabaseServerClient();
+    const { data, error } = await sb
+      .from("opportunities")
+      .select("*")
+      .in("scope", ["Portfolio", "Both"])
+      .neq("status", "Archived")
+      .order("updated_at", { ascending: false })
+      .limit(50);
+    if (error || !data) return [];
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const all: OpportunityItem[] = (res.results as any[]).map(page => ({
-      id:                   page.id,
-      name:                 text(prop(page, "Opportunity Name")) || text(prop(page, "Name")) || "Untitled",
-      stage:                select(prop(page, "Stage")),
-      scope:                select(prop(page, "Scope")),
-      followUpStatus:       select(prop(page, "Follow-up Status")),
-      type:                 select(prop(page, "Type")) || select(prop(page, "Opportunity Type")) || "",
-      orgName:              text(prop(page, "Organization")) || "",
-      lastEdited:           page.last_edited_time?.slice(0, 10) ?? null,
-      notionUrl:            page.url ?? "",
-      score:                num(prop(page, "Opportunity Score")),
-      qualificationStatus:  select(prop(page, "Qualification Status")) || "Not Scored",
-    }));
+    const all: OpportunityItem[] = (data as any[]).map(mapOpportunityRow);
 
     // If orgName provided, prefer matches — show matched first, then all if none match
     if (orgName) {

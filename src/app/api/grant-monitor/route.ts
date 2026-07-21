@@ -25,8 +25,6 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-// TODO phase-6: migrate read source to Supabase opportunities + projects
-import { Client } from "@notionhq/client";
 import { currentUser } from "@clerk/nextjs/server";
 import { isAdminUser, isAdminEmail } from "@/lib/clients";
 import { withRoutineLog } from "@/lib/routine-log";
@@ -34,13 +32,6 @@ import { createPageWithMirror } from "@/lib/notion-mirror-push";
 
 export const maxDuration = 180;
 export const dynamic = "force-dynamic";
-
-const notion = new Client({ auth: process.env.NOTION_API_KEY });
-
-const DB = {
-  opportunities: "687caa98594a41b595c9960c141be0c0",
-  projects:      "49d59b18095f46588960f2e717832c5f",
-};
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
@@ -62,17 +53,6 @@ async function authCheck(req: NextRequest): Promise<boolean> {
   return false;
 }
 
-// ─── Notion helpers ───────────────────────────────────────────────────────────
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const text = (p: any): string => p?.title?.[0]?.plain_text ?? p?.rich_text?.[0]?.plain_text ?? "";
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const sel  = (p: any): string => p?.select?.name ?? "";
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const dateStart = (p: any): string | null => p?.date?.start ?? null;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const relIds = (p: any): string[] => Array.isArray(p?.relation) ? p.relation.map((r: { id: string }) => r.id) : [];
-
 // ─── Data fetchers ────────────────────────────────────────────────────────────
 
 interface GrantOpportunity {
@@ -92,35 +72,35 @@ async function fetchActiveGrantOpportunities(): Promise<GrantOpportunity[]> {
   const OPEN = new Set(["New", "Qualifying", "Active", "Engaged", "Won", "Closed-Won"]);
   const today = new Date();
 
-  const res = await notion.databases.query({
-    database_id: DB.opportunities,
-    filter: { property: "Opportunity Type", select: { equals: "Grant" } },
-    page_size: 100,
-  });
+  const { getSupabaseServerClient } = await import("@/lib/supabase-server");
+  const sb = getSupabaseServerClient();
+  const { data, error } = await sb
+    .from("opportunities")
+    .select("notion_id, title, status, scope, expected_close_date, opportunity_score, follow_up_status, org_notion_id")
+    .eq("opportunity_type", "Grant")
+    .limit(100);
+  if (error) throw new Error(error.message);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (res.results as any[])
-    .map(p => {
-      const closeDate = dateStart(p.properties["Expected Close Date"]);
+  return (data ?? [])
+    .map((p) => {
+      const closeDate: string | null = p.expected_close_date ?? null;
       const daysToClose = closeDate
         ? Math.round((new Date(closeDate).getTime() - today.getTime()) / 86400_000)
         : null;
-      // Fit Score field name varies — try common variants
-      const fitScoreRaw =
-          p.properties["Fit Score"]?.number
-        ?? p.properties["Opportunity Score"]?.number
-        ?? null;
+      const fitScoreRaw = p.opportunity_score ?? null;
       return {
-        id:        p.id,
-        name:      text(p.properties["Opportunity Name"]),
-        status:    sel(p.properties["Opportunity Status"]),
-        scope:     sel(p.properties["Scope"]),
+        id:        p.notion_id as string,
+        name:      (p.title as string) ?? "",
+        status:    (p.status as string) ?? "",
+        scope:     (p.scope as string) ?? "",
         closeDate,
         daysToClose,
         fitScore:  typeof fitScoreRaw === "number" ? fitScoreRaw : null,
-        followUp:  sel(p.properties["Follow-up Status"]),
-        organisationIds: relIds(p.properties["Organization"]),
-        projectIds:      relIds(p.properties["Linked Projects"]) ?? relIds(p.properties["Project"]),
+        followUp:  (p.follow_up_status as string) ?? "",
+        // opportunities has a single org FK; wrap as array to preserve shape.
+        organisationIds: p.org_notion_id ? [p.org_notion_id as string] : [],
+        // No project-linkage column in the Supabase schema; leave empty.
+        projectIds:      [] as string[],
       };
     })
     .filter(o => o.status === "" || OPEN.has(o.status));
@@ -135,23 +115,21 @@ interface ProjectSummary {
 
 async function fetchActiveProjects(): Promise<ProjectSummary[]> {
   const ACTIVE = new Set(["Discovery", "Validation", "Execution", "Active"]);
-  const res = await notion.databases.query({
-    database_id: DB.projects,
-    page_size: 60,
-  });
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (res.results as any[])
-    .filter(p => {
-      const stage =
-        sel(p.properties["Current Stage"]) ||
-        sel(p.properties["Stage"]);
-      return ACTIVE.has(stage);
-    })
+  const { getSupabaseServerClient } = await import("@/lib/supabase-server");
+  const sb = getSupabaseServerClient();
+  const { data, error } = await sb
+    .from("projects")
+    .select("notion_id, name, current_stage")
+    .limit(60);
+  if (error) throw new Error(error.message);
+  return (data ?? [])
+    .filter(p => ACTIVE.has((p.current_stage as string) ?? ""))
     .map(p => ({
-      id:        p.id,
-      name:      text(p.properties["Project Name"]),
-      stage:     sel(p.properties["Current Stage"]) || sel(p.properties["Stage"]),
-      workspace: sel(p.properties["Primary Workspace"]) || "hall",
+      id:        p.notion_id as string,
+      name:      (p.name as string) ?? "",
+      stage:     (p.current_stage as string) ?? "",
+      // No workspace column in the Supabase schema; default to "hall".
+      workspace: "hall",
     }));
 }
 

@@ -1,33 +1,12 @@
 import { NextResponse } from "next/server"
-import { notion, DB } from "@/lib/notion"
+import {
+  getAllProjects,
+  getDecisionItems,
+  getContentPipeline,
+  getAgentDrafts,
+  getAllEvidence,
+} from "@/lib/notion"
 import { getSupabaseServerClient } from "@/lib/supabase-server"
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnyPage = any
-
-function text(p: AnyPage): string {
-  return p?.rich_text?.[0]?.plain_text ?? p?.title?.[0]?.plain_text ?? ""
-}
-function sel(p: AnyPage): string {
-  return p?.select?.name ?? ""
-}
-function ms(p: AnyPage): string[] {
-  return p?.multi_select?.map((s: AnyPage) => s.name) ?? []
-}
-function dt(p: AnyPage): string | null {
-  return p?.date?.start ?? null
-}
-
-function titleOf(page: AnyPage): string {
-  // Notion title property — could be named anything; find the "title" type
-  const props = page.properties ?? {}
-  for (const val of Object.values(props) as AnyPage[]) {
-    if (val?.type === "title" && val?.title?.[0]?.plain_text) {
-      return val.title[0].plain_text
-    }
-  }
-  return "Untitled"
-}
 
 function relDate(iso: string | null): string {
   if (!iso) return "—"
@@ -78,91 +57,51 @@ export async function OPTIONS(req: Request) {
 
 export async function GET(req: Request) {
   try {
-    // Run each Notion query in isolation — one failing DB must not blank out the
-    // whole Hall dashboard. Track which sources failed (as boolean flags) so
-    // the frontend can degrade gracefully. Wave 5 CR5: do NOT echo Notion
-    // error messages to the public response — they include database IDs.
+    // Reads migrated OFF Notion → Supabase getters (post-cutoff). Each getter
+    // swallows its own errors and returns [] so one failing source never blanks
+    // out the whole Hall dashboard. `sourceErrors` is retained for agentPulse.
     const sourceErrors: Record<string, boolean> = {}
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    async function safeQuery(name: string, args: any): Promise<{ results: AnyPage[]; has_more: boolean }> {
-      try {
-        const res = await notion.databases.query(args)
-        return { results: res.results as AnyPage[], has_more: res.has_more ?? false }
-      } catch (err) {
-        sourceErrors[name] = true
-        console.error(`[hall-data] ${name} query failed:`, err)
-        return { results: [], has_more: false }
-      }
-    }
-
-    const [projectsRes, decisionsRes, contentRes, agentDraftsRes, evidenceRes] = await Promise.all([
-      safeQuery("projects", {
-        database_id: DB.projects,
-        filter: { property: "Project Status", select: { equals: "Active" } },
-        sorts: [{ property: "Last Status Update", direction: "descending" }],
-        page_size: 20,
-      }),
-      safeQuery("decisions", {
-        database_id: DB.decisions,
-        filter: { property: "Status", select: { equals: "Open" } },
-        sorts: [{ property: "Priority", direction: "ascending" }],
-        page_size: 10,
-      }),
-      safeQuery("contentPipeline", {
-        database_id: DB.contentPipeline,
-        filter: { property: "Status", select: { equals: "Review" } },
-        page_size: 5,
-      }),
-      safeQuery("agentDrafts", {
-        database_id: DB.agentDrafts,
-        filter: { property: "Status", select: { equals: "Pending Review" } },
-        page_size: 5,
-      }),
-      safeQuery("evidence", {
-        database_id: DB.evidence,
-        filter: { property: "Validation Status", select: { equals: "New" } },
-        page_size: 1,
-      }),
+    const [allProjects, decisionItems, contentItems, draftItems, evidenceItems] = await Promise.all([
+      getAllProjects(),               // Active projects, ordered by last status update
+      getDecisionItems("Open"),       // decision_items where status = Open
+      getContentPipeline("Review"),   // content_pipeline_items where status = Review
+      getAgentDrafts("Pending Review"), // agent_drafts where status = Pending Review
+      getAllEvidence("New"),          // evidence where validation_status = New
     ])
 
-    // Parse projects
-    const projects = (projectsRes.results as AnyPage[]).map(page => {
-      const p = page.properties
-      const workspace = sel(p["Primary Workspace"]) || "hall"
+    // Parse projects (cap at 20 to match the previous page_size).
+    const projects = allProjects.slice(0, 20).map(pr => {
+      const workspace = pr.primaryWorkspace || "hall"
       return {
-        id: page.id,
-        name: text(p["Project Name"]) || titleOf(page),
-        stage: sel(p["Current Stage"]),
+        id: pr.id,
+        name: pr.name,
+        stage: pr.stage,
         type: workspace === "garage" ? "Garage" : workspace === "workroom" ? "Workroom" : "Hall",
-        lastUpdate: relDate(dt(p["Last Status Update"])),
-        geography: (ms(p["Geography"])[0]) ?? "",
-        updateNeeded: p["Project Update Needed?"]?.checkbox ?? false,
+        lastUpdate: relDate(pr.lastUpdate),
+        geography: pr.geography[0] ?? "",
+        updateNeeded: pr.updateNeeded,
       }
     })
 
     // Parse decision items — surface P1 Critical/High at top.
     // Priority values in Decision Items [OS v2]: "P1 Critical" | "High" | "Medium" | "Low"
     const PRIORITY_ORDER: Record<string, number> = { "P1 Critical": 0, High: 1, Medium: 2, Low: 3 }
-    const decisions = (decisionsRes.results as AnyPage[])
-      .map(page => {
-        const p = page.properties
-        return {
-          id: page.id,
-          title: titleOf(page),
-          priority: sel(p["Priority"]) || "Normal",
-          type: sel(p["Type"]) || "",
-          category: "Decisions" as const,
-        }
-      })
+    const decisions = decisionItems
+      .slice(0, 10)
+      .map(d => ({
+        id: d.id,
+        title: d.title,
+        priority: d.priority || "Normal",
+        type: d.decisionType || "",
+        category: "Decisions" as const,
+      }))
       .sort((a, b) => (PRIORITY_ORDER[a.priority] ?? 3) - (PRIORITY_ORDER[b.priority] ?? 3))
 
-    // Counts
-    const contentInReview = contentRes.results.length
-    const agentDraftsPending = agentDraftsRes.results.length
-    // Notion doesn't give exact count for filtered queries unless we paginate;
-    // use has_more + results.length as a floor estimate
-    const evidenceNewCount = evidenceRes.results.length + (evidenceRes.has_more ? 1 : 0)
+    // Counts (cap content/drafts to the previous page_size fetch limits).
+    const contentInReview = Math.min(contentItems.length, 5)
+    const agentDraftsPending = Math.min(draftItems.length, 5)
+    const evidenceNewCount = evidenceItems.length
 
     // Build pending items (top decisions + summary rows for other queues)
     const pendingItems = decisions.slice(0, 3).map(d => ({

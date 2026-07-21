@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { adminGuardApi } from "@/lib/require-admin";
-import { notion, DB } from "@/lib/notion";
 
 function corsHeaders() {
   return {
@@ -12,16 +11,6 @@ function corsHeaders() {
 
 export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: corsHeaders() });
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function titleOf(page: any): string {
-  for (const val of Object.values(page.properties ?? {}) as any[]) {
-    if (val?.type === "title" && val?.title?.[0]?.plain_text) {
-      return val.title[0].plain_text;
-    }
-  }
-  return "Untitled";
 }
 
 // Parse opportunity names in two formats:
@@ -68,51 +57,32 @@ export async function GET() {
   if (guard) return guard;
 
   try {
-    const res = await notion.databases.query({
-      database_id: DB.opportunities,
-      filter: {
-        and: [
-          { property: "Opportunity Type", select: { equals: "Grant" } },
-          { property: "Opportunity Status", select: { does_not_equal: "Closed Lost" } },
-          { property: "Opportunity Status", select: { does_not_equal: "Closed Won" } },
-        ],
-      },
-      sorts: [
-        { property: "Priority", direction: "ascending" },
-        { timestamp: "last_edited_time", direction: "descending" },
-      ],
-      page_size: 50,
-    });
+    const { getSupabaseServerClient } = await import("@/lib/supabase-server");
+    const sb = getSupabaseServerClient();
+    const { data, error } = await sb
+      .from("opportunities")
+      .select("notion_id, title, status, priority, org_notion_id, org_name, value_estimate, expected_close_date")
+      .eq("opportunity_type", "Grant")
+      .not("status", "in", '("Closed Lost","Closed Won")')
+      .order("priority", { ascending: true })
+      .order("updated_at", { ascending: false })
+      .limit(50);
+    if (error) throw new Error(error.message);
 
-    // Collect unique org IDs to resolve funder names
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const orgIds = [...new Set((res.results as any[])
-      .map(p => p.properties["Account / Organization"]?.relation?.[0]?.id)
-      .filter(Boolean)
-    )];
-
-    // Batch-fetch org names (max 10 concurrent)
-    const orgNames: Record<string, string> = {};
-    await Promise.all(orgIds.map(async (id) => {
-      try {
-        const page = await notion.pages.retrieve({ page_id: id as string });
-        orgNames[id as string] = titleOf(page);
-      } catch { /* skip */ }
-    }));
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const grants = (res.results as any[]).map((page) => {
-      const props = page.properties;
-      const name     = titleOf(page);
+    const grants = (data ?? []).map((row) => {
+      const name     = (row.title as string) ?? "Untitled";
       const parsed   = parseOpportunityName(name);
-      const status   = props["Opportunity Status"]?.select?.name ?? "New";
-      const priority = props["Priority"]?.select?.name ?? "";
-      const orgId    = props["Account / Organization"]?.relation?.[0]?.id ?? "";
-      const funder   = orgNames[orgId] ?? parsed.program;
+      const status   = (row.status as string) ?? "New";
+      const priority = (row.priority as string) ?? "";
+      const orgId    = (row.org_notion_id as string) ?? "";
+      // Funder resolved directly from the org_name column (no page retrieval needed).
+      const funder   = (row.org_name as string) ?? parsed.program;
+      const notionId = row.notion_id as string;
+      const notionUrl = notionId ? `https://www.notion.so/${notionId.replace(/-/g, "")}` : "";
 
       return {
-        id:         page.id,
-        notionUrl:  page.url ?? "",
+        id:         notionId,
+        notionUrl,
         name,
         funder,
         program:    parsed.program,
@@ -123,8 +93,8 @@ export async function GET() {
         orgId,
         // Fit score and financials will come from radar agent once it runs
         fitScore:   null as number | null,
-        amount:     props["Amount"]?.number ?? null,
-        deadline:   props["Deadline"]?.date?.start ?? null,
+        amount:     (row.value_estimate as number | null) ?? null,
+        deadline:   (row.expected_close_date as string | null) ?? null,
       };
     });
 

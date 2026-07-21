@@ -1,16 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminGuardApi } from "@/lib/require-admin";
-// TODO phase-6: migrate read source to Supabase insight_briefs + knowledge_assets
-import { Client } from "@notionhq/client";
 import Anthropic from "@anthropic-ai/sdk";
+import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { createPageWithMirror } from "@/lib/notion-mirror-push";
 
-const notion = new Client({ auth: process.env.NOTION_API_KEY });
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
-// AGENT_DRAFTS_DB removed — createPageWithMirror knows the DB from the table name.
-const INSIGHT_BRIEFS_DB = "04bed3a3fd1a4b3a99643cd21562e08a";
-const KNOWLEDGE_DB = "0f4bfe95549d4710a3a9ab6e119a9b04";
 
 function corsHeaders() {
   return {
@@ -39,36 +33,29 @@ export async function POST(req: NextRequest) {
   let knowledgeContext = "";
 
   try {
+    const sb = getSupabaseServerClient();
     const [briefsRes, knowledgeRes] = await Promise.all([
-      notion.databases.query({
-        database_id: INSIGHT_BRIEFS_DB,
-        sorts: [{ timestamp: "last_edited_time", direction: "descending" }],
-        page_size: 5,
-      }),
-      notion.databases.query({
-        database_id: KNOWLEDGE_DB,
-        sorts: [{ timestamp: "last_edited_time", direction: "descending" }],
-        page_size: 3,
-      }),
+      sb
+        .from("insight_briefs")
+        .select("title, body_md")
+        .order("updated_at", { ascending: false })
+        .limit(5),
+      sb
+        .from("knowledge_assets")
+        .select("title, summary")
+        .order("updated_at", { ascending: false })
+        .limit(3),
     ]);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const briefs = briefsRes.results.map((p: any) => {
-      const props = p.properties;
-      const title = props["Brief Title"]?.title?.[0]?.plain_text
-        ?? props["Name"]?.title?.[0]?.plain_text ?? "";
-      const summary = props["Executive Summary"]?.rich_text?.[0]?.plain_text
-        ?? props["Summary"]?.rich_text?.[0]?.plain_text ?? "";
-      const insights = props["Key Insights"]?.rich_text?.[0]?.plain_text ?? "";
-      return `- ${title}${summary ? `: ${summary.slice(0, 200)}` : ""}${insights ? ` // ${insights.slice(0, 150)}` : ""}`;
+    const briefs = (briefsRes.data ?? []).map((b) => {
+      const title = b.title ?? "";
+      const summary = b.body_md ?? "";
+      return `- ${title}${summary ? `: ${summary.slice(0, 200)}` : ""}`;
     }).filter(Boolean).join("\n");
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const assets = knowledgeRes.results.map((p: any) => {
-      const props = p.properties;
-      const name = props["Asset Name"]?.title?.[0]?.plain_text
-        ?? props["Name"]?.title?.[0]?.plain_text ?? "";
-      const summary = props["Summary"]?.rich_text?.[0]?.plain_text ?? "";
+    const assets = (knowledgeRes.data ?? []).map((a) => {
+      const name = a.title ?? "";
+      const summary = a.summary ?? "";
       return `- ${name}${summary ? `: ${summary.slice(0, 150)}` : ""}`;
     }).filter(Boolean).join("\n");
 

@@ -1,8 +1,11 @@
-import { notion, DB, prop, text, select, multiSelect, checkbox, date, relationIds } from "./core";
 import { fetchAllEvidence } from "./evidence";
 import { getAllSources } from "./sources";
 
-// ─── Projects ─────────────────────────────────────────────────────────────────
+// ─── Projects (Supabase-backed) ───────────────────────────────────────────────
+//
+// This module reads exclusively from Supabase (public.projects). No Notion.
+// The `id` field on every returned record is the row's `notion_id` — the stable
+// id used by call sites and for URL reconstruction.
 
 export type Project = {
   id: string;
@@ -16,7 +19,7 @@ export type Project = {
   updateNeeded: boolean;
   geography: string[];
   themes: string[];
-  // Hall editorial fields — written by CH team in Notion, read by /hall
+  // Hall editorial fields — written by CH team, read by /hall
   hallWelcomeNote: string;
   hallCurrentFocus: string;
   hallNextMilestone: string;
@@ -64,78 +67,35 @@ export type DashboardStats = {
   knowledgeCandidates: number;
 };
 
-// ─── Project queries ──────────────────────────────────────────────────────────
+const PROJECT_COLUMNS =
+  "notion_id, name, project_status, current_stage, status_summary, draft_status_update, last_status_update, last_meeting_date, update_needed, geography, themes, hall_welcome_note, hall_current_focus, hall_next_milestone, hall_challenge, hall_matters_most, hall_obstacles, hall_success, primary_workspace, engagement_stage, engagement_model, workroom_mode, hall_mode, grant_eligible";
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+// themes / geography are stored as TEXT and may be JSON-encoded arrays,
+// comma-separated strings, or a single plain value. Parse defensively.
+function parseTextList(v: unknown): string[] {
+  if (v == null) return [];
+  if (Array.isArray(v)) return (v as unknown[]).map(x => String(x));
+  if (typeof v !== "string") return [];
+  const s = v.trim();
+  if (!s) return [];
+  if (s.startsWith("[")) {
+    try {
+      const parsed = JSON.parse(s);
+      if (Array.isArray(parsed)) return parsed.map(x => String(x));
+    } catch {
+      // not valid JSON — fall through to string handling
+    }
+  }
+  if (s.includes(",")) return s.split(",").map(t => t.trim()).filter(Boolean);
+  return [s];
+}
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function parseProject(page: any): Project {
+function parseProjectRow(data: any): Project {
   return {
-    id: page.id,
-    name: text(prop(page, "Project Name")),
-    status: select(prop(page, "Project Status")),
-    stage: select(prop(page, "Current Stage")),
-    statusSummary: text(prop(page, "Status Summary")),
-    draftUpdate: text(prop(page, "Draft Status Update")),
-    lastUpdate: date(prop(page, "Last Status Update")),
-    updateNeeded: checkbox(prop(page, "Project Update Needed?")),
-    geography: multiSelect(prop(page, "Geography")),
-    themes: multiSelect(prop(page, "Themes / Topics")),
-    hallWelcomeNote:    text(prop(page, "Hall Welcome Note")),
-    hallCurrentFocus:   text(prop(page, "Hall Current Focus")),
-    hallNextMilestone:  text(prop(page, "Hall Next Milestone")),
-    hallChallenge:      text(prop(page, "Hall Challenge")),
-    hallMattersMost:    text(prop(page, "Hall Matters Most")),
-    hallObstacles:      text(prop(page, "Hall Obstacles")),
-    hallSuccess:        text(prop(page, "Hall Success")),
-    // House architecture — workspace routing and room configuration
-    // See src/types/house.ts for full model documentation
-    primaryWorkspace:  select(prop(page, "Primary Workspace"))  || "hall",
-    engagementStage:   select(prop(page, "Engagement Stage")),
-    engagementModel:   select(prop(page, "Engagement Model")),
-    workroomMode:      select(prop(page, "Workroom Mode")),
-    hallMode:          page.properties["Hall Mode"]?.select?.name ?? "explore",
-    grantEligible:     page.properties["Grant Eligible"]?.checkbox ?? false,
-    lastMeetingDate:   date(prop(page, "Last Meeting Date")),
-  };
-}
-
-export async function getAllProjects(): Promise<Project[]> {
-  const res = await notion.databases.query({
-    database_id: DB.projects,
-    filter: { property: "Project Status", select: { equals: "Active" } },
-    sorts: [{ property: "Last Status Update", direction: "descending" }],
-  });
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return res.results.map((page: any) => parseProject(page));
-}
-
-export async function getProjectById(id: string): Promise<Project | null> {
-  // Supabase-only projects (born from workroom-bridge auto-creation) carry a
-  // synthetic notion_id like `local-<uuid>`. Skip Notion entirely for those.
-  if (id.startsWith("local-")) {
-    return getProjectFromSupabase(id);
-  }
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const page: any = await notion.pages.retrieve({ page_id: id });
-    return parseProject(page);
-  } catch {
-    // Final fallback — if Notion errors, try Supabase mirror.
-    return getProjectFromSupabase(id);
-  }
-}
-
-async function getProjectFromSupabase(notionId: string): Promise<Project | null> {
-  const { getSupabaseServerClient } = await import("../supabase-server");
-  const sb = getSupabaseServerClient();
-  const { data } = await sb
-    .from("projects")
-    .select("notion_id, name, project_status, current_stage, status_summary, draft_status_update, last_status_update, last_meeting_date, update_needed, geography, themes, hall_welcome_note, hall_current_focus, hall_next_milestone, hall_challenge, hall_matters_most, hall_obstacles, hall_success, primary_workspace, engagement_stage, engagement_model, workroom_mode, hall_mode, grant_eligible")
-    .eq("notion_id", notionId)
-    .maybeSingle();
-  if (!data) return null;
-  return {
-    id:                 data.notion_id as string,
+    id:                 (data.notion_id as string) ?? "",
     name:               (data.name as string) ?? "",
     status:             (data.project_status as string) ?? "",
     stage:              (data.current_stage as string) ?? "",
@@ -144,8 +104,8 @@ async function getProjectFromSupabase(notionId: string): Promise<Project | null>
     lastUpdate:         (data.last_status_update as string | null) ?? null,
     lastMeetingDate:    (data.last_meeting_date as string | null) ?? null,
     updateNeeded:       Boolean(data.update_needed),
-    geography:          data.geography ? [data.geography as string] : [],
-    themes:             data.themes ? [data.themes as string] : [],
+    geography:          parseTextList(data.geography),
+    themes:             parseTextList(data.themes),
     hallWelcomeNote:    (data.hall_welcome_note as string) ?? "",
     hallCurrentFocus:   (data.hall_current_focus as string) ?? "",
     hallNextMilestone:  (data.hall_next_milestone as string) ?? "",
@@ -153,13 +113,47 @@ async function getProjectFromSupabase(notionId: string): Promise<Project | null>
     hallMattersMost:    (data.hall_matters_most as string) ?? "",
     hallObstacles:      (data.hall_obstacles as string) ?? "",
     hallSuccess:        (data.hall_success as string) ?? "",
-    primaryWorkspace:   (data.primary_workspace as string) ?? "hall",
+    primaryWorkspace:   (data.primary_workspace as string) || "hall",
     engagementStage:    (data.engagement_stage as string) ?? "",
     engagementModel:    (data.engagement_model as string) ?? "",
     workroomMode:       (data.workroom_mode as string) ?? "",
     hallMode:           (data.hall_mode as string | undefined) ?? "explore",
     grantEligible:      Boolean(data.grant_eligible),
   };
+}
+
+// ─── Project queries ──────────────────────────────────────────────────────────
+
+export async function getAllProjects(): Promise<Project[]> {
+  try {
+    const { getSupabaseServerClient } = await import("../supabase-server");
+    const sb = getSupabaseServerClient();
+    const { data, error } = await sb
+      .from("projects")
+      .select(PROJECT_COLUMNS)
+      .eq("project_status", "Active")
+      .order("last_status_update", { ascending: false, nullsFirst: false });
+    if (error || !data) return [];
+    return data.map(parseProjectRow);
+  } catch {
+    return [];
+  }
+}
+
+export async function getProjectById(id: string): Promise<Project | null> {
+  try {
+    const { getSupabaseServerClient } = await import("../supabase-server");
+    const sb = getSupabaseServerClient();
+    const { data, error } = await sb
+      .from("projects")
+      .select(PROJECT_COLUMNS)
+      .eq("notion_id", id)
+      .maybeSingle();
+    if (error || !data) return null;
+    return parseProjectRow(data);
+  } catch {
+    return null;
+  }
 }
 
 // Projects enriched with evidence + sources counts (for home cards)
@@ -171,9 +165,7 @@ export async function getProjectsOverview(): Promise<ProjectCard[]> {
   ]);
 
   return projects.map(project => {
-    const projEvidence = evidence.filter(e =>
-      relationIds(prop(e, "Project")).includes(project.id)
-    );
+    const projEvidence = evidence.filter(e => e.project_notion_id === project.id);
     const projSources = allSrcs.filter(s => s.projectId === project.id);
 
     const emailCount    = projSources.filter(s => s.sourceType.includes("Email")   || s.sourceType === "Gmail").length;
@@ -184,40 +176,35 @@ export async function getProjectsOverview(): Promise<ProjectCard[]> {
       ...project,
       evidenceCount: projEvidence.length,
       validatedCount: projEvidence.filter(e => {
-        const vs = select(prop(e, "Validation Status"));
+        const vs = e.validation_status;
         return vs === "Validated" || vs === "Reviewed";
       }).length,
       blockerCount: projEvidence.filter(e =>
-        select(prop(e, "Evidence Type")) === "Blocker" &&
-        select(prop(e, "Validation Status")) === "Validated"
+        e.evidence_type === "Blocker" && e.validation_status === "Validated"
       ).length,
       sourcesCount: projSources.length,
       emailCount,
       meetingCount,
       documentCount,
       decisionCount: projEvidence.filter(e =>
-        select(prop(e, "Evidence Type")) === "Decision" &&
-        select(prop(e, "Validation Status")) === "Validated"
+        e.evidence_type === "Decision" && e.validation_status === "Validated"
       ).length,
       dependencyCount: projEvidence.filter(e =>
-        select(prop(e, "Evidence Type")) === "Dependency" &&
-        select(prop(e, "Validation Status")) === "Validated"
+        e.evidence_type === "Dependency" && e.validation_status === "Validated"
       ).length,
       outcomeCount: projEvidence.filter(e =>
-        select(prop(e, "Evidence Type")) === "Outcome" &&
-        select(prop(e, "Validation Status")) === "Validated"
+        e.evidence_type === "Outcome" && e.validation_status === "Validated"
       ).length,
       newEvidenceCount: projEvidence.filter(e =>
-        select(prop(e, "Validation Status")) === "New"
+        e.validation_status === "New"
       ).length,
       // Include both Reusable and Canonical tiers (Canonical is the higher tier)
       reusableCount: projEvidence.filter(e =>
-        (select(prop(e, "Reusability Level")) === "Reusable" ||
-         select(prop(e, "Reusability Level")) === "Canonical") &&
-        select(prop(e, "Validation Status")) === "Validated"
+        (e.reusability_level === "Reusable" || e.reusability_level === "Canonical") &&
+        e.validation_status === "Validated"
       ).length,
       lastEvidenceDate: projEvidence.reduce<string | null>((latest, e) => {
-        const d = date(prop(e, "Date Captured"));
+        const d = (e.date_captured as string | null) ?? null;
         if (!d) return latest;
         if (!latest) return d;
         return d > latest ? d : latest;
@@ -254,48 +241,49 @@ async function getDashboardStatsFromSupabase(projectId: string): Promise<Dashboa
 }
 
 export async function getDashboardStats(projectId?: string): Promise<DashboardStats> {
-  // Supabase-only project — count from Supabase evidence.
+  // Supabase-only project — count from Supabase evidence only.
   if (projectId?.startsWith("local-")) {
     return getDashboardStatsFromSupabase(projectId);
   }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const evidenceFilter: any = projectId
-    ? { property: "Project", relation: { contains: projectId } }
-    : undefined;
+  try {
+    const { getSupabaseServerClient } = await import("../supabase-server");
+    const sb = getSupabaseServerClient();
 
-  const [projectsRes, evidenceRes] = await Promise.all([
-    notion.databases.query({ database_id: DB.projects, page_size: 100 }),
-    notion.databases.query({
-      database_id: DB.evidence,
-      filter: evidenceFilter,
-      page_size: 100,
-    }),
-  ]);
+    let evidenceQuery = sb
+      .from("evidence")
+      .select("evidence_type, validation_status, reusability_level");
+    if (projectId) evidenceQuery = evidenceQuery.eq("project_notion_id", projectId);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const projects = projectsRes.results as any[];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const evidence = evidenceRes.results as any[];
+    const [projectsRes, evidenceRes] = await Promise.all([
+      sb.from("projects").select("project_status").limit(100),
+      evidenceQuery.limit(100),
+    ]);
 
-  return {
-    totalProjects: projects.length,
-    activeProjects: projects.filter(p => select(prop(p, "Project Status")) === "Active").length,
-    totalEvidence: evidence.length,
-    validatedEvidence: evidence.filter(e => select(prop(e, "Validation Status")) === "Validated").length,
-    pendingEvidence: evidence.filter(e => select(prop(e, "Validation Status")) === "New").length,
-    blockers: evidence.filter(e =>
-      select(prop(e, "Evidence Type")) === "Blocker" &&
-      select(prop(e, "Validation Status")) === "Validated"
-    ).length,
-    dependencies: evidence.filter(e =>
-      select(prop(e, "Evidence Type")) === "Dependency" &&
-      select(prop(e, "Validation Status")) === "Validated"
-    ).length,
-    // Include both Reusable and Canonical tiers
-    knowledgeCandidates: evidence.filter(e =>
-      (select(prop(e, "Reusability Level")) === "Reusable" ||
-       select(prop(e, "Reusability Level")) === "Canonical") &&
-      select(prop(e, "Validation Status")) === "Validated"
-    ).length,
-  };
+    const projects = projectsRes.data ?? [];
+    const evidence = evidenceRes.data ?? [];
+
+    return {
+      totalProjects: projects.length,
+      activeProjects: projects.filter(p => p.project_status === "Active").length,
+      totalEvidence: evidence.length,
+      validatedEvidence: evidence.filter(e => e.validation_status === "Validated").length,
+      pendingEvidence: evidence.filter(e => e.validation_status === "New").length,
+      blockers: evidence.filter(e =>
+        e.evidence_type === "Blocker" && e.validation_status === "Validated"
+      ).length,
+      dependencies: evidence.filter(e =>
+        e.evidence_type === "Dependency" && e.validation_status === "Validated"
+      ).length,
+      // Include both Reusable and Canonical tiers
+      knowledgeCandidates: evidence.filter(e =>
+        (e.reusability_level === "Reusable" || e.reusability_level === "Canonical") &&
+        e.validation_status === "Validated"
+      ).length,
+    };
+  } catch {
+    return {
+      totalProjects: 0, activeProjects: 0, totalEvidence: 0, validatedEvidence: 0,
+      pendingEvidence: 0, blockers: 0, dependencies: 0, knowledgeCandidates: 0,
+    };
+  }
 }

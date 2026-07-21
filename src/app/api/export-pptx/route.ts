@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminGuardApi } from "@/lib/require-admin";
-import { notion } from "@/lib/notion";
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const PptxGenJS = require("pptxgenjs");
 
@@ -223,12 +222,21 @@ export async function POST(req: NextRequest) {
   const { pageId } = await req.json();
   if (!pageId) return NextResponse.json({ error: "pageId required" }, { status: 400 });
 
-  // Read page from Notion
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const page = await notion.pages.retrieve({ page_id: pageId }) as any;
-  const props = page.properties;
-  const pageTitle: string = props["Title"]?.title?.[0]?.plain_text ?? "Common House";
-  const slideHtml: string = props["Slide HTML"]?.rich_text?.map((r: { plain_text: string }) => r.plain_text).join("") ?? "";
+  // Read the content-pipeline item from Supabase (canonical store). `pageId` may
+  // be a Supabase uuid or the legacy Notion page id (matched via notion_id).
+  const { getSupabaseServerClient } = await import("@/lib/supabase-server");
+  const sb = getSupabaseServerClient();
+  const matchColumn = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(pageId)
+    ? "id"
+    : "notion_id";
+  const { data: item } = await sb
+    .from("content_pipeline_items")
+    .select("title, payload")
+    .eq(matchColumn, pageId)
+    .maybeSingle();
+  const payload = (item?.payload as { slide_html?: string } | null) ?? null;
+  const pageTitle: string = item?.title || "Common House";
+  const slideHtml: string = payload?.slide_html ?? "";
 
   let buffer: Buffer;
 
