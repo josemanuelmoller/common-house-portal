@@ -94,6 +94,10 @@
       "schedule": "0 7 * * 3"
     },
     {
+      "path": "/api/maintenance/reattribute-orphan-evidence?execute=true",
+      "schedule": "0 4 * * 0"
+    },
+    {
       "path": "/api/cron/observe-calendar",
       "schedule": "0 6 * * *"
     },
