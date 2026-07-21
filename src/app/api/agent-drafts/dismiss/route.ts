@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { currentUser } from "@clerk/nextjs/server";
 import { adminGuardApi } from "@/lib/require-admin";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
+import { recordProposalOutcome } from "@/lib/proposal-outcomes";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +23,7 @@ export async function POST(req: NextRequest) {
   const user = await currentUser();
   if (!user?.id) return NextResponse.json({ error: "no_user" }, { status: 401 });
 
-  let body: { draft_id?: string };
+  let body: { draft_id?: string; reason?: string };
   try {
     body = await req.json();
   } catch {
@@ -30,6 +31,7 @@ export async function POST(req: NextRequest) {
   }
   const draftId = (body.draft_id ?? "").trim();
   if (!draftId) return NextResponse.json({ error: "draft_id required" }, { status: 400 });
+  const reason = (body.reason ?? "").trim() || null;
 
   const sb = getSupabaseServerClient();
   const { error } = await sb.from("hall_draft_dismissals").upsert({
@@ -40,5 +42,24 @@ export async function POST(req: NextRequest) {
   }, { onConflict: "draft_notion_id,user_id" });
 
   if (error) return NextResponse.json({ error: "persist_failed" }, { status: 500 });
+
+  // A dismiss IS a rejection — record it as learnable feedback. Best-effort
+  // enrichment of draft_type/title so the signal is useful per agent.
+  // The id rendered in the Hall is the notion_id; look up the canonical row.
+  const { data: draft } = await sb
+    .from("agent_drafts")
+    .select("id, title, draft_type")
+    .eq("notion_id", draftId)
+    .maybeSingle();
+  void recordProposalOutcome({
+    proposal_type: "agent_draft",
+    proposal_id: (draft?.id as string | null) ?? draftId,
+    action: "rejected",
+    agent_name: (draft?.draft_type as string | null) ?? null,
+    reason,
+    actor_email: user.primaryEmailAddress?.emailAddress ?? null,
+    proposal_title: (draft?.title as string | null) ?? null,
+  });
+
   return NextResponse.json({ ok: true });
 }

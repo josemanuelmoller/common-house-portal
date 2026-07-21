@@ -31,8 +31,13 @@ const INTENT_DEFAULTS: Record<WorkroomIntent, { project_status: string; current_
 /**
  * Ensure a workroom (project with engagement_model='delivery') exists for this org.
  *
- * Lookup key: `name = hallOrg.name AND engagement_model = 'delivery'`. If we ever
- * add a stronger bridge column on projects, swap the lookup — the rest stays.
+ * Dedup key: the ORGANIZATION (`primary_org_notion_id`), not the project name.
+ * A name-based lookup is fragile — it misses an existing project whose name is
+ * descriptive ("Kinko — Pre-sale …") or whose engagement_model differs
+ * (Consulting/startup), which is exactly how duplicate "Kinko" projects were
+ * created. We reuse the earliest NON-startup project for the org (a portfolio
+ * 'startup' project is not a workroom). Falls back to the legacy name match only
+ * when the org has no notion_id to key on.
  */
 export async function ensureWorkroomForOrg(
   sb: SupabaseClient,
@@ -41,13 +46,28 @@ export async function ensureWorkroomForOrg(
 ): Promise<WorkroomBridgeResult> {
   const target = INTENT_DEFAULTS[intent];
 
-  const { data: existing } = await sb
-    .from("projects")
-    .select("notion_id, project_status, current_stage")
-    .eq("name", hallOrg.name)
-    .eq("engagement_model", "delivery")
-    .limit(1)
-    .maybeSingle();
+  let existing: { notion_id: string | null; project_status: string | null; current_stage: string | null } | null =
+    null;
+
+  if (hallOrg.notion_id) {
+    const { data: orgProjects } = await sb
+      .from("projects")
+      .select("notion_id, project_status, current_stage, engagement_model")
+      .eq("primary_org_notion_id", hallOrg.notion_id)
+      .order("created_at", { ascending: true });
+    existing = (orgProjects ?? []).find((p) => p.engagement_model !== "startup") ?? null;
+  }
+
+  if (!existing) {
+    const { data } = await sb
+      .from("projects")
+      .select("notion_id, project_status, current_stage")
+      .eq("name", hallOrg.name)
+      .eq("engagement_model", "delivery")
+      .limit(1)
+      .maybeSingle();
+    existing = data;
+  }
 
   // Promote Prospect → Client if the user upgrades. Don't downgrade Client → Prospect
   // automatically — that's a separate decision the human should make explicitly.

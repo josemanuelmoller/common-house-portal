@@ -4,18 +4,16 @@
  * Generates a check-in email draft for a given person and saves it to
  * Agent Drafts [OS v2].
  *
- * Person lookup: Supabase-first since Wave 5 (2026-04-17).
- * Falls back to Notion pages.retrieve if person not yet synced.
+ * Person lookup: Supabase canonical (Notion fallback removed 2026-05-15,
+ * post Phase 2 backfill).
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { adminGuardApi } from "@/lib/require-admin";
-import { Client } from "@notionhq/client";
 import Anthropic from "@anthropic-ai/sdk";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { createPageWithMirror } from "@/lib/notion-mirror-push";
 
-const notion = new Client({ auth: process.env.NOTION_API_KEY });
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 export async function POST(req: NextRequest) {
@@ -27,7 +25,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "personId required" }, { status: 400 });
   }
 
-  // 1. Fetch person — Supabase-first, Notion fallback
+  // 1. Fetch person — Supabase canonical (Notion fallback removed post-cutoff)
   let name      = "this person";
   let jobTitle  = "";
   let email     = "";
@@ -54,32 +52,11 @@ export async function POST(req: NextRequest) {
       personFound = true;
     }
   } catch {
-    // Supabase lookup failed — fall through to Notion
+    // Supabase lookup failed — proceed to 404 below
   }
 
   if (!personFound) {
-    // Fallback: person not yet synced to Supabase
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let person: any;
-    try {
-      person = await notion.pages.retrieve({ page_id: personId });
-    } catch {
-      return NextResponse.json({ error: "Person not found" }, { status: 404 });
-    }
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const prop = (n: string) => (person as any).properties?.[n];
-    const richText = (p: { rich_text?: { plain_text: string }[] } | undefined) =>
-      p?.rich_text?.map((r) => r.plain_text).join("") ?? "";
-    const sel = (p: { select?: { name: string } } | undefined) => p?.select?.name ?? "";
-    const dateVal = (p: { date?: { start: string } } | undefined) => p?.date?.start ?? null;
-
-    name     = richText(prop("Full Name")) || richText(prop("Name")) || "this person";
-    jobTitle = richText(prop("Job Title / Role"));
-    email    = prop("Email")?.email ?? "";
-    warmth   = sel(prop("Contact Warmth"));
-    lastDate = dateVal(prop("Last Contact Date"));
-    notes    = richText(prop("Notes"));
+    return NextResponse.json({ error: "Person not found" }, { status: 404 });
   }
 
   const lastContactDays = lastDate

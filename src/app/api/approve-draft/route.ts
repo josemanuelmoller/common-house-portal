@@ -1,8 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminGuardApi } from "@/lib/require-admin";
-// notion-cutoff-2026-06-02: removed; canonical write is now to agent_drafts (Supabase).
-// import { Client } from "@notionhq/client";
-// const notion = new Client({ auth: process.env.NOTION_API_KEY });
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 
 export async function POST(req: NextRequest) {
@@ -28,13 +25,6 @@ export async function POST(req: NextRequest) {
   const newStatus = statusMap[action as keyof typeof statusMap];
 
   try {
-    // notion-cutoff-2026-06-02: removed; canonical write is now to agent_drafts (Supabase).
-    // await notion.pages.update({
-    //   page_id: draftId,
-    //   properties: {
-    //     "Status": { select: { name: newStatus } },
-    //   },
-    // });
     const sb = getSupabaseServerClient();
     const nowIso = new Date().toISOString();
     // draftId here was historically the Notion page_id. Match against notion_id

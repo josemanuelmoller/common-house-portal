@@ -57,6 +57,7 @@ export const ADMIN_NAV_V2: NavEntry[] = [
       { label: "Watchlist",      href: "/admin/watchlist" },
       { label: "Reuse Atlas",    href: "/admin/landscape" },
       { label: "Opportunities",  href: "/admin/opportunities" },
+      { label: "Relational review", href: "/admin/relational-review" },
       { label: "Pipeline",       href: "/admin/pipeline" },
       { label: "Grants",         href: "/admin/grants" },
       { label: "Investor Match", href: "/admin/investors" },

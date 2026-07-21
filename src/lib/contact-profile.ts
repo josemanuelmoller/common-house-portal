@@ -24,6 +24,7 @@ export type OrgOpportunity = {
   expected_close_date: string | null;
   next_meeting_at:    string | null;
   suggested_next_step: string | null;
+  canonical_stage:    string | null;
 };
 
 export type OrgProject = {
@@ -51,7 +52,7 @@ export async function getOrgCrossRef(orgNotionId: string | null): Promise<OrgCro
 
   const [oppsRes, projsRes] = await Promise.all([
     sb.from("opportunities")
-      .select("id, title, status, pending_action, opportunity_score, probability, value_estimate, expected_close_date, next_meeting_at, suggested_next_step, is_active, is_archived")
+      .select("id, title, status, pending_action, opportunity_score, probability, value_estimate, expected_close_date, next_meeting_at, suggested_next_step, canonical_stage, is_active, is_archived")
       .eq("org_notion_id", orgNotionId)
       .eq("is_archived", false)
       .order("opportunity_score", { ascending: false, nullsFirst: false })

@@ -367,20 +367,38 @@ async function _POST(req: NextRequest) {
     const body      = await req.text();
     const params    = body ? JSON.parse(body) : {};
     const hoursBack = params.hoursBack ?? 24;
+    const dryRun    = params.dryRun === true;
+    // Backfill / source-agnostic support: callers may inject transcripts in the
+    // FirefliesTranscript shape directly (e.g. replayed from a local Fireflies
+    // export, or mapped from any other transcription provider) instead of
+    // reading the live Fireflies API. The extraction + entity-resolution + write
+    // contract below is identical regardless of where the transcript came from —
+    // this `transcripts` injection is the seam that makes the OS able to ingest
+    // meetings from any transcription intelligence, not only Fireflies.
+    const injected  = Array.isArray(params.transcripts)
+      ? (params.transcripts as FirefliesTranscript[])
+      : null;
     const now       = new Date();
     const fromDate  = new Date(now.getTime() - hoursBack * 60 * 60 * 1000);
-    const fromStr   = fromDate.toISOString().slice(0, 10);
     const today     = now.toISOString().slice(0, 10);
+
+    // 2. Fetch transcripts (or use injected ones — no Fireflies call then)
+    const transcripts = injected ?? await fetchTranscripts(fromDate);
+
+    if (transcripts.length === 0) {
+      return NextResponse.json({ ok: true, dry_run: dryRun, meetings: 0, evidence_written: 0, skipped: 0, cost_usd: 0, message: "No new meetings in window" });
+    }
+
+    // Dedup window: an injected backfill can span months, so widen the
+    // existing-evidence preload back to the earliest injected meeting date
+    // rather than the hoursBack window (which only covers the live cron case).
+    const earliestMs = injected
+      ? Math.min(...injected.map(t => Number(t.date) || now.getTime()))
+      : fromDate.getTime();
+    const fromStr   = new Date(earliestMs).toISOString().slice(0, 10);
 
     // 1. Pre-load existing evidence keys for deduplication
     const existingKeys = await loadExistingEvidenceKeys(fromStr);
-
-    // 2. Fetch transcripts
-    const transcripts = await fetchTranscripts(fromDate);
-
-    if (transcripts.length === 0) {
-      return NextResponse.json({ ok: true, meetings: 0, evidence_written: 0, skipped: 0, cost_usd: 0, message: "No new meetings in window" });
-    }
 
     // 3. Load the Supabase entity index + self-identity set once.
     //    resolveOrgId / resolveProjectId are pure-function lookups against
@@ -396,6 +414,9 @@ async function _POST(req: NextRequest) {
     const usageAcc = makeUsageAccumulator();
     const results: { meetingTitle: string; evidenceCount: number; skipped: number; orgPath: string; projPath: string; ids: string[] }[] = [];
     const errors:  string[] = [];
+    // dry-run only: what WOULD be written, so a backfill can be inspected
+    // before any row is inserted.
+    const preview: { meeting: string; title: string; type: string; org_linked: boolean; project_linked: boolean }[] = [];
 
     // 4. Process each transcript
     for (const t of transcripts) {
@@ -414,7 +435,8 @@ async function _POST(req: NextRequest) {
         const projResult = resolveProjectId(idx, transcriptOrg.orgNotionId, { title: t.title });
         // Ensure the meeting has a `sources` row so evidence can FK to it,
         // and patch in org/project links if the row predates the resolver.
-        const sourceId  = await ensureFirefliesSource(t, transcriptOrg.orgNotionId, projResult.projectNotionId);
+        // In dry-run we don't create the source row either — nothing is written.
+        const sourceId  = dryRun ? null : await ensureFirefliesSource(t, transcriptOrg.orgNotionId, projResult.projectNotionId);
         const ids:      string[] = [];
         let   skipped   = 0;
 
@@ -433,9 +455,20 @@ async function _POST(req: NextRequest) {
               selfEmails,
             });
             const orgId = itemOrg.orgNotionId ?? transcriptOrg.orgNotionId;
-            const id    = await writeEvidence(item, dateStr, orgId, projResult.projectNotionId, sourceId);
+            if (dryRun) {
+              preview.push({
+                meeting:        t.title,
+                title:          item.title,
+                type:           VALID_TYPES.has(item.type) ? item.type : "Outcome",
+                org_linked:     !!orgId,
+                project_linked: !!projResult.projectNotionId,
+              });
+              ids.push("(dry-run)");
+            } else {
+              const id = await writeEvidence(item, dateStr, orgId, projResult.projectNotionId, sourceId);
+              ids.push(id);
+            }
             existingKeys.add(key);
-            ids.push(id);
           } catch (e) {
             errors.push(`${t.title} / "${item.title}": ${String(e)}`);
           }
@@ -461,13 +494,16 @@ async function _POST(req: NextRequest) {
 
     return NextResponse.json({
       ok:               true,
+      dry_run:          dryRun,
+      source:           injected ? "injected" : "fireflies",
       meetings:         transcripts.length,
-      evidence_written: totalEvidence,
+      evidence_written: totalEvidence,   // in dry-run: count that WOULD be written
       skipped:          totalSkipped,
       cost_usd,
       results,
+      preview:          dryRun ? preview : undefined,
       errors,
-      window:           `${fromDate.toISOString()} → ${now.toISOString()}`,
+      window:           injected ? `injected:${transcripts.length}` : `${fromDate.toISOString()} → ${now.toISOString()}`,
       date:             today,
     });
 

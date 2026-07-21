@@ -17,6 +17,7 @@ import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { adminGuardApi } from "@/lib/require-admin";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
+import { buildPromptPrefix } from "@/lib/user-context";
 
 export const maxDuration = 60;
 export const dynamic     = "force-dynamic";
@@ -116,11 +117,13 @@ export async function POST(req: NextRequest) {
 
   let topics: string[] = [];
   try {
+    const prefix = await buildPromptPrefix({ personId: p.id, context: "summary" });
+    const systemWithContext = prefix ? `${prefix}\n${SYSTEM_PROMPT}` : SYSTEM_PROMPT;
     const resp = await anthropic.messages.create({
       model:      "claude-haiku-4-5-20251001",
       max_tokens: 256,
       temperature: 0,
-      system:     SYSTEM_PROMPT,
+      system:     systemWithContext,
       messages:   [{ role: "user", content: userPrompt }],
     });
     const block = resp.content[0];

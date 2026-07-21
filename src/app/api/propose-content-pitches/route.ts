@@ -18,10 +18,12 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
+// TODO phase-6: migrate read source to Supabase insight_briefs
 import { Client } from "@notionhq/client";
 import { adminGuardApi } from "@/lib/require-admin";
 import { withRoutineLog } from "@/lib/routine-log";
 import { computeAnthropicCost } from "@/lib/anthropic-cost";
+import { getProposalFeedbackContext } from "@/lib/proposal-feedback";
 import {
   getActivePillars,
   getActiveAudiences,
@@ -130,6 +132,11 @@ async function _POST(req: NextRequest) {
   const cadence        = primaryChannel.monthly_cadence;
   const dates          = pickDates(cadence);
   const briefContext   = await recentInsightBriefsSummary();
+  // Feedback loop: what José rejected / rewrote on past pitches. Empty until data exists.
+  const feedbackContext = await getProposalFeedbackContext({
+    proposalType: "content_pitch",
+    agentName: "propose-content-pitches",
+  });
 
   // Build the prompt. We give Anthropic the full strategy + signals and ask
   // it to produce a structured JSON array we can parse and insert.
@@ -183,6 +190,7 @@ ${recentPublished.length === 0
 
 If your proposed pitches significantly overlap with any of the above (same pillar + very similar angle), adjust or replace them. Variety within a pillar is fine; repetition is not.
 
+${feedbackContext}
 ## Output format (strict JSON — no markdown fence, no commentary)
 
 Return a JSON array of exactly ${cadence} objects. Each object must have:
