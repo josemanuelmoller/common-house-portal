@@ -20,6 +20,7 @@
 import { getSupabaseServerClient } from "./supabase-server";
 import type { MeetingAttendee, UpcomingMeeting } from "./calendar-slots";
 import { lookupByEmails as googleLookupByEmails } from "./google-contacts";
+import { cleanHeaderName } from "./people-names";
 
 /**
  * Cache TTL for Google Contacts resolution. Contacts change infrequently, so
@@ -174,6 +175,7 @@ export async function loadAttendeeClasses(emails: string[]): Promise<AttendeeLoo
     google_labels: string[];
     google_synced_at: string;
     updated_at: string;
+    display_name: string | null;
   }> = [];
 
   for (const email of needGoogle) {
@@ -188,6 +190,9 @@ export async function loadAttendeeClasses(emails: string[]): Promise<AttendeeLoo
       google_labels:        r?.labels ?? [],
       google_synced_at:     nowIso,
       updated_at:           nowIso,
+      // Carry the Google display name so the insert path can seed a real
+      // full_name instead of the email (root-cause name hygiene).
+      display_name:         r?.displayName ?? null,
     });
   }
 
@@ -229,9 +234,14 @@ export async function loadAttendeeClasses(emails: string[]): Promise<AttendeeLoo
         if (id) {
           await sb.from("people").update(patch).eq("id", id);
         } else {
+          // Seed full_name/display_name from the Google display name when it's
+          // a real name; fall back to the email only when none is available
+          // (never invent a name).
+          const cleanName = cleanHeaderName(u.display_name, email);
           toInsert.push({
             email,
-            full_name:       email,
+            full_name:       cleanName ?? email,
+            display_name:    cleanName,
             ...patch,
             auto_suggested:    "google_contacts",
             auto_suggested_at: nowIso,

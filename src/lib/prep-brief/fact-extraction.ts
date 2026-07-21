@@ -12,6 +12,7 @@
 import { getGoogleCalendarClient } from "@/lib/google-calendar";
 import { getGoogleGmailClient } from "@/lib/google-gmail";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
+import { cleanHeaderName } from "@/lib/people-names";
 import { notion } from "@/lib/notion";
 import type {
   FactSheet, Counterpart, TrustTier, DisclosureProfile,
@@ -205,7 +206,11 @@ async function resolveCounterpart(email: string): Promise<Counterpart> {
     return {
       person_id:          null,
       notion_id:          null,
-      full_name:          email,
+      // No display name is available at this resolution point (attendee is
+      // keyed by email only), so this falls back to the email. Routed through
+      // cleanHeaderName so a real name is used if one ever flows in here, and
+      // an email is never mistaken for a name.
+      full_name:          cleanHeaderName(null, lower) ?? lower,
       email:              lower,
       aliases:            [],
       classification:     null,

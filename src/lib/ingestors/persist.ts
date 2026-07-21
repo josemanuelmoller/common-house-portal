@@ -9,6 +9,7 @@
 
 import { randomUUID } from "node:crypto";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
+import { isEmailLikeName } from "@/lib/people-names";
 import { buildDedupKey, actionItemFingerprint, overlapCoefficient, normalizeCounterparty } from "@/lib/normalize";
 import { computePriorityScore } from "./priority";
 import type {
@@ -411,6 +412,18 @@ export async function persistRelationshipSignal(signal: RelationshipSignal): Pro
     .upsert(patch, { onConflict: "contact_id" });
   if (error) throw new Error(`persistRelationshipSignal: ${error.message}`);
 
+  // Root-cause name hygiene: if the signal carries a cleaned counterparty name
+  // and the person's stored name is still email-like/blank, fill it. This
+  // NEVER clobbers an already-good name (isEmailLikeName gate). Fail-soft —
+  // a name-fill failure must not break relationship persistence.
+  if (signal.payload.counterparty_name) {
+    try {
+      await fillEmailLikePersonName(sb, signal.payload.contact_id, signal.payload.counterparty_name);
+    } catch (e) {
+      console.warn("[persist] person name-fill failed:", e);
+    }
+  }
+
   // Bump opportunities.last_signal_at for any open opportunity tied to this
   // contact's org. Feeds the Hall Pipeline State "new signal" chip.
   // Failures are non-fatal — log and continue.
@@ -421,6 +434,34 @@ export async function persistRelationshipSignal(signal: RelationshipSignal): Pro
       console.warn("[persist] last_signal_at bump failed:", e);
     }
   }
+}
+
+/**
+ * Fill an email-like/blank people.full_name (and display_name) with a cleaned
+ * counterparty name. Only writes when the current value is email-like — a
+ * curated/good name is never overwritten. `cleanedName` is expected to already
+ * be the output of cleanHeaderName (non-null).
+ */
+async function fillEmailLikePersonName(
+  sb: ReturnType<typeof getSupabaseServerClient>,
+  contactId: string,
+  cleanedName: string,
+): Promise<void> {
+  const { data: person } = await sb
+    .from("people")
+    .select("full_name, display_name, email")
+    .eq("id", contactId)
+    .maybeSingle();
+  if (!person) return;
+
+  const p = person as { full_name: string | null; display_name: string | null; email: string | null };
+  const patch: Record<string, string> = {};
+  if (isEmailLikeName(p.full_name, p.email)) patch.full_name = cleanedName;
+  if (isEmailLikeName(p.display_name, p.email)) patch.display_name = cleanedName;
+  if (Object.keys(patch).length === 0) return;
+
+  patch.updated_at = new Date().toISOString();
+  await sb.from("people").update(patch).eq("id", contactId);
 }
 
 async function bumpOpportunitiesLastSignalForContact(

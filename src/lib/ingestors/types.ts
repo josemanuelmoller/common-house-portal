@@ -102,6 +102,14 @@ export type RelationshipSignal = SignalEnvelope & {
     contact_id: string;
     direction: "inbound" | "outbound" | "meeting";
     at: string; // ISO timestamp
+    /**
+     * Cleaned counterparty display name (already passed through
+     * cleanHeaderName), or null/undefined when unavailable/unusable. When
+     * present, persist fills an email-like people.full_name/display_name from
+     * it — it NEVER overwrites an already-good name. Root-cause fix for the
+     * Gmail path that used to store the sender's email as full_name.
+     */
+    counterparty_name?: string | null;
   };
 };
 
