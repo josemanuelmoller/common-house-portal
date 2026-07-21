@@ -201,9 +201,11 @@ export async function POST(req: NextRequest) {
       if (!em || !em.includes("@")) continue;
       if (dict.has(em)) continue;
       try {
+        // Bidirectional: `from:` catches inbound senders, `to:` catches people
+        // we email who never reply (their name is in our message's To/Cc).
         const search = await gmail.users.messages.list({
           userId: "me",
-          q: `from:${em}`,
+          q: `from:${em} OR to:${em}`,
           maxResults: 1,
         });
         calls++;
@@ -214,7 +216,7 @@ export async function POST(req: NextRequest) {
           userId: "me",
           id: mid,
           format: "metadata",
-          metadataHeaders: ["From"],
+          metadataHeaders: ["From", "To", "Cc"],
         });
         calls++;
         for (const pair of pairsFromMessage(msg.data)) {
