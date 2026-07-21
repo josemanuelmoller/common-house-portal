@@ -109,6 +109,20 @@ export function cleanHeaderName(
   s = s.trim();
   if (s === "") return null;
 
+  // Flip "Last, First" → "First Last" (common Outlook/Gmail export format,
+  // e.g. "Mateo Rodríguez, Ignasi" → "Ignasi Mateo Rodríguez"). Only when there
+  // is exactly one comma splitting two plausible name halves — never touch a
+  // value that isn't clearly an inverted name.
+  const commaParts = s.split(",");
+  if (commaParts.length === 2) {
+    const last = commaParts[0].trim();
+    const first = commaParts[1].trim();
+    const namePart = /^[\p{L}][\p{L} .'-]*$/u;
+    if (last && first && namePart.test(last) && namePart.test(first)) {
+      s = `${first} ${last}`;
+    }
+  }
+
   // ─── Reject clearly non-name / automated / ambiguous results ───────────
   if (s.includes("@")) return null;
 
