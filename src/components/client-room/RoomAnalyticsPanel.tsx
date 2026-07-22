@@ -77,13 +77,18 @@ export function RoomAnalyticsPanel({ data }: { data: RoomAnalytics }) {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {/* Top sections */}
+        {/* Top sections — ranked by real on-screen time, not just "scrolled past" */}
         <div>
-          <p style={labelStyle} className="mb-2">Secciones más vistas</p>
+          <p style={labelStyle} className="mb-2">Tiempo por sección</p>
           {data.topSections.length === 0 ? <p className="text-[11px]" style={{ color: "var(--hall-muted-2)" }}>—</p> : (
             <div className="space-y-1.5">
               {data.topSections.map((s) => (
-                <div key={s.id} className="flex items-center justify-between gap-3 text-[12px]"><span>{s.label}</span><span style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted)" }}>{s.views}</span></div>
+                <div key={s.id} className="flex items-center justify-between gap-3 text-[12px]">
+                  <span>{s.label}</span>
+                  <span style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted)" }}>
+                    {s.dwellMs > 0 ? fmtDur(s.dwellMs) : "—"}{s.views > 1 ? ` · ${s.views}×` : ""}
+                  </span>
+                </div>
               ))}
             </div>
           )}

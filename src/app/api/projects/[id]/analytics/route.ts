@@ -35,7 +35,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     sessionId?: string;
     path?: string;
     referrer?: string;
-    events?: Array<{ type?: string; target?: string; durationMs?: number; metadata?: Record<string, unknown> }>;
+    events?: Array<{ type?: string; target?: string; durationMs?: number; metadata?: Record<string, unknown>; ts?: string }>;
   };
   try {
     body = JSON.parse(await req.text());
@@ -50,12 +50,26 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   }
 
   const userAgent = req.headers.get("user-agent")?.slice(0, 400) ?? null;
-  const now = new Date().toISOString();
+  const nowMs = Date.now();
+
+  // Trust the client-supplied per-event timestamp only within a sane window
+  // (guards against clock skew / tampering). Otherwise fall back to ingest time.
+  // Without this every event in a flush batch would share one timestamp and the
+  // real timeline (order + spacing of section views) would be lost.
+  const coerceOccurredAt = (raw: unknown): string => {
+    if (typeof raw === "string") {
+      const t = Date.parse(raw);
+      if (Number.isFinite(t) && t <= nowMs + 5 * 60_000 && t >= nowMs - 24 * 60 * 60_000) {
+        return new Date(t).toISOString();
+      }
+    }
+    return new Date(nowMs).toISOString();
+  };
 
   const rows = events
     .filter((e) => e && typeof e.type === "string" && ALLOWED.has(e.type))
     .map((e) => ({
-      occurred_at: now,
+      occurred_at: coerceOccurredAt(e.ts),
       session_id: sessionId,
       actor_email: actorEmail,
       actor_role: actorRole,
