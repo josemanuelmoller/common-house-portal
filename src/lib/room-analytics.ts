@@ -19,6 +19,7 @@ type EventRow = {
   event_type: string;
   target: string | null;
   duration_ms: number | null;
+  metadata: { sections?: Record<string, number> } | null;
 };
 
 export type VisitorSummary = {
@@ -49,7 +50,7 @@ export type RoomAnalytics = {
   adminPreviews: number;
   visitors: VisitorSummary[];
   recentSessions: SessionSummary[];
-  topSections: Array<{ id: string; label: string; views: number }>;
+  topSections: Array<{ id: string; label: string; views: number; dwellMs: number }>;
   topDocs: Array<{ target: string; opens: number }>;
 };
 
@@ -113,7 +114,9 @@ export async function getRoomsOverview(): Promise<RoomOverviewItem[]> {
     a.sessions.add(e.session_id);
     if (e.actor_email) a.visitors.add(e.actor_email);
     if (!a.last || e.occurred_at > a.last) a.last = e.occurred_at;
-    if (e.event_type === "session_end" && e.duration_ms && !seenSessionTime.has(e.session_id)) {
+    // Events arrive newest-first, and heartbeat/session_end carry cumulative
+    // active time — so the first one seen per session is its largest value.
+    if ((e.event_type === "session_end" || e.event_type === "heartbeat") && e.duration_ms && !seenSessionTime.has(e.session_id)) {
       seenSessionTime.add(e.session_id);
       a.timeMs += e.duration_ms;
     }
@@ -144,7 +147,7 @@ export async function getRoomsOverview(): Promise<RoomOverviewItem[]> {
 export async function getRoomAnalytics(projectId: string): Promise<RoomAnalytics> {
   const { data } = await supabaseAdmin()
     .from("portal_analytics_events")
-    .select("occurred_at, session_id, actor_email, actor_role, is_admin, event_type, target, duration_ms")
+    .select("occurred_at, session_id, actor_email, actor_role, is_admin, event_type, target, duration_ms, metadata")
     .eq("project_id", projectId)
     .order("occurred_at", { ascending: false })
     .limit(8000);
@@ -152,7 +155,7 @@ export async function getRoomAnalytics(projectId: string): Promise<RoomAnalytics
   const rows = (data as EventRow[] | null) ?? [];
 
   // Group by session.
-  type Sess = { email: string; role: string | null; isAdmin: boolean; start: string; end: string; durationMs: number | null; sections: Set<string>; docs: number };
+  type Sess = { email: string; role: string | null; isAdmin: boolean; start: string; end: string; durationMs: number | null; sections: Set<string>; docs: number; sectionMs: Record<string, number> };
   const sessions = new Map<string, Sess>();
   const topSections = new Map<string, number>();
   const topDocs = new Map<string, number>();
@@ -161,13 +164,22 @@ export async function getRoomAnalytics(projectId: string): Promise<RoomAnalytics
   for (const r of rows) {
     let s = sessions.get(r.session_id);
     if (!s) {
-      s = { email: r.actor_email ?? "—", role: r.actor_role, isAdmin: r.is_admin, start: r.occurred_at, end: r.occurred_at, durationMs: null, sections: new Set(), docs: 0 };
+      s = { email: r.actor_email ?? "—", role: r.actor_role, isAdmin: r.is_admin, start: r.occurred_at, end: r.occurred_at, durationMs: null, sections: new Set(), docs: 0, sectionMs: {} };
       sessions.set(r.session_id, s);
     }
     if (r.occurred_at < s.start) s.start = r.occurred_at;
     if (r.occurred_at > s.end) s.end = r.occurred_at;
     if (r.actor_email && s.email === "—") s.email = r.actor_email;
-    if (r.event_type === "session_end" && r.duration_ms != null) s.durationMs = Math.max(s.durationMs ?? 0, r.duration_ms);
+    // Both heartbeat and session_end carry cumulative active time; take the max
+    // so a session's length survives even when the final session_end is lost.
+    // The per-section dwell snapshot from that same (longest) event wins.
+    if ((r.event_type === "session_end" || r.event_type === "heartbeat") && r.duration_ms != null) {
+      if (r.duration_ms >= (s.durationMs ?? -1)) {
+        s.durationMs = r.duration_ms;
+        const secs = r.metadata?.sections;
+        if (secs && typeof secs === "object") s.sectionMs = secs;
+      }
+    }
     if (r.event_type === "section_view" && r.target) {
       s.sections.add(r.target);
       if (!r.is_admin) topSections.set(r.target, (topSections.get(r.target) ?? 0) + 1);
@@ -175,6 +187,15 @@ export async function getRoomAnalytics(projectId: string): Promise<RoomAnalytics
     if (r.event_type === "material_open" && r.target) {
       s.docs += 1;
       if (!r.is_admin) topDocs.set(r.target, (topDocs.get(r.target) ?? 0) + 1);
+    }
+  }
+
+  // Sum real on-screen dwell per section across client sessions (admin excluded).
+  const sectionDwell = new Map<string, number>();
+  for (const s of sessions.values()) {
+    if (s.isAdmin) continue;
+    for (const [id, ms] of Object.entries(s.sectionMs)) {
+      if (Number.isFinite(ms) && ms > 0) sectionDwell.set(id, (sectionDwell.get(id) ?? 0) + ms);
     }
   }
 
@@ -214,7 +235,10 @@ export async function getRoomAnalytics(projectId: string): Promise<RoomAnalytics
     adminPreviews,
     visitors,
     recentSessions: clientSessions.slice(0, 25),
-    topSections: [...topSections.entries()].map(([id, views]) => ({ id, label: sectionLabel(id), views })).sort((a, b) => b.views - a.views).slice(0, 8),
+    topSections: [...new Set([...topSections.keys(), ...sectionDwell.keys()])]
+      .map((id) => ({ id, label: sectionLabel(id), views: topSections.get(id) ?? 0, dwellMs: sectionDwell.get(id) ?? 0 }))
+      .sort((a, b) => b.dwellMs - a.dwellMs || b.views - a.views)
+      .slice(0, 8),
     topDocs: [...topDocs.entries()].map(([target, opens]) => ({ target, opens })).sort((a, b) => b.opens - a.opens).slice(0, 8),
   };
 }
