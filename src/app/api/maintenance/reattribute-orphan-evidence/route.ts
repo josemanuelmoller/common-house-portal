@@ -25,6 +25,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { getSelfEmails } from "@/lib/hall-self";
 import { loadEntityIndex, resolveOrgId, resolveProjectId } from "@/lib/resolve-meeting-entities";
+import { loadActiveProjects, inferProjectFromText } from "@/lib/project-context";
 
 export const maxDuration = 300;
 export const dynamic = "force-dynamic";
@@ -47,7 +48,7 @@ async function handle(req: NextRequest) {
   const limit = Math.min(parseInt(url.searchParams.get("limit") ?? "5000", 10) || 5000, 20000);
 
   const sb = getSupabaseServerClient();
-  const [idx, selfEmails] = await Promise.all([loadEntityIndex(sb), getSelfEmails()]);
+  const [idx, selfEmails, activeProjects] = await Promise.all([loadEntityIndex(sb), getSelfEmails(), loadActiveProjects()]);
 
   // active project notion_ids (only attribute to a real target)
   const activeProjectIds = new Set<string>();
@@ -81,45 +82,57 @@ async function handle(req: NextRequest) {
     for (const s of (data ?? []) as SrcRow[]) srcById.set(s.id, s);
   }
 
-  // 3. Attendee emails per transcript (source_external_id = transcript_id)
-  const transcriptIds = Array.from(new Set(
-    Array.from(srcById.values()).map(s => s.source_external_id).filter((x): x is string => !!x)
-  ));
-  const emailsByTranscript = new Map<string, string[]>();
-  for (let i = 0; i < transcriptIds.length; i += 500) {
+  // 3. Attendee emails — join sources→transcripts by source_external_id, WITH a
+  //    title fallback. Many sources carry a NULL/mismatched external_id (the
+  //    same fragility getAttendeesByMeeting handles in the ingestor), so match
+  //    by title too. hall_transcript_observations is small (~140 rows) → load all.
+  const emailsByTranscriptId = new Map<string, string[]>();
+  const emailsByTitle = new Map<string, string[]>();
+  {
     const { data } = await sb
       .from("hall_transcript_observations")
-      .select("transcript_id, participant_emails")
-      .in("transcript_id", transcriptIds.slice(i, i + 500));
-    for (const o of (data ?? []) as Array<{ transcript_id: string; participant_emails: string[] | null }>) {
-      emailsByTranscript.set(o.transcript_id, (o.participant_emails ?? []).filter(Boolean));
+      .select("transcript_id, title, participant_emails");
+    for (const o of (data ?? []) as Array<{ transcript_id: string; title: string | null; participant_emails: string[] | null }>) {
+      const emails = (o.participant_emails ?? []).filter(Boolean);
+      if (o.transcript_id) emailsByTranscriptId.set(o.transcript_id, emails);
+      if (o.title) emailsByTitle.set(o.title, emails);
     }
   }
 
   // 4. Resolve each orphan
   const updates: Array<{ id: string; project: string }> = [];
   const byProject = new Map<string, number>();
-  let viaOrg = 0, viaResolve = 0;
+  let viaText = 0, viaOrg = 0, viaResolve = 0;
   for (const ev of orphans) {
     const src = ev.source_id ? srcById.get(ev.source_id) : undefined;
-    const corpus = [ev.title ?? "", ev.evidence_statement ?? "", src?.title ?? ""].join(" ").slice(0, 600);
+    const evText = [ev.title ?? "", ev.evidence_statement ?? ""].join(" ").slice(0, 600);
+    const corpus = [evText, src?.title ?? ""].join(" ").slice(0, 700);
 
-    // Path 1: org already known on the evidence (or its source)
-    let orgId = ev.org_notion_id ?? src?.org_notion_id ?? null;
-    let matchedVia: "org" | "resolve" = "org";
-    if (!orgId) {
-      const emails = src?.source_external_id ? (emailsByTranscript.get(src.source_external_id) ?? []) : [];
-      const r = resolveOrgId(idx, { title: corpus, participantEmails: emails, selfEmails });
-      orgId = r.orgNotionId;
-      matchedVia = "resolve";
+    // Per-evidence FIRST: if this atomic claim's own text names a specific
+    // active project, that wins. This is what splits a multi-project meeting —
+    // a Celia meeting yields Expo claims → Expo and DRS claims → Upstream PAS.
+    let pid: string | null = inferProjectFromText(activeProjects, evText)?.notion_id ?? null;
+    let matchedVia: "text" | "org" | "resolve" = "text";
+
+    if (!pid) {
+      // Fallback: the meeting's org → project (incl. multi-org stakeholders
+      // folded into the index via project_organization_roles).
+      let orgId = ev.org_notion_id ?? src?.org_notion_id ?? null;
+      matchedVia = "org";
+      if (!orgId) {
+        const emails = (src?.source_external_id ? emailsByTranscriptId.get(src.source_external_id) : undefined)
+          ?? (src?.title ? emailsByTitle.get(src.title) : undefined)
+          ?? [];
+        orgId = resolveOrgId(idx, { title: corpus, participantEmails: emails, selfEmails }).orgNotionId;
+        matchedVia = "resolve";
+      }
+      pid = resolveProjectId(idx, orgId, { title: corpus }).projectNotionId;
     }
 
-    const proj = resolveProjectId(idx, orgId, { title: corpus });
-    const pid = proj.projectNotionId;
     if (!pid || !activeProjectIds.has(pid)) continue;
     updates.push({ id: ev.id, project: pid });
     byProject.set(pid, (byProject.get(pid) ?? 0) + 1);
-    if (matchedVia === "org") viaOrg++; else viaResolve++;
+    if (matchedVia === "text") viaText++; else if (matchedVia === "org") viaOrg++; else viaResolve++;
   }
 
   // 5. Apply (or report)
@@ -144,7 +157,7 @@ async function handle(req: NextRequest) {
     scanned: orphans.length,
     resolvable: updates.length,
     applied,
-    matched_via: { evidence_or_source_org: viaOrg, attendee_or_title_resolve: viaResolve },
+    matched_via: { evidence_text: viaText, evidence_or_source_org: viaOrg, attendee_or_title_resolve: viaResolve },
     per_project: perProject,
   });
 }

@@ -23,6 +23,7 @@ import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { withRoutineLog } from "@/lib/routine-log";
 import { computeAnthropicCost, makeUsageAccumulator, addUsage, type AnthropicUsage } from "@/lib/anthropic-cost";
 import { loadEntityIndex, resolveOrgId, resolveProjectId, type EntityIndex } from "@/lib/resolve-meeting-entities";
+import { loadActiveProjects, inferProjectFromText, type MatchableProject } from "@/lib/project-context";
 import { getSelfEmails } from "@/lib/hall-self";
 
 const HAIKU_MODEL = "claude-haiku-4-5-20251001";
@@ -406,9 +407,10 @@ async function _POST(req: NextRequest) {
     //    org match so a Jose-hosted meeting resolves to the counterpart
     //    org rather than Common House.
     const sb: ReturnType<typeof getSupabaseServerClient> = getSupabaseServerClient();
-    const [idx, selfEmails]: [EntityIndex, Set<string>] = await Promise.all([
+    const [idx, selfEmails, activeProjects]: [EntityIndex, Set<string>, MatchableProject[]] = await Promise.all([
       loadEntityIndex(sb),
       getSelfEmails(),
+      loadActiveProjects(),
     ]);
 
     const usageAcc = makeUsageAccumulator();
@@ -455,17 +457,23 @@ async function _POST(req: NextRequest) {
               selfEmails,
             });
             const orgId = itemOrg.orgNotionId ?? transcriptOrg.orgNotionId;
+            // Per-evidence project: this atomic claim's own text can name a
+            // DIFFERENT project than the meeting default (a single meeting can
+            // touch several projects — e.g. Expo vs. Upstream PAS with Celia).
+            // A confident text match wins; otherwise the transcript-level project.
+            const itemProject = inferProjectFromText(activeProjects, `${item.title} ${item.statement}`)?.notion_id
+              ?? projResult.projectNotionId;
             if (dryRun) {
               preview.push({
                 meeting:        t.title,
                 title:          item.title,
                 type:           VALID_TYPES.has(item.type) ? item.type : "Outcome",
                 org_linked:     !!orgId,
-                project_linked: !!projResult.projectNotionId,
+                project_linked: !!itemProject,
               });
               ids.push("(dry-run)");
             } else {
-              const id = await writeEvidence(item, dateStr, orgId, projResult.projectNotionId, sourceId);
+              const id = await writeEvidence(item, dateStr, orgId, itemProject, sourceId);
               ids.push(id);
             }
             existingKeys.add(key);
