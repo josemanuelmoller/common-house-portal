@@ -38,7 +38,7 @@ function authCheck(req: NextRequest): boolean {
   return false;
 }
 
-type EvRow = { id: string; title: string | null; evidence_statement: string | null; org_notion_id: string | null; source_id: string | null };
+type EvRow = { id: string; title: string | null; evidence_statement: string | null; project_notion_id: string | null; org_notion_id: string | null; source_id: string | null };
 type SrcRow = { id: string; title: string | null; org_notion_id: string | null; source_external_id: string | null };
 
 async function handle(req: NextRequest) {
@@ -55,14 +55,15 @@ async function handle(req: NextRequest) {
   for (const list of idx.projectsByOrg.values()) for (const p of list) activeProjectIds.add(p.notionId);
   for (const p of idx.projectsByName) activeProjectIds.add(p.notionId);
 
-  // 1. Page through orphaned evidence
+  // 1. Page through evidence missing a project OR an org (not everything has a
+  //    project, but almost everything should carry its counterpart org).
   const orphans: EvRow[] = [];
   const PAGE = 1000;
   for (let from = 0; orphans.length < limit; from += PAGE) {
     const { data, error } = await sb
       .from("evidence")
-      .select("id, title, evidence_statement, org_notion_id, source_id")
-      .is("project_notion_id", null)
+      .select("id, title, evidence_statement, project_notion_id, org_notion_id, source_id")
+      .or("project_notion_id.is.null,org_notion_id.is.null")
       .order("date_captured", { ascending: false })
       .range(from, from + PAGE - 1);
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
@@ -99,47 +100,52 @@ async function handle(req: NextRequest) {
     }
   }
 
-  // 4. Resolve each orphan
-  const updates: Array<{ id: string; project: string }> = [];
+  // 4. Resolve each row — the counterpart ORG always (not everything is a
+  //    project, but should carry its org), plus the PROJECT when derivable.
+  const updates: Array<{ id: string; patch: { project_notion_id?: string; org_notion_id?: string } }> = [];
   const byProject = new Map<string, number>();
-  let viaText = 0, viaOrg = 0, viaResolve = 0;
+  let viaText = 0, viaOrg = 0, viaResolve = 0, orgBackfilled = 0;
   for (const ev of orphans) {
     const src = ev.source_id ? srcById.get(ev.source_id) : undefined;
     const evText = [ev.title ?? "", ev.evidence_statement ?? ""].join(" ").slice(0, 600);
     const corpus = [evText, src?.title ?? ""].join(" ").slice(0, 700);
 
-    // Per-evidence FIRST: if this atomic claim's own text names a specific
-    // active project, that wins. This is what splits a multi-project meeting —
-    // a Celia meeting yields Expo claims → Expo and DRS claims → Upstream PAS.
-    let pid: string | null = inferProjectFromText(activeProjects, evText)?.notion_id ?? null;
-    let matchedVia: "text" | "org" | "resolve" = "text";
-
-    if (!pid) {
-      // Fallback: the meeting's org → project (incl. multi-org stakeholders
-      // folded into the index via project_organization_roles).
-      let orgId = ev.org_notion_id ?? src?.org_notion_id ?? null;
-      matchedVia = "org";
-      if (!orgId) {
-        const emails = (src?.source_external_id ? emailsByTranscriptId.get(src.source_external_id) : undefined)
-          ?? (src?.title ? emailsByTitle.get(src.title) : undefined)
-          ?? [];
-        orgId = resolveOrgId(idx, { title: corpus, participantEmails: emails, selfEmails }).orgNotionId;
-        matchedVia = "resolve";
-      }
-      pid = resolveProjectId(idx, orgId, { title: corpus }).projectNotionId;
+    // Resolve the counterpart org — known on the row/source, else from the
+    // meeting attendees (source_external_id, then title fallback).
+    let orgId = ev.org_notion_id ?? src?.org_notion_id ?? null;
+    let orgVia: "org" | "resolve" = "org";
+    if (!orgId) {
+      const emails = (src?.source_external_id ? emailsByTranscriptId.get(src.source_external_id) : undefined)
+        ?? (src?.title ? emailsByTitle.get(src.title) : undefined)
+        ?? [];
+      orgId = resolveOrgId(idx, { title: corpus, participantEmails: emails, selfEmails }).orgNotionId;
+      orgVia = "resolve";
     }
 
-    if (!pid || !activeProjectIds.has(pid)) continue;
-    updates.push({ id: ev.id, project: pid });
-    byProject.set(pid, (byProject.get(pid) ?? 0) + 1);
-    if (matchedVia === "text") viaText++; else if (matchedVia === "org") viaOrg++; else viaResolve++;
+    // Resolve the project: per-evidence text FIRST (splits multi-project
+    // meetings), else the org's project (incl. multi-org stakeholders).
+    let pid: string | null = inferProjectFromText(activeProjects, evText)?.notion_id ?? null;
+    const textHit = !!pid;
+    if (!pid) pid = resolveProjectId(idx, orgId, { title: corpus }).projectNotionId;
+
+    const patch: { project_notion_id?: string; org_notion_id?: string } = {};
+    if (ev.project_notion_id === null && pid && activeProjectIds.has(pid)) {
+      patch.project_notion_id = pid;
+      byProject.set(pid, (byProject.get(pid) ?? 0) + 1);
+      if (textHit) viaText++; else if (orgVia === "org") viaOrg++; else viaResolve++;
+    }
+    if (ev.org_notion_id === null && orgId) {
+      patch.org_notion_id = orgId;
+      orgBackfilled++;
+    }
+    if (patch.project_notion_id || patch.org_notion_id) updates.push({ id: ev.id, patch });
   }
 
   // 5. Apply (or report)
   let applied = 0;
   if (execute && updates.length) {
     for (const u of updates) {
-      const { error } = await sb.from("evidence").update({ project_notion_id: u.project }).eq("id", u.id);
+      const { error } = await sb.from("evidence").update(u.patch).eq("id", u.id);
       if (!error) applied++;
     }
   }
@@ -157,6 +163,8 @@ async function handle(req: NextRequest) {
     scanned: orphans.length,
     resolvable: updates.length,
     applied,
+    org_backfilled: orgBackfilled,
+    project_attributed: Array.from(byProject.values()).reduce((a, b) => a + b, 0),
     matched_via: { evidence_text: viaText, evidence_or_source_org: viaOrg, attendee_or_title_resolve: viaResolve },
     per_project: perProject,
   });
