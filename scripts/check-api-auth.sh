@@ -36,6 +36,10 @@ HELPER_CALLS=(
   "clientAccessGuardApi"
   "requireClientAccessForSlug"
   "resolveAccessForSlug"
+  # Work-room role/membership auth (src/lib/project-roles.ts). resolveRoomActor
+  # authenticates (Clerk currentUser) AND authorizes (project_members role);
+  # every mutating /api/rooms route gates on the returned role via can().
+  "resolveRoomActor"
 )
 
 # Env-var auth markers (legacy inline-style routes still using these are OK).
