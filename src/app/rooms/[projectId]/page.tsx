@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { currentUser } from "@clerk/nextjs/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { resolveClientRoomProject } from "@/lib/client-room";
-import { capabilitiesFor, resolveRoomActor } from "@/lib/project-roles";
+import { capabilitiesFor, listRoomsForActor, resolveRoomActor } from "@/lib/project-roles";
 import { RoomClient } from "./RoomClient";
 
 export const dynamic = "force-dynamic";
@@ -45,12 +45,16 @@ export default async function RoomPage({ params }: { params: Promise<{ projectId
   const canDownload = caps.includes("material.download");
   const mats = (materials.data ?? []).map((m) => (canDownload ? m : { ...m, url: null }));
 
+  // Salas del usuario (acordeón del sidebar).
+  const rooms = await listRoomsForActor(actor);
+
   return (
     <RoomClient
       projectId={project.id}
       role={actor.role}
       capabilities={caps}
       project={proj.data ?? { id: project.id, name: null, current_stage: null }}
+      rooms={rooms}
       initialPhases={phases.data ?? []}
       initialDeliverables={deliverables.data ?? []}
       initialTasks={tasks.data ?? []}
