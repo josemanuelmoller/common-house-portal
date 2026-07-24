@@ -81,6 +81,11 @@ export function can(role: RoomRole | null, cap: Capability): boolean {
   return MATRIX[role].includes(cap);
 }
 
+/** Todas las capacidades de un rol — el front las usa para habilitar/deshabilitar UI. */
+export function capabilitiesFor(role: RoomRole | null): Capability[] {
+  return role ? [...MATRIX[role]] : [];
+}
+
 /**
  * Resuelve quién es y qué rol tiene en ESTA sala. Fuente del scope:
  * si role === null, la persona no participa en la sala (403).
