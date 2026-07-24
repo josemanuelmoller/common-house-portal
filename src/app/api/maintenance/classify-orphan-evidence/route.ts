@@ -41,6 +41,7 @@ type Proposal = {
   confidence: "high" | "medium" | "low";
   reason: string;
   ev_project_null: boolean;
+  ev_project_current: string | null;
   ev_org_null: boolean;
 };
 
@@ -52,6 +53,9 @@ async function handle(req: NextRequest) {
   // Default newest-first (keeps the recent layer clean). `order=oldest` sweeps
   // the historical backlog (e.g. source-less April/May evidence).
   const oldestFirst = url.searchParams.get("order") === "oldest";
+  // Re-split mode: re-classify the evidence CURRENTLY in this project across the
+  // full catalog, and MOVE (high-confidence) the ones that belong elsewhere.
+  const sourceProject = url.searchParams.get("source_project");
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return NextResponse.json({ ok: false, error: "ANTHROPIC_API_KEY missing" }, { status: 500 });
 
@@ -73,13 +77,17 @@ async function handle(req: NextRequest) {
 
   const projByKey = new Map(projList.map(p => [p.key, p]));
   const orgByKey  = new Map(orgList.map(o => [o.key, o]));
+  const validProjects = new Set(projList.map(p => p.notion_id));
 
   // Orphans with rich text
-  const { data: evs } = await sb
+  let evQuery = sb
     .from("evidence")
     .select("id, title, evidence_statement, project_notion_id, org_notion_id")
-    .or("project_notion_id.is.null,org_notion_id.is.null")
-    .not("evidence_statement", "is", null)
+    .not("evidence_statement", "is", null);
+  evQuery = sourceProject
+    ? evQuery.eq("project_notion_id", sourceProject)          // re-split this project
+    : evQuery.or("project_notion_id.is.null,org_notion_id.is.null"); // fill orphans
+  const { data: evs } = await evQuery
     .order("date_captured", { ascending: oldestFirst })
     .limit(limit);
   const evidence = ((evs ?? []) as Array<{ id: string; title: string | null; evidence_statement: string | null; project_notion_id: string | null; org_notion_id: string | null }>)
@@ -140,6 +148,7 @@ Return ONLY the JSON array, no prose.`;
           confidence,
           reason: (r.reason ?? "").slice(0, 90),
           ev_project_null: ev.project_notion_id === null,
+          ev_project_current: ev.project_notion_id,
           ev_org_null: ev.org_notion_id === null,
         });
       }
@@ -154,7 +163,12 @@ Return ONLY the JSON array, no prose.`;
     for (const p of proposals) {
       if (p.confidence !== "high") continue;
       const patch: { project_notion_id?: string; org_notion_id?: string } = {};
-      if (p.project_notion_id && p.ev_project_null) patch.project_notion_id = p.project_notion_id;
+      if (sourceProject) {
+        // re-split: MOVE only when confidently a DIFFERENT valid project
+        if (p.project_notion_id && p.project_notion_id !== p.ev_project_current && validProjects.has(p.project_notion_id)) patch.project_notion_id = p.project_notion_id;
+      } else if (p.project_notion_id && p.ev_project_null) {
+        patch.project_notion_id = p.project_notion_id;
+      }
       if (p.org_notion_id && p.ev_org_null) patch.org_notion_id = p.org_notion_id;
       if (!patch.project_notion_id && !patch.org_notion_id) continue;
       const { error } = await sb.from("evidence").update(patch).eq("id", p.id);
