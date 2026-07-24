@@ -25,6 +25,7 @@ export const ADMIN_NAV = [
 
   // ── Knowledge layer (top-level) ─────────────────────────────────────────
   { label: "Knowledge",           href: "/admin/knowledge",      icon: "◉" },
+  { label: "Attribution",         href: "/admin/attribution-review", icon: "◊" },
 
   // ── Control Room ──────────────────────────────────────────────────────────
   // Capture + Prep promoted to the nav 2026-06-10 — both were fully wired but

@@ -43,6 +43,7 @@ type Proposal = {
   ev_project_null: boolean;
   ev_project_current: string | null;
   ev_org_null: boolean;
+  snippet: string;
 };
 
 async function handle(req: NextRequest) {
@@ -150,6 +151,7 @@ Return ONLY the JSON array, no prose.`;
           ev_project_null: ev.project_notion_id === null,
           ev_project_current: ev.project_notion_id,
           ev_org_null: ev.org_notion_id === null,
+          snippet: `${ev.title ? ev.title + ": " : ""}${ev.evidence_statement ?? ""}`.replace(/\s+/g, " ").slice(0, 300),
         });
       }
     } catch (e) {
@@ -176,6 +178,32 @@ Return ONLY the JSON array, no prose.`;
     }
   }
 
+  // Queue medium-confidence proposals for human review (approve/adjust/reject).
+  // ignoreDuplicates: never re-propose an evidence that already has a proposal
+  // (including ones already approved/rejected earlier).
+  let queued = 0;
+  if (execute) {
+    const rows = proposals
+      .filter(p => p.confidence === "medium" && (p.project_notion_id || p.org_notion_id))
+      .map(p => ({
+        evidence_id: p.id,
+        evidence_snippet: p.snippet,
+        current_project_notion_id: p.ev_project_current,
+        proposed_project_notion_id: p.project_notion_id,
+        proposed_project_name: p.project_name,
+        proposed_org_notion_id: p.org_notion_id,
+        proposed_org_name: p.org_name,
+        confidence: p.confidence,
+        reason: p.reason,
+      }));
+    for (let k = 0; k < rows.length; k += 100) {
+      const { error, count } = await sb
+        .from("evidence_attribution_proposals")
+        .upsert(rows.slice(k, k + 100), { onConflict: "evidence_id", ignoreDuplicates: true, count: "exact" });
+      if (!error) queued += count ?? 0;
+    }
+  }
+
   const byProject = new Map<string, number>();
   for (const p of proposals) if (p.confidence === "high" && p.project_name) byProject.set(p.project_name, (byProject.get(p.project_name) ?? 0) + 1);
 
@@ -189,6 +217,7 @@ Return ONLY the JSON array, no prose.`;
     proposed: proposals.length,
     by_confidence: counts,
     applied: { project: appliedProject, org: appliedOrg },
+    queued_for_review: queued,
     high_by_project: Array.from(byProject.entries()).map(([name, n]) => ({ project: name, count: n })).sort((a, b) => b.count - a.count),
     sample_medium: proposals.filter(p => p.confidence === "medium").slice(0, 15).map(p => ({ project: p.project_name, org: p.org_name, reason: p.reason })),
     errors: errors.slice(0, 5),
