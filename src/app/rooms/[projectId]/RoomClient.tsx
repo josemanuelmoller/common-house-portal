@@ -282,6 +282,22 @@ export function RoomClient({ projectId, role, capabilities, personId, defaultLan
   }, [deliverables, tasks]);
   const heroTitle = meta.currentFocus ?? cleanName(project.name);
   const heroSub = heroNote ?? (meta.nextMilestone ? `${tr("field.milestone")}: ${meta.nextMilestone}` : "");
+  const gantt = useMemo(() => {
+    const dated = deliverables.map((d) => d.due_date).filter((x): x is string => !!x).map((x) => new Date(x).getTime());
+    const s0 = meta.startDate ? new Date(meta.startDate).getTime() : (dated.length ? Math.min(...dated) : Date.now());
+    const e0 = meta.targetEndDate ? new Date(meta.targetEndDate).getTime() : (dated.length ? Math.max(...dated) : s0 + 90 * 864e5);
+    const span = Math.max(864e5, e0 - s0);
+    const pct = (dateStr: string) => Math.round(Math.max(0, Math.min(100, (new Date(dateStr).getTime() - s0) / span * 100)));
+    const months: { label: string; leftPct: number }[] = [];
+    const cur = new Date(s0); cur.setUTCDate(1);
+    while (cur.getTime() <= e0 && months.length < 14) {
+      months.push({ label: cur.toLocaleDateString(lang === "es" ? "es-ES" : "en-US", { month: "short", timeZone: "UTC" }), leftPct: Math.round(Math.max(0, (cur.getTime() - s0) / span * 100)) });
+      cur.setUTCMonth(cur.getUTCMonth() + 1);
+    }
+    const todayPct = Math.round(Math.max(0, Math.min(100, (Date.now() - s0) / span * 100)));
+    const rangeLabel = `${new Date(s0).toLocaleDateString(lang === "es" ? "es-ES" : "en-US", { month: "short", timeZone: "UTC" })} – ${new Date(e0).toLocaleDateString(lang === "es" ? "es-ES" : "en-US", { month: "short", year: "numeric", timeZone: "UTC" })}`;
+    return { pct, months, todayPct, rangeLabel };
+  }, [meta.startDate, meta.targetEndDate, deliverables, lang]);
 
   const openDecisions = decisions.filter((d) => d.status === "open").length;
   const myTasks = personId ? tasks.filter((t) => t.owner_person_id === personId) : [];
@@ -601,35 +617,78 @@ export function RoomClient({ projectId, role, capabilities, personId, defaultLan
 
           {/* PLAN */}
           {section === "plan" && (
-            <div style={{ maxWidth: 760 }}>
-              {phases.length === 0 && <Empty text={tr("plan.noPhases")} />}
-              {phases.map((p) => {
-                const dels = deliverables.filter((d) => d.phase_id === p.id);
-                const st = p.status === "done" ? { i: "✓", bg: C.lime, fg: "#0a0a0a" } : p.status === "in_progress" ? { i: "•", bg: C.paper, fg: C.warn } : { i: "○", bg: C.paper2, fg: C.muted };
-                const open = openPhase === p.id;
-                return (
-                  <div key={p.id} style={{ background: C.paper, border: `1.5px solid ${C.line}`, borderRadius: 12, overflow: "hidden", marginBottom: 10 }}>
-                    <button onClick={() => setOpenPhase(open ? null : p.id)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "13px 15px", background: "transparent", border: 0, cursor: "pointer", fontFamily: "inherit" }}>
-                      <span style={{ width: 22, height: 22, borderRadius: 999, display: "grid", placeItems: "center", fontSize: 11, fontWeight: 900, background: st.bg, color: st.fg, border: p.status === "in_progress" ? `2px solid ${C.warn}` : "none" }}>{st.i}</span>
-                      <b style={{ fontSize: 14, fontWeight: 800 }}>{p.title}</b>
-                      <span style={{ ...label, marginLeft: 4 }}>{p.status === "done" ? tr("plan.doneTag") : p.status === "in_progress" ? tr("plan.inProgressTag") : tr("plan.upcomingTag")}</span>
-                      <span style={{ flex: 1 }} />
-                      <span style={{ color: C.muted, transform: open ? "rotate(90deg)" : "none", transition: "transform .15s" }}>▸</span>
-                    </button>
-                    {open && (
-                      <div style={{ padding: "0 15px 12px 49px" }}>
-                        {dels.length === 0 && <div style={{ fontSize: 12, color: C.muted, padding: "6px 0" }}>{tr("plan.noDeliverablesInPhase")}</div>}
-                        {dels.map((d) => (
-                          <div key={d.id} style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 0", borderTop: `1px solid ${C.lineSoft}`, fontSize: 12.5, fontWeight: 600 }}>
-                            <span style={{ width: 7, height: 7, borderRadius: 999, background: statusDot(d.status) }} />
-                            {d.title}<span style={{ marginLeft: "auto", ...label }}>{d.progress}%</span>
-                          </div>
-                        ))}
+            <div>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 11, marginBottom: 14 }}>
+                <h3 style={{ fontSize: 16, fontWeight: 800, margin: 0 }}>{tr("nav.plan")}</h3>
+                {(meta.startDate || meta.targetEndDate) && <span style={{ fontSize: 11, color: C.muted, fontWeight: 600, textTransform: "capitalize" }}>{gantt.rangeLabel}</span>}
+                <span style={{ flex: 1 }} />
+                {can("structure.edit") && <button onClick={createDeliverable} style={btn(C.paper, C.muted2, true)}>{lang === "es" ? "+ Fase" : "+ Phase"}</button>}
+              </div>
+              <div style={{ maxWidth: 760 }}>
+                {phases.length === 0 && <Empty text={tr("plan.noPhases")} />}
+                {phases.map((p) => {
+                  const dels = deliverables.filter((d) => d.phase_id === p.id);
+                  const open = openPhase === p.id;
+                  const pct = dels.length ? Math.round(dels.reduce((a, d) => a + (d.progress || 0), 0) / dels.length) : (p.status === "done" ? 100 : 0);
+                  const stat = p.status === "done" ? { icon: "✓", bg: C.lime, fg: "#0a0a0a", brd: "none" } : p.status === "in_progress" ? { icon: "•", bg: C.paper, fg: C.warn, brd: `2px solid ${C.warn}` } : { icon: "○", bg: C.paper2, fg: C.muted, brd: "none" };
+                  const statusText = p.status === "done" ? tr("plan.doneTag") : p.status === "in_progress" ? `${tr("plan.inProgressTag")} · ${pct}%` : tr("plan.upcomingTag");
+                  return (
+                    <div key={p.id} style={{ background: C.paper, border: `1.5px solid ${C.line}`, borderRadius: 12, overflow: "hidden", marginBottom: 10 }}>
+                      <button onClick={() => setOpenPhase(open ? null : p.id)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "12px 15px", background: "transparent", border: 0, cursor: "pointer", fontFamily: "inherit" }}>
+                        <span style={{ width: 22, height: 22, borderRadius: 999, display: "grid", placeItems: "center", fontSize: 11, fontWeight: 900, background: stat.bg, color: stat.fg, border: stat.brd, flexShrink: 0 }}>{stat.icon}</span>
+                        <div style={{ textAlign: "left", minWidth: 0 }}>
+                          <b style={{ fontSize: 14, fontWeight: 800 }}>{p.title}</b>
+                          <div style={{ fontSize: 11, color: C.muted, fontWeight: 600, marginTop: 1, textTransform: "capitalize" }}>{statusText}</div>
+                        </div>
+                        <span style={{ flex: 1 }} />
+                        <span style={{ color: C.muted, transform: open ? "rotate(90deg)" : "none", transition: "transform .15s" }}>▸</span>
+                      </button>
+                      {open && (
+                        <div style={{ padding: "0 15px 12px 49px" }}>
+                          {dels.length === 0 && <div style={{ fontSize: 12, color: C.muted, padding: "6px 0" }}>{tr("plan.noDeliverablesInPhase")}</div>}
+                          {dels.map((d) => (
+                            <div key={d.id} style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 0", borderTop: `1px solid ${C.lineSoft}`, fontSize: 12.5, fontWeight: 600 }}>
+                              <span style={{ width: 7, height: 7, borderRadius: 999, background: statusDot(d.status), flexShrink: 0 }} />
+                              <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.title}</span>
+                              <span style={{ marginLeft: "auto", ...label, whiteSpace: "nowrap" }}>{statusLabel(d.status)}{d.due_date ? ` · ${d.due_date.slice(5)}` : ` · ${d.progress}%`}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              {/* línea de tiempo (gantt) */}
+              {gantt.months.length > 0 && deliverables.some((d) => d.due_date) && (
+                <div style={{ marginTop: 22 }}>
+                  <div style={{ ...label, marginBottom: 10 }}>{lang === "es" ? "Línea de tiempo" : "Timeline"}</div>
+                  <div style={{ background: C.paper, border: `1.5px solid ${C.line}`, borderRadius: 14, overflow: "hidden", position: "relative" }}>
+                    <div style={{ display: "flex", borderBottom: `1.5px solid ${C.line}` }}>
+                      <div style={{ width: 160, flexShrink: 0 }} />
+                      <div style={{ flex: 1, position: "relative", height: 26 }}>
+                        {gantt.months.map((m, i) => (<span key={i} style={{ position: "absolute", left: `${m.leftPct}%`, top: 8, fontSize: 8, fontWeight: 700, letterSpacing: "1.5px", textTransform: "uppercase", color: "rgba(0,0,0,.3)", paddingLeft: 6, whiteSpace: "nowrap" }}>{m.label}</span>))}
                       </div>
-                    )}
+                    </div>
+                    {deliverables.filter((d) => d.due_date).map((d) => {
+                      const end = gantt.pct(d.due_date!); const start = Math.max(0, end - 14);
+                      const tone = d.status === "at_risk" ? C.warn : (d.status === "delivered" || d.status === "accepted") ? C.ok : d.status === "in_progress" ? C.lime : C.paper2;
+                      const barTxt = (d.status === "delivered" || d.status === "accepted") ? statusLabel(d.status) : `${d.progress}%`;
+                      return (
+                        <div key={d.id} style={{ display: "flex", alignItems: "center", borderTop: `1px solid ${C.lineSoft}`, minHeight: 36 }}>
+                          <div style={{ width: 160, flexShrink: 0, padding: "8px 12px", fontSize: 11.5, fontWeight: 600, color: C.muted2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.title}</div>
+                          <div style={{ flex: 1, position: "relative", alignSelf: "stretch" }}>
+                            <div title={`${d.title} · ${d.due_date} · ${d.progress}%`} style={{ position: "absolute", top: "50%", transform: "translateY(-50%)", left: `${start}%`, width: `${Math.max(7, end - start)}%`, height: 21, borderRadius: 6, background: tone, display: "flex", alignItems: "center", padding: "0 8px", fontSize: 9, fontWeight: 800, letterSpacing: ".4px", textTransform: "uppercase", color: "#3a3a34", overflow: "hidden", whiteSpace: "nowrap" }}>{barTxt}</div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    <div style={{ position: "absolute", top: 0, bottom: 0, left: `calc(160px + (100% - 160px) * ${gantt.todayPct / 100})`, width: 2, background: C.danger, zIndex: 3 }}>
+                      <span style={{ position: "absolute", top: 0, left: "50%", transform: "translateX(-50%)", background: C.danger, color: "#fff", fontSize: 7, fontWeight: 800, padding: "1px 4px", borderRadius: "0 0 4px 4px", letterSpacing: ".5px" }}>{lang === "es" ? "HOY" : "NOW"}</span>
+                    </div>
                   </div>
-                );
-              })}
+                </div>
+              )}
             </div>
           )}
 
