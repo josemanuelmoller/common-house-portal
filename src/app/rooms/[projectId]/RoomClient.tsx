@@ -6,6 +6,10 @@ import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
 type Phase = { id: string; title: string; status: string; position: number };
 type Deliverable = { id: string; title: string; status: string; progress: number; phase_id: string | null; owner_person_id: string | null; due_date: string | null; position: number };
 type Task = { id: string; title: string; status: string; assignee_side: string; deliverable_id: string | null; closed_via: string | null; closed_by: string | null; due_date: string | null; position: number };
+type Participant = { initials?: string; name?: string; side?: string };
+type Decision = { id: string; title: string; context: string | null; status: string; deliverable_id: string | null; participants: Participant[] | null; source_ref: string | null; resolved_by: string | null };
+type Material = { id: string; title: string; url: string | null; mime_type: string | null; category: string | null; folder_name: string | null; modified_at: string | null };
+type EventRow = { id: string; actor_email: string | null; actor_role: string | null; verb: string; target_type: string; summary: string | null; created_at: string };
 
 type Props = {
   projectId: string;
@@ -15,6 +19,9 @@ type Props = {
   initialPhases: Phase[];
   initialDeliverables: Deliverable[];
   initialTasks: Task[];
+  initialDecisions: Decision[];
+  initialMaterials: Material[];
+  initialEvents: EventRow[];
 };
 
 /* ── tokens del portal ── */
@@ -52,10 +59,13 @@ async function api(path: string, method: string, body?: unknown) {
   return json;
 }
 
-export function RoomClient({ projectId, role, capabilities, project, initialPhases, initialDeliverables, initialTasks }: Props) {
-  const [section, setSection] = useState<"resumen" | "plan" | "entregables" | "tareas">("resumen");
+type SectionKey = "resumen" | "plan" | "entregables" | "tareas" | "decisiones" | "materiales" | "actividad";
+
+export function RoomClient({ projectId, role, capabilities, project, initialPhases, initialDeliverables, initialTasks, initialDecisions, initialMaterials, initialEvents }: Props) {
+  const [section, setSection] = useState<SectionKey>("resumen");
   const [deliverables, setDeliverables] = useState<Deliverable[]>(initialDeliverables);
   const [tasks, setTasks] = useState<Task[]>(initialTasks);
+  const [decisions, setDecisions] = useState<Decision[]>(initialDecisions);
   const [phases] = useState<Phase[]>(initialPhases);
   const [openPhase, setOpenPhase] = useState<string | null>(initialPhases.find((p) => p.status === "in_progress")?.id ?? null);
   const [dView, setDView] = useState<"list" | "kanban">("kanban");
@@ -107,6 +117,20 @@ export function RoomClient({ projectId, role, capabilities, project, initialPhas
     try { const r = await api(`${base}/tasks`, "POST", { title }); setTasks((ts) => [...ts, r.task]); }
     catch (e) { flash((e as Error).message); }
   }
+  async function resolveDecision(id: string) {
+    if (!(can("decision.manage") || can("decision.resolve_own"))) return;
+    const prev = decisions;
+    setDecisions((ds) => ds.map((d) => (d.id === id ? { ...d, status: "closed" } : d)));
+    try { await api(`${base}/decisions`, "PATCH", { id, action: "resolve" }); flash("Decisión resuelta"); }
+    catch (e) { setDecisions(prev); flash((e as Error).message); }
+  }
+  async function createDecision() {
+    if (!can("decision.manage")) return;
+    const title = window.prompt("Nueva decisión:");
+    if (!title?.trim()) return;
+    try { const r = await api(`${base}/decisions`, "POST", { title }); setDecisions((ds) => [...ds, r.decision]); }
+    catch (e) { flash((e as Error).message); }
+  }
 
   /* ── stats ── */
   const stats = useMemo(() => {
@@ -117,6 +141,7 @@ export function RoomClient({ projectId, role, capabilities, project, initialPhas
   }, [deliverables, tasks]);
 
   const roleLabel: Record<string, string> = { pm: "PM", collaborator: "Colaborador", client: "Cliente", reader: "Lector" };
+  const openDecisions = decisions.filter((d) => d.status === "open").length;
 
   return (
     <div style={{ maxWidth: 1120, margin: "0 auto", padding: "20px 18px 60px", fontFamily: "var(--font-hall-sans), 'Inter Tight', sans-serif", color: C.ink }}>
@@ -132,13 +157,21 @@ export function RoomClient({ projectId, role, capabilities, project, initialPhas
       </div>
 
       {/* nav */}
-      <div style={{ display: "flex", gap: 4, borderBottom: `1.5px solid ${C.line}`, marginBottom: 20 }}>
-        {(["resumen", "plan", "entregables", "tareas"] as const).map((s) => (
-          <button key={s} onClick={() => setSection(s)} style={{
-            fontFamily: "inherit", fontSize: 13, fontWeight: section === s ? 700 : 600, textTransform: "capitalize",
-            color: section === s ? C.ink : C.muted, background: "transparent", border: 0, borderBottom: `2px solid ${section === s ? C.limeInk : "transparent"}`,
+      <div style={{ display: "flex", gap: 4, borderBottom: `1.5px solid ${C.line}`, marginBottom: 20, flexWrap: "wrap" }}>
+        {([
+          ["resumen", "Resumen"],
+          ["plan", "Plan"],
+          ["entregables", `Entregables (${deliverables.length})`],
+          ["tareas", `Tareas (${tasks.length})`],
+          ["decisiones", `Decisiones${openDecisions ? ` (${openDecisions})` : ""}`],
+          ["materiales", "Materiales"],
+          ...(can("analytics.view") ? ([["actividad", "Actividad"]] as [SectionKey, string][]) : []),
+        ] as [SectionKey, string][]).map(([key, lbl]) => (
+          <button key={key} onClick={() => setSection(key)} style={{
+            fontFamily: "inherit", fontSize: 13, fontWeight: section === key ? 700 : 600,
+            color: section === key ? C.ink : C.muted, background: "transparent", border: 0, borderBottom: `2px solid ${section === key ? C.limeInk : "transparent"}`,
             padding: "10px 12px", cursor: "pointer", marginBottom: -1.5,
-          }}>{s}{s === "entregables" ? ` (${deliverables.length})` : s === "tareas" ? ` (${tasks.length})` : ""}</button>
+          }}>{lbl}</button>
         ))}
       </div>
 
@@ -255,6 +288,80 @@ export function RoomClient({ projectId, role, capabilities, project, initialPhas
           )}
           {!can("task.move") && tView === "kanban" && <Note text="Tu rol no puede mover tareas (solo mirar)." />}
         </Section>
+      )}
+
+      {/* DECISIONES */}
+      {section === "decisiones" && (
+        <div style={{ maxWidth: 720 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 14 }}>
+            <h3 style={{ fontSize: 16, fontWeight: 800, margin: 0 }}>Decisiones</h3><span style={{ flex: 1 }} />
+            {can("decision.manage") && <button onClick={createDecision} style={btn(C.paper, C.muted2, true)}>+ Decisión</button>}
+          </div>
+          {decisions.length === 0 && <Empty text="Todavía no hay decisiones." />}
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {decisions.map((d) => {
+              const del = deliverables.find((x) => x.id === d.deliverable_id);
+              const open = d.status === "open";
+              return (
+                <div key={d.id} style={{ background: open ? C.warnSoft : C.paper, border: `1.5px solid ${open ? "#f0e0b0" : C.line}`, borderRadius: 12, padding: "13px 15px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                    <b style={{ fontSize: 14, fontWeight: 800 }}>{d.title}</b>
+                    {del && <span style={{ ...label, color: "#4a5bc0", background: "rgba(91,107,214,.11)", padding: "2px 7px", borderRadius: 5 }}>↳ {del.title}</span>}
+                    <span style={{ flex: 1 }} />
+                    <span style={pill(open ? C.warnSoft : C.okSoft, open ? C.warn : C.ok)}>{open ? "Abierta" : "Cerrada"}</span>
+                  </div>
+                  {d.context && <div style={{ fontSize: 12.5, color: C.muted2, marginTop: 6, lineHeight: 1.5 }}>{d.context}</div>}
+                  {d.source_ref && <div style={{ fontSize: 9, color: C.muted, marginTop: 6, fontWeight: 600, letterSpacing: ".3px", textTransform: "uppercase" }}>↳ {d.source_ref}</div>}
+                  {Array.isArray(d.participants) && d.participants.length > 0 && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 9, flexWrap: "wrap" }}>
+                      <span style={label}>Presentes</span>
+                      {d.participants.map((p, i) => <span key={i} style={{ width: 22, height: 22, borderRadius: 999, background: p.side === "client" ? "#495057" : C.limeInk, color: "#fff", display: "grid", placeItems: "center", fontSize: 8, fontWeight: 700 }}>{p.initials || "?"}</span>)}
+                    </div>
+                  )}
+                  {open && (can("decision.manage") || can("decision.resolve_own")) && (
+                    <button onClick={() => resolveDecision(d.id)} style={{ ...btn(C.lime, "#0a0a0a"), marginTop: 11 }}>Resolver decisión</button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* MATERIALES */}
+      {section === "materiales" && (
+        <div>
+          <h3 style={{ fontSize: 16, fontWeight: 800, margin: "0 0 14px" }}>Materiales</h3>
+          {initialMaterials.length === 0 && <Empty text="Todavía no hay materiales." />}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(240px,1fr))", gap: 10 }}>
+            {initialMaterials.map((m) => (
+              <a key={m.id} href={m.url ?? undefined} target="_blank" rel="noreferrer"
+                style={{ display: "flex", alignItems: "center", gap: 11, background: C.paper, border: `1.5px solid ${C.line}`, borderRadius: 12, padding: "11px 14px", textDecoration: "none", color: "inherit", cursor: m.url ? "pointer" : "default" }}>
+                <span style={{ width: 32, height: 32, borderRadius: 7, background: C.paper2, display: "grid", placeItems: "center", fontSize: 8, fontWeight: 800, color: C.muted2 }}>{(m.mime_type || "DOC").split("/").pop()?.slice(0, 4).toUpperCase()}</span>
+                <span style={{ flex: 1, minWidth: 0 }}><b style={{ fontSize: 12.5, fontWeight: 700, display: "block", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.title}</b><small style={{ fontSize: 10, color: C.muted }}>{m.category || m.folder_name || ""}</small></span>
+                {m.url ? <span style={{ color: C.muted }}>↗</span> : <span style={label}>solo lectura</span>}
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ACTIVIDAD (solo PM) */}
+      {section === "actividad" && can("analytics.view") && (
+        <div style={{ maxWidth: 720 }}>
+          <h3 style={{ fontSize: 16, fontWeight: 800, margin: "0 0 6px" }}>Actividad</h3>
+          <div style={{ fontSize: 12.5, color: C.muted2, marginBottom: 16 }}>Registro del event log — quién hizo qué. Carga y aporte, no vigilancia. Solo lo ve el PM.</div>
+          {initialEvents.length === 0 && <Empty text="Sin actividad todavía." />}
+          <div style={{ background: C.paper, border: `1.5px solid ${C.line}`, borderRadius: 12, padding: "6px 16px" }}>
+            {initialEvents.map((e) => (
+              <div key={e.id} style={{ display: "flex", alignItems: "flex-start", gap: 11, padding: "10px 0", borderTop: `1px solid ${C.lineSoft}` }}>
+                <span style={{ ...label, fontFamily: "ui-monospace,monospace", minWidth: 74, paddingTop: 1 }}>{e.created_at.slice(0, 10)}</span>
+                <span style={{ flex: 1, fontSize: 12.5 }}>{e.summary || `${e.verb} ${e.target_type}`}</span>
+                <span style={label}>{e.actor_role || ""}</span>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
 
       {toast && (
