@@ -14,7 +14,8 @@ const ES: Record<string, string> = {
   "chrome.collapse": "Colapsar", "chrome.expand": "Expandir", "chrome.openNav": "Abrir navegación", "chrome.room": "Sala",
   // nav
   "nav.mio": "Lo mío", "nav.resumen": "Resumen", "nav.plan": "Plan", "nav.entregables": "Entregables",
-  "nav.tareas": "Tareas", "nav.decisiones": "Decisiones", "nav.materiales": "Materiales", "nav.proyecto": "Proyecto", "nav.actividad": "Actividad",
+  "nav.tareas": "Tareas", "nav.decisiones": "Decisiones", "nav.materiales": "Materiales", "nav.reuniones": "Reuniones", "nav.proyecto": "Proyecto", "nav.actividad": "Actividad",
+  "meet.desc": "Cada reunión del proyecto se procesa y aterriza acá sola.", "meet.none": "Todavía no hay reuniones registradas.",
   // roles
   "role.pm": "PM", "role.collaborator": "Colaborador", "role.client": "Cliente", "role.reader": "Lector",
   // stats
@@ -80,7 +81,8 @@ const EN: Record<string, string> = {
   "chrome.workRoom": "Work room", "chrome.rooms": "Rooms", "chrome.yourRole": "Your role in this room",
   "chrome.collapse": "Collapse", "chrome.expand": "Expand", "chrome.openNav": "Open navigation", "chrome.room": "Room",
   "nav.mio": "My work", "nav.resumen": "Overview", "nav.plan": "Plan", "nav.entregables": "Deliverables",
-  "nav.tareas": "Tasks", "nav.decisiones": "Decisions", "nav.materiales": "Materials", "nav.proyecto": "Project", "nav.actividad": "Activity",
+  "nav.tareas": "Tasks", "nav.decisiones": "Decisions", "nav.materiales": "Materials", "nav.reuniones": "Meetings", "nav.proyecto": "Project", "nav.actividad": "Activity",
+  "meet.desc": "Every project meeting is processed and lands here automatically.", "meet.none": "No meetings recorded yet.",
   "role.pm": "PM", "role.collaborator": "Collaborator", "role.client": "Client", "role.reader": "Reader",
   "stat.avance": "Progress", "stat.entregables": "Deliverables", "stat.tareasHechas": "Tasks done", "stat.bloqueadas": "Blocked",
   "ds.not_started": "Not started", "ds.in_progress": "In progress", "ds.at_risk": "At risk", "ds.delivered": "Delivered", "ds.accepted": "Accepted",
