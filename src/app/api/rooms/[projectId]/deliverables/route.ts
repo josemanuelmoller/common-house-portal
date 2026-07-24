@@ -117,5 +117,16 @@ export async function PATCH(req: NextRequest, c: { params: Promise<{ projectId: 
     return NextResponse.json({ ok: true, deliverable: data });
   }
 
+  // Deshacer aceptación — vuelve a "entregado". Mismo permiso que aceptar.
+  if (action === "revert_accept") {
+    if (!can(actor.role, "deliverable.accept")) return NextResponse.json({ error: "Tu rol no puede revertir la aceptación" }, { status: 403 });
+    const { data, error: upErr } = await db.from("project_deliverables")
+      .update({ status: "delivered", accepted_at: null, accepted_by: null })
+      .eq("id", id).select("*").single();
+    if (upErr) return NextResponse.json({ error: upErr.message }, { status: 502 });
+    await logRoomEvent({ projectId: project.id, actor, verb: "status_changed", targetType: "deliverable", targetId: id, summary: `Deshizo la aceptación de "${current.title}"`, payload: { from: "accepted", to: "delivered" } });
+    return NextResponse.json({ ok: true, deliverable: data });
+  }
+
   return NextResponse.json({ error: "Unknown action" }, { status: 400 });
 }
