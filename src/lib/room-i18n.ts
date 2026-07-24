@@ -20,6 +20,7 @@ const ES: Record<string, string> = {
   "role.pm": "PM", "role.collaborator": "Colaborador", "role.client": "Cliente", "role.reader": "Lector",
   // stats
   "stat.avance": "Avance", "stat.entregables": "Entregables", "stat.tareasHechas": "Tareas hechas", "stat.bloqueadas": "Bloqueadas",
+  "ov.upcoming": "Próximas fechas", "ov.noUpcoming": "Nada con fecha por ahora.", "ov.phases": "Fases", "ov.deliverable": "entregable", "ov.task": "tarea",
   // deliverable statuses
   "ds.not_started": "Por iniciar", "ds.in_progress": "En curso", "ds.at_risk": "En riesgo", "ds.delivered": "Entregado", "ds.accepted": "Aceptado",
   // task statuses
@@ -86,6 +87,7 @@ const EN: Record<string, string> = {
   "meet.desc": "Every project meeting is processed and lands here automatically.", "meet.none": "No meetings recorded yet.",
   "role.pm": "PM", "role.collaborator": "Collaborator", "role.client": "Client", "role.reader": "Reader",
   "stat.avance": "Progress", "stat.entregables": "Deliverables", "stat.tareasHechas": "Tasks done", "stat.bloqueadas": "Blocked",
+  "ov.upcoming": "Upcoming", "ov.noUpcoming": "Nothing scheduled yet.", "ov.phases": "Phases", "ov.deliverable": "deliverable", "ov.task": "task",
   "ds.not_started": "Not started", "ds.in_progress": "In progress", "ds.at_risk": "At risk", "ds.delivered": "Delivered", "ds.accepted": "Accepted",
   "ts.todo": "To do", "ts.doing": "In progress", "ts.blocked": "Blocked", "ts.done": "Done",
   "view.list": "List", "view.kanban": "Board",
