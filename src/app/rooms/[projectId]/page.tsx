@@ -28,7 +28,7 @@ export default async function RoomPage({ params }: { params: Promise<{ projectId
   const caps = capabilitiesFor(actor.role);
   const db = supabaseAdmin();
   const [proj, phases, deliverables, tasks, decisions, materials] = await Promise.all([
-    db.from("projects").select("id, name, current_stage, room_language, notion_id, hall_draft").eq("id", project.id).single(),
+    db.from("projects").select("id, name, current_stage, room_language, notion_id, hall_draft, hall_welcome_note").eq("id", project.id).single(),
     db.from("project_phases").select("*").eq("project_id", project.id).order("position", { ascending: true }),
     db.from("project_deliverables").select("*").eq("project_id", project.id).order("position", { ascending: true }),
     db.from("project_tasks").select("*").eq("project_id", project.id).order("position", { ascending: true }),
@@ -47,12 +47,16 @@ export default async function RoomPage({ params }: { params: Promise<{ projectId
   const canDownload = caps.includes("material.download");
   const mats = (materials.data ?? []).map((m) => (canDownload ? m : { ...m, url: null }));
 
-  // Salas del usuario (acordeón del sidebar) + contexto de "Proyecto" + reuniones.
-  const [rooms, context, meetings] = await Promise.all([
+  // Salas del usuario (acordeón) + contexto de "Proyecto" + reuniones + sugerencias pendientes.
+  const [rooms, context, meetings, suggRes] = await Promise.all([
     listRoomsForActor(actor),
     loadRoomContext(project.id, actor, caps),
     loadRoomMeetings((proj.data?.notion_id as string | null) ?? null, caps.includes("internal.view")),
+    caps.includes("suggestion.view")
+      ? db.from("project_state_proposals").select("id, proposal_kind, item_type, summary, rationale, source_refs, created_at").eq("project_id", project.id).eq("status", "pending").order("created_at", { ascending: false }).limit(20)
+      : Promise.resolve({ data: [] }),
   ]);
+  const suggestions = (suggRes.data ?? []) as { id: string; proposal_kind: string | null; item_type: string | null; summary: string | null; rationale: string | null; source_refs: string[] | null; created_at: string }[];
 
   // Empty-state: la sala no parte de cero; si no tiene estructura, se sugiere una
   // (heredando personas/Drive/reuniones de la preventa) para que el PM la apruebe.
@@ -75,6 +79,8 @@ export default async function RoomPage({ params }: { params: Promise<{ projectId
       team={context.team}
       billing={context.billing}
       meetings={meetings}
+      suggestions={suggestions}
+      heroNote={(proj.data?.hall_welcome_note as string | null) ?? null}
       initialPhases={phases.data ?? []}
       initialDeliverables={deliverables.data ?? []}
       initialTasks={tasks.data ?? []}
