@@ -296,14 +296,16 @@ export function RoomClient({ projectId, role, capabilities, personId, defaultLan
 
   const asideStyle: CSSProperties = {
     width: sidebarWidth, flex: "none", background: C.paper1, borderRight: `1px solid ${C.line}`,
-    display: "flex", flexDirection: "column", zIndex: 50,
+    display: "flex", flexDirection: "column", zIndex: 50, minHeight: 0,
     ...(isMobile
       ? { position: "fixed", top: 0, left: 0, height: "100vh", transform: mobileOpen ? "translateX(0)" : "translateX(-110%)", transition: "transform .22s ease", boxShadow: mobileOpen ? "0 10px 40px rgba(0,0,0,.28)" : "none" }
-      : { position: "sticky", top: 0, height: "100vh" }),
+      : {}),
   };
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh", fontFamily: "var(--font-hall-sans), 'Inter Tight', sans-serif", color: C.ink, background: C.bg }}>
+    <div style={{ minHeight: "100vh", fontFamily: "var(--font-hall-sans), 'Inter Tight', sans-serif", color: C.ink, background: "#e2e2da", padding: isMobile ? 0 : "22px 16px 40px" }}>
+      {/* app enmarcada (calcada de la maqueta) */}
+      <div style={{ maxWidth: 1160, margin: "0 auto", display: "flex", height: isMobile ? "100vh" : "calc(100vh - 62px)", background: C.bg, border: isMobile ? "none" : `1.5px solid ${C.line}`, borderRadius: isMobile ? 0 : 16, overflow: "hidden" }}>
       {/* hamburguesa (mobile) */}
       {isMobile && !mobileOpen && (
         <button onClick={() => setMobileOpen(true)} aria-label={tr("chrome.openNav")}
@@ -404,7 +406,7 @@ export function RoomClient({ projectId, role, capabilities, personId, defaultLan
       </aside>
 
       {/* ── MAIN ── */}
-      <main style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
+      <main style={{ flex: 1, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column" }}>
         <header style={{ display: "flex", alignItems: "center", gap: 10, padding: isMobile ? "12px 16px 12px 60px" : "12px 20px", borderBottom: `1.5px solid ${C.line}`, position: "sticky", top: 0, background: C.bg, zIndex: 10, flexWrap: "wrap" }}>
           <div style={{ minWidth: 0 }}>
             <div style={{ fontSize: 8, fontWeight: 700, letterSpacing: "2px", textTransform: "uppercase", color: "rgba(0,0,0,.3)" }}>Common House × {(meta.orgName ?? cleanName(project.name)).toUpperCase()}</div>
@@ -436,7 +438,7 @@ export function RoomClient({ projectId, role, capabilities, personId, defaultLan
           )}
         </header>
 
-        <div style={{ padding: "22px 26px 64px", maxWidth: 1120, width: "100%" }}>
+        <div style={{ padding: "20px", flex: 1, overflowY: "auto", minHeight: 0 }}>
           {/* LO MÍO */}
           {section === "mio" && (
             <div style={{ maxWidth: 720 }}>
@@ -902,6 +904,7 @@ export function RoomClient({ projectId, role, capabilities, personId, defaultLan
           )}
         </div>
       </main>
+      </div>{/* /app enmarcada */}
 
       {toast && (
         <div style={{ position: "fixed", left: "50%", bottom: 24, transform: "translateX(-50%)", display: "flex", alignItems: "center", gap: 14, background: C.ink, color: "#fff", padding: "10px 12px 10px 16px", borderRadius: 11, fontSize: 12.5, fontWeight: 600, boxShadow: "0 10px 30px rgba(0,0,0,.3)", zIndex: 100 }}>
