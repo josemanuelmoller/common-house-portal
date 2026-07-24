@@ -178,7 +178,7 @@ export function Sidebar({ items, projectName, isAdmin, adminNav }: Props) {
       {/* Logo — isotipo vivo (señal de vida) + official wordmark. */}
       <div className="px-[18px] pt-5 pb-[18px] border-b border-[#d8d8d0] mb-3">
         <div className="flex items-center gap-2.5">
-          {/* SMIL SVG: negro y quieto, con una onda de luz cada ~2 min. Plano <img> para preservar la animación. */}
+          {/* SMIL SVG: negro y quieto, con una onda de luz que recorre el ∞ (arranca en la C) cada ~1 min. Plano <img> para preservar la animación. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/brand/isotipo-vivo.svg" alt="" style={{ height: 30, width: "auto", display: "block", flexShrink: 0 }} />
           <BrandLogo variant="black" height={34} />
