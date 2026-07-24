@@ -7,19 +7,26 @@ import { UserButton } from "@clerk/nextjs";
 /* ── tipos (espejo de las tablas del Bloque 0) ── */
 type Phase = { id: string; title: string; status: string; position: number };
 type Deliverable = { id: string; title: string; status: string; progress: number; phase_id: string | null; owner_person_id: string | null; due_date: string | null; position: number };
-type Task = { id: string; title: string; status: string; assignee_side: string; deliverable_id: string | null; closed_via: string | null; closed_by: string | null; due_date: string | null; position: number };
+type Task = { id: string; title: string; status: string; assignee_side: string; deliverable_id: string | null; owner_person_id: string | null; closed_via: string | null; closed_by: string | null; due_date: string | null; position: number };
 type Participant = { initials?: string; name?: string; side?: string };
 type Decision = { id: string; title: string; context: string | null; status: string; deliverable_id: string | null; participants: Participant[] | null; source_ref: string | null; resolved_by: string | null };
 type Material = { id: string; title: string; url: string | null; mime_type: string | null; category: string | null; folder_name: string | null; modified_at: string | null };
 type EventRow = { id: string; actor_email: string | null; actor_role: string | null; verb: string; target_type: string; summary: string | null; created_at: string };
 type RoomSummary = { id: string; name: string | null; slug: string | null; stage: string | null };
+type RoomProjectMeta = { orgName: string | null; orgLocation: string | null; orgWebsite: string | null; engagementModel: string | null; projectType: string | null; geography: string | null; startDate: string | null; targetEndDate: string | null; projectCode: string | null; driveUrl: string | null; presaleSlug: string | null; currentFocus: string | null; nextMilestone: string | null };
+type RoomTeamMember = { id: string; name: string; email: string | null; role: string; jobTitle: string | null; photoUrl: string | null; side: "team" | "client" };
+type RoomBilling = { company: { legalName: string | null; taxId: string | null; vatNumber: string | null; address: string | null; billingEmail: string | null; publicNote: string | null } | null; client: { legalName: string | null; taxId: string | null; address: string | null; billingEmail: string | null; billingContact: string | null; poReference: string | null } | null };
 
 type Props = {
   projectId: string;
   role: string;
   capabilities: string[];
+  personId: string | null;
   project: { id: string; name: string | null; current_stage: string | null };
   rooms: RoomSummary[];
+  meta: RoomProjectMeta;
+  team: RoomTeamMember[];
+  billing: RoomBilling;
   initialPhases: Phase[];
   initialDeliverables: Deliverable[];
   initialTasks: Task[];
@@ -55,6 +62,14 @@ function pill(bg: string, fg: string): CSSProperties {
   return { fontSize: 10, fontWeight: 700, letterSpacing: ".3px", textTransform: "uppercase", padding: "2px 8px", borderRadius: 999, background: bg, color: fg, whiteSpace: "nowrap" };
 }
 const label: CSSProperties = { fontSize: 9, fontWeight: 700, letterSpacing: "1.5px", textTransform: "uppercase", color: C.muted };
+const linkChip: CSSProperties = { fontSize: 11, fontWeight: 700, color: C.muted2, background: C.paper, border: `1.5px solid ${C.line}`, borderRadius: 8, padding: "6px 11px", textDecoration: "none" };
+
+function statusTone(s: string): { bg: string; fg: string } {
+  if (s === "doing") return { bg: C.limePaper, fg: C.limeInk };
+  if (s === "blocked") return { bg: C.warnSoft, fg: C.warn };
+  if (s === "done") return { bg: C.okSoft, fg: C.ok };
+  return { bg: C.paper2, fg: C.muted2 };
+}
 
 async function api(path: string, method: string, body?: unknown) {
   const res = await fetch(path, { method, headers: { "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
@@ -63,15 +78,17 @@ async function api(path: string, method: string, body?: unknown) {
   return json;
 }
 
-type SectionKey = "resumen" | "plan" | "entregables" | "tareas" | "decisiones" | "materiales" | "actividad";
+type SectionKey = "mio" | "resumen" | "plan" | "entregables" | "tareas" | "decisiones" | "materiales" | "proyecto" | "actividad";
 
 const NAV: { key: SectionKey; label: string; icon: string; pmOnly?: boolean }[] = [
+  { key: "mio", label: "Lo mío", icon: "✦" },
   { key: "resumen", label: "Resumen", icon: "◈" },
   { key: "plan", label: "Plan", icon: "◆" },
   { key: "entregables", label: "Entregables", icon: "◧" },
   { key: "tareas", label: "Tareas", icon: "✓" },
   { key: "decisiones", label: "Decisiones", icon: "◉" },
   { key: "materiales", label: "Materiales", icon: "▤" },
+  { key: "proyecto", label: "Proyecto", icon: "◍" },
   { key: "actividad", label: "Actividad", icon: "◫", pmOnly: true },
 ];
 
@@ -84,7 +101,7 @@ function initialsOf(name: string | null): string {
   return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase() || "·";
 }
 
-export function RoomClient({ projectId, role, capabilities, project, rooms, initialPhases, initialDeliverables, initialTasks, initialDecisions, initialMaterials, initialEvents }: Props) {
+export function RoomClient({ projectId, role, capabilities, personId, project, rooms, meta, team, billing, initialPhases, initialDeliverables, initialTasks, initialDecisions, initialMaterials, initialEvents }: Props) {
   const [section, setSection] = useState<SectionKey>("resumen");
   const [deliverables, setDeliverables] = useState<Deliverable[]>(initialDeliverables);
   const [tasks, setTasks] = useState<Task[]>(initialTasks);
@@ -179,7 +196,10 @@ export function RoomClient({ projectId, role, capabilities, project, rooms, init
   }, [deliverables, tasks]);
 
   const openDecisions = decisions.filter((d) => d.status === "open").length;
-  const navCount: Partial<Record<SectionKey, number | undefined>> = { entregables: deliverables.length, tareas: tasks.length, decisiones: openDecisions || undefined };
+  const myTasks = personId ? tasks.filter((t) => t.owner_person_id === personId) : [];
+  const myOpenTasks = myTasks.filter((t) => t.status !== "done");
+  const myDeliverables = personId ? deliverables.filter((d) => d.owner_person_id === personId) : [];
+  const navCount: Partial<Record<SectionKey, number | undefined>> = { mio: myOpenTasks.length || undefined, entregables: deliverables.length, tareas: tasks.length, decisiones: openDecisions || undefined };
   const navItems = NAV.filter((n) => !n.pmOnly || can("analytics.view"));
   const sectionLabel = NAV.find((n) => n.key === section)?.label ?? "";
 
@@ -304,6 +324,46 @@ export function RoomClient({ projectId, role, capabilities, project, rooms, init
         </header>
 
         <div style={{ padding: "22px 26px 64px", maxWidth: 1120, width: "100%" }}>
+          {/* LO MÍO */}
+          {section === "mio" && (
+            <div style={{ maxWidth: 720 }}>
+              <h3 style={{ fontSize: 16, fontWeight: 800, margin: "0 0 4px" }}>Lo mío</h3>
+              <div style={{ fontSize: 12.5, color: C.muted2, marginBottom: 16 }}>Tus tareas y entregables en esta sala.</div>
+              {!personId && <Empty text="Tu usuario todavía no está vinculado a una persona en esta sala." />}
+              {personId && myOpenTasks.length === 0 && myDeliverables.length === 0 && <Empty text="No tenés tareas ni entregables asignados. 🎈" />}
+              {myOpenTasks.length > 0 && (
+                <div style={{ marginBottom: 18 }}>
+                  <div style={{ ...label, marginBottom: 8 }}>Mis tareas · {myOpenTasks.length}</div>
+                  {myOpenTasks.map((t) => (
+                    <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 11, padding: "11px 13px", background: C.paper, border: `1.5px solid ${C.line}`, borderRadius: 10, marginBottom: 7 }}>
+                      {(can("task.manage") || can("task.mark_own"))
+                        ? <button onClick={() => closeTask(t)} title="Marcar hecha" style={{ width: 17, height: 17, borderRadius: 5, border: `1.5px solid ${C.muted}`, background: "transparent", cursor: "pointer", flex: "none" }} />
+                        : <span style={{ width: 17, height: 17, borderRadius: 5, border: `1.5px solid ${C.line}`, flex: "none" }} />}
+                      <span style={{ flex: 1, fontSize: 12.5 }}>{t.title}</span>
+                      <span style={pill(statusTone(t.status).bg, statusTone(t.status).fg)}>{TASK_COLS.find((c) => c.key === t.status)?.label ?? t.status}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {myDeliverables.length > 0 && (
+                <div>
+                  <div style={{ ...label, marginBottom: 8 }}>Mis entregables · {myDeliverables.length}</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: 12 }}>
+                    {myDeliverables.map((d) => (
+                      <div key={d.id} style={card()}>
+                        <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                          <b style={{ fontSize: 14, fontWeight: 800 }}>{d.title}</b>
+                          <span style={statusPill(d.status)}>{statusLabel(d.status)}</span>
+                        </div>
+                        <Progress v={d.progress} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* RESUMEN */}
           {section === "resumen" && (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 11 }}>
@@ -475,6 +535,84 @@ export function RoomClient({ projectId, role, capabilities, project, rooms, init
             </div>
           )}
 
+          {/* PROYECTO (Origen · Equipo · Administrativo) */}
+          {section === "proyecto" && (
+            <div style={{ maxWidth: 860, display: "flex", flexDirection: "column", gap: 22 }}>
+              {/* ORIGEN */}
+              <Block title="Origen" note="Heredado de la preventa.">
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(220px,1fr))", gap: "14px 22px" }}>
+                  <Field k="Organización" v={meta.orgName} />
+                  <Field k="Sede" v={meta.orgLocation} />
+                  <Field k="Modelo de trabajo" v={meta.engagementModel} />
+                  <Field k="Tipo de proyecto" v={meta.projectType} />
+                  <Field k="Geografía" v={meta.geography} />
+                  <Field k="Inicio" v={meta.startDate} />
+                  <Field k="Cierre objetivo" v={meta.targetEndDate} />
+                  <Field k="Código" v={meta.projectCode} />
+                  <Field k="Foco actual" v={meta.currentFocus} />
+                  <Field k="Próximo hito" v={meta.nextMilestone} />
+                </div>
+                {(meta.driveUrl || meta.presaleSlug || meta.orgWebsite) && (
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 15 }}>
+                    {meta.driveUrl && <a href={meta.driveUrl} target="_blank" rel="noreferrer" style={linkChip}>Carpeta Drive ↗</a>}
+                    {meta.presaleSlug && <a href={`/hall/${meta.presaleSlug}`} style={linkChip}>Sala de preventa ↗</a>}
+                    {meta.orgWebsite && <a href={meta.orgWebsite} target="_blank" rel="noreferrer" style={linkChip}>Web del cliente ↗</a>}
+                  </div>
+                )}
+              </Block>
+
+              {/* EQUIPO */}
+              <Block title="Equipo" note={`${team.length} ${team.length === 1 ? "persona" : "personas"} con acceso a la sala.`}>
+                {team.length === 0 && <Empty text="Todavía no hay miembros." />}
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(240px,1fr))", gap: 10 }}>
+                  {team.map((m) => (
+                    <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 11, background: C.paper, border: `1.5px solid ${C.line}`, borderRadius: 12, padding: "11px 13px" }}>
+                      <Avatar name={m.name} photoUrl={m.photoUrl} side={m.side} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <b style={{ fontSize: 12.5, fontWeight: 700, display: "block", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.name}</b>
+                        <small style={{ fontSize: 10.5, color: C.muted }}>{m.jobTitle || (m.side === "client" ? "Cliente" : "Equipo")}</small>
+                      </div>
+                      <span style={pill(m.side === "client" ? C.paper2 : C.limePaper, m.side === "client" ? C.muted2 : C.limeInk)}>{roleLabel[m.role] ?? m.role}</span>
+                    </div>
+                  ))}
+                </div>
+              </Block>
+
+              {/* ADMINISTRATIVO */}
+              <Block title="Administrativo">
+                {billing.company && (
+                  <div style={{ marginBottom: billing.client ? 18 : 0 }}>
+                    <div style={{ ...label, marginBottom: 10 }}>Datos de cobro · Common House</div>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(220px,1fr))", gap: "14px 22px" }}>
+                      <Field k="Razón social" v={billing.company.legalName} />
+                      <Field k="Tax ID" v={billing.company.taxId} />
+                      <Field k="VAT" v={billing.company.vatNumber} />
+                      <Field k="Dirección" v={billing.company.address} />
+                      <Field k="Email de facturación" v={billing.company.billingEmail} />
+                    </div>
+                    {billing.company.publicNote && <div style={{ fontSize: 11.5, color: C.muted2, marginTop: 10, lineHeight: 1.5 }}>{billing.company.publicNote}</div>}
+                  </div>
+                )}
+                {billing.client ? (
+                  <div>
+                    <div style={{ ...label, marginBottom: 10 }}>Facturación del cliente</div>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(220px,1fr))", gap: "14px 22px" }}>
+                      <Field k="Razón social" v={billing.client.legalName} />
+                      <Field k="Tax ID" v={billing.client.taxId} />
+                      <Field k="Dirección" v={billing.client.address} />
+                      <Field k="Email de facturación" v={billing.client.billingEmail} />
+                      <Field k="Contacto" v={billing.client.billingContact} />
+                      <Field k="Orden de compra" v={billing.client.poReference} />
+                    </div>
+                  </div>
+                ) : (can("internal.view") || role === "client") ? (
+                  <Note text="El cliente todavía no cargó sus datos de facturación." />
+                ) : null}
+                {!billing.company && !billing.client && <Empty text="Sin datos administrativos." />}
+              </Block>
+            </div>
+          )}
+
           {/* ACTIVIDAD (solo PM) */}
           {section === "actividad" && can("analytics.view") && (
             <div style={{ maxWidth: 720 }}>
@@ -585,6 +723,34 @@ function Progress({ v }: { v: number }) {
   );
 }
 function Empty({ text }: { text: string }) { return <div style={{ padding: "26px 0", textAlign: "center", color: C.muted, fontSize: 13 }}>{text}</div>; }
+function Block({ title, note, children }: { title: string; note?: string; children: ReactNode }) {
+  return (
+    <div style={{ background: C.paper, border: `1.5px solid ${C.line}`, borderRadius: 14, padding: "17px 18px" }}>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 14 }}>
+        <h3 style={{ fontSize: 15, fontWeight: 800, margin: 0 }}>{title}</h3>
+        {note && <span style={{ fontSize: 11, color: C.muted }}>{note}</span>}
+      </div>
+      {children}
+    </div>
+  );
+}
+function Field({ k, v }: { k: string; v: string | null | undefined }) {
+  if (!v) return null;
+  return (
+    <div>
+      <div style={label}>{k}</div>
+      <div style={{ fontSize: 12.5, fontWeight: 600, color: C.ink, marginTop: 3, lineHeight: 1.45, wordBreak: "break-word" }}>{v}</div>
+    </div>
+  );
+}
+function Avatar({ name, photoUrl, side }: { name: string; photoUrl: string | null; side: "team" | "client" }) {
+  const init = name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase() || "·";
+  if (photoUrl) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={photoUrl} alt="" style={{ width: 34, height: 34, borderRadius: 999, objectFit: "cover", flexShrink: 0 }} />;
+  }
+  return <span style={{ width: 34, height: 34, borderRadius: 999, flexShrink: 0, background: side === "client" ? "#495057" : C.limeInk, color: "#fff", display: "grid", placeItems: "center", fontSize: 11, fontWeight: 700 }}>{init}</span>;
+}
 function Note({ text }: { text: string }) { return <div style={{ marginTop: 11, fontSize: 11, color: C.muted, fontWeight: 600 }}>{text}</div>; }
 function card(): CSSProperties { return { background: C.paper, border: `1.5px solid ${C.line}`, borderRadius: 12, padding: 15, display: "flex", flexDirection: "column", gap: 10 }; }
 function btn(bg: string, fg: string, bordered?: boolean): CSSProperties { return { fontFamily: "inherit", fontSize: 11, fontWeight: 800, letterSpacing: ".3px", textTransform: "uppercase", padding: "7px 13px", borderRadius: 8, border: bordered ? `1.5px solid ${C.line}` : "none", background: bg, color: fg, cursor: "pointer" }; }
