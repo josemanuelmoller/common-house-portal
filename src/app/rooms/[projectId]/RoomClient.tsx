@@ -286,6 +286,11 @@ export function RoomClient({ projectId, role, capabilities, personId, defaultLan
 
         {/* acordeón de salas */}
         <nav style={{ flex: 1, overflowY: "auto", padding: "12px 0" }}>
+          <Link href="/rooms" title={tr("chrome.myDesk")}
+            style={{ display: "flex", alignItems: "center", gap: 10, padding: showLabels ? "6px 16px 10px" : "6px 0 10px", justifyContent: showLabels ? "flex-start" : "center", textDecoration: "none", color: C.muted2, fontSize: 12, fontWeight: 700 }}>
+            <span style={{ fontSize: 12, width: 16, textAlign: "center", flexShrink: 0 }}>◱</span>
+            {showLabels && <span>{tr("chrome.myDesk")}</span>}
+          </Link>
           {showLabels && <div style={{ ...label, padding: "0 16px 8px" }}>{tr("chrome.rooms")}</div>}
           {roomList.map((r) => {
             const current = r.id === projectId;

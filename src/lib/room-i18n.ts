@@ -11,7 +11,7 @@ export type Lang = "es" | "en";
 const ES: Record<string, string> = {
   // chrome
   "chrome.workRoom": "Sala de trabajo", "chrome.rooms": "Salas", "chrome.yourRole": "Tu rol en esta sala",
-  "chrome.collapse": "Colapsar", "chrome.expand": "Expandir", "chrome.openNav": "Abrir navegación", "chrome.room": "Sala",
+  "chrome.collapse": "Colapsar", "chrome.expand": "Expandir", "chrome.openNav": "Abrir navegación", "chrome.room": "Sala", "chrome.myDesk": "Mi escritorio",
   // nav
   "nav.mio": "Lo mío", "nav.resumen": "Resumen", "nav.plan": "Plan", "nav.entregables": "Entregables",
   "nav.tareas": "Tareas", "nav.decisiones": "Decisiones", "nav.materiales": "Materiales", "nav.reuniones": "Reuniones", "nav.proyecto": "Proyecto", "nav.actividad": "Actividad",
@@ -79,7 +79,7 @@ const ES: Record<string, string> = {
 
 const EN: Record<string, string> = {
   "chrome.workRoom": "Work room", "chrome.rooms": "Rooms", "chrome.yourRole": "Your role in this room",
-  "chrome.collapse": "Collapse", "chrome.expand": "Expand", "chrome.openNav": "Open navigation", "chrome.room": "Room",
+  "chrome.collapse": "Collapse", "chrome.expand": "Expand", "chrome.openNav": "Open navigation", "chrome.room": "Room", "chrome.myDesk": "My desk",
   "nav.mio": "My work", "nav.resumen": "Overview", "nav.plan": "Plan", "nav.entregables": "Deliverables",
   "nav.tareas": "Tasks", "nav.decisiones": "Decisions", "nav.materiales": "Materials", "nav.reuniones": "Meetings", "nav.proyecto": "Project", "nav.actividad": "Activity",
   "meet.desc": "Every project meeting is processed and lands here automatically.", "meet.none": "No meetings recorded yet.",
