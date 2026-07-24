@@ -175,6 +175,41 @@ export function RoomClient({ projectId, role, capabilities, personId, defaultLan
   const delivCols = useMemo(() => DELIV_COLS.map((c) => ({ ...c, label: tr("ds." + c.key) })), [tr]);
   const taskCols = useMemo(() => TASK_COLS.map((c) => ({ ...c, label: tr("ts." + c.key) })), [tr]);
 
+  /* resolución de responsable (owner_person_id → miembro del equipo) para avatares */
+  const memberById = useMemo(() => { const m = new Map<string, RoomTeamMember>(); team.forEach((x) => m.set(x.id, x)); return m; }, [team]);
+  const ownerOf = (id: string | null) => (id ? memberById.get(id) ?? null : null);
+
+  /* Materiales agrupados por categoría (calco .matg de la maqueta) */
+  const matGroups = useMemo(() => {
+    const map = new Map<string, Material[]>();
+    initialMaterials.forEach((m) => { const c = m.category ?? "other"; if (!map.has(c)) map.set(c, []); map.get(c)!.push(m); });
+    return [...map.entries()].map(([cat, items]) => ({ cat, label: cat === "other" ? (lang === "es" ? "Otros" : "Other") : tr("matcat." + cat, cat.replace(/_/g, " ")), items }));
+  }, [initialMaterials, tr, lang]);
+
+  /* Tareas agrupadas por responsable; sin responsable, por entregable (calco .owner) */
+  const taskGroups = useMemo(() => {
+    const groups: { key: string; name: string; color: string; init: string; tag: string; items: Task[] }[] = [];
+    const idx = new Map<string, number>();
+    for (const t of tasks) {
+      const owner = t.owner_person_id ? memberById.get(t.owner_person_id) ?? null : null;
+      const del = t.deliverable_id ? deliverables.find((d) => d.id === t.deliverable_id) : null;
+      const key = owner ? "p:" + owner.id : del ? "d:" + del.id : t.assignee_side === "client" ? "client" : "un";
+      if (!idx.has(key)) {
+        const name = owner ? owner.name : del ? del.title : t.assignee_side === "client" ? tr("tasks.client") : (lang === "es" ? "Sin asignar" : "Unassigned");
+        groups.push({
+          key, name,
+          color: owner ? avColor(owner.name) : del ? "#495057" : "#8a8a82",
+          init: owner ? avInit(owner.name) : del ? "◧" : "·",
+          tag: owner && del ? "· " + del.title : del ? (lang === "es" ? "· entregable" : "· deliverable") : "",
+          items: [],
+        });
+        idx.set(key, groups.length - 1);
+      }
+      groups[idx.get(key)!].items.push(t);
+    }
+    return groups;
+  }, [tasks, deliverables, memberById, tr, lang]);
+
   function flash(msg: string, undo?: () => void) { setToast({ msg, undo }); window.setTimeout(() => setToast((cur) => (cur?.msg === msg ? null : cur)), undo ? 6000 : 3000); }
 
   /* ── acciones (optimistic + revert) ── */
@@ -700,32 +735,47 @@ export function RoomClient({ projectId, role, capabilities, personId, defaultLan
               onCreate={can("structure.edit") ? createDeliverable : undefined} createLabel={tr("btn.addDeliverable")}
             >
               {dView === "list" ? (
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: 12 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(280px,1fr))", gap: 12, alignItems: "start" }}>
                   {deliverables.map((d) => {
                     const dTasks = tasks.filter((t) => t.deliverable_id === d.id);
+                    const done = dTasks.filter((t) => t.status === "done").length;
                     const open = expandedDeliv === d.id;
+                    const owner = ownerOf(d.owner_person_id);
+                    const day = fmtDay(d.due_date, lang);
+                    const whenTxt = d.status === "delivered" || d.status === "accepted"
+                      ? (day || tr("ds." + d.status))
+                      : d.status === "not_started"
+                        ? (day ? (lang === "es" ? "inicia " : "starts ") + day : tr("ds." + d.status))
+                        : (day ? (lang === "es" ? "vence " : "due ") + day : tr("ds." + d.status));
+                    const phase = d.phase_id ? phases.find((p) => p.id === d.phase_id) : null;
                     return (
-                      <div key={d.id} style={card()}>
-                        <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-                          <b style={{ fontSize: 14, fontWeight: 800 }}>{d.title}</b>
+                      <div key={d.id} style={{ background: C.paper, border: `1.5px solid ${C.line}`, borderRadius: 14, padding: "15px 16px", display: "flex", flexDirection: "column", gap: 11 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
+                          <h4 style={{ fontSize: 14, fontWeight: 800, letterSpacing: "-.2px", lineHeight: 1.3, margin: 0 }}>{d.title}</h4>
                           <span style={statusPill(d.status)}>{statusLabel(d.status)}</span>
                         </div>
+                        <div style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11.5, color: C.muted }}>
+                          {owner && <span style={{ width: 19, height: 19, borderRadius: 999, display: "grid", placeItems: "center", fontSize: 9, fontWeight: 700, color: "#fff", flex: "none", background: avColor(owner.name) }}>{avInit(owner.name)}</span>}
+                          <span>{owner ? owner.name.split(" ")[0] + " · " + whenTxt : whenTxt}</span>
+                        </div>
                         <Progress v={d.progress} />
-                        {dTasks.length > 0 && (
-                          <button onClick={() => setExpandedDeliv(open ? null : d.id)} style={{ display: "flex", alignItems: "center", gap: 6, background: "transparent", border: 0, padding: 0, cursor: "pointer", fontFamily: "inherit", ...label, color: C.muted2 }}>
-                            <span style={{ transform: open ? "rotate(90deg)" : "none", transition: "transform .15s" }}>▸</span>
-                            {dTasks.filter((t) => t.status === "done").length}/{dTasks.length} {tr("word.tasks")}
-                          </button>
-                        )}
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: `1px solid ${C.line}`, paddingTop: 11, fontSize: 10.5, color: C.muted, fontWeight: 600 }}>
+                          {dTasks.length > 0
+                            ? <button onClick={() => setExpandedDeliv(open ? null : d.id)} style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "transparent", border: 0, padding: 0, cursor: "pointer", fontFamily: "inherit", fontSize: 9, fontWeight: 800, letterSpacing: ".5px", textTransform: "uppercase", color: C.muted }}>
+                                <span style={{ transform: open ? "rotate(90deg)" : "none", transition: "transform .15s" }}>▸</span>{done}/{dTasks.length} {tr("word.tasks")}
+                              </button>
+                            : <span>0 {tr("word.tasks")}</span>}
+                          {phase && <span>{phase.title}</span>}
+                        </div>
                         {open && dTasks.length > 0 && (
-                          <div style={{ display: "flex", flexDirection: "column", gap: 6, borderTop: `1px solid ${C.lineSoft}`, paddingTop: 9 }}>
-                            {dTasks.map((t) => (
-                              <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
-                                <span style={{ width: 6, height: 6, borderRadius: 999, background: statusTone(t.status).fg, flexShrink: 0 }} />
-                                <span style={{ flex: 1, textDecoration: t.status === "done" ? "line-through" : "none", color: t.status === "done" ? C.muted : C.ink }}>{t.title}</span>
-                                <span style={label}>{tr("ts." + t.status)}</span>
+                          <div style={{ borderTop: "1px solid #eee", paddingTop: 8, marginTop: -2 }}>
+                            {dTasks.map((t) => { const td = fmtDay(t.due_date, lang); const isDone = t.status === "done"; return (
+                              <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 0", fontSize: 11.5 }}>
+                                <span style={{ width: 13, height: 13, borderRadius: 4, border: `1.5px solid ${isDone ? C.lime : "#c4c4ba"}`, background: isDone ? C.lime : "transparent", flex: "none", display: "grid", placeItems: "center", fontSize: 8, fontWeight: 900, color: "#000" }}>{isDone ? "✓" : ""}</span>
+                                <span style={{ color: isDone ? C.muted : C.ink, textDecoration: isDone ? "line-through" : "none" }}>{t.title}</span>
+                                {!isDone && td && <span style={{ marginLeft: "auto", color: t.status === "blocked" ? C.warn : C.muted, fontSize: 10, fontWeight: 700 }}>{t.status === "blocked" ? (lang === "es" ? "bloqueada" : "blocked") : td}</span>}
                               </div>
-                            ))}
+                            ); })}
                           </div>
                         )}
                         {d.status === "delivered" && can("deliverable.accept") && (
@@ -739,7 +789,7 @@ export function RoomClient({ projectId, role, capabilities, personId, defaultLan
               ) : (
                 <Kanban cols={delivCols} items={deliverables} draggable={can("deliverable.move")}
                   onDrop={(id, to) => { const d = deliverables.find((x) => x.id === id); if (d && d.status !== to) moveDeliverable(id, to, d.status); }}
-                  renderCard={(d) => (<><div style={{ fontSize: 12, fontWeight: 700 }}>{d.title}</div><div style={{ ...label, marginTop: 6 }}>{d.progress}%</div></>)} />
+                  renderCard={(d) => { const o = ownerOf(d.owner_person_id); return (<><div style={{ fontSize: 12, fontWeight: 700 }}>{d.title}</div><div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 7 }}>{o && <span style={{ width: 17, height: 17, borderRadius: 999, display: "grid", placeItems: "center", fontSize: 8, fontWeight: 700, color: "#fff", background: avColor(o.name) }}>{avInit(o.name)}</span>}<span style={label}>{d.progress}%</span></div></>); }} />
               )}
               {!can("deliverable.move") && dView === "kanban" && <Note text={tr("deliv.cantMove")} />}
             </Section>
@@ -753,75 +803,88 @@ export function RoomClient({ projectId, role, capabilities, personId, defaultLan
               onCreate={can("task.crud") ? createTask : undefined} createLabel={tr("btn.addTask")}
             >
               {tView === "list" ? (
-                <div style={{ maxWidth: 680 }}>
-                  {["todo", "doing", "blocked", "done"].map((stt) => {
-                    const items = tasks.filter((t) => t.status === stt);
-                    if (!items.length) return null;
-                    return (
-                      <div key={stt} style={{ marginBottom: 14 }}>
-                        <div style={{ ...label, marginBottom: 7 }}>{tr("ts." + stt)}</div>
-                        {items.map((t) => (
-                          <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 11, padding: "11px 13px", background: C.paper, border: `1.5px solid ${C.line}`, borderRadius: 10, marginBottom: 7 }}>
-                            {t.status !== "done" && (can("task.manage") || can("task.mark_own"))
-                              ? <button onClick={() => closeTask(t)} title={tr("btn.markDone")} style={{ width: 17, height: 17, borderRadius: 5, border: `1.5px solid ${C.muted}`, background: "transparent", cursor: "pointer", flex: "none" }} />
-                              : <span style={{ width: 17, height: 17, borderRadius: 5, background: t.status === "done" ? C.lime : "transparent", border: `1.5px solid ${t.status === "done" ? C.lime : C.line}`, display: "grid", placeItems: "center", fontSize: 11, fontWeight: 900, color: "#0a0a0a", flex: "none" }}>{t.status === "done" ? "✓" : ""}</span>}
-                            <span style={{ flex: 1, fontSize: 12.5, textDecoration: t.status === "done" ? "line-through" : "none", color: t.status === "done" ? C.muted : C.ink }}>{t.title}</span>
-                            {t.assignee_side === "client" && <span style={pill(C.paper2, C.muted2)}>{tr("tasks.client")}</span>}
-                            {t.closed_via && <span style={{ ...label, color: t.closed_via === "evidence" ? C.limeInk : C.muted }}>{t.closed_via === "evidence" ? tr("tasks.evidence") : tr("tasks.attested")}</span>}
-                          </div>
-                        ))}
+                <div style={{ maxWidth: 700 }}>
+                  {taskGroups.map((g) => (
+                    <div key={g.key} style={{ background: C.paper, border: `1.5px solid ${C.line}`, borderRadius: 14, overflow: "hidden", marginBottom: 12 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "11px 15px", borderBottom: "1px solid #eee" }}>
+                        <span style={{ width: 19, height: 19, borderRadius: 999, display: "grid", placeItems: "center", fontSize: g.init.length > 2 ? 7 : 9, fontWeight: 700, color: "#fff", flex: "none", background: g.color }}>{g.init}</span>
+                        <b style={{ fontSize: 12, fontWeight: 800 }}>{g.name}</b>
+                        {g.tag && <span style={{ fontSize: 9, color: C.muted, fontWeight: 700, letterSpacing: "1px", textTransform: "uppercase" }}>{g.tag}</span>}
                       </div>
-                    );
-                  })}
+                      {g.items.map((t, i) => { const isDone = t.status === "done"; const td = fmtDay(t.due_date, lang); const late = !isDone && isPast(t.due_date); return (
+                        <div key={t.id} style={{ display: "flex", alignItems: "flex-start", gap: 11, padding: "11px 15px", ...(i > 0 ? { borderTop: "1px solid #eee" } : {}) }}>
+                          {!isDone && (can("task.manage") || can("task.mark_own"))
+                            ? <button onClick={() => closeTask(t)} title={tr("btn.markDone")} style={{ width: 17, height: 17, borderRadius: 5, border: `1.5px solid #c4c4ba`, background: "transparent", cursor: "pointer", flex: "none", marginTop: 1 }} />
+                            : <span style={{ width: 17, height: 17, borderRadius: 5, background: isDone ? C.lime : "transparent", border: `1.5px solid ${isDone ? C.lime : "#c4c4ba"}`, display: "grid", placeItems: "center", fontSize: 11, fontWeight: 900, color: "#0a0a0a", flex: "none", marginTop: 1 }}>{isDone ? "✓" : ""}</span>}
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <span style={{ fontSize: 12.5, color: isDone ? C.muted : C.ink, textDecoration: isDone ? "line-through" : "none" }}>{t.title}</span>
+                            {t.closed_via && (
+                              <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 9, fontWeight: 700, letterSpacing: ".6px", textTransform: "uppercase", marginTop: 4, flexWrap: "wrap", color: t.closed_via === "evidence" ? C.limeInk : C.muted }}>
+                                {t.closed_via === "evidence" ? "✓ " + tr("tasks.evidence") : "✍ " + tr("tasks.attested")}
+                                {t.closed_via !== "evidence" && <span style={{ fontSize: 8, background: "rgba(0,0,0,.06)", color: "rgba(0,0,0,.42)", padding: "1px 6px", borderRadius: 6 }}>{lang === "es" ? "sin evidencia" : "no evidence"}</span>}
+                              </span>
+                            )}
+                          </div>
+                          {t.assignee_side === "client" && !g.key.startsWith("d:") && g.key !== "client" && <span style={pill(C.paper2, C.muted2)}>{tr("tasks.client")}</span>}
+                          {td && <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: ".6px", textTransform: "uppercase", color: late ? "#b91c1c" : C.muted, whiteSpace: "nowrap", marginTop: 2 }}>{late ? (lang === "es" ? "vencida" : "overdue") : td}</span>}
+                        </div>
+                      ); })}
+                    </div>
+                  ))}
                   {tasks.length === 0 && <Empty text={tr("tasks.none")} />}
                 </div>
               ) : (
                 <Kanban cols={taskCols} items={tasks} draggable={can("task.move")}
                   onDrop={(id, to) => { const t = tasks.find((x) => x.id === id); if (t && t.status !== to) moveTask(id, to, t.status); }}
-                  renderCard={(t) => (<><div style={{ fontSize: 12, fontWeight: 700 }}>{t.title}</div>{t.assignee_side === "client" && <div style={{ ...label, marginTop: 6 }}>{tr("tasks.client")}</div>}</>)} />
+                  renderCard={(t) => { const o = ownerOf(t.owner_person_id); const td = fmtDay(t.due_date, lang); const late = t.status !== "done" && isPast(t.due_date); return (<><div style={{ fontSize: 12, fontWeight: 700 }}>{t.title}</div><div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 7 }}>{o && <span style={{ width: 17, height: 17, borderRadius: 999, display: "grid", placeItems: "center", fontSize: 8, fontWeight: 700, color: "#fff", background: avColor(o.name) }}>{avInit(o.name)}</span>}{t.assignee_side === "client" && !o && <span style={label}>{tr("tasks.client")}</span>}<span style={{ ...label, marginLeft: "auto", color: late ? "#b91c1c" : C.muted }}>{late ? (lang === "es" ? "vencida" : "overdue") : td}</span></div></>); }} />
               )}
               {!can("task.move") && tView === "kanban" && <Note text={tr("tasks.cantMove")} />}
             </Section>
           )}
 
-          {/* DECISIONES */}
+          {/* DECISIONES — calco .rowc (columna "when" + dec-exp expandible) */}
           {section === "decisiones" && (
-            <div style={{ maxWidth: 720 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 14 }}>
-                <h3 style={{ fontSize: 16, fontWeight: 800, margin: 0 }}>{tr("dec.title")}</h3><span style={{ flex: 1 }} />
+            <div style={{ maxWidth: 740 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 7 }}>
+                <h3 style={{ fontSize: 16, fontWeight: 800, margin: 0 }}>{tr("dec.title")}</h3>
+                <span style={{ fontSize: 11, color: C.muted, fontWeight: 600 }}>{decisions.filter((d) => d.status === "open").length} {lang === "es" ? "abierta" : "open"} · {decisions.filter((d) => d.status !== "open").length} {lang === "es" ? "cerradas" : "closed"}</span>
+                <span style={{ flex: 1 }} />
                 {can("decision.manage") && <button onClick={createDecision} style={btn(C.paper, C.muted2, true)}>{tr("btn.addDecision")}</button>}
               </div>
+              <p style={{ color: C.muted, fontSize: 13, maxWidth: "72ch", margin: "-2px 0 18px", lineHeight: 1.6 }}>{lang === "es" ? "Cada decisión queda anclada al entregable que afecta y a la reunión donde salió. Clickeá una para ver el contexto y quién estuvo presente." : "Each decision is anchored to the deliverable it affects and the meeting it came from. Click one to see the context and who was present."}</p>
               {decisions.length === 0 && <Empty text={tr("dec.none")} />}
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 {decisions.map((d) => {
                   const del = deliverables.find((x) => x.id === d.deliverable_id);
                   const open = d.status === "open";
                   const exp = expandedDecision === d.id;
-                  const hasBody = !!(d.context || d.source_ref || (Array.isArray(d.participants) && d.participants.length > 0));
+                  const hasBody = !!(d.context || (Array.isArray(d.participants) && d.participants.length > 0));
                   return (
-                    <div key={d.id} style={{ background: open ? C.warnSoft : C.paper, border: `1.5px solid ${open ? "#f0e0b0" : C.line}`, borderRadius: 12, padding: "13px 15px" }}>
-                      <button onClick={() => setExpandedDecision(exp ? null : d.id)} style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", width: "100%", textAlign: "left", background: "transparent", border: 0, padding: 0, cursor: "pointer", fontFamily: "inherit" }}>
-                        {hasBody && <span style={{ color: C.muted, transform: exp ? "rotate(90deg)" : "none", transition: "transform .15s", fontSize: 11 }}>▸</span>}
-                        <b style={{ fontSize: 14, fontWeight: 800 }}>{d.title}</b>
-                        {del && <span style={{ ...label, color: "#4a5bc0", background: "rgba(91,107,214,.11)", padding: "2px 7px", borderRadius: 5 }}>↳ {del.title}</span>}
-                        <span style={{ flex: 1 }} />
-                        <span style={pill(open ? C.warnSoft : C.okSoft, open ? C.warn : C.ok)}>{open ? tr("dec.open") : tr("dec.closed")}</span>
-                      </button>
-                      {exp && (
-                        <div style={{ paddingLeft: hasBody ? 19 : 0 }}>
-                          {d.context && <div style={{ fontSize: 12.5, color: C.muted2, marginTop: 8, lineHeight: 1.5 }}>{d.context}</div>}
-                          {d.source_ref && <div style={{ fontSize: 9, color: C.muted, marginTop: 6, fontWeight: 600, letterSpacing: ".3px", textTransform: "uppercase" }}>↳ {d.source_ref}</div>}
-                          {Array.isArray(d.participants) && d.participants.length > 0 && (
-                            <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 9, flexWrap: "wrap" }}>
-                              <span style={label}>{tr("dec.present")}</span>
-                              {d.participants.map((p, i) => <span key={i} style={{ width: 22, height: 22, borderRadius: 999, background: p.side === "client" ? "#495057" : C.limeInk, color: "#fff", display: "grid", placeItems: "center", fontSize: 8, fontWeight: 700 }}>{p.initials || "?"}</span>)}
-                            </div>
-                          )}
-                          {open && (can("decision.manage") || can("decision.resolve_own")) && (
-                            <button onClick={() => resolveDecision(d.id)} style={{ ...btn(C.lime, "#0a0a0a"), marginTop: 11 }}>{tr("btn.resolveDecision")}</button>
-                          )}
+                    <div key={d.id} onClick={() => hasBody && setExpandedDecision(exp ? null : d.id)}
+                      style={{ display: "flex", gap: 13, background: open ? C.warnSoft : C.paper, border: `1.5px solid ${open ? "#f0e0b0" : C.line}`, borderRadius: 12, padding: "13px 15px", cursor: hasBody ? "pointer" : "default" }}>
+                      <span style={{ fontFamily: "ui-monospace,monospace", fontSize: 9, fontWeight: 700, letterSpacing: ".5px", textTransform: "uppercase", color: open ? C.warn : C.muted, whiteSpace: "nowrap", minWidth: 52, paddingTop: 2 }}>{open ? tr("dec.open") : tr("dec.closed")}</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                          <b style={{ fontSize: 13, fontWeight: 800 }}>{d.title}</b>
+                          {del && <span style={{ fontSize: 8, fontWeight: 800, letterSpacing: ".4px", textTransform: "uppercase", color: "#4a5bc0", background: "rgba(91,107,214,.11)", padding: "2px 7px", borderRadius: 5, whiteSpace: "nowrap" }}>↳ {del.title}</span>}
                         </div>
-                      )}
+                        {d.source_ref && <div style={{ fontSize: 9, color: "rgba(0,0,0,.4)", marginTop: 6, fontWeight: 600, letterSpacing: ".3px" }}>↳ {d.source_ref}</div>}
+                        {exp && hasBody && (
+                          <div style={{ marginTop: 11, paddingTop: 11, borderTop: "1px solid #eee", fontSize: 12, color: C.muted, lineHeight: 1.55 }}>
+                            {d.context && <span><b style={{ color: C.ink }}>{lang === "es" ? "Por qué importa: " : "Why it matters: "}</b>{d.context}</span>}
+                            {Array.isArray(d.participants) && d.participants.length > 0 && (
+                              <div style={{ display: "flex", alignItems: "center", gap: 7, marginTop: 10, flexWrap: "wrap" }}>
+                                <span style={{ fontSize: 8, fontWeight: 800, letterSpacing: "1px", textTransform: "uppercase", color: "rgba(0,0,0,.4)" }}>{tr("dec.present")}</span>
+                                {d.participants.map((p, i) => <span key={i} style={{ width: 24, height: 24, borderRadius: 999, background: p.side === "client" ? "#495057" : "#3B5BDB", color: "#fff", display: "grid", placeItems: "center", fontSize: 8, fontWeight: 700, ...(p.side === "client" ? { outline: `2px solid ${C.lime}`, outlineOffset: 1 } : {}) }}>{p.initials || "?"}</span>)}
+                              </div>
+                            )}
+                            {open && (can("decision.manage") || can("decision.resolve_own")) && (
+                              <button onClick={(e) => { e.stopPropagation(); resolveDecision(d.id); }} style={{ ...btn(C.lime, "#0a0a0a"), marginTop: 11 }}>{tr("btn.resolveDecision")}</button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      {hasBody && <span style={{ marginLeft: "auto", color: C.muted, transform: exp ? "rotate(90deg)" : "none", transition: "transform .15s", fontSize: 11, alignSelf: "flex-start", paddingTop: 2 }}>▸</span>}
                     </div>
                   );
                 })}
@@ -829,21 +892,38 @@ export function RoomClient({ projectId, role, capabilities, personId, defaultLan
             </div>
           )}
 
-          {/* MATERIALES */}
+          {/* MATERIALES — agrupados por categoría (calco .matg) */}
           {section === "materiales" && (
             <div>
-              <h3 style={{ fontSize: 16, fontWeight: 800, margin: "0 0 14px" }}>{tr("mat.title")}</h3>
-              {initialMaterials.length === 0 && <Empty text={tr("mat.none")} />}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(240px,1fr))", gap: 10 }}>
-                {initialMaterials.map((m) => (
-                  <a key={m.id} href={m.url ?? undefined} target="_blank" rel="noreferrer"
-                    style={{ display: "flex", alignItems: "center", gap: 11, background: C.paper, border: `1.5px solid ${C.line}`, borderRadius: 12, padding: "11px 14px", textDecoration: "none", color: "inherit", cursor: m.url ? "pointer" : "default" }}>
-                    <span style={{ width: 32, height: 32, borderRadius: 7, background: C.paper2, display: "grid", placeItems: "center", fontSize: 8, fontWeight: 800, color: C.muted2 }}>{(m.mime_type || "DOC").split("/").pop()?.slice(0, 4).toUpperCase()}</span>
-                    <span style={{ flex: 1, minWidth: 0 }}><b style={{ fontSize: 12.5, fontWeight: 700, display: "block", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.title}</b><small style={{ fontSize: 10, color: C.muted }}>{m.category ? tr("matcat." + m.category, m.category.replace(/_/g, " ")) : (m.folder_name || "")}</small></span>
-                    {m.url ? <span style={{ color: C.muted }}>↗</span> : <span style={label}>{tr("mat.readonly")}</span>}
-                  </a>
-                ))}
+              <div style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 7 }}>
+                <h3 style={{ fontSize: 16, fontWeight: 800, margin: 0 }}>{tr("mat.title")}</h3>
+                <span style={{ fontSize: 11, color: C.muted, fontWeight: 600 }}>{initialMaterials.length} {lang === "es" ? "archivos · Google Drive" : "files · Google Drive"}</span>
+                <span style={{ flex: 1 }} />
+                {can("material.upload") && <button style={btn(C.paper, C.muted2, true)}>{lang === "es" ? "+ Subir" : "+ Upload"}</button>}
               </div>
+              <p style={{ color: C.muted, fontSize: 13, maxWidth: "72ch", margin: "-2px 0 18px", lineHeight: 1.6 }}>{lang === "es" ? "Agrupados por área de trabajo, siempre en su versión más reciente desde Drive." : "Grouped by work area, always the latest version from Drive."}</p>
+              {initialMaterials.length === 0 && <Empty text={tr("mat.none")} />}
+              {matGroups.map((g) => (
+                <div key={g.cat} style={{ marginBottom: 18 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 10 }}>
+                    <span style={label}>{g.label}</span>
+                    <span style={{ fontSize: 8.5, fontWeight: 700, background: "rgba(0,0,0,.06)", color: "rgba(0,0,0,.4)", padding: "1px 7px", borderRadius: 8 }}>{g.items.length}</span>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(228px,1fr))", gap: 8 }}>
+                    {g.items.map((m) => { const f = fileIcon(m.mime_type); return (
+                      <a key={m.id} href={m.url ?? undefined} target="_blank" rel="noreferrer"
+                        style={{ display: "flex", alignItems: "center", gap: 12, background: C.paper, border: `1.5px solid ${C.line}`, borderRadius: 12, padding: "11px 15px", textDecoration: "none", color: "inherit", cursor: m.url ? "pointer" : "default" }}>
+                        <span style={{ width: 32, height: 32, borderRadius: 7, display: "grid", placeItems: "center", fontSize: 8, fontWeight: 900, color: "#fff", flexShrink: 0, letterSpacing: ".3px", background: f.bg }}>{f.label}</span>
+                        <span style={{ flex: 1, minWidth: 0 }}>
+                          <b style={{ fontSize: 12.5, fontWeight: 700, display: "block", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.title}</b>
+                          <small style={{ fontSize: 10, color: C.muted }}>{m.modified_at ? fmtDay(m.modified_at, lang) : (m.folder_name || "Drive")}</small>
+                        </span>
+                        {m.url ? <span style={{ color: C.muted }}>↗</span> : <span style={label}>{tr("mat.readonly")}</span>}
+                      </a>
+                    ); })}
+                  </div>
+                </div>
+              ))}
             </div>
           )}
 
@@ -993,6 +1073,28 @@ export function RoomClient({ projectId, role, capabilities, personId, defaultLan
 
 /* ── helpers de presentación ── */
 function cleanName(name: string | null): string { return (name ?? "Sala").replace(/^\[[^\]]*\]\s*/, "").trim() || "Sala"; }
+function fileIcon(mime: string | null): { bg: string; label: string } {
+  const m = (mime ?? "").toLowerCase();
+  if (m.includes("pdf")) return { bg: "#d33a34", label: "PDF" };
+  if (m.includes("sheet") || m.includes("excel") || m.includes("csv")) return { bg: "#1f9d57", label: "XLS" };
+  if (m.includes("presentation") || m.includes("slides") || m.includes("powerpoint")) return { bg: "#c67a0a", label: "DECK" };
+  if (m.includes("word") || m.includes("document")) return { bg: "#3b5bdb", label: "DOC" };
+  return { bg: "#6b6b6b", label: (m.split("/").pop() ?? "DOC").slice(0, 4).toUpperCase() || "DOC" };
+}
+const AV_COLORS = ["#3B5BDB", "#0C8599", "#9C36B5", "#495057", "#c67a0a"];
+function avInit(name: string): string { return name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase() || "·"; }
+function avColor(seed: string): string { let h = 0; for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0; return AV_COLORS[h % AV_COLORS.length]; }
+function fmtDay(iso: string | null, lang: string): string {
+  if (!iso) return "";
+  const d = new Date(iso.length <= 10 ? iso + "T00:00:00" : iso);
+  if (isNaN(d.getTime())) return "";
+  return d.toLocaleDateString(lang === "en" ? "en-GB" : "es-ES", { day: "numeric", month: "short" });
+}
+function isPast(iso: string | null): boolean {
+  if (!iso) return false;
+  const d = new Date(iso.length <= 10 ? iso + "T23:59:59" : iso);
+  return !isNaN(d.getTime()) && d.getTime() < Date.now();
+}
 
 /* ── sub-componentes ── */
 function Stat({ l, v, lime, warn, sm, animate }: { l: string; v: string; lime?: boolean; warn?: boolean; sm?: boolean; animate?: { to: number; suffix?: string } }) {
