@@ -49,6 +49,9 @@ async function handle(req: NextRequest) {
   const url = new URL(req.url);
   const execute = url.searchParams.get("execute") === "true";
   const limit = Math.min(parseInt(url.searchParams.get("limit") ?? "200", 10) || 200, 2000);
+  // Default newest-first (keeps the recent layer clean). `order=oldest` sweeps
+  // the historical backlog (e.g. source-less April/May evidence).
+  const oldestFirst = url.searchParams.get("order") === "oldest";
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return NextResponse.json({ ok: false, error: "ANTHROPIC_API_KEY missing" }, { status: 500 });
 
@@ -77,7 +80,7 @@ async function handle(req: NextRequest) {
     .select("id, title, evidence_statement, project_notion_id, org_notion_id")
     .or("project_notion_id.is.null,org_notion_id.is.null")
     .not("evidence_statement", "is", null)
-    .order("date_captured", { ascending: false })
+    .order("date_captured", { ascending: oldestFirst })
     .limit(limit);
   const evidence = ((evs ?? []) as Array<{ id: string; title: string | null; evidence_statement: string | null; project_notion_id: string | null; org_notion_id: string | null }>)
     .filter(e => (e.evidence_statement ?? "").trim().length >= 25);
