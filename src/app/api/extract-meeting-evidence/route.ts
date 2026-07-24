@@ -390,6 +390,17 @@ async function _POST(req: NextRequest) {
       return NextResponse.json({ ok: true, dry_run: dryRun, meetings: 0, evidence_written: 0, skipped: 0, cost_usd: 0, message: "No new meetings in window" });
     }
 
+    // fetchOnly: confirm Fireflies still returns these transcripts (no LLM
+    // extraction — the cheap probe that gates a re-digest backfill).
+    if (params.fetchOnly === true) {
+      return NextResponse.json({
+        ok: true,
+        fetch_only: true,
+        count: transcripts.length,
+        transcripts: transcripts.map(t => ({ id: t.id, title: t.title, date: t.date, participants: (t.participants ?? []).length })),
+      });
+    }
+
     // Dedup window: an injected backfill can span months, so widen the
     // existing-evidence preload back to the earliest injected meeting date
     // rather than the hoursBack window (which only covers the live cron case).
