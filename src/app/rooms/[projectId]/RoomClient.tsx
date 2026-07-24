@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import Link from "next/link";
 import { UserButton } from "@clerk/nextjs";
+import { makeT, type Lang, type TFn } from "@/lib/room-i18n";
 
 /* ── tipos (espejo de las tablas del Bloque 0) ── */
 type Phase = { id: string; title: string; status: string; position: number };
@@ -22,6 +23,7 @@ type Props = {
   role: string;
   capabilities: string[];
   personId: string | null;
+  defaultLang: Lang;
   project: { id: string; name: string | null; current_stage: string | null };
   rooms: RoomSummary[];
   meta: RoomProjectMeta;
@@ -92,8 +94,6 @@ const NAV: { key: SectionKey; label: string; icon: string; pmOnly?: boolean }[] 
   { key: "actividad", label: "Actividad", icon: "◫", pmOnly: true },
 ];
 
-const roleLabel: Record<string, string> = { pm: "PM", collaborator: "Colaborador", client: "Cliente", reader: "Lector" };
-
 function initialsOf(name: string | null): string {
   if (!name) return "·";
   const clean = name.replace(/^\[[^\]]*\]\s*/, "").trim();
@@ -101,7 +101,7 @@ function initialsOf(name: string | null): string {
   return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase() || "·";
 }
 
-export function RoomClient({ projectId, role, capabilities, personId, project, rooms, meta, team, billing, initialPhases, initialDeliverables, initialTasks, initialDecisions, initialMaterials, initialEvents }: Props) {
+export function RoomClient({ projectId, role, capabilities, personId, defaultLang, project, rooms, meta, team, billing, initialPhases, initialDeliverables, initialTasks, initialDecisions, initialMaterials, initialEvents }: Props) {
   const [section, setSection] = useState<SectionKey>("resumen");
   const [deliverables, setDeliverables] = useState<Deliverable[]>(initialDeliverables);
   const [tasks, setTasks] = useState<Task[]>(initialTasks);
@@ -118,20 +118,26 @@ export function RoomClient({ projectId, role, capabilities, personId, project, r
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [lang, setLang] = useState<Lang>(defaultLang);
   useEffect(() => {
     try { setCollapsed(window.localStorage.getItem("room.sidebar.collapsed") === "1"); } catch {}
+    try { const s = window.localStorage.getItem("room.lang." + projectId); if (s === "es" || s === "en") setLang(s); } catch {}
     const mq = () => setIsMobile(window.innerWidth < 900);
     mq(); window.addEventListener("resize", mq);
     return () => window.removeEventListener("resize", mq);
-  }, []);
+  }, [projectId]);
+  function switchLang(l: Lang) { setLang(l); try { window.localStorage.setItem("room.lang." + projectId, l); } catch {} }
   function toggleCollapsed() {
     setCollapsed((v) => { const nv = !v; try { window.localStorage.setItem("room.sidebar.collapsed", nv ? "1" : "0"); } catch {} return nv; });
   }
 
   const can = (c: string) => capabilities.includes(c);
   const base = `/api/rooms/${projectId}`;
+  const tr = useMemo(() => makeT(lang), [lang]);
+  const delivCols = useMemo(() => DELIV_COLS.map((c) => ({ ...c, label: tr("ds." + c.key) })), [tr]);
+  const taskCols = useMemo(() => TASK_COLS.map((c) => ({ ...c, label: tr("ts." + c.key) })), [tr]);
 
-  function flash(msg: string, undo?: () => void) { setToast({ msg, undo }); window.setTimeout(() => setToast((t) => (t?.msg === msg ? null : t)), undo ? 6000 : 3000); }
+  function flash(msg: string, undo?: () => void) { setToast({ msg, undo }); window.setTimeout(() => setToast((cur) => (cur?.msg === msg ? null : cur)), undo ? 6000 : 3000); }
 
   /* ── acciones (optimistic + revert) ── */
   async function moveDeliverable(id: string, to: string, from: string) {
@@ -144,12 +150,12 @@ export function RoomClient({ projectId, role, capabilities, personId, project, r
     if (!can("deliverable.accept")) return;
     const prev = deliverables;
     setDeliverables((ds) => ds.map((d) => (d.id === id ? { ...d, status: "accepted" } : d)));
-    try { await api(`${base}/deliverables`, "PATCH", { id, action: "accept" }); flash("Entregable aceptado", () => undoAccept(id)); }
+    try { await api(`${base}/deliverables`, "PATCH", { id, action: "accept" }); flash(tr("toast.accepted"), () => undoAccept(id)); }
     catch (e) { setDeliverables(prev); flash((e as Error).message); }
   }
   async function undoAccept(id: string) {
     setDeliverables((ds) => ds.map((d) => (d.id === id ? { ...d, status: "delivered" } : d)));
-    try { await api(`${base}/deliverables`, "PATCH", { id, action: "revert_accept" }); flash("Aceptación deshecha"); }
+    try { await api(`${base}/deliverables`, "PATCH", { id, action: "revert_accept" }); flash(tr("toast.acceptUndone")); }
     catch (e) { flash((e as Error).message); }
   }
   async function moveTask(id: string, to: string, from: string) {
@@ -163,24 +169,24 @@ export function RoomClient({ projectId, role, capabilities, personId, project, r
     const before = t.status;
     const prev = tasks;
     setTasks((ts) => ts.map((x) => (x.id === t.id ? { ...x, status: "done", closed_via: "attestation" } : x)));
-    try { await api(`${base}/tasks`, "PATCH", { id: t.id, action: "close" }); flash("Tarea cerrada · atestiguada por ti", () => undoClose(t.id, before)); }
+    try { await api(`${base}/tasks`, "PATCH", { id: t.id, action: "close" }); flash(tr("toast.taskClosed"), () => undoClose(t.id, before)); }
     catch (e) { setTasks(prev); flash((e as Error).message); }
   }
   async function undoClose(id: string, before: string) {
     setTasks((ts) => ts.map((x) => (x.id === id ? { ...x, status: before, closed_via: null } : x)));
-    try { await api(`${base}/tasks`, "PATCH", { id, action: "reopen" }); flash("Tarea reabierta"); }
+    try { await api(`${base}/tasks`, "PATCH", { id, action: "reopen" }); flash(tr("toast.taskReopened")); }
     catch (e) { flash((e as Error).message); }
   }
   async function createDeliverable() {
     if (!can("structure.edit")) return;
-    const title = window.prompt("Nuevo entregable:");
+    const title = window.prompt(tr("prompt.newDeliverable"));
     if (!title?.trim()) return;
     try { const r = await api(`${base}/deliverables`, "POST", { title }); setDeliverables((ds) => [...ds, r.deliverable]); }
     catch (e) { flash((e as Error).message); }
   }
   async function createTask() {
     if (!can("task.crud")) return;
-    const title = window.prompt("Nueva tarea:");
+    const title = window.prompt(tr("prompt.newTask"));
     if (!title?.trim()) return;
     try { const r = await api(`${base}/tasks`, "POST", { title }); setTasks((ts) => [...ts, r.task]); }
     catch (e) { flash((e as Error).message); }
@@ -189,17 +195,17 @@ export function RoomClient({ projectId, role, capabilities, personId, project, r
     if (!(can("decision.manage") || can("decision.resolve_own"))) return;
     const prev = decisions;
     setDecisions((ds) => ds.map((d) => (d.id === id ? { ...d, status: "closed" } : d)));
-    try { await api(`${base}/decisions`, "PATCH", { id, action: "resolve" }); flash("Decisión resuelta", () => undoResolve(id)); }
+    try { await api(`${base}/decisions`, "PATCH", { id, action: "resolve" }); flash(tr("toast.decisionResolved"), () => undoResolve(id)); }
     catch (e) { setDecisions(prev); flash((e as Error).message); }
   }
   async function undoResolve(id: string) {
     setDecisions((ds) => ds.map((d) => (d.id === id ? { ...d, status: "open" } : d)));
-    try { await api(`${base}/decisions`, "PATCH", { id, action: "reopen" }); flash("Decisión reabierta"); }
+    try { await api(`${base}/decisions`, "PATCH", { id, action: "reopen" }); flash(tr("toast.decisionReopened")); }
     catch (e) { flash((e as Error).message); }
   }
   async function createDecision() {
     if (!can("decision.manage")) return;
-    const title = window.prompt("Nueva decisión:");
+    const title = window.prompt(tr("prompt.newDecision"));
     if (!title?.trim()) return;
     try { const r = await api(`${base}/decisions`, "POST", { title }); setDecisions((ds) => [...ds, r.decision]); }
     catch (e) { flash((e as Error).message); }
@@ -219,7 +225,7 @@ export function RoomClient({ projectId, role, capabilities, personId, project, r
   const myDeliverables = personId ? deliverables.filter((d) => d.owner_person_id === personId) : [];
   const navCount: Partial<Record<SectionKey, number | undefined>> = { mio: myOpenTasks.length || undefined, entregables: deliverables.length, tareas: tasks.length, decisiones: openDecisions || undefined };
   const navItems = NAV.filter((n) => !n.pmOnly || can("analytics.view"));
-  const sectionLabel = NAV.find((n) => n.key === section)?.label ?? "";
+  const sectionLabel = tr("nav." + section);
 
   // La sala actual siempre presente en el acordeón (aunque el listado venga vacío).
   const roomList = rooms.some((r) => r.id === projectId)
@@ -243,7 +249,7 @@ export function RoomClient({ projectId, role, capabilities, personId, project, r
     <div style={{ display: "flex", minHeight: "100vh", fontFamily: "var(--font-hall-sans), 'Inter Tight', sans-serif", color: C.ink, background: C.paper }}>
       {/* hamburguesa (mobile) */}
       {isMobile && !mobileOpen && (
-        <button onClick={() => setMobileOpen(true)} aria-label="Abrir navegación"
+        <button onClick={() => setMobileOpen(true)} aria-label={tr("chrome.openNav")}
           style={{ position: "fixed", top: 12, left: 12, zIndex: 40, width: 40, height: 40, borderRadius: 10, background: C.paper, border: `1px solid ${C.line}`, cursor: "pointer", fontSize: 17, display: "grid", placeItems: "center" }}>≡</button>
       )}
       {/* backdrop (mobile) */}
@@ -262,13 +268,13 @@ export function RoomClient({ projectId, role, capabilities, personId, project, r
 
         {/* acordeón de salas */}
         <nav style={{ flex: 1, overflowY: "auto", padding: "12px 0" }}>
-          {showLabels && <div style={{ ...label, padding: "0 16px 8px" }}>Salas</div>}
+          {showLabels && <div style={{ ...label, padding: "0 16px 8px" }}>{tr("chrome.rooms")}</div>}
           {roomList.map((r) => {
             const current = r.id === projectId;
             if (!current) {
               // otras salas: link (navega) — colapsado = inicial, expandido = nombre
               return (
-                <Link key={r.id} href={`/rooms/${r.id}`} title={r.name ?? "Sala"}
+                <Link key={r.id} href={`/rooms/${r.id}`} title={r.name ?? tr("chrome.room")}
                   style={{ display: "flex", alignItems: "center", gap: 10, padding: showLabels ? "8px 16px" : "8px 0", justifyContent: showLabels ? "flex-start" : "center", textDecoration: "none", color: C.muted2, fontSize: 12.5, fontWeight: 600 }}>
                   <span style={{ width: 22, height: 22, borderRadius: 7, flexShrink: 0, background: C.paper2, color: C.muted2, display: "grid", placeItems: "center", fontSize: 9, fontWeight: 800 }}>{initialsOf(r.name)}</span>
                   {showLabels && <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cleanName(r.name)}</span>}
@@ -289,7 +295,7 @@ export function RoomClient({ projectId, role, capabilities, personId, project, r
                     const active = section === n.key;
                     const count = navCount[n.key];
                     return (
-                      <button key={n.key} onClick={() => pickSection(n.key)} title={n.label}
+                      <button key={n.key} onClick={() => pickSection(n.key)} title={tr("nav." + n.key)}
                         style={{
                           display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left",
                           justifyContent: showLabels ? "flex-start" : "center",
@@ -299,7 +305,7 @@ export function RoomClient({ projectId, role, capabilities, personId, project, r
                           color: active ? "#0a0a0a" : C.muted2, border: 0, position: "relative",
                         }}>
                         <span style={{ fontSize: 12, opacity: active ? 1 : 0.55, width: 16, textAlign: "center", flexShrink: 0 }}>{n.icon}</span>
-                        {showLabels && <span style={{ flex: 1 }}>{n.label}</span>}
+                        {showLabels && <span style={{ flex: 1 }}>{tr("nav." + n.key)}</span>}
                         {showLabels && count != null && (
                           <span style={{ fontSize: 10, fontWeight: 800, background: active ? "rgba(0,0,0,.12)" : "rgba(0,0,0,.06)", color: active ? "#0a0a0a" : C.muted2, padding: "1px 7px", borderRadius: 8 }}>{count}</span>
                         )}
@@ -316,15 +322,22 @@ export function RoomClient({ projectId, role, capabilities, personId, project, r
         <div style={{ borderTop: `1px solid ${C.line}`, padding: showLabels ? "10px 14px" : "10px 0", display: "flex", alignItems: "center", gap: 10, justifyContent: showLabels ? "space-between" : "center" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 9, minWidth: 0 }}>
             <UserButton />
-            {showLabels && <span style={{ fontSize: 11, color: C.muted, fontWeight: 600 }} title="Tu rol en esta sala">{roleLabel[role] ?? role}</span>}
+            {showLabels && <span style={{ fontSize: 11, color: C.muted, fontWeight: 600 }} title={tr("chrome.yourRole")}>{tr("role." + role)}</span>}
           </div>
+          {showLabels && (
+            <div style={{ display: "inline-flex", background: C.paper, border: `1px solid ${C.line}`, borderRadius: 7, padding: 1 }}>
+              {(["es", "en"] as const).map((l) => (
+                <button key={l} onClick={() => switchLang(l)} style={{ fontFamily: "inherit", fontSize: 9.5, fontWeight: 800, letterSpacing: ".4px", textTransform: "uppercase", border: 0, borderRadius: 5, padding: "3px 7px", cursor: "pointer", background: lang === l ? C.ink : "transparent", color: lang === l ? "#fff" : C.muted }}>{l}</button>
+              ))}
+            </div>
+          )}
           {!isMobile && (
-            <button onClick={toggleCollapsed} aria-label={collapsed ? "Expandir" : "Colapsar"} title={collapsed ? "Expandir" : "Colapsar"}
+            <button onClick={toggleCollapsed} aria-label={collapsed ? tr("chrome.expand") : tr("chrome.collapse")} title={collapsed ? tr("chrome.expand") : tr("chrome.collapse")}
               style={{ width: 26, height: 26, borderRadius: 7, border: `1px solid ${C.line}`, background: C.paper, color: C.muted, cursor: "pointer", flexShrink: 0, display: showLabels ? "grid" : "none", placeItems: "center", fontSize: 12 }}>‹</button>
           )}
         </div>
         {!isMobile && collapsed && (
-          <button onClick={toggleCollapsed} aria-label="Expandir" title="Expandir"
+          <button onClick={toggleCollapsed} aria-label={tr("chrome.expand")} title={tr("chrome.expand")}
             style={{ margin: "0 auto 12px", width: 26, height: 26, borderRadius: 7, border: `1px solid ${C.line}`, background: C.paper, color: C.muted, cursor: "pointer", display: "grid", placeItems: "center", fontSize: 12 }}>›</button>
         )}
       </aside>
@@ -333,39 +346,39 @@ export function RoomClient({ projectId, role, capabilities, personId, project, r
       <main style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
         <header style={{ display: "flex", alignItems: "center", gap: 12, padding: isMobile ? "14px 20px 14px 62px" : "15px 26px", borderBottom: `1px solid ${C.line}`, position: "sticky", top: 0, background: C.paper, zIndex: 10 }}>
           <div style={{ minWidth: 0 }}>
-            <div style={label}>Sala de trabajo</div>
+            <div style={label}>{tr("chrome.workRoom")}</div>
             <h1 style={{ fontSize: 17, fontWeight: 800, letterSpacing: "-.3px", margin: "3px 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sectionLabel}</h1>
           </div>
           <span style={{ flex: 1 }} />
           {project.current_stage && <span style={pill(C.lime, "#0a0a0a")}>{project.current_stage}</span>}
-          <span style={pill(C.paper2, C.muted2)} title="Tu rol en esta sala">{roleLabel[role] ?? role}</span>
+          <span style={pill(C.paper2, C.muted2)} title={tr("chrome.yourRole")}>{tr("role." + role)}</span>
         </header>
 
         <div style={{ padding: "22px 26px 64px", maxWidth: 1120, width: "100%" }}>
           {/* LO MÍO */}
           {section === "mio" && (
             <div style={{ maxWidth: 720 }}>
-              <h3 style={{ fontSize: 16, fontWeight: 800, margin: "0 0 4px" }}>Lo mío</h3>
-              <div style={{ fontSize: 12.5, color: C.muted2, marginBottom: 16 }}>Tus tareas y entregables en esta sala.</div>
-              {!personId && <Empty text="Tu usuario todavía no está vinculado a una persona en esta sala." />}
-              {personId && myOpenTasks.length === 0 && myDeliverables.length === 0 && <Empty text="No tenés tareas ni entregables asignados. 🎈" />}
+              <h3 style={{ fontSize: 16, fontWeight: 800, margin: "0 0 4px" }}>{tr("mio.title")}</h3>
+              <div style={{ fontSize: 12.5, color: C.muted2, marginBottom: 16 }}>{tr("mio.desc")}</div>
+              {!personId && <Empty text={tr("mio.noPerson")} />}
+              {personId && myOpenTasks.length === 0 && myDeliverables.length === 0 && <Empty text={tr("mio.nothing")} />}
               {myOpenTasks.length > 0 && (
                 <div style={{ marginBottom: 18 }}>
-                  <div style={{ ...label, marginBottom: 8 }}>Mis tareas · {myOpenTasks.length}</div>
+                  <div style={{ ...label, marginBottom: 8 }}>{tr("mio.myTasks")} · {myOpenTasks.length}</div>
                   {myOpenTasks.map((t) => (
                     <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 11, padding: "11px 13px", background: C.paper, border: `1.5px solid ${C.line}`, borderRadius: 10, marginBottom: 7 }}>
                       {(can("task.manage") || can("task.mark_own"))
-                        ? <button onClick={() => closeTask(t)} title="Marcar hecha" style={{ width: 17, height: 17, borderRadius: 5, border: `1.5px solid ${C.muted}`, background: "transparent", cursor: "pointer", flex: "none" }} />
+                        ? <button onClick={() => closeTask(t)} title={tr("btn.markDone")} style={{ width: 17, height: 17, borderRadius: 5, border: `1.5px solid ${C.muted}`, background: "transparent", cursor: "pointer", flex: "none" }} />
                         : <span style={{ width: 17, height: 17, borderRadius: 5, border: `1.5px solid ${C.line}`, flex: "none" }} />}
                       <span style={{ flex: 1, fontSize: 12.5 }}>{t.title}</span>
-                      <span style={pill(statusTone(t.status).bg, statusTone(t.status).fg)}>{TASK_COLS.find((c) => c.key === t.status)?.label ?? t.status}</span>
+                      <span style={pill(statusTone(t.status).bg, statusTone(t.status).fg)}>{tr("ts." + t.status)}</span>
                     </div>
                   ))}
                 </div>
               )}
               {myDeliverables.length > 0 && (
                 <div>
-                  <div style={{ ...label, marginBottom: 8 }}>Mis entregables · {myDeliverables.length}</div>
+                  <div style={{ ...label, marginBottom: 8 }}>{tr("mio.myDeliverables")} · {myDeliverables.length}</div>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: 12 }}>
                     {myDeliverables.map((d) => (
                       <div key={d.id} style={card()}>
@@ -385,17 +398,17 @@ export function RoomClient({ projectId, role, capabilities, personId, project, r
           {/* RESUMEN */}
           {section === "resumen" && (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 11 }}>
-              <Stat l="Avance" v={`${stats.avance}%`} lime animate={{ to: stats.avance, suffix: "%" }} />
-              <Stat l="Entregables" v={`${stats.dDone}/${stats.dTot}`} />
-              <Stat l="Tareas hechas" v={`${stats.tDone}/${stats.tTot}`} />
-              <Stat l="Bloqueadas" v={String(stats.blocked)} warn={stats.blocked > 0} animate={{ to: stats.blocked }} />
+              <Stat l={tr("stat.avance")} v={`${stats.avance}%`} lime animate={{ to: stats.avance, suffix: "%" }} />
+              <Stat l={tr("stat.entregables")} v={`${stats.dDone}/${stats.dTot}`} />
+              <Stat l={tr("stat.tareasHechas")} v={`${stats.tDone}/${stats.tTot}`} />
+              <Stat l={tr("stat.bloqueadas")} v={String(stats.blocked)} warn={stats.blocked > 0} animate={{ to: stats.blocked }} />
             </div>
           )}
 
           {/* PLAN */}
           {section === "plan" && (
             <div style={{ maxWidth: 760 }}>
-              {phases.length === 0 && <Empty text="Todavía no hay fases." />}
+              {phases.length === 0 && <Empty text={tr("plan.noPhases")} />}
               {phases.map((p) => {
                 const dels = deliverables.filter((d) => d.phase_id === p.id);
                 const st = p.status === "done" ? { i: "✓", bg: C.lime, fg: "#0a0a0a" } : p.status === "in_progress" ? { i: "•", bg: C.paper, fg: C.warn } : { i: "○", bg: C.paper2, fg: C.muted };
@@ -405,13 +418,13 @@ export function RoomClient({ projectId, role, capabilities, personId, project, r
                     <button onClick={() => setOpenPhase(open ? null : p.id)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "13px 15px", background: "transparent", border: 0, cursor: "pointer", fontFamily: "inherit" }}>
                       <span style={{ width: 22, height: 22, borderRadius: 999, display: "grid", placeItems: "center", fontSize: 11, fontWeight: 900, background: st.bg, color: st.fg, border: p.status === "in_progress" ? `2px solid ${C.warn}` : "none" }}>{st.i}</span>
                       <b style={{ fontSize: 14, fontWeight: 800 }}>{p.title}</b>
-                      <span style={{ ...label, marginLeft: 4 }}>{p.status === "done" ? "cumplida" : p.status === "in_progress" ? "en curso" : "por venir"}</span>
+                      <span style={{ ...label, marginLeft: 4 }}>{p.status === "done" ? tr("plan.doneTag") : p.status === "in_progress" ? tr("plan.inProgressTag") : tr("plan.upcomingTag")}</span>
                       <span style={{ flex: 1 }} />
                       <span style={{ color: C.muted, transform: open ? "rotate(90deg)" : "none", transition: "transform .15s" }}>▸</span>
                     </button>
                     {open && (
                       <div style={{ padding: "0 15px 12px 49px" }}>
-                        {dels.length === 0 && <div style={{ fontSize: 12, color: C.muted, padding: "6px 0" }}>Sin entregables en esta fase.</div>}
+                        {dels.length === 0 && <div style={{ fontSize: 12, color: C.muted, padding: "6px 0" }}>{tr("plan.noDeliverablesInPhase")}</div>}
                         {dels.map((d) => (
                           <div key={d.id} style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 0", borderTop: `1px solid ${C.lineSoft}`, fontSize: 12.5, fontWeight: 600 }}>
                             <span style={{ width: 7, height: 7, borderRadius: 999, background: statusDot(d.status) }} />
@@ -429,9 +442,9 @@ export function RoomClient({ projectId, role, capabilities, personId, project, r
           {/* ENTREGABLES */}
           {section === "entregables" && (
             <Section
-              title="Entregables"
+              title={tr("nav.entregables")} tr={tr}
               view={dView} setView={setDView}
-              onCreate={can("structure.edit") ? createDeliverable : undefined} createLabel="+ Entregable"
+              onCreate={can("structure.edit") ? createDeliverable : undefined} createLabel={tr("btn.addDeliverable")}
             >
               {dView === "list" ? (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: 12 }}>
@@ -448,7 +461,7 @@ export function RoomClient({ projectId, role, capabilities, personId, project, r
                         {dTasks.length > 0 && (
                           <button onClick={() => setExpandedDeliv(open ? null : d.id)} style={{ display: "flex", alignItems: "center", gap: 6, background: "transparent", border: 0, padding: 0, cursor: "pointer", fontFamily: "inherit", ...label, color: C.muted2 }}>
                             <span style={{ transform: open ? "rotate(90deg)" : "none", transition: "transform .15s" }}>▸</span>
-                            {dTasks.filter((t) => t.status === "done").length}/{dTasks.length} tareas
+                            {dTasks.filter((t) => t.status === "done").length}/{dTasks.length} {tr("word.tasks")}
                           </button>
                         )}
                         {open && dTasks.length > 0 && (
@@ -457,34 +470,34 @@ export function RoomClient({ projectId, role, capabilities, personId, project, r
                               <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
                                 <span style={{ width: 6, height: 6, borderRadius: 999, background: statusTone(t.status).fg, flexShrink: 0 }} />
                                 <span style={{ flex: 1, textDecoration: t.status === "done" ? "line-through" : "none", color: t.status === "done" ? C.muted : C.ink }}>{t.title}</span>
-                                <span style={label}>{TASK_COLS.find((c) => c.key === t.status)?.label}</span>
+                                <span style={label}>{tr("ts." + t.status)}</span>
                               </div>
                             ))}
                           </div>
                         )}
                         {d.status === "delivered" && can("deliverable.accept") && (
-                          <button onClick={() => acceptDeliverable(d.id)} style={btn(C.lime, "#0a0a0a")}>Aceptar entregable</button>
+                          <button onClick={() => acceptDeliverable(d.id)} style={btn(C.lime, "#0a0a0a")}>{tr("btn.acceptDeliverable")}</button>
                         )}
                       </div>
                     );
                   })}
-                  {deliverables.length === 0 && <Empty text="Todavía no hay entregables." />}
+                  {deliverables.length === 0 && <Empty text={tr("deliv.none")} />}
                 </div>
               ) : (
-                <Kanban cols={DELIV_COLS} items={deliverables} draggable={can("deliverable.move")}
+                <Kanban cols={delivCols} items={deliverables} draggable={can("deliverable.move")}
                   onDrop={(id, to) => { const d = deliverables.find((x) => x.id === id); if (d && d.status !== to) moveDeliverable(id, to, d.status); }}
                   renderCard={(d) => (<><div style={{ fontSize: 12, fontWeight: 700 }}>{d.title}</div><div style={{ ...label, marginTop: 6 }}>{d.progress}%</div></>)} />
               )}
-              {!can("deliverable.move") && dView === "kanban" && <Note text="Tu rol no puede mover entregables (solo mirar)." />}
+              {!can("deliverable.move") && dView === "kanban" && <Note text={tr("deliv.cantMove")} />}
             </Section>
           )}
 
           {/* TAREAS */}
           {section === "tareas" && (
             <Section
-              title="Tareas"
+              title={tr("nav.tareas")} tr={tr}
               view={tView} setView={setTView}
-              onCreate={can("task.crud") ? createTask : undefined} createLabel="+ Tarea"
+              onCreate={can("task.crud") ? createTask : undefined} createLabel={tr("btn.addTask")}
             >
               {tView === "list" ? (
                 <div style={{ maxWidth: 680 }}>
@@ -493,28 +506,28 @@ export function RoomClient({ projectId, role, capabilities, personId, project, r
                     if (!items.length) return null;
                     return (
                       <div key={stt} style={{ marginBottom: 14 }}>
-                        <div style={{ ...label, marginBottom: 7 }}>{TASK_COLS.find((c) => c.key === stt)?.label}</div>
+                        <div style={{ ...label, marginBottom: 7 }}>{tr("ts." + stt)}</div>
                         {items.map((t) => (
                           <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 11, padding: "11px 13px", background: C.paper, border: `1.5px solid ${C.line}`, borderRadius: 10, marginBottom: 7 }}>
                             {t.status !== "done" && (can("task.manage") || can("task.mark_own"))
-                              ? <button onClick={() => closeTask(t)} title="Marcar hecha" style={{ width: 17, height: 17, borderRadius: 5, border: `1.5px solid ${C.muted}`, background: "transparent", cursor: "pointer", flex: "none" }} />
+                              ? <button onClick={() => closeTask(t)} title={tr("btn.markDone")} style={{ width: 17, height: 17, borderRadius: 5, border: `1.5px solid ${C.muted}`, background: "transparent", cursor: "pointer", flex: "none" }} />
                               : <span style={{ width: 17, height: 17, borderRadius: 5, background: t.status === "done" ? C.lime : "transparent", border: `1.5px solid ${t.status === "done" ? C.lime : C.line}`, display: "grid", placeItems: "center", fontSize: 11, fontWeight: 900, color: "#0a0a0a", flex: "none" }}>{t.status === "done" ? "✓" : ""}</span>}
                             <span style={{ flex: 1, fontSize: 12.5, textDecoration: t.status === "done" ? "line-through" : "none", color: t.status === "done" ? C.muted : C.ink }}>{t.title}</span>
-                            {t.assignee_side === "client" && <span style={pill(C.paper2, C.muted2)}>cliente</span>}
-                            {t.closed_via && <span style={{ ...label, color: t.closed_via === "evidence" ? C.limeInk : C.muted }}>{t.closed_via === "evidence" ? "✓ evidencia" : "✍ atestiguada"}</span>}
+                            {t.assignee_side === "client" && <span style={pill(C.paper2, C.muted2)}>{tr("tasks.client")}</span>}
+                            {t.closed_via && <span style={{ ...label, color: t.closed_via === "evidence" ? C.limeInk : C.muted }}>{t.closed_via === "evidence" ? tr("tasks.evidence") : tr("tasks.attested")}</span>}
                           </div>
                         ))}
                       </div>
                     );
                   })}
-                  {tasks.length === 0 && <Empty text="Todavía no hay tareas." />}
+                  {tasks.length === 0 && <Empty text={tr("tasks.none")} />}
                 </div>
               ) : (
-                <Kanban cols={TASK_COLS} items={tasks} draggable={can("task.move")}
+                <Kanban cols={taskCols} items={tasks} draggable={can("task.move")}
                   onDrop={(id, to) => { const t = tasks.find((x) => x.id === id); if (t && t.status !== to) moveTask(id, to, t.status); }}
-                  renderCard={(t) => (<><div style={{ fontSize: 12, fontWeight: 700 }}>{t.title}</div>{t.assignee_side === "client" && <div style={{ ...label, marginTop: 6 }}>cliente</div>}</>)} />
+                  renderCard={(t) => (<><div style={{ fontSize: 12, fontWeight: 700 }}>{t.title}</div>{t.assignee_side === "client" && <div style={{ ...label, marginTop: 6 }}>{tr("tasks.client")}</div>}</>)} />
               )}
-              {!can("task.move") && tView === "kanban" && <Note text="Tu rol no puede mover tareas (solo mirar)." />}
+              {!can("task.move") && tView === "kanban" && <Note text={tr("tasks.cantMove")} />}
             </Section>
           )}
 
@@ -522,10 +535,10 @@ export function RoomClient({ projectId, role, capabilities, personId, project, r
           {section === "decisiones" && (
             <div style={{ maxWidth: 720 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 14 }}>
-                <h3 style={{ fontSize: 16, fontWeight: 800, margin: 0 }}>Decisiones</h3><span style={{ flex: 1 }} />
-                {can("decision.manage") && <button onClick={createDecision} style={btn(C.paper, C.muted2, true)}>+ Decisión</button>}
+                <h3 style={{ fontSize: 16, fontWeight: 800, margin: 0 }}>{tr("dec.title")}</h3><span style={{ flex: 1 }} />
+                {can("decision.manage") && <button onClick={createDecision} style={btn(C.paper, C.muted2, true)}>{tr("btn.addDecision")}</button>}
               </div>
-              {decisions.length === 0 && <Empty text="Todavía no hay decisiones." />}
+              {decisions.length === 0 && <Empty text={tr("dec.none")} />}
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 {decisions.map((d) => {
                   const del = deliverables.find((x) => x.id === d.deliverable_id);
@@ -539,7 +552,7 @@ export function RoomClient({ projectId, role, capabilities, personId, project, r
                         <b style={{ fontSize: 14, fontWeight: 800 }}>{d.title}</b>
                         {del && <span style={{ ...label, color: "#4a5bc0", background: "rgba(91,107,214,.11)", padding: "2px 7px", borderRadius: 5 }}>↳ {del.title}</span>}
                         <span style={{ flex: 1 }} />
-                        <span style={pill(open ? C.warnSoft : C.okSoft, open ? C.warn : C.ok)}>{open ? "Abierta" : "Cerrada"}</span>
+                        <span style={pill(open ? C.warnSoft : C.okSoft, open ? C.warn : C.ok)}>{open ? tr("dec.open") : tr("dec.closed")}</span>
                       </button>
                       {exp && (
                         <div style={{ paddingLeft: hasBody ? 19 : 0 }}>
@@ -547,12 +560,12 @@ export function RoomClient({ projectId, role, capabilities, personId, project, r
                           {d.source_ref && <div style={{ fontSize: 9, color: C.muted, marginTop: 6, fontWeight: 600, letterSpacing: ".3px", textTransform: "uppercase" }}>↳ {d.source_ref}</div>}
                           {Array.isArray(d.participants) && d.participants.length > 0 && (
                             <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 9, flexWrap: "wrap" }}>
-                              <span style={label}>Presentes</span>
+                              <span style={label}>{tr("dec.present")}</span>
                               {d.participants.map((p, i) => <span key={i} style={{ width: 22, height: 22, borderRadius: 999, background: p.side === "client" ? "#495057" : C.limeInk, color: "#fff", display: "grid", placeItems: "center", fontSize: 8, fontWeight: 700 }}>{p.initials || "?"}</span>)}
                             </div>
                           )}
                           {open && (can("decision.manage") || can("decision.resolve_own")) && (
-                            <button onClick={() => resolveDecision(d.id)} style={{ ...btn(C.lime, "#0a0a0a"), marginTop: 11 }}>Resolver decisión</button>
+                            <button onClick={() => resolveDecision(d.id)} style={{ ...btn(C.lime, "#0a0a0a"), marginTop: 11 }}>{tr("btn.resolveDecision")}</button>
                           )}
                         </div>
                       )}
@@ -566,15 +579,15 @@ export function RoomClient({ projectId, role, capabilities, personId, project, r
           {/* MATERIALES */}
           {section === "materiales" && (
             <div>
-              <h3 style={{ fontSize: 16, fontWeight: 800, margin: "0 0 14px" }}>Materiales</h3>
-              {initialMaterials.length === 0 && <Empty text="Todavía no hay materiales." />}
+              <h3 style={{ fontSize: 16, fontWeight: 800, margin: "0 0 14px" }}>{tr("mat.title")}</h3>
+              {initialMaterials.length === 0 && <Empty text={tr("mat.none")} />}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(240px,1fr))", gap: 10 }}>
                 {initialMaterials.map((m) => (
                   <a key={m.id} href={m.url ?? undefined} target="_blank" rel="noreferrer"
                     style={{ display: "flex", alignItems: "center", gap: 11, background: C.paper, border: `1.5px solid ${C.line}`, borderRadius: 12, padding: "11px 14px", textDecoration: "none", color: "inherit", cursor: m.url ? "pointer" : "default" }}>
                     <span style={{ width: 32, height: 32, borderRadius: 7, background: C.paper2, display: "grid", placeItems: "center", fontSize: 8, fontWeight: 800, color: C.muted2 }}>{(m.mime_type || "DOC").split("/").pop()?.slice(0, 4).toUpperCase()}</span>
-                    <span style={{ flex: 1, minWidth: 0 }}><b style={{ fontSize: 12.5, fontWeight: 700, display: "block", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.title}</b><small style={{ fontSize: 10, color: C.muted }}>{materialCategory(m.category) || m.folder_name || ""}</small></span>
-                    {m.url ? <span style={{ color: C.muted }}>↗</span> : <span style={label}>solo lectura</span>}
+                    <span style={{ flex: 1, minWidth: 0 }}><b style={{ fontSize: 12.5, fontWeight: 700, display: "block", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.title}</b><small style={{ fontSize: 10, color: C.muted }}>{m.category ? tr("matcat." + m.category, m.category.replace(/_/g, " ")) : (m.folder_name || "")}</small></span>
+                    {m.url ? <span style={{ color: C.muted }}>↗</span> : <span style={label}>{tr("mat.readonly")}</span>}
                   </a>
                 ))}
               </div>
@@ -585,76 +598,76 @@ export function RoomClient({ projectId, role, capabilities, personId, project, r
           {section === "proyecto" && (
             <div style={{ maxWidth: 860, display: "flex", flexDirection: "column", gap: 22 }}>
               {/* ORIGEN */}
-              <Block title="Origen" note="Heredado de la preventa.">
+              <Block title={tr("proj.origin")} note={tr("proj.originNote")}>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(220px,1fr))", gap: "14px 22px" }}>
-                  <Field k="Organización" v={meta.orgName} />
-                  <Field k="Sede" v={meta.orgLocation} />
-                  <Field k="Modelo de trabajo" v={meta.engagementModel} />
-                  <Field k="Tipo de proyecto" v={meta.projectType} />
-                  <Field k="Geografía" v={meta.geography} />
-                  <Field k="Inicio" v={meta.startDate} />
-                  <Field k="Cierre objetivo" v={meta.targetEndDate} />
-                  <Field k="Código" v={meta.projectCode} />
-                  <Field k="Foco actual" v={meta.currentFocus} />
-                  <Field k="Próximo hito" v={meta.nextMilestone} />
+                  <Field k={tr("field.org")} v={meta.orgName} />
+                  <Field k={tr("field.location")} v={meta.orgLocation} />
+                  <Field k={tr("field.engagement")} v={meta.engagementModel} />
+                  <Field k={tr("field.type")} v={meta.projectType} />
+                  <Field k={tr("field.geography")} v={meta.geography} />
+                  <Field k={tr("field.start")} v={meta.startDate} />
+                  <Field k={tr("field.end")} v={meta.targetEndDate} />
+                  <Field k={tr("field.code")} v={meta.projectCode} />
+                  <Field k={tr("field.focus")} v={meta.currentFocus} />
+                  <Field k={tr("field.milestone")} v={meta.nextMilestone} />
                 </div>
                 {(meta.driveUrl || meta.presaleSlug || meta.orgWebsite) && (
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 15 }}>
-                    {meta.driveUrl && <a href={meta.driveUrl} target="_blank" rel="noreferrer" style={linkChip}>Carpeta Drive ↗</a>}
-                    {meta.presaleSlug && <a href={`/hall/${meta.presaleSlug}`} style={linkChip}>Sala de preventa ↗</a>}
-                    {meta.orgWebsite && <a href={meta.orgWebsite} target="_blank" rel="noreferrer" style={linkChip}>Web del cliente ↗</a>}
+                    {meta.driveUrl && <a href={meta.driveUrl} target="_blank" rel="noreferrer" style={linkChip}>{tr("proj.driveFolder")}</a>}
+                    {meta.presaleSlug && <a href={`/hall/${meta.presaleSlug}`} style={linkChip}>{tr("proj.presaleRoom")}</a>}
+                    {meta.orgWebsite && <a href={meta.orgWebsite} target="_blank" rel="noreferrer" style={linkChip}>{tr("proj.clientWeb")}</a>}
                   </div>
                 )}
               </Block>
 
               {/* EQUIPO */}
-              <Block title="Equipo" note={`${team.length} ${team.length === 1 ? "persona" : "personas"} con acceso a la sala.`}>
-                {team.length === 0 && <Empty text="Todavía no hay miembros." />}
+              <Block title={tr("proj.team")} note={`${team.length} ${team.length === 1 ? tr("word.person") : tr("word.people")} ${tr("word.access")}`}>
+                {team.length === 0 && <Empty text={tr("proj.noMembers")} />}
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(240px,1fr))", gap: 10 }}>
                   {team.map((m) => (
                     <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 11, background: C.paper, border: `1.5px solid ${C.line}`, borderRadius: 12, padding: "11px 13px" }}>
                       <Avatar name={m.name} photoUrl={m.photoUrl} side={m.side} />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <b style={{ fontSize: 12.5, fontWeight: 700, display: "block", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.name}</b>
-                        <small style={{ fontSize: 10.5, color: C.muted }}>{m.jobTitle || (m.side === "client" ? "Cliente" : "Equipo")}</small>
+                        <small style={{ fontSize: 10.5, color: C.muted }}>{m.jobTitle || (m.side === "client" ? tr("side.client") : tr("side.team"))}</small>
                       </div>
-                      <span style={pill(m.side === "client" ? C.paper2 : C.limePaper, m.side === "client" ? C.muted2 : C.limeInk)}>{roleLabel[m.role] ?? m.role}</span>
+                      <span style={pill(m.side === "client" ? C.paper2 : C.limePaper, m.side === "client" ? C.muted2 : C.limeInk)}>{tr("role." + m.role)}</span>
                     </div>
                   ))}
                 </div>
               </Block>
 
               {/* ADMINISTRATIVO */}
-              <Block title="Administrativo">
+              <Block title={tr("proj.admin")}>
                 {billing.company && (
                   <div style={{ marginBottom: billing.client ? 18 : 0 }}>
-                    <div style={{ ...label, marginBottom: 10 }}>Datos de cobro · Common House</div>
+                    <div style={{ ...label, marginBottom: 10 }}>{tr("proj.chTitle")}</div>
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(220px,1fr))", gap: "14px 22px" }}>
-                      <Field k="Razón social" v={billing.company.legalName} />
-                      <Field k="Tax ID" v={billing.company.taxId} />
-                      <Field k="VAT" v={billing.company.vatNumber} />
-                      <Field k="Dirección" v={billing.company.address} />
-                      <Field k="Email de facturación" v={billing.company.billingEmail} />
+                      <Field k={tr("bill.legalName")} v={billing.company.legalName} />
+                      <Field k={tr("bill.taxId")} v={billing.company.taxId} />
+                      <Field k={tr("bill.vat")} v={billing.company.vatNumber} />
+                      <Field k={tr("bill.address")} v={billing.company.address} />
+                      <Field k={tr("bill.billingEmail")} v={billing.company.billingEmail} />
                     </div>
                     {billing.company.publicNote && <div style={{ fontSize: 11.5, color: C.muted2, marginTop: 10, lineHeight: 1.5 }}>{billing.company.publicNote}</div>}
                   </div>
                 )}
                 {billing.client ? (
                   <div>
-                    <div style={{ ...label, marginBottom: 10 }}>Facturación del cliente</div>
+                    <div style={{ ...label, marginBottom: 10 }}>{tr("proj.clientBillingTitle")}</div>
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(220px,1fr))", gap: "14px 22px" }}>
-                      <Field k="Razón social" v={billing.client.legalName} />
-                      <Field k="Tax ID" v={billing.client.taxId} />
-                      <Field k="Dirección" v={billing.client.address} />
-                      <Field k="Email de facturación" v={billing.client.billingEmail} />
-                      <Field k="Contacto" v={billing.client.billingContact} />
-                      <Field k="Orden de compra" v={billing.client.poReference} />
+                      <Field k={tr("bill.legalName")} v={billing.client.legalName} />
+                      <Field k={tr("bill.taxId")} v={billing.client.taxId} />
+                      <Field k={tr("bill.address")} v={billing.client.address} />
+                      <Field k={tr("bill.billingEmail")} v={billing.client.billingEmail} />
+                      <Field k={tr("bill.contact")} v={billing.client.billingContact} />
+                      <Field k={tr("bill.po")} v={billing.client.poReference} />
                     </div>
                   </div>
                 ) : (can("internal.view") || role === "client") ? (
-                  <Note text="El cliente todavía no cargó sus datos de facturación." />
+                  <Note text={tr("proj.clientBillingEmpty")} />
                 ) : null}
-                {!billing.company && !billing.client && <Empty text="Sin datos administrativos." />}
+                {!billing.company && !billing.client && <Empty text={tr("proj.noAdmin")} />}
               </Block>
             </div>
           )}
@@ -662,9 +675,9 @@ export function RoomClient({ projectId, role, capabilities, personId, project, r
           {/* ACTIVIDAD (solo PM) */}
           {section === "actividad" && can("analytics.view") && (
             <div style={{ maxWidth: 720 }}>
-              <h3 style={{ fontSize: 16, fontWeight: 800, margin: "0 0 6px" }}>Actividad</h3>
-              <div style={{ fontSize: 12.5, color: C.muted2, marginBottom: 16 }}>Registro del event log — quién hizo qué. Carga y aporte, no vigilancia. Solo lo ve el PM.</div>
-              {initialEvents.length === 0 && <Empty text="Sin actividad todavía." />}
+              <h3 style={{ fontSize: 16, fontWeight: 800, margin: "0 0 6px" }}>{tr("act.title")}</h3>
+              <div style={{ fontSize: 12.5, color: C.muted2, marginBottom: 16 }}>{tr("act.desc")}</div>
+              {initialEvents.length === 0 && <Empty text={tr("act.none")} />}
               <div style={{ background: C.paper, border: `1.5px solid ${C.line}`, borderRadius: 12, padding: "6px 16px" }}>
                 {initialEvents.map((e) => (
                   <div key={e.id} style={{ display: "flex", alignItems: "flex-start", gap: 11, padding: "10px 0", borderTop: `1px solid ${C.lineSoft}` }}>
@@ -684,7 +697,7 @@ export function RoomClient({ projectId, role, capabilities, personId, project, r
           <span>{toast.msg}</span>
           {toast.undo && (
             <button onClick={() => { const u = toast.undo; setToast(null); u?.(); }}
-              style={{ fontFamily: "inherit", fontSize: 11, fontWeight: 800, letterSpacing: ".3px", textTransform: "uppercase", color: "#0a0a0a", background: C.lime, border: 0, borderRadius: 7, padding: "5px 11px", cursor: "pointer" }}>Deshacer</button>
+              style={{ fontFamily: "inherit", fontSize: 11, fontWeight: 800, letterSpacing: ".3px", textTransform: "uppercase", color: "#0a0a0a", background: C.lime, border: 0, borderRadius: 7, padding: "5px 11px", cursor: "pointer" }}>{tr("btn.undo")}</button>
           )}
         </div>
       )}
@@ -693,7 +706,7 @@ export function RoomClient({ projectId, role, capabilities, personId, project, r
 
   /* ── helpers de color ── */
   function statusDot(s: string) { return s === "at_risk" ? C.warn : s === "delivered" || s === "accepted" ? C.ok : s === "in_progress" ? C.limeInk : C.muted; }
-  function statusLabel(s: string) { return ({ not_started: "Por iniciar", in_progress: "En curso", at_risk: "En riesgo", delivered: "Entregado", accepted: "Aceptado" } as Record<string, string>)[s] ?? s; }
+  function statusLabel(s: string) { return tr("ds." + s); }
   function statusPill(s: string): CSSProperties {
     if (s === "at_risk") return pill(C.warnSoft, C.warn);
     if (s === "delivered" || s === "accepted") return pill(C.okSoft, C.ok);
@@ -704,13 +717,6 @@ export function RoomClient({ projectId, role, capabilities, personId, project, r
 
 /* ── helpers de presentación ── */
 function cleanName(name: string | null): string { return (name ?? "Sala").replace(/^\[[^\]]*\]\s*/, "").trim() || "Sala"; }
-function materialCategory(cat: string | null): string {
-  if (!cat) return "";
-  return ({
-    invoice: "Factura", presentation: "Presentación", multimedia: "Multimedia", manual: "Manual",
-    plan_timeline: "Plan / cronograma", contract_agreement: "Contrato", working_document: "Documento de trabajo",
-  } as Record<string, string>)[cat] ?? cat.replace(/_/g, " ");
-}
 
 /* ── sub-componentes ── */
 function Stat({ l, v, lime, warn, animate }: { l: string; v: string; lime?: boolean; warn?: boolean; animate?: { to: number; suffix?: string } }) {
@@ -738,7 +744,7 @@ function AnimatedNumber({ to, suffix = "" }: { to: number; suffix?: string }) {
   }, [to]);
   return <>{n}{suffix}</>;
 }
-function Section({ title, view, setView, onCreate, createLabel, children }: { title: string; view: "list" | "kanban"; setView: (v: "list" | "kanban") => void; onCreate?: () => void; createLabel: string; children: ReactNode }) {
+function Section({ title, tr, view, setView, onCreate, createLabel, children }: { title: string; tr: TFn; view: "list" | "kanban"; setView: (v: "list" | "kanban") => void; onCreate?: () => void; createLabel: string; children: ReactNode }) {
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 14 }}>
@@ -746,7 +752,7 @@ function Section({ title, view, setView, onCreate, createLabel, children }: { ti
         <span style={{ flex: 1 }} />
         <div style={{ display: "inline-flex", background: C.paper, border: `1.5px solid ${C.line}`, borderRadius: 8, padding: 2 }}>
           {(["list", "kanban"] as const).map((v) => (
-            <button key={v} onClick={() => setView(v)} style={{ fontFamily: "inherit", fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".3px", border: 0, borderRadius: 6, padding: "5px 11px", cursor: "pointer", background: view === v ? C.ink : "transparent", color: view === v ? "#fff" : C.muted }}>{v === "list" ? "Lista" : "Kanban"}</button>
+            <button key={v} onClick={() => setView(v)} style={{ fontFamily: "inherit", fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".3px", border: 0, borderRadius: 6, padding: "5px 11px", cursor: "pointer", background: view === v ? C.ink : "transparent", color: view === v ? "#fff" : C.muted }}>{v === "list" ? tr("view.list") : tr("view.kanban")}</button>
           ))}
         </div>
         {onCreate && <button onClick={onCreate} style={btn(C.paper, C.muted2, true)}>{createLabel}</button>}

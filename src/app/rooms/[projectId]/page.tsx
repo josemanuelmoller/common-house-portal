@@ -27,7 +27,7 @@ export default async function RoomPage({ params }: { params: Promise<{ projectId
   const caps = capabilitiesFor(actor.role);
   const db = supabaseAdmin();
   const [proj, phases, deliverables, tasks, decisions, materials] = await Promise.all([
-    db.from("projects").select("id, name, current_stage").eq("id", project.id).single(),
+    db.from("projects").select("id, name, current_stage, room_language").eq("id", project.id).single(),
     db.from("project_phases").select("*").eq("project_id", project.id).order("position", { ascending: true }),
     db.from("project_deliverables").select("*").eq("project_id", project.id).order("position", { ascending: true }),
     db.from("project_tasks").select("*").eq("project_id", project.id).order("position", { ascending: true }),
@@ -58,6 +58,7 @@ export default async function RoomPage({ params }: { params: Promise<{ projectId
       role={actor.role}
       capabilities={caps}
       personId={actor.personId}
+      defaultLang={proj.data?.room_language === "en" ? "en" : "es"}
       project={proj.data ?? { id: project.id, name: null, current_stage: null }}
       rooms={rooms}
       meta={context.meta}
