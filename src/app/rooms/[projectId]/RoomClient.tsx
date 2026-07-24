@@ -2,8 +2,10 @@
 
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { UserButton } from "@clerk/nextjs";
 import { makeT, type Lang, type TFn } from "@/lib/room-i18n";
+import type { SuggestedStructure } from "@/lib/room-structure";
 
 /* ── tipos (espejo de las tablas del Bloque 0) ── */
 type Phase = { id: string; title: string; status: string; position: number };
@@ -24,6 +26,8 @@ type Props = {
   capabilities: string[];
   personId: string | null;
   defaultLang: Lang;
+  emptyRoom: boolean;
+  suggestion: SuggestedStructure | null;
   project: { id: string; name: string | null; current_stage: string | null };
   rooms: RoomSummary[];
   meta: RoomProjectMeta;
@@ -101,8 +105,10 @@ function initialsOf(name: string | null): string {
   return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase() || "·";
 }
 
-export function RoomClient({ projectId, role, capabilities, personId, defaultLang, project, rooms, meta, team, billing, initialPhases, initialDeliverables, initialTasks, initialDecisions, initialMaterials, initialEvents }: Props) {
+export function RoomClient({ projectId, role, capabilities, personId, defaultLang, emptyRoom, suggestion, project, rooms, meta, team, billing, initialPhases, initialDeliverables, initialTasks, initialDecisions, initialMaterials, initialEvents }: Props) {
+  const router = useRouter();
   const [section, setSection] = useState<SectionKey>("resumen");
+  const [approving, setApproving] = useState(false);
   const [deliverables, setDeliverables] = useState<Deliverable[]>(initialDeliverables);
   const [tasks, setTasks] = useState<Task[]>(initialTasks);
   const [decisions, setDecisions] = useState<Decision[]>(initialDecisions);
@@ -209,6 +215,15 @@ export function RoomClient({ projectId, role, capabilities, personId, defaultLan
     if (!title?.trim()) return;
     try { const r = await api(`${base}/decisions`, "POST", { title }); setDecisions((ds) => [...ds, r.decision]); }
     catch (e) { flash((e as Error).message); }
+  }
+  async function approveStructure() {
+    if (!can("room.configure") || !suggestion) return;
+    setApproving(true);
+    try {
+      await api(`${base}/structure`, "POST", { phases: suggestion.phases.map((p) => ({ title: p.title, deliverables: p.deliverables })) });
+      flash(tr("toast.structureCreated"));
+      router.refresh();
+    } catch (e) { flash((e as Error).message); setApproving(false); }
   }
 
   /* ── stats ── */
@@ -396,14 +411,58 @@ export function RoomClient({ projectId, role, capabilities, personId, defaultLan
           )}
 
           {/* RESUMEN */}
-          {section === "resumen" && (
+          {section === "resumen" && (emptyRoom ? (
+            <div style={{ maxWidth: 720, display: "flex", flexDirection: "column", gap: 18 }}>
+              <div>
+                <h2 style={{ fontSize: 20, fontWeight: 800, letterSpacing: "-.3px", margin: "0 0 5px" }}>{tr("empty.title")}</h2>
+                <div style={{ fontSize: 13, color: C.muted2 }}>{tr("empty.lead")}</div>
+              </div>
+              {/* heredado de la preventa */}
+              <div style={{ background: C.paper, border: `1.5px solid ${C.line}`, borderRadius: 14, padding: "16px 18px" }}>
+                <div style={{ ...label, marginBottom: 12 }}>{tr("empty.inheritedTitle")}</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+                  <InheritRow text={`${team.length} ${team.length === 1 ? tr("word.person") : tr("word.people")} ${tr("empty.withAccess")}`} />
+                  {meta.driveUrl && <InheritRow text={tr("empty.drive")} />}
+                  {meta.presaleSlug && <InheritRow text={tr("empty.presale")} />}
+                  <InheritRow text={tr("empty.meetings")} />
+                </div>
+              </div>
+              {/* estructura sugerida */}
+              {suggestion && (
+                <div style={{ background: C.paper, border: `1.5px solid ${C.line}`, borderRadius: 14, padding: "16px 18px" }}>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
+                    <h3 style={{ fontSize: 15, fontWeight: 800, margin: 0 }}>{tr("empty.suggestedTitle")}</h3>
+                    <span style={{ fontSize: 11, color: C.muted }}>{tr("empty.suggestedNote")}</span>
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 14 }}>
+                    {suggestion.phases.map((p, i) => (
+                      <div key={i}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+                          <span style={{ width: 20, height: 20, borderRadius: 999, background: i === 0 ? C.lime : C.paper2, color: i === 0 ? "#0a0a0a" : C.muted2, display: "grid", placeItems: "center", fontSize: 10, fontWeight: 800 }}>{i + 1}</span>
+                          <b style={{ fontSize: 13, fontWeight: 800 }}>{p.title}</b>
+                        </div>
+                        <div style={{ paddingLeft: 29, marginTop: 6, display: "flex", flexDirection: "column", gap: 5 }}>
+                          {p.deliverables.map((d, j) => (
+                            <div key={j} style={{ fontSize: 12, color: C.muted2, display: "flex", gap: 8, alignItems: "center" }}><span style={{ width: 5, height: 5, borderRadius: 999, background: C.muted, flexShrink: 0 }} />{d}</div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {can("room.configure")
+                    ? <button onClick={approveStructure} disabled={approving} style={{ ...btn(C.lime, "#0a0a0a"), marginTop: 16, padding: "9px 15px", opacity: approving ? 0.6 : 1, cursor: approving ? "default" : "pointer" }}>{tr("empty.approve")}</button>
+                    : <Note text={tr("empty.pmWillApprove")} />}
+                </div>
+              )}
+            </div>
+          ) : (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 11 }}>
               <Stat l={tr("stat.avance")} v={`${stats.avance}%`} lime animate={{ to: stats.avance, suffix: "%" }} />
               <Stat l={tr("stat.entregables")} v={`${stats.dDone}/${stats.dTot}`} />
               <Stat l={tr("stat.tareasHechas")} v={`${stats.tDone}/${stats.tTot}`} />
               <Stat l={tr("stat.bloqueadas")} v={String(stats.blocked)} warn={stats.blocked > 0} animate={{ to: stats.blocked }} />
             </div>
-          )}
+          ))}
 
           {/* PLAN */}
           {section === "plan" && (
@@ -798,6 +857,14 @@ function Progress({ v }: { v: number }) {
   );
 }
 function Empty({ text }: { text: string }) { return <div style={{ padding: "26px 0", textAlign: "center", color: C.muted, fontSize: 13 }}>{text}</div>; }
+function InheritRow({ text }: { text: string }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 12.5, color: C.ink }}>
+      <span style={{ width: 18, height: 18, borderRadius: 999, background: C.lime, color: "#0a0a0a", display: "grid", placeItems: "center", fontSize: 10, fontWeight: 900, flexShrink: 0 }}>✓</span>
+      {text}
+    </div>
+  );
+}
 function Block({ title, note, children }: { title: string; note?: string; children: ReactNode }) {
   return (
     <div style={{ background: C.paper, border: `1.5px solid ${C.line}`, borderRadius: 14, padding: "17px 18px" }}>
