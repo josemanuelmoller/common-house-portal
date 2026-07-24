@@ -98,6 +98,10 @@
       "schedule": "0 4 * * 0"
     },
     {
+      "path": "/api/maintenance/classify-orphan-evidence?execute=true&limit=250",
+      "schedule": "30 4 * * 0"
+    },
+    {
       "path": "/api/cron/observe-calendar",
       "schedule": "0 6 * * *"
     },
