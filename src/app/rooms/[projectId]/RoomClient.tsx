@@ -19,6 +19,7 @@ type RoomSummary = { id: string; name: string | null; slug: string | null; stage
 type RoomProjectMeta = { orgName: string | null; orgLocation: string | null; orgWebsite: string | null; engagementModel: string | null; projectType: string | null; geography: string | null; startDate: string | null; targetEndDate: string | null; projectCode: string | null; driveUrl: string | null; presaleSlug: string | null; currentFocus: string | null; nextMilestone: string | null };
 type RoomTeamMember = { id: string; name: string; email: string | null; role: string; jobTitle: string | null; photoUrl: string | null; side: "team" | "client" };
 type RoomBilling = { company: { legalName: string | null; taxId: string | null; vatNumber: string | null; address: string | null; billingEmail: string | null; publicNote: string | null } | null; client: { legalName: string | null; taxId: string | null; address: string | null; billingEmail: string | null; billingContact: string | null; poReference: string | null } | null };
+type Meeting = { id: string; title: string; date: string | null; summary: string | null; url: string | null; platform: string | null; kind: string };
 
 type Props = {
   projectId: string;
@@ -33,6 +34,7 @@ type Props = {
   meta: RoomProjectMeta;
   team: RoomTeamMember[];
   billing: RoomBilling;
+  meetings: Meeting[];
   initialPhases: Phase[];
   initialDeliverables: Deliverable[];
   initialTasks: Task[];
@@ -84,7 +86,7 @@ async function api(path: string, method: string, body?: unknown) {
   return json;
 }
 
-type SectionKey = "mio" | "resumen" | "plan" | "entregables" | "tareas" | "decisiones" | "materiales" | "proyecto" | "actividad";
+type SectionKey = "mio" | "resumen" | "plan" | "entregables" | "tareas" | "decisiones" | "materiales" | "reuniones" | "proyecto" | "actividad";
 
 const NAV: { key: SectionKey; label: string; icon: string; pmOnly?: boolean }[] = [
   { key: "mio", label: "Lo mío", icon: "✦" },
@@ -94,6 +96,7 @@ const NAV: { key: SectionKey; label: string; icon: string; pmOnly?: boolean }[] 
   { key: "tareas", label: "Tareas", icon: "✓" },
   { key: "decisiones", label: "Decisiones", icon: "◉" },
   { key: "materiales", label: "Materiales", icon: "▤" },
+  { key: "reuniones", label: "Reuniones", icon: "▷" },
   { key: "proyecto", label: "Proyecto", icon: "◍" },
   { key: "actividad", label: "Actividad", icon: "◫", pmOnly: true },
 ];
@@ -105,7 +108,7 @@ function initialsOf(name: string | null): string {
   return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase() || "·";
 }
 
-export function RoomClient({ projectId, role, capabilities, personId, defaultLang, emptyRoom, suggestion, project, rooms, meta, team, billing, initialPhases, initialDeliverables, initialTasks, initialDecisions, initialMaterials, initialEvents }: Props) {
+export function RoomClient({ projectId, role, capabilities, personId, defaultLang, emptyRoom, suggestion, project, rooms, meta, team, billing, meetings, initialPhases, initialDeliverables, initialTasks, initialDecisions, initialMaterials, initialEvents }: Props) {
   const router = useRouter();
   const [section, setSection] = useState<SectionKey>("resumen");
   const [approving, setApproving] = useState(false);
@@ -238,7 +241,7 @@ export function RoomClient({ projectId, role, capabilities, personId, defaultLan
   const myTasks = personId ? tasks.filter((t) => t.owner_person_id === personId) : [];
   const myOpenTasks = myTasks.filter((t) => t.status !== "done");
   const myDeliverables = personId ? deliverables.filter((d) => d.owner_person_id === personId) : [];
-  const navCount: Partial<Record<SectionKey, number | undefined>> = { mio: myOpenTasks.length || undefined, entregables: deliverables.length, tareas: tasks.length, decisiones: openDecisions || undefined };
+  const navCount: Partial<Record<SectionKey, number | undefined>> = { mio: myOpenTasks.length || undefined, entregables: deliverables.length, tareas: tasks.length, decisiones: openDecisions || undefined, reuniones: meetings.length || undefined };
   const navItems = NAV.filter((n) => !n.pmOnly || can("analytics.view"));
   const sectionLabel = tr("nav." + section);
 
@@ -648,6 +651,28 @@ export function RoomClient({ projectId, role, capabilities, personId, defaultLan
                     <span style={{ flex: 1, minWidth: 0 }}><b style={{ fontSize: 12.5, fontWeight: 700, display: "block", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.title}</b><small style={{ fontSize: 10, color: C.muted }}>{m.category ? tr("matcat." + m.category, m.category.replace(/_/g, " ")) : (m.folder_name || "")}</small></span>
                     {m.url ? <span style={{ color: C.muted }}>↗</span> : <span style={label}>{tr("mat.readonly")}</span>}
                   </a>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* REUNIONES */}
+          {section === "reuniones" && (
+            <div style={{ maxWidth: 760 }}>
+              <h3 style={{ fontSize: 16, fontWeight: 800, margin: "0 0 6px" }}>{tr("nav.reuniones")}</h3>
+              <div style={{ fontSize: 12.5, color: C.muted2, marginBottom: 16 }}>{tr("meet.desc")}</div>
+              {meetings.length === 0 && <Empty text={tr("meet.none")} />}
+              <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+                {meetings.map((m) => (
+                  <div key={m.id} style={{ background: C.paper, border: `1.5px solid ${C.line}`, borderRadius: 12, padding: "12px 15px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                      <span style={{ width: 26, height: 26, borderRadius: 8, background: C.limePaper, color: C.limeInk, display: "grid", placeItems: "center", fontSize: 12, flexShrink: 0 }}>▷</span>
+                      <b style={{ fontSize: 13, fontWeight: 700, flex: 1, minWidth: 0 }}>{m.url ? <a href={m.url} target="_blank" rel="noreferrer" style={{ color: "inherit", textDecoration: "none" }}>{m.title}</a> : m.title}</b>
+                      {m.platform && <span style={pill(C.paper2, C.muted2)}>{m.platform}</span>}
+                      {m.date && <span style={{ ...label, fontFamily: "ui-monospace,monospace" }}>{m.date}</span>}
+                    </div>
+                    {m.summary && <div style={{ fontSize: 12, color: C.muted2, marginTop: 8, lineHeight: 1.5, paddingLeft: 36 }}>{m.summary.length > 320 ? m.summary.slice(0, 320) + "…" : m.summary}</div>}
+                  </div>
                 ))}
               </div>
             </div>

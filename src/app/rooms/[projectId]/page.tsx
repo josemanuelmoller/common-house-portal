@@ -3,7 +3,7 @@ import { currentUser } from "@clerk/nextjs/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { resolveClientRoomProject } from "@/lib/client-room";
 import { capabilitiesFor, listRoomsForActor, resolveRoomActor } from "@/lib/project-roles";
-import { loadRoomContext } from "@/lib/room-context";
+import { loadRoomContext, loadRoomMeetings } from "@/lib/room-context";
 import { suggestRoomStructure } from "@/lib/room-structure";
 import { RoomClient } from "./RoomClient";
 
@@ -28,7 +28,7 @@ export default async function RoomPage({ params }: { params: Promise<{ projectId
   const caps = capabilitiesFor(actor.role);
   const db = supabaseAdmin();
   const [proj, phases, deliverables, tasks, decisions, materials] = await Promise.all([
-    db.from("projects").select("id, name, current_stage, room_language").eq("id", project.id).single(),
+    db.from("projects").select("id, name, current_stage, room_language, notion_id").eq("id", project.id).single(),
     db.from("project_phases").select("*").eq("project_id", project.id).order("position", { ascending: true }),
     db.from("project_deliverables").select("*").eq("project_id", project.id).order("position", { ascending: true }),
     db.from("project_tasks").select("*").eq("project_id", project.id).order("position", { ascending: true }),
@@ -47,10 +47,11 @@ export default async function RoomPage({ params }: { params: Promise<{ projectId
   const canDownload = caps.includes("material.download");
   const mats = (materials.data ?? []).map((m) => (canDownload ? m : { ...m, url: null }));
 
-  // Salas del usuario (acordeón del sidebar) + contexto de "Proyecto".
-  const [rooms, context] = await Promise.all([
+  // Salas del usuario (acordeón del sidebar) + contexto de "Proyecto" + reuniones.
+  const [rooms, context, meetings] = await Promise.all([
     listRoomsForActor(actor),
     loadRoomContext(project.id, actor, caps),
+    loadRoomMeetings((proj.data?.notion_id as string | null) ?? null, caps.includes("internal.view")),
   ]);
 
   // Empty-state: la sala no parte de cero; si no tiene estructura, se sugiere una
@@ -73,6 +74,7 @@ export default async function RoomPage({ params }: { params: Promise<{ projectId
       meta={context.meta}
       team={context.team}
       billing={context.billing}
+      meetings={meetings}
       initialPhases={phases.data ?? []}
       initialDeliverables={deliverables.data ?? []}
       initialTasks={tasks.data ?? []}
