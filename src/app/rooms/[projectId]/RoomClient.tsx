@@ -42,13 +42,13 @@ type Props = {
   initialEvents: EventRow[];
 };
 
-/* ── tokens del portal ── */
+/* ── tokens de la sala (calcados de la maqueta room-full.html) ── */
 const C = {
-  ink: "var(--hall-ink-0)", paper: "var(--hall-paper-0)", paper1: "var(--hall-paper-1)", paper2: "var(--hall-paper-2)",
-  line: "var(--hall-line)", lineSoft: "var(--hall-line-soft)", muted: "var(--hall-muted)", muted2: "var(--hall-muted-2)",
-  lime: "var(--hall-lime)", limeSoft: "var(--hall-lime-soft)", limePaper: "var(--hall-lime-paper)", limeInk: "var(--hall-lime-ink)",
-  ok: "var(--hall-ok)", okSoft: "var(--hall-ok-soft)", warn: "var(--hall-warn)", warnSoft: "var(--hall-warn-soft)",
-  danger: "var(--hall-danger)", dangerSoft: "var(--hall-danger-soft)",
+  ink: "#0e0e0e", paper: "#ffffff", paper1: "#ffffff", paper2: "#ecece4", bg: "#eeeee8",
+  line: "#d8d8d0", lineSoft: "#ececE4", muted: "#6b6b6b", muted2: "#4a4a44",
+  lime: "#c8f55a", limeSoft: "#e7f9a8", limePaper: "rgba(200,245,90,.32)", limeInk: "#3a8c00",
+  ok: "#166534", okSoft: "#dcfce7", warn: "#b45309", warnSoft: "#fff3cd",
+  danger: "#991b1b", dangerSoft: "#fee2e2", mine: "#4258c9", minePaper: "rgba(66,88,201,.12)",
 };
 
 const DELIV_COLS: { key: string; label: string; dot: string }[] = [
@@ -100,11 +100,26 @@ const NAV: { key: SectionKey; label: string; icon: string; pmOnly?: boolean }[] 
   { key: "actividad", label: "Actividad", icon: "◫", pmOnly: true },
 ];
 
-function initialsOf(name: string | null): string {
-  if (!name) return "·";
-  const clean = name.replace(/^\[[^\]]*\]\s*/, "").trim();
-  const parts = clean.split(/\s+/).filter(Boolean);
-  return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase() || "·";
+/* íconos SVG del sidebar — calcados de room-full.html */
+const ICON_PATHS: Record<string, ReactNode> = {
+  desk: <><path d="M2.5 7 8 2.5 13.5 7" /><path d="M4 6.5V13h8V6.5" /></>,
+  mio: <path d="M8 2.5l1.6 3.3 3.6.5-2.6 2.5.6 3.6L8 10.7 4.8 12.4l.6-3.6L2.8 6.3l3.6-.5z" />,
+  resumen: <><rect x="2.5" y="2.5" width="4.5" height="4.5" rx="1" /><rect x="9" y="2.5" width="4.5" height="4.5" rx="1" /><rect x="2.5" y="9" width="4.5" height="4.5" rx="1" /><rect x="9" y="9" width="4.5" height="4.5" rx="1" /></>,
+  plan: <><rect x="2.5" y="3.5" width="11" height="10" rx="1.5" /><path d="M2.5 6.5h11" /><path d="M5.5 2v3M10.5 2v3" /></>,
+  entregables: <><path d="M8 2.5 14 5.5 8 8.5 2 5.5z" /><path d="M2 8.5 8 11.5 14 8.5" /><path d="M2 11 8 14 14 11" /></>,
+  tareas: <><rect x="2.5" y="2.5" width="11" height="11" rx="2.5" /><path d="M5.4 8.2 7.2 10 10.7 6" /></>,
+  decisiones: <><path d="M4 14V2.5" /><path d="M4 3.2h7.5l-1.7 2.4 1.7 2.4H4" /></>,
+  materiales: <path d="M2.5 5.4c0-.8.6-1.4 1.4-1.4h2.1l1.4 1.5h4.7c.8 0 1.4.6 1.4 1.4v4.9c0 .8-.6 1.4-1.4 1.4H3.9c-.8 0-1.4-.6-1.4-1.4z" />,
+  reuniones: <><circle cx="8" cy="8" r="5.5" /><path d="M8 4.8V8l2.2 1.3" /></>,
+  proyecto: <><circle cx="8" cy="8" r="5.5" /><path d="M8 7.4v3.3M8 5.2v.1" /></>,
+  actividad: <path d="M2.5 13.5V9.5M6 13.5V4.5M9.5 13.5V7.5M13 13.5V2.5" />,
+};
+function NavIcon({ k }: { k: string }) {
+  return (
+    <svg viewBox="0 0 16 16" style={{ width: 16, height: 16, stroke: "currentColor", fill: "none", strokeWidth: 1.5, strokeLinecap: "round", strokeLinejoin: "round" }}>
+      {ICON_PATHS[k] ?? ICON_PATHS.resumen}
+    </svg>
+  );
 }
 
 export function RoomClient({ projectId, role, capabilities, personId, defaultLang, emptyRoom, suggestion, project, rooms, meta, team, billing, meetings, initialPhases, initialDeliverables, initialTasks, initialDecisions, initialMaterials, initialEvents }: Props) {
@@ -276,7 +291,7 @@ export function RoomClient({ projectId, role, capabilities, personId, defaultLan
   };
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh", fontFamily: "var(--font-hall-sans), 'Inter Tight', sans-serif", color: C.ink, background: C.paper }}>
+    <div style={{ display: "flex", minHeight: "100vh", fontFamily: "var(--font-hall-sans), 'Inter Tight', sans-serif", color: C.ink, background: C.bg }}>
       {/* hamburguesa (mobile) */}
       {isMobile && !mobileOpen && (
         <button onClick={() => setMobileOpen(true)} aria-label={tr("chrome.openNav")}
@@ -299,8 +314,8 @@ export function RoomClient({ projectId, role, capabilities, personId, defaultLan
         {/* acordeón de salas */}
         <nav style={{ flex: 1, overflowY: "auto", padding: "12px 0" }}>
           <Link href="/rooms" title={tr("chrome.myDesk")}
-            style={{ display: "flex", alignItems: "center", gap: 10, padding: showLabels ? "6px 16px 10px" : "6px 0 10px", justifyContent: showLabels ? "flex-start" : "center", textDecoration: "none", color: C.muted2, fontSize: 12, fontWeight: 700 }}>
-            <span style={{ fontSize: 12, width: 16, textAlign: "center", flexShrink: 0 }}>◱</span>
+            style={{ display: "flex", alignItems: "center", gap: 10, padding: showLabels ? "8px 14px" : "8px 0", margin: showLabels ? "0 8px 6px" : "0 0 6px", justifyContent: showLabels ? "flex-start" : "center", textDecoration: "none", color: C.muted2, fontSize: 11.5, fontWeight: 600, borderRadius: 8 }}>
+            <span style={{ width: 16, height: 16, flexShrink: 0, display: "grid", placeItems: "center" }}><NavIcon k="desk" /></span>
             {showLabels && <span>{tr("chrome.myDesk")}</span>}
           </Link>
           {showLabels && <div style={{ ...label, padding: "0 16px 8px" }}>{tr("chrome.rooms")}</div>}
@@ -310,9 +325,9 @@ export function RoomClient({ projectId, role, capabilities, personId, defaultLan
               // otras salas: link (navega) — colapsado = inicial, expandido = nombre
               return (
                 <Link key={r.id} href={`/rooms/${r.id}`} title={r.name ?? tr("chrome.room")}
-                  style={{ display: "flex", alignItems: "center", gap: 10, padding: showLabels ? "8px 16px" : "8px 0", justifyContent: showLabels ? "flex-start" : "center", textDecoration: "none", color: C.muted2, fontSize: 12.5, fontWeight: 600 }}>
-                  <span style={{ width: 22, height: 22, borderRadius: 7, flexShrink: 0, background: C.paper2, color: C.muted2, display: "grid", placeItems: "center", fontSize: 9, fontWeight: 800 }}>{initialsOf(r.name)}</span>
-                  {showLabels && <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cleanName(r.name)}</span>}
+                  style={{ display: "flex", alignItems: "center", gap: 8, padding: showLabels ? "7px 12px" : "7px 0", margin: showLabels ? "2px 8px" : "2px 0", borderRadius: 8, textDecoration: "none", color: "inherit", justifyContent: showLabels ? "flex-start" : "center", opacity: 0.72 }}>
+                  <span style={{ width: 7, height: 7, borderRadius: 2, background: C.muted, flexShrink: 0 }} />
+                  {showLabels && <div style={{ minWidth: 0 }}><b style={{ fontSize: 11, fontWeight: 800, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cleanName(r.name)}</b>{r.stage && <small style={{ fontSize: 9, color: C.muted, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.stage}</small>}</div>}
                 </Link>
               );
             }
@@ -320,29 +335,35 @@ export function RoomClient({ projectId, role, capabilities, personId, defaultLan
             return (
               <div key={r.id} style={{ marginBottom: 4 }}>
                 {showLabels && (
-                  <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 16px 6px" }}>
-                    <span style={{ width: 22, height: 22, borderRadius: 7, flexShrink: 0, background: C.lime, color: "#0a0a0a", display: "grid", placeItems: "center", fontSize: 9, fontWeight: 800 }}>{initialsOf(r.name)}</span>
-                    <b style={{ fontSize: 12.5, fontWeight: 800, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cleanName(r.name)}</b>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 12px", margin: "2px 8px 4px", borderRadius: 8, background: C.bg }}>
+                    <span style={{ width: 7, height: 7, borderRadius: 2, background: C.lime, flexShrink: 0 }} />
+                    <div style={{ minWidth: 0 }}>
+                      <b style={{ fontSize: 11, fontWeight: 800, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cleanName(r.name)}</b>
+                      {r.stage && <small style={{ fontSize: 9, color: C.muted, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.stage}</small>}
+                    </div>
                   </div>
                 )}
                 <div style={{ display: "flex", flexDirection: "column", gap: 1, padding: showLabels ? "2px 8px" : "2px 0" }}>
                   {navItems.map((n) => {
                     const active = section === n.key;
                     const count = navCount[n.key];
+                    const isMine = n.key === "mio";
+                    const warmBadge = n.key === "decisiones";
+                    const onBg = active ? (isMine ? C.minePaper : C.limePaper) : "transparent";
+                    const fg = active ? (isMine ? "#3346a8" : C.ink) : (isMine ? C.mine : "rgba(0,0,0,.52)");
                     return (
                       <button key={n.key} onClick={() => pickSection(n.key)} title={tr("nav." + n.key)}
                         style={{
                           display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left",
                           justifyContent: showLabels ? "flex-start" : "center",
-                          padding: showLabels ? "7px 12px 7px 14px" : "9px 0", borderRadius: 8, cursor: "pointer",
-                          fontFamily: "inherit", fontSize: 12.5, fontWeight: active ? 700 : 600,
-                          background: active ? C.lime : "transparent",
-                          color: active ? "#0a0a0a" : C.muted2, border: 0, position: "relative",
+                          padding: showLabels ? "8px" : "9px 0", borderRadius: 8, cursor: "pointer",
+                          fontFamily: "inherit", fontSize: 11.5, fontWeight: active ? 700 : 600,
+                          background: onBg, color: fg, border: 0, position: "relative",
                         }}>
-                        <span style={{ fontSize: 12, opacity: active ? 1 : 0.55, width: 16, textAlign: "center", flexShrink: 0 }}>{n.icon}</span>
-                        {showLabels && <span style={{ flex: 1 }}>{tr("nav." + n.key)}</span>}
+                        <span style={{ width: 16, height: 16, flexShrink: 0, display: "grid", placeItems: "center" }}><NavIcon k={n.key} /></span>
+                        {showLabels && <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tr("nav." + n.key)}</span>}
                         {showLabels && count != null && (
-                          <span style={{ fontSize: 10, fontWeight: 800, background: active ? "rgba(0,0,0,.12)" : "rgba(0,0,0,.06)", color: active ? "#0a0a0a" : C.muted2, padding: "1px 7px", borderRadius: 8 }}>{count}</span>
+                          <span style={{ fontSize: 8.5, fontWeight: 700, background: warmBadge ? C.warnSoft : "rgba(0,0,0,.08)", color: warmBadge ? "#7a5800" : "rgba(0,0,0,.42)", padding: "1px 6px", borderRadius: 8 }}>{count}</span>
                         )}
                       </button>
                     );
@@ -379,7 +400,7 @@ export function RoomClient({ projectId, role, capabilities, personId, defaultLan
 
       {/* ── MAIN ── */}
       <main style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
-        <header style={{ display: "flex", alignItems: "center", gap: 12, padding: isMobile ? "14px 20px 14px 62px" : "15px 26px", borderBottom: `1px solid ${C.line}`, position: "sticky", top: 0, background: C.paper, zIndex: 10 }}>
+        <header style={{ display: "flex", alignItems: "center", gap: 12, padding: isMobile ? "14px 20px 14px 62px" : "13px 26px", borderBottom: `1.5px solid ${C.line}`, position: "sticky", top: 0, background: C.bg, zIndex: 10 }}>
           <div style={{ minWidth: 0 }}>
             <div style={label}>{tr("chrome.workRoom")}</div>
             <h1 style={{ fontSize: 17, fontWeight: 800, letterSpacing: "-.3px", margin: "3px 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sectionLabel}</h1>
