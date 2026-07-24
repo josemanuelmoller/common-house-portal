@@ -28,7 +28,7 @@ import { getSelfEmails } from "@/lib/hall-self";
 
 const HAIKU_MODEL = "claude-haiku-4-5-20251001";
 
-export const maxDuration = 90;
+export const maxDuration = 300;
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -133,10 +133,10 @@ async function loadExistingEvidenceKeys(fromDateStr: string): Promise<Set<string
 
 // ─── Fireflies fetch ──────────────────────────────────────────────────────────
 
-async function fetchTranscripts(fromDate: Date): Promise<FirefliesTranscript[]> {
+async function fetchTranscripts(fromDate: Date, limit = 20): Promise<FirefliesTranscript[]> {
   const query = `
     query RecentTranscripts($fromDate: DateTime) {
-      transcripts(fromDate: $fromDate, limit: 20) {
+      transcripts(fromDate: $fromDate, limit: ${Math.max(1, Math.min(limit, 200))}) {
         id title date duration participants organizer_email
         summary { action_items keywords shorthand_bullet overview }
       }
@@ -369,6 +369,15 @@ async function _POST(req: NextRequest) {
     const params    = body ? JSON.parse(body) : {};
     const hoursBack = params.hoursBack ?? 24;
     const dryRun    = params.dryRun === true;
+    // Re-digest / backfill controls (default behaviour = the live cron, unchanged):
+    //   replace    — regenerate evidence and DELETE the meeting's existing
+    //                source-linked evidence first (dedup is disabled so it re-extracts)
+    //   fetchLimit — how many transcripts Fireflies returns (default 20)
+    //   skip/maxMeetings — window slice, so a backfill can page in small batches
+    const replace   = params.replace === true;
+    const fetchLim  = typeof params.fetchLimit === "number" ? params.fetchLimit : 20;
+    const skipMeet  = typeof params.skip === "number" ? params.skip : 0;
+    const maxMeet   = typeof params.maxMeetings === "number" ? params.maxMeetings : null;
     // Backfill / source-agnostic support: callers may inject transcripts in the
     // FirefliesTranscript shape directly (e.g. replayed from a local Fireflies
     // export, or mapped from any other transcription provider) instead of
@@ -384,7 +393,12 @@ async function _POST(req: NextRequest) {
     const today     = now.toISOString().slice(0, 10);
 
     // 2. Fetch transcripts (or use injected ones — no Fireflies call then)
-    const transcripts = injected ?? await fetchTranscripts(fromDate);
+    let transcripts = injected ?? await fetchTranscripts(fromDate, fetchLim);
+    // Backfill paging: process a small slice per call so a re-digest over
+    // months of meetings fits inside maxDuration instead of 504-ing.
+    if (skipMeet > 0 || maxMeet !== null) {
+      transcripts = transcripts.slice(skipMeet, maxMeet !== null ? skipMeet + maxMeet : undefined);
+    }
 
     if (transcripts.length === 0) {
       return NextResponse.json({ ok: true, dry_run: dryRun, meetings: 0, evidence_written: 0, skipped: 0, cost_usd: 0, message: "No new meetings in window" });
@@ -409,8 +423,11 @@ async function _POST(req: NextRequest) {
       : fromDate.getTime();
     const fromStr   = new Date(earliestMs).toISOString().slice(0, 10);
 
-    // 1. Pre-load existing evidence keys for deduplication
-    const existingKeys = await loadExistingEvidenceKeys(fromStr);
+    // 1. Pre-load existing evidence keys for deduplication.
+    //    In replace/re-digest mode we WANT to re-extract meetings that already
+    //    have (stale/orphaned) evidence, so the dedup preload is skipped and the
+    //    old source-linked rows are deleted per-transcript below before writing.
+    const existingKeys = replace ? new Set<string>() : await loadExistingEvidenceKeys(fromStr);
 
     // 3. Load the Supabase entity index + self-identity set once.
     //    resolveOrgId / resolveProjectId are pure-function lookups against
@@ -425,7 +442,7 @@ async function _POST(req: NextRequest) {
     ]);
 
     const usageAcc = makeUsageAccumulator();
-    const results: { meetingTitle: string; evidenceCount: number; skipped: number; orgPath: string; projPath: string; ids: string[] }[] = [];
+    const results: { meetingTitle: string; evidenceCount: number; skipped: number; replacedOld?: number; orgPath: string; projPath: string; ids: string[] }[] = [];
     const errors:  string[] = [];
     // dry-run only: what WOULD be written, so a backfill can be inspected
     // before any row is inserted.
@@ -450,6 +467,15 @@ async function _POST(req: NextRequest) {
         // and patch in org/project links if the row predates the resolver.
         // In dry-run we don't create the source row either — nothing is written.
         const sourceId  = dryRun ? null : await ensureFirefliesSource(t, transcriptOrg.orgNotionId, projResult.projectNotionId);
+        // Re-digest: delete this meeting's existing source-linked evidence before
+        // writing fresh, correctly-attributed rows. Scoped to source_id, so only
+        // this transcript's own (identifiable) evidence is replaced — orphaned
+        // source-less rows are never touched here.
+        let replacedOld = 0;
+        if (replace && !dryRun && sourceId) {
+          const { data: del } = await sb.from("evidence").delete().eq("source_id", sourceId).select("id");
+          replacedOld = del?.length ?? 0;
+        }
         const ids:      string[] = [];
         let   skipped   = 0;
 
@@ -497,6 +523,7 @@ async function _POST(req: NextRequest) {
           meetingTitle:  t.title,
           evidenceCount: ids.length,
           skipped,
+          replacedOld,
           orgPath:       transcriptOrg.matchPath,
           projPath:      projResult.matchPath,
           ids,
@@ -508,6 +535,7 @@ async function _POST(req: NextRequest) {
 
     const totalEvidence = results.reduce((s, r) => s + r.evidenceCount, 0);
     const totalSkipped  = results.reduce((s, r) => s + r.skipped, 0);
+    const totalReplaced = results.reduce((s, r) => s + (r.replacedOld ?? 0), 0);
 
     const cost_usd = computeAnthropicCost(usageAcc, HAIKU_MODEL);
 
@@ -518,6 +546,9 @@ async function _POST(req: NextRequest) {
       meetings:         transcripts.length,
       evidence_written: totalEvidence,   // in dry-run: count that WOULD be written
       skipped:          totalSkipped,
+      replace:          replace || undefined,
+      replaced_old:     replace ? totalReplaced : undefined,
+      slice:            (skipMeet > 0 || maxMeet !== null) ? { skip: skipMeet, take: maxMeet } : undefined,
       cost_usd,
       results,
       preview:          dryRun ? preview : undefined,
