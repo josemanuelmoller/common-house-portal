@@ -95,9 +95,8 @@ const NAV: { key: SectionKey; label: string; icon: string; pmOnly?: boolean }[] 
   { key: "tareas", label: "Tareas", icon: "✓" },
   { key: "decisiones", label: "Decisiones", icon: "◉" },
   { key: "materiales", label: "Materiales", icon: "▤" },
-  { key: "reuniones", label: "Reuniones", icon: "▷" },
-  { key: "proyecto", label: "Proyecto", icon: "◍" },
   { key: "actividad", label: "Actividad", icon: "◫", pmOnly: true },
+  { key: "proyecto", label: "Proyecto", icon: "◍" },
 ];
 
 /* íconos SVG del sidebar — calcados de room-full.html */
@@ -121,6 +120,17 @@ function NavIcon({ k }: { k: string }) {
     </svg>
   );
 }
+
+/* matriz de capacidades por rol (espejo client de src/lib/project-roles.ts) — para el "Ver como" */
+const CLIENT_MATRIX: Record<string, string[]> = {
+  pm: ["room.view", "internal.view", "financial.view", "analytics.view", "task.mark_own", "task.manage", "task.move", "task.crud", "deliverable.move", "deliverable.accept", "structure.edit", "structure.suggest", "decision.comment", "decision.resolve_own", "decision.manage", "suggestion.view", "suggestion.confirm", "material.view", "material.download", "material.upload", "member.manage", "room.configure"],
+  collaborator: ["room.view", "internal.view", "task.mark_own", "task.manage", "task.move", "task.crud", "deliverable.move", "structure.suggest", "decision.comment", "decision.resolve_own", "decision.manage", "suggestion.view", "material.view", "material.download", "material.upload"],
+  client: ["room.view", "task.mark_own", "deliverable.accept", "decision.comment", "decision.resolve_own", "material.view", "material.download", "material.upload"],
+  reader: ["room.view", "material.view"],
+};
+const ROLE_TABS: { key: string; label: string }[] = [
+  { key: "pm", label: "PM" }, { key: "collaborator", label: "Colab" }, { key: "client", label: "Cliente" }, { key: "reader", label: "Lector" },
+];
 
 export function RoomClient({ projectId, role, capabilities, personId, defaultLang, emptyRoom, suggestion, project, rooms, meta, team, billing, meetings, initialPhases, initialDeliverables, initialTasks, initialDecisions, initialMaterials, initialEvents }: Props) {
   const [section, setSection] = useState<SectionKey>("resumen");
@@ -153,7 +163,9 @@ export function RoomClient({ projectId, role, capabilities, personId, defaultLan
     setCollapsed((v) => { const nv = !v; try { window.localStorage.setItem("room.sidebar.collapsed", nv ? "1" : "0"); } catch {} return nv; });
   }
 
-  const can = (c: string) => capabilities.includes(c);
+  const [viewRole, setViewRole] = useState(role);
+  const effCaps = viewRole === role ? capabilities : (CLIENT_MATRIX[viewRole] ?? capabilities);
+  const can = (c: string) => effCaps.includes(c);
   const base = `/api/rooms/${projectId}`;
   const tr = useMemo(() => makeT(lang), [lang]);
   const delivCols = useMemo(() => DELIV_COLS.map((c) => ({ ...c, label: tr("ds." + c.key) })), [tr]);
@@ -378,15 +390,8 @@ export function RoomClient({ projectId, role, capabilities, personId, defaultLan
         <div style={{ borderTop: `1px solid ${C.line}`, padding: showLabels ? "10px 14px" : "10px 0", display: "flex", alignItems: "center", gap: 10, justifyContent: showLabels ? "space-between" : "center" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 9, minWidth: 0 }}>
             <UserButton />
-            {showLabels && <span style={{ fontSize: 11, color: C.muted, fontWeight: 600 }} title={tr("chrome.yourRole")}>{tr("role." + role)}</span>}
+            {showLabels && <span style={{ fontSize: 11, color: C.muted, fontWeight: 600 }} title={tr("chrome.yourRole")}>{tr("role." + viewRole)}</span>}
           </div>
-          {showLabels && (
-            <div style={{ display: "inline-flex", background: C.paper, border: `1px solid ${C.line}`, borderRadius: 7, padding: 1 }}>
-              {(["es", "en"] as const).map((l) => (
-                <button key={l} onClick={() => switchLang(l)} style={{ fontFamily: "inherit", fontSize: 9.5, fontWeight: 800, letterSpacing: ".4px", textTransform: "uppercase", border: 0, borderRadius: 5, padding: "3px 7px", cursor: "pointer", background: lang === l ? C.ink : "transparent", color: lang === l ? "#fff" : C.muted }}>{l}</button>
-              ))}
-            </div>
-          )}
           {!isMobile && (
             <button onClick={toggleCollapsed} aria-label={collapsed ? tr("chrome.expand") : tr("chrome.collapse")} title={collapsed ? tr("chrome.expand") : tr("chrome.collapse")}
               style={{ width: 26, height: 26, borderRadius: 7, border: `1px solid ${C.line}`, background: C.paper, color: C.muted, cursor: "pointer", flexShrink: 0, display: showLabels ? "grid" : "none", placeItems: "center", fontSize: 12 }}>‹</button>
@@ -400,14 +405,35 @@ export function RoomClient({ projectId, role, capabilities, personId, defaultLan
 
       {/* ── MAIN ── */}
       <main style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
-        <header style={{ display: "flex", alignItems: "center", gap: 12, padding: isMobile ? "14px 20px 14px 62px" : "13px 26px", borderBottom: `1.5px solid ${C.line}`, position: "sticky", top: 0, background: C.bg, zIndex: 10 }}>
+        <header style={{ display: "flex", alignItems: "center", gap: 10, padding: isMobile ? "12px 16px 12px 60px" : "12px 20px", borderBottom: `1.5px solid ${C.line}`, position: "sticky", top: 0, background: C.bg, zIndex: 10, flexWrap: "wrap" }}>
           <div style={{ minWidth: 0 }}>
-            <div style={label}>{tr("chrome.workRoom")}</div>
-            <h1 style={{ fontSize: 17, fontWeight: 800, letterSpacing: "-.3px", margin: "3px 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sectionLabel}</h1>
+            <div style={{ fontSize: 8, fontWeight: 700, letterSpacing: "2px", textTransform: "uppercase", color: "rgba(0,0,0,.3)" }}>Common House × {(meta.orgName ?? cleanName(project.name)).toUpperCase()}</div>
+            <h2 style={{ fontSize: 17, fontWeight: 800, letterSpacing: "-.4px", margin: "1px 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sectionLabel}</h2>
           </div>
           <span style={{ flex: 1 }} />
-          {project.current_stage && <span style={pill(C.lime, "#0a0a0a")}>{project.current_stage}</span>}
-          <span style={pill(C.paper2, C.muted2)} title={tr("chrome.yourRole")}>{tr("role." + role)}</span>
+          {!isMobile && role === "pm" && (
+            <>
+              <span style={{ ...label, letterSpacing: "1px" }}>Ver como</span>
+              <div style={{ display: "inline-flex", background: C.paper, border: `1.5px solid ${C.line}`, borderRadius: 8, padding: 3 }}>
+                {ROLE_TABS.map((rt) => (
+                  <button key={rt.key} onClick={() => setViewRole(rt.key)} style={{ fontFamily: "inherit", fontSize: 9.5, fontWeight: 700, letterSpacing: ".4px", textTransform: "uppercase", border: 0, borderRadius: 5, padding: "5px 10px", cursor: "pointer", background: viewRole === rt.key ? C.ink : "transparent", color: viewRole === rt.key ? "#fff" : C.muted }}>{rt.label}</button>
+                ))}
+              </div>
+            </>
+          )}
+          <div style={{ display: "inline-flex", background: C.paper, border: `1px solid ${C.line}`, borderRadius: 7, padding: 1 }}>
+            {(["es", "en"] as const).map((l) => (
+              <button key={l} onClick={() => switchLang(l)} style={{ fontFamily: "inherit", fontSize: 9.5, fontWeight: 800, letterSpacing: ".4px", textTransform: "uppercase", border: 0, borderRadius: 5, padding: "3px 8px", cursor: "pointer", background: lang === l ? C.ink : "transparent", color: lang === l ? "#fff" : C.muted }}>{l}</button>
+            ))}
+          </div>
+          {project.current_stage && <span style={pill(C.lime, "#000")}>{project.current_stage}</span>}
+          {!isMobile && team.length > 0 && (
+            <div style={{ display: "flex" }}>
+              {team.slice(0, 3).map((m, i) => (
+                <span key={m.id} title={m.name} style={{ width: 26, height: 26, borderRadius: "50%", marginLeft: i ? -6 : 0, border: `2px solid ${C.bg}`, display: "grid", placeItems: "center", fontSize: 9, fontWeight: 700, color: "#fff", background: ["#3B5BDB", "#0C8599", "#9C36B5"][i % 3] }}>{m.name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase()}</span>
+              ))}
+            </div>
+          )}
         </header>
 
         <div style={{ padding: "22px 26px 64px", maxWidth: 1120, width: "100%" }}>

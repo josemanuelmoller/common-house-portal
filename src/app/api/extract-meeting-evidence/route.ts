@@ -133,10 +133,14 @@ async function loadExistingEvidenceKeys(fromDateStr: string): Promise<Set<string
 
 // ─── Fireflies fetch ──────────────────────────────────────────────────────────
 
-async function fetchTranscripts(fromDate: Date, limit = 20): Promise<FirefliesTranscript[]> {
+async function fetchTranscripts(fromDate: Date, limit = 20, toDate?: Date): Promise<FirefliesTranscript[]> {
+  // Fireflies returns newest-first and caps `limit` at 50. `toDate` is the upper
+  // bound that lets a backfill page BACKWARD through history: each call asks for
+  // the newest N meetings before the cursor, then the caller moves the cursor to
+  // the oldest date it just saw and calls again.
   const query = `
-    query RecentTranscripts($fromDate: DateTime) {
-      transcripts(fromDate: $fromDate, limit: ${Math.max(1, Math.min(limit, 200))}) {
+    query RecentTranscripts($fromDate: DateTime, $toDate: DateTime) {
+      transcripts(fromDate: $fromDate, toDate: $toDate, limit: ${Math.max(1, Math.min(limit, 50))}) {
         id title date duration participants organizer_email
         summary { action_items keywords shorthand_bullet overview }
       }
@@ -149,7 +153,7 @@ async function fetchTranscripts(fromDate: Date, limit = 20): Promise<FirefliesTr
       "Content-Type":  "application/json",
       "Authorization": `Bearer ${process.env.FIREFLIES_API_KEY}`,
     },
-    body: JSON.stringify({ query, variables: { fromDate: fromDate.toISOString() } }),
+    body: JSON.stringify({ query, variables: { fromDate: fromDate.toISOString(), toDate: toDate ? toDate.toISOString() : null } }),
   });
 
   if (!res.ok) throw new Error(`Fireflies error: ${res.status}`);
@@ -378,6 +382,9 @@ async function _POST(req: NextRequest) {
     const fetchLim  = typeof params.fetchLimit === "number" ? params.fetchLimit : 20;
     const skipMeet  = typeof params.skip === "number" ? params.skip : 0;
     const maxMeet   = typeof params.maxMeetings === "number" ? params.maxMeetings : null;
+    // toDate cursor for backward paging through history (ISO string). When set,
+    // the fromDate window is widened so [fromDate, toDate] covers the full past.
+    const toDate    = typeof params.toDate === "string" ? new Date(params.toDate) : undefined;
     // Backfill / source-agnostic support: callers may inject transcripts in the
     // FirefliesTranscript shape directly (e.g. replayed from a local Fireflies
     // export, or mapped from any other transcription provider) instead of
@@ -389,11 +396,13 @@ async function _POST(req: NextRequest) {
       ? (params.transcripts as FirefliesTranscript[])
       : null;
     const now       = new Date();
-    const fromDate  = new Date(now.getTime() - hoursBack * 60 * 60 * 1000);
+    // Backward-paging backfills set toDate and want the whole past below it, so
+    // widen fromDate to an epoch floor rather than the hoursBack window.
+    const fromDate  = toDate ? new Date("2020-01-01T00:00:00Z") : new Date(now.getTime() - hoursBack * 60 * 60 * 1000);
     const today     = now.toISOString().slice(0, 10);
 
     // 2. Fetch transcripts (or use injected ones — no Fireflies call then)
-    let transcripts = injected ?? await fetchTranscripts(fromDate, fetchLim);
+    let transcripts = injected ?? await fetchTranscripts(fromDate, fetchLim, toDate);
     // Backfill paging: process a small slice per call so a re-digest over
     // months of meetings fits inside maxDuration instead of 504-ing.
     if (skipMeet > 0 || maxMeet !== null) {
@@ -549,6 +558,12 @@ async function _POST(req: NextRequest) {
       replace:          replace || undefined,
       replaced_old:     replace ? totalReplaced : undefined,
       slice:            (skipMeet > 0 || maxMeet !== null) ? { skip: skipMeet, take: maxMeet } : undefined,
+      // oldest/newest processed meeting dates — the client moves its toDate
+      // cursor to `oldest` to fetch the next-older page.
+      date_range:       transcripts.length ? {
+        newest: new Date(Math.max(...transcripts.map(t => Number(t.date) || 0))).toISOString(),
+        oldest: new Date(Math.min(...transcripts.map(t => Number(t.date) || now.getTime()))).toISOString(),
+      } : undefined,
       cost_usd,
       results,
       preview:          dryRun ? preview : undefined,
