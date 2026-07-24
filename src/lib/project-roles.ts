@@ -95,17 +95,16 @@ export async function resolveRoomActor(projectId: string): Promise<RoomActor> {
   const email = user?.primaryEmailAddress?.emailAddress?.toLowerCase() ?? null;
   const clerkId = user?.id ?? null;
 
-  // José / platform admin: PM en cualquier sala.
-  if (user && (isAdminUser(user.id) || isAdminEmail(email ?? ""))) {
-    return { email, clerkId, personId: null, role: "pm", isSuperAdmin: true };
-  }
   if (!email && !clerkId) {
     return { email: null, clerkId: null, personId: null, role: null, isSuperAdmin: false };
   }
 
+  const isSuperAdmin = !!user && (isAdminUser(user.id) || isAdminEmail(email ?? ""));
+  const db = supabaseAdmin();
+
   // Membresía activa por email (los clientes/colaboradores externos entran por email Clerk).
-  // TODO: cuando exista un mapa user↔person, resolver también por person_id.
-  const { data } = await supabaseAdmin()
+  // Da el rol (para no-admins) y la persona con la que se le asignan tareas/entregables.
+  const { data } = await db
     .from("project_members")
     .select("role, person_id")
     .eq("project_id", projectId)
@@ -114,10 +113,24 @@ export async function resolveRoomActor(projectId: string): Promise<RoomActor> {
     .limit(1)
     .maybeSingle();
 
+  // personId: preferimos el de la fila de miembro (consistente con el owner_person_id
+  // que se asigna en ESTA sala). Un admin puede no ser miembro de la sala pero igual
+  // necesita identidad para "Lo mío" / "Mi escritorio": lo resolvemos por email en people.
+  let personId = (data?.person_id as string | null) ?? null;
+  if (!personId && email) {
+    const { data: p } = await db.from("people").select("id").ilike("email", email).limit(1).maybeSingle();
+    personId = (p?.id as string | null) ?? null;
+  }
+
+  // José / platform admin: PM en cualquier sala (aunque no tenga fila de miembro).
+  if (isSuperAdmin) {
+    return { email, clerkId, personId, role: "pm", isSuperAdmin: true };
+  }
+
   return {
     email,
     clerkId,
-    personId: (data?.person_id as string | null) ?? null,
+    personId,
     role: (data?.role as RoomRole | null) ?? null,
     isSuperAdmin: false,
   };
