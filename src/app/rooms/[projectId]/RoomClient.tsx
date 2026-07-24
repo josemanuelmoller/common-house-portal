@@ -110,7 +110,9 @@ export function RoomClient({ projectId, role, capabilities, personId, project, r
   const [openPhase, setOpenPhase] = useState<string | null>(initialPhases.find((p) => p.status === "in_progress")?.id ?? null);
   const [dView, setDView] = useState<"list" | "kanban">("kanban");
   const [tView, setTView] = useState<"list" | "kanban">("kanban");
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ msg: string; undo?: () => void } | null>(null);
+  const [expandedDeliv, setExpandedDeliv] = useState<string | null>(null);
+  const [expandedDecision, setExpandedDecision] = useState<string | null>(() => initialDecisions.find((d) => d.status === "open")?.id ?? null);
 
   /* shell: colapso (desktop, persistido) + drawer (mobile) */
   const [collapsed, setCollapsed] = useState(false);
@@ -129,7 +131,7 @@ export function RoomClient({ projectId, role, capabilities, personId, project, r
   const can = (c: string) => capabilities.includes(c);
   const base = `/api/rooms/${projectId}`;
 
-  function flash(msg: string) { setToast(msg); window.setTimeout(() => setToast(null), 3000); }
+  function flash(msg: string, undo?: () => void) { setToast({ msg, undo }); window.setTimeout(() => setToast((t) => (t?.msg === msg ? null : t)), undo ? 6000 : 3000); }
 
   /* ── acciones (optimistic + revert) ── */
   async function moveDeliverable(id: string, to: string, from: string) {
@@ -142,8 +144,13 @@ export function RoomClient({ projectId, role, capabilities, personId, project, r
     if (!can("deliverable.accept")) return;
     const prev = deliverables;
     setDeliverables((ds) => ds.map((d) => (d.id === id ? { ...d, status: "accepted" } : d)));
-    try { await api(`${base}/deliverables`, "PATCH", { id, action: "accept" }); flash("Entregable aceptado"); }
+    try { await api(`${base}/deliverables`, "PATCH", { id, action: "accept" }); flash("Entregable aceptado", () => undoAccept(id)); }
     catch (e) { setDeliverables(prev); flash((e as Error).message); }
+  }
+  async function undoAccept(id: string) {
+    setDeliverables((ds) => ds.map((d) => (d.id === id ? { ...d, status: "delivered" } : d)));
+    try { await api(`${base}/deliverables`, "PATCH", { id, action: "revert_accept" }); flash("Aceptación deshecha"); }
+    catch (e) { flash((e as Error).message); }
   }
   async function moveTask(id: string, to: string, from: string) {
     if (!can("task.move")) return;
@@ -153,10 +160,16 @@ export function RoomClient({ projectId, role, capabilities, personId, project, r
   }
   async function closeTask(t: Task) {
     if (!(can("task.manage") || can("task.mark_own"))) return;
+    const before = t.status;
     const prev = tasks;
     setTasks((ts) => ts.map((x) => (x.id === t.id ? { ...x, status: "done", closed_via: "attestation" } : x)));
-    try { await api(`${base}/tasks`, "PATCH", { id: t.id, action: "close" }); flash("Tarea cerrada · atestiguada por ti"); }
+    try { await api(`${base}/tasks`, "PATCH", { id: t.id, action: "close" }); flash("Tarea cerrada · atestiguada por ti", () => undoClose(t.id, before)); }
     catch (e) { setTasks(prev); flash((e as Error).message); }
+  }
+  async function undoClose(id: string, before: string) {
+    setTasks((ts) => ts.map((x) => (x.id === id ? { ...x, status: before, closed_via: null } : x)));
+    try { await api(`${base}/tasks`, "PATCH", { id, action: "reopen" }); flash("Tarea reabierta"); }
+    catch (e) { flash((e as Error).message); }
   }
   async function createDeliverable() {
     if (!can("structure.edit")) return;
@@ -176,8 +189,13 @@ export function RoomClient({ projectId, role, capabilities, personId, project, r
     if (!(can("decision.manage") || can("decision.resolve_own"))) return;
     const prev = decisions;
     setDecisions((ds) => ds.map((d) => (d.id === id ? { ...d, status: "closed" } : d)));
-    try { await api(`${base}/decisions`, "PATCH", { id, action: "resolve" }); flash("Decisión resuelta"); }
+    try { await api(`${base}/decisions`, "PATCH", { id, action: "resolve" }); flash("Decisión resuelta", () => undoResolve(id)); }
     catch (e) { setDecisions(prev); flash((e as Error).message); }
+  }
+  async function undoResolve(id: string) {
+    setDecisions((ds) => ds.map((d) => (d.id === id ? { ...d, status: "open" } : d)));
+    try { await api(`${base}/decisions`, "PATCH", { id, action: "reopen" }); flash("Decisión reabierta"); }
+    catch (e) { flash((e as Error).message); }
   }
   async function createDecision() {
     if (!can("decision.manage")) return;
@@ -366,11 +384,11 @@ export function RoomClient({ projectId, role, capabilities, personId, project, r
 
           {/* RESUMEN */}
           {section === "resumen" && (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 11 }}>
-              <Stat l="Avance" v={`${stats.avance}%`} lime />
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 11 }}>
+              <Stat l="Avance" v={`${stats.avance}%`} lime animate={{ to: stats.avance, suffix: "%" }} />
               <Stat l="Entregables" v={`${stats.dDone}/${stats.dTot}`} />
               <Stat l="Tareas hechas" v={`${stats.tDone}/${stats.tTot}`} />
-              <Stat l="Bloqueadas" v={String(stats.blocked)} warn={stats.blocked > 0} />
+              <Stat l="Bloqueadas" v={String(stats.blocked)} warn={stats.blocked > 0} animate={{ to: stats.blocked }} />
             </div>
           )}
 
@@ -417,18 +435,39 @@ export function RoomClient({ projectId, role, capabilities, personId, project, r
             >
               {dView === "list" ? (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: 12 }}>
-                  {deliverables.map((d) => (
-                    <div key={d.id} style={card()}>
-                      <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-                        <b style={{ fontSize: 14, fontWeight: 800 }}>{d.title}</b>
-                        <span style={statusPill(d.status)}>{statusLabel(d.status)}</span>
+                  {deliverables.map((d) => {
+                    const dTasks = tasks.filter((t) => t.deliverable_id === d.id);
+                    const open = expandedDeliv === d.id;
+                    return (
+                      <div key={d.id} style={card()}>
+                        <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                          <b style={{ fontSize: 14, fontWeight: 800 }}>{d.title}</b>
+                          <span style={statusPill(d.status)}>{statusLabel(d.status)}</span>
+                        </div>
+                        <Progress v={d.progress} />
+                        {dTasks.length > 0 && (
+                          <button onClick={() => setExpandedDeliv(open ? null : d.id)} style={{ display: "flex", alignItems: "center", gap: 6, background: "transparent", border: 0, padding: 0, cursor: "pointer", fontFamily: "inherit", ...label, color: C.muted2 }}>
+                            <span style={{ transform: open ? "rotate(90deg)" : "none", transition: "transform .15s" }}>▸</span>
+                            {dTasks.filter((t) => t.status === "done").length}/{dTasks.length} tareas
+                          </button>
+                        )}
+                        {open && dTasks.length > 0 && (
+                          <div style={{ display: "flex", flexDirection: "column", gap: 6, borderTop: `1px solid ${C.lineSoft}`, paddingTop: 9 }}>
+                            {dTasks.map((t) => (
+                              <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
+                                <span style={{ width: 6, height: 6, borderRadius: 999, background: statusTone(t.status).fg, flexShrink: 0 }} />
+                                <span style={{ flex: 1, textDecoration: t.status === "done" ? "line-through" : "none", color: t.status === "done" ? C.muted : C.ink }}>{t.title}</span>
+                                <span style={label}>{TASK_COLS.find((c) => c.key === t.status)?.label}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {d.status === "delivered" && can("deliverable.accept") && (
+                          <button onClick={() => acceptDeliverable(d.id)} style={btn(C.lime, "#0a0a0a")}>Aceptar entregable</button>
+                        )}
                       </div>
-                      <Progress v={d.progress} />
-                      {d.status === "delivered" && can("deliverable.accept") && (
-                        <button onClick={() => acceptDeliverable(d.id)} style={btn(C.lime, "#0a0a0a")}>Aceptar entregable</button>
-                      )}
-                    </div>
-                  ))}
+                    );
+                  })}
                   {deliverables.length === 0 && <Empty text="Todavía no hay entregables." />}
                 </div>
               ) : (
@@ -491,24 +530,31 @@ export function RoomClient({ projectId, role, capabilities, personId, project, r
                 {decisions.map((d) => {
                   const del = deliverables.find((x) => x.id === d.deliverable_id);
                   const open = d.status === "open";
+                  const exp = expandedDecision === d.id;
+                  const hasBody = !!(d.context || d.source_ref || (Array.isArray(d.participants) && d.participants.length > 0));
                   return (
                     <div key={d.id} style={{ background: open ? C.warnSoft : C.paper, border: `1.5px solid ${open ? "#f0e0b0" : C.line}`, borderRadius: 12, padding: "13px 15px" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                      <button onClick={() => setExpandedDecision(exp ? null : d.id)} style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", width: "100%", textAlign: "left", background: "transparent", border: 0, padding: 0, cursor: "pointer", fontFamily: "inherit" }}>
+                        {hasBody && <span style={{ color: C.muted, transform: exp ? "rotate(90deg)" : "none", transition: "transform .15s", fontSize: 11 }}>▸</span>}
                         <b style={{ fontSize: 14, fontWeight: 800 }}>{d.title}</b>
                         {del && <span style={{ ...label, color: "#4a5bc0", background: "rgba(91,107,214,.11)", padding: "2px 7px", borderRadius: 5 }}>↳ {del.title}</span>}
                         <span style={{ flex: 1 }} />
                         <span style={pill(open ? C.warnSoft : C.okSoft, open ? C.warn : C.ok)}>{open ? "Abierta" : "Cerrada"}</span>
-                      </div>
-                      {d.context && <div style={{ fontSize: 12.5, color: C.muted2, marginTop: 6, lineHeight: 1.5 }}>{d.context}</div>}
-                      {d.source_ref && <div style={{ fontSize: 9, color: C.muted, marginTop: 6, fontWeight: 600, letterSpacing: ".3px", textTransform: "uppercase" }}>↳ {d.source_ref}</div>}
-                      {Array.isArray(d.participants) && d.participants.length > 0 && (
-                        <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 9, flexWrap: "wrap" }}>
-                          <span style={label}>Presentes</span>
-                          {d.participants.map((p, i) => <span key={i} style={{ width: 22, height: 22, borderRadius: 999, background: p.side === "client" ? "#495057" : C.limeInk, color: "#fff", display: "grid", placeItems: "center", fontSize: 8, fontWeight: 700 }}>{p.initials || "?"}</span>)}
+                      </button>
+                      {exp && (
+                        <div style={{ paddingLeft: hasBody ? 19 : 0 }}>
+                          {d.context && <div style={{ fontSize: 12.5, color: C.muted2, marginTop: 8, lineHeight: 1.5 }}>{d.context}</div>}
+                          {d.source_ref && <div style={{ fontSize: 9, color: C.muted, marginTop: 6, fontWeight: 600, letterSpacing: ".3px", textTransform: "uppercase" }}>↳ {d.source_ref}</div>}
+                          {Array.isArray(d.participants) && d.participants.length > 0 && (
+                            <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 9, flexWrap: "wrap" }}>
+                              <span style={label}>Presentes</span>
+                              {d.participants.map((p, i) => <span key={i} style={{ width: 22, height: 22, borderRadius: 999, background: p.side === "client" ? "#495057" : C.limeInk, color: "#fff", display: "grid", placeItems: "center", fontSize: 8, fontWeight: 700 }}>{p.initials || "?"}</span>)}
+                            </div>
+                          )}
+                          {open && (can("decision.manage") || can("decision.resolve_own")) && (
+                            <button onClick={() => resolveDecision(d.id)} style={{ ...btn(C.lime, "#0a0a0a"), marginTop: 11 }}>Resolver decisión</button>
+                          )}
                         </div>
-                      )}
-                      {open && (can("decision.manage") || can("decision.resolve_own")) && (
-                        <button onClick={() => resolveDecision(d.id)} style={{ ...btn(C.lime, "#0a0a0a"), marginTop: 11 }}>Resolver decisión</button>
                       )}
                     </div>
                   );
@@ -634,7 +680,13 @@ export function RoomClient({ projectId, role, capabilities, personId, project, r
       </main>
 
       {toast && (
-        <div style={{ position: "fixed", left: "50%", bottom: 24, transform: "translateX(-50%)", background: C.ink, color: "#fff", padding: "10px 15px", borderRadius: 11, fontSize: 12.5, fontWeight: 600, boxShadow: "0 10px 30px rgba(0,0,0,.3)", zIndex: 100 }}>{toast}</div>
+        <div style={{ position: "fixed", left: "50%", bottom: 24, transform: "translateX(-50%)", display: "flex", alignItems: "center", gap: 14, background: C.ink, color: "#fff", padding: "10px 12px 10px 16px", borderRadius: 11, fontSize: 12.5, fontWeight: 600, boxShadow: "0 10px 30px rgba(0,0,0,.3)", zIndex: 100 }}>
+          <span>{toast.msg}</span>
+          {toast.undo && (
+            <button onClick={() => { const u = toast.undo; setToast(null); u?.(); }}
+              style={{ fontFamily: "inherit", fontSize: 11, fontWeight: 800, letterSpacing: ".3px", textTransform: "uppercase", color: "#0a0a0a", background: C.lime, border: 0, borderRadius: 7, padding: "5px 11px", cursor: "pointer" }}>Deshacer</button>
+          )}
+        </div>
       )}
     </div>
   );
@@ -661,13 +713,30 @@ function materialCategory(cat: string | null): string {
 }
 
 /* ── sub-componentes ── */
-function Stat({ l, v, lime, warn }: { l: string; v: string; lime?: boolean; warn?: boolean }) {
+function Stat({ l, v, lime, warn, animate }: { l: string; v: string; lime?: boolean; warn?: boolean; animate?: { to: number; suffix?: string } }) {
   return (
     <div style={{ background: C.paper, border: `1.5px solid ${C.line}`, borderRadius: 12, padding: "15px 16px" }}>
       <div style={label}>{l}</div>
-      <div style={{ fontSize: "1.5rem", fontWeight: 900, letterSpacing: "-1px", marginTop: 8, color: lime ? C.limeInk : warn ? C.warn : C.ink }}>{v}</div>
+      <div style={{ fontSize: "1.5rem", fontWeight: 900, letterSpacing: "-1px", marginTop: 8, color: lime ? C.limeInk : warn ? C.warn : C.ink }}>
+        {animate ? <AnimatedNumber to={animate.to} suffix={animate.suffix} /> : v}
+      </div>
     </div>
   );
+}
+function AnimatedNumber({ to, suffix = "" }: { to: number; suffix?: string }) {
+  const [n, setN] = useState(0);
+  useEffect(() => {
+    let raf = 0; let start = 0;
+    const tick = (now: number) => {
+      if (!start) start = now;
+      const p = Math.min(1, (now - start) / 600);
+      setN(Math.round(to * (1 - Math.pow(1 - p, 3))));
+      if (p < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [to]);
+  return <>{n}{suffix}</>;
 }
 function Section({ title, view, setView, onCreate, createLabel, children }: { title: string; view: "list" | "kanban"; setView: (v: "list" | "kanban") => void; onCreate?: () => void; createLabel: string; children: ReactNode }) {
   return (
