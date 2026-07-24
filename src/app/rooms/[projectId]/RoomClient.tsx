@@ -236,6 +236,19 @@ export function RoomClient({ projectId, role, capabilities, personId, defaultLan
     return { avance, dDone, dTot: deliverables.length, tDone, tTot: tasks.length, blocked: tasks.filter((t) => t.status === "blocked").length };
   }, [deliverables, tasks]);
 
+  const upcoming = useMemo(() => {
+    const items: { key: string; title: string; due: string; kind: "deliverable" | "task" }[] = [];
+    deliverables.forEach((d) => { if (d.due_date && d.status !== "accepted") items.push({ key: "d" + d.id, title: d.title, due: d.due_date, kind: "deliverable" }); });
+    tasks.forEach((t) => { if (t.due_date && t.status !== "done") items.push({ key: "t" + t.id, title: t.title, due: t.due_date, kind: "task" }); });
+    return items.sort((a, b) => a.due.localeCompare(b.due)).slice(0, 6);
+  }, [deliverables, tasks]);
+  const phaseProgress = useMemo(() => phases.map((p) => {
+    const dels = deliverables.filter((d) => d.phase_id === p.id);
+    const pct = dels.length ? Math.round(dels.reduce((a, d) => a + (d.progress || 0), 0) / dels.length) : (p.status === "done" ? 100 : 0);
+    return { id: p.id, title: p.title, status: p.status, pct };
+  }), [phases, deliverables]);
+  const todayStr = new Date().toISOString().slice(0, 10);
+
   const openDecisions = decisions.filter((d) => d.status === "open").length;
   const myTasks = personId ? tasks.filter((t) => t.owner_person_id === personId) : [];
   const myOpenTasks = myTasks.filter((t) => t.status !== "done");
@@ -464,11 +477,55 @@ export function RoomClient({ projectId, role, capabilities, personId, defaultLan
               )}
             </div>
           ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 11 }}>
-              <Stat l={tr("stat.avance")} v={`${stats.avance}%`} lime animate={{ to: stats.avance, suffix: "%" }} />
-              <Stat l={tr("stat.entregables")} v={`${stats.dDone}/${stats.dTot}`} />
-              <Stat l={tr("stat.tareasHechas")} v={`${stats.tDone}/${stats.tTot}`} />
-              <Stat l={tr("stat.bloqueadas")} v={String(stats.blocked)} warn={stats.blocked > 0} animate={{ to: stats.blocked }} />
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              {/* stats */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 11 }}>
+                <Stat l={tr("stat.avance")} v={`${stats.avance}%`} lime animate={{ to: stats.avance, suffix: "%" }} />
+                <Stat l={tr("stat.entregables")} v={`${stats.dDone}/${stats.dTot}`} />
+                <Stat l={tr("stat.tareasHechas")} v={`${stats.tDone}/${stats.tTot}`} />
+                <Stat l={tr("stat.bloqueadas")} v={String(stats.blocked)} warn={stats.blocked > 0} animate={{ to: stats.blocked }} />
+              </div>
+              {/* en foco + próximas fechas */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 14, alignItems: "start" }}>
+                {(meta.currentFocus || meta.nextMilestone) && (
+                  <div style={{ background: C.paper, border: `1.5px solid ${C.line}`, borderRadius: 14, padding: "15px 17px" }}>
+                    {meta.currentFocus && (<><div style={label}>{tr("field.focus")}</div><div style={{ fontSize: 15, fontWeight: 700, marginTop: 6, lineHeight: 1.4 }}>{meta.currentFocus}</div></>)}
+                    {meta.nextMilestone && (<div style={{ marginTop: meta.currentFocus ? 14 : 0 }}><div style={label}>{tr("field.milestone")}</div><div style={{ fontSize: 13, fontWeight: 600, color: C.muted2, marginTop: 6 }}>◆ {meta.nextMilestone}</div></div>)}
+                  </div>
+                )}
+                <div style={{ background: C.paper, border: `1.5px solid ${C.line}`, borderRadius: 14, padding: "15px 17px" }}>
+                  <div style={label}>{tr("ov.upcoming")}</div>
+                  {upcoming.length === 0 && <div style={{ fontSize: 12.5, color: C.muted, padding: "10px 0 2px" }}>{tr("ov.noUpcoming")}</div>}
+                  <div style={{ marginTop: 2 }}>
+                    {upcoming.map((u) => {
+                      const overdue = u.due < todayStr;
+                      return (
+                        <div key={u.key} style={{ display: "flex", alignItems: "center", gap: 11, padding: "9px 0", borderTop: `1px solid ${C.lineSoft}` }}>
+                          <span style={{ ...label, fontFamily: "ui-monospace,monospace", minWidth: 52, color: overdue ? C.warn : C.muted2 }}>{u.due.slice(5)}</span>
+                          <span style={{ flex: 1, fontSize: 12.5, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{u.title}</span>
+                          <span style={pill(u.kind === "deliverable" ? C.limePaper : C.paper2, u.kind === "deliverable" ? C.limeInk : C.muted2)}>{tr(u.kind === "deliverable" ? "ov.deliverable" : "ov.task")}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+              {/* fases */}
+              {phaseProgress.length > 0 && (
+                <div style={{ background: C.paper, border: `1.5px solid ${C.line}`, borderRadius: 14, padding: "15px 17px" }}>
+                  <div style={{ ...label, marginBottom: 13 }}>{tr("ov.phases")}</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                    {phaseProgress.map((p) => (
+                      <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                        <span style={{ width: 8, height: 8, borderRadius: 999, flexShrink: 0, background: p.status === "done" ? C.ok : p.status === "in_progress" ? C.limeInk : C.muted }} />
+                        <span style={{ fontSize: 12.5, fontWeight: 700, minWidth: 0, flex: "0 0 42%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.title}</span>
+                        <div style={{ flex: 1, height: 6, background: C.paper2, borderRadius: 4, overflow: "hidden" }}><div style={{ width: `${p.pct}%`, height: "100%", background: p.status === "done" ? C.ok : C.lime }} /></div>
+                        <span style={{ fontSize: 11, fontWeight: 800, color: C.muted2, minWidth: 30, textAlign: "right" }}>{p.pct}%</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           ))}
 
