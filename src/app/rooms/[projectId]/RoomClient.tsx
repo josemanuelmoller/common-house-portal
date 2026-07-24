@@ -19,6 +19,7 @@ type RoomProjectMeta = { orgName: string | null; orgLocation: string | null; org
 type RoomTeamMember = { id: string; name: string; email: string | null; role: string; jobTitle: string | null; photoUrl: string | null; side: "team" | "client" };
 type RoomBilling = { company: { legalName: string | null; taxId: string | null; vatNumber: string | null; address: string | null; billingEmail: string | null; publicNote: string | null } | null; client: { legalName: string | null; taxId: string | null; address: string | null; billingEmail: string | null; billingContact: string | null; poReference: string | null } | null };
 type Meeting = { id: string; title: string; date: string | null; summary: string | null; url: string | null; platform: string | null; kind: string };
+type Suggestion = { id: string; proposal_kind: string | null; item_type: string | null; summary: string | null; rationale: string | null; source_refs: string[] | null; created_at: string };
 
 type Props = {
   projectId: string;
@@ -34,6 +35,8 @@ type Props = {
   team: RoomTeamMember[];
   billing: RoomBilling;
   meetings: Meeting[];
+  suggestions: Suggestion[];
+  heroNote: string | null;
   initialPhases: Phase[];
   initialDeliverables: Deliverable[];
   initialTasks: Task[];
@@ -132,8 +135,9 @@ const ROLE_TABS: { key: string; label: string }[] = [
   { key: "pm", label: "PM" }, { key: "collaborator", label: "Colab" }, { key: "client", label: "Cliente" }, { key: "reader", label: "Lector" },
 ];
 
-export function RoomClient({ projectId, role, capabilities, personId, defaultLang, emptyRoom, suggestion, project, rooms, meta, team, billing, meetings, initialPhases, initialDeliverables, initialTasks, initialDecisions, initialMaterials, initialEvents }: Props) {
+export function RoomClient({ projectId, role, capabilities, personId, defaultLang, emptyRoom, suggestion, project, rooms, meta, team, billing, meetings, suggestions, heroNote, initialPhases, initialDeliverables, initialTasks, initialDecisions, initialMaterials, initialEvents }: Props) {
   const [section, setSection] = useState<SectionKey>("resumen");
+  const [suggs, setSuggs] = useState<Suggestion[]>(suggestions);
   const [approving, setApproving] = useState(false);
   const [deliverables, setDeliverables] = useState<Deliverable[]>(initialDeliverables);
   const [tasks, setTasks] = useState<Task[]>(initialTasks);
@@ -254,6 +258,13 @@ export function RoomClient({ projectId, role, capabilities, personId, defaultLan
       window.location.reload();
     } catch (e) { flash((e as Error).message); setApproving(false); }
   }
+  async function resolveSugg(id: string, action: "confirm" | "dismiss") {
+    if (!can("suggestion.confirm")) return;
+    const prev = suggs;
+    setSuggs((s) => s.filter((x) => x.id !== id));
+    try { await api(`${base}/suggestions`, "PATCH", { id, action }); if (action === "confirm") flash("Sugerencia confirmada"); }
+    catch (e) { setSuggs(prev); flash((e as Error).message); }
+  }
 
   /* ── stats ── */
   const stats = useMemo(() => {
@@ -269,12 +280,8 @@ export function RoomClient({ projectId, role, capabilities, personId, defaultLan
     tasks.forEach((t) => { if (t.due_date && t.status !== "done") items.push({ key: "t" + t.id, title: t.title, due: t.due_date, kind: "task" }); });
     return items.sort((a, b) => a.due.localeCompare(b.due)).slice(0, 6);
   }, [deliverables, tasks]);
-  const phaseProgress = useMemo(() => phases.map((p) => {
-    const dels = deliverables.filter((d) => d.phase_id === p.id);
-    const pct = dels.length ? Math.round(dels.reduce((a, d) => a + (d.progress || 0), 0) / dels.length) : (p.status === "done" ? 100 : 0);
-    return { id: p.id, title: p.title, status: p.status, pct };
-  }), [phases, deliverables]);
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const heroTitle = meta.currentFocus ?? cleanName(project.name);
+  const heroSub = heroNote ?? (meta.nextMilestone ? `${tr("field.milestone")}: ${meta.nextMilestone}` : "");
 
   const openDecisions = decisions.filter((d) => d.status === "open").length;
   const myTasks = personId ? tasks.filter((t) => t.owner_person_id === personId) : [];
@@ -526,69 +533,65 @@ export function RoomClient({ projectId, role, capabilities, personId, defaultLan
               )}
             </div>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <div>
+              {/* hero */}
+              {meta.projectType && <div style={label}>{meta.projectType.toUpperCase()}</div>}
+              <h1 style={{ fontSize: 26, fontWeight: 300, letterSpacing: "-1px", lineHeight: 1.1, maxWidth: "22ch", margin: "9px 0 0" }}>{renderHero(heroTitle)}</h1>
+              {heroSub && <p style={{ color: C.muted, fontSize: 14, maxWidth: "64ch", margin: "12px 0 0", lineHeight: 1.6 }}>{heroSub}</p>}
               {/* stats */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 11 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 11, marginTop: 20 }}>
                 <Stat l={tr("stat.avance")} v={`${stats.avance}%`} lime animate={{ to: stats.avance, suffix: "%" }} />
                 <Stat l={tr("stat.entregables")} v={`${stats.dDone}/${stats.dTot}`} />
-                <Stat l={tr("stat.tareasHechas")} v={`${stats.tDone}/${stats.tTot}`} />
-                <Stat l={tr("stat.bloqueadas")} v={String(stats.blocked)} warn={stats.blocked > 0} animate={{ to: stats.blocked }} />
+                <Stat l={lang === "es" ? "Próximo hito" : "Next milestone"} v={upcoming.length ? `${upcoming[0].due.slice(5)} · ${upcoming[0].title.length > 15 ? upcoming[0].title.slice(0, 15) + "…" : upcoming[0].title}` : (meta.nextMilestone ?? "—")} sm />
+                <Stat l={lang === "es" ? "Decisión pendiente" : "Pending decision"} v={String(openDecisions)} warn={openDecisions > 0} />
               </div>
-              {/* en foco + próximas fechas */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 14, alignItems: "start" }}>
-                {(meta.currentFocus || meta.nextMilestone) && (
-                  <div style={{ background: C.paper, border: `1.5px solid ${C.line}`, borderRadius: 14, padding: "15px 17px" }}>
-                    {meta.currentFocus && (<><div style={label}>{tr("field.focus")}</div><div style={{ fontSize: 15, fontWeight: 700, marginTop: 6, lineHeight: 1.4 }}>{meta.currentFocus}</div></>)}
-                    {meta.nextMilestone && (<div style={{ marginTop: meta.currentFocus ? 14 : 0 }}><div style={label}>{tr("field.milestone")}</div><div style={{ fontSize: 13, fontWeight: 600, color: C.muted2, marginTop: 6 }}>◆ {meta.nextMilestone}</div></div>)}
-                  </div>
-                )}
-                <div style={{ background: C.paper, border: `1.5px solid ${C.line}`, borderRadius: 14, padding: "15px 17px" }}>
-                  <div style={label}>{tr("ov.upcoming")}</div>
-                  {upcoming.length === 0 && <div style={{ fontSize: 12.5, color: C.muted, padding: "10px 0 2px" }}>{tr("ov.noUpcoming")}</div>}
-                  <div style={{ marginTop: 2 }}>
-                    {upcoming.map((u) => {
-                      const overdue = u.due < todayStr;
-                      return (
-                        <div key={u.key} style={{ display: "flex", alignItems: "center", gap: 11, padding: "9px 0", borderTop: `1px solid ${C.lineSoft}` }}>
-                          <span style={{ ...label, fontFamily: "ui-monospace,monospace", minWidth: 52, color: overdue ? C.warn : C.muted2 }}>{u.due.slice(5)}</span>
-                          <span style={{ flex: 1, fontSize: 12.5, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{u.title}</span>
-                          <span style={pill(u.kind === "deliverable" ? C.limePaper : C.paper2, u.kind === "deliverable" ? C.limeInk : C.muted2)}>{tr(u.kind === "deliverable" ? "ov.deliverable" : "ov.task")}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-                {/* reuniones recientes */}
-                {meetings.length > 0 && (
-                  <div style={{ background: C.paper, border: `1.5px solid ${C.line}`, borderRadius: 14, padding: "15px 17px" }}>
-                    <div style={label}>{tr("nav.reuniones")}</div>
-                    <div style={{ marginTop: 2 }}>
-                      {meetings.slice(0, 4).map((m) => (
-                        <a key={m.id} href={m.url ?? undefined} target="_blank" rel="noreferrer" style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderTop: `1px solid ${C.lineSoft}`, textDecoration: "none", color: "inherit" }}>
-                          <span style={{ width: 22, height: 22, borderRadius: 7, background: C.limePaper, color: C.limeInk, display: "grid", placeItems: "center", fontSize: 10, flexShrink: 0 }}>▷</span>
-                          <span style={{ flex: 1, minWidth: 0 }}>
-                            <b style={{ fontSize: 12.5, fontWeight: 700, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.title}</b>
-                            <small style={{ fontSize: 10, color: C.muted }}>{[m.platform, m.date].filter(Boolean).join(" · ")}</small>
-                          </span>
-                          <span style={{ color: C.muted, flexShrink: 0 }}>↗</span>
-                        </a>
-                      ))}
+              {/* inbox — la IA propone (gate) */}
+              {suggs.length > 0 && (
+                <div style={{ background: C.paper, border: `1.5px solid ${C.line}`, borderRadius: 14, overflow: "hidden", marginTop: 20 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", borderBottom: `1px solid ${C.line}`, background: "rgba(200,245,90,.09)" }}>
+                    <span style={{ width: 24, height: 24, borderRadius: 7, background: C.lime, display: "grid", placeItems: "center", fontSize: 12, flexShrink: 0 }}>✦</span>
+                    <div style={{ minWidth: 0 }}>
+                      <b style={{ fontSize: 11.5, fontWeight: 800, textTransform: "uppercase", letterSpacing: ".3px" }}>{lang === "es" ? "La IA leyó tus reuniones · para confirmar" : "The AI read your meetings · to confirm"}</b>
+                      <small style={{ display: "block", fontSize: 10, color: C.muted }}>{lang === "es" ? "Propone estos cambios — nada se aplica sin tu ✓." : "It proposes these changes — nothing applies without your ✓."}</small>
                     </div>
+                    <span style={{ flex: 1 }} />
+                    <span style={label}>{suggs.length}</span>
                   </div>
-                )}
-              </div>
-              {/* fases */}
-              {phaseProgress.length > 0 && (
-                <div style={{ background: C.paper, border: `1.5px solid ${C.line}`, borderRadius: 14, padding: "15px 17px" }}>
-                  <div style={{ ...label, marginBottom: 13 }}>{tr("ov.phases")}</div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                    {phaseProgress.map((p) => (
-                      <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                        <span style={{ width: 8, height: 8, borderRadius: 999, flexShrink: 0, background: p.status === "done" ? C.ok : p.status === "in_progress" ? C.limeInk : C.muted }} />
-                        <span style={{ fontSize: 12.5, fontWeight: 700, minWidth: 0, flex: "0 0 42%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.title}</span>
-                        <div style={{ flex: 1, height: 6, background: C.paper2, borderRadius: 4, overflow: "hidden" }}><div style={{ width: `${p.pct}%`, height: "100%", background: p.status === "done" ? C.ok : C.lime }} /></div>
-                        <span style={{ fontSize: 11, fontWeight: 800, color: C.muted2, minWidth: 30, textAlign: "right" }}>{p.pct}%</span>
+                  {suggs.map((s) => {
+                    const k = suggLabel(s.item_type, lang);
+                    return (
+                      <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 16px", borderTop: `1px solid ${C.lineSoft}` }}>
+                        <span style={{ fontSize: 8, fontWeight: 800, letterSpacing: ".8px", textTransform: "uppercase", padding: "3px 8px", borderRadius: 6, whiteSpace: "nowrap", background: k.warm ? C.warnSoft : "rgba(0,0,0,.07)", color: k.warm ? "#7a5800" : "#555" }}>{k.label}</span>
+                        <div style={{ flex: 1, fontSize: 12.5, minWidth: 0 }}>{s.summary}{s.rationale && <small style={{ display: "block", color: C.muted, fontSize: 10.5, marginTop: 1 }}>{s.rationale}</small>}</div>
+                        {can("suggestion.confirm")
+                          ? (<div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                              <button onClick={() => resolveSugg(s.id, "confirm")} style={{ fontFamily: "inherit", fontSize: 9.5, fontWeight: 800, letterSpacing: ".4px", textTransform: "uppercase", cursor: "pointer", borderRadius: 6, padding: "5px 10px", border: 0, background: C.lime, color: "#000" }}>{lang === "es" ? "Confirmar" : "Confirm"}</button>
+                              <button onClick={() => resolveSugg(s.id, "dismiss")} style={{ fontFamily: "inherit", fontSize: 9.5, fontWeight: 800, letterSpacing: ".4px", textTransform: "uppercase", cursor: "pointer", borderRadius: 6, padding: "5px 10px", border: `1.5px solid ${C.line}`, background: C.paper, color: C.muted }}>{lang === "es" ? "Descartar" : "Dismiss"}</button>
+                            </div>)
+                          : <span style={{ ...label }}>{lang === "es" ? "Confirma el PM" : "PM confirms"}</span>}
                       </div>
+                    );
+                  })}
+                </div>
+              )}
+              {/* reuniones */}
+              {meetings.length > 0 && (
+                <div style={{ background: C.paper, border: `1.5px solid ${C.line}`, borderRadius: 14, overflow: "hidden", marginTop: 16 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "13px 17px 12px", borderBottom: `1px solid ${C.line}` }}>
+                    <span style={{ width: 26, height: 26, borderRadius: 7, background: C.lime, display: "grid", placeItems: "center", flexShrink: 0 }}>
+                      <svg viewBox="0 0 16 16" style={{ width: 14, height: 14, stroke: "#000", fill: "none", strokeWidth: 1.6, strokeLinecap: "round", strokeLinejoin: "round" }}><rect x="2.5" y="3.5" width="11" height="10" rx="1.5" /><path d="M2.5 6.5h11" /><path d="M5.5 2v3M10.5 2v3" /></svg>
+                    </span>
+                    <b style={{ fontSize: 11.5, fontWeight: 800, textTransform: "uppercase", letterSpacing: ".2px" }}>{tr("nav.reuniones")}</b>
+                    <span style={{ flex: 1 }} />
+                    <span style={{ fontSize: 10, color: C.muted, fontWeight: 600 }}>{meetings.length} {lang === "es" ? "en total" : "total"}</span>
+                  </div>
+                  <div style={{ padding: "6px 17px 14px" }}>
+                    {meetings.slice(0, 5).map((m) => (
+                      <a key={m.id} href={m.url ?? undefined} target="_blank" rel="noreferrer" style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 0", borderTop: `1px solid ${C.lineSoft}`, textDecoration: "none", color: "inherit" }}>
+                        <span style={{ fontSize: 9, fontFamily: "ui-monospace,monospace", fontWeight: 700, letterSpacing: ".5px", textTransform: "uppercase", color: C.muted, minWidth: 44, flexShrink: 0 }}>{m.date ? m.date.slice(5) : ""}</span>
+                        <div style={{ flex: 1, minWidth: 0 }}><b style={{ fontSize: 12.5, fontWeight: 700, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.title}</b>{m.platform && <small style={{ fontSize: 10, color: C.muted }}>{m.platform}</small>}</div>
+                        <span style={{ color: C.muted, flexShrink: 0 }}>↗</span>
+                      </a>
                     ))}
                   </div>
                 </div>
@@ -933,15 +936,28 @@ export function RoomClient({ projectId, role, capabilities, personId, defaultLan
 function cleanName(name: string | null): string { return (name ?? "Sala").replace(/^\[[^\]]*\]\s*/, "").trim() || "Sala"; }
 
 /* ── sub-componentes ── */
-function Stat({ l, v, lime, warn, animate }: { l: string; v: string; lime?: boolean; warn?: boolean; animate?: { to: number; suffix?: string } }) {
+function Stat({ l, v, lime, warn, sm, animate }: { l: string; v: string; lime?: boolean; warn?: boolean; sm?: boolean; animate?: { to: number; suffix?: string } }) {
   return (
     <div style={{ background: C.paper, border: `1.5px solid ${C.line}`, borderRadius: 12, padding: "15px 16px" }}>
       <div style={label}>{l}</div>
-      <div style={{ fontSize: "1.5rem", fontWeight: 900, letterSpacing: "-1px", marginTop: 8, color: lime ? C.limeInk : warn ? C.warn : C.ink }}>
+      <div style={{ fontSize: sm ? "1.05rem" : "1.5rem", fontWeight: 900, letterSpacing: sm ? "-.3px" : "-1px", marginTop: 8, color: lime ? C.limeInk : warn ? C.warn : C.ink, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
         {animate ? <AnimatedNumber to={animate.to} suffix={animate.suffix} /> : v}
       </div>
     </div>
   );
+}
+/* hero: resalta el texto entre *asteriscos* en lime itálica (como la maqueta) */
+function renderHero(text: string): ReactNode {
+  return text.split(/(\*[^*]+\*)/g).map((part, i) => part.startsWith("*") && part.endsWith("*")
+    ? <em key={i} style={{ fontWeight: 900, fontStyle: "italic", color: C.limeInk }}>{part.slice(1, -1)}</em>
+    : <span key={i}>{part}</span>);
+}
+function suggLabel(itemType: string | null, lang: Lang): { label: string; warm: boolean } {
+  const it = (itemType ?? "").toLowerCase();
+  if (it.includes("decision")) return { label: lang === "es" ? "+ Decisión" : "+ Decision", warm: true };
+  if (it.includes("status") || it.includes("state")) return { label: lang === "es" ? "↑ Estado" : "↑ Status", warm: false };
+  if (it.includes("task")) return { label: lang === "es" ? "+ Tarea" : "+ Task", warm: false };
+  return { label: lang === "es" ? "Sugerencia" : "Suggestion", warm: false };
 }
 function AnimatedNumber({ to, suffix = "" }: { to: number; suffix?: string }) {
   const [n, setN] = useState(0);
