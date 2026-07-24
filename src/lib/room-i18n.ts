@@ -73,6 +73,7 @@ const ES: Record<string, string> = {
   "empty.drive": "Carpeta de Drive vinculada", "empty.presale": "Sala de preventa",
   "empty.meetings": "El proyecto ya existe — las reuniones se procesan solas",
   "empty.suggestedTitle": "Estructura sugerida", "empty.suggestedNote": "Aprobála para arrancar — después la editás.",
+  "empty.fromProposal": "desde la propuesta", "empty.fromTemplate": "template inicial",
   "empty.approve": "Aprobar estructura y arrancar", "empty.pmWillApprove": "El PM va a aprobar la estructura para arrancar.",
   "toast.structureCreated": "Estructura creada · sala en marcha",
 };
@@ -124,6 +125,7 @@ const EN: Record<string, string> = {
   "empty.drive": "Drive folder linked", "empty.presale": "Pre-sale room",
   "empty.meetings": "The project already exists — meetings are processed automatically",
   "empty.suggestedTitle": "Suggested structure", "empty.suggestedNote": "Approve to start — you can edit it later.",
+  "empty.fromProposal": "from the proposal", "empty.fromTemplate": "starter template",
   "empty.approve": "Approve structure & start", "empty.pmWillApprove": "The PM will approve the structure to start.",
   "toast.structureCreated": "Structure created · room is live",
 };

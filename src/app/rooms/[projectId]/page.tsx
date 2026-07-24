@@ -28,7 +28,7 @@ export default async function RoomPage({ params }: { params: Promise<{ projectId
   const caps = capabilitiesFor(actor.role);
   const db = supabaseAdmin();
   const [proj, phases, deliverables, tasks, decisions, materials] = await Promise.all([
-    db.from("projects").select("id, name, current_stage, room_language, notion_id").eq("id", project.id).single(),
+    db.from("projects").select("id, name, current_stage, room_language, notion_id, hall_draft").eq("id", project.id).single(),
     db.from("project_phases").select("*").eq("project_id", project.id).order("position", { ascending: true }),
     db.from("project_deliverables").select("*").eq("project_id", project.id).order("position", { ascending: true }),
     db.from("project_tasks").select("*").eq("project_id", project.id).order("position", { ascending: true }),
@@ -58,7 +58,7 @@ export default async function RoomPage({ params }: { params: Promise<{ projectId
   // (heredando personas/Drive/reuniones de la preventa) para que el PM la apruebe.
   const lang = proj.data?.room_language === "en" ? "en" : "es";
   const emptyRoom = (phases.data?.length ?? 0) === 0 && (deliverables.data?.length ?? 0) === 0 && (tasks.data?.length ?? 0) === 0;
-  const suggestion = emptyRoom ? suggestRoomStructure(lang) : null;
+  const suggestion = emptyRoom ? suggestRoomStructure(lang, proj.data?.hall_draft ?? null) : null;
 
   return (
     <RoomClient

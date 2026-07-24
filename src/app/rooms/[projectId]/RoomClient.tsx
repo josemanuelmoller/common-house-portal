@@ -439,6 +439,7 @@ export function RoomClient({ projectId, role, capabilities, personId, defaultLan
                 <div style={{ background: C.paper, border: `1.5px solid ${C.line}`, borderRadius: 14, padding: "16px 18px" }}>
                   <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
                     <h3 style={{ fontSize: 15, fontWeight: 800, margin: 0 }}>{tr("empty.suggestedTitle")}</h3>
+                    <span style={{ ...pill(suggestion.source === "proposal" ? C.limePaper : C.paper2, suggestion.source === "proposal" ? C.limeInk : C.muted2) }}>{tr(suggestion.source === "proposal" ? "empty.fromProposal" : "empty.fromTemplate")}</span>
                     <span style={{ fontSize: 11, color: C.muted }}>{tr("empty.suggestedNote")}</span>
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 14 }}>
