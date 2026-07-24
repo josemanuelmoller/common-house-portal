@@ -123,6 +123,40 @@ export async function resolveRoomActor(projectId: string): Promise<RoomActor> {
   };
 }
 
+export type RoomSummary = { id: string; name: string | null; slug: string | null; stage: string | null };
+
+/**
+ * Salas visibles para este actor — alimenta el acordeón del sidebar.
+ * José/admin ve todas las salas que existen (proyectos con al menos un miembro);
+ * cliente/colaborador/lector ven sólo aquellas en las que participan.
+ */
+export async function listRoomsForActor(actor: RoomActor): Promise<RoomSummary[]> {
+  const db = supabaseAdmin();
+
+  let memberQ = db.from("project_members").select("project_id").is("revoked_at", null);
+  if (!actor.isSuperAdmin) {
+    if (!actor.email) return [];
+    memberQ = memberQ.ilike("user_email", actor.email);
+  }
+  const { data: mem } = await memberQ;
+  const ids = [...new Set((mem ?? []).map((m) => m.project_id as string))];
+  if (ids.length === 0) return [];
+
+  const { data } = await db
+    .from("projects")
+    .select("id, name, hall_slug, current_stage")
+    .in("id", ids);
+
+  return (data ?? [])
+    .map((p) => ({
+      id: p.id as string,
+      name: (p.name as string | null) ?? null,
+      slug: (p.hall_slug as string | null) ?? null,
+      stage: (p.current_stage as string | null) ?? null,
+    }))
+    .sort((a, b) => (a.name ?? "").localeCompare(b.name ?? ""));
+}
+
 /**
  * Emite un evento al event log inmutable (project_events).
  * Todo cambio de la capa de trabajo pasa por acá: de esto salen undo,

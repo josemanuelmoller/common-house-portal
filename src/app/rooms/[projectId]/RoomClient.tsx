@@ -1,6 +1,8 @@
 "use client";
 
-import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import Link from "next/link";
+import { UserButton } from "@clerk/nextjs";
 
 /* ── tipos (espejo de las tablas del Bloque 0) ── */
 type Phase = { id: string; title: string; status: string; position: number };
@@ -10,12 +12,14 @@ type Participant = { initials?: string; name?: string; side?: string };
 type Decision = { id: string; title: string; context: string | null; status: string; deliverable_id: string | null; participants: Participant[] | null; source_ref: string | null; resolved_by: string | null };
 type Material = { id: string; title: string; url: string | null; mime_type: string | null; category: string | null; folder_name: string | null; modified_at: string | null };
 type EventRow = { id: string; actor_email: string | null; actor_role: string | null; verb: string; target_type: string; summary: string | null; created_at: string };
+type RoomSummary = { id: string; name: string | null; slug: string | null; stage: string | null };
 
 type Props = {
   projectId: string;
   role: string;
   capabilities: string[];
   project: { id: string; name: string | null; current_stage: string | null };
+  rooms: RoomSummary[];
   initialPhases: Phase[];
   initialDeliverables: Deliverable[];
   initialTasks: Task[];
@@ -61,7 +65,26 @@ async function api(path: string, method: string, body?: unknown) {
 
 type SectionKey = "resumen" | "plan" | "entregables" | "tareas" | "decisiones" | "materiales" | "actividad";
 
-export function RoomClient({ projectId, role, capabilities, project, initialPhases, initialDeliverables, initialTasks, initialDecisions, initialMaterials, initialEvents }: Props) {
+const NAV: { key: SectionKey; label: string; icon: string; pmOnly?: boolean }[] = [
+  { key: "resumen", label: "Resumen", icon: "◈" },
+  { key: "plan", label: "Plan", icon: "◆" },
+  { key: "entregables", label: "Entregables", icon: "◧" },
+  { key: "tareas", label: "Tareas", icon: "✓" },
+  { key: "decisiones", label: "Decisiones", icon: "◉" },
+  { key: "materiales", label: "Materiales", icon: "▤" },
+  { key: "actividad", label: "Actividad", icon: "◫", pmOnly: true },
+];
+
+const roleLabel: Record<string, string> = { pm: "PM", collaborator: "Colaborador", client: "Cliente", reader: "Lector" };
+
+function initialsOf(name: string | null): string {
+  if (!name) return "·";
+  const clean = name.replace(/^\[[^\]]*\]\s*/, "").trim();
+  const parts = clean.split(/\s+/).filter(Boolean);
+  return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase() || "·";
+}
+
+export function RoomClient({ projectId, role, capabilities, project, rooms, initialPhases, initialDeliverables, initialTasks, initialDecisions, initialMaterials, initialEvents }: Props) {
   const [section, setSection] = useState<SectionKey>("resumen");
   const [deliverables, setDeliverables] = useState<Deliverable[]>(initialDeliverables);
   const [tasks, setTasks] = useState<Task[]>(initialTasks);
@@ -71,6 +94,21 @@ export function RoomClient({ projectId, role, capabilities, project, initialPhas
   const [dView, setDView] = useState<"list" | "kanban">("kanban");
   const [tView, setTView] = useState<"list" | "kanban">("kanban");
   const [toast, setToast] = useState<string | null>(null);
+
+  /* shell: colapso (desktop, persistido) + drawer (mobile) */
+  const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    try { setCollapsed(window.localStorage.getItem("room.sidebar.collapsed") === "1"); } catch {}
+    const mq = () => setIsMobile(window.innerWidth < 900);
+    mq(); window.addEventListener("resize", mq);
+    return () => window.removeEventListener("resize", mq);
+  }, []);
+  function toggleCollapsed() {
+    setCollapsed((v) => { const nv = !v; try { window.localStorage.setItem("room.sidebar.collapsed", nv ? "1" : "0"); } catch {} return nv; });
+  }
+
   const can = (c: string) => capabilities.includes(c);
   const base = `/api/rooms/${projectId}`;
 
@@ -140,229 +178,322 @@ export function RoomClient({ projectId, role, capabilities, project, initialPhas
     return { avance, dDone, dTot: deliverables.length, tDone, tTot: tasks.length, blocked: tasks.filter((t) => t.status === "blocked").length };
   }, [deliverables, tasks]);
 
-  const roleLabel: Record<string, string> = { pm: "PM", collaborator: "Colaborador", client: "Cliente", reader: "Lector" };
   const openDecisions = decisions.filter((d) => d.status === "open").length;
+  const navCount: Partial<Record<SectionKey, number | undefined>> = { entregables: deliverables.length, tareas: tasks.length, decisiones: openDecisions || undefined };
+  const navItems = NAV.filter((n) => !n.pmOnly || can("analytics.view"));
+  const sectionLabel = NAV.find((n) => n.key === section)?.label ?? "";
+
+  // La sala actual siempre presente en el acordeón (aunque el listado venga vacío).
+  const roomList = rooms.some((r) => r.id === projectId)
+    ? rooms
+    : [{ id: projectId, name: project.name, slug: null, stage: project.current_stage }, ...rooms];
+
+  function pickSection(k: SectionKey) { setSection(k); if (isMobile) setMobileOpen(false); }
+
+  const sidebarWidth = isMobile ? 268 : collapsed ? 66 : 248;
+  const showLabels = isMobile || !collapsed;
+
+  const asideStyle: CSSProperties = {
+    width: sidebarWidth, flex: "none", background: C.paper1, borderRight: `1px solid ${C.line}`,
+    display: "flex", flexDirection: "column", zIndex: 50,
+    ...(isMobile
+      ? { position: "fixed", top: 0, left: 0, height: "100vh", transform: mobileOpen ? "translateX(0)" : "translateX(-110%)", transition: "transform .22s ease", boxShadow: mobileOpen ? "0 10px 40px rgba(0,0,0,.28)" : "none" }
+      : { position: "sticky", top: 0, height: "100vh" }),
+  };
 
   return (
-    <div style={{ maxWidth: 1120, margin: "0 auto", padding: "20px 18px 60px", fontFamily: "var(--font-hall-sans), 'Inter Tight', sans-serif", color: C.ink }}>
-      {/* header */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18 }}>
-        <div>
-          <div style={label}>Sala de trabajo</div>
-          <h1 style={{ fontSize: 22, fontWeight: 800, letterSpacing: "-.4px", margin: "4px 0 0" }}>{project.name ?? "Proyecto"}</h1>
-        </div>
-        <span style={{ flex: 1 }} />
-        {project.current_stage && <span style={pill(C.lime, "#0a0a0a")}>{project.current_stage}</span>}
-        <span style={pill(C.paper2, C.muted2)} title="Tu rol en esta sala">{roleLabel[role] ?? role}</span>
-      </div>
-
-      {/* nav */}
-      <div style={{ display: "flex", gap: 4, borderBottom: `1.5px solid ${C.line}`, marginBottom: 20, flexWrap: "wrap" }}>
-        {([
-          ["resumen", "Resumen"],
-          ["plan", "Plan"],
-          ["entregables", `Entregables (${deliverables.length})`],
-          ["tareas", `Tareas (${tasks.length})`],
-          ["decisiones", `Decisiones${openDecisions ? ` (${openDecisions})` : ""}`],
-          ["materiales", "Materiales"],
-          ...(can("analytics.view") ? ([["actividad", "Actividad"]] as [SectionKey, string][]) : []),
-        ] as [SectionKey, string][]).map(([key, lbl]) => (
-          <button key={key} onClick={() => setSection(key)} style={{
-            fontFamily: "inherit", fontSize: 13, fontWeight: section === key ? 700 : 600,
-            color: section === key ? C.ink : C.muted, background: "transparent", border: 0, borderBottom: `2px solid ${section === key ? C.limeInk : "transparent"}`,
-            padding: "10px 12px", cursor: "pointer", marginBottom: -1.5,
-          }}>{lbl}</button>
-        ))}
-      </div>
-
-      {/* RESUMEN */}
-      {section === "resumen" && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 11 }}>
-          <Stat l="Avance" v={`${stats.avance}%`} lime />
-          <Stat l="Entregables" v={`${stats.dDone}/${stats.dTot}`} />
-          <Stat l="Tareas hechas" v={`${stats.tDone}/${stats.tTot}`} />
-          <Stat l="Bloqueadas" v={String(stats.blocked)} warn={stats.blocked > 0} />
-        </div>
+    <div style={{ display: "flex", minHeight: "100vh", fontFamily: "var(--font-hall-sans), 'Inter Tight', sans-serif", color: C.ink, background: C.paper }}>
+      {/* hamburguesa (mobile) */}
+      {isMobile && !mobileOpen && (
+        <button onClick={() => setMobileOpen(true)} aria-label="Abrir navegación"
+          style={{ position: "fixed", top: 12, left: 12, zIndex: 40, width: 40, height: 40, borderRadius: 10, background: C.paper, border: `1px solid ${C.line}`, cursor: "pointer", fontSize: 17, display: "grid", placeItems: "center" }}>≡</button>
+      )}
+      {/* backdrop (mobile) */}
+      {isMobile && mobileOpen && (
+        <div onClick={() => setMobileOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.4)", zIndex: 45 }} />
       )}
 
-      {/* PLAN */}
-      {section === "plan" && (
-        <div style={{ maxWidth: 760 }}>
-          {phases.length === 0 && <Empty text="Todavía no hay fases." />}
-          {phases.map((p) => {
-            const dels = deliverables.filter((d) => d.phase_id === p.id);
-            const st = p.status === "done" ? { i: "✓", bg: C.lime, fg: "#0a0a0a" } : p.status === "in_progress" ? { i: "•", bg: C.paper, fg: C.warn } : { i: "○", bg: C.paper2, fg: C.muted };
-            const open = openPhase === p.id;
+      {/* ── SIDEBAR ── */}
+      <aside style={asideStyle}>
+        {/* brand */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: showLabels ? "16px 16px 14px" : "16px 0 14px", justifyContent: showLabels ? "flex-start" : "center", borderBottom: `1px solid ${C.line}` }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/brand/isotipo-vivo.svg" alt="Common House" style={{ height: 26, width: "auto", display: "block", flexShrink: 0 }} />
+          {showLabels && <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: "-.2px" }}>Common House</span>}
+        </div>
+
+        {/* acordeón de salas */}
+        <nav style={{ flex: 1, overflowY: "auto", padding: "12px 0" }}>
+          {showLabels && <div style={{ ...label, padding: "0 16px 8px" }}>Salas</div>}
+          {roomList.map((r) => {
+            const current = r.id === projectId;
+            if (!current) {
+              // otras salas: link (navega) — colapsado = inicial, expandido = nombre
+              return (
+                <Link key={r.id} href={`/rooms/${r.id}`} title={r.name ?? "Sala"}
+                  style={{ display: "flex", alignItems: "center", gap: 10, padding: showLabels ? "8px 16px" : "8px 0", justifyContent: showLabels ? "flex-start" : "center", textDecoration: "none", color: C.muted2, fontSize: 12.5, fontWeight: 600 }}>
+                  <span style={{ width: 22, height: 22, borderRadius: 7, flexShrink: 0, background: C.paper2, color: C.muted2, display: "grid", placeItems: "center", fontSize: 9, fontWeight: 800 }}>{initialsOf(r.name)}</span>
+                  {showLabels && <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cleanName(r.name)}</span>}
+                </Link>
+              );
+            }
+            // sala actual: nombre + nav de secciones
             return (
-              <div key={p.id} style={{ background: C.paper, border: `1.5px solid ${C.line}`, borderRadius: 12, overflow: "hidden", marginBottom: 10 }}>
-                <button onClick={() => setOpenPhase(open ? null : p.id)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "13px 15px", background: "transparent", border: 0, cursor: "pointer", fontFamily: "inherit" }}>
-                  <span style={{ width: 22, height: 22, borderRadius: 999, display: "grid", placeItems: "center", fontSize: 11, fontWeight: 900, background: st.bg, color: st.fg, border: p.status === "in_progress" ? `2px solid ${C.warn}` : "none" }}>{st.i}</span>
-                  <b style={{ fontSize: 14, fontWeight: 800 }}>{p.title}</b>
-                  <span style={{ ...label, marginLeft: 4 }}>{p.status === "done" ? "cumplida" : p.status === "in_progress" ? "en curso" : "por venir"}</span>
-                  <span style={{ flex: 1 }} />
-                  <span style={{ color: C.muted, transform: open ? "rotate(90deg)" : "none", transition: "transform .15s" }}>▸</span>
-                </button>
-                {open && (
-                  <div style={{ padding: "0 15px 12px 49px" }}>
-                    {dels.length === 0 && <div style={{ fontSize: 12, color: C.muted, padding: "6px 0" }}>Sin entregables en esta fase.</div>}
-                    {dels.map((d) => (
-                      <div key={d.id} style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 0", borderTop: `1px solid ${C.lineSoft}`, fontSize: 12.5, fontWeight: 600 }}>
-                        <span style={{ width: 7, height: 7, borderRadius: 999, background: statusDot(d.status) }} />
-                        {d.title}<span style={{ marginLeft: "auto", ...label }}>{d.progress}%</span>
-                      </div>
-                    ))}
+              <div key={r.id} style={{ marginBottom: 4 }}>
+                {showLabels && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 16px 6px" }}>
+                    <span style={{ width: 22, height: 22, borderRadius: 7, flexShrink: 0, background: C.lime, color: "#0a0a0a", display: "grid", placeItems: "center", fontSize: 9, fontWeight: 800 }}>{initialsOf(r.name)}</span>
+                    <b style={{ fontSize: 12.5, fontWeight: 800, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cleanName(r.name)}</b>
                   </div>
                 )}
+                <div style={{ display: "flex", flexDirection: "column", gap: 1, padding: showLabels ? "2px 8px" : "2px 0" }}>
+                  {navItems.map((n) => {
+                    const active = section === n.key;
+                    const count = navCount[n.key];
+                    return (
+                      <button key={n.key} onClick={() => pickSection(n.key)} title={n.label}
+                        style={{
+                          display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left",
+                          justifyContent: showLabels ? "flex-start" : "center",
+                          padding: showLabels ? "7px 12px 7px 14px" : "9px 0", borderRadius: 8, cursor: "pointer",
+                          fontFamily: "inherit", fontSize: 12.5, fontWeight: active ? 700 : 600,
+                          background: active ? C.lime : "transparent",
+                          color: active ? "#0a0a0a" : C.muted2, border: 0, position: "relative",
+                        }}>
+                        <span style={{ fontSize: 12, opacity: active ? 1 : 0.55, width: 16, textAlign: "center", flexShrink: 0 }}>{n.icon}</span>
+                        {showLabels && <span style={{ flex: 1 }}>{n.label}</span>}
+                        {showLabels && count != null && (
+                          <span style={{ fontSize: 10, fontWeight: 800, background: active ? "rgba(0,0,0,.12)" : "rgba(0,0,0,.06)", color: active ? "#0a0a0a" : C.muted2, padding: "1px 7px", borderRadius: 8 }}>{count}</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             );
           })}
-        </div>
-      )}
+        </nav>
 
-      {/* ENTREGABLES */}
-      {section === "entregables" && (
-        <Section
-          title="Entregables"
-          view={dView} setView={setDView}
-          onCreate={can("structure.edit") ? createDeliverable : undefined} createLabel="+ Entregable"
-        >
-          {dView === "list" ? (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: 12 }}>
-              {deliverables.map((d) => (
-                <div key={d.id} style={card()}>
-                  <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-                    <b style={{ fontSize: 14, fontWeight: 800 }}>{d.title}</b>
-                    <span style={statusPill(d.status)}>{statusLabel(d.status)}</span>
-                  </div>
-                  <Progress v={d.progress} />
-                  {d.status === "delivered" && can("deliverable.accept") && (
-                    <button onClick={() => acceptDeliverable(d.id)} style={btn(C.lime, "#0a0a0a")}>Aceptar entregable</button>
-                  )}
-                </div>
-              ))}
-              {deliverables.length === 0 && <Empty text="Todavía no hay entregables." />}
-            </div>
-          ) : (
-            <Kanban cols={DELIV_COLS} items={deliverables} draggable={can("deliverable.move")}
-              onDrop={(id, to) => { const d = deliverables.find((x) => x.id === id); if (d && d.status !== to) moveDeliverable(id, to, d.status); }}
-              renderCard={(d) => (<><div style={{ fontSize: 12, fontWeight: 700 }}>{d.title}</div><div style={{ ...label, marginTop: 6 }}>{d.progress}%</div></>)} />
+        {/* footer: colapsar (desktop) + user */}
+        <div style={{ borderTop: `1px solid ${C.line}`, padding: showLabels ? "10px 14px" : "10px 0", display: "flex", alignItems: "center", gap: 10, justifyContent: showLabels ? "space-between" : "center" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 9, minWidth: 0 }}>
+            <UserButton />
+            {showLabels && <span style={{ fontSize: 11, color: C.muted, fontWeight: 600 }} title="Tu rol en esta sala">{roleLabel[role] ?? role}</span>}
+          </div>
+          {!isMobile && (
+            <button onClick={toggleCollapsed} aria-label={collapsed ? "Expandir" : "Colapsar"} title={collapsed ? "Expandir" : "Colapsar"}
+              style={{ width: 26, height: 26, borderRadius: 7, border: `1px solid ${C.line}`, background: C.paper, color: C.muted, cursor: "pointer", flexShrink: 0, display: showLabels ? "grid" : "none", placeItems: "center", fontSize: 12 }}>‹</button>
           )}
-          {!can("deliverable.move") && dView === "kanban" && <Note text="Tu rol no puede mover entregables (solo mirar)." />}
-        </Section>
-      )}
+        </div>
+        {!isMobile && collapsed && (
+          <button onClick={toggleCollapsed} aria-label="Expandir" title="Expandir"
+            style={{ margin: "0 auto 12px", width: 26, height: 26, borderRadius: 7, border: `1px solid ${C.line}`, background: C.paper, color: C.muted, cursor: "pointer", display: "grid", placeItems: "center", fontSize: 12 }}>›</button>
+        )}
+      </aside>
 
-      {/* TAREAS */}
-      {section === "tareas" && (
-        <Section
-          title="Tareas"
-          view={tView} setView={setTView}
-          onCreate={can("task.crud") ? createTask : undefined} createLabel="+ Tarea"
-        >
-          {tView === "list" ? (
-            <div style={{ maxWidth: 680 }}>
-              {["todo", "doing", "blocked", "done"].map((stt) => {
-                const items = tasks.filter((t) => t.status === stt);
-                if (!items.length) return null;
+      {/* ── MAIN ── */}
+      <main style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
+        <header style={{ display: "flex", alignItems: "center", gap: 12, padding: isMobile ? "14px 20px 14px 62px" : "15px 26px", borderBottom: `1px solid ${C.line}`, position: "sticky", top: 0, background: C.paper, zIndex: 10 }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={label}>Sala de trabajo</div>
+            <h1 style={{ fontSize: 17, fontWeight: 800, letterSpacing: "-.3px", margin: "3px 0 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sectionLabel}</h1>
+          </div>
+          <span style={{ flex: 1 }} />
+          {project.current_stage && <span style={pill(C.lime, "#0a0a0a")}>{project.current_stage}</span>}
+          <span style={pill(C.paper2, C.muted2)} title="Tu rol en esta sala">{roleLabel[role] ?? role}</span>
+        </header>
+
+        <div style={{ padding: "22px 26px 64px", maxWidth: 1120, width: "100%" }}>
+          {/* RESUMEN */}
+          {section === "resumen" && (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 11 }}>
+              <Stat l="Avance" v={`${stats.avance}%`} lime />
+              <Stat l="Entregables" v={`${stats.dDone}/${stats.dTot}`} />
+              <Stat l="Tareas hechas" v={`${stats.tDone}/${stats.tTot}`} />
+              <Stat l="Bloqueadas" v={String(stats.blocked)} warn={stats.blocked > 0} />
+            </div>
+          )}
+
+          {/* PLAN */}
+          {section === "plan" && (
+            <div style={{ maxWidth: 760 }}>
+              {phases.length === 0 && <Empty text="Todavía no hay fases." />}
+              {phases.map((p) => {
+                const dels = deliverables.filter((d) => d.phase_id === p.id);
+                const st = p.status === "done" ? { i: "✓", bg: C.lime, fg: "#0a0a0a" } : p.status === "in_progress" ? { i: "•", bg: C.paper, fg: C.warn } : { i: "○", bg: C.paper2, fg: C.muted };
+                const open = openPhase === p.id;
                 return (
-                  <div key={stt} style={{ marginBottom: 14 }}>
-                    <div style={{ ...label, marginBottom: 7 }}>{TASK_COLS.find((c) => c.key === stt)?.label}</div>
-                    {items.map((t) => (
-                      <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 11, padding: "11px 13px", background: C.paper, border: `1.5px solid ${C.line}`, borderRadius: 10, marginBottom: 7 }}>
-                        {t.status !== "done" && (can("task.manage") || can("task.mark_own"))
-                          ? <button onClick={() => closeTask(t)} title="Marcar hecha" style={{ width: 17, height: 17, borderRadius: 5, border: `1.5px solid ${C.muted}`, background: "transparent", cursor: "pointer", flex: "none" }} />
-                          : <span style={{ width: 17, height: 17, borderRadius: 5, background: t.status === "done" ? C.lime : "transparent", border: `1.5px solid ${t.status === "done" ? C.lime : C.line}`, display: "grid", placeItems: "center", fontSize: 11, fontWeight: 900, color: "#0a0a0a", flex: "none" }}>{t.status === "done" ? "✓" : ""}</span>}
-                        <span style={{ flex: 1, fontSize: 12.5, textDecoration: t.status === "done" ? "line-through" : "none", color: t.status === "done" ? C.muted : C.ink }}>{t.title}</span>
-                        {t.assignee_side === "client" && <span style={pill(C.paper2, C.muted2)}>cliente</span>}
-                        {t.closed_via && <span style={{ ...label, color: t.closed_via === "evidence" ? C.limeInk : C.muted }}>{t.closed_via === "evidence" ? "✓ evidencia" : "✍ atestiguada"}</span>}
+                  <div key={p.id} style={{ background: C.paper, border: `1.5px solid ${C.line}`, borderRadius: 12, overflow: "hidden", marginBottom: 10 }}>
+                    <button onClick={() => setOpenPhase(open ? null : p.id)} style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "13px 15px", background: "transparent", border: 0, cursor: "pointer", fontFamily: "inherit" }}>
+                      <span style={{ width: 22, height: 22, borderRadius: 999, display: "grid", placeItems: "center", fontSize: 11, fontWeight: 900, background: st.bg, color: st.fg, border: p.status === "in_progress" ? `2px solid ${C.warn}` : "none" }}>{st.i}</span>
+                      <b style={{ fontSize: 14, fontWeight: 800 }}>{p.title}</b>
+                      <span style={{ ...label, marginLeft: 4 }}>{p.status === "done" ? "cumplida" : p.status === "in_progress" ? "en curso" : "por venir"}</span>
+                      <span style={{ flex: 1 }} />
+                      <span style={{ color: C.muted, transform: open ? "rotate(90deg)" : "none", transition: "transform .15s" }}>▸</span>
+                    </button>
+                    {open && (
+                      <div style={{ padding: "0 15px 12px 49px" }}>
+                        {dels.length === 0 && <div style={{ fontSize: 12, color: C.muted, padding: "6px 0" }}>Sin entregables en esta fase.</div>}
+                        {dels.map((d) => (
+                          <div key={d.id} style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 0", borderTop: `1px solid ${C.lineSoft}`, fontSize: 12.5, fontWeight: 600 }}>
+                            <span style={{ width: 7, height: 7, borderRadius: 999, background: statusDot(d.status) }} />
+                            {d.title}<span style={{ marginLeft: "auto", ...label }}>{d.progress}%</span>
+                          </div>
+                        ))}
                       </div>
-                    ))}
+                    )}
                   </div>
                 );
               })}
-              {tasks.length === 0 && <Empty text="Todavía no hay tareas." />}
             </div>
-          ) : (
-            <Kanban cols={TASK_COLS} items={tasks} draggable={can("task.move")}
-              onDrop={(id, to) => { const t = tasks.find((x) => x.id === id); if (t && t.status !== to) moveTask(id, to, t.status); }}
-              renderCard={(t) => (<><div style={{ fontSize: 12, fontWeight: 700 }}>{t.title}</div>{t.assignee_side === "client" && <div style={{ ...label, marginTop: 6 }}>cliente</div>}</>)} />
           )}
-          {!can("task.move") && tView === "kanban" && <Note text="Tu rol no puede mover tareas (solo mirar)." />}
-        </Section>
-      )}
 
-      {/* DECISIONES */}
-      {section === "decisiones" && (
-        <div style={{ maxWidth: 720 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 14 }}>
-            <h3 style={{ fontSize: 16, fontWeight: 800, margin: 0 }}>Decisiones</h3><span style={{ flex: 1 }} />
-            {can("decision.manage") && <button onClick={createDecision} style={btn(C.paper, C.muted2, true)}>+ Decisión</button>}
-          </div>
-          {decisions.length === 0 && <Empty text="Todavía no hay decisiones." />}
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {decisions.map((d) => {
-              const del = deliverables.find((x) => x.id === d.deliverable_id);
-              const open = d.status === "open";
-              return (
-                <div key={d.id} style={{ background: open ? C.warnSoft : C.paper, border: `1.5px solid ${open ? "#f0e0b0" : C.line}`, borderRadius: 12, padding: "13px 15px" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                    <b style={{ fontSize: 14, fontWeight: 800 }}>{d.title}</b>
-                    {del && <span style={{ ...label, color: "#4a5bc0", background: "rgba(91,107,214,.11)", padding: "2px 7px", borderRadius: 5 }}>↳ {del.title}</span>}
-                    <span style={{ flex: 1 }} />
-                    <span style={pill(open ? C.warnSoft : C.okSoft, open ? C.warn : C.ok)}>{open ? "Abierta" : "Cerrada"}</span>
-                  </div>
-                  {d.context && <div style={{ fontSize: 12.5, color: C.muted2, marginTop: 6, lineHeight: 1.5 }}>{d.context}</div>}
-                  {d.source_ref && <div style={{ fontSize: 9, color: C.muted, marginTop: 6, fontWeight: 600, letterSpacing: ".3px", textTransform: "uppercase" }}>↳ {d.source_ref}</div>}
-                  {Array.isArray(d.participants) && d.participants.length > 0 && (
-                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 9, flexWrap: "wrap" }}>
-                      <span style={label}>Presentes</span>
-                      {d.participants.map((p, i) => <span key={i} style={{ width: 22, height: 22, borderRadius: 999, background: p.side === "client" ? "#495057" : C.limeInk, color: "#fff", display: "grid", placeItems: "center", fontSize: 8, fontWeight: 700 }}>{p.initials || "?"}</span>)}
+          {/* ENTREGABLES */}
+          {section === "entregables" && (
+            <Section
+              title="Entregables"
+              view={dView} setView={setDView}
+              onCreate={can("structure.edit") ? createDeliverable : undefined} createLabel="+ Entregable"
+            >
+              {dView === "list" ? (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: 12 }}>
+                  {deliverables.map((d) => (
+                    <div key={d.id} style={card()}>
+                      <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                        <b style={{ fontSize: 14, fontWeight: 800 }}>{d.title}</b>
+                        <span style={statusPill(d.status)}>{statusLabel(d.status)}</span>
+                      </div>
+                      <Progress v={d.progress} />
+                      {d.status === "delivered" && can("deliverable.accept") && (
+                        <button onClick={() => acceptDeliverable(d.id)} style={btn(C.lime, "#0a0a0a")}>Aceptar entregable</button>
+                      )}
                     </div>
-                  )}
-                  {open && (can("decision.manage") || can("decision.resolve_own")) && (
-                    <button onClick={() => resolveDecision(d.id)} style={{ ...btn(C.lime, "#0a0a0a"), marginTop: 11 }}>Resolver decisión</button>
-                  )}
+                  ))}
+                  {deliverables.length === 0 && <Empty text="Todavía no hay entregables." />}
                 </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
+              ) : (
+                <Kanban cols={DELIV_COLS} items={deliverables} draggable={can("deliverable.move")}
+                  onDrop={(id, to) => { const d = deliverables.find((x) => x.id === id); if (d && d.status !== to) moveDeliverable(id, to, d.status); }}
+                  renderCard={(d) => (<><div style={{ fontSize: 12, fontWeight: 700 }}>{d.title}</div><div style={{ ...label, marginTop: 6 }}>{d.progress}%</div></>)} />
+              )}
+              {!can("deliverable.move") && dView === "kanban" && <Note text="Tu rol no puede mover entregables (solo mirar)." />}
+            </Section>
+          )}
 
-      {/* MATERIALES */}
-      {section === "materiales" && (
-        <div>
-          <h3 style={{ fontSize: 16, fontWeight: 800, margin: "0 0 14px" }}>Materiales</h3>
-          {initialMaterials.length === 0 && <Empty text="Todavía no hay materiales." />}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(240px,1fr))", gap: 10 }}>
-            {initialMaterials.map((m) => (
-              <a key={m.id} href={m.url ?? undefined} target="_blank" rel="noreferrer"
-                style={{ display: "flex", alignItems: "center", gap: 11, background: C.paper, border: `1.5px solid ${C.line}`, borderRadius: 12, padding: "11px 14px", textDecoration: "none", color: "inherit", cursor: m.url ? "pointer" : "default" }}>
-                <span style={{ width: 32, height: 32, borderRadius: 7, background: C.paper2, display: "grid", placeItems: "center", fontSize: 8, fontWeight: 800, color: C.muted2 }}>{(m.mime_type || "DOC").split("/").pop()?.slice(0, 4).toUpperCase()}</span>
-                <span style={{ flex: 1, minWidth: 0 }}><b style={{ fontSize: 12.5, fontWeight: 700, display: "block", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.title}</b><small style={{ fontSize: 10, color: C.muted }}>{m.category || m.folder_name || ""}</small></span>
-                {m.url ? <span style={{ color: C.muted }}>↗</span> : <span style={label}>solo lectura</span>}
-              </a>
-            ))}
-          </div>
-        </div>
-      )}
+          {/* TAREAS */}
+          {section === "tareas" && (
+            <Section
+              title="Tareas"
+              view={tView} setView={setTView}
+              onCreate={can("task.crud") ? createTask : undefined} createLabel="+ Tarea"
+            >
+              {tView === "list" ? (
+                <div style={{ maxWidth: 680 }}>
+                  {["todo", "doing", "blocked", "done"].map((stt) => {
+                    const items = tasks.filter((t) => t.status === stt);
+                    if (!items.length) return null;
+                    return (
+                      <div key={stt} style={{ marginBottom: 14 }}>
+                        <div style={{ ...label, marginBottom: 7 }}>{TASK_COLS.find((c) => c.key === stt)?.label}</div>
+                        {items.map((t) => (
+                          <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 11, padding: "11px 13px", background: C.paper, border: `1.5px solid ${C.line}`, borderRadius: 10, marginBottom: 7 }}>
+                            {t.status !== "done" && (can("task.manage") || can("task.mark_own"))
+                              ? <button onClick={() => closeTask(t)} title="Marcar hecha" style={{ width: 17, height: 17, borderRadius: 5, border: `1.5px solid ${C.muted}`, background: "transparent", cursor: "pointer", flex: "none" }} />
+                              : <span style={{ width: 17, height: 17, borderRadius: 5, background: t.status === "done" ? C.lime : "transparent", border: `1.5px solid ${t.status === "done" ? C.lime : C.line}`, display: "grid", placeItems: "center", fontSize: 11, fontWeight: 900, color: "#0a0a0a", flex: "none" }}>{t.status === "done" ? "✓" : ""}</span>}
+                            <span style={{ flex: 1, fontSize: 12.5, textDecoration: t.status === "done" ? "line-through" : "none", color: t.status === "done" ? C.muted : C.ink }}>{t.title}</span>
+                            {t.assignee_side === "client" && <span style={pill(C.paper2, C.muted2)}>cliente</span>}
+                            {t.closed_via && <span style={{ ...label, color: t.closed_via === "evidence" ? C.limeInk : C.muted }}>{t.closed_via === "evidence" ? "✓ evidencia" : "✍ atestiguada"}</span>}
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })}
+                  {tasks.length === 0 && <Empty text="Todavía no hay tareas." />}
+                </div>
+              ) : (
+                <Kanban cols={TASK_COLS} items={tasks} draggable={can("task.move")}
+                  onDrop={(id, to) => { const t = tasks.find((x) => x.id === id); if (t && t.status !== to) moveTask(id, to, t.status); }}
+                  renderCard={(t) => (<><div style={{ fontSize: 12, fontWeight: 700 }}>{t.title}</div>{t.assignee_side === "client" && <div style={{ ...label, marginTop: 6 }}>cliente</div>}</>)} />
+              )}
+              {!can("task.move") && tView === "kanban" && <Note text="Tu rol no puede mover tareas (solo mirar)." />}
+            </Section>
+          )}
 
-      {/* ACTIVIDAD (solo PM) */}
-      {section === "actividad" && can("analytics.view") && (
-        <div style={{ maxWidth: 720 }}>
-          <h3 style={{ fontSize: 16, fontWeight: 800, margin: "0 0 6px" }}>Actividad</h3>
-          <div style={{ fontSize: 12.5, color: C.muted2, marginBottom: 16 }}>Registro del event log — quién hizo qué. Carga y aporte, no vigilancia. Solo lo ve el PM.</div>
-          {initialEvents.length === 0 && <Empty text="Sin actividad todavía." />}
-          <div style={{ background: C.paper, border: `1.5px solid ${C.line}`, borderRadius: 12, padding: "6px 16px" }}>
-            {initialEvents.map((e) => (
-              <div key={e.id} style={{ display: "flex", alignItems: "flex-start", gap: 11, padding: "10px 0", borderTop: `1px solid ${C.lineSoft}` }}>
-                <span style={{ ...label, fontFamily: "ui-monospace,monospace", minWidth: 74, paddingTop: 1 }}>{e.created_at.slice(0, 10)}</span>
-                <span style={{ flex: 1, fontSize: 12.5 }}>{e.summary || `${e.verb} ${e.target_type}`}</span>
-                <span style={label}>{e.actor_role || ""}</span>
+          {/* DECISIONES */}
+          {section === "decisiones" && (
+            <div style={{ maxWidth: 720 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 14 }}>
+                <h3 style={{ fontSize: 16, fontWeight: 800, margin: 0 }}>Decisiones</h3><span style={{ flex: 1 }} />
+                {can("decision.manage") && <button onClick={createDecision} style={btn(C.paper, C.muted2, true)}>+ Decisión</button>}
               </div>
-            ))}
-          </div>
+              {decisions.length === 0 && <Empty text="Todavía no hay decisiones." />}
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {decisions.map((d) => {
+                  const del = deliverables.find((x) => x.id === d.deliverable_id);
+                  const open = d.status === "open";
+                  return (
+                    <div key={d.id} style={{ background: open ? C.warnSoft : C.paper, border: `1.5px solid ${open ? "#f0e0b0" : C.line}`, borderRadius: 12, padding: "13px 15px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                        <b style={{ fontSize: 14, fontWeight: 800 }}>{d.title}</b>
+                        {del && <span style={{ ...label, color: "#4a5bc0", background: "rgba(91,107,214,.11)", padding: "2px 7px", borderRadius: 5 }}>↳ {del.title}</span>}
+                        <span style={{ flex: 1 }} />
+                        <span style={pill(open ? C.warnSoft : C.okSoft, open ? C.warn : C.ok)}>{open ? "Abierta" : "Cerrada"}</span>
+                      </div>
+                      {d.context && <div style={{ fontSize: 12.5, color: C.muted2, marginTop: 6, lineHeight: 1.5 }}>{d.context}</div>}
+                      {d.source_ref && <div style={{ fontSize: 9, color: C.muted, marginTop: 6, fontWeight: 600, letterSpacing: ".3px", textTransform: "uppercase" }}>↳ {d.source_ref}</div>}
+                      {Array.isArray(d.participants) && d.participants.length > 0 && (
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 9, flexWrap: "wrap" }}>
+                          <span style={label}>Presentes</span>
+                          {d.participants.map((p, i) => <span key={i} style={{ width: 22, height: 22, borderRadius: 999, background: p.side === "client" ? "#495057" : C.limeInk, color: "#fff", display: "grid", placeItems: "center", fontSize: 8, fontWeight: 700 }}>{p.initials || "?"}</span>)}
+                        </div>
+                      )}
+                      {open && (can("decision.manage") || can("decision.resolve_own")) && (
+                        <button onClick={() => resolveDecision(d.id)} style={{ ...btn(C.lime, "#0a0a0a"), marginTop: 11 }}>Resolver decisión</button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* MATERIALES */}
+          {section === "materiales" && (
+            <div>
+              <h3 style={{ fontSize: 16, fontWeight: 800, margin: "0 0 14px" }}>Materiales</h3>
+              {initialMaterials.length === 0 && <Empty text="Todavía no hay materiales." />}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(240px,1fr))", gap: 10 }}>
+                {initialMaterials.map((m) => (
+                  <a key={m.id} href={m.url ?? undefined} target="_blank" rel="noreferrer"
+                    style={{ display: "flex", alignItems: "center", gap: 11, background: C.paper, border: `1.5px solid ${C.line}`, borderRadius: 12, padding: "11px 14px", textDecoration: "none", color: "inherit", cursor: m.url ? "pointer" : "default" }}>
+                    <span style={{ width: 32, height: 32, borderRadius: 7, background: C.paper2, display: "grid", placeItems: "center", fontSize: 8, fontWeight: 800, color: C.muted2 }}>{(m.mime_type || "DOC").split("/").pop()?.slice(0, 4).toUpperCase()}</span>
+                    <span style={{ flex: 1, minWidth: 0 }}><b style={{ fontSize: 12.5, fontWeight: 700, display: "block", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.title}</b><small style={{ fontSize: 10, color: C.muted }}>{materialCategory(m.category) || m.folder_name || ""}</small></span>
+                    {m.url ? <span style={{ color: C.muted }}>↗</span> : <span style={label}>solo lectura</span>}
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ACTIVIDAD (solo PM) */}
+          {section === "actividad" && can("analytics.view") && (
+            <div style={{ maxWidth: 720 }}>
+              <h3 style={{ fontSize: 16, fontWeight: 800, margin: "0 0 6px" }}>Actividad</h3>
+              <div style={{ fontSize: 12.5, color: C.muted2, marginBottom: 16 }}>Registro del event log — quién hizo qué. Carga y aporte, no vigilancia. Solo lo ve el PM.</div>
+              {initialEvents.length === 0 && <Empty text="Sin actividad todavía." />}
+              <div style={{ background: C.paper, border: `1.5px solid ${C.line}`, borderRadius: 12, padding: "6px 16px" }}>
+                {initialEvents.map((e) => (
+                  <div key={e.id} style={{ display: "flex", alignItems: "flex-start", gap: 11, padding: "10px 0", borderTop: `1px solid ${C.lineSoft}` }}>
+                    <span style={{ ...label, fontFamily: "ui-monospace,monospace", minWidth: 74, paddingTop: 1 }}>{e.created_at.slice(0, 10)}</span>
+                    <span style={{ flex: 1, fontSize: 12.5 }}>{e.summary || `${e.verb} ${e.target_type}`}</span>
+                    <span style={label}>{e.actor_role || ""}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
-      )}
+      </main>
 
       {toast && (
         <div style={{ position: "fixed", left: "50%", bottom: 24, transform: "translateX(-50%)", background: C.ink, color: "#fff", padding: "10px 15px", borderRadius: 11, fontSize: 12.5, fontWeight: 600, boxShadow: "0 10px 30px rgba(0,0,0,.3)", zIndex: 100 }}>{toast}</div>
@@ -379,6 +510,16 @@ export function RoomClient({ projectId, role, capabilities, project, initialPhas
     if (s === "in_progress") return pill(C.limePaper, C.limeInk);
     return pill(C.paper2, C.muted2);
   }
+}
+
+/* ── helpers de presentación ── */
+function cleanName(name: string | null): string { return (name ?? "Sala").replace(/^\[[^\]]*\]\s*/, "").trim() || "Sala"; }
+function materialCategory(cat: string | null): string {
+  if (!cat) return "";
+  return ({
+    invoice: "Factura", presentation: "Presentación", multimedia: "Multimedia", manual: "Manual",
+    plan_timeline: "Plan / cronograma", contract_agreement: "Contrato", working_document: "Documento de trabajo",
+  } as Record<string, string>)[cat] ?? cat.replace(/_/g, " ");
 }
 
 /* ── sub-componentes ── */
@@ -409,7 +550,7 @@ function Section({ title, view, setView, onCreate, createLabel, children }: { ti
 }
 function Kanban<T extends { id: string; status: string }>({ cols, items, draggable, onDrop, renderCard }: { cols: { key: string; label: string; dot: string }[]; items: T[]; draggable: boolean; onDrop: (id: string, to: string) => void; renderCard: (item: T) => ReactNode }) {
   return (
-    <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols.length},1fr)`, gap: 11, alignItems: "start" }}>
+    <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols.length},minmax(150px,1fr))`, gap: 11, alignItems: "start", overflowX: "auto" }}>
       {cols.map((col) => {
         const its = items.filter((i) => i.status === col.key);
         return (
