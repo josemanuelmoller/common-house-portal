@@ -379,6 +379,10 @@ async function _POST(req: NextRequest) {
     //   fetchLimit — how many transcripts Fireflies returns (default 20)
     //   skip/maxMeetings — window slice, so a backfill can page in small batches
     const replace   = params.replace === true;
+    // onlyNew: digest ONLY meetings that have no evidence yet (skip already-
+    // digested ones). Non-destructive backfill of never-ingested meetings —
+    // avoids the title-based dedup creating duplicates on a full-history replay.
+    const onlyNew   = params.onlyNew === true;
     const fetchLim  = typeof params.fetchLimit === "number" ? params.fetchLimit : 20;
     const skipMeet  = typeof params.skip === "number" ? params.skip : 0;
     const maxMeet   = typeof params.maxMeetings === "number" ? params.maxMeetings : null;
@@ -450,6 +454,21 @@ async function _POST(req: NextRequest) {
       loadActiveProjects(),
     ]);
 
+    // onlyNew: pre-load the set of Fireflies transcript ids that ALREADY have
+    // at least one evidence row, so we only digest the never-ingested meetings.
+    const digestedExtIds = new Set<string>();
+    let skippedMeetings = 0;
+    if (onlyNew) {
+      const { data: digested } = await sb
+        .from("sources")
+        .select("source_external_id, evidence!inner(id)")
+        .eq("source_type", "Meeting")
+        .not("source_external_id", "is", null);
+      for (const s of (digested ?? []) as Array<{ source_external_id: string | null }>) {
+        if (s.source_external_id) digestedExtIds.add(s.source_external_id);
+      }
+    }
+
     const usageAcc = makeUsageAccumulator();
     const results: { meetingTitle: string; evidenceCount: number; skipped: number; replacedOld?: number; orgPath: string; projPath: string; ids: string[] }[] = [];
     const errors:  string[] = [];
@@ -460,6 +479,8 @@ async function _POST(req: NextRequest) {
     // 4. Process each transcript
     for (const t of transcripts) {
       try {
+        // onlyNew: skip meetings that already have evidence (before any LLM cost).
+        if (onlyNew && digestedExtIds.has(t.id)) { skippedMeetings++; continue; }
         const items     = await extractEvidence(t, usageAcc);
         const dateStr   = new Date(t.date).toISOString().slice(0, 10);
         // Project is resolved per transcript (one project per meeting).
@@ -557,6 +578,8 @@ async function _POST(req: NextRequest) {
       skipped:          totalSkipped,
       replace:          replace || undefined,
       replaced_old:     replace ? totalReplaced : undefined,
+      only_new:         onlyNew || undefined,
+      skipped_meetings: onlyNew ? skippedMeetings : undefined,
       slice:            (skipMeet > 0 || maxMeet !== null) ? { skip: skipMeet, take: maxMeet } : undefined,
       // oldest/newest processed meeting dates — the client moves its toDate
       // cursor to `oldest` to fetch the next-older page.
