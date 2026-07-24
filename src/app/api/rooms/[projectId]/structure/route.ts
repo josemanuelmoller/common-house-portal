@@ -61,17 +61,19 @@ export async function POST(req: NextRequest, c: { params: Promise<{ projectId: s
   }
 
   // Registro auditable del gate (aceptada).
-  await db.from("project_state_proposals").insert({
+  const { error: auditErr } = await db.from("project_state_proposals").insert({
     project_id: project.id,
     proposal_kind: "room_structure",
     item_type: "structure",
     summary: `Estructura inicial aprobada — ${createdPhases} fases, ${createdDeliverables} entregables`,
+    rationale: "Estructura inicial de la sala aprobada por el PM desde el empty-state.",
     payload: { phases },
     status: "accepted",
     generated_by: "room-empty-state",
     reviewed_by: actor.email ?? actor.clerkId,
     reviewed_at: new Date().toISOString(),
   });
+  if (auditErr) console.warn("room structure audit insert failed:", auditErr.message);
 
   await logRoomEvent({
     projectId: project.id, actor, verb: "confirmed", targetType: "room",
