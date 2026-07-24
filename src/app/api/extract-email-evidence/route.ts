@@ -203,7 +203,7 @@ async function _POST(req: NextRequest) {
     .limit(batch * 4); // over-fetch: many will be noise/skipped
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
 
-  const candidates = ((rows ?? []) as EmailSource[]).filter(r => !isNoise(r.title));
+  const candidates = (rows ?? []) as EmailSource[];
 
   const [idx, selfEmails, activeProjects]: [EntityIndex, Set<string>, MatchableProject[]] =
     await Promise.all([loadEntityIndex(sb), getSelfEmails(), loadActiveProjects()]);
@@ -215,6 +215,14 @@ async function _POST(req: NextRequest) {
 
   for (const src of candidates) {
     if (processed >= batch) break;
+    // Calendar / automated noise: mark Processed (so it drops out of the
+    // unprocessed set and the cursor advances) without a fetch or LLM call.
+    // Does NOT count toward the per-call `batch` of real extractions.
+    if (isNoise(src.title)) {
+      if (!dryRun) await sb.from("sources").update({ processing_status: "Processed" }).eq("id", src.id);
+      noiseSkipped++;
+      continue;
+    }
     try {
       const thread = await gmail.users.threads.get({ userId: "me", id: src.thread_id, format: "full" });
       const messages = thread.data.messages ?? [];
