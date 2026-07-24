@@ -509,6 +509,24 @@ export function RoomClient({ projectId, role, capabilities, personId, defaultLan
                     })}
                   </div>
                 </div>
+                {/* reuniones recientes */}
+                {meetings.length > 0 && (
+                  <div style={{ background: C.paper, border: `1.5px solid ${C.line}`, borderRadius: 14, padding: "15px 17px" }}>
+                    <div style={label}>{tr("nav.reuniones")}</div>
+                    <div style={{ marginTop: 2 }}>
+                      {meetings.slice(0, 4).map((m) => (
+                        <a key={m.id} href={m.url ?? undefined} target="_blank" rel="noreferrer" style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 0", borderTop: `1px solid ${C.lineSoft}`, textDecoration: "none", color: "inherit" }}>
+                          <span style={{ width: 22, height: 22, borderRadius: 7, background: C.limePaper, color: C.limeInk, display: "grid", placeItems: "center", fontSize: 10, flexShrink: 0 }}>▷</span>
+                          <span style={{ flex: 1, minWidth: 0 }}>
+                            <b style={{ fontSize: 12.5, fontWeight: 700, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.title}</b>
+                            <small style={{ fontSize: 10, color: C.muted }}>{[m.platform, m.date].filter(Boolean).join(" · ")}</small>
+                          </span>
+                          <span style={{ color: C.muted, flexShrink: 0 }}>↗</span>
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
               {/* fases */}
               {phaseProgress.length > 0 && (
