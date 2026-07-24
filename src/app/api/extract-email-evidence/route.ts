@@ -205,6 +205,17 @@ async function _POST(req: NextRequest) {
 
   const candidates = (rows ?? []) as EmailSource[];
 
+  // Idempotency guard: any candidate that ALREADY has evidence was processed by
+  // a prior (possibly CF-timed-out) call — skip re-extraction and just mark it
+  // Processed. Closes the 524 race that would otherwise double-write a thread.
+  const alreadyHasEvidence = new Set<string>();
+  if (candidates.length) {
+    const { data: evRows } = await sb
+      .from("evidence").select("source_id")
+      .in("source_id", candidates.map(c => c.id));
+    for (const r of (evRows ?? []) as Array<{ source_id: string | null }>) if (r.source_id) alreadyHasEvidence.add(r.source_id);
+  }
+
   const [idx, selfEmails, activeProjects]: [EntityIndex, Set<string>, MatchableProject[]] =
     await Promise.all([loadEntityIndex(sb), getSelfEmails(), loadActiveProjects()]);
 
@@ -219,6 +230,12 @@ async function _POST(req: NextRequest) {
     // unprocessed set and the cursor advances) without a fetch or LLM call.
     // Does NOT count toward the per-call `batch` of real extractions.
     if (isNoise(src.title)) {
+      if (!dryRun) await sb.from("sources").update({ processing_status: "Processed" }).eq("id", src.id);
+      noiseSkipped++;
+      continue;
+    }
+    // Already mined (e.g. by a timed-out prior call) — just mark Processed.
+    if (alreadyHasEvidence.has(src.id)) {
       if (!dryRun) await sb.from("sources").update({ processing_status: "Processed" }).eq("id", src.id);
       noiseSkipped++;
       continue;
