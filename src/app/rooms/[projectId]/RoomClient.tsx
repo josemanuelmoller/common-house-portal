@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { UserButton } from "@clerk/nextjs";
 import { makeT, type Lang, type TFn } from "@/lib/room-i18n";
 import type { SuggestedStructure } from "@/lib/room-structure";
@@ -109,7 +108,6 @@ function initialsOf(name: string | null): string {
 }
 
 export function RoomClient({ projectId, role, capabilities, personId, defaultLang, emptyRoom, suggestion, project, rooms, meta, team, billing, meetings, initialPhases, initialDeliverables, initialTasks, initialDecisions, initialMaterials, initialEvents }: Props) {
-  const router = useRouter();
   const [section, setSection] = useState<SectionKey>("resumen");
   const [approving, setApproving] = useState(false);
   const [deliverables, setDeliverables] = useState<Deliverable[]>(initialDeliverables);
@@ -224,8 +222,9 @@ export function RoomClient({ projectId, role, capabilities, personId, defaultLan
     setApproving(true);
     try {
       await api(`${base}/structure`, "POST", { phases: suggestion.phases.map((p) => ({ title: p.title, deliverables: p.deliverables })) });
-      flash(tr("toast.structureCreated"));
-      router.refresh();
+      // Reload duro: la estructura recién materializada entra por SSR (el estado
+      // cliente se inicializa una sola vez, así que un refresh no alcanza).
+      window.location.reload();
     } catch (e) { flash((e as Error).message); setApproving(false); }
   }
 
