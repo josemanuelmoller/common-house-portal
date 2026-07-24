@@ -49,6 +49,41 @@ export type RoomBilling = {
 
 export type RoomContext = { meta: RoomProjectMeta; team: RoomTeamMember[]; billing: RoomBilling };
 
+export type RoomMeeting = {
+  id: string;
+  title: string;
+  date: string | null;
+  summary: string | null;
+  url: string | null;
+  platform: string | null;
+  kind: string;
+};
+
+/**
+ * Reuniones del proyecto (tab "Reuniones"). Salen de `sources` (Fireflies/Gmail),
+ * linkeadas por project_notion_id. Demuestran dedicación y alimentan el "se
+ * escribe sola". El resumen procesado solo se muestra a roles internos.
+ */
+export async function loadRoomMeetings(projectNotionId: string | null, includeSummary: boolean): Promise<RoomMeeting[]> {
+  if (!projectNotionId) return [];
+  const { data } = await supabaseAdmin()
+    .from("sources")
+    .select("id, title, source_type, source_platform, processed_summary, source_url, source_date, created_at")
+    .eq("project_notion_id", projectNotionId)
+    .in("source_type", ["Meeting", "Conversation"])
+    .order("source_date", { ascending: false, nullsFirst: false })
+    .limit(30);
+  return (data ?? []).map((s) => ({
+    id: s.id as string,
+    title: (s.title as string | null) ?? "Reunión",
+    date: (s.source_date as string | null) ?? (s.created_at ? String(s.created_at).slice(0, 10) : null),
+    summary: includeSummary ? ((s.processed_summary as string | null) ?? null) : null,
+    url: (s.source_url as string | null) ?? null,
+    platform: (s.source_platform as string | null) ?? null,
+    kind: (s.source_type as string | null) ?? "Meeting",
+  }));
+}
+
 export async function loadRoomContext(projectId: string, actor: RoomActor, caps: Capability[]): Promise<RoomContext> {
   const db = supabaseAdmin();
 
