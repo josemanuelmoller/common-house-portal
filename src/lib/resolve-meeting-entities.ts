@@ -100,24 +100,27 @@ export async function loadEntityIndex(sb: SupabaseClient): Promise<EntityIndex> 
   // Longer names first so "Common House Foundation" wins over "Common".
   orgsByName.sort((a, b) => b.name.length - a.name.length);
 
-  // 2. People: email → org_notion_id (frequency vote on duplicates)
+  // 2. People: email(s) → org_notion_id (frequency vote on duplicates). One
+  //    human can hold several email accounts (people.email_accounts) — map ALL
+  //    of them so every address resolves to the person's org.
   const { data: people } = await sb
     .from("people")
-    .select("email, org_notion_id")
-    .not("email", "is", null)
+    .select("email, email_accounts, org_notion_id")
     .not("org_notion_id", "is", null);
 
   const emailVotes = new Map<string, Map<string, number>>();
-  for (const p of (people ?? []) as Array<{ email: string | null; org_notion_id: string | null }>) {
-    if (!p.email || !p.org_notion_id) continue;
-    const e = p.email.toLowerCase().trim();
-    if (e.length === 0) continue;
+  const castVote = (rawEmail: string | null | undefined, org: string) => {
+    if (!rawEmail) return;
+    const e = rawEmail.toLowerCase().trim();
+    if (e.length === 0 || !e.includes("@")) return;
     let bucket = emailVotes.get(e);
-    if (!bucket) {
-      bucket = new Map<string, number>();
-      emailVotes.set(e, bucket);
-    }
-    bucket.set(p.org_notion_id, (bucket.get(p.org_notion_id) ?? 0) + 1);
+    if (!bucket) { bucket = new Map<string, number>(); emailVotes.set(e, bucket); }
+    bucket.set(org, (bucket.get(org) ?? 0) + 1);
+  };
+  for (const p of (people ?? []) as Array<{ email: string | null; email_accounts: string[] | null; org_notion_id: string | null }>) {
+    if (!p.org_notion_id) continue;
+    castVote(p.email, p.org_notion_id);
+    for (const ea of (p.email_accounts ?? [])) castVote(ea, p.org_notion_id);
   }
   for (const [email, bucket] of emailVotes) {
     let bestOrg: string | null = null;
@@ -164,6 +167,37 @@ export async function loadEntityIndex(sb: SupabaseClient): Promise<EntityIndex> 
     }
   }
   projectsByName.sort((a, b) => b.name.length - a.name.length);
+
+  // Multi-org membership: a project can have SEVERAL stakeholder orgs via
+  // project_organization_roles, not just primary_org_notion_id (e.g. COP31 ←
+  // climate-champions + climate-action; Upstream PAS ← Shape + NEW ERA +
+  // Eunomia). Fold those links into projectsByOrg so a meeting with ANY
+  // stakeholder org resolves to the project. That table keys by uuid, so map
+  // uuid → notion_id first. Additive + fail-soft.
+  try {
+    const [orgIdsRes, projIdsRes, rolesRes] = await Promise.all([
+      sb.from("organizations").select("id, notion_id"),
+      sb.from("projects").select("id, notion_id, name, project_status, last_meeting_date"),
+      sb.from("project_organization_roles").select("project_id, organization_id, participation_status"),
+    ]);
+    const orgNotionByUuid = new Map<string, string>();
+    for (const o of (orgIdsRes.data ?? []) as Array<{ id: string; notion_id: string | null }>) {
+      if (o.notion_id) orgNotionByUuid.set(o.id, o.notion_id);
+    }
+    const projByUuid = new Map<string, { notionId: string; name: string; status: string | null; lastMeetingDate: string | null }>();
+    for (const p of (projIdsRes.data ?? []) as Array<{ id: string; notion_id: string | null; name: string | null; project_status: string | null; last_meeting_date: string | null }>) {
+      if (p.notion_id) projByUuid.set(p.id, { notionId: p.notion_id, name: p.name ?? "", status: p.project_status, lastMeetingDate: p.last_meeting_date });
+    }
+    for (const r of (rolesRes.data ?? []) as Array<{ project_id: string; organization_id: string; participation_status: string | null }>) {
+      if ((r.participation_status ?? "").toLowerCase() === "ended") continue;
+      const orgN = orgNotionByUuid.get(r.organization_id);
+      const proj = projByUuid.get(r.project_id);
+      if (!orgN || !proj) continue;
+      let bucket = projectsByOrg.get(orgN);
+      if (!bucket) { bucket = []; projectsByOrg.set(orgN, bucket); }
+      if (!bucket.some(b => b.notionId === proj.notionId)) bucket.push(proj);
+    }
+  } catch { /* multi-org is additive — never break resolution over it */ }
 
   return { emailToOrg, domainToOrg, orgsByName, projectsByOrg, projectsByName };
 }
