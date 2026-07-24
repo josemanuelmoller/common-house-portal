@@ -4,6 +4,7 @@ import { supabaseAdmin } from "@/lib/supabase";
 import { resolveClientRoomProject } from "@/lib/client-room";
 import { capabilitiesFor, listRoomsForActor, resolveRoomActor } from "@/lib/project-roles";
 import { loadRoomContext } from "@/lib/room-context";
+import { suggestRoomStructure } from "@/lib/room-structure";
 import { RoomClient } from "./RoomClient";
 
 export const dynamic = "force-dynamic";
@@ -52,13 +53,21 @@ export default async function RoomPage({ params }: { params: Promise<{ projectId
     loadRoomContext(project.id, actor, caps),
   ]);
 
+  // Empty-state: la sala no parte de cero; si no tiene estructura, se sugiere una
+  // (heredando personas/Drive/reuniones de la preventa) para que el PM la apruebe.
+  const lang = proj.data?.room_language === "en" ? "en" : "es";
+  const emptyRoom = (phases.data?.length ?? 0) === 0 && (deliverables.data?.length ?? 0) === 0 && (tasks.data?.length ?? 0) === 0;
+  const suggestion = emptyRoom ? suggestRoomStructure(lang) : null;
+
   return (
     <RoomClient
       projectId={project.id}
       role={actor.role}
       capabilities={caps}
       personId={actor.personId}
-      defaultLang={proj.data?.room_language === "en" ? "en" : "es"}
+      defaultLang={lang}
+      emptyRoom={emptyRoom}
+      suggestion={suggestion}
       project={proj.data ?? { id: project.id, name: null, current_stage: null }}
       rooms={rooms}
       meta={context.meta}

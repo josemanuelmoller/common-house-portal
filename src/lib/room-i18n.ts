@@ -66,6 +66,14 @@ const ES: Record<string, string> = {
   "toast.decisionResolved": "Decisión resuelta", "toast.decisionReopened": "Decisión reabierta",
   // prompts
   "prompt.newDeliverable": "Nuevo entregable:", "prompt.newTask": "Nueva tarea:", "prompt.newDecision": "Nueva decisión:",
+  // empty-state (sala recién abierta)
+  "empty.title": "Arranquemos la sala", "empty.lead": "La sala no parte de cero: hereda lo de la preventa.",
+  "empty.inheritedTitle": "Heredado de la preventa", "empty.withAccess": "con acceso",
+  "empty.drive": "Carpeta de Drive vinculada", "empty.presale": "Sala de preventa",
+  "empty.meetings": "El proyecto ya existe — las reuniones se procesan solas",
+  "empty.suggestedTitle": "Estructura sugerida", "empty.suggestedNote": "Aprobála para arrancar — después la editás.",
+  "empty.approve": "Aprobar estructura y arrancar", "empty.pmWillApprove": "El PM va a aprobar la estructura para arrancar.",
+  "toast.structureCreated": "Estructura creada · sala en marcha",
 };
 
 const EN: Record<string, string> = {
@@ -109,6 +117,13 @@ const EN: Record<string, string> = {
   "toast.taskClosed": "Task closed · attested by you", "toast.taskReopened": "Task reopened",
   "toast.decisionResolved": "Decision resolved", "toast.decisionReopened": "Decision reopened",
   "prompt.newDeliverable": "New deliverable:", "prompt.newTask": "New task:", "prompt.newDecision": "New decision:",
+  "empty.title": "Let's start the room", "empty.lead": "The room doesn't start from scratch — it inherits from pre-sale.",
+  "empty.inheritedTitle": "Inherited from pre-sale", "empty.withAccess": "with access",
+  "empty.drive": "Drive folder linked", "empty.presale": "Pre-sale room",
+  "empty.meetings": "The project already exists — meetings are processed automatically",
+  "empty.suggestedTitle": "Suggested structure", "empty.suggestedNote": "Approve to start — you can edit it later.",
+  "empty.approve": "Approve structure & start", "empty.pmWillApprove": "The PM will approve the structure to start.",
+  "toast.structureCreated": "Structure created · room is live",
 };
 
 const STR: Record<Lang, Record<string, string>> = { es: ES, en: EN };
