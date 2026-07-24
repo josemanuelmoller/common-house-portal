@@ -41,6 +41,38 @@ function authCheck(req: NextRequest): boolean {
 type EvRow = { id: string; title: string | null; evidence_statement: string | null; project_notion_id: string | null; org_notion_id: string | null; source_id: string | null };
 type SrcRow = { id: string; title: string | null; org_notion_id: string | null; source_external_id: string | null };
 
+// Live Fireflies participant fetch — the stored hall_transcript_observations
+// only covers ~74/163 meeting sources, so orphans whose source doesn't match it
+// have no attendees to resolve from. Pulling participants LIVE (paged backward,
+// 50/window, Fireflies caps limit at 50) gives the resolver the same signal a
+// fresh ingest has. Read-only: this only feeds resolution, nothing is written.
+const FIREFLIES_API = "https://api.fireflies.ai/graphql";
+type FfLite = { id: string; title: string; participants: string[] };
+async function fetchFirefliesParticipants(backTo: Date): Promise<FfLite[]> {
+  const key = process.env.FIREFLIES_API_KEY;
+  if (!key) return [];
+  const floor = new Date("2020-01-01T00:00:00Z");
+  const out: FfLite[] = [];
+  let cursor: Date | undefined;
+  for (let i = 0; i < 30; i++) {
+    const query = `query Q($fromDate: DateTime, $toDate: DateTime){ transcripts(fromDate:$fromDate, toDate:$toDate, limit:50){ id title date participants } }`;
+    const res = await fetch(FIREFLIES_API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${key}` },
+      body: JSON.stringify({ query, variables: { fromDate: floor.toISOString(), toDate: cursor ? cursor.toISOString() : null } }),
+    });
+    if (!res.ok) break;
+    const json = await res.json();
+    const batch = (json?.data?.transcripts ?? []) as Array<{ id: string; title: string; date: number; participants: string[] }>;
+    if (!batch.length) break;
+    for (const t of batch) out.push({ id: t.id, title: t.title, participants: (t.participants ?? []).filter(Boolean) });
+    const oldest = Math.min(...batch.map(t => Number(t.date) || Date.now()));
+    if (oldest <= backTo.getTime() || batch.length < 50) break;
+    cursor = new Date(oldest - 1000);
+  }
+  return out;
+}
+
 async function handle(req: NextRequest) {
   if (!authCheck(req)) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   const url = new URL(req.url);
@@ -97,6 +129,21 @@ async function handle(req: NextRequest) {
       const emails = (o.participant_emails ?? []).filter(Boolean);
       if (o.transcript_id) emailsByTranscriptId.set(o.transcript_id, emails);
       if (o.title) emailsByTitle.set(o.title, emails);
+    }
+  }
+
+  // 3b. Augment with LIVE Fireflies participants (default on; ?live=false skips).
+  //     Live data wins on ties — it's the authoritative attendee list a fresh
+  //     ingest would see, and covers the ~89 sources hto misses.
+  let ffFetched = 0;
+  if (url.searchParams.get("live") !== "false") {
+    const ff = await fetchFirefliesParticipants(new Date("2026-03-01T00:00:00Z"));
+    ffFetched = ff.length;
+    for (const t of ff) {
+      if (t.participants.length) {
+        emailsByTranscriptId.set(t.id, t.participants);
+        if (t.title) emailsByTitle.set(t.title, t.participants);
+      }
     }
   }
 
@@ -160,6 +207,7 @@ async function handle(req: NextRequest) {
   return NextResponse.json({
     ok: true,
     mode: execute ? "execute" : "dry-run",
+    fireflies_transcripts_loaded: ffFetched,
     scanned: orphans.length,
     resolvable: updates.length,
     applied,
