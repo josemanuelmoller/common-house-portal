@@ -328,7 +328,9 @@ async function assembleRoom(row: ProjectRow, includeInternal: boolean, canSeeBan
     slug: row.hall_slug ?? "",
     name: row.name ?? "Your project",
     organizationName: orgName,
-    roomLabel: row.client_room_label ?? "Project room",
+    // "Room" quedó reservado para la sala de trabajo; esta superficie es la
+    // propuesta (el lobby), así que el rótulo por defecto la nombra por lo que es.
+    roomLabel: row.client_room_label ?? "Propuesta",
     roomStatus: row.client_room_status ?? "preparing",
     roomEnabled: row.client_room_enabled ?? false,
     projectStatus: row.project_status,

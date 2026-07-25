@@ -143,9 +143,12 @@ function projectTypeBadge(primaryWorkspace: string): string {
   return "bg-[#f4f4ef] text-[#0a0a0a]/30 border border-[#e4e4dd]";
 }
 
+// El valor `workroom` del dato se queda (es el tipo de proyecto), pero la
+// etiqueta ya no: /workroom no existe y nombrar una superficie muerta confunde.
+// Lo que distingue de verdad es a quién sirve el proyecto: cliente vs cartera.
 function projectTypeLabel(primaryWorkspace: string): string {
   if (primaryWorkspace === "garage")   return "Garage";
-  if (primaryWorkspace === "workroom") return "Workroom";
+  if (primaryWorkspace === "workroom") return "Cliente";
   return "—";
 }
 
