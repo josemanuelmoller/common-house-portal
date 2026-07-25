@@ -638,7 +638,7 @@ export default async function VitrinaPage() {
               <span className="text-[10px] font-medium text-white/30 tracking-[0.5px]">
                 common house ›{" "}
                 <span className="text-white/55">Auto Mercado Fase 2</span> ›{" "}
-                <span className="text-white/55">The Workroom</span>
+                <span className="text-white/55">The Room</span>
               </span>
             </div>
 
