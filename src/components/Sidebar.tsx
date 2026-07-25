@@ -81,6 +81,7 @@ export const ADMIN_NAV_V2: NavEntry[] = [
       { label: "Control plane",   href: "/admin/control-plane" },
       { label: "Inbox + drafts",  href: "/admin/inbox" },
       { label: "Agents",          href: "/admin/agents" },
+      { label: "Fireflies backup", href: "/admin/fireflies-backup" },
       { label: "Intake / Decisions", href: "/admin/os" },
       { label: "Prep Briefs",     href: "/admin/prep" },
       { label: "Content",         href: "/admin/content" },
