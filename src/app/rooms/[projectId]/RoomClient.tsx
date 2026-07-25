@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import Link from "next/link";
 import { UserButton } from "@clerk/nextjs";
 import { makeT, type Lang, type TFn } from "@/lib/room-i18n";
@@ -18,7 +18,8 @@ type RoomSummary = { id: string; name: string | null; slug: string | null; stage
 type RoomProjectMeta = { orgName: string | null; orgLocation: string | null; orgWebsite: string | null; engagementModel: string | null; projectType: string | null; geography: string | null; startDate: string | null; targetEndDate: string | null; projectCode: string | null; driveUrl: string | null; presaleSlug: string | null; currentFocus: string | null; nextMilestone: string | null };
 type RoomTeamMember = { id: string; name: string; email: string | null; role: string; jobTitle: string | null; photoUrl: string | null; side: "team" | "client" };
 type RoomBilling = { company: { legalName: string | null; taxId: string | null; vatNumber: string | null; address: string | null; billingEmail: string | null; publicNote: string | null } | null; client: { legalName: string | null; taxId: string | null; address: string | null; billingEmail: string | null; billingContact: string | null; poReference: string | null } | null };
-type Meeting = { id: string; title: string; date: string | null; summary: string | null; url: string | null; platform: string | null; kind: string };
+type Meeting = { id: string; title: string; date: string | null; summary: string | null; url: string | null; platform: string | null; kind: string; durationMinutes: number | null; attendees: string[] };
+type EvidenceItem = { id: string; sourceId: string; statement: string | null; type: string | null; workstream: string | null; people: string[] };
 type Suggestion = { id: string; proposal_kind: string | null; item_type: string | null; summary: string | null; rationale: string | null; source_refs: string[] | null; created_at: string };
 
 type Props = {
@@ -35,6 +36,7 @@ type Props = {
   team: RoomTeamMember[];
   billing: RoomBilling;
   meetings: Meeting[];
+  evidence: EvidenceItem[];
   suggestions: Suggestion[];
   heroNote: string | null;
   initialPhases: Phase[];
@@ -44,6 +46,10 @@ type Props = {
   initialMaterials: Material[];
   initialEvents: EventRow[];
 };
+
+/* tipografía calcada de room-full.html (--sans / --mono) */
+const FONT_SANS = `-apple-system, "Inter", "Segoe UI", Roboto, system-ui, sans-serif`;
+const FONT_MONO = `ui-monospace, Consolas, "SF Mono", monospace`;
 
 /* ── tokens de la sala (calcados de la maqueta room-full.html) ── */
 const C = {
@@ -135,14 +141,14 @@ const ROLE_TABS: { key: string; label: string }[] = [
   { key: "pm", label: "PM" }, { key: "collaborator", label: "Colab" }, { key: "client", label: "Cliente" }, { key: "reader", label: "Lector" },
 ];
 
-export function RoomClient({ projectId, role, capabilities, personId, defaultLang, emptyRoom, suggestion, project, rooms, meta, team, billing, meetings, suggestions, heroNote, initialPhases, initialDeliverables, initialTasks, initialDecisions, initialMaterials, initialEvents }: Props) {
+export function RoomClient({ projectId, role, capabilities, personId, defaultLang, emptyRoom, suggestion, project, rooms, meta, team, billing, meetings, evidence, suggestions, heroNote, initialPhases, initialDeliverables, initialTasks, initialDecisions, initialMaterials, initialEvents }: Props) {
   const [section, setSection] = useState<SectionKey>("resumen");
   const [suggs, setSuggs] = useState<Suggestion[]>(suggestions);
   const [approving, setApproving] = useState(false);
   const [deliverables, setDeliverables] = useState<Deliverable[]>(initialDeliverables);
   const [tasks, setTasks] = useState<Task[]>(initialTasks);
   const [decisions, setDecisions] = useState<Decision[]>(initialDecisions);
-  const [phases] = useState<Phase[]>(initialPhases);
+  const [phases, setPhases] = useState<Phase[]>(initialPhases);
   const [openPhase, setOpenPhase] = useState<string | null>(initialPhases.find((p) => p.status === "in_progress")?.id ?? null);
   const [dView, setDView] = useState<"list" | "kanban">("kanban");
   const [tView, setTView] = useState<"list" | "kanban">("kanban");
@@ -174,6 +180,16 @@ export function RoomClient({ projectId, role, capabilities, personId, defaultLan
   const tr = useMemo(() => makeT(lang), [lang]);
   const delivCols = useMemo(() => DELIV_COLS.map((c) => ({ ...c, label: tr("ds." + c.key) })), [tr]);
   const taskCols = useMemo(() => TASK_COLS.map((c) => ({ ...c, label: tr("ts." + c.key) })), [tr]);
+
+  /* evidencia por reunión (source_id → items) para el detalle expandible */
+  const [expandedMeeting, setExpandedMeeting] = useState<string | null>(null);
+  const [showAllMeetings, setShowAllMeetings] = useState(false);
+  const totalMeetingMinutes = useMemo(() => meetings.reduce((a, m) => a + (m.durationMinutes ?? 0), 0), [meetings]);
+  const evidenceByMeeting = useMemo(() => {
+    const m = new Map<string, EvidenceItem[]>();
+    evidence.forEach((e) => { if (!m.has(e.sourceId)) m.set(e.sourceId, []); m.get(e.sourceId)!.push(e); });
+    return m;
+  }, [evidence]);
 
   /* resolución de responsable (owner_person_id → miembro del equipo) para avatares */
   const memberById = useMemo(() => { const m = new Map<string, RoomTeamMember>(); team.forEach((x) => m.set(x.id, x)); return m; }, [team]);
@@ -227,9 +243,10 @@ export function RoomClient({ projectId, role, capabilities, personId, defaultLan
     catch (e) { setDeliverables(prev); flash((e as Error).message); }
   }
   async function undoAccept(id: string) {
+    const prev = deliverables;
     setDeliverables((ds) => ds.map((d) => (d.id === id ? { ...d, status: "delivered" } : d)));
     try { await api(`${base}/deliverables`, "PATCH", { id, action: "revert_accept" }); flash(tr("toast.acceptUndone")); }
-    catch (e) { flash((e as Error).message); }
+    catch (e) { setDeliverables(prev); flash((e as Error).message); }
   }
   async function moveTask(id: string, to: string, from: string) {
     if (!can("task.move")) return;
@@ -246,9 +263,10 @@ export function RoomClient({ projectId, role, capabilities, personId, defaultLan
     catch (e) { setTasks(prev); flash((e as Error).message); }
   }
   async function undoClose(id: string, before: string) {
+    const prev = tasks;
     setTasks((ts) => ts.map((x) => (x.id === id ? { ...x, status: before, closed_via: null } : x)));
     try { await api(`${base}/tasks`, "PATCH", { id, action: "reopen" }); flash(tr("toast.taskReopened")); }
-    catch (e) { flash((e as Error).message); }
+    catch (e) { setTasks(prev); flash((e as Error).message); }
   }
   async function createDeliverable() {
     if (!can("structure.edit")) return;
@@ -256,6 +274,15 @@ export function RoomClient({ projectId, role, capabilities, personId, defaultLan
     if (!title?.trim()) return;
     try { const r = await api(`${base}/deliverables`, "POST", { title }); setDeliverables((ds) => [...ds, r.deliverable]); }
     catch (e) { flash((e as Error).message); }
+  }
+  async function createPhase() {
+    if (!can("structure.edit")) return;
+    const title = window.prompt(tr("prompt.newPhase"));
+    if (!title?.trim()) return;
+    try {
+      const r = await api(`${base}/phases`, "POST", { title, position: phases.length });
+      setPhases((ps) => [...ps, r.phase]);
+    } catch (e) { flash((e as Error).message); }
   }
   async function createTask() {
     if (!can("task.crud")) return;
@@ -272,9 +299,10 @@ export function RoomClient({ projectId, role, capabilities, personId, defaultLan
     catch (e) { setDecisions(prev); flash((e as Error).message); }
   }
   async function undoResolve(id: string) {
+    const prev = decisions;
     setDecisions((ds) => ds.map((d) => (d.id === id ? { ...d, status: "open" } : d)));
     try { await api(`${base}/decisions`, "PATCH", { id, action: "reopen" }); flash(tr("toast.decisionReopened")); }
-    catch (e) { flash((e as Error).message); }
+    catch (e) { setDecisions(prev); flash((e as Error).message); }
   }
   async function createDecision() {
     if (!can("decision.manage")) return;
@@ -297,7 +325,7 @@ export function RoomClient({ projectId, role, capabilities, personId, defaultLan
     if (!can("suggestion.confirm")) return;
     const prev = suggs;
     setSuggs((s) => s.filter((x) => x.id !== id));
-    try { await api(`${base}/suggestions`, "PATCH", { id, action }); if (action === "confirm") flash("Sugerencia confirmada"); }
+    try { await api(`${base}/suggestions`, "PATCH", { id, action }); if (action === "confirm") flash(tr("toast.suggConfirmed")); }
     catch (e) { setSuggs(prev); flash((e as Error).message); }
   }
 
@@ -318,21 +346,42 @@ export function RoomClient({ projectId, role, capabilities, personId, defaultLan
   const heroTitle = meta.currentFocus ?? cleanName(project.name);
   const heroSub = heroNote ?? (meta.nextMilestone ? `${tr("field.milestone")}: ${meta.nextMilestone}` : "");
   const gantt = useMemo(() => {
+    // Rango completo del proyecto (inicio → fin + margen); la vista scrollea y se centra en HOY (±3 meses visibles).
     const dated = deliverables.map((d) => d.due_date).filter((x): x is string => !!x).map((x) => new Date(x).getTime());
-    const s0 = meta.startDate ? new Date(meta.startDate).getTime() : (dated.length ? Math.min(...dated) : Date.now());
-    const e0 = meta.targetEndDate ? new Date(meta.targetEndDate).getTime() : (dated.length ? Math.max(...dated) : s0 + 90 * 864e5);
+    const now = Date.now();
+    const rawS = meta.startDate ? new Date(meta.startDate).getTime() : (dated.length ? Math.min(...dated) : now);
+    const rawE = Math.max(
+      meta.targetEndDate ? new Date(meta.targetEndDate).getTime() : 0,
+      dated.length ? Math.max(...dated) : 0,
+      now,
+    ) || rawS + 90 * 864e5;
+    // Redondear a meses calendario, con 1 mes de aire a cada lado.
+    const s = new Date(rawS); s.setUTCDate(1); s.setUTCHours(0, 0, 0, 0); s.setUTCMonth(s.getUTCMonth() - 1);
+    const e = new Date(rawE); e.setUTCDate(1); e.setUTCHours(0, 0, 0, 0); e.setUTCMonth(e.getUTCMonth() + 2);
+    const s0 = s.getTime(), e0 = e.getTime();
     const span = Math.max(864e5, e0 - s0);
-    const pct = (dateStr: string) => Math.round(Math.max(0, Math.min(100, (new Date(dateStr).getTime() - s0) / span * 100)));
-    const months: { label: string; leftPct: number }[] = [];
-    const cur = new Date(s0); cur.setUTCDate(1);
-    while (cur.getTime() <= e0 && months.length < 14) {
-      months.push({ label: cur.toLocaleDateString(lang === "es" ? "es-ES" : "en-US", { month: "short", timeZone: "UTC" }), leftPct: Math.round(Math.max(0, (cur.getTime() - s0) / span * 100)) });
+    const PX_PER_MONTH = 90; // ~6 meses visibles en el viewport (~540px)
+    const totalMonths = Math.max(1, Math.round(span / (30.44 * 864e5)));
+    const width = totalMonths * PX_PER_MONTH;
+    const px = (dateStr: string) => Math.round(Math.max(0, Math.min(1, (new Date(dateStr).getTime() - s0) / span)) * width);
+    const months: { label: string; leftPx: number }[] = [];
+    const cur = new Date(s0);
+    while (cur.getTime() < e0 && months.length < 48) {
+      const opts: Intl.DateTimeFormatOptions = cur.getUTCMonth() === 0 || months.length === 0
+        ? { month: "short", year: "2-digit", timeZone: "UTC" } : { month: "short", timeZone: "UTC" };
+      months.push({ label: cur.toLocaleDateString(lang === "es" ? "es-ES" : "en-US", opts), leftPx: Math.round((cur.getTime() - s0) / span * width) });
       cur.setUTCMonth(cur.getUTCMonth() + 1);
     }
-    const todayPct = Math.round(Math.max(0, Math.min(100, (Date.now() - s0) / span * 100)));
-    const rangeLabel = `${new Date(s0).toLocaleDateString(lang === "es" ? "es-ES" : "en-US", { month: "short", timeZone: "UTC" })} – ${new Date(e0).toLocaleDateString(lang === "es" ? "es-ES" : "en-US", { month: "short", year: "numeric", timeZone: "UTC" })}`;
-    return { pct, months, todayPct, rangeLabel };
+    const todayPx = Math.round(Math.max(0, Math.min(1, (now - s0) / span)) * width);
+    const rangeLabel = `${new Date(s0).toLocaleDateString(lang === "es" ? "es-ES" : "en-US", { month: "short", year: "numeric", timeZone: "UTC" })} – ${new Date(e0 - 864e5).toLocaleDateString(lang === "es" ? "es-ES" : "en-US", { month: "short", year: "numeric", timeZone: "UTC" })}`;
+    return { px, months, todayPx, width, pxPerMonth: PX_PER_MONTH, rangeLabel };
   }, [meta.startDate, meta.targetEndDate, deliverables, lang]);
+  /* auto-scroll del gantt: centrar HOY (deja ~3 meses de pasado visibles) */
+  const ganttScrollRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const el = ganttScrollRef.current;
+    if (el) el.scrollLeft = Math.max(0, gantt.todayPx - 3 * gantt.pxPerMonth);
+  }, [section, gantt.todayPx, gantt.pxPerMonth]);
 
   const openDecisions = decisions.filter((d) => d.status === "open").length;
   const myTasks = personId ? tasks.filter((t) => t.owner_person_id === personId) : [];
@@ -361,7 +410,7 @@ export function RoomClient({ projectId, role, capabilities, personId, defaultLan
   };
 
   return (
-    <div style={{ minHeight: "100vh", fontFamily: "var(--font-hall-sans), 'Inter Tight', sans-serif", color: C.ink, background: "#e2e2da", padding: isMobile ? 0 : "22px 16px 40px" }}>
+    <div style={{ minHeight: "100vh", fontFamily: FONT_SANS, fontSize: 14, lineHeight: 1.5, color: C.ink, background: "#e2e2da", padding: isMobile ? 0 : "22px 16px 40px" }}>
       {/* app enmarcada (calcada de la maqueta) */}
       <div style={{ maxWidth: 1160, margin: "0 auto", display: "flex", height: isMobile ? "100vh" : "calc(100vh - 62px)", background: C.bg, border: isMobile ? "none" : `1.5px solid ${C.line}`, borderRadius: isMobile ? 0 : 16, overflow: "hidden" }}>
       {/* hamburguesa (mobile) */}
@@ -473,7 +522,7 @@ export function RoomClient({ projectId, role, capabilities, personId, defaultLan
           <span style={{ flex: 1 }} />
           {!isMobile && role === "pm" && (
             <>
-              <span style={{ ...label, letterSpacing: "1px" }}>Ver como</span>
+              <span style={{ ...label, letterSpacing: "1px" }}>{tr("chrome.viewAs")}</span>
               <div style={{ display: "inline-flex", background: C.paper, border: `1.5px solid ${C.line}`, borderRadius: 8, padding: 3 }}>
                 {ROLE_TABS.map((rt) => (
                   <button key={rt.key} onClick={() => setViewRole(rt.key)} style={{ fontFamily: "inherit", fontSize: 9.5, fontWeight: 700, letterSpacing: ".4px", textTransform: "uppercase", border: 0, borderRadius: 5, padding: "5px 10px", cursor: "pointer", background: viewRole === rt.key ? C.ink : "transparent", color: viewRole === rt.key ? "#fff" : C.muted }}>{rt.label}</button>
@@ -634,16 +683,70 @@ export function RoomClient({ projectId, role, capabilities, personId, defaultLan
                     </span>
                     <b style={{ fontSize: 11.5, fontWeight: 800, textTransform: "uppercase", letterSpacing: ".2px" }}>{tr("nav.reuniones")}</b>
                     <span style={{ flex: 1 }} />
-                    <span style={{ fontSize: 10, color: C.muted, fontWeight: 600 }}>{meetings.length} {lang === "es" ? "en total" : "total"}</span>
+                    <span style={{ fontSize: 10, color: C.muted, fontWeight: 600 }}>
+                      {meetings.length} {lang === "es" ? "en total" : "total"}
+                      {totalMeetingMinutes > 0 && ` · ${fmtTotalTime(totalMeetingMinutes, lang)} ${lang === "es" ? "dedicadas a" : "spent on"} ${meta.orgName ?? cleanName(project.name)}`}
+                    </span>
                   </div>
                   <div style={{ padding: "6px 17px 14px" }}>
-                    {meetings.slice(0, 5).map((m) => (
-                      <a key={m.id} href={m.url ?? undefined} target="_blank" rel="noreferrer" style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 0", borderTop: `1px solid ${C.lineSoft}`, textDecoration: "none", color: "inherit" }}>
-                        <span style={{ fontSize: 9, fontFamily: "ui-monospace,monospace", fontWeight: 700, letterSpacing: ".5px", textTransform: "uppercase", color: C.muted, minWidth: 44, flexShrink: 0 }}>{m.date ? m.date.slice(5) : ""}</span>
-                        <div style={{ flex: 1, minWidth: 0 }}><b style={{ fontSize: 12.5, fontWeight: 700, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.title}</b>{m.platform && <small style={{ fontSize: 10, color: C.muted }}>{m.platform}</small>}</div>
-                        <span style={{ color: C.muted, flexShrink: 0 }}>↗</span>
-                      </a>
-                    ))}
+                    {(showAllMeetings ? meetings : meetings.slice(0, 5)).map((m) => {
+                      const ev = evidenceByMeeting.get(m.id) ?? [];
+                      const exp = expandedMeeting === m.id;
+                      const hasBody = !!(m.summary || ev.length);
+                      return (
+                        <div key={m.id} style={{ borderTop: `1px solid ${C.lineSoft}` }}>
+                          <div onClick={() => hasBody && setExpandedMeeting(exp ? null : m.id)} style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 0", cursor: hasBody ? "pointer" : "default" }}>
+                            <span style={{ fontFamily: "ui-monospace,Consolas,'SF Mono',monospace", fontSize: 10, color: C.muted, minWidth: 42, fontWeight: 700, flexShrink: 0 }}>{fmtDay(m.date, lang)}</span>
+                            <div style={{ flex: 1, minWidth: 0, fontSize: 12.5, fontWeight: 600 }}>
+                              {m.title}
+                              <small style={{ display: "block", color: C.muted, fontSize: 10.5, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                {[m.platform, ev.length ? `${ev.length} ${lang === "es" ? "evidencias" : "evidence"}` : null, m.durationMinutes == null ? (lang === "es" ? "sin transcripción" : "no transcript") : null].filter(Boolean).join(" · ")}
+                              </small>
+                            </div>
+                            {m.attendees.length > 0 && (
+                              <div style={{ display: "flex", flexShrink: 0 }}>
+                                {m.attendees.slice(0, 4).map((a, i) => { const c = attendeeChip(a, team); return (
+                                  <i key={i} title={a} style={{ width: 20, height: 20, borderRadius: "50%", marginLeft: i === 0 ? 0 : -5, border: `2px solid ${C.paper}`, fontSize: 8, fontWeight: 700, color: "#fff", display: "grid", placeItems: "center", fontStyle: "normal", background: c.bg }}>{c.initials}</i>
+                                ); })}
+                                {m.attendees.length > 4 && <i style={{ width: 20, height: 20, borderRadius: "50%", marginLeft: -5, border: `2px solid ${C.paper}`, fontSize: 7.5, fontWeight: 700, color: C.muted2, display: "grid", placeItems: "center", fontStyle: "normal", background: C.paper2 }}>+{m.attendees.length - 4}</i>}
+                              </div>
+                            )}
+                            <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: ".4px", textTransform: "uppercase", color: C.muted, minWidth: 34, textAlign: "right", flexShrink: 0 }}>{m.durationMinutes != null ? `${Math.round(m.durationMinutes)}m` : "—"}</span>
+                            {hasBody && <span style={{ color: C.muted, fontSize: 11, flexShrink: 0, transform: exp ? "rotate(90deg)" : "none", transition: "transform .15s" }}>▸</span>}
+                          </div>
+                          {exp && (
+                            <div style={{ padding: "0 0 12px 56px" }}>
+                              {m.summary && <div style={{ fontSize: 12, color: C.muted2, lineHeight: 1.55, whiteSpace: "pre-wrap" }}>{m.summary}</div>}
+                              {ev.length > 0 && (
+                                <div style={{ marginTop: m.summary ? 10 : 0 }}>
+                                  <div style={{ ...label, marginBottom: 6 }}>{lang === "es" ? "Evidencia extraída" : "Extracted evidence"} · {ev.length}</div>
+                                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                                    {ev.map((e) => (
+                                      <div key={e.id} style={{ display: "flex", gap: 8, alignItems: "flex-start", background: C.paper2, borderRadius: 8, padding: "7px 10px" }}>
+                                        <span style={{ width: 6, height: 6, borderRadius: 999, background: C.limeInk, flexShrink: 0, marginTop: 5 }} />
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                          <span style={{ fontSize: 11.5, color: C.ink, lineHeight: 1.45 }}>{e.statement}</span>
+                                          <div style={{ display: "flex", gap: 6, marginTop: 3, flexWrap: "wrap" }}>
+                                            {e.type && <span style={{ fontSize: 8, fontWeight: 800, letterSpacing: ".4px", textTransform: "uppercase", color: C.muted, background: "rgba(0,0,0,.05)", padding: "1px 6px", borderRadius: 5 }}>{e.type}</span>}
+                                            {e.workstream && <span style={{ fontSize: 8, fontWeight: 800, letterSpacing: ".4px", textTransform: "uppercase", color: "#4a5bc0", background: "rgba(91,107,214,.11)", padding: "1px 6px", borderRadius: 5 }}>{e.workstream}</span>}
+                                            {e.people.length > 0 && <span style={{ fontSize: 8, fontWeight: 700, color: C.muted, padding: "1px 0" }}>{e.people.slice(0, 3).join(", ")}{e.people.length > 3 ? "…" : ""}</span>}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                    {meetings.length > 5 && (
+                      <button onClick={() => setShowAllMeetings((v) => !v)} style={{ ...btn(C.paper, C.muted2, true), marginTop: 10, fontSize: 10 }}>
+                        {showAllMeetings ? (lang === "es" ? "Ver menos" : "Show less") : `${lang === "es" ? "Ver todas" : "Show all"} (${meetings.length})`}
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
@@ -657,7 +760,7 @@ export function RoomClient({ projectId, role, capabilities, personId, defaultLan
                 <h3 style={{ fontSize: 16, fontWeight: 800, margin: 0 }}>{tr("nav.plan")}</h3>
                 {(meta.startDate || meta.targetEndDate) && <span style={{ fontSize: 11, color: C.muted, fontWeight: 600, textTransform: "capitalize" }}>{gantt.rangeLabel}</span>}
                 <span style={{ flex: 1 }} />
-                {can("structure.edit") && <button onClick={createDeliverable} style={btn(C.paper, C.muted2, true)}>{lang === "es" ? "+ Fase" : "+ Phase"}</button>}
+                {can("structure.edit") && <button onClick={createPhase} style={btn(C.paper, C.muted2, true)}>{lang === "es" ? "+ Fase" : "+ Phase"}</button>}
               </div>
               <div style={{ maxWidth: 760 }}>
                 {phases.length === 0 && <Empty text={tr("plan.noPhases")} />}
@@ -697,29 +800,35 @@ export function RoomClient({ projectId, role, capabilities, personId, defaultLan
               {/* línea de tiempo (gantt) */}
               {gantt.months.length > 0 && deliverables.some((d) => d.due_date) && (
                 <div style={{ marginTop: 22 }}>
-                  <div style={{ ...label, marginBottom: 10 }}>{lang === "es" ? "Línea de tiempo" : "Timeline"}</div>
-                  <div style={{ background: C.paper, border: `1.5px solid ${C.line}`, borderRadius: 14, overflow: "hidden", position: "relative" }}>
-                    <div style={{ display: "flex", borderBottom: `1.5px solid ${C.line}` }}>
-                      <div style={{ width: 160, flexShrink: 0 }} />
-                      <div style={{ flex: 1, position: "relative", height: 26 }}>
-                        {gantt.months.map((m, i) => (<span key={i} style={{ position: "absolute", left: `${m.leftPct}%`, top: 8, fontSize: 8, fontWeight: 700, letterSpacing: "1.5px", textTransform: "uppercase", color: "rgba(0,0,0,.3)", paddingLeft: 6, whiteSpace: "nowrap" }}>{m.label}</span>))}
-                      </div>
+                  <div style={{ ...label, marginBottom: 10 }}>{lang === "es" ? "Línea de tiempo" : "Timeline"} <span style={{ fontWeight: 600, letterSpacing: ".3px", textTransform: "none", color: "rgba(0,0,0,.35)" }}>· {lang === "es" ? "desplazá para ver pasado y futuro" : "scroll to see past and future"}</span></div>
+                  <div style={{ background: C.paper, border: `1.5px solid ${C.line}`, borderRadius: 14, overflow: "hidden", display: "flex" }}>
+                    {/* columna fija de nombres */}
+                    <div style={{ width: 160, flexShrink: 0, borderRight: `1.5px solid ${C.line}`, zIndex: 2, background: C.paper }}>
+                      <div style={{ height: 26, borderBottom: `1.5px solid ${C.line}` }} />
+                      {deliverables.filter((d) => d.due_date).map((d) => (
+                        <div key={d.id} style={{ borderTop: `1px solid ${C.lineSoft}`, minHeight: 36, display: "flex", alignItems: "center", padding: "8px 12px", fontSize: 11.5, fontWeight: 600, color: C.muted2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.title}</div>
+                      ))}
                     </div>
-                    {deliverables.filter((d) => d.due_date).map((d) => {
-                      const end = gantt.pct(d.due_date!); const start = Math.max(0, end - 14);
-                      const tone = d.status === "at_risk" ? C.warn : (d.status === "delivered" || d.status === "accepted") ? C.ok : d.status === "in_progress" ? C.lime : C.paper2;
-                      const barTxt = (d.status === "delivered" || d.status === "accepted") ? statusLabel(d.status) : `${d.progress}%`;
-                      return (
-                        <div key={d.id} style={{ display: "flex", alignItems: "center", borderTop: `1px solid ${C.lineSoft}`, minHeight: 36 }}>
-                          <div style={{ width: 160, flexShrink: 0, padding: "8px 12px", fontSize: 11.5, fontWeight: 600, color: C.muted2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.title}</div>
-                          <div style={{ flex: 1, position: "relative", alignSelf: "stretch" }}>
-                            <div title={`${d.title} · ${d.due_date} · ${d.progress}%`} style={{ position: "absolute", top: "50%", transform: "translateY(-50%)", left: `${start}%`, width: `${Math.max(7, end - start)}%`, height: 21, borderRadius: 6, background: tone, display: "flex", alignItems: "center", padding: "0 8px", fontSize: 9, fontWeight: 800, letterSpacing: ".4px", textTransform: "uppercase", color: "#3a3a34", overflow: "hidden", whiteSpace: "nowrap" }}>{barTxt}</div>
-                          </div>
+                    {/* pista scrolleable (auto-centrada en HOY: ~3 meses atrás / 3 adelante) */}
+                    <div ref={ganttScrollRef} style={{ flex: 1, overflowX: "auto", position: "relative" }}>
+                      <div style={{ width: gantt.width, position: "relative" }}>
+                        <div style={{ position: "relative", height: 26, borderBottom: `1.5px solid ${C.line}` }}>
+                          {gantt.months.map((m, i) => (<span key={i} style={{ position: "absolute", left: m.leftPx, top: 8, fontSize: 8, fontWeight: 700, letterSpacing: "1.5px", textTransform: "uppercase", color: "rgba(0,0,0,.3)", paddingLeft: 6, whiteSpace: "nowrap", borderLeft: "1px solid rgba(0,0,0,.07)" }}>{m.label}</span>))}
                         </div>
-                      );
-                    })}
-                    <div style={{ position: "absolute", top: 0, bottom: 0, left: `calc(160px + (100% - 160px) * ${gantt.todayPct / 100})`, width: 2, background: C.danger, zIndex: 3 }}>
-                      <span style={{ position: "absolute", top: 0, left: "50%", transform: "translateX(-50%)", background: C.danger, color: "#fff", fontSize: 7, fontWeight: 800, padding: "1px 4px", borderRadius: "0 0 4px 4px", letterSpacing: ".5px" }}>{lang === "es" ? "HOY" : "NOW"}</span>
+                        {deliverables.filter((d) => d.due_date).map((d) => {
+                          const end = gantt.px(d.due_date!); const start = Math.max(0, end - Math.round(1.5 * gantt.pxPerMonth));
+                          const tone = d.status === "at_risk" ? C.warn : (d.status === "delivered" || d.status === "accepted") ? C.ok : d.status === "in_progress" ? C.lime : C.paper2;
+                          const barTxt = (d.status === "delivered" || d.status === "accepted") ? statusLabel(d.status) : `${d.progress}%`;
+                          return (
+                            <div key={d.id} style={{ position: "relative", borderTop: `1px solid ${C.lineSoft}`, minHeight: 36 }}>
+                              <div title={`${d.title} · ${d.due_date} · ${d.progress}%`} style={{ position: "absolute", top: "50%", transform: "translateY(-50%)", left: start, width: Math.max(52, end - start), height: 21, borderRadius: 6, background: tone, display: "flex", alignItems: "center", padding: "0 8px", fontSize: 9, fontWeight: 800, letterSpacing: ".4px", textTransform: "uppercase", color: "#3a3a34", overflow: "hidden", whiteSpace: "nowrap" }}>{barTxt}</div>
+                            </div>
+                          );
+                        })}
+                        <div style={{ position: "absolute", top: 0, bottom: 0, left: gantt.todayPx, width: 2, background: C.danger, zIndex: 3 }}>
+                          <span style={{ position: "absolute", top: 0, left: "50%", transform: "translateX(-50%)", background: C.danger, color: "#fff", fontSize: 7, fontWeight: 800, padding: "1px 4px", borderRadius: "0 0 4px 4px", letterSpacing: ".5px" }}>{lang === "es" ? "HOY" : "NOW"}</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -930,22 +1039,72 @@ export function RoomClient({ projectId, role, capabilities, personId, defaultLan
           {/* REUNIONES */}
           {section === "reuniones" && (
             <div style={{ maxWidth: 760 }}>
-              <h3 style={{ fontSize: 16, fontWeight: 800, margin: "0 0 6px" }}>{tr("nav.reuniones")}</h3>
+              <div style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 6 }}>
+                <h3 style={{ fontSize: 16, fontWeight: 800, margin: 0 }}>{tr("nav.reuniones")}</h3>
+                <span style={{ fontSize: 11, color: C.muted, fontWeight: 600 }}>
+                  {meetings.length} {lang === "es" ? "en total" : "total"}
+                  {totalMeetingMinutes > 0 && ` · ${fmtTotalTime(totalMeetingMinutes, lang)} ${lang === "es" ? "dedicadas a" : "spent on"} ${meta.orgName ?? cleanName(project.name)}`}
+                </span>
+              </div>
               <div style={{ fontSize: 12.5, color: C.muted2, marginBottom: 16 }}>{tr("meet.desc")}</div>
               {meetings.length === 0 && <Empty text={tr("meet.none")} />}
-              <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
-                {meetings.map((m) => (
-                  <div key={m.id} style={{ background: C.paper, border: `1.5px solid ${C.line}`, borderRadius: 12, padding: "12px 15px" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                      <span style={{ width: 26, height: 26, borderRadius: 8, background: C.limePaper, color: C.limeInk, display: "grid", placeItems: "center", fontSize: 12, flexShrink: 0 }}>▷</span>
-                      <b style={{ fontSize: 13, fontWeight: 700, flex: 1, minWidth: 0 }}>{m.url ? <a href={m.url} target="_blank" rel="noreferrer" style={{ color: "inherit", textDecoration: "none" }}>{m.title}</a> : m.title}</b>
-                      {m.platform && <span style={pill(C.paper2, C.muted2)}>{m.platform}</span>}
-                      {m.date && <span style={{ ...label, fontFamily: "ui-monospace,monospace" }}>{m.date}</span>}
-                    </div>
-                    {m.summary && <div style={{ fontSize: 12, color: C.muted2, marginTop: 8, lineHeight: 1.5, paddingLeft: 36 }}>{m.summary.length > 320 ? m.summary.slice(0, 320) + "…" : m.summary}</div>}
-                  </div>
-                ))}
-              </div>
+              {meetings.length > 0 && (
+                <div style={{ background: C.paper, border: `1.5px solid ${C.line}`, borderRadius: 14, padding: "4px 17px 10px" }}>
+                  {meetings.map((m, idx) => {
+                    const ev = evidenceByMeeting.get(m.id) ?? [];
+                    const exp = expandedMeeting === m.id;
+                    const hasBody = !!(m.summary || ev.length);
+                    return (
+                      <div key={m.id} style={{ borderTop: idx === 0 ? 0 : "1px solid #eee" }}>
+                        <div onClick={() => hasBody && setExpandedMeeting(exp ? null : m.id)} style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 0", cursor: hasBody ? "pointer" : "default" }}>
+                          <span style={{ fontFamily: FONT_MONO, fontSize: 10, color: C.muted, minWidth: 42, fontWeight: 700, flexShrink: 0 }}>{fmtDay(m.date, lang)}</span>
+                          <div style={{ flex: 1, minWidth: 0, fontSize: 12.5, fontWeight: 600 }}>
+                            {m.title}
+                            <small style={{ display: "block", color: C.muted, fontSize: 10.5, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              {[m.platform, ev.length ? `${ev.length} ${lang === "es" ? "evidencias" : "evidence"}` : null, m.durationMinutes == null ? (lang === "es" ? "sin transcripción" : "no transcript") : null].filter(Boolean).join(" · ")}
+                            </small>
+                          </div>
+                          {m.attendees.length > 0 && (
+                            <div style={{ display: "flex", flexShrink: 0 }}>
+                              {m.attendees.slice(0, 4).map((a, i) => { const c = attendeeChip(a, team); return (
+                                <i key={i} title={a} style={{ width: 20, height: 20, borderRadius: "50%", marginLeft: i === 0 ? 0 : -5, border: `2px solid ${C.paper}`, fontSize: 8, fontWeight: 700, color: "#fff", display: "grid", placeItems: "center", fontStyle: "normal", background: c.bg }}>{c.initials}</i>
+                              ); })}
+                              {m.attendees.length > 4 && <i style={{ width: 20, height: 20, borderRadius: "50%", marginLeft: -5, border: `2px solid ${C.paper}`, fontSize: 7.5, fontWeight: 700, color: C.muted2, display: "grid", placeItems: "center", fontStyle: "normal", background: C.paper2 }}>+{m.attendees.length - 4}</i>}
+                            </div>
+                          )}
+                          <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: ".4px", textTransform: "uppercase", color: C.muted, minWidth: 34, textAlign: "right", flexShrink: 0 }}>{m.durationMinutes != null ? `${Math.round(m.durationMinutes)}m` : "—"}</span>
+                          {m.url && <a href={m.url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} style={{ color: C.muted, flexShrink: 0, textDecoration: "none" }}>↗</a>}
+                          {hasBody && <span style={{ color: C.muted, fontSize: 11, flexShrink: 0, transform: exp ? "rotate(90deg)" : "none", transition: "transform .15s" }}>▸</span>}
+                        </div>
+                        {exp && (
+                          <div style={{ padding: "0 0 12px 54px" }}>
+                            {m.summary && <div style={{ fontSize: 12, color: C.muted2, lineHeight: 1.55, whiteSpace: "pre-wrap" }}>{m.summary}</div>}
+                            {ev.length > 0 && (
+                              <div style={{ marginTop: m.summary ? 10 : 0 }}>
+                                <div style={{ ...label, marginBottom: 6 }}>{lang === "es" ? "Evidencia extraída" : "Extracted evidence"} · {ev.length}</div>
+                                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                                  {ev.map((e) => (
+                                    <div key={e.id} style={{ display: "flex", gap: 8, alignItems: "flex-start", background: C.paper2, borderRadius: 8, padding: "7px 10px" }}>
+                                      <span style={{ width: 6, height: 6, borderRadius: 999, background: C.limeInk, flexShrink: 0, marginTop: 5 }} />
+                                      <div style={{ flex: 1, minWidth: 0 }}>
+                                        <span style={{ fontSize: 11.5, color: C.ink, lineHeight: 1.45 }}>{e.statement}</span>
+                                        <div style={{ display: "flex", gap: 6, marginTop: 3, flexWrap: "wrap" }}>
+                                          {e.type && <span style={{ fontSize: 8, fontWeight: 800, letterSpacing: ".4px", textTransform: "uppercase", color: C.muted, background: "rgba(0,0,0,.05)", padding: "1px 6px", borderRadius: 5 }}>{e.type}</span>}
+                                          {e.workstream && <span style={{ fontSize: 8, fontWeight: 800, letterSpacing: ".4px", textTransform: "uppercase", color: "#4a5bc0", background: "rgba(91,107,214,.11)", padding: "1px 6px", borderRadius: 5 }}>{e.workstream}</span>}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 
@@ -1084,6 +1243,21 @@ function fileIcon(mime: string | null): { bg: string; label: string } {
 const AV_COLORS = ["#3B5BDB", "#0C8599", "#9C36B5", "#495057", "#c67a0a"];
 function avInit(name: string): string { return name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase() || "·"; }
 function avColor(seed: string): string { let h = 0; for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0; return AV_COLORS[h % AV_COLORS.length]; }
+/* duración total de reuniones, formato "11h 20m" (calco de la maqueta) */
+function fmtTotalTime(mins: number, lang: string): string {
+  const h = Math.floor(mins / 60), m = Math.round(mins % 60);
+  if (h === 0) return `${m}m`;
+  return lang === "es" ? `${h}h ${m}m` : `${h}h ${m}m`;
+}
+/* avatar de asistente: iniciales desde el email + color por dominio (equipo/cliente) */
+function attendeeChip(email: string, team: RoomTeamMember[]): { initials: string; bg: string } {
+  const member = team.find((t) => t.email?.toLowerCase() === email.toLowerCase());
+  if (member) return { initials: avInit(member.name), bg: avColor(member.name) };
+  const local = email.split("@")[0].replace(/[._-]+/g, " ").trim();
+  const parts = local.split(/\s+/).filter(Boolean);
+  const initials = (parts.length > 1 ? parts[0][0] + parts[1][0] : local.slice(0, 2)).toUpperCase();
+  return { initials, bg: avColor(email) };
+}
 function fmtDay(iso: string | null, lang: string): string {
   if (!iso) return "";
   const d = new Date(iso.length <= 10 ? iso + "T00:00:00" : iso);

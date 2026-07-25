@@ -57,6 +57,8 @@ export type RoomMeeting = {
   url: string | null;
   platform: string | null;
   kind: string;
+  durationMinutes: number | null;
+  attendees: string[];
 };
 
 /**
@@ -68,11 +70,11 @@ export async function loadRoomMeetings(projectNotionId: string | null, includeSu
   if (!projectNotionId) return [];
   const { data } = await supabaseAdmin()
     .from("sources")
-    .select("id, title, source_type, source_platform, processed_summary, source_url, source_date, created_at")
+    .select("id, title, source_type, source_platform, processed_summary, source_url, source_date, created_at, duration_minutes, attendees")
     .eq("project_notion_id", projectNotionId)
     .in("source_type", ["Meeting", "Conversation"])
     .order("source_date", { ascending: false, nullsFirst: false })
-    .limit(30);
+    .limit(120);
   return (data ?? []).map((s) => ({
     id: s.id as string,
     title: (s.title as string | null) ?? "Reunión",
@@ -81,6 +83,41 @@ export async function loadRoomMeetings(projectNotionId: string | null, includeSu
     url: (s.source_url as string | null) ?? null,
     platform: (s.source_platform as string | null) ?? null,
     kind: (s.source_type as string | null) ?? "Meeting",
+    durationMinutes: s.duration_minutes != null ? Number(s.duration_minutes) : null,
+    attendees: Array.isArray(s.attendees) ? (s.attendees as string[]) : [],
+  }));
+}
+
+export type RoomEvidenceItem = {
+  id: string;
+  sourceId: string;
+  statement: string | null;
+  type: string | null;
+  workstream: string | null;
+  people: string[];
+};
+
+/**
+ * Evidencia extraída de las reuniones del proyecto (tabla `evidence`, ligada por
+ * source_id). Alimenta el detalle expandible de cada reunión. Solo para roles
+ * internos (el caller gatea por internal.view).
+ */
+export async function loadRoomEvidence(projectNotionId: string | null): Promise<RoomEvidenceItem[]> {
+  if (!projectNotionId) return [];
+  const { data } = await supabaseAdmin()
+    .from("evidence")
+    .select("id, source_id, evidence_statement, evidence_type, workstream, people_involved")
+    .eq("project_notion_id", projectNotionId)
+    .not("source_id", "is", null)
+    .order("created_at", { ascending: true })
+    .limit(500);
+  return (data ?? []).map((e) => ({
+    id: e.id as string,
+    sourceId: e.source_id as string,
+    statement: (e.evidence_statement as string | null) ?? null,
+    type: (e.evidence_type as string | null) ?? null,
+    workstream: (e.workstream as string | null) ?? null,
+    people: Array.isArray(e.people_involved) ? (e.people_involved as string[]) : [],
   }));
 }
 
