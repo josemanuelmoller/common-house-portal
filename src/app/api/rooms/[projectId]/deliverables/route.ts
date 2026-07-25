@@ -2,10 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { resolveClientRoomProject } from "@/lib/client-room";
 import { can, logRoomEvent, resolveRoomActor } from "@/lib/project-roles";
+import { buildPatch, fieldDiff, DATE_RE, UUID_RE } from "@/lib/room-patch";
 
 /**
  * CRUD de entregables de la sala, con permisos por rol (matriz) y event log.
  * Cada cambio emite un project_events → de ahí salen undo, auditoría, analítica y feed.
+ *
+ * Editar parte el permiso en dos, siguiendo la matriz: cambiar qué ES el
+ * entregable (título, descripción, fase) es estructural → structure.edit (PM).
+ * Cambiar cómo VA (responsable, fecha, avance) es operativo → deliverable.move,
+ * que el colaborador ya tiene.
  */
 
 const STATUSES = new Set(["not_started", "in_progress", "at_risk", "delivered", "accepted"]);
@@ -125,6 +131,58 @@ export async function PATCH(req: NextRequest, c: { params: Promise<{ projectId: 
       .eq("id", id).select("*").single();
     if (upErr) return NextResponse.json({ error: upErr.message }, { status: 502 });
     await logRoomEvent({ projectId: project.id, actor, verb: "status_changed", targetType: "deliverable", targetId: id, summary: `Deshizo la aceptación de "${current.title}"`, payload: { from: "accepted", to: "delivered" } });
+    return NextResponse.json({ ok: true, deliverable: data });
+  }
+
+  // Editar campos. Permiso partido: estructural (PM) vs operativo (PM/colaborador).
+  if (action === "update") {
+    const built = buildPatch(body, [
+      { key: "title", col: "title", label: "Título", required: true },
+      { key: "description", col: "description", label: "Descripción" },
+      { key: "phaseId", col: "phase_id", label: "Fase", check: (v) => UUID_RE.test(v) },
+      { key: "ownerPersonId", col: "owner_person_id", label: "Responsable", check: (v) => UUID_RE.test(v) },
+      { key: "dueDate", col: "due_date", label: "Fecha", check: (v) => DATE_RE.test(v) },
+    ]);
+    if (!built.ok) return NextResponse.json({ error: built.error }, { status: 400 });
+
+    const patch: Record<string, unknown> = { ...built.patch };
+    const touched = [...built.touched];
+    if ("progress" in body) {
+      const n = typeof body.progress === "number" ? Math.round(body.progress) : NaN;
+      if (!Number.isFinite(n) || n < 0 || n > 100) return NextResponse.json({ error: "Avance: 0 a 100" }, { status: 400 });
+      patch.progress = n;
+      touched.push("progress");
+    }
+    if (touched.length === 0) return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
+
+    const STRUCTURAL = ["title", "description", "phase_id"];
+    const needsStructural = touched.some((c) => STRUCTURAL.includes(c));
+    if (needsStructural && !can(actor.role, "structure.edit")) {
+      return NextResponse.json({ error: "Sólo el PM cambia título, descripción o fase" }, { status: 403 });
+    }
+    if (!needsStructural && !can(actor.role, "deliverable.move")) {
+      return NextResponse.json({ error: "Tu rol no puede editar entregables" }, { status: 403 });
+    }
+
+    // La fase tiene que ser de esta sala (el id viene del cliente).
+    if (patch.phase_id) {
+      const { data: ph } = await db.from("project_phases").select("id").eq("id", patch.phase_id).eq("project_id", project.id).maybeSingle();
+      if (!ph) return NextResponse.json({ error: "La fase no existe en esta sala" }, { status: 400 });
+    }
+
+    const diff = fieldDiff(current, patch);
+    if (Object.keys(diff).length === 0) return NextResponse.json({ ok: true, deliverable: current, unchanged: true });
+
+    const { data, error: upErr } = await db.from("project_deliverables")
+      .update({ ...patch, updated_at: new Date().toISOString() })
+      .eq("id", id).eq("project_id", project.id).select("*").single();
+    if (upErr) return NextResponse.json({ error: upErr.message }, { status: 502 });
+
+    await logRoomEvent({
+      projectId: project.id, actor, verb: "updated", targetType: "deliverable", targetId: id,
+      summary: `Editó "${current.title}" (${Object.keys(diff).join(", ")})`,
+      payload: { changes: diff },
+    });
     return NextResponse.json({ ok: true, deliverable: data });
   }
 
