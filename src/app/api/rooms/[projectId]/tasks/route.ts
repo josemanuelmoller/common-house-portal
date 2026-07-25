@@ -2,10 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { resolveClientRoomProject } from "@/lib/client-room";
 import { can, logRoomEvent, resolveRoomActor, type RoomActor } from "@/lib/project-roles";
+import { buildPatch, fieldDiff, DATE_RE, UUID_RE } from "@/lib/room-patch";
 
 /**
  * CRUD de tareas de la sala, con permisos por rol (matriz) y event log.
  * - Mover en kanban (status) → task.move (cliente/lector: 403).
+ * - Editar campos → task.crud (mismo permiso que crear).
  * - Cerrar → task.mark_own (propia) o task.manage. Cierre por evidencia o atestiguación
  *   ("sin evidencia, no hay bloque": si no hay evidencia digital, la persona atestigua y es la evidencia).
  */
@@ -140,6 +142,52 @@ export async function PATCH(req: NextRequest, c: { params: Promise<{ projectId: 
       .eq("id", id).select("*").single();
     if (upErr) return NextResponse.json({ error: upErr.message }, { status: 502 });
     await logRoomEvent({ projectId: project.id, actor, verb: "reopened", targetType: "task", targetId: id, summary: `Reabrió "${current.title}"` });
+    return NextResponse.json({ ok: true, task: data });
+  }
+
+  // Editar campos — task.crud (mismo permiso que crear). Cliente/lector: 403.
+  if (action === "update") {
+    if (!can(actor.role, "task.crud")) return NextResponse.json({ error: "Tu rol no puede editar tareas" }, { status: 403 });
+
+    const built = buildPatch(body, [
+      { key: "title", col: "title", label: "Título", required: true },
+      { key: "ownerPersonId", col: "owner_person_id", label: "Responsable", check: (v) => UUID_RE.test(v) },
+      { key: "assigneeSide", col: "assignee_side", label: "Parte responsable", required: true, check: (v) => SIDES.has(v) },
+      { key: "deliverableId", col: "deliverable_id", label: "Entregable", check: (v) => UUID_RE.test(v) },
+      { key: "dependsOn", col: "depends_on", label: "Depende de", check: (v) => UUID_RE.test(v) },
+      { key: "startDate", col: "start_date", label: "Inicio", check: (v) => DATE_RE.test(v) },
+      { key: "dueDate", col: "due_date", label: "Fecha", check: (v) => DATE_RE.test(v) },
+    ]);
+    if (!built.ok) return NextResponse.json({ error: built.error }, { status: 400 });
+    if (built.touched.length === 0) return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
+
+    // Guarda de un salto: bloquea A→A y A→B cuando B ya depende de A. Cadenas
+    // más largas (A→B→C→A) todavía pasan; no hay recorrido de la cadena entera.
+    if (built.patch.depends_on) {
+      if (built.patch.depends_on === id) return NextResponse.json({ error: "Una tarea no puede depender de sí misma" }, { status: 400 });
+      const { data: dep } = await db.from("project_tasks").select("id, depends_on").eq("id", built.patch.depends_on).eq("project_id", project.id).maybeSingle();
+      if (!dep) return NextResponse.json({ error: "La dependencia no existe en esta sala" }, { status: 400 });
+      if (dep.depends_on === id) return NextResponse.json({ error: "Esa dependencia crearía un ciclo" }, { status: 400 });
+    }
+    // El entregable tiene que ser de esta sala (el id viene del cliente).
+    if (built.patch.deliverable_id) {
+      const { data: del } = await db.from("project_deliverables").select("id").eq("id", built.patch.deliverable_id).eq("project_id", project.id).maybeSingle();
+      if (!del) return NextResponse.json({ error: "El entregable no existe en esta sala" }, { status: 400 });
+    }
+
+    const diff = fieldDiff(current, built.patch);
+    if (Object.keys(diff).length === 0) return NextResponse.json({ ok: true, task: current, unchanged: true });
+
+    const { data, error: upErr } = await db.from("project_tasks")
+      .update({ ...built.patch, updated_at: new Date().toISOString() })
+      .eq("id", id).eq("project_id", project.id).select("*").single();
+    if (upErr) return NextResponse.json({ error: upErr.message }, { status: 502 });
+
+    await logRoomEvent({
+      projectId: project.id, actor, verb: "updated", targetType: "task", targetId: id,
+      summary: `Editó "${current.title}" (${Object.keys(diff).join(", ")})`,
+      payload: { changes: diff },
+    });
     return NextResponse.json({ ok: true, task: data });
   }
 

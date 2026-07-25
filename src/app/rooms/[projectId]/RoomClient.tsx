@@ -8,11 +8,12 @@ import type { SuggestedStructure } from "@/lib/room-structure";
 
 /* ── tipos (espejo de las tablas del Bloque 0) ── */
 type Phase = { id: string; title: string; status: string; position: number };
-type Deliverable = { id: string; title: string; status: string; progress: number; phase_id: string | null; owner_person_id: string | null; due_date: string | null; position: number };
-type Task = { id: string; title: string; status: string; assignee_side: string; deliverable_id: string | null; owner_person_id: string | null; closed_via: string | null; closed_by: string | null; due_date: string | null; position: number };
+type Deliverable = { id: string; title: string; description: string | null; status: string; progress: number; phase_id: string | null; owner_person_id: string | null; due_date: string | null; accepted_at: string | null; accepted_by: string | null; position: number };
+type Task = { id: string; title: string; status: string; assignee_side: string; deliverable_id: string | null; owner_person_id: string | null; closed_via: string | null; closed_by: string | null; evidence_ref: string | null; start_date: string | null; due_date: string | null; depends_on: string | null; position: number };
 type Participant = { initials?: string; name?: string; side?: string };
 type Decision = { id: string; title: string; context: string | null; status: string; deliverable_id: string | null; participants: Participant[] | null; source_ref: string | null; resolved_by: string | null };
 type Material = { id: string; title: string; url: string | null; mime_type: string | null; category: string | null; folder_name: string | null; modified_at: string | null };
+type DetailTarget = { kind: "task"; id: string } | { kind: "deliverable"; id: string } | null;
 type EventRow = { id: string; actor_email: string | null; actor_role: string | null; verb: string; target_type: string; summary: string | null; created_at: string };
 type RoomSummary = { id: string; name: string | null; slug: string | null; stage: string | null };
 type RoomProjectMeta = { orgName: string | null; orgLocation: string | null; orgWebsite: string | null; engagementModel: string | null; projectType: string | null; geography: string | null; startDate: string | null; targetEndDate: string | null; projectCode: string | null; driveUrl: string | null; presaleSlug: string | null; currentFocus: string | null; nextMilestone: string | null };
@@ -78,6 +79,8 @@ function pill(bg: string, fg: string): CSSProperties {
   return { fontSize: 10, fontWeight: 700, letterSpacing: ".3px", textTransform: "uppercase", padding: "2px 8px", borderRadius: 999, background: bg, color: fg, whiteSpace: "nowrap" };
 }
 const label: CSSProperties = { fontSize: 9, fontWeight: 700, letterSpacing: "1.5px", textTransform: "uppercase", color: C.muted };
+/* título de tarjeta que abre el detalle sin romper el arrastre del kanban */
+const cardTitleBtn: CSSProperties = { font: "inherit", color: "inherit", background: "transparent", border: 0, padding: 0, textAlign: "left", cursor: "pointer" };
 const linkChip: CSSProperties = { fontSize: 11, fontWeight: 700, color: C.muted2, background: C.paper, border: `1.5px solid ${C.line}`, borderRadius: 8, padding: "6px 11px", textDecoration: "none" };
 
 function statusTone(s: string): { bg: string; fg: string } {
@@ -157,6 +160,10 @@ export function RoomClient({ projectId, role, capabilities, personId, defaultLan
   const [toast, setToast] = useState<{ msg: string; undo?: () => void } | null>(null);
   const [expandedDeliv, setExpandedDeliv] = useState<string | null>(null);
   const [expandedDecision, setExpandedDecision] = useState<string | null>(() => initialDecisions.find((d) => d.status === "open")?.id ?? null);
+  const [materials, setMaterials] = useState<Material[]>(initialMaterials);
+  const [detail, setDetail] = useState<DetailTarget>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement | null>(null);
 
   /* shell: colapso (desktop, persistido) + drawer (mobile) */
   const [collapsed, setCollapsed] = useState(false);
@@ -203,9 +210,9 @@ export function RoomClient({ projectId, role, capabilities, personId, defaultLan
   /* Materiales agrupados por categoría (calco .matg de la maqueta) */
   const matGroups = useMemo(() => {
     const map = new Map<string, Material[]>();
-    initialMaterials.forEach((m) => { const c = m.category ?? "other"; if (!map.has(c)) map.set(c, []); map.get(c)!.push(m); });
+    materials.forEach((m) => { const c = m.category ?? "other"; if (!map.has(c)) map.set(c, []); map.get(c)!.push(m); });
     return [...map.entries()].map(([cat, items]) => ({ cat, label: cat === "other" ? (lang === "es" ? "Otros" : "Other") : tr("matcat." + cat, cat.replace(/_/g, " ")), items }));
-  }, [initialMaterials, tr, lang]);
+  }, [materials, tr, lang]);
 
   /* Tareas agrupadas por responsable; sin responsable, por entregable (calco .owner) */
   const taskGroups = useMemo(() => {
@@ -326,6 +333,37 @@ export function RoomClient({ projectId, role, capabilities, personId, defaultLan
       window.location.reload();
     } catch (e) { flash((e as Error).message); setApproving(false); }
   }
+  /* ── panel de detalle: guardar campos ── */
+  // Sólo se mandan las claves que cambiaron: la API trata "ausente" como
+  // "no tocar" y null como "limpiar", así que mandar el objeto entero borraría
+  // lo que el usuario nunca abrió.
+  async function saveTask(id: string, patch: Record<string, string | null>) {
+    const r = await api(`${base}/tasks`, "PATCH", { id, action: "update", ...patch });
+    setTasks((ts) => ts.map((t) => (t.id === id ? (r.task as Task) : t)));
+    flash(tr("toast.saved"));
+  }
+  async function saveDeliverable(id: string, patch: Record<string, string | number | null>) {
+    const r = await api(`${base}/deliverables`, "PATCH", { id, action: "update", ...patch });
+    setDeliverables((ds) => ds.map((d) => (d.id === id ? (r.deliverable as Deliverable) : d)));
+    flash(tr("toast.saved"));
+  }
+
+  /* ── materiales: subir ── */
+  async function uploadMaterial(file: File) {
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("title", file.name.replace(/\.[^.]+$/, ""));
+      const res = await fetch(`${base}/materials`, { method: "POST", body: fd, headers: { "x-csrf-portal": "1" } });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.error || `Error ${res.status}`);
+      setMaterials((ms) => [json.material as Material, ...ms]);
+      flash(tr("toast.uploaded"));
+    } catch (e) { flash((e as Error).message); }
+    finally { setUploading(false); }
+  }
+
   async function resolveSugg(id: string, action: "confirm" | "dismiss") {
     if (!can("suggestion.confirm")) return;
     const prev = suggs;
@@ -882,7 +920,10 @@ export function RoomClient({ projectId, role, capabilities, personId, defaultLan
                     return (
                       <div key={d.id} style={{ background: C.paper, border: `1.5px solid ${C.line}`, borderRadius: 14, padding: "15px 16px", display: "flex", flexDirection: "column", gap: 11 }}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
-                          <h4 style={{ fontSize: 14, fontWeight: 800, letterSpacing: "-.2px", lineHeight: 1.3, margin: 0 }}>{d.title}</h4>
+                          <h4 style={{ fontSize: 14, fontWeight: 800, letterSpacing: "-.2px", lineHeight: 1.3, margin: 0 }}>
+                            <button onClick={() => setDetail({ kind: "deliverable", id: d.id })} title={tr("detail.open")}
+                              style={{ font: "inherit", color: "inherit", background: "transparent", border: 0, padding: 0, textAlign: "left", cursor: "pointer" }}>{d.title}</button>
+                          </h4>
                           <span style={statusPill(d.status)}>{statusLabel(d.status)}</span>
                         </div>
                         <div style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11.5, color: C.muted }}>
@@ -920,7 +961,7 @@ export function RoomClient({ projectId, role, capabilities, personId, defaultLan
               ) : (
                 <Kanban cols={delivCols} items={deliverables} draggable={can("deliverable.move")}
                   onDrop={(id, to) => { const d = deliverables.find((x) => x.id === id); if (d && d.status !== to) moveDeliverable(id, to, d.status); }}
-                  renderCard={(d) => { const o = ownerOf(d.owner_person_id); return (<><div style={{ fontSize: 12, fontWeight: 700 }}>{d.title}</div><div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 7 }}>{o && <span style={{ width: 17, height: 17, borderRadius: 999, display: "grid", placeItems: "center", fontSize: 8, fontWeight: 700, color: "#fff", background: avColor(o.name) }}>{avInit(o.name)}</span>}<span style={label}>{d.progress}%</span></div></>); }} />
+                  renderCard={(d) => { const o = ownerOf(d.owner_person_id); return (<><div style={{ fontSize: 12, fontWeight: 700 }}><button onClick={() => setDetail({ kind: "deliverable", id: d.id })} title={tr("detail.open")} style={cardTitleBtn}>{d.title}</button></div><div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 7 }}>{o && <span style={{ width: 17, height: 17, borderRadius: 999, display: "grid", placeItems: "center", fontSize: 8, fontWeight: 700, color: "#fff", background: avColor(o.name) }}>{avInit(o.name)}</span>}<span style={label}>{d.progress}%</span></div></>); }} />
               )}
               {!can("deliverable.move") && dView === "kanban" && <Note text={tr("deliv.cantMove")} />}
             </Section>
@@ -948,7 +989,8 @@ export function RoomClient({ projectId, role, capabilities, personId, defaultLan
                             ? <button onClick={() => closeTask(t)} title={tr("btn.markDone")} style={{ width: 17, height: 17, borderRadius: 5, border: `1.5px solid #c4c4ba`, background: "transparent", cursor: "pointer", flex: "none", marginTop: 1 }} />
                             : <span style={{ width: 17, height: 17, borderRadius: 5, background: isDone ? C.lime : "transparent", border: `1.5px solid ${isDone ? C.lime : "#c4c4ba"}`, display: "grid", placeItems: "center", fontSize: 11, fontWeight: 900, color: "#0a0a0a", flex: "none", marginTop: 1 }}>{isDone ? "✓" : ""}</span>}
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <span style={{ fontSize: 12.5, color: isDone ? C.muted : C.ink, textDecoration: isDone ? "line-through" : "none" }}>{t.title}</span>
+                            <button onClick={() => setDetail({ kind: "task", id: t.id })} title={tr("detail.open")}
+                              style={{ font: "inherit", background: "transparent", border: 0, padding: 0, textAlign: "left", cursor: "pointer", fontSize: 12.5, color: isDone ? C.muted : C.ink, textDecoration: isDone ? "line-through" : "none" }}>{t.title}</button>
                             {t.closed_via && (
                               <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 9, fontWeight: 700, letterSpacing: ".6px", textTransform: "uppercase", marginTop: 4, flexWrap: "wrap", color: t.closed_via === "evidence" ? C.limeInk : C.muted }}>
                                 {t.closed_via === "evidence" ? "✓ " + tr("tasks.evidence") : "✍ " + tr("tasks.attested")}
@@ -967,7 +1009,7 @@ export function RoomClient({ projectId, role, capabilities, personId, defaultLan
               ) : (
                 <Kanban cols={taskCols} items={tasks} draggable={can("task.move")}
                   onDrop={(id, to) => { const t = tasks.find((x) => x.id === id); if (t && t.status !== to) moveTask(id, to, t.status); }}
-                  renderCard={(t) => { const o = ownerOf(t.owner_person_id); const td = fmtDay(t.due_date, lang); const late = t.status !== "done" && isPast(t.due_date); return (<><div style={{ fontSize: 12, fontWeight: 700 }}>{t.title}</div><div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 7 }}>{o && <span style={{ width: 17, height: 17, borderRadius: 999, display: "grid", placeItems: "center", fontSize: 8, fontWeight: 700, color: "#fff", background: avColor(o.name) }}>{avInit(o.name)}</span>}{t.assignee_side === "client" && !o && <span style={label}>{tr("tasks.client")}</span>}<span style={{ ...label, marginLeft: "auto", color: late ? "#b91c1c" : C.muted }}>{late ? (lang === "es" ? "vencida" : "overdue") : td}</span></div></>); }} />
+                  renderCard={(t) => { const o = ownerOf(t.owner_person_id); const td = fmtDay(t.due_date, lang); const late = t.status !== "done" && isPast(t.due_date); return (<><div style={{ fontSize: 12, fontWeight: 700 }}><button onClick={() => setDetail({ kind: "task", id: t.id })} title={tr("detail.open")} style={cardTitleBtn}>{t.title}</button></div><div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 7 }}>{o && <span style={{ width: 17, height: 17, borderRadius: 999, display: "grid", placeItems: "center", fontSize: 8, fontWeight: 700, color: "#fff", background: avColor(o.name) }}>{avInit(o.name)}</span>}{t.assignee_side === "client" && !o && <span style={label}>{tr("tasks.client")}</span>}<span style={{ ...label, marginLeft: "auto", color: late ? "#b91c1c" : C.muted }}>{late ? (lang === "es" ? "vencida" : "overdue") : td}</span></div></>); }} />
               )}
               {!can("task.move") && tView === "kanban" && <Note text={tr("tasks.cantMove")} />}
             </Section>
@@ -1028,12 +1070,23 @@ export function RoomClient({ projectId, role, capabilities, personId, defaultLan
             <div>
               <div style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 7 }}>
                 <h3 style={{ fontSize: 16, fontWeight: 800, margin: 0 }}>{tr("mat.title")}</h3>
-                <span style={{ fontSize: 11, color: C.muted, fontWeight: 600 }}>{initialMaterials.length} {lang === "es" ? "archivos · Google Drive" : "files · Google Drive"}</span>
+                <span style={{ fontSize: 11, color: C.muted, fontWeight: 600 }}>{materials.length} {lang === "es" ? "archivos" : "files"}</span>
                 <span style={{ flex: 1 }} />
-                {can("material.upload") && <button style={btn(C.paper, C.muted2, true)}>{lang === "es" ? "+ Subir" : "+ Upload"}</button>}
+                {can("material.upload") && (
+                  <>
+                    <input ref={fileRef} type="file" accept="application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation"
+                      style={{ display: "none" }}
+                      onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) uploadMaterial(f); }} />
+                    <button onClick={() => fileRef.current?.click()} disabled={uploading} style={{ ...btn(C.paper, C.muted2, true), opacity: uploading ? .55 : 1, cursor: uploading ? "default" : "pointer" }}>
+                      {uploading ? tr("mat.uploading") : (lang === "es" ? "+ Subir" : "+ Upload")}
+                    </button>
+                  </>
+                )}
               </div>
-              <p style={{ color: C.muted, fontSize: 13, maxWidth: "72ch", margin: "-2px 0 18px", lineHeight: 1.6 }}>{lang === "es" ? "Agrupados por área de trabajo, siempre en su versión más reciente desde Drive." : "Grouped by work area, always the latest version from Drive."}</p>
-              {initialMaterials.length === 0 && <Empty text={tr("mat.none")} />}
+              <p style={{ color: C.muted, fontSize: 13, maxWidth: "72ch", margin: "-2px 0 18px", lineHeight: 1.6 }}>
+                {lang === "es" ? "Agrupados por área de trabajo. Lo que subas aquí queda interno hasta que se marque visible para el cliente." : "Grouped by work area. What you upload stays internal until it's marked client-visible."}
+              </p>
+              {materials.length === 0 && <Empty text={tr("mat.none")} />}
               {matGroups.map((g) => (
                 <div key={g.cat} style={{ marginBottom: 18 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 10 }}>
@@ -1228,6 +1281,24 @@ export function RoomClient({ projectId, role, capabilities, personId, defaultLan
         </div>
       </main>
       </div>{/* /app enmarcada */}
+
+      {detail && (
+        <DetailPanel
+          target={detail}
+          tasks={tasks}
+          deliverables={deliverables}
+          phases={phases}
+          team={team}
+          lang={lang}
+          tr={tr}
+          canEditTask={can("task.crud")}
+          canEditDeliverableOps={can("deliverable.move")}
+          canEditDeliverableStructure={can("structure.edit")}
+          onClose={() => setDetail(null)}
+          onSaveTask={saveTask}
+          onSaveDeliverable={saveDeliverable}
+        />
+      )}
 
       {toast && (
         <div style={{ position: "fixed", left: "50%", bottom: 24, transform: "translateX(-50%)", display: "flex", alignItems: "center", gap: 14, background: C.ink, color: "#fff", padding: "10px 12px 10px 16px", borderRadius: 11, fontSize: 12.5, fontWeight: 600, boxShadow: "0 10px 30px rgba(0,0,0,.3)", zIndex: 100 }}>
@@ -1465,5 +1536,218 @@ function Avatar({ name, photoUrl, side }: { name: string; photoUrl: string | nul
   return <span style={{ width: 34, height: 34, borderRadius: 999, flexShrink: 0, background: side === "client" ? "#495057" : C.limeInk, color: "#fff", display: "grid", placeItems: "center", fontSize: 11, fontWeight: 700 }}>{init}</span>;
 }
 function Note({ text }: { text: string }) { return <div style={{ marginTop: 11, fontSize: 11, color: C.muted, fontWeight: 600 }}>{text}</div>; }
+
+/* ── panel de detalle (tarea / entregable) ─────────────────────────────── */
+
+const dpRow: CSSProperties = { marginBottom: 15 };
+const dpLabel: CSSProperties = { ...label, display: "block", marginBottom: 5 };
+const dpInput: CSSProperties = {
+  width: "100%", fontFamily: "inherit", fontSize: 13, color: C.ink, background: C.paper,
+  padding: "8px 10px", borderRadius: 8, border: `1.5px solid ${C.line}`, boxSizing: "border-box",
+};
+
+function DetailPanel({
+  target, tasks, deliverables, phases, team, lang, tr,
+  canEditTask, canEditDeliverableOps, canEditDeliverableStructure,
+  onClose, onSaveTask, onSaveDeliverable,
+}: {
+  target: NonNullable<DetailTarget>;
+  tasks: Task[];
+  deliverables: Deliverable[];
+  phases: Phase[];
+  team: RoomTeamMember[];
+  lang: Lang;
+  tr: TFn;
+  canEditTask: boolean;
+  canEditDeliverableOps: boolean;
+  canEditDeliverableStructure: boolean;
+  onClose: () => void;
+  onSaveTask: (id: string, patch: Record<string, string | null>) => Promise<void>;
+  onSaveDeliverable: (id: string, patch: Record<string, string | number | null>) => Promise<void>;
+}) {
+  const task = target.kind === "task" ? tasks.find((t) => t.id === target.id) ?? null : null;
+  const deliv = target.kind === "deliverable" ? deliverables.find((d) => d.id === target.id) ?? null : null;
+
+  // El borrador arranca del objeto guardado; cuando el padre lo reemplaza tras
+  // guardar, la identidad cambia y el efecto de abajo lo vuelve a sincronizar.
+  const initial = useMemo<Record<string, string>>((): Record<string, string> => {
+    if (task) return {
+      title: task.title,
+      assigneeSide: task.assignee_side,
+      ownerPersonId: task.owner_person_id ?? "",
+      deliverableId: task.deliverable_id ?? "",
+      dependsOn: task.depends_on ?? "",
+      startDate: task.start_date ?? "",
+      dueDate: task.due_date ?? "",
+    };
+    if (deliv) return {
+      title: deliv.title,
+      description: deliv.description ?? "",
+      phaseId: deliv.phase_id ?? "",
+      ownerPersonId: deliv.owner_person_id ?? "",
+      dueDate: deliv.due_date ?? "",
+      progress: String(deliv.progress ?? 0),
+    };
+    return {};
+  }, [task, deliv]);
+
+  const [draft, setDraft] = useState<Record<string, string>>(initial);
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  useEffect(() => { setDraft(initial); setErr(null); }, [initial]);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const changed = Object.keys(draft).filter((k) => draft[k] !== initial[k]);
+  const editable = task ? canEditTask : canEditDeliverableStructure || canEditDeliverableOps;
+  const set = (k: string, v: string) => setDraft((d) => ({ ...d, [k]: v }));
+
+  async function save() {
+    if (!changed.length) { onClose(); return; }
+    setSaving(true); setErr(null);
+    try {
+      if (task) {
+        const patch: Record<string, string | null> = {};
+        changed.forEach((k) => { patch[k] = draft[k] === "" ? null : draft[k]; });
+        await onSaveTask(task.id, patch);
+      } else if (deliv) {
+        const patch: Record<string, string | number | null> = {};
+        changed.forEach((k) => { patch[k] = k === "progress" ? Number(draft[k]) : (draft[k] === "" ? null : draft[k]); });
+        await onSaveDeliverable(deliv.id, patch);
+      }
+      onClose();
+    } catch (e) { setErr((e as Error).message); }
+    finally { setSaving(false); }
+  }
+
+  const kindLabel = task ? tr("detail.task") : tr("detail.deliverable");
+
+  return (
+    <>
+      <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.32)", zIndex: 110 }} />
+      <aside role="dialog" aria-modal="true" aria-label={kindLabel}
+        style={{ position: "fixed", top: 0, right: 0, height: "100vh", width: "min(460px,100vw)", background: C.paper, borderLeft: `1.5px solid ${C.line}`, zIndex: 111, display: "flex", flexDirection: "column", boxShadow: "-14px 0 44px rgba(0,0,0,.16)" }}>
+        <header style={{ display: "flex", alignItems: "center", gap: 10, padding: "16px 18px", borderBottom: `1px solid ${C.line}` }}>
+          <span style={label}>{kindLabel}</span>
+          <span style={{ flex: 1 }} />
+          <button onClick={onClose} aria-label={tr("detail.close")} style={{ background: "transparent", border: 0, fontSize: 19, lineHeight: 1, cursor: "pointer", color: C.muted }}>×</button>
+        </header>
+
+        <div style={{ flex: 1, overflowY: "auto", padding: "18px" }}>
+          {!task && !deliv && <Empty text={tr("detail.gone")} />}
+
+          {task && (
+            <>
+              <div style={dpRow}>
+                <label style={dpLabel} htmlFor="dp-title">{tr("field.title")}</label>
+                <input id="dp-title" style={dpInput} value={draft.title ?? ""} disabled={!canEditTask} onChange={(e) => set("title", e.target.value)} />
+              </div>
+              <div style={dpRow}>
+                <label style={dpLabel} htmlFor="dp-side">{tr("field.side")}</label>
+                <select id="dp-side" style={dpInput} value={draft.assigneeSide ?? "team"} disabled={!canEditTask} onChange={(e) => set("assigneeSide", e.target.value)}>
+                  <option value="team">{tr("side.team")}</option>
+                  <option value="client">{tr("side.client")}</option>
+                </select>
+              </div>
+              <div style={dpRow}>
+                <label style={dpLabel} htmlFor="dp-owner">{tr("field.owner")}</label>
+                <select id="dp-owner" style={dpInput} value={draft.ownerPersonId ?? ""} disabled={!canEditTask} onChange={(e) => set("ownerPersonId", e.target.value)}>
+                  <option value="">{tr("detail.unassigned")}</option>
+                  {team.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                </select>
+              </div>
+              <div style={dpRow}>
+                <label style={dpLabel} htmlFor="dp-deliv">{tr("field.deliverable")}</label>
+                <select id="dp-deliv" style={dpInput} value={draft.deliverableId ?? ""} disabled={!canEditTask} onChange={(e) => set("deliverableId", e.target.value)}>
+                  <option value="">{tr("detail.none")}</option>
+                  {deliverables.map((d) => <option key={d.id} value={d.id}>{d.title}</option>)}
+                </select>
+              </div>
+              <div style={dpRow}>
+                <label style={dpLabel} htmlFor="dp-dep">{tr("field.dependsOn")}</label>
+                <select id="dp-dep" style={dpInput} value={draft.dependsOn ?? ""} disabled={!canEditTask} onChange={(e) => set("dependsOn", e.target.value)}>
+                  <option value="">{tr("detail.none")}</option>
+                  {tasks.filter((t) => t.id !== task.id).map((t) => <option key={t.id} value={t.id}>{t.title}</option>)}
+                </select>
+              </div>
+              <div style={{ display: "flex", gap: 12 }}>
+                <div style={{ ...dpRow, flex: 1 }}>
+                  <label style={dpLabel} htmlFor="dp-start">{tr("field.start")}</label>
+                  <input id="dp-start" type="date" style={dpInput} value={draft.startDate ?? ""} disabled={!canEditTask} onChange={(e) => set("startDate", e.target.value)} />
+                </div>
+                <div style={{ ...dpRow, flex: 1 }}>
+                  <label style={dpLabel} htmlFor="dp-due">{tr("field.due")}</label>
+                  <input id="dp-due" type="date" style={dpInput} value={draft.dueDate ?? ""} disabled={!canEditTask} onChange={(e) => set("dueDate", e.target.value)} />
+                </div>
+              </div>
+              <div style={{ borderTop: `1px solid ${C.lineSoft}`, paddingTop: 14, display: "grid", gap: 10 }}>
+                <Field k={tr("field.state")} v={tr("ts." + task.status, task.status)} />
+                <Field k={tr("field.closure")} v={task.closed_via ? `${task.closed_via === "evidence" ? tr("tasks.evidence") : tr("tasks.attested")}${task.closed_by ? " · " + task.closed_by : ""}` : null} />
+                <Field k={tr("field.evidence")} v={task.evidence_ref} />
+              </div>
+            </>
+          )}
+
+          {deliv && (
+            <>
+              <div style={dpRow}>
+                <label style={dpLabel} htmlFor="dp-dtitle">{tr("field.title")}</label>
+                <input id="dp-dtitle" style={dpInput} value={draft.title ?? ""} disabled={!canEditDeliverableStructure} onChange={(e) => set("title", e.target.value)} />
+              </div>
+              <div style={dpRow}>
+                <label style={dpLabel} htmlFor="dp-desc">{tr("field.description")}</label>
+                <textarea id="dp-desc" rows={4} style={{ ...dpInput, resize: "vertical", lineHeight: 1.5 }} value={draft.description ?? ""} disabled={!canEditDeliverableStructure} onChange={(e) => set("description", e.target.value)} />
+              </div>
+              <div style={dpRow}>
+                <label style={dpLabel} htmlFor="dp-phase">{tr("field.phase")}</label>
+                <select id="dp-phase" style={dpInput} value={draft.phaseId ?? ""} disabled={!canEditDeliverableStructure} onChange={(e) => set("phaseId", e.target.value)}>
+                  <option value="">{tr("detail.noPhase")}</option>
+                  {phases.map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
+                </select>
+              </div>
+              <div style={dpRow}>
+                <label style={dpLabel} htmlFor="dp-downer">{tr("field.owner")}</label>
+                <select id="dp-downer" style={dpInput} value={draft.ownerPersonId ?? ""} disabled={!canEditDeliverableOps} onChange={(e) => set("ownerPersonId", e.target.value)}>
+                  <option value="">{tr("detail.unassigned")}</option>
+                  {team.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                </select>
+              </div>
+              <div style={{ display: "flex", gap: 12 }}>
+                <div style={{ ...dpRow, flex: 1 }}>
+                  <label style={dpLabel} htmlFor="dp-ddue">{tr("field.due")}</label>
+                  <input id="dp-ddue" type="date" style={dpInput} value={draft.dueDate ?? ""} disabled={!canEditDeliverableOps} onChange={(e) => set("dueDate", e.target.value)} />
+                </div>
+                <div style={{ ...dpRow, flex: 1 }}>
+                  <label style={dpLabel} htmlFor="dp-prog">{tr("field.progress")} · {draft.progress ?? 0}%</label>
+                  <input id="dp-prog" type="range" min={0} max={100} step={5} style={{ width: "100%", accentColor: C.limeInk }} value={Number(draft.progress ?? 0)} disabled={!canEditDeliverableOps} onChange={(e) => set("progress", e.target.value)} />
+                </div>
+              </div>
+              <div style={{ borderTop: `1px solid ${C.lineSoft}`, paddingTop: 14, display: "grid", gap: 10 }}>
+                <Field k={tr("field.state")} v={tr("ds." + deliv.status, deliv.status)} />
+                <Field k={tr("field.acceptedBy")} v={deliv.accepted_by ? `${deliv.accepted_by}${deliv.accepted_at ? " · " + fmtDay(deliv.accepted_at, lang) : ""}` : null} />
+              </div>
+            </>
+          )}
+        </div>
+
+        <footer style={{ borderTop: `1px solid ${C.line}`, padding: "13px 18px", display: "flex", alignItems: "center", gap: 10 }}>
+          {err && <span style={{ fontSize: 11.5, color: "#b91c1c", fontWeight: 600, flex: 1 }}>{err}</span>}
+          {!err && !editable && <span style={{ fontSize: 11, color: C.muted, fontWeight: 600, flex: 1 }}>{tr("detail.readonly")}</span>}
+          {!err && editable && <span style={{ flex: 1 }} />}
+          <button onClick={onClose} style={btn(C.paper, C.muted2, true)}>{tr("detail.cancel")}</button>
+          {editable && (
+            <button onClick={save} disabled={saving || changed.length === 0}
+              style={{ ...btn(C.lime, "#0a0a0a"), opacity: saving || changed.length === 0 ? .45 : 1, cursor: saving || changed.length === 0 ? "default" : "pointer" }}>
+              {tr("detail.save")}
+            </button>
+          )}
+        </footer>
+      </aside>
+    </>
+  );
+}
 function card(): CSSProperties { return { background: C.paper, border: `1.5px solid ${C.line}`, borderRadius: 12, padding: 15, display: "flex", flexDirection: "column", gap: 10 }; }
 function btn(bg: string, fg: string, bordered?: boolean): CSSProperties { return { fontFamily: "inherit", fontSize: 11, fontWeight: 800, letterSpacing: ".3px", textTransform: "uppercase", padding: "7px 13px", borderRadius: 8, border: bordered ? `1.5px solid ${C.line}` : "none", background: bg, color: fg, cursor: "pointer" }; }
