@@ -11,7 +11,7 @@ export type Lang = "es" | "en";
 const ES: Record<string, string> = {
   // chrome
   "chrome.workRoom": "Sala de trabajo", "chrome.rooms": "Salas", "chrome.yourRole": "Tu rol en esta sala",
-  "chrome.collapse": "Colapsar", "chrome.expand": "Expandir", "chrome.openNav": "Abrir navegación", "chrome.room": "Sala", "chrome.myDesk": "Mi escritorio",
+  "chrome.collapse": "Colapsar", "chrome.expand": "Expandir", "chrome.openNav": "Abrir navegación", "chrome.room": "Sala", "chrome.myDesk": "Mi escritorio", "chrome.viewAs": "Ver como",
   // nav
   "nav.mio": "Lo mío", "nav.resumen": "Resumen", "nav.plan": "Plan", "nav.entregables": "Entregables",
   "nav.tareas": "Tareas", "nav.decisiones": "Decisiones", "nav.materiales": "Materiales", "nav.reuniones": "Reuniones", "nav.proyecto": "Proyecto", "nav.actividad": "Actividad",
@@ -65,9 +65,9 @@ const ES: Record<string, string> = {
   // toasts
   "toast.accepted": "Entregable aceptado", "toast.acceptUndone": "Aceptación deshecha",
   "toast.taskClosed": "Tarea cerrada · atestiguada por ti", "toast.taskReopened": "Tarea reabierta",
-  "toast.decisionResolved": "Decisión resuelta", "toast.decisionReopened": "Decisión reabierta",
+  "toast.decisionResolved": "Decisión resuelta", "toast.decisionReopened": "Decisión reabierta", "toast.suggConfirmed": "Sugerencia confirmada",
   // prompts
-  "prompt.newDeliverable": "Nuevo entregable:", "prompt.newTask": "Nueva tarea:", "prompt.newDecision": "Nueva decisión:",
+  "prompt.newDeliverable": "Nuevo entregable:", "prompt.newTask": "Nueva tarea:", "prompt.newDecision": "Nueva decisión:", "prompt.newPhase": "Nueva fase:",
   // empty-state (sala recién abierta)
   "empty.title": "Arranquemos la sala", "empty.lead": "La sala no parte de cero: hereda lo de la preventa.",
   "empty.inheritedTitle": "Heredado de la preventa", "empty.withAccess": "con acceso",
@@ -81,7 +81,7 @@ const ES: Record<string, string> = {
 
 const EN: Record<string, string> = {
   "chrome.workRoom": "Work room", "chrome.rooms": "Rooms", "chrome.yourRole": "Your role in this room",
-  "chrome.collapse": "Collapse", "chrome.expand": "Expand", "chrome.openNav": "Open navigation", "chrome.room": "Room", "chrome.myDesk": "My desk",
+  "chrome.collapse": "Collapse", "chrome.expand": "Expand", "chrome.openNav": "Open navigation", "chrome.room": "Room", "chrome.myDesk": "My desk", "chrome.viewAs": "View as",
   "nav.mio": "My work", "nav.resumen": "Overview", "nav.plan": "Plan", "nav.entregables": "Deliverables",
   "nav.tareas": "Tasks", "nav.decisiones": "Decisions", "nav.materiales": "Materials", "nav.reuniones": "Meetings", "nav.proyecto": "Project", "nav.actividad": "Activity",
   "meet.desc": "Every project meeting is processed and lands here automatically.", "meet.none": "No meetings recorded yet.",
@@ -120,8 +120,8 @@ const EN: Record<string, string> = {
   "side.team": "Team", "side.client": "Client",
   "toast.accepted": "Deliverable accepted", "toast.acceptUndone": "Acceptance undone",
   "toast.taskClosed": "Task closed · attested by you", "toast.taskReopened": "Task reopened",
-  "toast.decisionResolved": "Decision resolved", "toast.decisionReopened": "Decision reopened",
-  "prompt.newDeliverable": "New deliverable:", "prompt.newTask": "New task:", "prompt.newDecision": "New decision:",
+  "toast.decisionResolved": "Decision resolved", "toast.decisionReopened": "Decision reopened", "toast.suggConfirmed": "Suggestion confirmed",
+  "prompt.newDeliverable": "New deliverable:", "prompt.newTask": "New task:", "prompt.newDecision": "New decision:", "prompt.newPhase": "New phase:",
   "empty.title": "Let's start the room", "empty.lead": "The room doesn't start from scratch — it inherits from pre-sale.",
   "empty.inheritedTitle": "Inherited from pre-sale", "empty.withAccess": "with access",
   "empty.drive": "Drive folder linked", "empty.presale": "Pre-sale room",
