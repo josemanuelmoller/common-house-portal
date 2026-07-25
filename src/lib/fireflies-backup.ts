@@ -722,3 +722,126 @@ export async function resolveFlag(id: string, resolution: string, status: "resol
   const sb = getSupabaseServerClient();
   await sb.from("fireflies_backup_flags").update({ status, resolution, resolved_at: new Date().toISOString() }).eq("id", id);
 }
+
+// ─── Title linking (externally-recorded meetings → calendar) ──────────────────
+// When Fireflies isn't admitted to a call, it still records "outside" but with a
+// generic auto-title ("Jul 24, 02:01 PM", "Meet – dpp-jouq-fof"). Those are real
+// scheduled meetings — match them to the calendar by START TIME (±25min) +
+// approx duration; a specific time slot has ~one meeting, so a unique hit is
+// high-confidence. Then relabel the Fireflies title to the calendar title.
+
+const GENERIC_TITLE = [
+  /^[A-Za-z]{3,4}\.?\s+\d{1,2},?\s+\d{1,2}:\d{2}/,                 // "Jul 24, 02:01 PM"
+  /meet\s*[–-]\s*[a-z]{3,4}-[a-z]{3,4}(-[a-z]{3,4})?\b/i,     // "Meet – dpp-jouq-fof"
+  /meet\s*[–-]\s*[\w-]+\.[a-z]{2,}/i,                          // "Meet – FB - Wearecommonhouse.com"
+  /^[a-z]{3,4}-[a-z]{3,4}-[a-z]{3,4}$/i,                            // bare meet code
+];
+export function isGenericTitle(t: string | null | undefined): boolean {
+  const s = (t ?? "").trim();
+  if (!s) return true;
+  return GENERIC_TITLE.some((re) => re.test(s));
+}
+
+export interface TitleLink {
+  id: string;
+  old_title: string | null;
+  new_title: string;
+  start_diff_min: number;
+  dur_diff_min: number;
+}
+export interface AmbiguousLink {
+  id: string;
+  old_title: string | null;
+  candidates: { title: string; start_diff_min: number; dur_diff_min: number }[];
+}
+export interface TitleLinkResult {
+  window_days: number;
+  scanned_generic: number;
+  high: TitleLink[];
+  ambiguous: AmbiguousLink[];
+}
+
+async function ffUpdateTitle(id: string, title: string): Promise<void> {
+  const q = `mutation Up($input: UpdateMeetingTitleInput!) { updateMeetingTitle(input: $input) { title } }`;
+  await ffQuery(q, { input: { id, title } });
+}
+
+/** Propose calendar titles for generic-titled (externally-recorded) meetings. */
+export async function computeTitleLinks(days = 120): Promise<TitleLinkResult> {
+  const now = Date.now();
+  const fromIso = new Date(now - days * 86_400_000).toISOString();
+  const toIso = new Date(now).toISOString();
+
+  const sb = getSupabaseServerClient();
+  const [ff, calRes] = await Promise.all([
+    listFirefliesMeetings(fromIso, toIso),
+    sb
+      .from("hall_calendar_events")
+      .select("event_title, event_start, event_end, is_cancelled")
+      .gte("event_start", fromIso)
+      .lte("event_start", toIso),
+  ]);
+
+  const cal = ((calRes.data ?? []) as {
+    event_title: string | null; event_start: string; event_end: string | null; is_cancelled: boolean | null;
+  }[])
+    .filter((c) => !c.is_cancelled && c.event_title && !/^meet\s*[–-]/i.test(c.event_title.trim()) && !isGenericTitle(c.event_title))
+    .map((c) => ({
+      title: c.event_title as string,
+      startMs: new Date(c.event_start).getTime(),
+      durMin: c.event_end ? (new Date(c.event_end).getTime() - new Date(c.event_start).getTime()) / 60_000 : 0,
+    }));
+
+  const START_WIN = 25 * 60_000;
+  const result: TitleLinkResult = { window_days: days, scanned_generic: 0, high: [], ambiguous: [] };
+
+  for (const m of ff) {
+    if (!isGenericTitle(m.title)) continue;
+    result.scanned_generic++;
+    const ms = m.date ? Number(m.date) : 0;
+    const dur = m.duration ?? 0;
+    const cands = cal
+      .filter((c) => Math.abs(c.startMs - ms) <= START_WIN && Math.abs(dur - c.durMin) <= Math.max(15, 0.4 * c.durMin))
+      .map((c) => ({ title: c.title, start_diff_min: Math.round(Math.abs(c.startMs - ms) / 60_000), dur_diff_min: Math.round(Math.abs(dur - c.durMin)) }))
+      .sort((a, b) => a.start_diff_min - b.start_diff_min);
+
+    if (cands.length === 0) continue;
+    const best = cands[0];
+    // Unique, or clearly the closest by start time → high confidence.
+    const clear = cands.length === 1 || (best.start_diff_min <= 8 && cands[1].start_diff_min - best.start_diff_min >= 12);
+    if (clear) {
+      result.high.push({ id: m.id, old_title: m.title, new_title: best.title, start_diff_min: best.start_diff_min, dur_diff_min: best.dur_diff_min });
+    } else {
+      result.ambiguous.push({ id: m.id, old_title: m.title, candidates: cands.slice(0, 4) });
+    }
+  }
+  return result;
+}
+
+export interface ApplyLinksResult {
+  applied: { id: string; new_title: string }[];
+  errors: string[];
+  rate_capped: boolean;
+}
+
+/** Apply approved title relabels to Fireflies + mirror into manifest/sources. */
+export async function applyTitleLinks(items: { id: string; title: string }[]): Promise<ApplyLinksResult> {
+  const sb = getSupabaseServerClient();
+  const res: ApplyLinksResult = { applied: [], errors: [], rate_capped: false };
+  const CAP = 15;
+  for (const it of items.slice(0, CAP)) {
+    if (!it.id || !it.title) continue;
+    try {
+      await ffUpdateTitle(it.id, it.title);
+      await sb.from("meeting_backups").update({ title: it.title, updated_at: new Date().toISOString() }).eq("fireflies_id", it.id);
+      await sb.from("sources").update({ title: it.title, updated_at: new Date().toISOString() }).eq("source_external_id", it.id);
+      res.applied.push({ id: it.id, new_title: it.title });
+    } catch (e) {
+      const fe = e as FirefliesError;
+      if (fe.rateLimited) { res.rate_capped = true; break; }
+      res.errors.push(`${it.id}: ${fe.message}`);
+    }
+  }
+  if (items.length > CAP) res.rate_capped = true;
+  return res;
+}
