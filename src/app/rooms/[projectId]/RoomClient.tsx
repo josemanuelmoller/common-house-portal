@@ -184,12 +184,15 @@ export function RoomClient({ projectId, role, capabilities, personId, defaultLan
   /* evidencia por reunión (source_id → items) para el detalle expandible */
   const [expandedMeeting, setExpandedMeeting] = useState<string | null>(null);
   const [showAllMeetings, setShowAllMeetings] = useState(false);
+  const [showAllSuggestions, setShowAllSuggestions] = useState(false);
   const totalMeetingMinutes = useMemo(() => meetings.reduce((a, m) => a + (m.durationMinutes ?? 0), 0), [meetings]);
   const evidenceByMeeting = useMemo(() => {
     const m = new Map<string, EvidenceItem[]>();
     evidence.forEach((e) => { if (!m.has(e.sourceId)) m.set(e.sourceId, []); m.get(e.sourceId)!.push(e); });
     return m;
   }, [evidence]);
+  const curatedSuggestions = useMemo(() => dedupeSuggestions(suggs), [suggs]);
+  const visibleSuggestions = showAllSuggestions ? curatedSuggestions : curatedSuggestions.slice(0, 5);
 
   /* resolución de responsable (owner_person_id → miembro del equipo) para avatares */
   const memberById = useMemo(() => { const m = new Map<string, RoomTeamMember>(); team.forEach((x) => m.set(x.id, x)); return m; }, [team]);
@@ -642,7 +645,7 @@ export function RoomClient({ projectId, role, capabilities, personId, defaultLan
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 11, marginTop: 20 }}>
                 <Stat l={tr("stat.avance")} v={`${stats.avance}%`} lime animate={{ to: stats.avance, suffix: "%" }} />
                 <Stat l={tr("stat.entregables")} v={`${stats.dDone}/${stats.dTot}`} />
-                <Stat l={lang === "es" ? "Próximo hito" : "Next milestone"} v={upcoming.length ? `${upcoming[0].due.slice(5)} · ${upcoming[0].title.length > 15 ? upcoming[0].title.slice(0, 15) + "…" : upcoming[0].title}` : (meta.nextMilestone ?? "—")} sm />
+                <Stat l={lang === "es" ? "Próximo hito" : "Next milestone"} v={upcoming.length ? `${fmtDay(upcoming[0].due, lang)} · ${upcoming[0].title}` : (meta.nextMilestone ?? "—")} sm />
                 <Stat l={lang === "es" ? "Decisión pendiente" : "Pending decision"} v={String(openDecisions)} warn={openDecisions > 0} />
               </div>
               {/* inbox — la IA propone (gate) */}
@@ -657,7 +660,7 @@ export function RoomClient({ projectId, role, capabilities, personId, defaultLan
                     <span style={{ flex: 1 }} />
                     <span style={label}>{suggs.length}</span>
                   </div>
-                  {suggs.map((s) => {
+                  {visibleSuggestions.map((s) => {
                     const k = suggLabel(s.item_type, lang);
                     return (
                       <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 16px", borderTop: `1px solid ${C.lineSoft}` }}>
@@ -672,6 +675,16 @@ export function RoomClient({ projectId, role, capabilities, personId, defaultLan
                       </div>
                     );
                   })}
+                  {curatedSuggestions.length > 5 && (
+                    <div style={{ padding: "10px 16px", borderTop: `1px solid ${C.lineSoft}`, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                      <button onClick={() => setShowAllSuggestions((v) => !v)} style={{ ...btn(C.paper, C.muted2, true), fontSize: 10 }}>
+                        {showAllSuggestions
+                          ? (lang === "es" ? "Ver menos" : "Show less")
+                          : `${lang === "es" ? "Ver todas" : "Show all"} (${curatedSuggestions.length})`}
+                      </button>
+                      {!showAllSuggestions && <span style={{ fontSize: 10.5, color: C.muted }}>{lang === "es" ? "Mostrando las 5 propuestas más recientes y sin duplicados." : "Showing the 5 most recent, non-duplicate proposals."}</span>}
+                    </div>
+                  )}
                 </div>
               )}
               {/* reuniones */}
@@ -1270,12 +1283,55 @@ function isPast(iso: string | null): boolean {
   return !isNaN(d.getTime()) && d.getTime() < Date.now();
 }
 
+const SUGGESTION_STOP_WORDS = new Set([
+  "a", "an", "and", "are", "as", "at", "be", "by", "for", "from", "has", "in", "is", "of", "on", "or", "the", "to", "with",
+  "de", "del", "el", "en", "la", "las", "los", "para", "por", "que", "se", "un", "una", "y",
+  "blocker", "decision", "dependency", "milestone", "outcome", "project", "state", "status", "suggestion", "update",
+]);
+
+function suggestionTokens(s: Suggestion): Set<string> {
+  const text = `${s.summary ?? ""} ${s.rationale ?? ""}`
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ");
+  const aliases: Record<string, string> = {
+    arrived: "arrival", arrives: "arrival", arriving: "arrival", delivery: "arrival",
+    delayed: "delay", delays: "delay", shifted: "delay",
+    approvals: "approval", approved: "approval",
+    locations: "location", stores: "location", tiendas: "location",
+    regulations: "regulation", regulatory: "regulation",
+  };
+  return new Set(text.split(/\s+/).filter((w) => w.length > 2 && !SUGGESTION_STOP_WORDS.has(w)).map((w) => aliases[w] ?? w));
+}
+
+function suggestionsOverlap(a: Suggestion, b: Suggestion): boolean {
+  const kind = (s: Suggestion) => {
+    const value = (s.item_type ?? "").toLowerCase();
+    if (value.includes("decision")) return "decision";
+    if (value.includes("status") || value.includes("state")) return "state";
+    if (value.includes("task")) return "task";
+    return "suggestion";
+  };
+  if (kind(a) !== kind(b)) return false;
+  const aa = suggestionTokens(a), bb = suggestionTokens(b);
+  if (!aa.size || !bb.size) return false;
+  let shared = 0;
+  aa.forEach((token) => { if (bb.has(token)) shared += 1; });
+  const union = aa.size + bb.size - shared;
+  const containment = shared / Math.min(aa.size, bb.size);
+  return shared >= 3 && (shared / union >= 0.42 || containment >= 0.6);
+}
+
+function dedupeSuggestions(items: Suggestion[]): Suggestion[] {
+  const newestFirst = [...items].sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
+  return newestFirst.filter((candidate, index) => !newestFirst.slice(0, index).some((kept) => suggestionsOverlap(candidate, kept)));
+}
+
 /* ── sub-componentes ── */
 function Stat({ l, v, lime, warn, sm, animate }: { l: string; v: string; lime?: boolean; warn?: boolean; sm?: boolean; animate?: { to: number; suffix?: string } }) {
   return (
     <div style={{ background: C.paper, border: `1.5px solid ${C.line}`, borderRadius: 12, padding: "15px 16px" }}>
       <div style={label}>{l}</div>
-      <div style={{ fontSize: sm ? "1.05rem" : "1.5rem", fontWeight: 900, letterSpacing: sm ? "-.3px" : "-1px", marginTop: 8, color: lime ? C.limeInk : warn ? C.warn : C.ink, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+      <div style={{ fontSize: sm ? "1.05rem" : "1.5rem", fontWeight: 900, letterSpacing: sm ? "-.3px" : "-1px", marginTop: 8, color: lime ? C.limeInk : warn ? C.warn : C.ink, whiteSpace: sm ? "normal" : "nowrap", overflow: sm ? "visible" : "hidden", textOverflow: "ellipsis", lineHeight: sm ? 1.25 : undefined }}>
         {animate ? <AnimatedNumber to={animate.to} suffix={animate.suffix} /> : v}
       </div>
     </div>
