@@ -3,7 +3,7 @@ import { currentUser } from "@clerk/nextjs/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { resolveClientRoomProject } from "@/lib/client-room";
 import { capabilitiesFor, listRoomsForActor, resolveRoomActor } from "@/lib/project-roles";
-import { loadRoomContext, loadRoomMeetings } from "@/lib/room-context";
+import { loadRoomContext, loadRoomEvidence, loadRoomMeetings } from "@/lib/room-context";
 import { suggestRoomStructure } from "@/lib/room-structure";
 import { RoomClient } from "./RoomClient";
 
@@ -33,7 +33,7 @@ export default async function RoomPage({ params }: { params: Promise<{ projectId
     db.from("project_deliverables").select("*").eq("project_id", project.id).order("position", { ascending: true }),
     db.from("project_tasks").select("*").eq("project_id", project.id).order("position", { ascending: true }),
     db.from("project_decisions").select("*").eq("project_id", project.id).order("position", { ascending: true }),
-    db.from("project_materials").select("id, title, url, mime_type, category, folder_name, modified_at").eq("project_id", project.id).order("modified_at", { ascending: false }),
+    db.from("project_materials").select("id, title, url, mime_type, category, folder_name, modified_at, visibility").eq("project_id", project.id).order("modified_at", { ascending: false }),
   ]);
 
   // Actividad (event log) solo para PM.
@@ -43,15 +43,22 @@ export default async function RoomPage({ params }: { params: Promise<{ projectId
     const ev = await db.from("project_events").select("id, actor_email, actor_role, verb, target_type, summary, created_at").eq("project_id", project.id).order("created_at", { ascending: false }).limit(60);
     events = (ev.data ?? []) as Ev[];
   }
+  // Visibilidad gateada: los materiales internos (contratos, propuestas, docs de
+  // trabajo del equipo) solo los ve quien tiene internal.view. Cliente y lector
+  // ven únicamente lo marcado como visible para cliente — mismo criterio que la
+  // sala de preventa (loadMaterials en @/lib/client-room).
+  const canSeeInternal = caps.includes("internal.view");
+  const visibleMats = (materials.data ?? []).filter((m) => canSeeInternal || m.visibility === "client");
   // Descarga gateada: al que no puede, se le omite la url.
   const canDownload = caps.includes("material.download");
-  const mats = (materials.data ?? []).map((m) => (canDownload ? m : { ...m, url: null }));
+  const mats = visibleMats.map((m) => (canDownload ? m : { ...m, url: null }));
 
   // Salas del usuario (acordeón) + contexto de "Proyecto" + reuniones + sugerencias pendientes.
-  const [rooms, context, meetings, suggRes] = await Promise.all([
+  const [rooms, context, meetings, evidence, suggRes] = await Promise.all([
     listRoomsForActor(actor),
     loadRoomContext(project.id, actor, caps),
     loadRoomMeetings((proj.data?.notion_id as string | null) ?? null, caps.includes("internal.view")),
+    caps.includes("internal.view") ? loadRoomEvidence((proj.data?.notion_id as string | null) ?? null) : Promise.resolve([]),
     caps.includes("suggestion.view")
       ? db.from("project_state_proposals").select("id, proposal_kind, item_type, summary, rationale, source_refs, created_at").eq("project_id", project.id).eq("status", "pending").order("created_at", { ascending: false }).limit(20)
       : Promise.resolve({ data: [] }),
@@ -79,6 +86,7 @@ export default async function RoomPage({ params }: { params: Promise<{ projectId
       team={context.team}
       billing={context.billing}
       meetings={meetings}
+      evidence={evidence}
       suggestions={suggestions}
       heroNote={(proj.data?.hall_welcome_note as string | null) ?? null}
       initialPhases={phases.data ?? []}
