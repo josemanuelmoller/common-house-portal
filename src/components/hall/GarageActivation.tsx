@@ -21,7 +21,7 @@ interface GarageActivationProps {
  * the client can always stay in The Hall for context and narrative.
  * The Garage is for execution. The Hall is for orientation.
  *
- * Mirrors WorkspaceActivation (Hall → Workroom) but with Garage framing.
+ * Same shape as the (now removed) Hall → Workroom block, Garage framing.
  */
 export function GarageActivation({ project: _project, lastSession }: GarageActivationProps) {
   return (

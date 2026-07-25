@@ -24,7 +24,7 @@ export default async function ClientRoomAdminPage({ params }: { params: Promise<
   await requireAdmin();
   const { id } = await params;
   const room = await getClientRoomAdminData(id);
-  if (!room) redirect("/admin/workrooms");
+  if (!room) redirect("/admin/projects");
   const readiness = await getOnboardingReadiness(id);
   const readyCount = readiness ? readiness.checks.filter((c) => c.ok).length : 0;
   const readyTotal = readiness ? readiness.checks.length : 0;
@@ -36,8 +36,8 @@ export default async function ClientRoomAdminPage({ params }: { params: Promise<
       title={room.name}
       period={false}
       subtitle="Control exactly what the client can see, respond to and approve. Drive files stay internal until you explicitly share them."
-      meta={<div className="flex items-center gap-3"><span>{room.roomEnabled ? "ROOM ON" : "ROOM OFF"}</span>{room.slug && <a href={`/hall/${room.slug}`} target="_blank" rel="noreferrer" className="hover:underline">View as client ↗</a>}<Link href={`/admin/projects/${id}`} className="hover:underline">← Project</Link></div>}
-      metaMobile={<div className="flex items-center gap-3">{room.slug && <a href={`/hall/${room.slug}`} target="_blank" rel="noreferrer" className="text-[10px]">Client ↗</a>}<Link href={`/admin/projects/${id}`} className="text-[10px]">← Project</Link></div>}
+      meta={<div className="flex items-center gap-3"><span>{room.roomEnabled ? "ROOM ON" : "ROOM OFF"}</span>{room.slug && <a href={`/lobby/${room.slug}`} target="_blank" rel="noreferrer" className="hover:underline">View as client ↗</a>}<Link href={`/admin/projects/${id}`} className="hover:underline">← Project</Link></div>}
+      metaMobile={<div className="flex items-center gap-3">{room.slug && <a href={`/lobby/${room.slug}`} target="_blank" rel="noreferrer" className="text-[10px]">Client ↗</a>}<Link href={`/admin/projects/${id}`} className="text-[10px]">← Project</Link></div>}
       narrow
       bodySpacing={8}
     >

@@ -110,7 +110,7 @@ export function ClientRoomSettings({ room }: { room: ClientRoomAdminData }) {
       <label><span style={labelStyle}>Google Drive folder URL</span><input style={fieldStyle} value={driveFolderUrl} onChange={(event) => setDriveFolderUrl(event.target.value)} placeholder="https://drive.google.com/..." /></label>
       <div className="lg:col-span-2 flex flex-wrap items-center gap-3 pt-1">
         <button className="hall-btn-primary" type="submit" disabled={saving}>{saving ? "Saving…" : "Save room"}</button>
-        {room.slug && room.roomEnabled && <Link className="hall-btn-ghost" href={`/hall/${room.slug}`} target="_blank">Open client view ↗</Link>}
+        {room.slug && room.roomEnabled && <Link className="hall-btn-ghost" href={`/lobby/${room.slug}`} target="_blank">Open client view ↗</Link>}
         <Feedback message={message} error={failed} />
       </div>
     </form>
