@@ -24,7 +24,7 @@ export default async function ClientRoomAdminPage({ params }: { params: Promise<
   await requireAdmin();
   const { id } = await params;
   const room = await getClientRoomAdminData(id);
-  if (!room) redirect("/admin");
+  if (!room) redirect("/admin/projects");
   const readiness = await getOnboardingReadiness(id);
   const readyCount = readiness ? readiness.checks.filter((c) => c.ok).length : 0;
   const readyTotal = readiness ? readiness.checks.length : 0;

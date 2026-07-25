@@ -30,7 +30,7 @@ export default async function HallComposePage({
     .eq("notion_id", id)
     .maybeSingle();
 
-  if (!project) redirect("/admin");
+  if (!project) redirect("/admin/projects");
 
   const draft = (project.hall_draft as HallDraft | null) ?? null;
   const hero  = (project.hall_hero as HallDraft | null) ?? null;
