@@ -12,6 +12,8 @@ const MAX_BYTES = 25 * 1024 * 1024;
 const EXT: Record<string, string> = {
   "application/pdf": "pdf",
   "application/vnd.openxmlformats-officedocument.presentationml.presentation": "pptx",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+  "application/msword": "doc",
 };
 const CATEGORIES = new Set(["plan_timeline", "deliverable", "presentation", "manual", "working_document", "contract_agreement", "proposal_budget", "purchase_order", "invoice", "multimedia", "other"]);
 
@@ -34,7 +36,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   const file = form.get("file") as File | null;
   if (!file) return NextResponse.json({ error: "No file provided" }, { status: 400 });
   const ext = EXT[file.type];
-  if (!ext) return NextResponse.json({ error: "Only PDF or PPTX files" }, { status: 400 });
+  if (!ext) return NextResponse.json({ error: "Only PDF, PPTX or Word files" }, { status: 400 });
   if (file.size > MAX_BYTES) return NextResponse.json({ error: "File too large (max 25MB)" }, { status: 400 });
 
   const title = ((form.get("title") as string) || file.name || "Documento").trim();

@@ -312,11 +312,11 @@ export function ClientMaterialsManager({ room }: { room: ClientRoomAdminData }) 
   return (
     <div>
       <form onSubmit={(e) => void uploadFile(e)} className="flex flex-wrap items-center gap-2 mb-3 p-3" style={{ border: "1px solid var(--hall-line)", borderRadius: 6 }}>
-        <span className="text-[11px] font-semibold" style={{ color: "var(--hall-muted-2)" }}>Upload PDF / PPTX</span>
-        <input ref={fileRef} type="file" accept=".pdf,.pptx,application/pdf" className="text-[11px]" />
+        <span className="text-[11px] font-semibold" style={{ color: "var(--hall-muted-2)" }}>Upload PDF / PPTX / Word</span>
+        <input ref={fileRef} type="file" accept=".pdf,.pptx,.docx,.doc,application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword" className="text-[11px]" />
         <select aria-label="Category" style={{ ...fieldStyle, width: 170 }} value={uploadCategory} onChange={(e) => setUploadCategory(e.target.value as ClientRoomMaterialCategory)}>{CATEGORIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}</select>
         <button type="submit" className="hall-btn-primary" disabled={uploading}>{uploading ? "Uploading…" : "Upload"}</button>
-        <span className="text-[10px]" style={{ color: "var(--hall-muted-2)" }}>PDF previews inline; NDA/contracts → Contract. Max 25MB.</span>
+        <span className="text-[10px]" style={{ color: "var(--hall-muted-2)" }}>PDF/PPTX preview inline; Word downloads. NDA/contracts → Contract. Max 25MB.</span>
       </form>
       <div className="flex flex-wrap items-center gap-3 mb-4">
         {room.driveFolderId

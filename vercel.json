@@ -90,6 +90,14 @@
       "schedule": "30 6 * * 1-5"
     },
     {
+      "path": "/api/fireflies-backup/reconcile",
+      "schedule": "15 7 * * *"
+    },
+    {
+      "path": "/api/fireflies-backup/capture-reconcile",
+      "schedule": "30 7 * * *"
+    },
+    {
       "path": "/api/grant-radar",
       "schedule": "0 7 * * 3"
     },
