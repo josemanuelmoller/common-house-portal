@@ -808,7 +808,15 @@ export async function computeTitleLinks(days = 120): Promise<TitleLinkResult> {
     if (cands.length === 0) continue;
     const best = cands[0];
     // Unique, or clearly the closest by start time → high confidence.
-    const clear = cands.length === 1 || (best.start_diff_min <= 8 && cands[1].start_diff_min - best.start_diff_min >= 12);
+    // "Unique candidate" is the wrong bar: Fireflies often splits ONE meeting
+    // into several recordings (bot inside + outside capture + 1-min silent
+    // artifacts), so N transcripts legitimately map to 1 calendar event. What
+    // matters is that this transcript falls inside a single event's slot —
+    // i.e. the best candidate is clearly closer in start time than the next.
+    const clear =
+      cands.length === 1 ||
+      best.start_diff_min <= 10 ||
+      cands[1].start_diff_min - best.start_diff_min >= 12;
     if (clear) {
       result.high.push({ id: m.id, old_title: m.title, new_title: best.title, start_diff_min: best.start_diff_min, dur_diff_min: best.dur_diff_min });
     } else {
@@ -838,10 +846,96 @@ export async function applyTitleLinks(items: { id: string; title: string }[]): P
       res.applied.push({ id: it.id, new_title: it.title });
     } catch (e) {
       const fe = e as FirefliesError;
-      if (fe.rateLimited) { res.rate_capped = true; break; }
+      if (fe.rateLimited) {
+        // Surface it: a silent rate_capped with an empty errors[] reads as
+        // "nothing to do" in the UI when it actually means "quota exhausted".
+        res.rate_capped = true;
+        res.errors.push("Fireflies rate limit / daily quota exhausted — retry later");
+        break;
+      }
       res.errors.push(`${it.id}: ${fe.message}`);
     }
   }
   if (items.length > CAP) res.rate_capped = true;
   return res;
+}
+
+// ─── Duplicate fragments ─────────────────────────────────────────────────────
+// Fireflies often records ONE meeting several times: the bot inside the call,
+// an "outside" capture when it wasn't admitted, plus 1-minute silent artifacts
+// when the joiner bounced. Every fragment burns storage minutes. This groups
+// overlapping recordings so the junk ones can be pruned without losing content.
+
+export interface DupGroup {
+  /** Cluster label — the best (longest, titled) fragment in the group. */
+  keep: { id: string; title: string | null; minutes: number; start: string };
+  /** Fragments safe to drop: silent/no-content artifacts or strict subsets. */
+  drop: { id: string; title: string | null; minutes: number; start: string; reason: string }[];
+  minutes_reclaimable: number;
+}
+
+export interface DupResult {
+  window_days: number;
+  scanned: number;
+  groups: DupGroup[];
+  total_reclaimable_min: number;
+}
+
+/**
+ * Find duplicate recordings of the same meeting: transcripts whose start times
+ * fall within `windowMin` of each other. Within a group we KEEP the longest
+ * fragment and mark the rest droppable — but only ones that are clearly
+ * disposable (very short artifacts, or fully contained in the keeper).
+ * Read-only: returns proposals, deletes nothing.
+ */
+export async function computeDuplicates(days = 200, windowMin = 45): Promise<DupResult> {
+  const now = Date.now();
+  const fromIso = new Date(now - days * 86_400_000).toISOString();
+  const toIso = new Date(now).toISOString();
+
+  const ff = (await listFirefliesMeetings(fromIso, toIso))
+    .filter((m) => m.date)
+    .sort((a, b) => Number(a.date) - Number(b.date));
+
+  const groups: DupGroup[] = [];
+  const winMs = windowMin * 60_000;
+  let i = 0;
+  while (i < ff.length) {
+    // Greedily gather everything starting within the window of this one.
+    const cluster = [ff[i]];
+    let j = i + 1;
+    while (j < ff.length && Number(ff[j].date) - Number(cluster[0].date) <= winMs) {
+      cluster.push(ff[j]);
+      j++;
+    }
+    i = j;
+    if (cluster.length < 2) continue;
+
+    const sorted = [...cluster].sort((a, b) => (b.duration ?? 0) - (a.duration ?? 0));
+    const keeper = sorted[0];
+    const drop = sorted.slice(1)
+      .map((m) => {
+        const mins = m.duration ?? 0;
+        // Only propose dropping what is clearly disposable.
+        let reason = "";
+        if (mins <= 2) reason = "artefacto (<2 min, sin contenido)";
+        else if (mins <= (keeper.duration ?? 0) * 0.5) reason = "fragmento parcial de la misma reunión";
+        return { id: m.id, title: m.title, minutes: Math.round(mins), start: new Date(Number(m.date)).toISOString(), reason };
+      })
+      .filter((d) => d.reason !== "");
+    if (drop.length === 0) continue;
+
+    groups.push({
+      keep: { id: keeper.id, title: keeper.title, minutes: Math.round(keeper.duration ?? 0), start: new Date(Number(keeper.date)).toISOString() },
+      drop,
+      minutes_reclaimable: drop.reduce((s, d) => s + d.minutes, 0),
+    });
+  }
+
+  return {
+    window_days: days,
+    scanned: ff.length,
+    groups: groups.sort((a, b) => b.minutes_reclaimable - a.minutes_reclaimable),
+    total_reclaimable_min: groups.reduce((s, g) => s + g.minutes_reclaimable, 0),
+  };
 }
