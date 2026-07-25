@@ -87,6 +87,8 @@ function statusTone(s: string): { bg: string; fg: string } {
   return { bg: C.paper2, fg: C.muted2 };
 }
 
+const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1).trimEnd()}…` : s);
+
 async function api(path: string, method: string, body?: unknown) {
   const res = await fetch(path, { method, headers: { "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
   const json = await res.json().catch(() => ({}));
@@ -328,7 +330,14 @@ export function RoomClient({ projectId, role, capabilities, personId, defaultLan
     if (!can("suggestion.confirm")) return;
     const prev = suggs;
     setSuggs((s) => s.filter((x) => x.id !== id));
-    try { await api(`${base}/suggestions`, "PATCH", { id, action }); if (action === "confirm") flash(tr("toast.suggConfirmed")); }
+    try {
+      const r = await api(`${base}/suggestions`, "PATCH", { id, action });
+      if (action !== "confirm") return;
+      // Confirmar aplica el cambio al estado: el toast dice qué quedó distinto.
+      const c = r?.change as { before?: string | null; after?: string | null } | null;
+      const detail = c?.after ? (c.before ? `${c.before} → ${c.after}` : c.after) : null;
+      flash(detail ? `${tr("toast.suggConfirmed")} · ${clip(detail, 110)}` : tr("toast.suggConfirmed"));
+    }
     catch (e) { setSuggs(prev); flash((e as Error).message); }
   }
 
