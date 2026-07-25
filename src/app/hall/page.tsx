@@ -13,7 +13,6 @@ import { HallDecisions } from "@/components/hall/HallDecisions";
 import { HallTeam } from "@/components/hall/HallTeam";
 import { NeedsYourInput } from "@/components/hall/NeedsYourInput";
 import { NextSteps } from "@/components/hall/NextSteps";
-import { WorkspaceActivation } from "@/components/hall/WorkspaceActivation";
 import { GarageActivation } from "@/components/hall/GarageActivation";
 import { DigitalResidents } from "@/components/hall/DigitalResidents";
 import {
@@ -182,9 +181,6 @@ export default async function HallPage({
   // Hall always appears as the first item.
   const NAV = [
     { label: "The Hall",     href: "/hall",      icon: "◈" },
-    ...(project.primaryWorkspace === "workroom" && WORKSPACE_READY.workroom
-      ? [{ label: "The Workroom", href: "/workroom", icon: "◻" }]
-      : []),
     ...(project.primaryWorkspace === "garage" && WORKSPACE_READY.garage
       ? [{ label: "The Garage", href: "/garage", icon: "◧" }]
       : []),
@@ -197,9 +193,10 @@ export default async function HallPage({
   // (sidebar link + threshold block) not a forced redirect.
   //
   // WORKSPACE_READY controls whether a workspace link appears in the sidebar.
-  // Workroom is live (WORKSPACE_READY.workroom = true).
   // Garage is built (WORKSPACE_READY.garage = true) — activate by assigning
   // Primary Workspace = "garage" in CH Projects [OS v2].
+  // The old client-facing /workroom surface was removed; post-sale delivery
+  // now lives in the Salas (/rooms/[projectId]), which are membership-gated.
 
   // ── Mode ─────────────────────────────────────────────────────────────────
   // Driven by "Hall Mode" select property on CH Projects [OS v2].
@@ -313,13 +310,6 @@ export default async function HallPage({
   const showWhatWeHeard =
     !!(hallProject.theChallenge || hallProject.whatMattersMost ||
        hallProject.whatMayBeInTheWay || hallProject.whatSuccessCouldLookLike);
-
-  // Onboarding: workroom_activation moment — show threshold block when this project
-  // has graduated to Workroom delivery (live mode + workroom workspace + ready flag).
-  const showWorkspaceActivation =
-    isLive &&
-    project.primaryWorkspace === "workroom" &&
-    WORKSPACE_READY.workroom;
 
   // Onboarding: garage_activation moment — show threshold block when this project
   // has activated to The Garage (live mode + garage workspace + built flag).
@@ -501,17 +491,6 @@ export default async function HallPage({
               <section id="asks" className="scroll-mt-6 mb-7">
                 <NeedsYourInput asks={asks} />
               </section>
-            )}
-
-            {/* Onboarding: workroom_activation — threshold block.
-                Pass the most recent session as a "something is already moving" signal. */}
-            {showWorkspaceActivation && (
-              <div className="mb-7">
-                <WorkspaceActivation
-                  project={hallProject}
-                  lastSession={conversations[0] ?? undefined}
-                />
-              </div>
             )}
 
             {/* Onboarding: garage_activation — startup workspace threshold block. */}

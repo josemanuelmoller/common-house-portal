@@ -8,7 +8,6 @@ export const ADMIN_NAV = [
   { label: "Residents",           href: "/residents",            icon: "◍" },
 
   // ── Portfolio ─────────────────────────────────────────────────────────────
-  { label: "Workrooms",           href: "/admin/workrooms",      icon: "◻", section: "Portfolio" },
   { label: "Garage",              href: "/admin/garage-view",    icon: "◧", section: "Portfolio" },
   { label: "Investors",           href: "/admin/investors",      icon: "◎", section: "Portfolio" },
 
