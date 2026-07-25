@@ -24,6 +24,7 @@ import {
 } from "@/lib/notion";
 import { getProjectIdForUser, isAdminUser, isAdminEmail } from "@/lib/clients";
 import { listGrantsForCurrentUser } from "@/lib/require-client-access";
+import { listRoomsForEmail } from "@/lib/project-roles";
 import type {
   HallProject,
   HallMaterial,
@@ -118,11 +119,17 @@ export default async function HallPage({
 
   if (isAdmin && !adminViewAs) redirect("/admin");
 
-  // ── Client-scoped access (new flow, takes precedence over CLIENT_REGISTRY) ─
-  // If the signed-in user has at least one active grant in client_access,
-  // route them to the new /lobby/[slug] page. This is the canonical flow for
-  // prospect / external client onboarding going forward.
+  // ── Enrutado del cliente ───────────────────────────────────────────────────
+  // La sala manda sobre el lobby: un proyecto andando no tiene preventa, tiene
+  // sala. Quien ya es miembro entra a trabajar; el lobby queda para el
+  // prospecto que todavía no tiene sala. Con varias salas, al escritorio (elige
+  // él) en vez de adivinar cuál.
   if (!isAdmin) {
+    const rooms = await listRoomsForEmail(email);
+    if (rooms.length === 1) redirect(`/rooms/${rooms[0].id}`);
+    if (rooms.length > 1) redirect("/rooms");
+
+    // Sin sala: si tiene un grant activo en client_access, va a su lobby.
     const grants = await listGrantsForCurrentUser();
     if (grants.length > 0) {
       const first = grants[0];
