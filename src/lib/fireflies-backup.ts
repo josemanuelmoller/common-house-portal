@@ -97,17 +97,29 @@ export async function listFirefliesMeetings(
   fromIso: string,
   toIso: string,
 ): Promise<{ id: string; title: string | null; date: number | null; duration: number | null }[]> {
+  // Fireflies caps `transcripts` at 50 rows per call, so we page with skip
+  // until a short page comes back. Without this the agent only ever sees the
+  // 50 most-recent meetings in the window and could never reach the OLD ones
+  // (>60d) that are the whole point of the prune flow.
   const query = `
-    query List($fromDate: DateTime, $toDate: DateTime) {
-      transcripts(fromDate: $fromDate, toDate: $toDate) {
+    query List($fromDate: DateTime, $toDate: DateTime, $limit: Int, $skip: Int) {
+      transcripts(fromDate: $fromDate, toDate: $toDate, limit: $limit, skip: $skip) {
         id title date duration
       }
     }`;
-  const data = await ffQuery<{ transcripts: { id: string; title: string | null; date: number | null; duration: number | null }[] }>(
-    query,
-    { fromDate: fromIso, toDate: toIso },
-  );
-  return data?.transcripts ?? [];
+  const PAGE = 50;
+  const MAX_PAGES = 30; // safety backstop (1500 meetings)
+  const all: { id: string; title: string | null; date: number | null; duration: number | null }[] = [];
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const data = await ffQuery<{ transcripts: typeof all }>(
+      query,
+      { fromDate: fromIso, toDate: toIso, limit: PAGE, skip: page * PAGE },
+    );
+    const rows = data?.transcripts ?? [];
+    all.push(...rows);
+    if (rows.length < PAGE) break;
+  }
+  return all;
 }
 
 /** Full transcript (sentences + attendees + summary) for a single meeting. */
@@ -344,7 +356,7 @@ export interface ReconcileResult {
  */
 export async function reconcile(opts: { days?: number; cap?: number; execute?: boolean }): Promise<ReconcileResult> {
   const days = opts.days ?? 120;
-  const cap = opts.cap ?? 40;
+  const cap = opts.cap ?? 24; // fits the edge timeout at concurrency 3 (~5s/meeting)
   const execute = opts.execute ?? false;
 
   const now = Date.now();
@@ -396,21 +408,33 @@ export async function reconcile(opts: { days?: number; cap?: number; execute?: b
   }
   const drive = getDriveClientOAuth()!;
 
-  for (const m of missing.slice(0, cap)) {
-    try {
-      const out = await backupMeeting(sb, drive, folders, m.id, manifest.get(m.id) ?? null);
-      if (out.status === "backed_up") result.backed_up_now++;
-      else if (out.status === "error") result.errors.push(`${out.title}: ${out.error}`);
-    } catch (e) {
-      const fe = e as FirefliesError;
-      if (fe.rateLimited) {
-        result.rate_limited = true;
-        result.errors.push("Fireflies rate limit hit — stopping; will resume next run");
-        break;
+  // Back up in small concurrent batches: one meeting is a full-transcript
+  // fetch + 3 Drive uploads (~5s each), so sequential is too slow to fit under
+  // the edge timeout. Concurrency 3 roughly triples throughput per request.
+  const targets = missing.slice(0, cap);
+  const CONCURRENCY = 3;
+  batches: for (let i = 0; i < targets.length; i += CONCURRENCY) {
+    const group = targets.slice(i, i + CONCURRENCY);
+    const settled = await Promise.allSettled(
+      group.map((m) => backupMeeting(sb, drive, folders, m.id, manifest.get(m.id) ?? null)),
+    );
+    for (let k = 0; k < settled.length; k++) {
+      const s = settled[k];
+      if (s.status === "fulfilled") {
+        if (s.value.status === "backed_up") result.backed_up_now++;
+        else if (s.value.status === "error") result.errors.push(`${s.value.title}: ${s.value.error}`);
+      } else {
+        const fe = s.reason as FirefliesError;
+        if (fe?.rateLimited) {
+          result.rate_limited = true;
+          result.errors.push("Fireflies rate limit hit — stopping; will resume next run");
+          break batches;
+        }
+        result.errors.push(`${group[k].id}: ${fe?.message ?? String(fe)}`);
       }
-      result.errors.push(`${m.id}: ${fe.message}`);
     }
   }
+  result.remaining_after_cap = Math.max(0, missing.length - result.backed_up_now);
   return result;
 }
 
