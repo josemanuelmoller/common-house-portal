@@ -120,13 +120,13 @@ export default async function HallPage({
 
   // ── Client-scoped access (new flow, takes precedence over CLIENT_REGISTRY) ─
   // If the signed-in user has at least one active grant in client_access,
-  // route them to the new /hall/[slug] page. This is the canonical flow for
+  // route them to the new /lobby/[slug] page. This is the canonical flow for
   // prospect / external client onboarding going forward.
   if (!isAdmin) {
     const grants = await listGrantsForCurrentUser();
     if (grants.length > 0) {
       const first = grants[0];
-      if (first.hallSlug) redirect(`/hall/${first.hallSlug}`);
+      if (first.hallSlug) redirect(`/lobby/${first.hallSlug}`);
     }
   }
 

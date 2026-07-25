@@ -1213,7 +1213,7 @@ export function RoomClient({ projectId, role, capabilities, isSuperAdmin, person
                 {(meta.driveUrl || meta.presaleSlug || meta.orgWebsite) && (
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 15 }}>
                     {meta.driveUrl && <a href={meta.driveUrl} target="_blank" rel="noreferrer" style={linkChip}>{tr("proj.driveFolder")}</a>}
-                    {meta.presaleSlug && <a href={`/hall/${meta.presaleSlug}`} style={linkChip}>{tr("proj.presaleRoom")}</a>}
+                    {meta.presaleSlug && <a href={`/lobby/${meta.presaleSlug}`} style={linkChip}>{tr("proj.presaleRoom")}</a>}
                     {meta.orgWebsite && <a href={meta.orgWebsite} target="_blank" rel="noreferrer" style={linkChip}>{tr("proj.clientWeb")}</a>}
                   </div>
                 )}

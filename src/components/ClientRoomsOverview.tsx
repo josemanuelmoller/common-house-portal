@@ -24,7 +24,7 @@ function fmtWhen(iso: string | null): string {
  * to share and a light analytics roll-up per lobby. Self-fetching so it can be
  * dropped into the Hall inside a Suspense/error boundary.
  *
- * "Lobby" = pre-sale surface (`/hall/[slug]`). Post-sale work happens in a
+ * "Lobby" = pre-sale surface (`/lobby/[slug]`). Post-sale work happens in a
  * Sala (`/rooms/[projectId]`), which is a different surface entirely.
  */
 export async function ClientRoomsOverview() {

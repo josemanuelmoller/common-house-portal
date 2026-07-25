@@ -78,7 +78,7 @@ function ProjectRows({ items }: { items: PresaleRow[] }) {
           {p.client_room_enabled &&
             (p.hall_slug ? (
               <Link
-                href={`/hall/${p.hall_slug}`}
+                href={`/lobby/${p.hall_slug}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-[8.5px] px-1.5 py-0.5 uppercase tracking-[0.06em] hover:opacity-70"
