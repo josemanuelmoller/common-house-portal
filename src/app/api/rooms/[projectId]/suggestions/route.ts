@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { resolveClientRoomProject } from "@/lib/client-room";
 import { can, logRoomEvent, resolveRoomActor } from "@/lib/project-roles";
+import { acceptProposal } from "@/lib/state-proposals";
 
 /**
  * Bandeja "la IA propone" (inbox del Resumen). Lista y resuelve sugerencias
@@ -44,11 +45,22 @@ export async function PATCH(req: NextRequest, c: { params: Promise<{ projectId: 
 
   const db = supabaseAdmin();
   const { data: cur } = await db.from("project_state_proposals").select("summary").eq("id", id).eq("project_id", project.id).maybeSingle();
-  const status = action === "confirm" ? "accepted" : "rejected";
-  const { error: upErr } = await db.from("project_state_proposals")
-    .update({ status, reviewed_by: actor.email ?? actor.clerkId, reviewed_at: new Date().toISOString() })
-    .eq("id", id).eq("project_id", project.id);
-  if (upErr) return NextResponse.json({ error: upErr.message }, { status: 502 });
+  const who = actor.email ?? actor.clerkId ?? "room";
+
+  if (action === "confirm") {
+    // Confirmar tiene que APLICAR, no solo marcar. Esta ruta cambiaba el status
+    // a mano y la propuesta quedaba 'accepted' sin crear nada (así se perdió una
+    // tarea en prod). acceptProposal delega en apply_state_proposal(), que
+    // inserta la entidad, deja revisión y cierra el action_item de origen —
+    // todo en una transacción.
+    const res = await acceptProposal(project.id, id, who);
+    if (!res.ok) return NextResponse.json({ error: res.error }, { status: res.status });
+  } else {
+    const { error: upErr } = await db.from("project_state_proposals")
+      .update({ status: "rejected", reviewed_by: who, reviewed_at: new Date().toISOString() })
+      .eq("id", id).eq("project_id", project.id).eq("status", "pending");
+    if (upErr) return NextResponse.json({ error: upErr.message }, { status: 502 });
+  }
 
   await logRoomEvent({ projectId: project.id, actor, verb: action === "confirm" ? "confirmed" : "rejected", targetType: "suggestion", targetId: id, summary: `${action === "confirm" ? "Confirmó" : "Descartó"} la sugerencia "${cur?.summary ?? ""}"` });
   return NextResponse.json({ ok: true });

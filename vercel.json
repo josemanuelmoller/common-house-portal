@@ -198,8 +198,16 @@
       "schedule": "0 6 * * *"
     },
     {
+      "path": "/api/backfill-action-item-projects?execute=true",
+      "schedule": "45 3 * * *"
+    },
+    {
       "path": "/api/maintenance/stale-decay",
       "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/propose-room-tasks?execute=true",
+      "schedule": "15 4 * * *"
     },
     {
       "path": "/api/competitive-monitor",

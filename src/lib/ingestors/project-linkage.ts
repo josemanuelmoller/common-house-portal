@@ -14,6 +14,9 @@
  *      active project names (same matcher as the STB chips; ambiguous → null).
  *   3. person    — the counterparty is linked to EXACTLY ONE active project
  *      in CH People. Two or more → null.
+ *   4. domain    — el dominio del correo de la contraparte mapea a UNA sola
+ *      organización con participación activa en UN solo proyecto
+ *      (project_organization_roles). Compartida entre proyectos → null.
  *
  * Fail-soft: linkage is decoration on top of ingestion. loadProjectLinkage
  * returns null on DB error (visibly logged) and resolveProjectIdForSignal
@@ -25,12 +28,33 @@ import {
   inferProjectFromText,
   type MatchableProject,
 } from "@/lib/project-context";
+import { getSupabaseServerClient } from "@/lib/supabase-server";
 
 export type ProjectLinkage = {
   projects: MatchableProject[];
   /** projects.notion_id → projects.id (active projects only) */
   idByNotionId: Map<string, string>;
+  /**
+   * dominio de correo → projects.id de los proyectos donde esa organización
+   * participa activamente. Varios proyectos = contraparte compartida, y ahí no
+   * se resuelve nada (Neil Khor está en COP31, ZWD y ZWF a la vez: quién es no
+   * alcanza para saber de qué se habló).
+   */
+  projectsByDomain: Map<string, Set<string>>;
 };
+
+/** org_domains es TEXT y guarda un JSON-array-como-texto: `["a.com","b.com"]`. */
+function parseOrgDomains(raw: string | null): string[] {
+  if (!raw) return [];
+  return raw
+    .replace(/[[\]"]/g, "")
+    .split(",")
+    .map(d => d.trim().toLowerCase())
+    // La columna hace doble uso: en varias orgs guarda etiquetas de sector
+    // ("Retail", "Climate") en vez de dominios. Sin punto no es un dominio, y
+    // dejarlas pasar emparejaría Tesco con Waitrose.
+    .filter(d => d.includes("."));
+}
 
 export async function loadProjectLinkage(): Promise<ProjectLinkage | null> {
   try {
@@ -39,7 +63,29 @@ export async function loadProjectLinkage(): Promise<ProjectLinkage | null> {
     for (const p of projects) {
       if (p.notion_id) idByNotionId.set(p.notion_id, p.id);
     }
-    return { projects, idByNotionId };
+
+    // project_organization_roles es el espinazo real proyecto↔organización:
+    // es muchos-a-muchos (COP31 tiene 7 contrapartes). projects.organization_id
+    // es sólo la org primaria y no sirve para esto.
+    const live = new Set(projects.map(p => p.id));
+    const projectsByDomain = new Map<string, Set<string>>();
+    const { data, error } = await getSupabaseServerClient()
+      .from("project_organization_roles")
+      .select("project_id, organizations(org_domains)")
+      .eq("participation_status", "active");
+    if (error) throw new Error(error.message);
+
+    for (const row of (data ?? []) as Array<{ project_id: string; organizations: { org_domains: string | null } | { org_domains: string | null }[] | null }>) {
+      if (!live.has(row.project_id)) continue;
+      const org = Array.isArray(row.organizations) ? row.organizations[0] : row.organizations;
+      for (const dom of parseOrgDomains(org?.org_domains ?? null)) {
+        const set = projectsByDomain.get(dom) ?? new Set<string>();
+        set.add(row.project_id);
+        projectsByDomain.set(dom, set);
+      }
+    }
+
+    return { projects, idByNotionId, projectsByDomain };
   } catch (e) {
     // Visible per the fallback observability rule — items land without
     // project_id this run and the logs say why.
@@ -60,6 +106,8 @@ export function resolveProjectIdForSignal(
     inferText?: string | null;
     /** Project notion_ids the counterparty is linked to in CH People. */
     counterpartyProjectNotionIds?: string[] | null;
+    /** Correo de la contraparte, para el salto dominio→organización→proyecto. */
+    counterpartyEmail?: string | null;
   },
 ): string | null {
   if (!linkage) return null;
@@ -84,6 +132,16 @@ export function resolveProjectIdForSignal(
       cpIds.map(n => linkage.idByNotionId.get(n)).filter((x): x is string => !!x),
     )];
     if (active.length === 1) return active[0];
+  }
+
+  // 4. dominio del correo → organización → proyecto donde participa.
+  //    Última porque es la más indirecta: dice con qué casa hablamos, no de qué.
+  //    Una organización en dos proyectos no desambigua nada y se descarta.
+  const email = params.counterpartyEmail?.trim().toLowerCase();
+  if (email && email.includes("@")) {
+    const dom = email.split("@")[1];
+    const hits = linkage.projectsByDomain.get(dom);
+    if (hits && hits.size === 1) return [...hits][0];
   }
 
   return null;
