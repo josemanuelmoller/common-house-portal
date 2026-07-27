@@ -207,21 +207,59 @@ async function organizationName(organizationId: string | null): Promise<string |
 const HOUSE = "Common House";
 const SYSTEM_HANDLE = /^(admin|system|cron|service|claude|codex|bot)\b|claude-code/i;
 
+type PersonRow = { email: string | null; display_name: string | null; full_name: string | null };
+
+/** "José Manuel Moller" → "josemanuelmoller". Sin acentos ni separadores, que es
+ *  la forma en que el handle guarda el nombre. */
+function normalizeName(value: string): string {
+  return value.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]/gi, "").toLowerCase();
+}
+
+/** full_name trae el correo como nombre en las personas sin higienizar; si no hay
+ *  un nombre de verdad, mejor la casa que un handle crudo. */
+function pickName(row: PersonRow): string | null {
+  if (row.display_name) return row.display_name;
+  if (row.full_name && !row.full_name.includes("@")) return row.full_name;
+  return null;
+}
+
 async function resolveSharers(handles: Array<string | null>): Promise<Map<string, string>> {
   const out = new Map<string, string>();
   const real = [...new Set(handles.filter((h): h is string => !!h && !SYSTEM_HANDLE.test(h)))];
   if (real.length === 0) return out;
-  const { data } = await supabaseAdmin()
+  const sb = supabaseAdmin();
+
+  // 1) Por la parte local del correo: "josemanuelmoller" → josemanuelmoller@…
+  const { data } = await sb
     .from("people")
     .select("email, display_name, full_name")
     .or(real.map((h) => `email.ilike.${h.replace(/[,()]/g, "")}@%`).join(","));
-  for (const row of (data ?? []) as Array<{ email: string | null; display_name: string | null; full_name: string | null }>) {
+  for (const row of (data ?? []) as PersonRow[]) {
     const local = (row.email ?? "").split("@")[0]?.toLowerCase();
-    if (!local) continue;
-    // full_name viene con el correo como nombre en las personas sin higienizar;
-    // si no hay un nombre de verdad, mejor la casa que un handle crudo.
-    const name = row.display_name || (row.full_name && !row.full_name.includes("@") ? row.full_name : null);
-    if (name) out.set(local, name);
+    const name = pickName(row);
+    if (local && name) out.set(local, name);
+  }
+
+  // 2) Los que quedaron sin resolver. El primer pase falla cuando la persona
+  //    está bajo otro correo: "josemanuelmoller" hace match con la cuenta de
+  //    gmail, cuyo full_name es el propio correo, mientras el nombre real vive
+  //    en josemanuel@wearecommonhouse.com. El handle suele ser el nombre sin
+  //    espacios, así que se compara normalizado contra el equipo de la casa —
+  //    que es, por definición, quien comparte material en un lobby.
+  const missing = real.filter((h) => !out.has(h.toLowerCase()));
+  if (missing.length > 0) {
+    const { data: staff } = await sb
+      .from("people")
+      .select("email, display_name, full_name")
+      .ilike("email", "%@wearecommonhouse.com");
+    for (const row of (staff ?? []) as PersonRow[]) {
+      const name = pickName(row);
+      if (!name) continue;
+      const candidates = [normalizeName(name), normalizeName(row.full_name ?? "")];
+      for (const handle of missing) {
+        if (candidates.includes(normalizeName(handle))) out.set(handle.toLowerCase(), name);
+      }
+    }
   }
   return out;
 }
