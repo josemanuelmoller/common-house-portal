@@ -47,6 +47,39 @@ Add all of these in Vercel Dashboard → Settings → Environment Variables:
 
 Note: `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY` is a multiline key. Store the full PEM string with literal `\n` sequences, not newlines.
 
+### Clerk: producción y preview usan instancias distintas
+
+**Las dos variables de Clerk van scopeadas, no compartidas entre entornos:**
+
+| Variable | Scope en Vercel | Instancia Clerk | Valor |
+|---|---|---|---|
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | **Production** | Production | `pk_live_***` |
+| `CLERK_SECRET_KEY` | **Production** | Production | `sk_live_***` |
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | **Preview** | Development | `pk_test_***` |
+| `CLERK_SECRET_KEY` | **Preview** | Development | `sk_test_***` |
+
+Por qué: la instancia de producción de Clerk está atada al dominio primario
+(`wearecommonhouse.com`), así que en un `*.vercel.app` el widget de sign-in **no
+monta** — la página queda en blanco bajo el logo y no hay forma de entrar. Los
+satélites, que serían la alternativa, son plan Pro.
+
+Hasta 2026-07-27 las llaves de producción estaban scopeadas a
+`production, preview, development` a la vez. Consecuencia: **ningún cambio del
+portal se podía ver antes de estar en producción**, con clientes adentro. Dos
+defectos visibles para el cliente se detectaron así, después de mergear.
+
+Los permisos se resuelven por email contra `client_access` en Supabase, que es
+compartido entre ambas instancias: entrando al preview con el mismo correo se
+ven los mismos lobbies y salas. Lo único distinto es dónde vive la sesión, así
+que en el preview hay que iniciar sesión aparte una vez.
+
+⚠️ Al rotar el secreto de preview, usar una llave dedicada en Clerk
+(*Development → API keys → Secret keys*), no la de uso local: así rotar una no
+rompe la otra.
+
+Si además quieres que el portal autentique en `localhost`, agrega las mismas
+`pk_test_` / `sk_test_` con scope **Development**.
+
 ## Step 3 -- Custom domain
 
 1. Vercel Dashboard → project → Settings → Domains
