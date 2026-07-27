@@ -48,7 +48,24 @@ const ZERO_UUID = "00000000-0000-0000-0000-000000000000";
 // Calibration: at most this many proposals per project per run, and the trigram
 // similarity at/above which an add_item is treated as a duplicate.
 const MAX_PROPOSALS_PER_RUN = 8;
-const SIMILARITY_THRESHOLD = 0.5;
+// Bajado de 0.5 a 0.45 el 2026-07-28. A 0.5 pasaban duplicados evidentes:
+// "Product launch will occur at PDX Guayabos and Moravia…" (17 jul) contra
+// "Product launch will take place at both PDX Guayabos and Mo…" (20 jul) da
+// 0.49 — la misma afirmación reescrita, propuesta dos veces al PM.
+//
+// 0.45 es el piso, no una preferencia. Medido contra la bandeja del 28 jul:
+// los tres duplicados reales caían entre 0.46 y 0.49, y la pareja distinta más
+// parecida daba 0.42 ("retrasos en materiales de diseño" vs "evento presencial
+// del 10-11 de agosto"). Bajar más empieza a suprimir afirmaciones legítimas.
+//
+// LÍMITE CONOCIDO — trigram no alcanza para el resto. En los mismos datos,
+// "Each container requires a unique QR code label" y "Each container must carry
+// a unique label with QR code" son el MISMO hecho y puntúan 0.38: por debajo de
+// esa pareja distinta de 0.42. Las bandas se cruzan, así que ningún umbral
+// separa los dos casos. Cazar esos duplicados pide comparación semántica
+// (embeddings sobre statement, o que el modelo vea las pendientes al proponer),
+// no calibración. No mover este número esperando resolverlo.
+const SIMILARITY_THRESHOLD = 0.45;
 const IMPACT_RANK: Record<string, number> = { critical: 3, high: 2, medium: 1, low: 0 };
 
 function normalizeStatement(s: string): string {
