@@ -128,6 +128,7 @@ function extractStats(body: any): RoutineStats {
     "sources_created", "sources_updated",
     "loops_created", "signals_added",
     "drafts_created", "drafts_updated",
+    "proposed",
   ];
 
   let read =
@@ -372,6 +373,22 @@ export const ROUTINE_CATALOG: Record<string, RoutineCatalogEntry> = {
     output_surface: "/admin/inbox (clean queue)",
     visible_in_product: true,
     priority: 2,
+  },
+  "propose-room-tasks": {
+    schedule: "04:15 daily (después del backfill de proyecto)",
+    reads: "Supabase action_items (open, con project_id)",
+    writes: "Supabase project_state_proposals (kind=add_task, pending)",
+    output_surface: "Bandeja «la IA propone» de cada sala (/rooms/[id])",
+    visible_in_product: true,
+    priority: 1,
+  },
+  "backfill-action-item-projects": {
+    schedule: "03:45 daily (before stale-decay at 04:00)",
+    reads: "Supabase action_items (open, project_id null) + evidence",
+    writes: "Supabase action_items.project_id",
+    output_surface: "Every per-project surface — rooms, /admin/inbox, STB chips",
+    visible_in_product: true,
+    priority: 1,
   },
   "sweep-replied-threads": {
     schedule: ":15 hourly Mon-Fri",

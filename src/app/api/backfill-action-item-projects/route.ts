@@ -16,8 +16,14 @@
  *
  * Auth: admin session OR CRON_SECRET (Bearer / x-agent-key).
  *
- * Input body (all optional):
- *   - dry_run: boolean (default TRUE — report matches without writing)
+ * Runs nightly via Vercel cron with ?execute=true. It was a one-shot before
+ * 2026-07-25 and the debt simply rebuilt: 29 open Fireflies items were sitting
+ * on evidence that already named their project. Unlinked items are invisible
+ * to every per-project surface, so this has to run on a schedule, not by hand.
+ *
+ * Input (body on POST, query string on either verb — query wins):
+ *   - dry_run / ?execute=true : default DRY RUN (report matches without
+ *     writing). ?execute=true is the house convention for scheduled writes.
  *   - limit: number (default 200)
  */
 
@@ -25,8 +31,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { adminGuardApi } from "@/lib/require-admin";
 import { loadProjectLinkage, resolveProjectIdForSignal } from "@/lib/ingestors/project-linkage";
+import { withRoutineLog } from "@/lib/routine-log";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 export const maxDuration = 120;
 
 async function isAuthorized(req: NextRequest): Promise<boolean> {
@@ -45,23 +53,28 @@ type OpenItem = {
   counterparty: string | null;
   source_type: string;
   source_id: string;
+  counterparty_contact_id: string | null;
 };
 
-export async function POST(req: NextRequest) {
+async function handle(req: NextRequest) {
   if (!(await isAuthorized(req))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   let body: { dry_run?: boolean; limit?: number } = {};
-  try { body = await req.json(); } catch { /* empty body ok */ }
-  const dryRun = body.dry_run ?? true;
-  const limit  = Math.min(Math.max(body.limit ?? 200, 1), 1000);
+  try { body = await req.json(); } catch { /* empty body / GET — ok */ }
+
+  // Query string wins over body so the cron entry (?execute=true) is the single
+  // visible source of truth for whether a scheduled run writes.
+  const qs = req.nextUrl.searchParams;
+  const dryRun = qs.get("execute") === "true" ? false : (body.dry_run ?? true);
+  const limit  = Math.min(Math.max(Number(qs.get("limit")) || body.limit || 200, 1), 1000);
 
   const sb = getSupabaseServerClient();
 
   const { data, error } = await sb
     .from("action_items")
-    .select("id, subject, next_action, counterparty, source_type, source_id")
+    .select("id, subject, next_action, counterparty, source_type, source_id, counterparty_contact_id")
     .eq("status", "open")
     .is("project_id", null)
     .limit(limit);
@@ -92,6 +105,18 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Correo de cada contraparte, para el salto dominio→organización→proyecto.
+  // Los items de calendario llegan acá sin proyecto y con contacto resuelto, así
+  // que este es el camino por el que se enganchan.
+  const personIds = [...new Set(items.map(i => i.counterparty_contact_id).filter((x): x is string => !!x))];
+  const emailByPerson = new Map<string, string>();
+  if (personIds.length > 0) {
+    const { data: people } = await sb.from("people").select("id, email").in("id", personIds);
+    for (const p of (people ?? []) as Array<{ id: string; email: string | null }>) {
+      if (p.email) emailByPerson.set(p.id, p.email);
+    }
+  }
+
   const report: Array<{
     id: string; subject: string; method: "explicit" | "inferred";
     project_id: string; project_name: string;
@@ -107,10 +132,13 @@ export async function POST(req: NextRequest) {
 
     // Same precedence as ingest: explicit linkage wins; an explicit pointer
     // to a dead project blocks inference (resolveProjectIdForSignal handles
-    // that), so try explicit-only first, then inference-only.
+    // that), so try explicit-only first, then inference + domain.
     const projectId = explicitNotionId
       ? resolveProjectIdForSignal(linkage, { projectNotionId: explicitNotionId })
-      : resolveProjectIdForSignal(linkage, { inferText });
+      : resolveProjectIdForSignal(linkage, {
+          inferText,
+          counterpartyEmail: emailByPerson.get(item.counterparty_contact_id ?? "") ?? null,
+        });
     if (!projectId) continue;
 
     report.push({
@@ -142,3 +170,8 @@ export async function POST(req: NextRequest) {
     items: report,
   });
 }
+
+// `scanned` → records_read, `updated` → records_written in routine_runs.
+export const POST = withRoutineLog("backfill-action-item-projects", handle);
+// Vercel cron fires GET; same wrapped handler, gated by ?execute=true.
+export const GET = POST;

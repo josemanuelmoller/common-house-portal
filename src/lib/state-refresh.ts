@@ -2,6 +2,7 @@ import "server-only";
 
 import Anthropic from "@anthropic-ai/sdk";
 import { supabaseAdmin } from "@/lib/supabase";
+import { loadActiveProjects } from "@/lib/project-context";
 import {
   makeUsageAccumulator,
   addUsage,
@@ -621,8 +622,20 @@ export async function runStateRefreshForProject(
 }
 
 /**
- * Runs the refresh across the given projects (default: all projects that have a
- * project_states row). Proposal-only; never mutates state.
+ * Runs the refresh across the given projects (default: every live project, plus
+ * any project that already carries a project_states row). Proposal-only; never
+ * mutates state.
+ *
+ * El default se elegía leyendo project_states, y eso era un huevo-y-gallina:
+ * un proyecto sin fila de estado nunca entraba al refresco, así que nunca
+ * generaba propuestas, así que nunca conseguía estado. Zero Waste Districts y
+ * Upstream PAS quedaron fuera de forma permanente con 277 y 213 evidencias sin
+ * mirar. La lista viva manda; project_states se une por si quedó estado de un
+ * proyecto ya cerrado que igual conviene seguir refrescando.
+ *
+ * Sin notion_id no hay forma de buscar la evidencia, así que esos se descartan
+ * acá en vez de gastarles una vuelta (runStateRefreshForProject los saltea
+ * igual, pero reportándolo como skip y no como "no elegible").
  */
 export async function runStateRefresh(
   opts: { projectIds?: string[]; lookbackDays?: number } = {},
@@ -630,9 +643,14 @@ export async function runStateRefresh(
   const sb = supabaseAdmin();
   let projectIds = opts.projectIds ?? [];
   if (projectIds.length === 0) {
-    const { data, error } = await sb.from("project_states").select("project_id");
-    if (error) throw new Error(`project_states scan failed: ${error.message}`);
-    projectIds = (data ?? []).map((r) => r.project_id as string);
+    const [live, withState] = await Promise.all([
+      loadActiveProjects(),
+      sb.from("project_states").select("project_id"),
+    ]);
+    if (withState.error) throw new Error(`project_states scan failed: ${withState.error.message}`);
+    const ids = new Set(live.filter((p) => p.notion_id).map((p) => p.id));
+    for (const r of (withState.data ?? [])) ids.add(r.project_id as string);
+    projectIds = [...ids];
   }
 
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });

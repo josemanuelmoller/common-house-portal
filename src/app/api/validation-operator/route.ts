@@ -23,6 +23,12 @@ export const maxDuration = 180;
 // Called by Vercel cron daily at 03:00 UTC (weekdays).
 // Also callable manually — requires x-agent-key or Authorization: Bearer <CRON_SECRET>.
 
+// Cuántas filas se leen por corrida y de a cuántas se escribe. El caudal de
+// entrada ronda las 300/día, así que 4.000 vacía el atraso acumulado en pocas
+// corridas y después sobra de largo.
+const READ_BATCH  = 4000;
+const WRITE_CHUNK = 500;
+
 const AUTO_VALIDATE_TYPES = new Set([
   "Process Step",
   "Outcome",
@@ -90,10 +96,15 @@ async function getEvidenceByStatus(status: "New" | "Reviewed"): Promise<Evidence
     .from("evidence")
     .select("id, title, evidence_type, confidence_level, source_excerpt, project_notion_id, date_captured, legacy_source_db")
     .eq("validation_status", status)
-    .limit(2000);
+    // Más viejas primero: sin orden explícito el lote es arbitrario y la cola
+    // se muere de hambre — una fila puede quedar sin mirar indefinidamente
+    // mientras entra material nuevo.
+    .order("created_at", { ascending: true })
+    .limit(READ_BATCH);
   if (error) {
-    console.error(`[validation-operator] read ${status} failed:`, error.message);
-    return [];
+    // Antes esto devolvía [] y la rutina reportaba éxito con cero trabajo: 200 OK
+    // y nada hecho. Un fallo de lectura tiene que romper, no disfrazarse.
+    throw new Error(`read ${status} failed: ${error.message}`);
   }
   return ((data ?? []) as Array<{
     id: string;
@@ -197,64 +208,79 @@ async function _POST(req: NextRequest) {
     validated_from_reviewed: 0,
     archived: 0,
     kept_reviewed: 0,
+    records_written: 0,
+    backlog_new_remaining: 0,
     errors: 0,
   };
 
-  async function writeStatus(id: string, status: "Validated" | "Reviewed" | "Superseded") {
-    // notion-cutoff-2026-06-02: canonical write is Supabase. `id` is the
-    // evidence uuid PK (evidence.id) — notion_id is NULL on Supabase-native
-    // rows, so it cannot be used as the update key.
+  /**
+   * Escritura por lote. Antes esto era un UPDATE por fila en serie: con 2.000
+   * elegibles son 2.000 viajes de red dentro de una función de 180s, así que la
+   * cola avanzaba unas decenas por día mientras entraban cientos. Agrupar por
+   * estado destino baja eso a un puñado de requests.
+   *
+   * notion-cutoff-2026-06-02: la escritura canónica es Supabase. `id` es el PK
+   * uuid de evidence — notion_id viene NULL en las filas nativas, así que no
+   * sirve como clave.
+   */
+  async function writeStatusBulk(ids: string[], status: "Validated" | "Reviewed" | "Superseded") {
+    if (ids.length === 0) return 0;
     const nowIso = new Date().toISOString();
-    const update: Record<string, unknown> = {
-      validation_status: status,
-      updated_at:        nowIso,
-    };
-    if (status === "Reviewed" || status === "Validated") {
-      update.reviewed_at = nowIso.slice(0, 10);
+    const update: Record<string, unknown> = { validation_status: status, updated_at: nowIso };
+    if (status === "Reviewed" || status === "Validated") update.reviewed_at = nowIso.slice(0, 10);
+
+    let written = 0;
+    for (let i = 0; i < ids.length; i += WRITE_CHUNK) {
+      const chunk = ids.slice(i, i + WRITE_CHUNK);
+      const { error } = await sb.from("evidence").update(update).in("id", chunk);
+      if (error) {
+        // Un chunk que falla no puede llevarse la corrida entera: se cuenta y
+        // se sigue, y el resto avanza igual.
+        console.error(`[validation-operator] bulk ${status} failed:`, error.message);
+        results.errors += chunk.length;
+        continue;
+      }
+      written += chunk.length;
     }
-    const { error } = await sb.from("evidence")
-      .update(update)
-      .eq("id", id);
-    if (error) throw new Error(`evidence update failed: ${error.message}`);
+    return written;
   }
 
   // Pass 1 — New items
+  const toValidate: string[] = [];
+  const toReview: string[] = [];
   for (const item of newItems) {
-    try {
-      const c = classifyNew(item);
-      if (c.tier === "AUTO_VALIDATE") {
-        await writeStatus(item.id, "Validated");
-        results.validated_from_new++;
-      } else if (c.tier === "AUTO_REVIEW") {
-        await writeStatus(item.id, "Reviewed");
-        results.promoted_to_reviewed++;
-      } else {
-        results.kept_new++;
-      }
-    } catch {
-      results.errors++;
-    }
+    const c = classifyNew(item);
+    if (c.tier === "AUTO_VALIDATE") toValidate.push(item.id);
+    else if (c.tier === "AUTO_REVIEW") toReview.push(item.id);
+    else results.kept_new++;
   }
+  results.validated_from_new   = await writeStatusBulk(toValidate, "Validated");
+  results.promoted_to_reviewed = await writeStatusBulk(toReview, "Reviewed");
 
   // Pass 2 — Reviewed items
+  const revValidate: string[] = [];
+  const revArchive: string[] = [];
   for (const item of reviewedItems) {
-    try {
-      const c = classifyReviewed(item);
-      if (c.tier === "AUTO_VALIDATE") {
-        await writeStatus(item.id, "Validated");
-        results.validated_from_reviewed++;
-      } else if (c.tier === "ARCHIVE") {
-        // Notion "Superseded" select exists in the Validation Status enum and
-        // is the closest to archive without schema change.
-        await writeStatus(item.id, "Superseded");
-        results.archived++;
-      } else {
-        results.kept_reviewed++;
-      }
-    } catch {
-      results.errors++;
-    }
+    const c = classifyReviewed(item);
+    if (c.tier === "AUTO_VALIDATE") revValidate.push(item.id);
+    // "Superseded" ya existe en el enum de Validation Status y es lo más
+    // cercano a archivar sin tocar el esquema.
+    else if (c.tier === "ARCHIVE") revArchive.push(item.id);
+    else results.kept_reviewed++;
   }
+  results.validated_from_reviewed = await writeStatusBulk(revValidate, "Validated");
+  results.archived                = await writeStatusBulk(revArchive, "Superseded");
+
+  results.records_written =
+    results.validated_from_new + results.promoted_to_reviewed +
+    results.validated_from_reviewed + results.archived;
+
+  // Cuánto queda sin mirar: si esto no baja corrida a corrida, el lote es chico
+  // para el caudal de entrada y hay que subirlo — visible en /admin/agents/health.
+  const { count } = await sb.from("evidence")
+    .select("id", { count: "exact", head: true })
+    .eq("validation_status", "New");
+  results.backlog_new_remaining = Math.max(0, (count ?? 0) - results.kept_new);
 
   console.log("[validation-operator]", results);
   return NextResponse.json(results);
