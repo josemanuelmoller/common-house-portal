@@ -128,6 +128,52 @@ mid-run crash can never leave state half-applied.
   returned so a truncated or over-filtered run is observable rather than silent.
 - Admin single-project trigger: `POST /api/admin/projects/[id]/state/refresh`.
 
+### Who may write a proposal, and what a proposal may say
+
+`project_state_proposals` has more writers than this repo has code for. As of
+2026-07-25 production holds four `generated_by` values, and only two are in
+`src/`:
+
+| `generated_by` | rows | where | notes |
+| --- | --- | --- | --- |
+| `job:state-refresh` | 165 | `src/lib/state-refresh.ts` | validates everything |
+| `propose-room-tasks` | 60 | `…/api/propose-room-tasks` | writes `add_task`; applies correctly against `project_tasks`. Daily cron `15 4 * * *` |
+| `room-empty-state` | 0 | `…/rooms/[id]/structure` | `room_structure` audit row, never applied |
+| `room-meeting-agent` | 3 | **unknown** | no code in this repo, on any branch, or on disk; all three rows written in a single batch and since closed as `rejected` |
+
+One writer has no locatable source, so a TypeScript guard cannot bind it. The
+load-bearing rule is therefore the
+`project_state_proposals_applicable` CHECK
+(`supabase/migrations/20260725220000_state_proposal_applicable.sql`), which
+mirrors `apply_state_proposal`'s per-kind requirements and rejects any *pending*
+proposal that could never be applied. `src/lib/state-proposal-insert.ts` holds
+the same contract in TypeScript — not as the gate, but so that in-repo writers
+fail with a named reason, and so a bad row never reaches the constraint from
+inside `commit_state_proposals` (which inserts the batch and advances the
+evidence cursor in one transaction; a violation there would roll back both and
+wedge that project's refresh).
+
+If a branch of `apply_state_proposal` gains or loses a required field, the
+constraint and `proposalRejectionReason()` in `state-proposal-insert.ts` change
+with it.
+
+**Known gap — deliverables are not proposable.** Production accepts seven kinds:
+the five state kinds, `room_structure` (audit only), and `add_task`. There is no
+kind that can change a `project_deliverables` row, so an agent cannot propose
+"mark the deliverable as delivered" — the PM changes deliverable status by hand
+in the room. This is deliberate as of 2026-07-25: adding `update_deliverable`
+would mean a new branch in the RPC, in the constraint, and in
+`state-proposal-insert.ts`, and the demand for it is one rejected proposal. An
+agent that wants to express work on a deliverable should propose an `add_task`
+instead.
+
+**Schema drift.** Production accepts `room_structure` and `add_task` and its
+`apply_state_proposal` has an `add_task` branch. The migration that does this
+(`20260725120000_add_task_proposals.sql`) is applied in production but was still
+uncommitted at the time of writing, so a checkout of `main` does not reproduce
+production for this table. The `project_state_proposals_applicable` constraint
+assumes it has landed.
+
 ## Increment status
 
 1. **Done** — incremental state-refresh job (keyset cursor, atomic acceptance, dedup/cap).

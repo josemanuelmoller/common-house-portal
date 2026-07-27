@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { resolveClientRoomProject } from "@/lib/client-room";
 import { can, logRoomEvent, resolveRoomActor } from "@/lib/project-roles";
+import { insertStateProposals } from "@/lib/state-proposal-insert";
 
 /**
  * Aprobar la estructura inicial de la sala (gate del empty-state).
@@ -60,8 +61,10 @@ export async function POST(req: NextRequest, c: { params: Promise<{ projectId: s
     }
   }
 
-  // Registro auditable del gate (aceptada).
-  const { error: auditErr } = await db.from("project_state_proposals").insert({
+  // Registro auditable del gate (aceptada). Pasa por insertStateProposals como
+  // todo escritor de la tabla; 'room_structure' nace 'accepted' y el RPC nunca
+  // lo aplica, así que la guarda de aplicabilidad lo deja pasar sin condiciones.
+  const audit = await insertStateProposals(db, [{
     project_id: project.id,
     proposal_kind: "room_structure",
     item_type: "structure",
@@ -72,8 +75,8 @@ export async function POST(req: NextRequest, c: { params: Promise<{ projectId: s
     generated_by: "room-empty-state",
     reviewed_by: actor.email ?? actor.clerkId,
     reviewed_at: new Date().toISOString(),
-  });
-  if (auditErr) console.warn("room structure audit insert failed:", auditErr.message);
+  }]);
+  if (audit.error) console.warn("room structure audit insert failed:", audit.error);
 
   await logRoomEvent({
     projectId: project.id, actor, verb: "confirmed", targetType: "room",

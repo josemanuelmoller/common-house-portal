@@ -8,6 +8,16 @@ import {
   computeAnthropicCost,
   type AnthropicUsage,
 } from "@/lib/anthropic-cost";
+import {
+  HEALTH,
+  IMPACT,
+  ITEM_RESOLVE_STATUSES,
+  ITEM_UPDATE_STATUSES,
+  LEARNING_TYPES,
+  PROPOSAL_KINDS,
+  STATE_ITEM_TYPES,
+  partitionApplicable,
+} from "@/lib/state-proposal-insert";
 
 /**
  * Incremental project state-refresh job.
@@ -44,23 +54,9 @@ function normalizeStatement(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9áéíóúñü ]+/gi, "").replace(/\s+/g, " ").trim();
 }
 
-// ─── Contract sets (validated against the DB check constraints) ───────────────
-
-const STATE_ITEM_TYPES = new Set([
-  "decision", "commitment", "risk", "dependency", "question", "milestone",
-  "stakeholder_signal", "assumption", "outcome",
-]);
-const ITEM_RESOLVE_STATUSES = new Set(["resolved", "superseded", "unknown", "expired"]);
-const ITEM_UPDATE_STATUSES = new Set(["active", "resolved", "superseded", "unknown", "expired"]);
-const HEALTH = new Set(["on_track", "watch", "blocked", "paused", "unknown"]);
-const IMPACT = new Set(["low", "medium", "high", "critical"]);
-const LEARNING_TYPES = new Set([
-  "implementation_question", "stakeholder_need", "friction",
-  "decision_pattern", "operating_pattern", "outcome",
-]);
-const PROPOSAL_KINDS = new Set([
-  "add_item", "update_item", "resolve_item", "state_summary", "add_learning",
-]);
+// ─── Contract sets ────────────────────────────────────────────────────────────
+// Owned by state-proposal-insert, which is where they are kept in sync with the
+// project_state_proposals_applicable CHECK and with apply_state_proposal.
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -560,7 +556,15 @@ export async function runStateRefreshForProject(
   const validated = raw
     .map((p) => normalizeProposal(p, ctx, evidence, labelToItemId, cursor.at, next.at))
     .filter((v): v is ProposalInsert => v !== null);
-  const inserts = await dedupeAndCap(projectId, validated);
+  const capped = await dedupeAndCap(projectId, validated);
+  // Last gate before the transactional commit. commit_state_proposals inserts
+  // the batch AND advances the cursor in one transaction, so a single row
+  // violating project_state_proposals_applicable would roll back both — leaving
+  // this project re-reading the same evidence, and failing, on every later run.
+  const { applicable: inserts, rejected: inapplicable } = partitionApplicable(capped);
+  for (const { proposal, reason } of inapplicable) {
+    console.warn(`state-refresh: dropped inapplicable ${proposal.proposal_kind} proposal for project ${projectId}: ${reason}`);
+  }
   const suppressed = validated.length - inserts.length;
 
   // Atomic commit: insert the (deduped/capped) proposals AND advance the cursor
