@@ -228,6 +228,66 @@ body {
   --hall-info-soft:   #e3ecff;
 }
 
+/* ─── Lobby ↔ Sala — lenguaje compartido ─────────────────────────────────────
+   El lobby (preventa, /lobby/[slug]) adopta el chrome de la sala de trabajo
+   (/rooms/[projectId]). Los valores salen de RoomClient.tsx, donde hoy viven
+   hardcodeados en el objeto `C`; acá quedan como variables para que las dos
+   superficies compartan una sola fuente y no vuelvan a divergir.
+   Al migrar la sala a estos tokens, borrar `C` allá — no duplicarlo. */
+:root {
+  --lobby-ink:        #0e0e0e;
+  --lobby-paper:      #ffffff;
+  --lobby-paper-2:    #ecece4;
+  --lobby-bg:         #eeeee8;
+  --lobby-outer:      #e2e2da;
+  --lobby-line:       #d8d8d0;
+  --lobby-line-soft:  #ececE4;
+  --lobby-muted:      #6b6b6b;
+  --lobby-muted-2:    #4a4a44;
+  --lobby-lime:       #c8f55a;
+  --lobby-lime-paper: rgba(200, 245, 90, 0.32);
+  --lobby-lime-wash:  rgba(200, 245, 90, 0.09);
+  --lobby-lime-ink:   #3a8c00;
+  /* Ámbar = "te toca a ti". Es la única señal con número, y por eso va llena:
+     un pill suave se lee como recuento, y los recuentos no piden nada. */
+  --lobby-alert:      #b45309;
+  --lobby-danger:     #991b1b;
+}
+
+/* Etiqueta ALL-CAPS del chrome (secciones, rótulos de grupo, metadatos). */
+.lobby-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--lobby-muted);
+}
+
+.lobby-btn-go,
+.lobby-btn-alt {
+  font-family: inherit;
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  border-radius: 6px;
+  padding: 6px 11px;
+  cursor: pointer;
+  transition: opacity 120ms;
+}
+.lobby-btn-go {
+  background: var(--lobby-ink);
+  color: #fff;
+  border: 0;
+}
+.lobby-btn-alt {
+  background: var(--lobby-paper);
+  color: var(--lobby-muted-2);
+  border: 1.5px solid var(--lobby-line);
+}
+.lobby-btn-go:disabled,
+.lobby-btn-alt:disabled { opacity: 0.45; cursor: default; }
+
 /* Italic display accent — used inside h2 ("Suggested *blocks*"). */
 .hall-flourish {
   font-family: var(--font-hall-display, "Instrument Serif", Georgia, serif);

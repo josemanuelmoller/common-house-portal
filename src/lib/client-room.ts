@@ -34,6 +34,11 @@ export type ClientRoomMaterial = {
   versionLabel: string | null;
   linkedMilestone: string | null;
   modifiedAt: string | null;
+  /** Display name of whoever shared it, already sanitised — never a raw handle.
+   *  Falls back to "Common House" so system writers stay invisible to clients. */
+  sharedBy: string;
+  /** When it became visible to the client; the honest "hace N días" anchor. */
+  clientVisibleAt: string | null;
 };
 
 export type BillingAccount = { title: string; details: string };
@@ -192,16 +197,46 @@ async function organizationName(organizationId: string | null): Promise<string |
   return (data?.name as string | undefined) ?? null;
 }
 
+/**
+ * `project_materials.added_by` stores raw handles, not people: real ones like
+ * "josemanuelmoller", but also "admin" and "claude-code (draft)". None of those
+ * can ever reach a client, so this resolves what it can against `people` (by the
+ * local part of the email) and collapses everything else to "Common House" —
+ * which is true, and leaks nothing about how the file got there.
+ */
+const HOUSE = "Common House";
+const SYSTEM_HANDLE = /^(admin|system|cron|service|claude|codex|bot)\b|claude-code/i;
+
+async function resolveSharers(handles: Array<string | null>): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  const real = [...new Set(handles.filter((h): h is string => !!h && !SYSTEM_HANDLE.test(h)))];
+  if (real.length === 0) return out;
+  const { data } = await supabaseAdmin()
+    .from("people")
+    .select("email, display_name, full_name")
+    .or(real.map((h) => `email.ilike.${h.replace(/[,()]/g, "")}@%`).join(","));
+  for (const row of (data ?? []) as Array<{ email: string | null; display_name: string | null; full_name: string | null }>) {
+    const local = (row.email ?? "").split("@")[0]?.toLowerCase();
+    if (!local) continue;
+    // full_name viene con el correo como nombre en las personas sin higienizar;
+    // si no hay un nombre de verdad, mejor la casa que un handle crudo.
+    const name = row.display_name || (row.full_name && !row.full_name.includes("@") ? row.full_name : null);
+    if (name) out.set(local, name);
+  }
+  return out;
+}
+
 async function loadMaterials(projectId: string, includeInternal: boolean): Promise<ClientRoomMaterial[]> {
   let query = supabaseAdmin()
     .from("project_materials")
-    .select("id, title, description, category, document_status, visibility, url, mime_type, folder_name, version_label, linked_milestone, modified_at")
+    .select("id, title, description, category, document_status, visibility, url, mime_type, folder_name, version_label, linked_milestone, modified_at, added_by, client_visible_at")
     .eq("project_id", projectId)
     .neq("document_status", "archived")
     .order("modified_at", { ascending: false, nullsFirst: false });
   if (!includeInternal) query = query.eq("visibility", "client");
   const { data, error } = await query;
   if (error) throw new Error(`client-room materials read failed: ${error.message}`);
+  const sharers = await resolveSharers((data ?? []).map((r) => (r.added_by as string | null) ?? null));
   return (data ?? []).map((row) => ({
     id: row.id as string,
     title: row.title as string,
@@ -215,6 +250,8 @@ async function loadMaterials(projectId: string, includeInternal: boolean): Promi
     versionLabel: (row.version_label as string | null) ?? null,
     linkedMilestone: (row.linked_milestone as string | null) ?? null,
     modifiedAt: (row.modified_at as string | null) ?? null,
+    sharedBy: sharers.get(((row.added_by as string | null) ?? "").toLowerCase()) ?? HOUSE,
+    clientVisibleAt: (row.client_visible_at as string | null) ?? null,
   }));
 }
 

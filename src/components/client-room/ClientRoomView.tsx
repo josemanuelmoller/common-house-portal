@@ -1,6 +1,4 @@
-import { SignOutButton } from "@clerk/nextjs";
 import type { ReactNode } from "react";
-import { BrandLogo } from "@/components/BrandLogo";
 import { AgreementResponseActions } from "@/components/client-room/AgreementResponseActions";
 import { DeckEmbed } from "@/components/client-room/DeckEmbed";
 import { PdfEmbed } from "@/components/client-room/PdfEmbed";
@@ -9,10 +7,7 @@ import { CopyButton } from "@/components/client-room/CopyButton";
 import { BankReveal } from "@/components/client-room/BankReveal";
 import { ClientBillingForm } from "@/components/client-room/ClientBillingForm";
 import { RoomAnalytics } from "@/components/client-room/RoomAnalytics";
-
-// Stable list of section ids the analytics tracker observes (must match the
-// DOM ids rendered below). Module-level so the effect dependency stays stable.
-const ROOM_SECTION_IDS = ["overview", "heard", "proposal", "plan", "together", "documents", "agreements", "admin"];
+import { LobbyShell, type LobbyNavItem } from "@/components/client-room/LobbyShell";
 import type { ClientRole } from "@/lib/require-client-access";
 import type { ClientRoomMaterial, ClientRoomProject } from "@/lib/client-room";
 
@@ -27,9 +22,23 @@ const TIMELINE_KIND_LABELS: Record<string, string> = {
   meeting: "Reunión", milestone: "Hito", document: "Documento", exchange: "Intercambio",
 };
 
+const ROOM_SECTION_IDS = ["overview", "heard", "proposal", "plan", "together", "documents", "agreements", "admin"];
+
 function displayDate(value: string | null) {
   if (!value) return "—";
   return new Intl.DateTimeFormat("es-ES", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(value));
+}
+
+/** "hace 7 días" — cuando el punto es "esto se movió", la frescura dice más que
+ *  la fecha exacta. Bajo un día, hoy/ayer; sobre dos meses, la fecha. */
+function relativeDate(value: string | null): string | null {
+  if (!value) return null;
+  const days = Math.floor((Date.now() - new Date(value).getTime()) / 86400000);
+  if (!Number.isFinite(days) || days < 0) return null;
+  if (days === 0) return "hoy";
+  if (days === 1) return "ayer";
+  if (days < 60) return `hace ${days} días`;
+  return displayDate(value);
 }
 
 function KindIcon({ kind }: { kind: string }) {
@@ -40,7 +49,58 @@ function KindIcon({ kind }: { kind: string }) {
     milestone: <><path d="M5 2.5v13" {...p} /><path d="M5 3.5h8l-2 3 2 3H5" {...p} /></>,
     exchange: <><path d="M3 6.5h10l-2.5-2.5" {...p} /><path d="M15 11.5H5l2.5 2.5" {...p} /></>,
   };
-  return <svg width="14" height="14" viewBox="0 0 18 18" aria-hidden="true" style={{ display: "block" }}>{glyphs[kind] ?? glyphs.milestone}</svg>;
+  return <svg width="13" height="13" viewBox="0 0 18 18" aria-hidden="true" style={{ display: "block" }}>{glyphs[kind] ?? glyphs.milestone}</svg>;
+}
+
+const HEAD_ICONS: Record<string, ReactNode> = {
+  heard: <path d="M13.5 9.2c0 .9-.7 1.6-1.6 1.6H6.4L3.2 13.2V4.4c0-.9.7-1.6 1.6-1.6h7.1c.9 0 1.6.7 1.6 1.6z" />,
+  proposal: <><path d="M8 2.5 14 5.5 8 8.5 2 5.5z" /><path d="M2 8.5 8 11.5 14 8.5" /></>,
+  plan: <><rect x="2.5" y="3.5" width="11" height="10" rx="1.5" /><path d="M2.5 6.5h11" /><path d="M5.5 2v3M10.5 2v3" /></>,
+  together: <><circle cx="8" cy="8" r="5.5" /><path d="M8 4.8V8l2.2 1.3" /></>,
+  agreements: <><path d="M4 14V2.5" /><path d="M4 3.2h7.5l-1.7 2.4 1.7 2.4H4" /></>,
+  documents: <path d="M2.5 5.4c0-.8.6-1.4 1.4-1.4h2.1l1.4 1.5h4.7c.8 0 1.4.6 1.4 1.4v4.9c0 .8-.6 1.4-1.4 1.4H3.9c-.8 0-1.4-.6-1.4-1.4z" />,
+  admin: <><circle cx="8" cy="8" r="5.5" /><path d="M8 7.4v3.3M8 5.2v.1" /></>,
+};
+
+function HeadIcon({ name }: { name: string }) {
+  return (
+    <span style={{ width: 26, height: 26, borderRadius: 7, background: "var(--lobby-lime)", display: "grid", placeItems: "center", flexShrink: 0 }}>
+      <svg viewBox="0 0 16 16" aria-hidden="true" style={{ width: 14, height: 14, stroke: "#000", fill: "none", strokeWidth: 1.6, strokeLinecap: "round", strokeLinejoin: "round" }}>
+        {HEAD_ICONS[name] ?? HEAD_ICONS.documents}
+      </svg>
+    </span>
+  );
+}
+
+function Card({ id, icon, title, meta, isNew, wash, children }: {
+  id?: string; icon: string; title: string; meta?: ReactNode; isNew?: boolean; wash?: boolean; children: ReactNode;
+}) {
+  return (
+    <section id={id} className="scroll-mt-4" style={{ background: "var(--lobby-paper)", border: "1.5px solid var(--lobby-line)", borderRadius: 14, overflow: "hidden" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "13px 17px 12px", borderBottom: "1px solid var(--lobby-line)", background: wash ? "var(--lobby-lime-wash)" : undefined }}>
+        <HeadIcon name={icon} />
+        <b style={{ fontSize: 11.5, fontWeight: 800, textTransform: "uppercase", letterSpacing: ".2px", whiteSpace: "nowrap" }}>{title}</b>
+        {isNew && <span className="lobby-label" style={{ color: "var(--lobby-lime-ink)", flex: "none" }}>· nuevo</span>}
+        <span style={{ flex: 1 }} />
+        {meta}
+      </div>
+      <div style={{ padding: "15px 17px 17px" }}>{children}</div>
+    </section>
+  );
+}
+
+function Stat({ label, value, sub, span, lime }: { label: string; value: string; sub?: string; span?: boolean; lime?: boolean }) {
+  return (
+    <div style={{ background: "var(--lobby-paper)", border: "1.5px solid var(--lobby-line)", borderRadius: 12, padding: "15px 16px", gridColumn: span ? "span 2" : undefined }}>
+      <div className="lobby-label">{label}</div>
+      <div style={{ fontSize: span ? "1.5rem" : "1.05rem", fontWeight: 900, letterSpacing: span ? "-1px" : "-.3px", marginTop: 8, lineHeight: 1.25, color: lime ? "var(--lobby-lime-ink)" : undefined }}>{value}</div>
+      {sub && <div style={{ fontSize: 11, color: "var(--lobby-muted)", marginTop: 4, fontWeight: 500 }}>{sub}</div>}
+    </div>
+  );
+}
+
+function Prov({ children }: { children: ReactNode }) {
+  return <div style={{ fontFamily: "var(--font-hall-mono)", fontSize: 9.5, letterSpacing: ".4px", textTransform: "uppercase", color: "var(--lobby-muted)" }}>{children}</div>;
 }
 
 function isEmbeddableHtml(url: string) {
@@ -55,41 +115,6 @@ function slidesId(url: string): string | null {
 }
 function isSlides(m: ClientRoomMaterial) {
   return slidesId(m.url) !== null;
-}
-
-function Card({ id, title, flourish, meta, children }: { id?: string; title: string; flourish?: string; meta?: ReactNode; children: ReactNode }) {
-  return (
-    <section id={id} className="scroll-mt-24 hall-room-card" style={{ background: "var(--hall-paper-0)", border: "1px solid var(--hall-line)", borderRadius: 14, padding: "20px 22px" }}>
-      <div className="flex items-baseline justify-between gap-3 pb-2.5 mb-4" style={{ borderBottom: "1px solid var(--hall-ink-0)" }}>
-        <h2 className="text-[16px] font-bold tracking-[-0.01em]">{title}{flourish && <> <em className="hall-room-flourish">{flourish}</em></>}</h2>
-        {meta && <span className="text-[10px] uppercase tracking-[0.06em] shrink-0" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted)" }}>{meta}</span>}
-      </div>
-      {children}
-    </section>
-  );
-}
-
-function StatIcon({ name }: { name: string }) {
-  const p = { fill: "none", stroke: "currentColor", strokeWidth: 1.4, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
-  const glyphs: Record<string, ReactNode> = {
-    stage: <><path d="M9 2.5l6 3-6 3-6-3z" {...p} /><path d="M3 9l6 3 6-3" {...p} /></>,
-    milestone: <><circle cx="9" cy="9" r="5.5" {...p} /><circle cx="9" cy="9" r="1.8" {...p} /></>,
-    work: <><rect x="2.5" y="5" width="9" height="8" rx="1.5" {...p} /><path d="M11.5 8.3l3.5-2v5.4l-3.5-2z" {...p} /></>,
-  };
-  return <svg width="15" height="15" viewBox="0 0 18 18" aria-hidden="true" style={{ display: "block" }}>{glyphs[name] ?? glyphs.stage}</svg>;
-}
-
-function Stat({ label, value, sub, flag, icon, span }: { label: string; value: string; sub?: string; flag?: boolean; icon?: string; span?: boolean }) {
-  return (
-    <div className={`p-4 sm:p-[18px]${span ? " col-span-2" : ""}`} style={{ background: flag ? "var(--hall-lime-paper)" : "var(--hall-paper-0)", borderTop: "3px solid var(--hall-lime)" }}>
-      <div className="flex items-center gap-1.5" style={{ color: flag ? "var(--hall-lime-ink)" : "var(--hall-muted-2)" }}>
-        {icon && <StatIcon name={icon} />}
-        <p className="text-[10px] uppercase tracking-[0.07em]" style={{ fontFamily: "var(--font-hall-mono)" }}>{label}</p>
-      </div>
-      <p className="text-[16px] sm:text-[18px] font-semibold mt-2 leading-[1.25]">{value}</p>
-      {sub && <p className="text-[11px] mt-1" style={{ color: "var(--hall-muted)" }}>{sub}</p>}
-    </div>
-  );
 }
 
 export function ClientRoomView({ room, role, adminPreview }: { room: ClientRoomProject; role: ClientRole | null; adminPreview: boolean }) {
@@ -113,8 +138,6 @@ export function ClientRoomView({ room, role, adminPreview }: { room: ClientRoomP
   const hasPayInfo = hasCompany || hasBank || !!b.publicNote;
   const hasAdmin = hasPayInfo || adminMaterials.length > 0 || showClientBilling;
   const presentations = room.materials.filter((m) => m.category === "presentation" && (isEmbeddableHtml(m.url) || isPdf(m) || isSlides(m)));
-  // The room preview (hero) is the presentation marked 'current'; fall back to any
-  // non-superseded, then the newest. Only one deck is ever featured.
   const featured = presentations.find((m) => m.documentStatus === "current")
     ?? presentations.find((m) => m.documentStatus !== "superseded")
     ?? presentations[0];
@@ -132,168 +155,297 @@ export function ClientRoomView({ room, role, adminPreview }: { room: ClientRoomP
     ? `${meetings} ${meetings === 1 ? "reunión" : "reuniones"} · ${room.timelineEvents.length} interacciones`
     : "Por comenzar";
 
-  const navItems: Array<[string, string]> = [
-    ["overview", "Resumen"], ["together", "Trabajo juntos"], ["proposal", "Propuesta"],
-    ["heard", "Lo que escuchamos"], ["agreements", "Acuerdos"], ["plan", "Plan"], ["documents", "Documentos"], ["admin", "Administrativo"],
+  const hasHeard = understandingAgreements.length > 0 || heardFields.length > 0 || room.whatWeHeard.heard.length > 0;
+  const stage = room.currentStage ?? room.projectStatus ?? room.roomStatus;
+
+  // El riel sólo nombra lo que existe. Una sección vacía en la nav promete un
+  // lugar y entrega una frase gris: dentro del marco de app eso se lee como
+  // producto a medio hacer, justo lo contrario de lo que el cromo quiere decir.
+  const nav: LobbyNavItem[] = [
+    { id: "overview", label: "Resumen", icon: "overview" },
+    ...(hasHeard ? [{ id: "heard", label: "Lo que escuchamos", icon: "heard" }] : []),
+    { id: "proposal", label: "Propuesta", icon: "proposal" },
+    ...(room.timeline.length ? [{ id: "plan", label: "Plan", icon: "plan" }] : []),
+    ...(room.timelineEvents.length ? [{ id: "together", label: "Trabajo juntos", icon: "together" }] : []),
+    ...(otherAgreements.length
+      ? [{ id: "agreements", label: "Acuerdos", icon: "agreements", ...(openAgreements.length ? { alert: openAgreements.length } : {}) }]
+      : []),
+    ...(documents.length ? [{ id: "documents", label: "Documentos", icon: "documents" }] : []),
+    ...(hasAdmin ? [{ id: "admin", label: "Administrativo", icon: "admin" }] : []),
   ];
 
+  // Sólo hay "te toca" si al que mira le toca de verdad: un lector no puede
+  // responder nada, y decirle que le toca es ruido.
+  const actionable = openAgreements.find((a) => canRespondTo(a.agreementType));
+  const todo = actionable
+    ? { label: `${actionable.status === "changes_requested" ? "Revisar" : "Responder"}: ${actionable.title}`, targetId: "agreements" }
+    : null;
+
+  const initials = [...new Set(room.timelineEvents.flatMap((e) => e.attendees))]
+    .map((n) => n.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase())
+    .filter((x) => x.length >= 2)
+    .slice(0, 3);
+
+  const featuredFresh = featured ? relativeDate(featured.clientVisibleAt ?? featured.modifiedAt) : null;
+
   return (
-    <div className="min-h-screen" style={{ background: "var(--hall-paper-1)", color: "var(--hall-ink-0)", fontFamily: "var(--font-hall-sans)" }}>
+    <LobbyShell
+      orgName={room.organizationName ?? "Common House"}
+      roomLabel={room.roomLabel}
+      stage={stage}
+      nav={nav}
+      soon={[
+        { label: "Lo mío", icon: "mine" },
+        { label: "Entregables", icon: "deliverables" },
+        { label: "Tareas", icon: "tasks" },
+        { label: "Decisiones", icon: "decisions" },
+      ]}
+      todo={todo}
+      adminPreview={adminPreview}
+      initials={initials}
+    >
       <RoomAnalytics projectId={room.id} sectionIds={ROOM_SECTION_IDS} />
-      <header className="px-4 sm:px-8 py-4 flex items-center justify-between gap-4" style={{ borderBottom: "1px solid var(--hall-ink-0)", background: "var(--hall-paper-0)" }}>
-        <div className="flex items-center gap-4 min-w-0"><BrandLogo variant="black" height={28} /><span className="hidden sm:inline text-[10px] uppercase tracking-[0.08em] truncate" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}>{room.roomLabel} · {room.name}</span></div>
-        <div className="flex items-center gap-3">
-          {adminPreview && <span className="hall-chip-dark">Admin preview</span>}
-          <SignOutButton><button type="button" className="hall-btn-ghost">Salir →</button></SignOutButton>
-        </div>
-      </header>
 
-      <nav className="px-4 sm:px-8 overflow-x-auto" style={{ borderBottom: "1px solid var(--hall-line)", background: "var(--hall-paper-2)" }}>
-        <div className="max-w-6xl mx-auto flex gap-5 min-w-max text-[11px] font-semibold hall-room-links">
-          {navItems.map(([href, label]) => <a key={href} href={`#${href}`} className="py-3.5 hover:underline">{label}{href === "agreements" && openAgreements.length > 0 ? ` ${openAgreements.length}` : ""}</a>)}
-        </div>
-      </nav>
-
-      <main className="max-w-6xl mx-auto px-4 sm:px-8 pb-16">
-        <section id="overview" className="scroll-mt-24 pt-10 sm:pt-12 pb-2 hall-room-fade">
-          <div className="flex flex-col-reverse sm:flex-row sm:items-center gap-5 sm:gap-8">
-            <div className="min-w-0 flex-1">
-              <p className="text-[10px] uppercase tracking-[0.1em] mb-2" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}>{room.organizationName ?? "Common House"} · {room.currentStage ?? room.projectStatus ?? room.roomStatus}</p>
-              <h1 className="text-[38px] sm:text-[52px] leading-[1] tracking-[-0.025em]" style={{ fontFamily: "var(--font-hall-display)", fontWeight: 400 }}>{room.name}<span style={{ color: "var(--hall-lime)" }}>_</span></h1>
-              {room.welcomeNote && <p className="mt-4 max-w-2xl text-[15px] leading-[1.6]" style={{ color: "var(--hall-muted-2)" }}>{room.welcomeNote}</p>}
-            </div>
-            {room.clientLogoUrl && (
-              <div className="shrink-0 flex items-center justify-center sm:min-w-[260px]">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={room.clientLogoUrl} alt={room.organizationName ?? "Client"} style={{ height: 132, width: "auto", maxWidth: 240 }} />
-              </div>
-            )}
+      {/* ── RESUMEN ── */}
+      <section id="overview" className="scroll-mt-4">
+        <div className="flex flex-col-reverse sm:flex-row sm:items-center gap-5 sm:gap-7">
+          <div className="min-w-0 flex-1">
+            <div className="lobby-label">{room.organizationName ?? "Common House"} · {stage}</div>
+            {/* El lobby titula la relación, no el foco de la semana: por eso
+                conserva el serif aunque el resto del cromo venga de la sala. */}
+            <h1 style={{ fontFamily: "var(--font-hall-display), Georgia, serif", fontStyle: "italic", fontWeight: 400, fontSize: 42, letterSpacing: "-.02em", lineHeight: 1.05, maxWidth: "18ch", margin: "10px 0 0" }}>
+              {room.name}<span style={{ color: "var(--lobby-lime)" }}>_</span>
+            </h1>
+            {room.welcomeNote && <p style={{ color: "var(--lobby-muted)", fontSize: 14, maxWidth: "64ch", margin: "12px 0 0", lineHeight: 1.6, whiteSpace: "pre-line" }}>{room.welcomeNote}</p>}
           </div>
-        </section>
-
-        <section className="grid grid-cols-2 md:grid-cols-4 mt-6 mb-2 hall-room-fade" style={{ gap: 1, background: "var(--hall-line)", border: "1px solid var(--hall-line)", borderRadius: 14, overflow: "hidden" }}>
-          <Stat icon="stage" label="Etapa" value={room.currentStage ?? room.projectStatus ?? room.roomStatus} sub={room.currentFocus ?? undefined} />
-          <Stat icon="milestone" label="Próximo hito" value={room.nextMilestone || "Por confirmar"} />
-          <Stat icon="work" span label="Trabajo dedicado" value={workValue} sub={earliest ? `Desde ${displayDate(earliest)}` : undefined} />
-        </section>
-
-        {(understandingAgreements.length > 0 || heardFields.length > 0 || room.whatWeHeard.heard.length > 0) && (
-          <section id="heard" className="scroll-mt-24 mt-5 hall-room-fade" style={{ background: "var(--hall-paper-0)", border: "1px solid var(--hall-ink-0)", borderRadius: 16, borderTop: "4px solid var(--hall-lime)", padding: "26px 28px" }}>
-            <div className="flex items-baseline justify-between gap-3 pb-3 mb-6" style={{ borderBottom: "1px solid var(--hall-line)" }}>
-              <h2 className="text-[20px] sm:text-[26px] font-bold tracking-[-0.015em]">Lo que <em className="hall-room-flourish">escuchamos</em></h2>
-              <span className="text-[10px] uppercase tracking-[0.06em] shrink-0" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted)" }}>Síntesis del análisis</span>
+          {room.clientLogoUrl && (
+            <div className="shrink-0 flex items-center justify-center" style={{ width: 240 }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={room.clientLogoUrl} alt={room.organizationName ?? "Client"} style={{ height: 132, width: "auto", maxWidth: 220 }} />
             </div>
-            {understandingAgreements.map((a) => a.summary && <p key={a.id} className="text-[15px] leading-[1.7] max-w-3xl mb-6" style={{ whiteSpace: "pre-line" }}>{a.summary}</p>)}
+          )}
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 11, marginTop: 20 }}>
+          <Stat label="Etapa" value={stage} sub={room.currentFocus ?? undefined} />
+          <Stat label="Próximo hito" value={room.nextMilestone || "Por confirmar"} />
+          <Stat span lime label="Trabajo dedicado" value={workValue} sub={earliest ? `Desde ${displayDate(earliest)}` : undefined} />
+        </div>
+      </section>
+
+      {/* ── LO QUE ESCUCHAMOS ── */}
+      {hasHeard && (
+        <div style={{ marginTop: 16 }}>
+          <Card id="heard" icon="heard" title="Lo que escuchamos" wash
+            meta={<span style={{ fontSize: 10, color: "var(--lobby-muted)", fontWeight: 600 }}>Síntesis del análisis</span>}>
+            {understandingAgreements.map((a) => a.summary && (
+              <p key={a.id} style={{ fontSize: 14, lineHeight: 1.7, maxWidth: "70ch", marginBottom: 18, whiteSpace: "pre-line" }}>{a.summary}</p>
+            ))}
             {heardFields.length > 0 && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-7 gap-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4" style={{ gap: 18 }}>
                 {heardFields.map(([label, value]) => (
-                  <div key={label} className="pt-3" style={{ borderTop: "2px solid var(--hall-lime)" }}>
-                    <p className="text-[10px] uppercase tracking-[0.07em] mb-1.5" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-lime-ink)" }}>{label}</p>
-                    <p className="text-[13.5px] leading-[1.6]">{value}</p>
+                  <div key={label} style={{ borderTop: "2px solid var(--lobby-lime)", paddingTop: 9 }}>
+                    <div className="lobby-label" style={{ color: "var(--lobby-lime-ink)", marginBottom: 6 }}>{label}</div>
+                    <p style={{ fontSize: 12.5, lineHeight: 1.55, margin: 0 }}>{value}</p>
                   </div>
                 ))}
               </div>
             )}
             {room.whatWeHeard.heard.length > 0 && (
-              <div className="mt-6 pt-5" style={{ borderTop: "1px solid var(--hall-line-soft)" }}>
-                <p className="text-[10px] uppercase tracking-[0.07em] mb-2" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}>De la conversación</p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-3">
-                  {room.whatWeHeard.heard.map((item, index) => <p key={`${item.point}-${index}`} className="text-[13.5px] leading-[1.55]">{item.point}{item.speakerName && <span style={{ color: "var(--hall-muted-3)" }}> — {item.speakerName}</span>}</p>)}
+              <div style={{ marginTop: 18, paddingTop: 14, borderTop: "1px solid var(--lobby-line-soft)" }}>
+                <div className="lobby-label" style={{ marginBottom: 8 }}>De la conversación</div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" style={{ gap: "10px 28px" }}>
+                  {room.whatWeHeard.heard.map((item, index) => (
+                    <p key={`${item.point}-${index}`} style={{ fontSize: 12.5, lineHeight: 1.55, margin: 0 }}>
+                      {item.point}{item.speakerName && <span style={{ color: "var(--lobby-muted)" }}> — {item.speakerName}</span>}
+                    </p>
+                  ))}
                 </div>
               </div>
             )}
-          </section>
-        )}
-
-        <div className="grid grid-cols-1 lg:grid-cols-[1.65fr_1fr] gap-5 items-start mt-5">
-          <div className="flex flex-col gap-5">
-            <Card id="proposal" title="Nuestra" flourish="propuesta" meta={room.proposal.status}>
-              {featured && <div className="mb-4">{
-                isPdf(featured) ? <PdfEmbed url={featured.url} title={featured.title} />
-                : isSlides(featured) ? <SlidesEmbed embedUrl={`https://docs.google.com/presentation/d/${slidesId(featured.url)}/embed?start=false&loop=false&rm=minimal`} openUrl={featured.url} title={featured.title} />
-                : <DeckEmbed url={featured.url} title={featured.title} />
-              }</div>}
-              <p className="text-[14px] leading-[1.6] max-w-2xl">{room.proposal.summary || "La propuesta se está preparando a partir de lo que escuchamos."}</p>
-              {!featured && room.proposal.file_url && <a className="hall-btn-primary inline-flex mt-4" href={room.proposal.file_url} target="_blank" rel="noreferrer">Abrir {room.proposal.file_name || "propuesta"} ↗</a>}
-              {previousVersions.length > 0 && (
-                <div className="mt-5 pt-4" style={{ borderTop: "1px solid var(--hall-line-soft)" }}>
-                  <p className="text-[10px] uppercase tracking-[0.07em] mb-2" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}>Versiones anteriores</p>
-                  {previousVersions.map((m) => (
-                    <a key={m.id} href={m.url} target="_blank" rel="noreferrer" data-track={`version:${m.title}`} className="flex items-center justify-between gap-3 py-1.5 hover:opacity-70">
-                      <span className="text-[12.5px]" style={{ color: "var(--hall-muted-2)" }}>{m.title}</span>
-                      <span className="text-[10.5px]" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-3)" }}>{m.versionLabel || "anterior"} ↗</span>
-                    </a>
-                  ))}
-                </div>
-              )}
-            </Card>
-
-            <Card id="plan" title="Plan" flourish="y progreso" meta={room.timeline.length ? `${room.timeline.length} hitos` : undefined}>
-              {room.timeline.length === 0 ? <p className="text-[12px]" style={{ color: "var(--hall-muted-2)" }}>El primer plan aparecerá aquí.</p> : <div>{room.timeline.map((item, index) => <div key={`${item.label}-${index}`} className="grid grid-cols-[84px_1fr_auto] gap-3 items-center py-2.5" style={{ borderBottom: index === room.timeline.length - 1 ? "none" : "1px solid var(--hall-line-soft)" }}><span className="text-[11px]" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}>{item.date || "—"}</span><strong className="text-[13.5px] font-medium">{item.label}</strong><span className="hall-chip-outline">{item.type}</span></div>)}</div>}
-            </Card>
-          </div>
-
-          <div className="flex flex-col gap-5">
-            <Card id="together" title="Nuestro" flourish="trabajo juntos" meta="Registro">
-              {room.timelineEvents.length === 0
-                ? <p className="text-[12px]" style={{ color: "var(--hall-muted-2)" }}>Reuniones, documentos e hitos aparecerán aquí.</p>
-                : <div>{room.timelineEvents.map((ev, index) => {
-                    const last = index === room.timelineEvents.length - 1;
-                    return (
-                      <div key={ev.id} className="relative pl-7 pb-4" style={{ borderLeft: last ? "1px solid transparent" : "1px solid var(--hall-line)" }}>
-                        <span className="absolute flex items-center justify-center rounded-full" style={{ left: -11, top: 0, width: 22, height: 22, background: "var(--hall-paper-0)", border: "1px solid var(--hall-line-strong)", color: "var(--hall-ink-0)" }}><KindIcon kind={ev.kind} /></span>
-                        <p className="text-[10px]" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}>{displayDate(ev.eventDate)} · {TIMELINE_KIND_LABELS[ev.kind] ?? ev.kind}</p>
-                        <p className="text-[13px] font-semibold mt-0.5">{ev.title}</p>
-                        {ev.attendees.length > 0 && <p className="text-[10.5px] mt-0.5" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted)" }}>{ev.attendees.join("  ·  ")}</p>}
-                      </div>
-                    );
-                  })}</div>}
-            </Card>
-
-            <Card id="documents" title="Documentos" meta={documents.length || undefined}>
-              {documents.length === 0 ? <p className="text-[12px]" style={{ color: "var(--hall-muted-2)" }}>Nada compartido aún.</p> : <div>{documents.map((m, i) => <a key={m.id} href={m.url} target="_blank" rel="noreferrer" data-track={`doc:${m.title}`} className="flex items-center justify-between gap-3 py-2.5 hover:opacity-70" style={{ borderBottom: i === documents.length - 1 ? "none" : "1px solid var(--hall-line-soft)" }}><div className="min-w-0"><p className="text-[13px] font-semibold truncate">{m.title}</p><p className="text-[10px]" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted)" }}>{CATEGORY_LABELS[m.category] ?? m.category}{m.versionLabel ? ` · ${m.versionLabel}` : ""}</p></div><span aria-hidden="true" style={{ color: "var(--hall-muted)" }}>↗</span></a>)}</div>}
-            </Card>
-
-            <Card id="agreements" title="Acuerdos" meta={otherAgreements.length || undefined}>
-              {otherAgreements.length === 0 ? <p className="text-[12px]" style={{ color: "var(--hall-muted-2)" }}>Las decisiones y siguientes pasos aparecerán aquí.</p> : <div className="space-y-4">{otherAgreements.map((agreement) => <article key={agreement.id} style={(agreement.status === "shared" || agreement.status === "changes_requested") ? { background: "var(--hall-lime-paper)", border: "1px solid var(--hall-lime)", borderRadius: 10, padding: "12px 14px" } : undefined}><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="text-[10px] uppercase tracking-[0.07em] mb-0.5" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}>{agreement.agreementType.replaceAll("_", " ")} · v{agreement.version}</p><h3 className="text-[14px] font-bold">{agreement.title}</h3>{agreement.summary && <p className="mt-1 text-[12px] leading-relaxed" style={{ color: "var(--hall-ink-3)" }}>{agreement.summary}</p>}</div><span className="hall-chip-outline shrink-0">{agreement.status.replaceAll("_", " ")}</span></div>{(agreement.status === "shared" || agreement.status === "changes_requested") && <AgreementResponseActions agreementId={agreement.id} version={agreement.version} agreementType={agreement.agreementType} canRespond={canRespondTo(agreement.agreementType)} />}{agreement.respondedAt && <p className="mt-2 text-[10px]" style={{ color: "var(--hall-muted-3)" }}>Respondido {displayDate(agreement.respondedAt)}{agreement.respondedEmail ? ` · ${agreement.respondedEmail}` : ""}</p>}</article>)}</div>}
-            </Card>
-
-            <Card id="admin" title="Administrativo">
-              {!hasAdmin
-                ? <p className="text-[12px]" style={{ color: "var(--hall-muted-2)" }}>Aquí verás la facturación y los datos de pago.</p>
-                : <div className="space-y-4">
-                    {(hasCompany || hasBank || b.publicNote) && (
-                      <div>
-                        <div className="flex items-center justify-between gap-3 mb-2">
-                          <p className="text-[10px] uppercase tracking-[0.07em]" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}>Datos de pago</p>
-                          {copyText && <CopyButton text={copyText} label="Copiar todo" />}
-                        </div>
-                        {hasCompany && <div className="text-[13px] leading-[1.6]" style={{ whiteSpace: "pre-line" }}>{["Common House", ...billingLines].join("\n")}</div>}
-                        {hasBank && <BankReveal accounts={b.bankAccounts} />}
-                        {b.publicNote && <p className="mt-2 text-[11px]" style={{ color: "var(--hall-muted)" }}>{b.publicNote}</p>}
-                      </div>
-                    )}
-                    {adminMaterials.length > 0 && (
-                      <div>
-                        <p className="text-[10px] uppercase tracking-[0.07em] mb-1" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}>Facturación</p>
-                        {adminMaterials.map((m, i) => <a key={m.id} href={m.url} target="_blank" rel="noreferrer" data-track={`admin-doc:${m.title}`} className="flex items-center justify-between gap-3 py-2.5 hover:opacity-70" style={{ borderBottom: i === adminMaterials.length - 1 ? "none" : "1px solid var(--hall-line-soft)" }}><div className="min-w-0"><p className="text-[13px] font-semibold truncate">{m.title}</p><p className="text-[10px]" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted)" }}>{CATEGORY_LABELS[m.category] ?? m.category}{m.versionLabel ? ` · ${m.versionLabel}` : ""}</p></div><span aria-hidden="true" style={{ color: "var(--hall-muted)" }}>↗</span></a>)}
-                      </div>
-                    )}
-                    {showClientBilling && (
-                      <div style={{ borderTop: hasPayInfo || adminMaterials.length > 0 ? "1px solid var(--hall-line-soft)" : undefined, paddingTop: hasPayInfo || adminMaterials.length > 0 ? 16 : 0 }}>
-                        <p className="text-[10px] uppercase tracking-[0.07em] mb-2" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}>Tus datos de facturación</p>
-                        <ClientBillingForm projectId={room.id} profile={cb} canEdit={canEditBilling} />
-                      </div>
-                    )}
-                  </div>}
-            </Card>
-          </div>
+          </Card>
         </div>
-      </main>
+      )}
 
-      <footer className="px-4 sm:px-8 py-7" style={{ borderTop: "1px solid var(--hall-ink-0)", background: "var(--hall-paper-0)" }}><div className="max-w-6xl mx-auto flex flex-wrap justify-between gap-3 text-[10px] uppercase tracking-[0.07em]" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted-2)" }}><span>Preparado por Common House</span><span className="flex items-center gap-4">Confidencial{room.organizationName ? ` · ${room.organizationName}` : ""}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/brand/isotipo-lime.png" alt="" style={{ height: 22, width: "auto" }} /></span></div></footer>
-    </div>
+      <div className="grid grid-cols-1 lg:grid-cols-[1.6fr_1fr]" style={{ gap: 16, alignItems: "start", marginTop: 16 }}>
+        <div className="flex flex-col" style={{ gap: 16 }}>
+
+          {/* ── PROPUESTA ── */}
+          <Card id="proposal" icon="proposal" title="Nuestra propuesta"
+            meta={<span style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".3px", textTransform: "uppercase", padding: "2px 8px", borderRadius: 999, background: "var(--lobby-paper-2)", color: "var(--lobby-muted-2)" }}>{room.proposal.status}</span>}>
+            {featured && (
+              <>
+                <Prov>
+                  Compartido por {featured.sharedBy}
+                  {featuredFresh ? ` · ${featuredFresh}` : ""}
+                  {previousVersions.length > 0 ? " · reemplazó a la versión anterior" : ""}
+                </Prov>
+                <div style={{ marginTop: 10, marginBottom: 14 }}>
+                  {isPdf(featured) ? <PdfEmbed url={featured.url} title={featured.title} />
+                    : isSlides(featured) ? <SlidesEmbed embedUrl={`https://docs.google.com/presentation/d/${slidesId(featured.url)}/embed?start=false&loop=false&rm=minimal`} openUrl={featured.url} title={featured.title} />
+                    : <DeckEmbed url={featured.url} title={featured.title} />}
+                </div>
+              </>
+            )}
+            <p style={{ fontSize: 13.5, lineHeight: 1.6, maxWidth: "60ch", margin: 0 }}>{room.proposal.summary || "La propuesta se está preparando a partir de lo que escuchamos."}</p>
+            {!featured && room.proposal.file_url && (
+              <a className="lobby-btn-go inline-flex" style={{ marginTop: 14, textDecoration: "none" }} href={room.proposal.file_url} target="_blank" rel="noreferrer">
+                Abrir {room.proposal.file_name || "propuesta"} ↗
+              </a>
+            )}
+            {previousVersions.length > 0 && (
+              <div style={{ marginTop: 16, paddingTop: 12, borderTop: "1px solid var(--lobby-line-soft)" }}>
+                <div className="lobby-label" style={{ marginBottom: 6 }}>Versiones anteriores</div>
+                {previousVersions.map((m) => (
+                  <a key={m.id} href={m.url} target="_blank" rel="noreferrer" data-track={`version:${m.title}`}
+                    style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "7px 0", textDecoration: "none", color: "inherit" }}>
+                    <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--lobby-muted-2)" }}>{m.title}</span>
+                    <span style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10, color: "var(--lobby-muted)" }}>{m.versionLabel || "anterior"} ↗</span>
+                  </a>
+                ))}
+              </div>
+            )}
+          </Card>
+
+          {/* ── PLAN ── */}
+          {room.timeline.length > 0 && (
+            <Card id="plan" icon="plan" title="Plan y progreso"
+              meta={<span style={{ fontSize: 10, color: "var(--lobby-muted)", fontWeight: 600 }}>{room.timeline.length} hitos</span>}>
+              {room.timeline.map((item, index) => (
+                <div key={`${item.label}-${index}`} style={{ display: "flex", alignItems: "center", gap: 11, padding: "10px 0", borderTop: index === 0 ? "none" : "1px solid var(--lobby-line-soft)" }}>
+                  <span style={{ fontFamily: "var(--font-hall-mono)", fontSize: 9.5, fontWeight: 700, letterSpacing: ".5px", textTransform: "uppercase", color: "var(--lobby-muted)", minWidth: 52, flex: "none" }}>{item.date || "—"}</span>
+                  <strong style={{ flex: 1, minWidth: 0, fontSize: 12.5, fontWeight: 700 }}>{item.label}</strong>
+                  <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".3px", textTransform: "uppercase", padding: "2px 8px", borderRadius: 999, whiteSpace: "nowrap", background: item.type === "today" ? "var(--lobby-lime)" : "var(--lobby-paper-2)", color: item.type === "today" ? "#000" : "var(--lobby-muted-2)" }}>
+                    {item.type === "today" ? "Hoy" : item.type}
+                  </span>
+                </div>
+              ))}
+            </Card>
+          )}
+        </div>
+
+        <div className="flex flex-col" style={{ gap: 16 }}>
+
+          {/* ── TRABAJO JUNTOS ── */}
+          {room.timelineEvents.length > 0 && (
+            <Card id="together" icon="together" title="Nuestro trabajo juntos"
+              meta={<span style={{ fontSize: 10, color: "var(--lobby-muted)", fontWeight: 600 }}>{room.timelineEvents.length}</span>}>
+              {room.timelineEvents.map((ev, index) => {
+                const last = index === room.timelineEvents.length - 1;
+                return (
+                  <div key={ev.id} style={{ position: "relative", paddingLeft: 26, paddingBottom: last ? 0 : 14, borderLeft: last ? "1px solid transparent" : "1px solid var(--lobby-line)" }}>
+                    <span style={{ position: "absolute", left: -11, top: -2, width: 22, height: 22, borderRadius: 999, background: "var(--lobby-paper)", border: "1px solid var(--lobby-line)", display: "grid", placeItems: "center" }}>
+                      <KindIcon kind={ev.kind} />
+                    </span>
+                    <Prov>{displayDate(ev.eventDate)} · {TIMELINE_KIND_LABELS[ev.kind] ?? ev.kind}</Prov>
+                    <div style={{ fontSize: 12.5, fontWeight: 800, marginTop: 2 }}>{ev.title}</div>
+                    {ev.attendees.length > 0 && <div style={{ fontSize: 10.5, color: "var(--lobby-muted)", marginTop: 2, lineHeight: 1.45 }}>{ev.attendees.join(" · ")}</div>}
+                  </div>
+                );
+              })}
+            </Card>
+          )}
+
+          {/* ── ACUERDOS ── */}
+          {otherAgreements.length > 0 && (
+            <Card id="agreements" icon="agreements" title="Acuerdos"
+              meta={openAgreements.length > 0
+                ? <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".3px", textTransform: "uppercase", padding: "2px 8px", borderRadius: 999, background: "var(--lobby-alert)", color: "#fff" }}>{openAgreements.length} pendiente{openAgreements.length > 1 ? "s" : ""}</span>
+                : undefined}>
+              <div className="space-y-4">
+                {otherAgreements.map((agreement) => {
+                  const open = agreement.status === "shared" || agreement.status === "changes_requested";
+                  return (
+                    <article key={agreement.id} style={open ? { background: "var(--lobby-lime-paper)", border: "1.5px solid var(--lobby-lime)", borderRadius: 10, padding: "12px 13px" } : undefined}>
+                      <div className="lobby-label" style={{ color: open ? "var(--lobby-lime-ink)" : undefined }}>{agreement.agreementType.replaceAll("_", " ")} · v{agreement.version}</div>
+                      <h3 style={{ fontSize: 13, fontWeight: 800, lineHeight: 1.3, margin: "3px 0 0" }}>{agreement.title}</h3>
+                      {agreement.summary && <p style={{ fontSize: 11.5, lineHeight: 1.5, color: "var(--lobby-muted-2)", margin: "6px 0 0", whiteSpace: "pre-line" }}>{agreement.summary}</p>}
+                      {open && <AgreementResponseActions agreementId={agreement.id} version={agreement.version} agreementType={agreement.agreementType} canRespond={canRespondTo(agreement.agreementType)} />}
+                      {agreement.respondedAt && (
+                        <div style={{ marginTop: 8 }}>
+                          <Prov>Respondido {displayDate(agreement.respondedAt)}{agreement.respondedEmail ? ` · ${agreement.respondedEmail}` : ""}</Prov>
+                        </div>
+                      )}
+                    </article>
+                  );
+                })}
+              </div>
+            </Card>
+          )}
+
+          {/* ── DOCUMENTOS ── */}
+          {documents.length > 0 && (
+            <Card id="documents" icon="documents" title="Documentos"
+              meta={<span style={{ fontSize: 10, color: "var(--lobby-muted)", fontWeight: 600 }}>{documents.length}</span>}>
+              {documents.map((m, i) => {
+                const fresh = relativeDate(m.clientVisibleAt ?? m.modifiedAt);
+                return (
+                  <a key={m.id} href={m.url} target="_blank" rel="noreferrer" data-track={`doc:${m.title}`}
+                    style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "10px 0", borderTop: i === 0 ? "none" : "1px solid var(--lobby-line-soft)", textDecoration: "none", color: "inherit" }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 12.5, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.title}</div>
+                      <div style={{ fontSize: 10.5, color: "var(--lobby-muted)", fontWeight: 500, marginTop: 1 }}>
+                        {CATEGORY_LABELS[m.category] ?? m.category} · {m.sharedBy}{fresh ? ` · ${fresh}` : ""}
+                      </div>
+                    </div>
+                    <span aria-hidden="true" style={{ color: "var(--lobby-muted)", flex: "none" }}>↗</span>
+                  </a>
+                );
+              })}
+            </Card>
+          )}
+
+          {/* ── ADMINISTRATIVO ── */}
+          {hasAdmin && (
+            <Card id="admin" icon="admin" title="Administrativo"
+              meta={copyText ? <CopyButton text={copyText} label="Copiar todo" /> : undefined}>
+              <div className="space-y-4">
+                {(hasCompany || hasBank || b.publicNote) && (
+                  <div>
+                    <div className="lobby-label" style={{ marginBottom: 6 }}>Datos de pago</div>
+                    {hasCompany && <div style={{ fontSize: 12.5, lineHeight: 1.6, whiteSpace: "pre-line" }}>{["Common House", ...billingLines].join("\n")}</div>}
+                    {hasBank && <div style={{ marginTop: 10 }}><BankReveal accounts={b.bankAccounts} /></div>}
+                    {b.publicNote && <p style={{ marginTop: 8, fontSize: 11, color: "var(--lobby-muted)" }}>{b.publicNote}</p>}
+                  </div>
+                )}
+                {adminMaterials.length > 0 && (
+                  <div>
+                    <div className="lobby-label" style={{ marginBottom: 4 }}>Facturación</div>
+                    {adminMaterials.map((m, i) => {
+                      const fresh = relativeDate(m.clientVisibleAt ?? m.modifiedAt);
+                      return (
+                        <a key={m.id} href={m.url} target="_blank" rel="noreferrer" data-track={`admin-doc:${m.title}`}
+                          style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "10px 0", borderTop: i === 0 ? "none" : "1px solid var(--lobby-line-soft)", textDecoration: "none", color: "inherit" }}>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: 12.5, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.title}</div>
+                            <div style={{ fontSize: 10.5, color: "var(--lobby-muted)", marginTop: 1 }}>{CATEGORY_LABELS[m.category] ?? m.category} · {m.sharedBy}{fresh ? ` · ${fresh}` : ""}</div>
+                          </div>
+                          <span aria-hidden="true" style={{ color: "var(--lobby-muted)", flex: "none" }}>↗</span>
+                        </a>
+                      );
+                    })}
+                  </div>
+                )}
+                {showClientBilling && (
+                  <div style={{ borderTop: hasPayInfo || adminMaterials.length > 0 ? "1px solid var(--lobby-line-soft)" : undefined, paddingTop: hasPayInfo || adminMaterials.length > 0 ? 16 : 0 }}>
+                    <div className="lobby-label" style={{ marginBottom: 8 }}>Tus datos de facturación</div>
+                    <ClientBillingForm projectId={room.id} profile={cb} canEdit={canEditBilling} />
+                  </div>
+                )}
+              </div>
+            </Card>
+          )}
+        </div>
+      </div>
+
+      <footer style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginTop: 22, paddingTop: 14, borderTop: "1px solid var(--lobby-line)", fontFamily: "var(--font-hall-mono)", fontSize: 9.5, letterSpacing: ".8px", textTransform: "uppercase", color: "var(--lobby-muted)" }}>
+        <span>Preparado por Common House</span>
+        <span style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          Confidencial{room.organizationName ? ` · ${room.organizationName}` : ""}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/brand/isotipo-lime.png" alt="" style={{ height: 20, width: "auto" }} />
+        </span>
+      </footer>
+    </LobbyShell>
   );
 }

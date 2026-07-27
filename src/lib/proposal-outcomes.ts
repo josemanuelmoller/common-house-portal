@@ -25,7 +25,11 @@ export type ProposalType =
   | "content_pitch"
   | "project_update"
   | "decision_item"
-  | "objective_artifact";
+  | "objective_artifact"
+  /** Client's own decision on an agreement shared in their lobby. The only
+   *  outcome here that comes from outside Common House — the counterpart
+   *  approving or asking for changes on a proposal we generated. */
+  | "client_agreement";
 
 export type ProposalOutcomeInput = {
   proposal_type: ProposalType;
