@@ -89,12 +89,26 @@ function Card({ id, icon, title, meta, isNew, wash, children }: {
   );
 }
 
+/**
+ * `*texto*` → itálica lime. Es la convención que ya usa la sala (`renderHero` en
+ * RoomClient) y con la que están escritos `hall_current_focus` y compañía en la
+ * base: sin esto el lobby imprime los asteriscos crudos ("Piloto de *reúso*").
+ * Al converger las dos superficies, este helper es el que manda.
+ */
+function withEmphasis(text: string): ReactNode {
+  return text.split(/(\*[^*]+\*)/g).map((part, i) => (
+    part.startsWith("*") && part.endsWith("*") && part.length > 2
+      ? <em key={i} style={{ fontStyle: "italic", fontWeight: 800, color: "var(--lobby-lime-ink)" }}>{part.slice(1, -1)}</em>
+      : <span key={i}>{part}</span>
+  ));
+}
+
 function Stat({ label, value, sub, span, lime }: { label: string; value: string; sub?: string; span?: boolean; lime?: boolean }) {
   return (
     <div style={{ background: "var(--lobby-paper)", border: "1.5px solid var(--lobby-line)", borderRadius: 12, padding: "15px 16px", gridColumn: span ? "span 2" : undefined }}>
       <div className="lobby-label">{label}</div>
-      <div style={{ fontSize: span ? "1.5rem" : "1.05rem", fontWeight: 900, letterSpacing: span ? "-1px" : "-.3px", marginTop: 8, lineHeight: 1.25, color: lime ? "var(--lobby-lime-ink)" : undefined }}>{value}</div>
-      {sub && <div style={{ fontSize: 11, color: "var(--lobby-muted)", marginTop: 4, fontWeight: 500 }}>{sub}</div>}
+      <div style={{ fontSize: span ? "1.5rem" : "1.05rem", fontWeight: 900, letterSpacing: span ? "-1px" : "-.3px", marginTop: 8, lineHeight: 1.25, color: lime ? "var(--lobby-lime-ink)" : undefined }}>{withEmphasis(value)}</div>
+      {sub && <div style={{ fontSize: 11, color: "var(--lobby-muted)", marginTop: 4, fontWeight: 500 }}>{withEmphasis(sub)}</div>}
     </div>
   );
 }
@@ -216,7 +230,7 @@ export function ClientRoomView({ room, role, adminPreview }: { room: ClientRoomP
             <h1 style={{ fontFamily: "var(--font-hall-display), Georgia, serif", fontStyle: "italic", fontWeight: 400, fontSize: 42, letterSpacing: "-.02em", lineHeight: 1.05, maxWidth: "18ch", margin: "10px 0 0" }}>
               {room.name}<span style={{ color: "var(--lobby-lime)" }}>_</span>
             </h1>
-            {room.welcomeNote && <p style={{ color: "var(--lobby-muted)", fontSize: 14, maxWidth: "64ch", margin: "12px 0 0", lineHeight: 1.6, whiteSpace: "pre-line" }}>{room.welcomeNote}</p>}
+            {room.welcomeNote && <p style={{ color: "var(--lobby-muted)", fontSize: 14, maxWidth: "64ch", margin: "12px 0 0", lineHeight: 1.6, whiteSpace: "pre-line" }}>{withEmphasis(room.welcomeNote)}</p>}
           </div>
           {room.clientLogoUrl && (
             <div className="shrink-0 flex items-center justify-center" style={{ width: 240 }}>
