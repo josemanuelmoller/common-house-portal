@@ -113,6 +113,18 @@ type ProjectContext = {
     confidence: number;
   } | null;
   items: ActiveItem[];
+  /** Lo ya propuesto y todavía sin revisar. Sin esto el job es ciego a su
+   *  propia cola: sólo ve lo que un humano aceptó, y con la aceptación al 12%
+   *  vuelve a derivar de evidencia solapada lo que ya había propuesto. */
+  pending: PendingProposal[];
+};
+
+type PendingProposal = {
+  id: string;
+  kind: string;
+  itemType: string | null;
+  statement: string;
+  createdAt: string;
 };
 
 export type ProjectRefreshResult = {
@@ -213,7 +225,7 @@ export async function getEvidenceDelta(
 
 async function loadProjectContext(projectId: string): Promise<ProjectContext | null> {
   const sb = supabaseAdmin();
-  const [projectRes, stateRes, itemsRes] = await Promise.all([
+  const [projectRes, stateRes, itemsRes, pendingRes] = await Promise.all([
     sb.from("projects").select("id, notion_id, name").eq("id", projectId).maybeSingle(),
     sb.from("project_states")
       .select("current_summary, current_phase, current_focus, health, confidence")
@@ -222,6 +234,10 @@ async function loadProjectContext(projectId: string): Promise<ProjectContext | n
       .select("id, item_type, statement, status, owner_label, stakeholder_label")
       .eq("project_id", projectId).eq("status", "active")
       .order("updated_at", { ascending: false }).limit(60),
+    sb.from("project_state_proposals")
+      .select("id, proposal_kind, item_type, summary, payload, created_at")
+      .eq("project_id", projectId).eq("status", "pending")
+      .order("created_at", { ascending: false }).limit(40),
   ]);
   if (projectRes.error) throw new Error(`project read failed: ${projectRes.error.message}`);
   if (!projectRes.data) return null;
@@ -245,6 +261,14 @@ async function loadProjectContext(projectId: string): Promise<ProjectContext | n
       ownerLabel: (row.owner_label as string | null) ?? null,
       stakeholderLabel: (row.stakeholder_label as string | null) ?? null,
     })),
+    pending: (pendingRes.data ?? []).map((row) => ({
+      id: row.id as string,
+      kind: row.proposal_kind as string,
+      itemType: (row.item_type as string | null) ?? null,
+      statement: ((row.payload as Record<string, unknown> | null)?.statement as string | null)
+        ?? (row.summary as string | null) ?? "",
+      createdAt: row.created_at as string,
+    })).filter((p) => p.statement.trim() !== ""),
   };
 }
 
@@ -263,6 +287,7 @@ const PROPOSAL_TOOL: Anthropic.Tool = {
           properties: {
             kind: { type: "string", enum: ["add_item", "update_item", "resolve_item", "state_summary", "add_learning"] },
             target_ref: { type: "string", description: "For update_item/resolve_item: the A-label of the existing active item this changes (e.g. 'A2')." },
+            supersedes: { type: "string", description: "P-label of a pending proposal that this one makes obsolete (e.g. 'P3'). Use when new evidence corrects or updates something already queued, instead of adding a second entry that contradicts it." },
             item_type: { type: "string", enum: ["decision", "commitment", "risk", "dependency", "question", "milestone", "stakeholder_signal", "assumption", "outcome"], description: "For add_item: the claim type." },
             summary: { type: "string", description: "One-line headline of the proposed change." },
             rationale: { type: "string", description: "Why the new evidence justifies this, in one or two sentences." },
@@ -301,6 +326,7 @@ const PROPOSAL_TOOL: Anthropic.Tool = {
 type RawProposal = {
   kind?: string;
   target_ref?: string;
+  supersedes?: string;
   item_type?: string;
   summary?: string;
   rationale?: string;
@@ -322,6 +348,15 @@ function buildPrompt(ctx: ProjectContext, evidence: EvidenceDeltaRow[], itemLabe
     ? ctx.items.map((it) => `${itemLabels.get(it.id)} [${it.itemType}] ${it.statement}${it.ownerLabel ? ` — owner: ${it.ownerLabel}` : ""}`).join("\n")
     : "(no active claims yet)";
 
+  // La cola pendiente entra al prompt como P-labels. El modelo puede así no
+  // repetir lo que ya propuso, y sobre todo declarar que una propuesta nueva
+  // REEMPLAZA a una pendiente cuando la evidencia fresca la deja obsoleta: es
+  // el caso "la máquina llega en mayo" → "se retrasó a agosto", que hoy entra
+  // como dos afirmaciones que conviven y se contradicen.
+  const pendingLines = ctx.pending.length
+    ? ctx.pending.map((pp, i) => `P${i + 1} [${pp.kind}${pp.itemType ? `/${pp.itemType}` : ""}] (propuesta ${pp.createdAt.slice(0, 10)}) ${pp.statement}`).join("\n")
+    : "(nothing queued)";
+
   const evLines = evidence.map((e, i) =>
     `E${i + 1} [${e.type}${e.resolutionStatus ? `/${e.resolutionStatus}` : ""}] (${e.confidenceLevel ?? "conf?"}, ${e.dateCaptured ?? e.createdAt.slice(0, 10)}) ${e.title}: ${e.statement}`
   ).join("\n");
@@ -336,11 +371,18 @@ ${stateBlock}
 ACTIVE CLAIMS (reference by A-label for update_item/resolve_item):
 ${itemLines}
 
+ALREADY PROPOSED, AWAITING HUMAN REVIEW (reference by P-label in supersedes):
+${pendingLines}
+
 NEW VALIDATED EVIDENCE (reference by E-label in source_evidence_refs):
 ${evLines}
 
 RULES:
 - Propose ONLY what the new evidence materially changes. If nothing material changed, return an empty proposals array.
+- The P-list is work you already proposed that nobody has reviewed yet. Treat it as known, not as missing:
+  - Do NOT re-propose something a P-item already says. Restating it in different words creates two queue entries for one decision.
+  - If new evidence makes a P-item WRONG or OUT OF DATE, propose the corrected version and set "supersedes" to that P-label. The stale one is then closed automatically instead of sitting next to yours contradicting it.
+  - A P-item is not an active claim: never target it with update_item/resolve_item (those take A-labels).
 - Prefer resolving or updating an existing active claim over adding a duplicate. Use resolve_item when evidence shows a claim is done, reversed, or no longer relevant (set proposed.status to resolved/superseded/expired/unknown and give a resolution_note).
 - add_item for a genuinely new decision, commitment, risk, dependency, question, milestone, stakeholder signal, assumption or outcome.
 - state_summary only when the overall summary/phase/focus/health should change.
@@ -398,6 +440,9 @@ type ProposalInsert = {
   evidence_window_end: string;
   generated_by: string;
   model: string;
+  /** Propuesta pendiente que ésta deja obsoleta. La resuelve el servidor desde
+   *  la P-label: el modelo nunca ve ni escribe uuids. */
+  supersedes_proposal_id: string | null;
 };
 
 function normalizeProposal(
@@ -405,6 +450,7 @@ function normalizeProposal(
   ctx: ProjectContext,
   evidence: EvidenceDeltaRow[],
   labelToItemId: Map<string, string>,
+  labelToPendingId: Map<string, string>,
   windowStart: string,
   windowEnd: string,
 ): ProposalInsert | null {
@@ -519,6 +565,10 @@ function normalizeProposal(
     evidence_window_end: windowEnd,
     generated_by: "job:state-refresh",
     model: STATE_MODEL,
+    // P-label → uuid acá, no en el modelo: misma regla que A/E labels.
+    supersedes_proposal_id: typeof raw.supersedes === "string"
+      ? labelToPendingId.get(raw.supersedes.trim().toUpperCase()) ?? null
+      : null,
   };
 }
 
@@ -588,9 +638,11 @@ export async function runStateRefreshForProject(
 
   const labelToItemId = new Map<string, string>();
   ctx.items.forEach((it, i) => labelToItemId.set(`A${i + 1}`, it.id));
+  const labelToPendingId = new Map<string, string>();
+  ctx.pending.forEach((pp, i) => labelToPendingId.set(`P${i + 1}`, pp.id));
 
   const validated = raw
-    .map((p) => normalizeProposal(p, ctx, evidence, labelToItemId, cursor.at, next.at))
+    .map((p) => normalizeProposal(p, ctx, evidence, labelToItemId, labelToPendingId, cursor.at, next.at))
     .filter((v): v is ProposalInsert => v !== null);
   // Model output the apply path could not have acted on. Counted, not swallowed —
   // this is what makes the guard above visible instead of a silent drop.
