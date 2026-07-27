@@ -163,6 +163,82 @@ export async function pendingProposalCount(projectId?: string): Promise<number> 
   return count ?? 0;
 }
 
+// ─── antes/después ───────────────────────────────────────────────────────────
+
+export type ProposalChange = {
+  kind: string;
+  itemType: string | null;
+  summary: string;
+  before: string | null;   // null cuando la propuesta crea algo que no existía
+  after: string | null;
+};
+
+const facet = (parts: (string | null | undefined)[]) => parts.map((p) => (p ?? "").trim()).filter(Boolean).join(" · ") || null;
+const str = (o: Record<string, unknown>, k: string) => {
+  const v = o[k];
+  return typeof v === "string" && v.trim() ? v.trim() : null;
+};
+
+/**
+ * Antes/después legible de una propuesta pendiente. Hay que llamarlo ANTES de
+ * aplicarla: una vez que corre `apply_state_proposal`, el "antes" ya no existe
+ * en ninguna tabla salvo el snapshot de la revisión.
+ *
+ * El "después" replica la semántica de coalesce del RPC: un campo ausente en el
+ * payload NO borra el valor actual, así que se muestra el valor que quedará.
+ */
+export async function describeProposalChange(projectId: string, proposalId: string): Promise<ProposalChange | null> {
+  const sb = supabaseAdmin();
+  const { data: prop } = await sb
+    .from("project_state_proposals")
+    .select("proposal_kind, item_type, summary, payload, project_state_items!project_state_proposals_target_item_id_fkey(statement, status, owner_label, resolution_note)")
+    .eq("id", proposalId)
+    .eq("project_id", projectId)
+    .maybeSingle();
+  if (!prop) return null;
+
+  const kind = prop.proposal_kind as string;
+  const payload = (prop.payload as Record<string, unknown>) ?? {};
+  const base: Omit<ProposalChange, "before" | "after"> = {
+    kind,
+    itemType: (prop.item_type as string | null) ?? null,
+    summary: (prop.summary as string | null) ?? "",
+  };
+
+  if (kind === "update_item" || kind === "resolve_item") {
+    const t = (Array.isArray(prop.project_state_items) ? prop.project_state_items[0] : prop.project_state_items) as
+      { statement?: string; status?: string; owner_label?: string; resolution_note?: string } | null;
+    const nextStatus = str(payload, "status") ?? (kind === "resolve_item" ? "resolved" : t?.status ?? null);
+    return {
+      ...base,
+      before: facet([t?.status, t?.owner_label, t?.resolution_note]),
+      after: facet([nextStatus, str(payload, "owner_label") ?? t?.owner_label, str(payload, "resolution_note") ?? t?.resolution_note]),
+    };
+  }
+
+  if (kind === "state_summary") {
+    const { data: st } = await sb
+      .from("project_states")
+      .select("current_summary, current_phase, current_focus, health")
+      .eq("project_id", projectId)
+      .maybeSingle();
+    const cur = (st ?? {}) as Record<string, string | null>;
+    return {
+      ...base,
+      before: facet([cur.current_summary, cur.current_phase, cur.current_focus, cur.health]),
+      after: facet([
+        str(payload, "current_summary") ?? cur.current_summary,
+        str(payload, "current_phase") ?? cur.current_phase,
+        str(payload, "current_focus") ?? cur.current_focus,
+        str(payload, "health") ?? cur.health,
+      ]),
+    };
+  }
+
+  // add_item / add_learning: no hay "antes" — la propuesta crea la fila.
+  return { ...base, before: null, after: proposalPreview(kind, payload) };
+}
+
 export type AcceptResult = { ok: true; kind: string } | { ok: false; error: string; status: number };
 
 /**

@@ -20,9 +20,12 @@ function fmtWhen(iso: string | null): string {
 }
 
 /**
- * Cross-room status box for the admin Hall: which client rooms are ready to
- * share and a light analytics roll-up per room. Self-fetching so it can be
+ * Cross-lobby status box for the admin Hall: which pre-sale lobbies are ready
+ * to share and a light analytics roll-up per lobby. Self-fetching so it can be
  * dropped into the Hall inside a Suspense/error boundary.
+ *
+ * "Lobby" = pre-sale surface (`/lobby/[slug]`). Post-sale work happens in a
+ * Sala (`/rooms/[projectId]`), which is a different surface entirely.
  */
 export async function ClientRoomsOverview() {
   const rooms = await getRoomsOverview();
@@ -39,8 +42,7 @@ export async function ClientRoomsOverview() {
     <section className="mb-2">
       <div className="flex items-baseline justify-between gap-3 pb-2 mb-3" style={{ borderBottom: "1px solid var(--hall-ink-0)" }}>
         <h2 className="text-[19px] font-bold leading-none flex items-baseline gap-2" style={{ letterSpacing: "-0.02em", color: "var(--hall-ink-0)" }}>
-          <span>Client</span>
-          <em style={{ fontFamily: "var(--font-hall-display)", fontStyle: "italic", fontWeight: 400 }}>rooms</em>
+          <span>Lobbies</span>
         </h2>
         <span style={{ fontFamily: "var(--font-hall-mono)", fontSize: 10, letterSpacing: "0.06em", color: "var(--hall-muted-2)" }}>
           {readyCount}/{rooms.length} LISTOS
@@ -64,7 +66,7 @@ export async function ClientRoomsOverview() {
               <div className="min-w-0">
                 <p className="text-[13px] font-semibold truncate" style={{ color: "var(--hall-ink-0)" }}>{r.org ?? r.name}</p>
                 <p className="text-[10px]" style={{ fontFamily: "var(--font-hall-mono)", color: "var(--hall-muted)" }}>
-                  {r.ready ? "listo" : !r.enabled ? "room off" : r.grants === 0 ? "sin accesos" : "sin material"}
+                  {r.ready ? "listo" : !r.enabled ? "lobby off" : r.grants === 0 ? "sin accesos" : "sin material"}
                   {" · "}/{r.slug}
                 </p>
               </div>

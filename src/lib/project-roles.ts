@@ -171,6 +171,16 @@ export async function listRoomsForActor(actor: RoomActor): Promise<RoomSummary[]
 }
 
 /**
+ * Salas de las que esta persona es miembro activo, resuelto solo por email
+ * (sin sesión). Lo usa el router de entrada del cliente: si ya tiene sala,
+ * entra a la sala — un proyecto andando no tiene lobby.
+ */
+export async function listRoomsForEmail(email: string): Promise<RoomSummary[]> {
+  if (!email) return [];
+  return listRoomsForActor({ email, clerkId: null, personId: null, role: null, isSuperAdmin: false });
+}
+
+/**
  * Emite un evento al event log inmutable (project_events).
  * Todo cambio de la capa de trabajo pasa por acá: de esto salen undo,
  * atestiguación, auditoría, analítica y el feed. Best-effort (no rompe la request).

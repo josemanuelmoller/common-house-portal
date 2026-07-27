@@ -87,7 +87,12 @@ export async function PATCH(req: NextRequest, c: { params: Promise<{ projectId: 
   }
 
   if (action === "reopen") {
-    if (!can(actor.role, "decision.manage")) return NextResponse.json({ error: "Tu rol no puede reabrir decisiones" }, { status: 403 });
+    // Simétrico con "resolve": quien resolvió puede deshacer lo suyo (el toast
+    // ofrece "Deshacer" a quien acaba de resolver). Reabrir una decisión ajena
+    // sigue siendo de decision.manage.
+    const resolvedByActor = !!current.resolved_by && current.resolved_by === (actor.email ?? actor.clerkId);
+    const allowed = can(actor.role, "decision.manage") || (can(actor.role, "decision.resolve_own") && resolvedByActor);
+    if (!allowed) return NextResponse.json({ error: "Tu rol no puede reabrir esta decisión" }, { status: 403 });
     const { data, error: upErr } = await db.from("project_decisions").update({ status: "open", resolved_by: null, resolved_at: null }).eq("id", id).select("*").single();
     if (upErr) return NextResponse.json({ error: upErr.message }, { status: 502 });
     await logRoomEvent({ projectId: project.id, actor, verb: "reopened", targetType: "decision", targetId: id, summary: `Reabrió "${current.title}"` });

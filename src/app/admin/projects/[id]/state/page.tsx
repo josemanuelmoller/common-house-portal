@@ -27,7 +27,7 @@ export default async function ProjectStatePage({ params }: { params: Promise<{ i
   await requireAdmin();
   const { id } = await params;
   const view = await getProjectStateView(id);
-  if (!view) redirect("/admin/workrooms");
+  if (!view) redirect("/admin/projects");
 
   const pending = await listPendingProposals(view.projectId);
   const proposals: ProposalCard[] = pending.map((p) => ({

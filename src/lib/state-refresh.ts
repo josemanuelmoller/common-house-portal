@@ -9,6 +9,16 @@ import {
   computeAnthropicCost,
   type AnthropicUsage,
 } from "@/lib/anthropic-cost";
+import {
+  HEALTH,
+  IMPACT,
+  ITEM_RESOLVE_STATUSES,
+  ITEM_UPDATE_STATUSES,
+  LEARNING_TYPES,
+  PROPOSAL_KINDS,
+  STATE_ITEM_TYPES,
+  partitionApplicable,
+} from "@/lib/state-proposal-insert";
 
 /**
  * Incremental project state-refresh job.
@@ -45,23 +55,9 @@ function normalizeStatement(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9áéíóúñü ]+/gi, "").replace(/\s+/g, " ").trim();
 }
 
-// ─── Contract sets (validated against the DB check constraints) ───────────────
-
-const STATE_ITEM_TYPES = new Set([
-  "decision", "commitment", "risk", "dependency", "question", "milestone",
-  "stakeholder_signal", "assumption", "outcome",
-]);
-const ITEM_RESOLVE_STATUSES = new Set(["resolved", "superseded", "unknown", "expired"]);
-const ITEM_UPDATE_STATUSES = new Set(["active", "resolved", "superseded", "unknown", "expired"]);
-const HEALTH = new Set(["on_track", "watch", "blocked", "paused", "unknown"]);
-const IMPACT = new Set(["low", "medium", "high", "critical"]);
-const LEARNING_TYPES = new Set([
-  "implementation_question", "stakeholder_need", "friction",
-  "decision_pattern", "operating_pattern", "outcome",
-]);
-const PROPOSAL_KINDS = new Set([
-  "add_item", "update_item", "resolve_item", "state_summary", "add_learning",
-]);
+// ─── Contract sets ────────────────────────────────────────────────────────────
+// Owned by state-proposal-insert, which is where they are kept in sync with the
+// project_state_proposals_applicable CHECK and with apply_state_proposal.
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -110,6 +106,13 @@ export type ProjectRefreshResult = {
   evidenceConsidered: number;
   /** How many proposals the model returned before server-side validation. */
   modelProposed: number;
+  /**
+   * Returned by the model but dropped by server-side validation: unknown kind,
+   * no traceable evidence, or a payload the apply path could not act on (see
+   * normalizeProposal). Historically zero — a run that starts discarding is the
+   * signal to look at the model output.
+   */
+  discarded: number;
   /** Dropped after validation by dedup (duplicate of an active claim / pending proposal) or the per-run cap. */
   suppressed: number;
   proposalsCreated: number;
@@ -454,8 +457,7 @@ function normalizeProposal(
       if (str("current_phase")) payload.current_phase = str("current_phase");
       if (str("current_focus")) payload.current_focus = str("current_focus");
       if (HEALTH.has(str("health") ?? "")) payload.health = str("health");
-      if (Object.keys(payload).length === 0) return null;
-      break;
+      break; // the shared empty-payload guard below covers this case too
     }
     case "add_learning": {
       const title = str("title");
@@ -471,6 +473,18 @@ function normalizeProposal(
     default:
       return null;
   }
+
+  // An empty payload is not a proposal. It was only guarded for state_summary,
+  // so an update_item whose model output carried no status/label/due_at/note fell
+  // through: apply_state_proposal coalesces every field over its current value, so
+  // accepting it succeeds and changes nothing.
+  //
+  // This guard also has to stay once the DB-side applicability constraint lands.
+  // commit_state_proposals inserts the whole batch in ONE transaction, so a single
+  // rejected row would abort the commit — losing every good proposal in that batch
+  // and leaving the cursor unadvanced, to fail again on the next run. Dropping the
+  // row here keeps the failure per-proposal instead of per-project.
+  if (Object.keys(payload).length === 0) return null;
 
   return {
     project_id: ctx.id,
@@ -533,18 +547,18 @@ export async function runStateRefreshForProject(
   const nowIso = new Date().toISOString();
   const ctx = await loadProjectContext(projectId);
   if (!ctx) {
-    return { projectId, projectName: "(unknown)", windowStart: nowIso, windowEnd: nowIso, evidenceConsidered: 0, modelProposed: 0, suppressed: 0, proposalsCreated: 0, skippedReason: "project not found" };
+    return { projectId, projectName: "(unknown)", windowStart: nowIso, windowEnd: nowIso, evidenceConsidered: 0, modelProposed: 0, discarded: 0, suppressed: 0, proposalsCreated: 0, skippedReason: "project not found" };
   }
   const base = { projectId, projectName: ctx.name };
   if (!ctx.notionId) {
-    return { ...base, windowStart: nowIso, windowEnd: nowIso, evidenceConsidered: 0, modelProposed: 0, suppressed: 0, proposalsCreated: 0, skippedReason: "no notion_id link for evidence lookup" };
+    return { ...base, windowStart: nowIso, windowEnd: nowIso, evidenceConsidered: 0, modelProposed: 0, discarded: 0, suppressed: 0, proposalsCreated: 0, skippedReason: "no notion_id link for evidence lookup" };
   }
 
   const cursor = await resolveCursor(projectId, lookbackDays);
   const evidence = await getEvidenceDelta(ctx.notionId, cursor);
   if (evidence.length === 0) {
     // Nothing new — cursor stays exactly where it was.
-    return { ...base, windowStart: cursor.at, windowEnd: cursor.at, evidenceConsidered: 0, modelProposed: 0, suppressed: 0, proposalsCreated: 0, skippedReason: "no new validated evidence" };
+    return { ...base, windowStart: cursor.at, windowEnd: cursor.at, evidenceConsidered: 0, modelProposed: 0, discarded: 0, suppressed: 0, proposalsCreated: 0, skippedReason: "no new validated evidence" };
   }
 
   // Evidence is ascending; the last row is the max (updated_at, id) in this batch.
@@ -561,7 +575,18 @@ export async function runStateRefreshForProject(
   const validated = raw
     .map((p) => normalizeProposal(p, ctx, evidence, labelToItemId, cursor.at, next.at))
     .filter((v): v is ProposalInsert => v !== null);
-  const inserts = await dedupeAndCap(projectId, validated);
+  // Model output the apply path could not have acted on. Counted, not swallowed —
+  // this is what makes the guard above visible instead of a silent drop.
+  const discarded = raw.length - validated.length;
+  const capped = await dedupeAndCap(projectId, validated);
+  // Last gate before the transactional commit. commit_state_proposals inserts
+  // the batch AND advances the cursor in one transaction, so a single row
+  // violating project_state_proposals_applicable would roll back both — leaving
+  // this project re-reading the same evidence, and failing, on every later run.
+  const { applicable: inserts, rejected: inapplicable } = partitionApplicable(capped);
+  for (const { proposal, reason } of inapplicable) {
+    console.warn(`state-refresh: dropped inapplicable ${proposal.proposal_kind} proposal for project ${projectId}: ${reason}`);
+  }
   const suppressed = validated.length - inserts.length;
 
   // Atomic commit: insert the (deduped/capped) proposals AND advance the cursor
@@ -578,18 +603,18 @@ export async function runStateRefreshForProject(
   });
   if (error) {
     if (error.code === "55000" || /cursor moved/i.test(error.message)) {
-      return { ...base, windowStart: cursor.at, windowEnd: cursor.at, evidenceConsidered: evidence.length, modelProposed: raw.length, suppressed, proposalsCreated: 0, skippedReason: "concurrent run handled this delta" };
+      return { ...base, windowStart: cursor.at, windowEnd: cursor.at, evidenceConsidered: evidence.length, modelProposed: raw.length, discarded, suppressed, proposalsCreated: 0, skippedReason: "concurrent run handled this delta" };
     }
     throw new Error(`commit failed: ${error.message}`);
   }
   const proposalsCreated = (committed as number | null) ?? inserts.length;
 
-  const result = { ...base, windowStart: cursor.at, windowEnd: next.at, evidenceConsidered: evidence.length, modelProposed: raw.length, suppressed, proposalsCreated };
+  const result = { ...base, windowStart: cursor.at, windowEnd: next.at, evidenceConsidered: evidence.length, modelProposed: raw.length, discarded, suppressed, proposalsCreated };
   if (proposalsCreated === 0) {
     // modelProposed > 0 with everything suppressed/failed is observable, not a
     // silent "nothing new".
     const reason = raw.length === 0 ? "no material proposals"
-      : validated.length === 0 ? "proposals failed validation"
+      : validated.length === 0 ? `${discarded} proposal${discarded === 1 ? "" : "s"} discarded as inapplicable (nothing the state layer could write)`
       : "all proposals were duplicates or capped";
     return { ...result, skippedReason: reason };
   }

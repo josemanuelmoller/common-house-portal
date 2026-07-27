@@ -2,7 +2,7 @@
  * Client-scoped access helpers.
  *
  * Mirrors require-admin.ts shape but for non-admin clients who only see
- * a single project via /hall/[slug]. Admin always passes through.
+ * a single project via /lobby/[slug]. Admin always passes through.
  *
  * Reads from public.client_access (Supabase) — the canonical mapping from
  * Clerk user → project(s) they can read. Service-role only; the table has
@@ -148,7 +148,7 @@ export async function findGrantForSlug(
  * Full resolution: returns "admin" if the user is admin (full pass),
  * "client" if they hold a grant for this slug, or "denied" otherwise.
  *
- * Use this in /hall/[slug]/page.tsx. Do NOT use this in API routes —
+ * Use this in /lobby/[slug]/page.tsx. Do NOT use this in API routes —
  * those should use clientAccessGuardApi which returns NextResponse.
  */
 export async function resolveAccessForSlug(slug: string): Promise<AccessOutcome> {

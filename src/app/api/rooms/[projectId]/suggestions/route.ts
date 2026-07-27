@@ -2,12 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { resolveClientRoomProject } from "@/lib/client-room";
 import { can, logRoomEvent, resolveRoomActor } from "@/lib/project-roles";
-import { acceptProposal } from "@/lib/state-proposals";
+import { acceptProposal, describeProposalChange, rejectProposal } from "@/lib/state-proposals";
 
 /**
  * Bandeja "la IA propone" (inbox del Resumen). Lista y resuelve sugerencias
  * pendientes (project_state_proposals). Confirmar/Descartar = gate humano: nada
  * se aplica sin el ✓ del PM (suggestion.confirm).
+ *
+ * Confirmar corre `apply_state_proposal` (misma RPC atómica que /admin), que es
+ * lo único que mueve el estado del proyecto. Marcar la propuesta como accepted
+ * a mano —como hacía esta ruta— la sacaba de 'pending' sin aplicar nada y la
+ * dejaba imposible de aplicar después: la RPC exige 'pending'.
  */
 
 export async function GET(_req: NextRequest, c: { params: Promise<{ projectId: string }> }) {
@@ -43,25 +48,32 @@ export async function PATCH(req: NextRequest, c: { params: Promise<{ projectId: 
   const action = body.action === "confirm" ? "confirm" : body.action === "dismiss" ? "dismiss" : "";
   if (!id || !action) return NextResponse.json({ error: "id and action (confirm|dismiss) required" }, { status: 400 });
 
-  const db = supabaseAdmin();
-  const { data: cur } = await db.from("project_state_proposals").select("summary").eq("id", id).eq("project_id", project.id).maybeSingle();
-  const who = actor.email ?? actor.clerkId ?? "room";
+  const actorId = actor.email ?? actor.clerkId ?? "unknown-room-actor";
 
-  if (action === "confirm") {
-    // Confirmar tiene que APLICAR, no solo marcar. Esta ruta cambiaba el status
-    // a mano y la propuesta quedaba 'accepted' sin crear nada (así se perdió una
-    // tarea en prod). acceptProposal delega en apply_state_proposal(), que
-    // inserta la entidad, deja revisión y cierra el action_item de origen —
-    // todo en una transacción.
-    const res = await acceptProposal(project.id, id, who);
-    if (!res.ok) return NextResponse.json({ error: res.error }, { status: res.status });
-  } else {
-    const { error: upErr } = await db.from("project_state_proposals")
-      .update({ status: "rejected", reviewed_by: who, reviewed_at: new Date().toISOString() })
-      .eq("id", id).eq("project_id", project.id).eq("status", "pending");
-    if (upErr) return NextResponse.json({ error: upErr.message }, { status: 502 });
-  }
+  // El antes/después se captura acá, con la propuesta todavía pendiente.
+  const change = await describeProposalChange(project.id, id);
+  if (!change) return NextResponse.json({ error: "Suggestion not found" }, { status: 404 });
 
-  await logRoomEvent({ projectId: project.id, actor, verb: action === "confirm" ? "confirmed" : "rejected", targetType: "suggestion", targetId: id, summary: `${action === "confirm" ? "Confirmó" : "Descartó"} la sugerencia "${cur?.summary ?? ""}"` });
-  return NextResponse.json({ ok: true });
+  const result = action === "confirm"
+    ? await acceptProposal(project.id, id, actorId)
+    : await rejectProposal(project.id, id, actorId, null);
+  if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status });
+
+  await logRoomEvent({
+    projectId: project.id,
+    actor,
+    verb: action === "confirm" ? "confirmed" : "rejected",
+    targetType: "suggestion",
+    targetId: id,
+    summary: `${action === "confirm" ? "Confirmó" : "Descartó"} la sugerencia "${change.summary}"`,
+    payload: action === "confirm"
+      ? { kind: change.kind, item_type: change.itemType, before: change.before, after: change.after }
+      : { kind: change.kind, item_type: change.itemType },
+  });
+
+  return NextResponse.json({
+    ok: true,
+    kind: result.kind,
+    change: action === "confirm" ? { before: change.before, after: change.after } : null,
+  });
 }

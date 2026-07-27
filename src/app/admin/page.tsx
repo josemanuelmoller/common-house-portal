@@ -143,9 +143,12 @@ function projectTypeBadge(primaryWorkspace: string): string {
   return "bg-[#f4f4ef] text-[#0a0a0a]/30 border border-[#e4e4dd]";
 }
 
+// El valor `workroom` del dato se queda (es el tipo de proyecto), pero la
+// etiqueta ya no: /workroom no existe y nombrar una superficie muerta confunde.
+// Lo que distingue de verdad es a quién sirve el proyecto: cliente vs cartera.
 function projectTypeLabel(primaryWorkspace: string): string {
   if (primaryWorkspace === "garage")   return "Garage";
-  if (primaryWorkspace === "workroom") return "Workroom";
+  if (primaryWorkspace === "workroom") return "Cliente";
   return "—";
 }
 
@@ -1060,14 +1063,6 @@ export default async function AdminPage({ searchParams }: { searchParams?: Promi
           </Suspense>
         </div>
 
-        {/* Client rooms — status (ready to share?) + light analytics roll-up.
-            Always visible above the tabs; self-isolating so it can't crash the Hall. */}
-        <div className="px-9 pt-4">
-          <Suspense fallback={null}>
-            <SafeServerSection name="ClientRoomsOverview" render={() => ClientRoomsOverview()} />
-          </Suspense>
-        </div>
-
         <HallTabs
           badges={{
             today:         (p1Decisions.length + imminentDeadlines.length) || undefined,
@@ -1955,18 +1950,17 @@ export default async function AdminPage({ searchParams }: { searchParams?: Promi
                         : p.updateNeeded ? "2px solid var(--hall-warn)"
                         : "none";
                       return (
-                        <Link
+                        <div
                           key={p.id}
-                          href={`/admin/projects/${p.id}`}
-                          className="grid grid-cols-[minmax(0,1fr)_72px_90px_18px] md:grid-cols-[minmax(0,2.2fr)_minmax(0,1fr)_110px_110px_24px] gap-2 md:gap-3 py-2.5 group items-center"
+                          className="grid grid-cols-[minmax(0,1fr)_72px_90px_44px] md:grid-cols-[minmax(0,2.2fr)_minmax(0,1fr)_110px_110px_52px] gap-2 md:gap-3 py-2.5 group items-center"
                           style={{
                             borderTop: "1px solid var(--hall-line-soft)",
                             borderLeft: leftBorder,
                             paddingLeft: leftBorder !== "none" ? 8 : 0,
                           }}
                         >
-                          {/* Project name + inline type + geography */}
-                          <div className="min-w-0">
+                          {/* Project name + inline type + geography — links to the admin project page */}
+                          <Link href={`/admin/projects/${p.id}`} className="block min-w-0">
                             <div className="flex items-center gap-2 min-w-0 flex-wrap">
                               <span className="text-[12.5px] font-semibold truncate max-w-full" style={{ color: "var(--hall-ink-0)" }}>{p.name}</span>
                               {typeLbl !== "—" && (
@@ -1987,7 +1981,7 @@ export default async function AdminPage({ searchParams }: { searchParams?: Promi
                                 {p.geography.slice(0, 2).join(" · ")}
                               </span>
                             )}
-                          </div>
+                          </Link>
 
                           {/* Stage — hidden on mobile, shown inline under project name instead */}
                           <div className="min-w-0 hidden md:block">
@@ -2031,8 +2025,20 @@ export default async function AdminPage({ searchParams }: { searchParams?: Promi
                             )}
                           </div>
 
-                          <div className="text-sm text-right transition-colors" style={{ color: "var(--hall-muted-3)" }}>→</div>
-                        </Link>
+                          {/* Sala — the post-sale work room for this project */}
+                          <Link
+                            href={`/rooms/${p.id}`}
+                            title="Abrir la sala de trabajo"
+                            className="text-right text-[9px] font-bold uppercase transition-colors hover:underline"
+                            style={{
+                              fontFamily: "var(--font-hall-mono)",
+                              letterSpacing: "0.06em",
+                              color: "var(--hall-muted-2)",
+                            }}
+                          >
+                            Sala →
+                          </Link>
+                        </div>
                       );
                     })}
                     {projects.length === 0 && (
@@ -2062,27 +2068,37 @@ export default async function AdminPage({ searchParams }: { searchParams?: Promi
                             const activityDate = bestActivity(p);
                             const days = daysSince(activityDate);
                             return (
-                              <Link
+                              <div
                                 key={p.id}
-                                href={`/admin/projects/${p.id}`}
-                                className="grid grid-cols-[minmax(0,2.2fr)_minmax(0,1fr)_110px_110px_24px] gap-3 py-2 items-center opacity-60"
+                                className="grid grid-cols-[minmax(0,2.2fr)_minmax(0,1fr)_110px_110px_52px] gap-3 py-2 items-center opacity-60"
                                 style={{ borderTop: "1px solid var(--hall-line-soft)" }}
                               >
-                                <div className="min-w-0">
+                                <Link href={`/admin/projects/${p.id}`} className="block min-w-0">
                                   <div className="flex items-center gap-2 min-w-0">
                                     <span className="text-[11.5px] truncate" style={{ color: "var(--hall-muted-2)" }}>{p.name}</span>
                                     {typeLbl !== "—" && (
                                       <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${typeCls}`}>{typeLbl}</span>
                                     )}
                                   </div>
-                                </div>
+                                </Link>
                                 <div>
                                   {p.stage && <span className={`inline-block text-[9px] font-bold px-2 py-0.5 rounded-full ${STAGE_COLORS[p.stage] ?? "bg-[#f4f4ef] text-[#0a0a0a]/50"}`}>{p.stage}</span>}
                                 </div>
                                 <div className="text-[10px]" style={{ color: "var(--hall-muted-3)", fontFamily: "var(--font-hall-mono)" }}>DORMANT</div>
                                 <div className="text-right text-[10px]" style={{ color: "var(--hall-muted-3)", fontFamily: "var(--font-hall-mono)" }}>{days != null ? `${days}d silent` : "—"}</div>
-                                <div className="text-sm text-right" style={{ color: "var(--hall-muted-3)" }}>→</div>
-                              </Link>
+                                <Link
+                                  href={`/rooms/${p.id}`}
+                                  title="Abrir la sala de trabajo"
+                                  className="text-right text-[9px] font-bold uppercase hover:underline"
+                                  style={{
+                                    fontFamily: "var(--font-hall-mono)",
+                                    letterSpacing: "0.06em",
+                                    color: "var(--hall-muted-3)",
+                                  }}
+                                >
+                                  Sala →
+                                </Link>
+                              </div>
                             );
                           })}
                         </div>
@@ -2094,6 +2110,15 @@ export default async function AdminPage({ searchParams }: { searchParams?: Promi
               </div>
             );
           })()}
+          </div>
+
+          {/* ── Lobbies — pre-sale surfaces: ready to share? + light analytics.
+              Sits under the portfolio because a running project has a Sala, not
+              a lobby. Self-isolating so it can't crash the Hall. ───────────── */}
+          <div data-hall-tab="portfolio">
+            <Suspense fallback={null}>
+              <SafeServerSection name="ClientRoomsOverview" render={() => ClientRoomsOverview()} />
+            </Suspense>
           </div>
 
           {/* ── Opportunities Explorer — PORTFOLIO tab only ─────────────── */}

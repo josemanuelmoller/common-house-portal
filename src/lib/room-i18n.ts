@@ -11,7 +11,7 @@ export type Lang = "es" | "en";
 const ES: Record<string, string> = {
   // chrome
   "chrome.workRoom": "Sala de trabajo", "chrome.rooms": "Salas", "chrome.yourRole": "Tu rol en esta sala",
-  "chrome.collapse": "Colapsar", "chrome.expand": "Expandir", "chrome.openNav": "Abrir navegación", "chrome.room": "Sala", "chrome.myDesk": "Mi escritorio",
+  "chrome.collapse": "Colapsar", "chrome.expand": "Expandir", "chrome.openNav": "Abrir navegación", "chrome.room": "Sala", "chrome.myDesk": "Mi escritorio", "chrome.viewAs": "Ver como",
   // nav
   "nav.mio": "Lo mío", "nav.resumen": "Resumen", "nav.plan": "Plan", "nav.entregables": "Entregables",
   "nav.tareas": "Tareas", "nav.decisiones": "Decisiones", "nav.materiales": "Materiales", "nav.reuniones": "Reuniones", "nav.proyecto": "Proyecto", "nav.actividad": "Actividad",
@@ -53,10 +53,17 @@ const ES: Record<string, string> = {
   "mio.nothing": "No tenés tareas ni entregables asignados. 🎈", "mio.myTasks": "Mis tareas", "mio.myDeliverables": "Mis entregables",
   // proyecto
   "proj.origin": "Origen", "proj.originNote": "Heredado de la preventa.", "proj.team": "Equipo", "proj.admin": "Administrativo",
+  // acceso (solo admin de plataforma por ahora)
+  "proj.access": "Acceso", "proj.accessNote": "Quién entra a esta sala y con qué rol.", "proj.accessLoad": "Ver accesos",
+  "btn.addMember": "+ Dar acceso", "btn.changeRole": "Cambiar rol", "btn.revoke": "Quitar acceso",
+  "prompt.memberEmail": "Correo de la persona:", "prompt.memberRole": "Rol (pm, collaborator, client, reader):",
+  "prompt.memberRevoke": "¿Quitar el acceso de {email} a esta sala?",
+  "toast.memberAdded": "Acceso dado", "toast.memberRoleChanged": "Rol cambiado", "toast.memberRevoked": "Acceso quitado",
+  "mat.uploading": "Subiendo…", "mat.uploadNote": "Lo que subas queda visible para la sala.", "toast.materialUploaded": "Documento subido",
   "field.org": "Organización", "field.location": "Sede", "field.engagement": "Modelo de trabajo", "field.type": "Tipo de proyecto",
   "field.geography": "Geografía", "field.start": "Inicio", "field.end": "Cierre objetivo", "field.code": "Código",
   "field.focus": "Foco actual", "field.milestone": "Próximo hito",
-  "proj.driveFolder": "Carpeta Drive ↗", "proj.presaleRoom": "Sala de preventa ↗", "proj.clientWeb": "Web del cliente ↗",
+  "proj.driveFolder": "Carpeta Drive ↗", "proj.presaleRoom": "Lobby ↗", "proj.clientWeb": "Web del cliente ↗",
   "proj.noMembers": "Todavía no hay miembros.", "proj.chTitle": "Datos de cobro · Common House", "proj.clientBillingTitle": "Facturación del cliente",
   "bill.legalName": "Razón social", "bill.taxId": "Tax ID", "bill.vat": "VAT", "bill.address": "Dirección",
   "bill.billingEmail": "Email de facturación", "bill.contact": "Contacto", "bill.po": "Orden de compra",
@@ -65,9 +72,9 @@ const ES: Record<string, string> = {
   // toasts
   "toast.accepted": "Entregable aceptado", "toast.acceptUndone": "Aceptación deshecha",
   "toast.taskClosed": "Tarea cerrada · atestiguada por ti", "toast.taskReopened": "Tarea reabierta",
-  "toast.decisionResolved": "Decisión resuelta", "toast.decisionReopened": "Decisión reabierta",
+  "toast.decisionResolved": "Decisión resuelta", "toast.decisionReopened": "Decisión reabierta", "toast.suggConfirmed": "Sugerencia confirmada",
   // prompts
-  "prompt.newDeliverable": "Nuevo entregable:", "prompt.newTask": "Nueva tarea:", "prompt.newDecision": "Nueva decisión:",
+  "prompt.newDeliverable": "Nuevo entregable:", "prompt.newTask": "Nueva tarea:", "prompt.newDecision": "Nueva decisión:", "prompt.newPhase": "Nueva fase:",
   // empty-state (sala recién abierta)
   "empty.title": "Arranquemos la sala", "empty.lead": "La sala no parte de cero: hereda lo de la preventa.",
   "empty.inheritedTitle": "Heredado de la preventa", "empty.withAccess": "con acceso",
@@ -81,7 +88,7 @@ const ES: Record<string, string> = {
 
 const EN: Record<string, string> = {
   "chrome.workRoom": "Work room", "chrome.rooms": "Rooms", "chrome.yourRole": "Your role in this room",
-  "chrome.collapse": "Collapse", "chrome.expand": "Expand", "chrome.openNav": "Open navigation", "chrome.room": "Room", "chrome.myDesk": "My desk",
+  "chrome.collapse": "Collapse", "chrome.expand": "Expand", "chrome.openNav": "Open navigation", "chrome.room": "Room", "chrome.myDesk": "My desk", "chrome.viewAs": "View as",
   "nav.mio": "My work", "nav.resumen": "Overview", "nav.plan": "Plan", "nav.entregables": "Deliverables",
   "nav.tareas": "Tasks", "nav.decisiones": "Decisions", "nav.materiales": "Materials", "nav.reuniones": "Meetings", "nav.proyecto": "Project", "nav.actividad": "Activity",
   "meet.desc": "Every project meeting is processed and lands here automatically.", "meet.none": "No meetings recorded yet.",
@@ -109,10 +116,16 @@ const EN: Record<string, string> = {
   "mio.noPerson": "Your account isn't linked to a person in this room yet.",
   "mio.nothing": "You have no assigned tasks or deliverables. 🎈", "mio.myTasks": "My tasks", "mio.myDeliverables": "My deliverables",
   "proj.origin": "Origin", "proj.originNote": "Inherited from pre-sale.", "proj.team": "Team", "proj.admin": "Billing",
+  "proj.access": "Access", "proj.accessNote": "Who gets into this room, and as what.", "proj.accessLoad": "View access",
+  "btn.addMember": "+ Grant access", "btn.changeRole": "Change role", "btn.revoke": "Remove access",
+  "prompt.memberEmail": "Person's email:", "prompt.memberRole": "Role (pm, collaborator, client, reader):",
+  "prompt.memberRevoke": "Remove {email}'s access to this room?",
+  "toast.memberAdded": "Access granted", "toast.memberRoleChanged": "Role changed", "toast.memberRevoked": "Access removed",
+  "mat.uploading": "Uploading…", "mat.uploadNote": "Anything you upload is visible to the room.", "toast.materialUploaded": "Document uploaded",
   "field.org": "Organization", "field.location": "Location", "field.engagement": "Engagement model", "field.type": "Project type",
   "field.geography": "Geography", "field.start": "Start", "field.end": "Target close", "field.code": "Code",
   "field.focus": "Current focus", "field.milestone": "Next milestone",
-  "proj.driveFolder": "Drive folder ↗", "proj.presaleRoom": "Pre-sale room ↗", "proj.clientWeb": "Client website ↗",
+  "proj.driveFolder": "Drive folder ↗", "proj.presaleRoom": "Lobby ↗", "proj.clientWeb": "Client website ↗",
   "proj.noMembers": "No members yet.", "proj.chTitle": "Billing details · Common House", "proj.clientBillingTitle": "Client billing",
   "bill.legalName": "Legal name", "bill.taxId": "Tax ID", "bill.vat": "VAT", "bill.address": "Address",
   "bill.billingEmail": "Billing email", "bill.contact": "Contact", "bill.po": "Purchase order",
@@ -120,8 +133,8 @@ const EN: Record<string, string> = {
   "side.team": "Team", "side.client": "Client",
   "toast.accepted": "Deliverable accepted", "toast.acceptUndone": "Acceptance undone",
   "toast.taskClosed": "Task closed · attested by you", "toast.taskReopened": "Task reopened",
-  "toast.decisionResolved": "Decision resolved", "toast.decisionReopened": "Decision reopened",
-  "prompt.newDeliverable": "New deliverable:", "prompt.newTask": "New task:", "prompt.newDecision": "New decision:",
+  "toast.decisionResolved": "Decision resolved", "toast.decisionReopened": "Decision reopened", "toast.suggConfirmed": "Suggestion confirmed",
+  "prompt.newDeliverable": "New deliverable:", "prompt.newTask": "New task:", "prompt.newDecision": "New decision:", "prompt.newPhase": "New phase:",
   "empty.title": "Let's start the room", "empty.lead": "The room doesn't start from scratch — it inherits from pre-sale.",
   "empty.inheritedTitle": "Inherited from pre-sale", "empty.withAccess": "with access",
   "empty.drive": "Drive folder linked", "empty.presale": "Pre-sale room",

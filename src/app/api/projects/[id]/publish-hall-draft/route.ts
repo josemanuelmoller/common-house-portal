@@ -87,7 +87,7 @@ export async function POST(
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
 
   // Bust the Hall page cache so the new hero shows immediately.
-  revalidatePath(`/hall/${id}`);
+  revalidatePath(`/lobby/${id}`);
   revalidatePath(`/admin/projects/${id}`);
   revalidatePath(`/admin/projects/${id}/hall-compose`);
 

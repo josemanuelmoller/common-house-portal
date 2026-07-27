@@ -125,7 +125,7 @@ export async function POST(req: NextRequest) {
           emailAddress: email,
           notify: true,
           ignoreExisting: true,
-          redirectUrl: `${req.nextUrl.origin}/hall/${slug}`,
+          redirectUrl: `${req.nextUrl.origin}/lobby/${slug}`,
         });
         invitationSent = true;
       } catch (err) {

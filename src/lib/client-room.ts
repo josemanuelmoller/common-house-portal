@@ -34,6 +34,11 @@ export type ClientRoomMaterial = {
   versionLabel: string | null;
   linkedMilestone: string | null;
   modifiedAt: string | null;
+  /** Display name of whoever shared it, already sanitised — never a raw handle.
+   *  Falls back to "Common House" so system writers stay invisible to clients. */
+  sharedBy: string;
+  /** When it became visible to the client; the honest "hace N días" anchor. */
+  clientVisibleAt: string | null;
 };
 
 export type BillingAccount = { title: string; details: string };
@@ -192,16 +197,84 @@ async function organizationName(organizationId: string | null): Promise<string |
   return (data?.name as string | undefined) ?? null;
 }
 
+/**
+ * `project_materials.added_by` stores raw handles, not people: real ones like
+ * "josemanuelmoller", but also "admin" and "claude-code (draft)". None of those
+ * can ever reach a client, so this resolves what it can against `people` (by the
+ * local part of the email) and collapses everything else to "Common House" —
+ * which is true, and leaks nothing about how the file got there.
+ */
+const HOUSE = "Common House";
+const SYSTEM_HANDLE = /^(admin|system|cron|service|claude|codex|bot)\b|claude-code/i;
+
+type PersonRow = { email: string | null; display_name: string | null; full_name: string | null };
+
+/** "José Manuel Moller" → "josemanuelmoller". Sin acentos ni separadores, que es
+ *  la forma en que el handle guarda el nombre. */
+function normalizeName(value: string): string {
+  return value.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]/gi, "").toLowerCase();
+}
+
+/** full_name trae el correo como nombre en las personas sin higienizar; si no hay
+ *  un nombre de verdad, mejor la casa que un handle crudo. */
+function pickName(row: PersonRow): string | null {
+  if (row.display_name) return row.display_name;
+  if (row.full_name && !row.full_name.includes("@")) return row.full_name;
+  return null;
+}
+
+async function resolveSharers(handles: Array<string | null>): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  const real = [...new Set(handles.filter((h): h is string => !!h && !SYSTEM_HANDLE.test(h)))];
+  if (real.length === 0) return out;
+  const sb = supabaseAdmin();
+
+  // 1) Por la parte local del correo: "josemanuelmoller" → josemanuelmoller@…
+  const { data } = await sb
+    .from("people")
+    .select("email, display_name, full_name")
+    .or(real.map((h) => `email.ilike.${h.replace(/[,()]/g, "")}@%`).join(","));
+  for (const row of (data ?? []) as PersonRow[]) {
+    const local = (row.email ?? "").split("@")[0]?.toLowerCase();
+    const name = pickName(row);
+    if (local && name) out.set(local, name);
+  }
+
+  // 2) Los que quedaron sin resolver. El primer pase falla cuando la persona
+  //    está bajo otro correo: "josemanuelmoller" hace match con la cuenta de
+  //    gmail, cuyo full_name es el propio correo, mientras el nombre real vive
+  //    en josemanuel@wearecommonhouse.com. El handle suele ser el nombre sin
+  //    espacios, así que se compara normalizado contra el equipo de la casa —
+  //    que es, por definición, quien comparte material en un lobby.
+  const missing = real.filter((h) => !out.has(h.toLowerCase()));
+  if (missing.length > 0) {
+    const { data: staff } = await sb
+      .from("people")
+      .select("email, display_name, full_name")
+      .ilike("email", "%@wearecommonhouse.com");
+    for (const row of (staff ?? []) as PersonRow[]) {
+      const name = pickName(row);
+      if (!name) continue;
+      const candidates = [normalizeName(name), normalizeName(row.full_name ?? "")];
+      for (const handle of missing) {
+        if (candidates.includes(normalizeName(handle))) out.set(handle.toLowerCase(), name);
+      }
+    }
+  }
+  return out;
+}
+
 async function loadMaterials(projectId: string, includeInternal: boolean): Promise<ClientRoomMaterial[]> {
   let query = supabaseAdmin()
     .from("project_materials")
-    .select("id, title, description, category, document_status, visibility, url, mime_type, folder_name, version_label, linked_milestone, modified_at")
+    .select("id, title, description, category, document_status, visibility, url, mime_type, folder_name, version_label, linked_milestone, modified_at, added_by, client_visible_at")
     .eq("project_id", projectId)
     .neq("document_status", "archived")
     .order("modified_at", { ascending: false, nullsFirst: false });
   if (!includeInternal) query = query.eq("visibility", "client");
   const { data, error } = await query;
   if (error) throw new Error(`client-room materials read failed: ${error.message}`);
+  const sharers = await resolveSharers((data ?? []).map((r) => (r.added_by as string | null) ?? null));
   return (data ?? []).map((row) => ({
     id: row.id as string,
     title: row.title as string,
@@ -215,6 +288,8 @@ async function loadMaterials(projectId: string, includeInternal: boolean): Promi
     versionLabel: (row.version_label as string | null) ?? null,
     linkedMilestone: (row.linked_milestone as string | null) ?? null,
     modifiedAt: (row.modified_at as string | null) ?? null,
+    sharedBy: sharers.get(((row.added_by as string | null) ?? "").toLowerCase()) ?? HOUSE,
+    clientVisibleAt: (row.client_visible_at as string | null) ?? null,
   }));
 }
 
@@ -328,7 +403,9 @@ async function assembleRoom(row: ProjectRow, includeInternal: boolean, canSeeBan
     slug: row.hall_slug ?? "",
     name: row.name ?? "Your project",
     organizationName: orgName,
-    roomLabel: row.client_room_label ?? "Project room",
+    // "Room" quedó reservado para la sala de trabajo; esta superficie es la
+    // propuesta (el lobby), así que el rótulo por defecto la nombra por lo que es.
+    roomLabel: row.client_room_label ?? "Propuesta",
     roomStatus: row.client_room_status ?? "preparing",
     roomEnabled: row.client_room_enabled ?? false,
     projectStatus: row.project_status,

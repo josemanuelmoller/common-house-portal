@@ -108,7 +108,7 @@ export function HallDraftReviewClient({
         setBusy(null); return;
       }
       setStatus("published");
-      setInfo("Published to /hall/" + projectId);
+      setInfo("Published to /lobby/" + projectId);
       startTransition(() => router.refresh());
       setTimeout(() => setInfo(null), 6000);
     } catch (e) {

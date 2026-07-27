@@ -1,0 +1,699 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lobby MPS — estética de sala (maqueta)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,700;1,900&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#0e0e0e; --paper:#ffffff; --paper2:#ecece4; --bg:#eeeee8; --outer:#e2e2da;
+  --line:#d8d8d0; --line-soft:#ececE4; --muted:#6b6b6b; --muted2:#4a4a44;
+  --lime:#c8f55a; --lime-paper:rgba(200,245,90,.32); --lime-ink:#3a8c00; --lime-wash:rgba(200,245,90,.09);
+  --warn:#b45309; --warn-soft:#fff3cd; --ok:#166534; --ok-soft:#dcfce7;
+  --mono:"JetBrains Mono", ui-monospace, monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background:var(--outer); color:var(--ink);
+  font-family:"Inter Tight", Inter, -apple-system, "Segoe UI", sans-serif;
+  padding:22px 16px 40px;
+}
+a{color:inherit;text-decoration:none}
+
+/* ── frame (calco de la sala) ── */
+.frame{
+  max-width:1160px; margin:0 auto; display:flex; height:calc(100vh - 62px);
+  background:var(--bg); border:1.5px solid var(--line); border-radius:16px; overflow:hidden;
+}
+
+/* ── sidebar ── */
+aside{width:248px;flex:none;background:var(--paper);border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0;transition:width .18s ease}
+
+/* ── riel colapsado: solo íconos (mismo comportamiento que la sala) ── */
+aside.mini{width:66px}
+aside.mini .brand{justify-content:center;padding:16px 0 14px}
+aside.mini .brand span,
+aside.mini .navlabel,
+aside.mini .roomrow div,
+aside.mini .n,
+aside.mini .role{display:none}
+aside.mini .roomrow{justify-content:center;padding:8px 0;margin:2px 0 6px;background:transparent}
+aside.mini .navlist{padding:2px 0}
+aside.mini .navlist button,
+aside.mini .soon .navlist div{justify-content:center;padding:10px 0;position:relative}
+aside.mini .soon{margin-top:14px;padding-top:12px;border-top:1px solid var(--line-soft)}
+aside.mini .sidefoot{justify-content:center;padding:10px 0}
+aside.mini .new{position:absolute;top:8px;right:19px}
+aside.mini .badge{position:absolute;top:7px;right:17px;width:8px;height:8px;padding:0;font-size:0;border-radius:999px;
+  box-shadow:0 0 0 2px var(--paper)}
+.brand{display:flex;align-items:center;gap:10px;padding:16px 16px 14px;border-bottom:1px solid var(--line)}
+.brand img{height:26px;width:auto;display:block}
+.brand span{font-size:13px;font-weight:800;letter-spacing:-.2px}
+.label{font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)}
+nav{flex:1;overflow-y:auto;padding:12px 0}
+.navlabel{padding:0 16px 8px}
+.roomrow{display:flex;align-items:center;gap:8px;padding:7px 12px;margin:2px 8px 4px;border-radius:8px;background:var(--bg)}
+.roomrow .dot{width:7px;height:7px;border-radius:2px;background:var(--lime);flex:none}
+.roomrow b{font-size:11px;font-weight:800;display:block}
+.roomrow small{font-size:9px;color:var(--muted);display:block}
+.navlist{display:flex;flex-direction:column;gap:1px;padding:2px 8px}
+.navlist button{
+  display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:8px;border-radius:8px;
+  cursor:pointer;font-family:inherit;font-size:11.5px;font-weight:700;background:transparent;color:rgba(0,0,0,.78);border:0;
+}
+.navlist button:hover{background:rgba(0,0,0,.035)}
+.navlist button.on{background:var(--lime-paper);color:var(--ink);font-weight:700}
+.navlist .ic{width:16px;height:16px;flex:none;display:grid;place-items:center}
+.navlist .ic svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.navlist .n{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* un solo sistema de señales:
+   punto lime = cambió algo · badge ámbar = te toca a ti. Sin recuentos de inventario. */
+.badge{font-size:8.5px;font-weight:800;background:var(--warn);color:#fff;padding:1px 6px;border-radius:8px}
+/* adelanto de la sala — mismo listado, sin candados: el contraste hace el trabajo */
+.soon{margin-top:16px}
+.soon .navlist div{display:flex;align-items:center;gap:10px;padding:8px;border-radius:8px;
+  font-size:11.5px;font-weight:600;color:rgba(0,0,0,.26)}
+.soon .ic{width:16px;height:16px;flex:none;display:grid;place-items:center}
+.soon .ic svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.sidefoot{border-top:1px solid var(--line);padding:10px 14px;display:flex;align-items:center;gap:10px;justify-content:space-between}
+.sidefoot .who{display:flex;align-items:center;gap:9px;min-width:0}
+.av{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-size:9px;font-weight:700;color:#fff;flex:none}
+.chev{width:26px;height:26px;border-radius:7px;border:1px solid var(--line);background:var(--paper);color:var(--muted);cursor:pointer;display:grid;place-items:center;font-size:12px}
+
+/* ── main ── */
+main{flex:1;min-width:0;min-height:0;display:flex;flex-direction:column}
+header.top{
+  display:flex;align-items:center;gap:10px;padding:12px 20px;border-bottom:1.5px solid var(--line);
+  position:sticky;top:0;background:var(--bg);z-index:10;flex-wrap:wrap;
+}
+.eyebrow{font-size:8px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:rgba(0,0,0,.3)}
+header.top h2{font-size:17px;font-weight:800;letter-spacing:-.4px;margin:1px 0 0}
+.spacer{flex:1}
+.pill{font-size:10px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;padding:2px 8px;border-radius:999px;white-space:nowrap}
+.pill.lime{background:var(--lime);color:#000}
+.pill.warm{background:var(--warn-soft);color:var(--warn)}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}
+.pill.mute{background:var(--paper2);color:var(--muted2)}
+.stack{display:flex}
+.stack .av{border:2px solid var(--bg)}
+.stack .av+.av{margin-left:-6px}
+.ghost{font-family:inherit;font-size:11px;font-weight:700;color:var(--muted2);background:var(--paper);border:1.5px solid var(--line);border-radius:8px;padding:6px 11px;cursor:pointer}
+
+/* barra "te toca" — lo único pendiente del lado del cliente, en el cromo */
+.todo{display:flex;align-items:center;gap:12px;padding:10px 20px;border-bottom:1.5px solid var(--line);background:var(--lime-wash)}
+.todo .k{font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--lime-ink);flex:none}
+.todo .t{font-size:12.5px;font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.todo .go{font-family:inherit;font-size:9.5px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;
+  border:0;border-radius:6px;padding:6px 11px;background:var(--ink);color:#fff;cursor:pointer;flex:none}
+
+/* marca de novedad desde la última visita del cliente */
+.new{width:6px;height:6px;border-radius:999px;background:var(--lime-ink);flex:none}
+
+.scroll{padding:20px;flex:1;overflow-y:auto;min-height:0;scroll-behavior:smooth}
+section{scroll-margin-top:14px}
+
+/* ── hero ── */
+.hero{display:flex;align-items:center;gap:28px}
+.hero .txt{flex:1;min-width:0}
+.hero h1{font-family:"Instrument Serif", Georgia, serif;font-style:italic;font-weight:400;
+  font-size:42px;letter-spacing:-.02em;line-height:1.05;max-width:18ch;margin:10px 0 0}
+.hero h1 .u{color:var(--lime)}
+.hero p{color:var(--muted);font-size:14px;max-width:64ch;margin:12px 0 0;line-height:1.6}
+.hero .logo{flex:none;width:240px;display:grid;place-items:center}
+.hero .logo img{height:132px;width:auto;max-width:220px;display:block}
+
+/* ── stats ── */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:11px;margin-top:20px}
+.stat{background:var(--paper);border:1.5px solid var(--line);border-radius:12px;padding:15px 16px}
+.stat .v{font-size:1.05rem;font-weight:900;letter-spacing:-.3px;margin-top:8px;line-height:1.25}
+.stat .v.big{font-size:1.5rem;letter-spacing:-1px}
+.stat .v.lime{color:var(--lime-ink)}
+.stat .s{font-size:11px;color:var(--muted);margin-top:4px;font-weight:500}
+.stat.wide{grid-column:span 2}
+
+/* ── cards ── */
+.card{background:var(--paper);border:1.5px solid var(--line);border-radius:14px;overflow:hidden}
+.card .head{display:flex;align-items:center;gap:10px;padding:13px 17px 12px;border-bottom:1px solid var(--line)}
+.card .head b{font-size:11.5px;font-weight:800;text-transform:uppercase;letter-spacing:.2px;white-space:nowrap}
+.card .head .isnew{font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--lime-ink);flex:none}
+.card .head .meta{font-size:10px;color:var(--muted);font-weight:600}
+.card .body{padding:15px 17px 17px}
+.ic-lime{width:26px;height:26px;border-radius:7px;background:var(--lime);display:grid;place-items:center;flex:none}
+.ic-lime svg{width:14px;height:14px;stroke:#000;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+
+/* ── lo que escuchamos ── */
+.heard .head{background:var(--lime-wash)}
+.quads{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
+.quad{border-top:2px solid var(--lime);padding-top:9px}
+.quad .k{font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--lime-ink);margin-bottom:6px}
+.quad p{margin:0;font-size:12.5px;line-height:1.55;color:var(--ink)}
+
+/* ── grid 2 col ── */
+.cols{display:grid;grid-template-columns:1.6fr 1fr;gap:16px;align-items:start;margin-top:16px}
+.colstack{display:flex;flex-direction:column;gap:16px}
+
+/* ── deck ── */
+.deck{border:1.5px solid var(--line);border-radius:10px;overflow:hidden;background:var(--paper2)}
+.deck .page{aspect-ratio:16/9;display:grid;place-items:center;background:
+  linear-gradient(135deg,#f6f6f1 0%,#eaeae2 100%)}
+.deck .page .ph{text-align:center}
+.deck .page .ph .t{font-family:var(--mono);font-size:10px;letter-spacing:1.4px;text-transform:uppercase;color:var(--muted)}
+.deck .page .ph .n{font-size:15px;font-weight:800;margin-top:6px}
+.deck .bar{display:flex;align-items:center;gap:10px;padding:8px 11px;border-top:1.5px solid var(--line);background:var(--paper)}
+.deck .bar .nav{font-family:var(--mono);font-size:10.5px;color:var(--muted);font-weight:700}
+.deck .bar button{font-family:inherit;font-size:9.5px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;border:1.5px solid var(--line);background:var(--paper);color:var(--muted2);border-radius:6px;padding:5px 10px;cursor:pointer}
+
+/* ── rows ── */
+.row{display:flex;align-items:center;gap:11px;padding:10px 0;border-top:1px solid var(--line-soft)}
+.row:first-child{border-top:0}
+.row .date{font-family:var(--mono);font-size:9.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);min-width:52px;flex:none}
+.row .t{flex:1;min-width:0;font-size:12.5px;font-weight:700}
+.row .sub{font-size:10.5px;color:var(--muted);font-weight:500;margin-top:1px}
+.arrow{color:var(--muted);flex:none}
+
+/* ── timeline (trabajo juntos) ── */
+.tl{position:relative}
+.tl .item{position:relative;padding-left:26px;padding-bottom:14px;border-left:1px solid var(--line)}
+.tl .item:last-child{border-left-color:transparent;padding-bottom:0}
+.tl .item .knob{position:absolute;left:-11px;top:-2px;width:22px;height:22px;border-radius:999px;background:var(--paper);border:1px solid var(--line);display:grid;place-items:center}
+.tl .item .knob svg{width:13px;height:13px;stroke:var(--ink);fill:none;stroke-width:1.4;stroke-linecap:round;stroke-linejoin:round}
+.tl .item .when{font-family:var(--mono);font-size:9.5px;letter-spacing:.4px;text-transform:uppercase;color:var(--muted)}
+.tl .item .ttl{font-size:12.5px;font-weight:800;margin-top:2px}
+.tl .item .who{font-size:10.5px;color:var(--muted);margin-top:2px;line-height:1.45}
+
+/* ── acuerdo abierto ── */
+.agreement{border:1.5px solid var(--lime);background:var(--lime-paper);border-radius:10px;padding:12px 13px}
+.agreement .k{font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--lime-ink)}
+.agreement h4{margin:3px 0 0;font-size:13px;font-weight:800;line-height:1.3}
+.agreement p{margin:6px 0 0;font-size:11.5px;line-height:1.5;color:var(--muted2)}
+/* procedencia + frescura: quién lo compartió y hace cuánto */
+.prov{font-family:var(--mono);font-size:9.5px;letter-spacing:.4px;text-transform:uppercase;color:var(--muted);
+  display:flex;align-items:center;gap:7px}
+
+/* motivo del "pedir cambios" — obligatorio, y preguntado como pregunta */
+.reason{margin-top:11px;display:none}
+.reason.open{display:block}
+.reason label{display:block;font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted2);margin-bottom:5px}
+.reason textarea{width:100%;resize:vertical;font-family:inherit;font-size:12px;line-height:1.5;padding:9px 11px;
+  border:1.5px solid var(--line);border-radius:8px;background:var(--paper);color:var(--ink)}
+.reason textarea:focus{outline:none;border-color:var(--lime-ink)}
+.reason .hint{font-size:10px;color:var(--muted);margin:6px 0 0}
+.acts{display:flex;gap:7px;margin-top:11px}
+.acts button{font-family:inherit;font-size:9.5px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;border-radius:6px;padding:6px 11px;cursor:pointer;border:0}
+.acts .go{background:var(--ink);color:#fff}
+.acts .alt{background:var(--paper);color:var(--muted2);border:1.5px solid var(--line)}
+
+/* ── admin ── */
+.paydata{font-size:12.5px;line-height:1.6;white-space:pre-line}
+.disclose{width:100%;text-align:left;font-family:inherit;font-size:11px;font-weight:800;letter-spacing:.3px;text-transform:uppercase;background:var(--paper);border:1.5px solid var(--line);border-radius:8px;padding:9px 12px;cursor:pointer;color:var(--muted2);display:flex;align-items:center;gap:8px}
+.disclose .plus{margin-left:auto;color:var(--muted)}
+
+footer.min{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:22px;padding-top:14px;border-top:1px solid var(--line);
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.8px;text-transform:uppercase;color:var(--muted)}
+footer.min img{height:20px;width:auto}
+
+@media (max-width:900px){
+  body{padding:0}
+  .frame{border:0;border-radius:0;height:100vh}
+  aside{display:none}
+  .hero{flex-direction:column-reverse;align-items:flex-start;gap:14px}
+  .cols{grid-template-columns:1fr}
+  .quads{grid-template-columns:1fr 1fr}
+}
+</style>
+</head>
+<body>
+<div class="frame">
+
+  <!-- ══ SIDEBAR ══ -->
+  <aside>
+    <div class="brand">
+      <img src="/brand/isotipo-vivo.svg" alt="Common House">
+      <span>Common House</span>
+    </div>
+
+    <nav>
+      <div class="label navlabel">Lobby</div>
+      <div class="roomrow">
+        <span class="dot"></span>
+        <div style="min-width:0">
+          <b>MPS · Propuesta</b>
+          <small>Propuesta en revisión</small>
+        </div>
+      </div>
+
+      <div class="navlist" id="navlist">
+        <button data-go="resumen" class="on">
+          <span class="ic"><svg viewBox="0 0 16 16"><rect x="2.5" y="2.5" width="4.5" height="4.5" rx="1"/><rect x="9" y="2.5" width="4.5" height="4.5" rx="1"/><rect x="2.5" y="9" width="4.5" height="4.5" rx="1"/><rect x="9" y="9" width="4.5" height="4.5" rx="1"/></svg></span>
+          <span class="n">Resumen</span>
+        </button>
+        <button data-go="escuchamos">
+          <span class="ic"><svg viewBox="0 0 16 16"><path d="M13.5 9.2c0 .9-.7 1.6-1.6 1.6H6.4L3.2 13.2V4.4c0-.9.7-1.6 1.6-1.6h7.1c.9 0 1.6.7 1.6 1.6z"/></svg></span>
+          <span class="n">Lo que escuchamos</span>
+        </button>
+        <button data-go="propuesta">
+          <span class="ic"><svg viewBox="0 0 16 16"><path d="M8 2.5 14 5.5 8 8.5 2 5.5z"/><path d="M2 8.5 8 11.5 14 8.5"/><path d="M2 11 8 14 14 11"/></svg></span>
+          <span class="n">Propuesta</span>
+          <span class="new" title="Nuevo desde tu última visita"></span>
+        </button>
+        <button data-go="plan">
+          <span class="ic"><svg viewBox="0 0 16 16"><rect x="2.5" y="3.5" width="11" height="10" rx="1.5"/><path d="M2.5 6.5h11"/><path d="M5.5 2v3M10.5 2v3"/></svg></span>
+          <span class="n">Plan</span>
+        </button>
+        <button data-go="juntos">
+          <span class="ic"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5"/><path d="M8 4.8V8l2.2 1.3"/></svg></span>
+          <span class="n">Trabajo juntos</span>
+        </button>
+        <button data-go="acuerdos">
+          <span class="ic"><svg viewBox="0 0 16 16"><path d="M4 14V2.5"/><path d="M4 3.2h7.5l-1.7 2.4 1.7 2.4H4"/></svg></span>
+          <span class="n">Acuerdos</span>
+          <span class="new" title="Nuevo desde tu última visita"></span>
+          <span class="badge" title="Te toca responder">1</span>
+        </button>
+        <button data-go="documentos">
+          <span class="ic"><svg viewBox="0 0 16 16"><path d="M2.5 5.4c0-.8.6-1.4 1.4-1.4h2.1l1.4 1.5h4.7c.8 0 1.4.6 1.4 1.4v4.9c0 .8-.6 1.4-1.4 1.4H3.9c-.8 0-1.4-.6-1.4-1.4z"/></svg></span>
+          <span class="n">Documentos</span>
+        </button>
+        <button data-go="admin">
+          <span class="ic"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5"/><path d="M8 7.4v3.3M8 5.2v.1"/></svg></span>
+          <span class="n">Administrativo</span>
+        </button>
+      </div>
+
+      <div class="soon">
+        <div class="label navlabel">Sala de trabajo</div>
+        <div class="navlist">
+          <div>
+            <span class="ic"><svg viewBox="0 0 16 16"><path d="M8 2.5l1.6 3.3 3.6.5-2.6 2.5.6 3.6L8 10.7 4.8 12.4l.6-3.6L2.8 6.3l3.6-.5z"/></svg></span>
+            <span class="n">Lo mío</span>
+          </div>
+          <div>
+            <span class="ic"><svg viewBox="0 0 16 16"><path d="M8 2.5 14 5.5 8 8.5 2 5.5z"/><path d="M2 8.5 8 11.5 14 8.5"/><path d="M2 11 8 14 14 11"/></svg></span>
+            <span class="n">Entregables</span>
+          </div>
+          <div>
+            <span class="ic"><svg viewBox="0 0 16 16"><rect x="2.5" y="2.5" width="11" height="11" rx="2.5"/><path d="M5.4 8.2 7.2 10 10.7 6"/></svg></span>
+            <span class="n">Tareas</span>
+          </div>
+          <div>
+            <span class="ic"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5"/><circle cx="8" cy="8" r="1.8"/></svg></span>
+            <span class="n">Decisiones</span>
+          </div>
+        </div>
+      </div>
+    </nav>
+
+    <div class="sidefoot">
+      <div class="who">
+        <span class="av" style="background:#495057">JV</span>
+        <span class="role" style="font-size:11px;color:var(--muted);font-weight:600">Aprobador</span>
+      </div>
+      <button class="chev" id="chev" title="Colapsar">‹</button>
+    </div>
+  </aside>
+
+  <!-- ══ MAIN ══ -->
+  <main>
+    <header class="top">
+      <div style="min-width:0">
+        <div class="eyebrow">Common House × MPS</div>
+        <h2 id="secTitle">Resumen</h2>
+      </div>
+      <span class="spacer"></span>
+      <span class="pill lime">Propuesta en revisión</span>
+      <div class="stack">
+        <span class="av" style="background:#3B5BDB" title="José Manuel Moller">JM</span>
+        <span class="av" style="background:#0C8599" title="Francisco Cerda">FC</span>
+        <span class="av" style="background:#495057" title="Alejandro Trillo">AT</span>
+      </div>
+      <button class="ghost">Salir →</button>
+    </header>
+
+    <div class="todo">
+      <span class="k">Te toca</span>
+      <span class="t">Aprobar la propuesta — Estrategia Upstream MPS (v1 · comercial)</span>
+      <span class="spacer"></span>
+      <button class="go" data-jump="acuerdos">Ir al acuerdo →</button>
+    </div>
+
+    <div class="scroll" id="scroll">
+
+      <!-- ── RESUMEN / HERO ── -->
+      <section id="resumen">
+        <div class="hero">
+          <div class="txt">
+            <div class="label">MPS · Propuesta en revisión</div>
+            <h1>MPS — Maritime Procurement Services<span class="u">_</span></h1>
+            <p>Este es el espacio de MPS dentro de la plataforma de Common House. Acá podrás ver toda la información
+               relacionada a nuestra relación: documentos, reuniones, contratos, detalles administrativos y otros.</p>
+          </div>
+          <div class="logo"><img src="/brand/clients/mps.png" alt="MPS"></div>
+        </div>
+
+        <div class="stats">
+          <div class="stat">
+            <div class="label">Etapa</div>
+            <div class="v">Propuesta en revisión</div>
+            <div class="s">Propuesta económica ajustada tras el feedback del 15 jul</div>
+          </div>
+          <div class="stat">
+            <div class="label">Próximo hito</div>
+            <div class="v">Casos de éxito + económica → aprobación</div>
+          </div>
+          <div class="stat wide">
+            <div class="label">Trabajo dedicado</div>
+            <div class="v big lime">3 reuniones · 7 interacciones</div>
+            <div class="s">Desde 23 jun 2026</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── LO QUE ESCUCHAMOS ── -->
+      <section id="escuchamos" style="margin-top:16px">
+        <div class="card heard">
+          <div class="head">
+            <span class="ic-lime"><svg viewBox="0 0 16 16"><path d="M13.5 9.2c0 .9-.7 1.6-1.6 1.6H6.4L3.2 13.2V4.4c0-.9.7-1.6 1.6-1.6h7.1c.9 0 1.6.7 1.6 1.6z"/></svg></span>
+            <div style="min-width:0">
+              <b>Lo que escuchamos</b>
+              <small style="display:block;font-size:10px;color:var(--muted)">Síntesis de la sesión del 15 de julio · confírmennos si refleja bien lo conversado</small>
+            </div>
+            <span class="spacer"></span>
+            <span class="pill mute">Por confirmar</span>
+          </div>
+          <div class="body">
+            <div class="quads">
+              <div class="quad">
+                <div class="k">El reto</div>
+                <p>Cambiar el modelo: de ganar por volumen de residuos a ganar por prevenirlos — sin arriesgar los ingresos de hoy, y con la trazabilidad que cierre la puerta al greenwashing.</p>
+              </div>
+              <div class="quad">
+                <div class="k">Lo que más importa</div>
+                <p>Liderar la prevención en la región y llegar a la COP y a la Climate Week con una estrategia propia: captar clientes clave y demostrar liderazgo real, con datos e implementación, no con relato.</p>
+              </div>
+              <div class="quad">
+                <div class="k">Lo que puede estorbar</div>
+                <p>La desconfianza regional hacia los claims ambientales, y el riesgo de que otros ocupen el espacio upstream primero. Sin verificación ni certificaciones, la credibilidad se vuelve un pasivo.</p>
+              </div>
+              <div class="quad">
+                <div class="k">Cómo se ve el éxito</div>
+                <p>Una Fase 1 ágil — talleres, mapeo de residuos y quick wins — que construya la estrategia sin tocar los ingresos actuales, protegida por una estructura de riesgo compartido y tecnología propia.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── GRID ── -->
+      <div class="cols">
+
+        <!-- IZQUIERDA -->
+        <div class="colstack">
+
+          <!-- PROPUESTA -->
+          <section id="propuesta">
+            <div class="card">
+              <div class="head">
+                <span class="ic-lime"><svg viewBox="0 0 16 16"><path d="M8 2.5 14 5.5 8 8.5 2 5.5z"/><path d="M2 8.5 8 11.5 14 8.5"/></svg></span>
+                <b>Nuestra propuesta</b>
+                <span class="isnew">· nuevo</span>
+                <span class="spacer"></span>
+                <span class="pill mute">En revisión · enviada 15 jul</span>
+              </div>
+              <div class="body">
+                <div class="prov" style="margin-bottom:10px">
+                  <span class="new"></span>Compartido por José Manuel · hace 7 días · reemplazó a la v1
+                </div>
+                <div class="deck">
+                  <div class="page">
+                    <div class="ph">
+                      <div class="t">PDF · 24 páginas</div>
+                      <div class="n">Estrategia Upstream MPS — v2.0</div>
+                    </div>
+                  </div>
+                  <div class="bar">
+                    <button>‹</button>
+                    <span class="nav">1 / 24</span>
+                    <button>›</button>
+                    <span class="spacer"></span>
+                    <span class="pill lime">v2 · 20 jul · actual</span>
+                    <button>Descargar ↓</button>
+                  </div>
+                </div>
+
+                <p style="font-size:13.5px;line-height:1.6;margin:14px 0 0;max-width:60ch">
+                  Una estrategia para que MPS lidere la prevención de residuos en cruceros y puertos: el modelo de
+                  negocio de prevenir, la trazabilidad que evita el greenwashing, y un despliegue por fases.
+                  Propuesta final, ajustada tras tu feedback del 15 jul.
+                </p>
+
+                <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--line-soft)">
+                  <div class="label" style="margin-bottom:6px">Versiones anteriores</div>
+                  <a class="row" href="#" style="padding:7px 0">
+                    <span class="t" style="font-weight:600;color:var(--muted2)">Estrategia Upstream MPS — v1 (15 jul)</span>
+                    <span class="date" style="min-width:auto">v1 · 15 jul ↗</span>
+                  </a>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- PLAN -->
+          <section id="plan">
+            <div class="card">
+              <div class="head">
+                <span class="ic-lime"><svg viewBox="0 0 16 16"><rect x="2.5" y="3.5" width="11" height="10" rx="1.5"/><path d="M2.5 6.5h11"/><path d="M5.5 2v3M10.5 2v3"/></svg></span>
+                <b>Plan y progreso</b>
+                <span class="spacer"></span>
+                <span class="meta">Jul 2026 – Nov 2026</span>
+              </div>
+              <div class="body" style="padding-top:8px">
+                <div class="row">
+                  <span class="date">Jul 26</span>
+                  <div class="t">Estrategia y alineación de alcance
+                    <div class="sub">Propuesta v2 en revisión por MPS</div></div>
+                  <span class="pill lime">Hoy</span>
+                </div>
+                <div class="row">
+                  <span class="date">Q3 26</span>
+                  <div class="t">Fase 1 — talleres, mapeo de residuos y quick wins</div>
+                  <span class="pill mute">Siguiente</span>
+                </div>
+                <div class="row">
+                  <span class="date">Q4 26</span>
+                  <div class="t">Trazabilidad + primer despliegue en barcos y puertos</div>
+                  <span class="pill mute">Futuro</span>
+                </div>
+                <div class="row">
+                  <span class="date">Nov 26</span>
+                  <div class="t">Presentación en COP / Climate Week</div>
+                  <span class="pill mute">Futuro</span>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <!-- DERECHA -->
+        <div class="colstack">
+
+          <!-- TRABAJO JUNTOS -->
+          <section id="juntos">
+            <div class="card">
+              <div class="head">
+                <span class="ic-lime"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5"/><path d="M8 4.8V8l2.2 1.3"/></svg></span>
+                <b>Nuestro trabajo juntos</b>
+                <span class="spacer"></span>
+                <span class="meta">7</span>
+              </div>
+              <div class="body">
+                <div class="tl">
+                  <div class="item">
+                    <span class="knob"><svg viewBox="0 0 18 18"><rect x="2.5" y="5" width="9" height="8" rx="1.5"/><path d="M11.5 8.3l3.5-2v5.4l-3.5-2z"/></svg></span>
+                    <div class="when">15 jul 2026 · Reunión</div>
+                    <div class="ttl">Sesión de descubrimiento — MPS × Common House</div>
+                    <div class="who">José Manuel Moller · Francisco Cerda · Alejandro Trillo · Javier Valdivia</div>
+                  </div>
+                  <div class="item">
+                    <span class="knob"><svg viewBox="0 0 18 18"><path d="M5 2.5v13"/><path d="M5 3.5h8l-2 3 2 3H5"/></svg></span>
+                    <div class="when">15 jul 2026 · Hito</div>
+                    <div class="ttl">Propuesta compartida y en revisión</div>
+                  </div>
+                  <div class="item">
+                    <span class="knob"><svg viewBox="0 0 18 18"><rect x="2.5" y="5" width="9" height="8" rx="1.5"/><path d="M11.5 8.3l3.5-2v5.4l-3.5-2z"/></svg></span>
+                    <div class="when">8 jul 2026 · Reunión</div>
+                    <div class="ttl">MPS × Common House — seguimiento</div>
+                    <div class="who">José Manuel Moller · Javier Valdivia</div>
+                  </div>
+                  <div class="item">
+                    <span class="knob"><svg viewBox="0 0 18 18"><path d="M3 6.5h10l-2.5-2.5"/><path d="M15 11.5H5l2.5 2.5"/></svg></span>
+                    <div class="when">7 jul 2026 · Intercambio</div>
+                    <div class="ttl">Intercambio de datos operativos y precios</div>
+                  </div>
+                  <div class="item">
+                    <span class="knob"><svg viewBox="0 0 18 18"><path d="M4.5 2.5h5l4 4v9h-9z"/><path d="M9.5 2.5v4h4"/><path d="M6.5 9.5h5M6.5 12h5"/></svg></span>
+                    <div class="when">2 jul 2026 · Documento</div>
+                    <div class="ttl">NDA firmado por ambas partes</div>
+                  </div>
+                  <div class="item">
+                    <span class="knob"><svg viewBox="0 0 18 18"><path d="M3 6.5h10l-2.5-2.5"/><path d="M15 11.5H5l2.5 2.5"/></svg></span>
+                    <div class="when">23 jun 2026 · Intercambio</div>
+                    <div class="ttl">Primer contacto</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ACUERDOS -->
+          <section id="acuerdos">
+            <div class="card">
+              <div class="head">
+                <span class="ic-lime"><svg viewBox="0 0 16 16"><path d="M4 14V2.5"/><path d="M4 3.2h7.5l-1.7 2.4 1.7 2.4H4"/></svg></span>
+                <b>Acuerdos</b>
+                <span class="isnew">· nuevo</span>
+                <span class="spacer"></span>
+                <span class="pill warm">1 pendiente</span>
+              </div>
+              <div class="body">
+                <div class="agreement">
+                  <div class="k">Comercial · v1</div>
+                  <h4>Aprobación de la propuesta — Estrategia Upstream MPS</h4>
+                  <p>v1 presentada el 15 jul; propuesta final ajustada tras el feedback de MPS.</p>
+                  <div class="prov" style="margin-top:9px">Compartido por José Manuel · hace 7 días</div>
+                  <div class="acts">
+                    <button class="go">Aprobar</button>
+                    <button class="alt" id="askChanges">Pedir cambios</button>
+                  </div>
+                  <div class="reason" id="reasonBox">
+                    <label for="reasonTxt">¿Qué habría que ajustar?</label>
+                    <textarea id="reasonTxt" rows="3" placeholder="Ej.: el alcance de la Fase 1 y el calendario de la COP."></textarea>
+                    <div class="acts" style="margin-top:9px">
+                      <button class="go">Enviar solicitud</button>
+                      <button class="alt" id="cancelChanges">Cancelar</button>
+                    </div>
+                    <p class="hint">Queda registrado en el acuerdo (v1) junto con tu respuesta.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- DOCUMENTOS -->
+          <section id="documentos">
+            <div class="card">
+              <div class="head">
+                <span class="ic-lime"><svg viewBox="0 0 16 16"><path d="M2.5 5.4c0-.8.6-1.4 1.4-1.4h2.1l1.4 1.5h4.7c.8 0 1.4.6 1.4 1.4v4.9c0 .8-.6 1.4-1.4 1.4H3.9c-.8 0-1.4-.6-1.4-1.4z"/></svg></span>
+                <b>Documentos</b>
+                <span class="spacer"></span>
+                <span class="meta">2</span>
+              </div>
+              <div class="body" style="padding-top:6px">
+                <a class="row" href="#">
+                  <div class="t">Estrategia Upstream MPS — v2.0
+                    <div class="sub">Presentación · v2 · José Manuel · hace 7 días</div></div>
+                  <span class="arrow">↗</span>
+                </a>
+                <a class="row" href="#">
+                  <div class="t">NDA MPS–Common House — firmado
+                    <div class="sub">Contrato · Common House · hace 7 días</div></div>
+                  <span class="arrow">↗</span>
+                </a>
+              </div>
+            </div>
+          </section>
+
+          <!-- ADMINISTRATIVO -->
+          <section id="admin">
+            <div class="card">
+              <div class="head">
+                <span class="ic-lime"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5"/><path d="M8 7.4v3.3M8 5.2v.1"/></svg></span>
+                <b>Administrativo</b>
+                <span class="spacer"></span>
+                <button class="ghost" style="padding:4px 9px;font-size:10px">Copiar todo</button>
+              </div>
+              <div class="body">
+                <div class="label" style="margin-bottom:6px">Datos de pago</div>
+                <div class="paydata">Common House Ltd
+N.º de registro: 17170050
+Mercury House, 19-21 Chapel Street, SL7 3HN, Marlow, United Kingdom
+Facturación: josemanuel@wearecommonhouse.com</div>
+
+                <div style="margin-top:12px;display:flex;flex-direction:column;gap:8px">
+                  <button class="disclose">Ver detalles bancarios <span class="plus">+</span></button>
+                  <button class="disclose">Tus datos de facturación <span class="plus">+</span></button>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <footer class="min">
+        <span>Preparado por Common House</span>
+        <span style="display:flex;align-items:center;gap:12px">Confidencial · MPS
+          <img src="/brand/isotipo-lime.png" alt=""></span>
+      </footer>
+    </div>
+  </main>
+</div>
+
+<script>
+/* nav → scroll + scroll-spy (la sala cambia de sección; el lobby es una historia
+   continua, así que el sidebar navega dentro de la misma página) */
+const scroller = document.getElementById('scroll');
+const buttons  = [...document.querySelectorAll('#navlist button')];
+const title    = document.getElementById('secTitle');
+const sections = buttons.map(b => document.getElementById(b.dataset.go));
+
+buttons.forEach(b => b.addEventListener('click', () => {
+  document.getElementById(b.dataset.go).scrollIntoView({block:'start'});
+}));
+
+/* riel colapsable — el ancho ganado va al contenido (la propuesta, sobre todo) */
+const aside = document.querySelector('aside');
+const chev  = document.getElementById('chev');
+document.querySelectorAll('#navlist button, .soon .navlist div').forEach(el => {
+  el.title = el.querySelector('.n').textContent.trim();
+});
+function setMini(on){
+  aside.classList.toggle('mini', on);
+  chev.textContent = on ? '›' : '‹';
+  chev.title = on ? 'Expandir' : 'Colapsar';
+  try { localStorage.setItem('lobby.sidebar.mini', on ? '1' : '0'); } catch {}
+}
+chev.addEventListener('click', () => setMini(!aside.classList.contains('mini')));
+try { setMini(localStorage.getItem('lobby.sidebar.mini') === '1'); } catch {}
+
+/* pedir cambios: el motivo se pregunta, no se ofrece como nota opcional */
+const reasonBox = document.getElementById('reasonBox');
+document.getElementById('askChanges').addEventListener('click', () => {
+  reasonBox.classList.add('open');
+  document.getElementById('reasonTxt').focus();
+});
+document.getElementById('cancelChanges').addEventListener('click', () => reasonBox.classList.remove('open'));
+
+document.querySelectorAll('[data-jump]').forEach(b => b.addEventListener('click', () => {
+  document.getElementById(b.dataset.jump).scrollIntoView({block:'start'});
+}));
+
+function setActive(i){
+  buttons.forEach((b,j) => b.classList.toggle('on', j === i));
+  title.textContent = buttons[i].querySelector('.n').textContent;
+}
+
+function spy(){
+  const line = scroller.getBoundingClientRect().top + 90;
+  let i = 0;
+  sections.forEach((s, j) => { if (s.getBoundingClientRect().top <= line) i = j; });
+  if (scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 4) i = sections.length - 1;
+  setActive(i);
+}
+scroller.addEventListener('scroll', spy, {passive:true});
+spy();
+</script>
+</body>
+</html>
