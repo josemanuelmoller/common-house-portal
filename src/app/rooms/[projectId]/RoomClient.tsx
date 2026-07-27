@@ -56,11 +56,18 @@ const FONT_SANS = `-apple-system, "Inter", "Segoe UI", Roboto, system-ui, sans-s
 const FONT_MONO = `ui-monospace, Consolas, "SF Mono", monospace`;
 
 /* ── tokens de la sala (calcados de la maqueta room-full.html) ── */
+/* Los tokens compartidos con el lobby viven en globals.css como --lobby-*.
+   Acá quedan como referencias, no como copias: cuando estaban duplicados en hex
+   las dos superficies derivaban sin que nadie lo notara. Los semánticos que el
+   lobby no usa (ok/danger/mine) siguen literales — no hay dónde compartirlos. */
 const C = {
-  ink: "#0e0e0e", paper: "#ffffff", paper1: "#ffffff", paper2: "#ecece4", bg: "#eeeee8",
-  line: "#d8d8d0", lineSoft: "#ececE4", muted: "#6b6b6b", muted2: "#4a4a44",
-  lime: "#c8f55a", limeSoft: "#e7f9a8", limePaper: "rgba(200,245,90,.32)", limeInk: "#3a8c00",
-  ok: "#166534", okSoft: "#dcfce7", warn: "#b45309", warnSoft: "#fff3cd",
+  ink: "var(--lobby-ink)", paper: "var(--lobby-paper)", paper1: "var(--lobby-paper)",
+  paper2: "var(--lobby-paper-2)", bg: "var(--lobby-bg)", outer: "var(--lobby-outer)",
+  line: "var(--lobby-line)", lineSoft: "var(--lobby-line-soft)",
+  muted: "var(--lobby-muted)", muted2: "var(--lobby-muted-2)",
+  lime: "var(--lobby-lime)", limeSoft: "#e7f9a8", limePaper: "var(--lobby-lime-paper)",
+  limeInk: "var(--lobby-lime-ink)",
+  ok: "#166534", okSoft: "#dcfce7", warn: "var(--lobby-alert)", warnSoft: "#fff3cd",
   danger: "#991b1b", dangerSoft: "#fee2e2", mine: "#4258c9", minePaper: "rgba(66,88,201,.12)",
 };
 
@@ -481,7 +488,12 @@ export function RoomClient({ projectId, role, capabilities, isSuperAdmin, person
   const myTasks = personId ? tasks.filter((t) => t.owner_person_id === personId) : [];
   const myOpenTasks = myTasks.filter((t) => t.status !== "done");
   const myDeliverables = personId ? deliverables.filter((d) => d.owner_person_id === personId) : [];
-  const navCount: Partial<Record<SectionKey, number | undefined>> = { mio: myOpenTasks.length || undefined, entregables: deliverables.length, tareas: tasks.length, decisiones: openDecisions || undefined, reuniones: meetings.length || undefined };
+  /* El riel sólo marca lo que pide atención, no lo que hay.
+     "Entregables 12" es inventario: si abrís la sección igual los vas a contar.
+     Quedan los dos que sí piden algo — tus tareas abiertas y las decisiones sin
+     resolver — y se van los de entregables/tareas/reuniones. Mismo criterio que
+     el lobby (ver .claude/CLIENT-ROOM-DESIGN.md § señales). */
+  const navCount: Partial<Record<SectionKey, number | undefined>> = { mio: myOpenTasks.length || undefined, decisiones: openDecisions || undefined };
   const navItems = NAV.filter((n) => !n.pmOnly || can("analytics.view"));
   const sectionLabel = tr("nav." + section);
 
@@ -504,7 +516,7 @@ export function RoomClient({ projectId, role, capabilities, isSuperAdmin, person
   };
 
   return (
-    <div style={{ minHeight: "100vh", fontFamily: FONT_SANS, fontSize: 14, lineHeight: 1.5, color: C.ink, background: "#e2e2da", padding: isMobile ? 0 : "22px 16px 40px" }}>
+    <div style={{ minHeight: "100vh", fontFamily: FONT_SANS, fontSize: 14, lineHeight: 1.5, color: C.ink, background: C.outer, padding: isMobile ? 0 : "22px 16px 40px" }}>
       {/* app enmarcada (calcada de la maqueta) */}
       <div style={{ maxWidth: 1160, margin: "0 auto", display: "flex", height: isMobile ? "100vh" : "calc(100vh - 62px)", background: C.bg, border: isMobile ? "none" : `1.5px solid ${C.line}`, borderRadius: isMobile ? 0 : 16, overflow: "hidden" }}>
       {/* hamburguesa (mobile) */}
