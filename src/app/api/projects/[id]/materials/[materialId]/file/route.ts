@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { resolveClientRoomProject } from "@/lib/client-room";
 import { resolveAccessForSlug } from "@/lib/require-client-access";
+import { can, resolveRoomActor } from "@/lib/project-roles";
 
 export const dynamic = "force-dynamic";
 
@@ -29,12 +30,22 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const access = await resolveAccessForSlug(project.hall_slug ?? "");
-  if (access.kind === "denied") {
-    return NextResponse.json({ error: "Unauthorized" }, { status: access.reason === "unauthenticated" ? 401 : 403 });
-  }
-  if (access.kind !== "admin" && material.visibility !== "client") {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  // Miembro de la sala de trabajo: el PM/colaborador que sube un documento
+  // interno tiene que poder abrirlo sin ser admin ni tener grant de cliente.
+  // El Lector queda afuera acá mismo (no tiene material.download).
+  const actor = await resolveRoomActor(project.id);
+  const roomMayRead = Boolean(actor.role)
+    && can(actor.role, "material.download")
+    && (material.visibility === "client" || can(actor.role, "internal.view"));
+
+  if (!roomMayRead) {
+    const access = await resolveAccessForSlug(project.hall_slug ?? "");
+    if (access.kind === "denied") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: access.reason === "unauthenticated" ? 401 : 403 });
+    }
+    if (access.kind !== "admin" && material.visibility !== "client") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
   }
 
   const { data: blob, error } = await supabaseAdmin().storage.from("room-docs").download(material.external_id as string);
