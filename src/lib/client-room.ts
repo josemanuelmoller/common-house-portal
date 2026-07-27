@@ -127,6 +127,9 @@ export type ClientRoomProject = {
   agreements: ClientRoomAgreement[];
   billing: ClientRoomBilling;
   clientBilling: ClientBillingProfile | null;
+  /** Visita anterior de quien mira, para marcar lo que cambió desde entonces.
+   *  null la primera vez (nada es "nuevo" si nunca estuviste). */
+  lastVisitAt: string | null;
 };
 
 export type ClientRoomAdminData = ClientRoomProject & {
@@ -387,7 +390,34 @@ async function loadClientBilling(projectId: string): Promise<ClientBillingProfil
   };
 }
 
-async function assembleRoom(row: ProjectRow, includeInternal: boolean, canSeeBank = false): Promise<ClientRoomProject> {
+/**
+ * La visita ANTERIOR de esta persona a este lobby — la que fija la línea de
+ * "nuevo desde tu última visita".
+ *
+ * Se ignoran los últimos 30 minutos a propósito: el tracker registra la visita
+ * en curso apenas monta, así que sin esa ventana la sesión de ahora se marcaría
+ * a sí misma como ya vista y no habría novedades nunca. Las previsualizaciones
+ * de admin quedan fuera (is_admin) por la misma razón que en las estadísticas:
+ * no son visitas del cliente.
+ */
+async function loadLastVisit(projectId: string, viewerEmail: string | null): Promise<string | null> {
+  if (!viewerEmail) return null;
+  const cutoff = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+  const { data } = await supabaseAdmin()
+    .from("portal_analytics_events")
+    .select("occurred_at")
+    .eq("project_id", projectId)
+    .eq("event_type", "visit")
+    .eq("is_admin", false)
+    .ilike("actor_email", viewerEmail)
+    .lt("occurred_at", cutoff)
+    .order("occurred_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return (data?.occurred_at as string | null) ?? null;
+}
+
+async function assembleRoom(row: ProjectRow, includeInternal: boolean, canSeeBank = false, viewerEmail: string | null = null): Promise<ClientRoomProject> {
   const hero = row.hall_hero ? withDraftDefaults(row.hall_hero) : null;
   const [orgName, materials, agreements, timelineEvents, billing, clientBilling] = await Promise.all([
     organizationName(row.organization_id),
@@ -397,6 +427,7 @@ async function assembleRoom(row: ProjectRow, includeInternal: boolean, canSeeBan
     loadBilling(canSeeBank),
     loadClientBilling(row.id),
   ]);
+  const lastVisitAt = await loadLastVisit(row.id, viewerEmail);
   return {
     id: row.id,
     notionId: row.notion_id,
@@ -441,13 +472,17 @@ async function assembleRoom(row: ProjectRow, includeInternal: boolean, canSeeBan
     agreements,
     billing,
     clientBilling,
+    lastVisitAt,
   };
 }
 
-export async function getClientRoomBySlug(slug: string, opts?: { canSeeBank?: boolean }): Promise<ClientRoomProject | null> {
+export async function getClientRoomBySlug(
+  slug: string,
+  opts?: { canSeeBank?: boolean; viewerEmail?: string | null },
+): Promise<ClientRoomProject | null> {
   const row = await resolveClientRoomProject(slug, "slug");
   if (!row || !row.client_room_enabled) return null;
-  return assembleRoom(row, false, opts?.canSeeBank ?? false);
+  return assembleRoom(row, false, opts?.canSeeBank ?? false, opts?.viewerEmail ?? null);
 }
 
 export async function getClientRoomAdminData(identifier: string): Promise<ClientRoomAdminData | null> {

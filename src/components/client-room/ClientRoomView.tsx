@@ -172,19 +172,32 @@ export function ClientRoomView({ room, role, adminPreview }: { room: ClientRoomP
   const hasHeard = understandingAgreements.length > 0 || heardFields.length > 0 || room.whatWeHeard.heard.length > 0;
   const stage = room.currentStage ?? room.projectStatus ?? room.roomStatus;
 
+  // Novedad = cambió después de tu visita anterior. Sin visita previa no hay
+  // nada "nuevo": la primera vez todo lo es, y marcarlo todo no dice nada.
+  const since = room.lastVisitAt ? new Date(room.lastVisitAt).getTime() : null;
+  const isNewer = (value: string | null | undefined) =>
+    since !== null && !!value && new Date(value).getTime() > since;
+  const proposalIsNew = !!featured && isNewer(featured.clientVisibleAt ?? featured.modifiedAt);
+  const documentsAreNew = documents.some((m) => isNewer(m.clientVisibleAt ?? m.modifiedAt));
+  const agreementsAreNew = otherAgreements.some((a) => isNewer(a.requestedAt));
+
   // El riel sólo nombra lo que existe. Una sección vacía en la nav promete un
   // lugar y entrega una frase gris: dentro del marco de app eso se lee como
   // producto a medio hacer, justo lo contrario de lo que el cromo quiere decir.
   const nav: LobbyNavItem[] = [
     { id: "overview", label: "Resumen", icon: "overview" },
     ...(hasHeard ? [{ id: "heard", label: "Lo que escuchamos", icon: "heard" }] : []),
-    { id: "proposal", label: "Propuesta", icon: "proposal" },
+    { id: "proposal", label: "Propuesta", icon: "proposal", ...(proposalIsNew ? { isNew: true } : {}) },
     ...(room.timeline.length ? [{ id: "plan", label: "Plan", icon: "plan" }] : []),
     ...(room.timelineEvents.length ? [{ id: "together", label: "Trabajo juntos", icon: "together" }] : []),
     ...(otherAgreements.length
-      ? [{ id: "agreements", label: "Acuerdos", icon: "agreements", ...(openAgreements.length ? { alert: openAgreements.length } : {}) }]
+      ? [{
+          id: "agreements", label: "Acuerdos", icon: "agreements",
+          ...(agreementsAreNew ? { isNew: true } : {}),
+          ...(openAgreements.length ? { alert: openAgreements.length } : {}),
+        }]
       : []),
-    ...(documents.length ? [{ id: "documents", label: "Documentos", icon: "documents" }] : []),
+    ...(documents.length ? [{ id: "documents", label: "Documentos", icon: "documents", ...(documentsAreNew ? { isNew: true } : {}) }] : []),
     ...(hasAdmin ? [{ id: "admin", label: "Administrativo", icon: "admin" }] : []),
   ];
 
@@ -285,7 +298,7 @@ export function ClientRoomView({ room, role, adminPreview }: { room: ClientRoomP
         <div className="flex flex-col" style={{ gap: 16 }}>
 
           {/* ── PROPUESTA ── */}
-          <Card id="proposal" icon="proposal" title="Nuestra propuesta"
+          <Card id="proposal" icon="proposal" title="Nuestra propuesta" isNew={proposalIsNew}
             meta={<span style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".3px", textTransform: "uppercase", padding: "2px 8px", borderRadius: 999, background: "var(--lobby-paper-2)", color: "var(--lobby-muted-2)" }}>{room.proposal.status}</span>}>
             {featured && (
               <>
@@ -362,7 +375,7 @@ export function ClientRoomView({ room, role, adminPreview }: { room: ClientRoomP
 
           {/* ── ACUERDOS ── */}
           {otherAgreements.length > 0 && (
-            <Card id="agreements" icon="agreements" title="Acuerdos"
+            <Card id="agreements" icon="agreements" title="Acuerdos" isNew={agreementsAreNew}
               meta={openAgreements.length > 0
                 ? <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".3px", textTransform: "uppercase", padding: "2px 8px", borderRadius: 999, background: "var(--lobby-alert)", color: "#fff" }}>{openAgreements.length} pendiente{openAgreements.length > 1 ? "s" : ""}</span>
                 : undefined}>
@@ -389,7 +402,7 @@ export function ClientRoomView({ room, role, adminPreview }: { room: ClientRoomP
 
           {/* ── DOCUMENTOS ── */}
           {documents.length > 0 && (
-            <Card id="documents" icon="documents" title="Documentos"
+            <Card id="documents" icon="documents" title="Documentos" isNew={documentsAreNew}
               meta={<span style={{ fontSize: 10, color: "var(--lobby-muted)", fontWeight: 600 }}>{documents.length}</span>}>
               {documents.map((m, i) => {
                 const fresh = relativeDate(m.clientVisibleAt ?? m.modifiedAt);
