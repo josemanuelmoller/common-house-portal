@@ -22,11 +22,14 @@ type RoomBilling = { company: { legalName: string | null; taxId: string | null; 
 type Meeting = { id: string; title: string; date: string | null; summary: string | null; url: string | null; platform: string | null; kind: string; durationMinutes: number | null; attendees: string[] };
 type EvidenceItem = { id: string; sourceId: string; statement: string | null; type: string | null; workstream: string | null; people: string[] };
 type Suggestion = { id: string; proposal_kind: string | null; item_type: string | null; summary: string | null; rationale: string | null; source_refs: string[] | null; created_at: string };
+/* fila de project_members (la que devuelve /members) — distinta de RoomTeamMember */
+type MemberRow = { id: string; person_id: string | null; user_email: string; role: string; revoked_at: string | null; created_at: string };
 
 type Props = {
   projectId: string;
   role: string;
   capabilities: string[];
+  isSuperAdmin: boolean;
   personId: string | null;
   defaultLang: Lang;
   emptyRoom: boolean;
@@ -146,7 +149,7 @@ const ROLE_TABS: { key: string; label: string }[] = [
   { key: "pm", label: "PM" }, { key: "collaborator", label: "Colab" }, { key: "client", label: "Cliente" }, { key: "reader", label: "Lector" },
 ];
 
-export function RoomClient({ projectId, role, capabilities, personId, defaultLang, emptyRoom, suggestion, project, rooms, meta, team, billing, meetings, evidence, suggestions, heroNote, initialPhases, initialDeliverables, initialTasks, initialDecisions, initialMaterials, initialEvents }: Props) {
+export function RoomClient({ projectId, role, capabilities, isSuperAdmin, personId, defaultLang, emptyRoom, suggestion, project, rooms, meta, team, billing, meetings, evidence, suggestions, heroNote, initialPhases, initialDeliverables, initialTasks, initialDecisions, initialMaterials, initialEvents }: Props) {
   const [section, setSection] = useState<SectionKey>("resumen");
   const [suggs, setSuggs] = useState<Suggestion[]>(suggestions);
   const [approving, setApproving] = useState(false);
@@ -154,16 +157,21 @@ export function RoomClient({ projectId, role, capabilities, personId, defaultLan
   const [tasks, setTasks] = useState<Task[]>(initialTasks);
   const [decisions, setDecisions] = useState<Decision[]>(initialDecisions);
   const [phases, setPhases] = useState<Phase[]>(initialPhases);
+  const [materials, setMaterials] = useState<Material[]>(initialMaterials);
+  const [uploading, setUploading] = useState(false);
+  const fileInput = useRef<HTMLInputElement | null>(null);
+  /* gestión de acceso: por ahora solo el admin de plataforma (no todo PM) */
+  const [members, setMembers] = useState<MemberRow[] | null>(null);
+  const [memberBusy, setMemberBusy] = useState(false);
   const [openPhase, setOpenPhase] = useState<string | null>(initialPhases.find((p) => p.status === "in_progress")?.id ?? null);
   const [dView, setDView] = useState<"list" | "kanban">("kanban");
   const [tView, setTView] = useState<"list" | "kanban">("kanban");
   const [toast, setToast] = useState<{ msg: string; undo?: () => void } | null>(null);
   const [expandedDeliv, setExpandedDeliv] = useState<string | null>(null);
   const [expandedDecision, setExpandedDecision] = useState<string | null>(() => initialDecisions.find((d) => d.status === "open")?.id ?? null);
-  const [materials, setMaterials] = useState<Material[]>(initialMaterials);
+  // materials/uploading/fileInput ya se declaran arriba (llegaron con #110);
+  // de esta rama sobrevive sólo el panel de detalle.
   const [detail, setDetail] = useState<DetailTarget>(null);
-  const [uploading, setUploading] = useState(false);
-  const fileRef = useRef<HTMLInputElement | null>(null);
 
   /* shell: colapso (desktop, persistido) + drawer (mobile) */
   const [collapsed, setCollapsed] = useState(false);
@@ -280,6 +288,40 @@ export function RoomClient({ projectId, role, capabilities, personId, defaultLan
     try { await api(`${base}/tasks`, "PATCH", { id, action: "reopen" }); flash(tr("toast.taskReopened")); }
     catch (e) { setTasks(prev); flash((e as Error).message); }
   }
+  /* ── acceso a la sala (solo admin de plataforma por ahora) ── */
+  async function loadMembers() {
+    if (!isSuperAdmin) return;
+    try { const r = await api(`${base}/members`, "GET"); setMembers(r.members as MemberRow[]); }
+    catch (e) { flash((e as Error).message); }
+  }
+  async function addMember() {
+    if (!isSuperAdmin) return;
+    const email = window.prompt(tr("prompt.memberEmail"))?.trim();
+    if (!email) return;
+    const role = window.prompt(tr("prompt.memberRole"), "client")?.trim();
+    if (!role) return;
+    setMemberBusy(true);
+    try { await api(`${base}/members`, "POST", { email, role }); await loadMembers(); flash(tr("toast.memberAdded")); }
+    catch (e) { flash((e as Error).message); }
+    finally { setMemberBusy(false); }
+  }
+  async function changeMemberRole(m: MemberRow) {
+    if (!isSuperAdmin) return;
+    const role = window.prompt(tr("prompt.memberRole"), m.role)?.trim();
+    if (!role || role === m.role) return;
+    setMemberBusy(true);
+    try { await api(`${base}/members`, "PATCH", { id: m.id, role }); await loadMembers(); flash(tr("toast.memberRoleChanged")); }
+    catch (e) { flash((e as Error).message); }
+    finally { setMemberBusy(false); }
+  }
+  async function revokeMember(m: MemberRow) {
+    if (!isSuperAdmin) return;
+    if (!window.confirm(tr("prompt.memberRevoke").replace("{email}", m.user_email))) return;
+    setMemberBusy(true);
+    try { await api(`${base}/members`, "PATCH", { id: m.id, revoke: true }); await loadMembers(); flash(tr("toast.memberRevoked")); }
+    catch (e) { flash((e as Error).message); }
+    finally { setMemberBusy(false); }
+  }
   async function createDeliverable() {
     if (!can("structure.edit")) return;
     const title = window.prompt(tr("prompt.newDeliverable"));
@@ -350,6 +392,8 @@ export function RoomClient({ projectId, role, capabilities, personId, defaultLan
 
   /* ── materiales: subir ── */
   async function uploadMaterial(file: File) {
+    // Guarda de capacidad además del botón: la UI puede cambiar, la regla no.
+    if (!can("material.upload")) return;
     setUploading(true);
     try {
       const fd = new FormData();
@@ -1074,17 +1118,20 @@ export function RoomClient({ projectId, role, capabilities, personId, defaultLan
                 <span style={{ flex: 1 }} />
                 {can("material.upload") && (
                   <>
-                    <input ref={fileRef} type="file" accept="application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation"
-                      style={{ display: "none" }}
-                      onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) uploadMaterial(f); }} />
-                    <button onClick={() => fileRef.current?.click()} disabled={uploading} style={{ ...btn(C.paper, C.muted2, true), opacity: uploading ? .55 : 1, cursor: uploading ? "default" : "pointer" }}>
+                    <input
+                      ref={fileInput} type="file" style={{ display: "none" }}
+                      accept=".pdf,.pptx,.docx,.doc,application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword"
+                      onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) uploadMaterial(f); }}
+                    />
+                    <button onClick={() => fileInput.current?.click()} disabled={uploading} style={{ ...btn(C.paper, C.muted2, true), opacity: uploading ? 0.55 : 1, cursor: uploading ? "default" : "pointer" }}>
                       {uploading ? tr("mat.uploading") : (lang === "es" ? "+ Subir" : "+ Upload")}
                     </button>
                   </>
                 )}
               </div>
               <p style={{ color: C.muted, fontSize: 13, maxWidth: "72ch", margin: "-2px 0 18px", lineHeight: 1.6 }}>
-                {lang === "es" ? "Agrupados por área de trabajo. Lo que subas aquí queda interno hasta que se marque visible para el cliente." : "Grouped by work area. What you upload stays internal until it's marked client-visible."}
+                {lang === "es" ? "Agrupados por área de trabajo, siempre en su versión más reciente desde Drive." : "Grouped by work area, always the latest version from Drive."}
+                {can("material.upload") ? ` ${tr("mat.uploadNote")}` : ""}
               </p>
               {materials.length === 0 && <Empty text={tr("mat.none")} />}
               {matGroups.map((g) => (
@@ -1203,7 +1250,7 @@ export function RoomClient({ projectId, role, capabilities, personId, defaultLan
                 {(meta.driveUrl || meta.presaleSlug || meta.orgWebsite) && (
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 15 }}>
                     {meta.driveUrl && <a href={meta.driveUrl} target="_blank" rel="noreferrer" style={linkChip}>{tr("proj.driveFolder")}</a>}
-                    {meta.presaleSlug && <a href={`/hall/${meta.presaleSlug}`} style={linkChip}>{tr("proj.presaleRoom")}</a>}
+                    {meta.presaleSlug && <a href={`/lobby/${meta.presaleSlug}`} style={linkChip}>{tr("proj.presaleRoom")}</a>}
                     {meta.orgWebsite && <a href={meta.orgWebsite} target="_blank" rel="noreferrer" style={linkChip}>{tr("proj.clientWeb")}</a>}
                   </div>
                 )}
@@ -1225,6 +1272,32 @@ export function RoomClient({ projectId, role, capabilities, personId, defaultLan
                   ))}
                 </div>
               </Block>
+
+              {/* ACCESO — gestión de miembros. Por ahora solo el admin de plataforma:
+                  el endpoint acepta member.manage (todo PM), pero la UI se abre
+                  acotada hasta que el flujo esté rodado. */}
+              {isSuperAdmin && (
+                <Block title={tr("proj.access")} note={tr("proj.accessNote")}>
+                  {members === null ? (
+                    <button onClick={loadMembers} style={btn(C.paper, C.muted2, true)}>{tr("proj.accessLoad")}</button>
+                  ) : (
+                    <>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
+                        {members.length === 0 && <Empty text={tr("proj.noMembers")} />}
+                        {members.map((m) => (
+                          <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 11, background: C.paper, border: `1.5px solid ${C.line}`, borderRadius: 12, padding: "10px 13px" }}>
+                            <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.user_email}</span>
+                            <span style={pill(m.role === "client" ? C.paper2 : C.limePaper, m.role === "client" ? C.muted2 : C.limeInk)}>{tr("role." + m.role)}</span>
+                            <button onClick={() => changeMemberRole(m)} disabled={memberBusy} style={btn(C.paper, C.muted2, true)}>{tr("btn.changeRole")}</button>
+                            <button onClick={() => revokeMember(m)} disabled={memberBusy} style={btn(C.paper, C.warn, true)}>{tr("btn.revoke")}</button>
+                          </div>
+                        ))}
+                      </div>
+                      <button onClick={addMember} disabled={memberBusy} style={btn(C.lime, "#0a0a0a")}>{tr("btn.addMember")}</button>
+                    </>
+                  )}
+                </Block>
+              )}
 
               {/* ADMINISTRATIVO */}
               <Block title={tr("proj.admin")}>

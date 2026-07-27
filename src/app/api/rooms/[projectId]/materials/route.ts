@@ -1,30 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { resolveClientRoomProject } from "@/lib/client-room";
-import { requireSameOriginRequest } from "@/lib/require-same-origin";
 import { can, logRoomEvent, resolveRoomActor } from "@/lib/project-roles";
-
-/**
- * Materiales de la sala (project_materials).
- * Ver: todos, pero quien no tiene internal.view sólo ve lo marcado como visible
- * para el cliente. Descargar: pm/colaborador/cliente. Al Lector se le OMITE la
- * url (ve la lista pero no puede bajar) — enforce a nivel de datos, no solo UI.
- * Subir: material.upload (pm/colaborador), siempre a visibilidad interna: pasar
- * algo a client-visible es una decisión de divulgación aparte.
- */
+import { requireSameOriginRequest } from "@/lib/require-same-origin";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
+
+/**
+ * Materiales de la sala (index de Drive + subidas desde la sala).
+ * Ver: todos, pero lo interno solo con internal.view — mismo criterio que el
+ * loader de la sala y que la sala de preventa.
+ * Descargar: pm/colaborador/cliente. Al Lector se le OMITE la url (ve la lista
+ * pero no puede bajar) — enforce a nivel de datos, no solo UI.
+ */
 
 const MAX_BYTES = 25 * 1024 * 1024;
 const EXT: Record<string, string> = {
   "application/pdf": "pdf",
   "application/vnd.openxmlformats-officedocument.presentationml.presentation": "pptx",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+  "application/msword": "doc",
 };
-const CATEGORIES = new Set([
-  "plan_timeline", "deliverable", "presentation", "manual", "working_document",
-  "contract_agreement", "proposal_budget", "purchase_order", "invoice", "multimedia", "other",
-]);
+const CATEGORIES = new Set(["plan_timeline", "deliverable", "presentation", "manual", "working_document", "contract_agreement", "proposal_budget", "purchase_order", "invoice", "multimedia", "other"]);
 
 async function ctxFor(projectId: string) {
   const project = await resolveClientRoomProject(projectId);
@@ -40,22 +38,29 @@ export async function GET(_req: NextRequest, c: { params: Promise<{ projectId: s
   if (error) return error;
   if (!can(actor.role, "material.view")) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  let query = supabaseAdmin()
+  const { data, error: dbError } = await supabaseAdmin()
     .from("project_materials")
-    .select("id, title, url, mime_type, category, folder_name, visibility, modified_at")
-    .eq("project_id", project.id);
-  // Sin internal.view (cliente, lector) sólo se ve lo explícitamente compartido.
-  if (!can(actor.role, "internal.view")) query = query.eq("visibility", "client");
+    .select("id, title, url, mime_type, category, folder_name, modified_at, visibility")
+    .eq("project_id", project.id)
+    .order("modified_at", { ascending: false });
+  if (dbError) return NextResponse.json({ error: dbError.message }, { status: 502 });
 
-  const { data, error: dbErr } = await query.order("modified_at", { ascending: false });
-  if (dbErr) return NextResponse.json({ error: dbErr.message }, { status: 502 });
-
+  const canSeeInternal = can(actor.role, "internal.view");
   const canDownload = can(actor.role, "material.download");
-  const materials = (data ?? []).map((m) => (canDownload ? m : { ...m, url: null }));
-  return NextResponse.json({ ok: true, materials, canDownload, canUpload: can(actor.role, "material.upload") });
+  const materials = (data ?? [])
+    .filter((m) => canSeeInternal || m.visibility === "client")
+    .map((m) => (canDownload ? m : { ...m, url: null }));
+  return NextResponse.json({ ok: true, materials, canDownload });
 }
 
-// ─── POST: subir un documento a la sala (multipart) ────────────────────────
+/**
+ * POST (multipart) — subir un documento desde la sala.
+ *
+ * Lo subido queda compartido con la sala (visibility 'client'), no interno: la
+ * ruta que sirve el archivo exige 'client' a quien no es admin, así que un
+ * material interno no lo podría abrir ni quien acaba de subirlo. Lo interno se
+ * carga por la superficie admin, que sí lo marca así a propósito.
+ */
 export async function POST(req: NextRequest, c: { params: Promise<{ projectId: string }> }) {
   const csrf = requireSameOriginRequest(req);
   if (csrf) return csrf;
@@ -68,10 +73,10 @@ export async function POST(req: NextRequest, c: { params: Promise<{ projectId: s
   const file = form.get("file") as File | null;
   if (!file) return NextResponse.json({ error: "No file provided" }, { status: 400 });
   const ext = EXT[file.type];
-  if (!ext) return NextResponse.json({ error: "Sólo PDF o PPTX" }, { status: 400 });
-  if (file.size > MAX_BYTES) return NextResponse.json({ error: "Archivo demasiado grande (máx 25MB)" }, { status: 400 });
+  if (!ext) return NextResponse.json({ error: "Solo PDF, PPTX o Word" }, { status: 400 });
+  if (file.size > MAX_BYTES) return NextResponse.json({ error: "Archivo muy grande (máx. 25MB)" }, { status: 400 });
 
-  const title = (((form.get("title") as string) || file.name || "Documento").trim()).slice(0, 200);
+  const title = ((form.get("title") as string) || file.name || "Documento").trim();
   const categoryRaw = (form.get("category") as string) || "working_document";
   const category = CATEGORIES.has(categoryRaw) ? categoryRaw : "working_document";
 
@@ -81,7 +86,8 @@ export async function POST(req: NextRequest, c: { params: Promise<{ projectId: s
   const { error: upErr } = await db.storage.from("room-docs").upload(path, buffer, { contentType: file.type, upsert: false });
   if (upErr) return NextResponse.json({ error: upErr.message }, { status: 502 });
 
-  const { data, error: insErr } = await db
+  const now = new Date().toISOString();
+  const { data, error: inErr } = await db
     .from("project_materials")
     .insert({
       project_id: project.id,
@@ -89,27 +95,25 @@ export async function POST(req: NextRequest, c: { params: Promise<{ projectId: s
       external_id: path,
       title,
       category,
-      document_status: "in_review",
-      visibility: "internal",
+      document_status: "current",
+      visibility: "client",
       url: "",
       mime_type: file.type,
       added_by: actor.email ?? actor.clerkId,
-      modified_at: new Date().toISOString(),
+      client_visible_at: now,
+      modified_at: now,
     })
-    .select("id, title, mime_type, category, folder_name, visibility, modified_at")
+    .select("id, title, url, mime_type, category, folder_name, modified_at, visibility")
     .single();
-  // Sin fila, el objeto en storage queda huérfano: se borra antes de responder.
-  if (insErr || !data) {
+  if (inErr || !data) {
+    // Sin fila no hay material: se borra el binario para no dejar huérfanos.
     await db.storage.from("room-docs").remove([path]);
-    return NextResponse.json({ error: insErr?.message ?? "Insert failed" }, { status: 502 });
+    return NextResponse.json({ error: inErr?.message ?? "Insert failed" }, { status: 502 });
   }
 
   const url = `/api/projects/${project.id}/materials/${data.id}/file`;
   await db.from("project_materials").update({ url }).eq("id", data.id);
 
-  await logRoomEvent({
-    projectId: project.id, actor, verb: "created", targetType: "material", targetId: data.id,
-    summary: `Subió "${title}"`, payload: { category, mime_type: file.type, bytes: file.size },
-  });
+  await logRoomEvent({ projectId: project.id, actor, verb: "uploaded", targetType: "material", targetId: data.id, summary: `Subió "${title}"`, payload: { title, category } });
   return NextResponse.json({ ok: true, material: { ...data, url } });
 }

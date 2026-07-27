@@ -13,7 +13,6 @@ import { HallDecisions } from "@/components/hall/HallDecisions";
 import { HallTeam } from "@/components/hall/HallTeam";
 import { NeedsYourInput } from "@/components/hall/NeedsYourInput";
 import { NextSteps } from "@/components/hall/NextSteps";
-import { WorkspaceActivation } from "@/components/hall/WorkspaceActivation";
 import { GarageActivation } from "@/components/hall/GarageActivation";
 import { DigitalResidents } from "@/components/hall/DigitalResidents";
 import {
@@ -25,6 +24,7 @@ import {
 } from "@/lib/notion";
 import { getProjectIdForUser, isAdminUser, isAdminEmail } from "@/lib/clients";
 import { listGrantsForCurrentUser } from "@/lib/require-client-access";
+import { listRoomsForEmail } from "@/lib/project-roles";
 import type {
   HallProject,
   HallMaterial,
@@ -119,15 +119,21 @@ export default async function HallPage({
 
   if (isAdmin && !adminViewAs) redirect("/admin");
 
-  // ── Client-scoped access (new flow, takes precedence over CLIENT_REGISTRY) ─
-  // If the signed-in user has at least one active grant in client_access,
-  // route them to the new /hall/[slug] page. This is the canonical flow for
-  // prospect / external client onboarding going forward.
+  // ── Enrutado del cliente ───────────────────────────────────────────────────
+  // La sala manda sobre el lobby: un proyecto andando no tiene preventa, tiene
+  // sala. Quien ya es miembro entra a trabajar; el lobby queda para el
+  // prospecto que todavía no tiene sala. Con varias salas, al escritorio (elige
+  // él) en vez de adivinar cuál.
   if (!isAdmin) {
+    const rooms = await listRoomsForEmail(email);
+    if (rooms.length === 1) redirect(`/rooms/${rooms[0].id}`);
+    if (rooms.length > 1) redirect("/rooms");
+
+    // Sin sala: si tiene un grant activo en client_access, va a su lobby.
     const grants = await listGrantsForCurrentUser();
     if (grants.length > 0) {
       const first = grants[0];
-      if (first.hallSlug) redirect(`/hall/${first.hallSlug}`);
+      if (first.hallSlug) redirect(`/lobby/${first.hallSlug}`);
     }
   }
 
@@ -182,9 +188,6 @@ export default async function HallPage({
   // Hall always appears as the first item.
   const NAV = [
     { label: "The Hall",     href: "/hall",      icon: "◈" },
-    ...(project.primaryWorkspace === "workroom" && WORKSPACE_READY.workroom
-      ? [{ label: "The Workroom", href: "/workroom", icon: "◻" }]
-      : []),
     ...(project.primaryWorkspace === "garage" && WORKSPACE_READY.garage
       ? [{ label: "The Garage", href: "/garage", icon: "◧" }]
       : []),
@@ -197,9 +200,10 @@ export default async function HallPage({
   // (sidebar link + threshold block) not a forced redirect.
   //
   // WORKSPACE_READY controls whether a workspace link appears in the sidebar.
-  // Workroom is live (WORKSPACE_READY.workroom = true).
   // Garage is built (WORKSPACE_READY.garage = true) — activate by assigning
   // Primary Workspace = "garage" in CH Projects [OS v2].
+  // The old client-facing /workroom surface was removed; post-sale delivery
+  // now lives in the Salas (/rooms/[projectId]), which are membership-gated.
 
   // ── Mode ─────────────────────────────────────────────────────────────────
   // Driven by "Hall Mode" select property on CH Projects [OS v2].
@@ -313,13 +317,6 @@ export default async function HallPage({
   const showWhatWeHeard =
     !!(hallProject.theChallenge || hallProject.whatMattersMost ||
        hallProject.whatMayBeInTheWay || hallProject.whatSuccessCouldLookLike);
-
-  // Onboarding: workroom_activation moment — show threshold block when this project
-  // has graduated to Workroom delivery (live mode + workroom workspace + ready flag).
-  const showWorkspaceActivation =
-    isLive &&
-    project.primaryWorkspace === "workroom" &&
-    WORKSPACE_READY.workroom;
 
   // Onboarding: garage_activation moment — show threshold block when this project
   // has activated to The Garage (live mode + garage workspace + built flag).
@@ -501,17 +498,6 @@ export default async function HallPage({
               <section id="asks" className="scroll-mt-6 mb-7">
                 <NeedsYourInput asks={asks} />
               </section>
-            )}
-
-            {/* Onboarding: workroom_activation — threshold block.
-                Pass the most recent session as a "something is already moving" signal. */}
-            {showWorkspaceActivation && (
-              <div className="mb-7">
-                <WorkspaceActivation
-                  project={hallProject}
-                  lastSession={conversations[0] ?? undefined}
-                />
-              </div>
             )}
 
             {/* Onboarding: garage_activation — startup workspace threshold block. */}

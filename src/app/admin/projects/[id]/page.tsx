@@ -35,7 +35,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
     getSourceActivity(id),
   ]);
 
-  if (!project) redirect("/admin");
+  if (!project) redirect("/admin/projects");
 
   // Supabase status read — keyed by notion_id (Phase 4 will move all reads here).
   const sbProject = await (async () => {

@@ -3,8 +3,8 @@
  *
  * When an org in `hall_organizations` is tagged as `Client` or `Prospect`,
  * make sure there's a paid-engagement project (`engagement_model='delivery'`)
- * pointing at the same domain. The project is what surfaces on
- * `/admin/workrooms`; the org tag is the trigger.
+ * pointing at the same domain. The project is what surfaces in the Hall's
+ * Active portfolio (`/admin`); the org tag is the trigger.
  *
  * Idempotent. Promotes Prospect → Client when the user upgrades the tag.
  * Does NOT delete projects when a tag is removed (per product decision).

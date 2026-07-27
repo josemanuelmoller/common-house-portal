@@ -1,6 +1,6 @@
 # Supabase Migration Status
 
-Last reviewed: 2026-04-17 (Wave 5 — organizations + people)
+Last reviewed: 2026-07-25 (BLK-0 wave — recovered 8 uncommitted prod migrations)
 
 Canonical Supabase project: `rjcsasbaxihaubkkkxrt` (commonhouse)
 Legacy Supabase project:     `qihudqahvhxsamaskjqo` (cote_OS) — DO NOT USE
@@ -29,6 +29,22 @@ timestamp, `name` = repo-file slug; repo files keep their planned timestamps).
 | `20260718170000_harden_learning_entity_rpcs.sql` | `harden_learning_entity_rpcs` | `project_state_proposals.applied_learning_id` column; `promote_learning_item` now requires **status=review AND transferability=confirmed AND ≥1 source** (candidate alone no longer qualifies); `link_subject_entities` hardened — exact (accent-insensitive via `unaccent`) preferred, else trigram **≥0.85**, else unresolved. |
 | `20260718171000_apply_state_proposal_learning.sql` | `apply_state_proposal_learning` | `apply_state_proposal` add_learning branch now sets `stale_after` (+45d) and records `applied_learning_id` (so acceptance resolves the learning's entity links). |
 | `20260718180000_commit_state_proposals.sql` | `commit_state_proposals` | Atomic state-refresh commit: inserts (deduped/capped) proposals AND advances the evidence cursor in one transaction, under a per-project **advisory xact lock + optimistic cursor check** — prevents duplicate proposals from concurrent runs or a crash between insert and cursor advance. |
+| `20260724112716_blk0_proposal_kind_room_structure.sql` | `blk0_proposal_kind_room_structure` | Sixth `proposal_kind`, `room_structure`, for the already-`accepted` audit row the room empty-state gate writes. **Reconstructed from prod** — applied 2026-07-24 without a repo file. |
+
+> The per-kind applicability CHECK on `project_state_proposals` is owned by PR #114
+> (`20260725150000_proposal_applicability.sql`) — not applied yet. A duplicate of it
+> was briefly applied out-of-band on 2026-07-25 and dropped again the same day
+> (`drop_state_proposal_payload_applicable_superseded_by_pr114`); the table carries
+> no applicability constraint until #114 lands.
+
+> **Drift warning (2026-07-25).** Eight further migrations are recorded in prod
+> with no file on any branch: `enable_rls_on_six_exposed_tables`,
+> `drop_notion_mirror_tables`, `multi_email_people_and_merge_person_fn`,
+> `blk0_work_execution_layer`, `blk0_project_decisions`,
+> `evidence_attribution_proposals`, `blk0_project_room_language`,
+> `blk0_source_meeting_meta`. They were applied via the Supabase MCP without
+> committing the SQL, so the repo can no longer reproduce prod from scratch.
+> Recover them the way `20260724112716` was recovered above.
 
 All new tables are RLS-enabled and service-role only (`revoke all` from
 anon/authenticated). Security advisors clean (only the expected INFO
@@ -54,6 +70,109 @@ row processed so nothing is skipped past the batch cap — and writes PROPOSALS 
 - Verified 2026-07-17 against real evidence: iRefill → model proposed 27, 24 stored
   (3 correctly dropped by validation), every proposal carries resolvable evidence
   `source_refs`. Auto Mercado Fase 2 (summary already evidence-complete) → 0, correct.
+
+---
+
+## Entity + billing wave — applied to canonical Supabase (2026-07-18 → 2026-07-21)
+
+These shipped with companion files from the start; listed here only so the
+timeline between the Portal 2.0 wave and the BLK-0 wave is unbroken.
+
+`20260718180000_organization_relationships.sql`,
+`20260718181000_project_organization_roles.sql`,
+`20260718182000_person_organization_memberships.sql`,
+`20260718183000_opportunities_project_link.sql`,
+`20260719120000_project_timeline_events.sql`,
+`20260720170000_timeline_calendar_event_id.sql`,
+`20260720190000_company_billing.sql`,
+`20260720200000_company_billing_accounts.sql`,
+`20260721120000_client_billing_profiles.sql`,
+`20260721160000_portal_analytics_events.sql`.
+
+---
+
+## BLK-0 wave — applied to canonical Supabase (2026-07-21 → 2026-07-25)
+
+> **These 8 were applied to prod via the Supabase MCP `apply_migration` WITHOUT a
+> companion file in the repo.** They existed on no branch — confirmed with
+> `git log --all --diff-filter=A --name-only -- 'supabase/migrations/*'`. That
+> broke fresh-environment reproduction and the audit trail the freeze doc
+> requires (freeze §6). Recovered 2026-07-25: the SQL below was pulled **verbatim**
+> from `supabase_migrations.schema_migrations.statements`, which the MCP records
+> at apply time — so the files are the original DDL, not a reconstruction. Each
+> file carries a `RECOVERED FROM PRODUCTION` header. Every statement is already
+> idempotent (`IF NOT EXISTS` / `CREATE OR REPLACE` / DO-block trigger guards);
+> nothing was re-applied.
+>
+> **Do not repeat this.** `apply_migration` without committing the SQL is how the
+> gap opened. Write the repo file first, then apply.
+
+Note the file-naming departure: because these are documentation-of-record for
+DDL that is already in prod, each file is named `<recorded version>_<name>.sql`
+(the apply-time timestamp), **not** the planned-timestamp convention used above.
+
+| Migration (repo file) | Recorded version | What it does |
+|---|---|---|
+| `20260721104013_enable_rls_on_six_exposed_tables.sql` | `20260721104013` | Freeze acceptance criterion #7 (zero `rls_disabled` on `public.*`): `ENABLE ROW LEVEL SECURITY` on `hall_attention_log`, `org_recent_topics`, `hall_snoozes`, `push_snoozes`, `hall_draft_dismissals`, `debug_log`. No policies — service_role bypasses RLS, anon/authenticated get nothing. |
+| `20260721130516_drop_notion_mirror_tables.sql` | `20260721130516` | **Phase 6 mirror DROP, already executed.** Drops all 8 `notion_*` mirror tables (`notion_decision_items`, `notion_daily_briefings`, `notion_insight_briefs`, `notion_watchlist`, `notion_competitive_intel`, `notion_agent_drafts`, `notion_content_pipeline`, `notion_sync_runs`). Irreversible; owner-approved 2026-07-21. New code must use the canonical tables (AGENTS.md notion-cutoff §4). |
+| `20260723214421_multi_email_people_and_merge_person_fn.sql` | `20260723214421` | `people.email_accounts text[]` (one human, several addresses — `email` stays primary). `merge_person(uuid,uuid)` RPC: atomic person merge reassigning all 9 FK relationships, `security definer set search_path=public`, `revoke all` from anon/authenticated. Replaces the lossy `/api/hall-contacts/merge` path that only moved `conversation_messages`. |
+| `20260724061309_blk0_work_execution_layer.sql` | `20260724061309` | BLK-0 execution layer — 5 tables: `project_members` (per-room role pm/collaborator/client/reader; permission-matrix backbone), `project_phases`, `project_deliverables` (client sign-off via `accepted_*`), `project_tasks` (close by `evidence` or `attestation`), `project_events` (append-only event log: undo, audit, activity feed). Also introduces `public.tg_set_updated_at()`. All RLS-on, no policies. |
+| `20260724083407_blk0_project_decisions.sql` | `20260724083407` | `project_decisions` — room decisions anchored to a deliverable, with context + `participants jsonb` + `source_ref`. Depends on the migration above for `project_deliverables` and `tg_set_updated_at()`. |
+| `20260724093302_evidence_attribution_proposals.sql` | `20260724093302` | `evidence_attribution_proposals` — human-review queue for medium-confidence attribution. The LLM classifier writes here instead of auto-applying; high-confidence still writes `evidence` directly. `unique(evidence_id)`. |
+| `20260724100655_blk0_project_room_language.sql` | `20260724100655` | `projects.room_language text not null default 'es' check (in ('es','en'))`. |
+| `20260725101524_blk0_source_meeting_meta.sql` | `20260725101524` | `sources.duration_minutes numeric` + `sources.attendees text[]` (from Fireflies). Nullable — only captured meetings carry them. |
+
+### Verification (2026-07-25)
+
+Each reconstruction was diffed against the live schema in `rjcsasbaxihaubkkkxrt`:
+
+- The 6 RLS tables: `relrowsecurity = true`, **0 policies** each ✅
+- Zero `notion_*` tables remain in `public` ✅
+- `people.email_accounts text[]`, `projects.room_language` (+ its CHECK),
+  `sources.duration_minutes`, `sources.attendees` all present with matching
+  types/defaults ✅
+- All 7 BLK-0 tables: column lists, every FK / CHECK / PK, every index
+  (including the partial and `lower(user_email)` ones), and all 5
+  `set_updated_at_*` triggers match the files exactly ✅
+- `merge_person`: `prosrc` is byte-identical (whitespace-normalized) to the body
+  in the recorded migration — no later migration replaced it. `prosecdef=true`,
+  `search_path=public`, `proacl` confirms anon/authenticated revoked ✅
+
+### Still unfiled as of 2026-07-25 — owned by other branches/sessions
+
+These were deliberately NOT filed by the recovery above: each belongs to work
+that was in flight elsewhere at the time, and writing a second copy from here
+would have created duplicate migrations at the same path.
+
+| Recorded version | Name | Owner / action |
+|---|---|---|
+| `20260724112716` | `blk0_proposal_kind_room_structure` | A file exists at `supabase/migrations/20260724112716_blk0_proposal_kind_room_structure.sql` but **only on the unmerged branch `claude/great-khayyam-e781e4`** (commit `f524b7f`), not on `main`. Its DDL is functionally exact (it spells the CHECK as `in (…)` where prod recorded `= any (array[…])`; Postgres normalizes both to the same constraint). **Action: land that branch, or the recovery is lost with it.** |
+| `20260725203404` | `state_proposal_payload_applicable` | No file on any branch. Added CHECK `project_state_proposals_payload_applicable`. |
+| `20260725204447` | `drop_state_proposal_payload_applicable_superseded_by_pr114` | No file on any branch. Drops that same constraint — PR #114 (`chore/proposal-integrity`) owns the rule and lands `project_state_proposals_applicable` instead. |
+| `20260725215545` | `add_task_proposals` | No file on any branch. Applied **21:55 on 2026-07-25**, i.e. while this recovery was running. Adds `project_state_proposals.applied_task_id`, extends `proposal_kind` to a 7th value `add_task`, adds the partial unique index `project_state_proposals_action_item_uniq`, and replaces `apply_state_proposal` with an `add_task` branch that inserts into `project_tasks` and resolves the source `action_items` row. **This is the live definition — the 6-kind CHECK in `20260724112716` is superseded by it.** |
+| `20260725215749` | `action_items_promoted_to_task_reason` | No file on any branch. Applied 21:57 on 2026-07-25. Adds `promoted_to_task` to the `action_items_resolved_reason_check` enum. Pairs with the migration above. |
+
+The middle two are a self-cancelling pair: net schema effect is zero (the
+constraint does not exist in prod now), so reproducing prod from scratch does not
+require them. They are audit trail only. The last two are **real, load-bearing
+schema** and must be filed by whoever applied them.
+
+**Wider gap, not addressed here:** the prod ledger holds 142 migrations; the repo
+holds 62 files. Most of the difference predates the Phase-1 file convention
+(`20260505120000+`) and is captured narratively in the wave sections below rather
+than as migration files. That reconciliation is a separate audit.
+
+### How to stop this recurring
+
+The gap opens whenever `apply_migration` runs without the SQL being committed.
+To detect it, compare the ledger against the repo:
+
+```sql
+select version, name from supabase_migrations.schema_migrations order by version;
+```
+
+…against `ls supabase/migrations/`. Any recorded `name` with no matching repo
+file slug is drift. Write the repo file **first**, then apply.
 
 ---
 

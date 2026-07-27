@@ -165,13 +165,15 @@ export async function runCalendarIngestor(input: IngestInput): Promise<IngestRes
               founderOwned: false,
               mentorshipPenalty,
             });
+            const cp = firstNonSelfAttendee(e.attendees, selfSet, contactByEmail);
             signals.push(buildActionSignal({
               sourceId:      `event:${e.id}:prep`,
               sourceUrl:     e.htmlLink,
               intent,
               subject:       e.summary || "(untitled event)",
               nextAction:    `Prep for "${e.summary}" — draft agenda + context`,
-              counterparty:  firstNonSelfAttendeeName(e.attendees, selfSet),
+              counterparty:  cp.name,
+              counterpartyContactId: cp.contactId,
               deadline:      new Date(e.startMs).toISOString(),
               lastMotionAt:  new Date(now).toISOString(),
               factors,
@@ -327,26 +329,49 @@ async function getTranscriptedTitles(titles: string[]): Promise<Set<string>> {
   return out;
 }
 
-async function resolveContactsByEmail(emails: string[]): Promise<Map<string, { id: string; email: string }>> {
-  const out = new Map<string, { id: string; email: string }>();
+type ResolvedContact = { id: string; email: string; name: string | null };
+
+async function resolveContactsByEmail(emails: string[]): Promise<Map<string, ResolvedContact>> {
+  const out = new Map<string, ResolvedContact>();
   if (emails.length === 0) return out;
   const sb = getSupabaseServerClient();
-  const { data } = await sb.from("people").select("id, email").in("email", emails);
-  for (const r of (data ?? []) as Array<{ id: string; email: string }>) {
-    if (r.email) out.set(r.email.toLowerCase(), { id: r.id, email: r.email });
+  const { data } = await sb.from("people").select("id, email, display_name, full_name").in("email", emails);
+  for (const r of (data ?? []) as Array<{ id: string; email: string; display_name: string | null; full_name: string | null }>) {
+    if (!r.email) continue;
+    // full_name viene con el correo como nombre en las personas sin higienizar;
+    // en ese caso no sirve como nombre y se descarta.
+    const named = [r.display_name, r.full_name].find(n => n && !n.includes("@")) ?? null;
+    out.set(r.email.toLowerCase(), { id: r.id, email: r.email, name: named });
   }
   return out;
 }
 
-function firstNonSelfAttendeeName(attendees: string[], selfSet: Set<string>): string | null {
+/**
+ * Primera contraparte no-propia del evento, resuelta contra people.
+ *
+ * Antes esto devolvía sólo el local-part del correo como nombre y el
+ * action_item nacía SIN counterparty_contact_id (related_ids iba vacío), aunque
+ * el ingestor ya tuviera el contacto resuelto para las señales de relación. Sin
+ * ese id no hay salto contacto→organización→proyecto, así que los 16 items de
+ * calendario quedaban huérfanos de proyecto — Renca entre ellos, teniendo la
+ * organización y el rol en Zero Waste Districts bien cargados.
+ */
+function firstNonSelfAttendee(
+  attendees: string[],
+  selfSet: Set<string>,
+  contactByEmail: Map<string, ResolvedContact>,
+): { contactId: string | null; name: string | null } {
   for (const e of attendees) {
-    if (!selfSet.has(e.toLowerCase())) {
-      // Return the local-part of the email as a rough name; better than nothing
-      // until we resolve via people table in the caller.
-      return e.split("@")[0].replace(/[._-]+/g, " ");
-    }
+    const email = e.toLowerCase();
+    if (selfSet.has(email)) continue;
+    const contact = contactByEmail.get(email);
+    return {
+      contactId: contact?.id ?? null,
+      // Nombre real si lo conocemos; si no, el local-part como antes.
+      name: contact?.name ?? e.split("@")[0].replace(/[._-]+/g, " "),
+    };
   }
-  return null;
+  return { contactId: null, name: null };
 }
 
 function buildActionSignal(params: {
@@ -356,6 +381,7 @@ function buildActionSignal(params: {
   subject:      string;
   nextAction:   string;
   counterparty: string | null;
+  counterpartyContactId: string | null;
   deadline:     string | null;
   lastMotionAt: string;
   factors:      ReturnType<typeof buildFactors>;
@@ -367,7 +393,9 @@ function buildActionSignal(params: {
     source_url: params.sourceUrl,
     emitted_at: new Date().toISOString(),
     ingestor_version: INGESTOR_VERSION,
-    related_ids: {},
+    // persist.ts lo baja a action_items.counterparty_contact_id, y de ahí sale
+    // el salto contacto→organización→proyecto.
+    related_ids: params.counterpartyContactId ? { contact_id: params.counterpartyContactId } : {},
     payload: {
       intent: params.intent,
       ball_in_court: "jose",

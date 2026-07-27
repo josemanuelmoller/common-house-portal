@@ -69,6 +69,16 @@ const embeddableHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  async redirects() {
+    return [
+      // La preventa pasó a llamarse Lobby y salió del namespace interno (/hall
+      // es el cockpit). Permanente y NO se puede quitar: hay URLs /hall/<slug>
+      // ya compartidas con clientes y enviadas en invitaciones de Clerk.
+      // `/hall` a secas no matchea (:slug exige un segmento), así que el router
+      // de entrada del cliente sigue intacto.
+      { source: "/hall/:slug", destination: "/lobby/:slug", permanent: true },
+    ];
+  },
   async headers() {
     return [
       { source: "/mps-deck/:path*", headers: embeddableHeaders },

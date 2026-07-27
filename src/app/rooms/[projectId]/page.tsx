@@ -76,6 +76,7 @@ export default async function RoomPage({ params }: { params: Promise<{ projectId
       projectId={project.id}
       role={actor.role}
       capabilities={caps}
+      isSuperAdmin={actor.isSuperAdmin}
       personId={actor.personId}
       defaultLang={lang}
       emptyRoom={emptyRoom}

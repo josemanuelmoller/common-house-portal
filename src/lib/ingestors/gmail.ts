@@ -283,6 +283,7 @@ export async function runGmailIngestor(input: IngestInput): Promise<IngestResult
       const projectId = resolveProjectIdForSignal(projectLinkage, {
         inferText: t.subject,
         counterpartyProjectNotionIds: peopleProjectMap.get(t.fromEmail.toLowerCase()) ?? null,
+        counterpartyEmail: t.fromEmail,
       });
 
       const signal: ActionSignal = {

@@ -115,18 +115,19 @@ export type WorkroomData = {
 };
 
 // ─── Workspace readiness guard ────────────────────────────────────────────────
-// Used by hall/page.tsx to gate Workroom CTA and by workroom/page.tsx to
+// Used by hall/page.tsx to gate the workspace CTA and by garage/page.tsx to
 // redirect non-ready workspace requests back to /hall.
-// Flip workroom to true once /workroom is built and client-ready.
 // Flip garage to true once /garage is built and client-ready.
+//
+// The `workroom` flag is gone: the old client-facing /workroom surface was
+// removed. Post-sale delivery lives in the Salas (/rooms/[projectId]), which
+// are gated by room membership, not by a global readiness boolean.
 
 export type WorkspaceReadiness = {
-  workroom: boolean;
   garage: boolean;
 };
 
 // Current readiness state — update here when a workspace goes live:
 export const WORKSPACE_READY: WorkspaceReadiness = {
-  workroom: true,   // /workroom is built and client-ready
   garage: true,     // /garage is built — activate by setting Primary Workspace = "garage" in Notion
 };
