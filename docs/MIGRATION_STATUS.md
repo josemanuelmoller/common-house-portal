@@ -29,6 +29,22 @@ timestamp, `name` = repo-file slug; repo files keep their planned timestamps).
 | `20260718170000_harden_learning_entity_rpcs.sql` | `harden_learning_entity_rpcs` | `project_state_proposals.applied_learning_id` column; `promote_learning_item` now requires **status=review AND transferability=confirmed AND ≥1 source** (candidate alone no longer qualifies); `link_subject_entities` hardened — exact (accent-insensitive via `unaccent`) preferred, else trigram **≥0.85**, else unresolved. |
 | `20260718171000_apply_state_proposal_learning.sql` | `apply_state_proposal_learning` | `apply_state_proposal` add_learning branch now sets `stale_after` (+45d) and records `applied_learning_id` (so acceptance resolves the learning's entity links). |
 | `20260718180000_commit_state_proposals.sql` | `commit_state_proposals` | Atomic state-refresh commit: inserts (deduped/capped) proposals AND advances the evidence cursor in one transaction, under a per-project **advisory xact lock + optimistic cursor check** — prevents duplicate proposals from concurrent runs or a crash between insert and cursor advance. |
+| `20260724112716_blk0_proposal_kind_room_structure.sql` | `blk0_proposal_kind_room_structure` | Sixth `proposal_kind`, `room_structure`, for the already-`accepted` audit row the room empty-state gate writes. **Reconstructed from prod** — applied 2026-07-24 without a repo file. |
+
+> The per-kind applicability CHECK on `project_state_proposals` is owned by PR #114
+> (`20260725150000_proposal_applicability.sql`) — not applied yet. A duplicate of it
+> was briefly applied out-of-band on 2026-07-25 and dropped again the same day
+> (`drop_state_proposal_payload_applicable_superseded_by_pr114`); the table carries
+> no applicability constraint until #114 lands.
+
+> **Drift warning (2026-07-25).** Eight further migrations are recorded in prod
+> with no file on any branch: `enable_rls_on_six_exposed_tables`,
+> `drop_notion_mirror_tables`, `multi_email_people_and_merge_person_fn`,
+> `blk0_work_execution_layer`, `blk0_project_decisions`,
+> `evidence_attribution_proposals`, `blk0_project_room_language`,
+> `blk0_source_meeting_meta`. They were applied via the Supabase MCP without
+> committing the SQL, so the repo can no longer reproduce prod from scratch.
+> Recover them the way `20260724112716` was recovered above.
 
 All new tables are RLS-enabled and service-role only (`revoke all` from
 anon/authenticated). Security advisors clean (only the expected INFO
