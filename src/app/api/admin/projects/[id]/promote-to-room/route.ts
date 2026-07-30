@@ -21,6 +21,7 @@ import { currentUser } from "@clerk/nextjs/server";
 import { adminGuardApi } from "@/lib/require-admin";
 import { requireSameOriginRequest } from "@/lib/require-same-origin";
 import { promoteLobbyToRoom } from "@/lib/promote-to-room";
+import { apiError } from "@/lib/api-error";
 
 export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const sameOrigin = requireSameOriginRequest(req);
@@ -43,7 +44,9 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
       actorEmail,
     });
     return NextResponse.json({ ok: true, dryRun: body.dryRun !== false, report });
-  } catch (e) {
-    return NextResponse.json({ error: e instanceof Error ? e.message : String(e) }, { status: 400 });
+  } catch (err) {
+    // El error detallado va a los logs de Vercel, no al cliente: los errores de
+    // Supabase traen nombres de tablas y constraints.
+    return apiError(err, { route: "[/api/admin/projects/[id]/promote-to-room]", status: 400 });
   }
 }
