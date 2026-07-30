@@ -43,16 +43,43 @@ export type PromoteReport = {
   warnings: string[];
 };
 
-/** Rol en el lobby → rol en la sala. El aprobador del lobby no es PM: aprueba
- *  comercialmente, no dirige el proyecto. */
-function roomRoleFor(email: string, lobbyRole: string, houseDomains: string[]): string {
+const HOUSE_DOMAINS = ["wearecommonhouse.com"];
+
+/**
+ * De qué lado está una persona. Tres respuestas, y la tercera es "no sé".
+ *
+ * La primera versión decidía por dominio de correo: lo que no fuera
+ * @wearecommonhouse.com era cliente. El dry run sobre MPS mostró el agujero —
+ * Francisco Cerda es de Common House y su correo es @gudcompany.com, así que
+ * habría entrado como CLIENTE a la sala de su propio proyecto. Y no hay dato que
+ * lo rescate: en `people` no tiene rol_interno ni clase "Team".
+ *
+ * O sea: no existe señal confiable de quién es de casa. Adivinar es exactamente
+ * lo que produjo el problema, así que acá no se adivina. Sin señal positiva de
+ * un lado o del otro, la persona queda AMBIGUA y no se agrega sola nunca —
+ * aparece en el reporte para que un humano decida.
+ */
+type Side = "house" | "client" | "ambiguous";
+
+function sideOf(
+  email: string,
+  person: { rol_interno: string | null; relationship_class: string | null } | undefined,
+  clientDomains: Set<string>,
+): Side {
   const domain = email.split("@")[1]?.toLowerCase() ?? "";
-  const isHouse = houseDomains.includes(domain);
-  if (isHouse) return lobbyRole === "approver" ? "pm" : "collaborator";
-  return lobbyRole === "viewer" ? "reader" : "client";
+  if (HOUSE_DOMAINS.includes(domain)) return "house";
+  if (person?.rol_interno || person?.relationship_class === "Team") return "house";
+  if (clientDomains.has(domain)) return "client";
+  return "ambiguous";
 }
 
-const HOUSE_DOMAINS = ["wearecommonhouse.com"];
+/** Rol en el lobby → rol en la sala. El aprobador del lobby no es PM: aprueba
+ *  comercialmente, no dirige el proyecto. */
+function roomRoleFor(side: Side, lobbyRole: string): string | null {
+  if (side === "house") return lobbyRole === "approver" ? "pm" : "collaborator";
+  if (side === "client") return lobbyRole === "viewer" ? "reader" : "client";
+  return null; // ambiguo: lo decide una persona
+}
 
 export async function promoteLobbyToRoom(
   projectId: string,
@@ -78,10 +105,43 @@ export async function promoteLobbyToRoom(
   ]);
   const already = new Set((existing ?? []).map((m) => (m.user_email as string | null)?.toLowerCase()).filter(Boolean));
 
+  // Dominios del cliente: los de la gente ya ligada a la organización del
+  // proyecto. Es la única señal de "lado cliente" que no depende de adivinar.
+  const clientDomains = new Set<string>();
+  if (project.organization_id) {
+    const { data: org } = await sb.from("organizations").select("notion_id").eq("id", project.organization_id).maybeSingle();
+    const orgNotion = (org?.notion_id as string | null) ?? null;
+    if (orgNotion) {
+      const { data: orgPeople } = await sb.from("people").select("email").eq("org_notion_id", orgNotion);
+      for (const row of (orgPeople ?? []) as Array<{ email: string | null }>) {
+        const d = row.email?.split("@")[1]?.toLowerCase();
+        if (d) clientDomains.add(d);
+      }
+    }
+  }
+  const emails = (grants ?? []).map((g) => (g.granted_email as string).toLowerCase());
+  const { data: peopleRows } = emails.length
+    ? await sb.from("people").select("email, rol_interno, relationship_class").in("email", emails)
+    : { data: [] as Array<Record<string, unknown>> };
+  const byEmail = new Map<string, { rol_interno: string | null; relationship_class: string | null }>();
+  for (const r of (peopleRows ?? []) as Array<Record<string, unknown>>) {
+    const e = (r.email as string | null)?.toLowerCase();
+    if (e) byEmail.set(e, {
+      rol_interno: (r.rol_interno as string | null) ?? null,
+      relationship_class: (r.relationship_class as string | null) ?? null,
+    });
+  }
+
   for (const g of (grants ?? []) as Array<{ granted_email: string; role: string }>) {
     const email = g.granted_email.toLowerCase();
     if (already.has(email)) { report.membersSkipped.push({ email, reason: "ya es miembro" }); continue; }
-    const role = roomRoleFor(email, g.role, HOUSE_DOMAINS);
+    const side = sideOf(email, byEmail.get(email), clientDomains);
+    const role = roomRoleFor(side, g.role);
+    if (!role) {
+      report.membersSkipped.push({ email, reason: "lado indeterminado — asignar el rol a mano" });
+      report.warnings.push(`No se pudo determinar si ${email} es de Common House o del cliente: no se agregó.`);
+      continue;
+    }
     const isClientSide = role === "client" || role === "reader";
     if (isClientSide && !opts.includeClient) {
       report.membersSkipped.push({ email, reason: "lado cliente — se suma en la sesión de inicio" });
