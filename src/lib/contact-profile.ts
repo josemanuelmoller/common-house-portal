@@ -41,16 +41,32 @@ export type OrgCrossRef = {
   projects:      OrgProject[];
 };
 
+const ORG_PROJECT_COLS = "id, name, project_status, current_stage, hall_current_focus, last_meeting_date";
+
 /**
  * For an organisation identified by its Notion ID, pull active
  * opportunities and projects. Returns empty arrays when the org isn't
  * registered in Notion or has nothing in the pipeline.
+ *
+ * Projects are read from BOTH spines (ADR-001): the legacy
+ * `projects.primary_org_notion_id` pointer *and* the authoritative
+ * `project_organization_roles` table. An org that only participates through a
+ * role (co_development_partner, technology_provider…) is genuinely involved in
+ * the project even though it isn't the primary org — reading only the legacy
+ * pointer made those orgs render as "None in OS v2".
  */
 export async function getOrgCrossRef(orgNotionId: string | null): Promise<OrgCrossRef> {
   if (!orgNotionId) return { opportunities: [], projects: [] };
   const sb = getSupabaseServerClient();
 
-  const [oppsRes, projsRes] = await Promise.all([
+  const { data: orgRow } = await sb
+    .from("organizations")
+    .select("id")
+    .eq("notion_id", orgNotionId)
+    .maybeSingle();
+  const orgId = (orgRow as { id: string } | null)?.id ?? null;
+
+  const [oppsRes, projsRes, rolesRes] = await Promise.all([
     sb.from("opportunities")
       .select("id, title, status, pending_action, opportunity_score, probability, value_estimate, expected_close_date, next_meeting_at, suggested_next_step, canonical_stage, is_active, is_archived")
       .eq("org_notion_id", orgNotionId)
@@ -58,15 +74,37 @@ export async function getOrgCrossRef(orgNotionId: string | null): Promise<OrgCro
       .order("opportunity_score", { ascending: false, nullsFirst: false })
       .limit(20),
     sb.from("projects")
-      .select("id, name, project_status, current_stage, hall_current_focus, last_meeting_date")
+      .select(ORG_PROJECT_COLS)
       .eq("primary_org_notion_id", orgNotionId)
       .neq("project_status", "Archived")
       .order("last_meeting_date", { ascending: false, nullsFirst: false })
       .limit(15),
+    orgId
+      ? sb.from("project_organization_roles")
+          .select(`projects(${ORG_PROJECT_COLS})`)
+          .eq("organization_id", orgId)
+          .is("ended_at", null)
+          .limit(30)
+      : Promise.resolve({ data: [] as Array<{ projects: OrgProject | OrgProject[] | null }> }),
   ]);
 
   const opportunities = ((oppsRes.data ?? []) as OrgOpportunity[]);
-  const projects      = ((projsRes.data ?? []) as OrgProject[]);
+
+  // Union both spines, de-duplicated by project id.
+  const byId = new Map<string, OrgProject>();
+  for (const p of (projsRes.data ?? []) as OrgProject[]) byId.set(p.id, p);
+  for (const row of (rolesRes.data ?? []) as Array<{ projects: OrgProject | OrgProject[] | null }>) {
+    // PostgREST returns the embedded row as an object or a single-element array.
+    const embedded = Array.isArray(row.projects) ? row.projects : row.projects ? [row.projects] : [];
+    for (const p of embedded) {
+      if (!p?.id || p.project_status === "Archived") continue;
+      if (!byId.has(p.id)) byId.set(p.id, p);
+    }
+  }
+
+  const projects = [...byId.values()]
+    .sort((a, b) => (b.last_meeting_date ?? "").localeCompare(a.last_meeting_date ?? ""))
+    .slice(0, 15);
 
   return { opportunities, projects };
 }
