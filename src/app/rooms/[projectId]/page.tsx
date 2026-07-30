@@ -6,6 +6,7 @@ import { resolveClientRoomProject } from "@/lib/client-room";
 import { capabilitiesFor, listRoomsForActor, resolveRoomActor } from "@/lib/project-roles";
 import { loadRoomContext, loadRoomEvidence, loadRoomMeetings } from "@/lib/room-context";
 import { suggestRoomStructure } from "@/lib/room-structure";
+import { clientStageLabel } from "@/lib/client-stage";
 import { RoomClient } from "./RoomClient";
 
 export const dynamic = "force-dynamic";
@@ -29,7 +30,7 @@ export default async function RoomPage({ params }: { params: Promise<{ projectId
   const caps = capabilitiesFor(actor.role);
   const db = supabaseAdmin();
   const [proj, phases, deliverables, tasks, decisions, materials] = await Promise.all([
-    db.from("projects").select("id, name, current_stage, room_language, notion_id, hall_draft, hall_welcome_note").eq("id", project.id).single(),
+    db.from("projects").select("id, name, current_stage, client_stage_label, room_language, notion_id, hall_draft, hall_welcome_note").eq("id", project.id).single(),
     db.from("project_phases").select("*").eq("project_id", project.id).order("position", { ascending: true }),
     db.from("project_deliverables").select("*").eq("project_id", project.id).order("position", { ascending: true }),
     db.from("project_tasks").select("*").eq("project_id", project.id).order("position", { ascending: true }),
@@ -88,7 +89,16 @@ export default async function RoomPage({ params }: { params: Promise<{ projectId
       defaultLang={lang}
       emptyRoom={emptyRoom}
       suggestion={suggestion}
-      project={proj.data ?? { id: project.id, name: null, current_stage: null }}
+      /* El estado interno NO cruza al componente cliente: se traduce acá, así el
+         pill de la sala no puede mostrar lenguaje de pipeline aunque alguien
+         escriba "Ganada" en current_stage. Ver src/lib/client-stage.ts. */
+      project={{
+        id: proj.data?.id ?? project.id,
+        name: proj.data?.name ?? null,
+        current_stage: proj.data
+          ? clientStageLabel(proj.data.current_stage as string | null, proj.data.client_stage_label as string | null)
+          : null,
+      }}
       rooms={rooms}
       meta={context.meta}
       team={context.team}

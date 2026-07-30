@@ -1,4 +1,5 @@
 import "server-only";
+import { clientStageLabel } from "@/lib/client-stage";
 import { currentUser } from "@clerk/nextjs/server";
 import { isAdminEmail, isAdminUser } from "@/lib/clients";
 import { supabaseAdmin } from "@/lib/supabase";
@@ -157,7 +158,7 @@ export async function listRoomsForActor(actor: RoomActor): Promise<RoomSummary[]
 
   const { data } = await db
     .from("projects")
-    .select("id, name, hall_slug, current_stage")
+    .select("id, name, hall_slug, current_stage, client_stage_label")
     .in("id", ids);
 
   return (data ?? [])
@@ -165,7 +166,8 @@ export async function listRoomsForActor(actor: RoomActor): Promise<RoomSummary[]
       id: p.id as string,
       name: (p.name as string | null) ?? null,
       slug: (p.hall_slug as string | null) ?? null,
-      stage: (p.current_stage as string | null) ?? null,
+      // Traducido: el acordeón de salas lo ve el cliente igual que el pill.
+      stage: clientStageLabel(p.current_stage as string | null, p.client_stage_label as string | null),
     }))
     .sort((a, b) => (a.name ?? "").localeCompare(b.name ?? ""));
 }
