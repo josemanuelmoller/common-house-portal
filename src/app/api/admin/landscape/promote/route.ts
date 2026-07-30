@@ -91,7 +91,9 @@ export async function POST(req: Request) {
         country: landRow.hq_country,
         city: landRow.headquarters ?? null,
         org_category: "Landscape Reuse Op",
-        org_domains: websiteHost,
+        // org_domains is TEXT holding a JSON array — every reader does
+        // JSON.parse() on it. Writing a bare host here produced malformed rows.
+        org_domains: websiteHost ? JSON.stringify([websiteHost]) : null,
         startup_stage: landRow.stage,
         notes: [
           landRow.mission,
