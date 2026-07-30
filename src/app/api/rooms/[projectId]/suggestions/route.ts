@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
+import { attachSources, type SuggestionRow } from "@/lib/proposal-sources";
 import { resolveClientRoomProject } from "@/lib/client-room";
 import { can, logRoomEvent, resolveRoomActor } from "@/lib/project-roles";
 import { acceptProposal, describeProposalChange, rejectProposal } from "@/lib/state-proposals";
@@ -29,7 +30,10 @@ export async function GET(_req: NextRequest, c: { params: Promise<{ projectId: s
     .eq("project_id", project.id).eq("status", "pending")
     .order("created_at", { ascending: false }).limit(20);
   if (error) return NextResponse.json({ error: error.message }, { status: 502 });
-  return NextResponse.json({ ok: true, suggestions: data });
+  // Cada propuesta viaja con la evidencia que la justifica: aceptar sin ver de
+  // dónde salió es avalar la atribución a ciegas.
+  const suggestions = await attachSources((data ?? []) as SuggestionRow[], project.notion_id ?? null);
+  return NextResponse.json({ ok: true, suggestions });
 }
 
 // Confirmar / descartar una sugerencia — solo PM (suggestion.confirm).

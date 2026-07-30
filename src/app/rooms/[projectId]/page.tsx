@@ -1,10 +1,12 @@
 import { redirect } from "next/navigation";
+import { attachSources, type SuggestionRow } from "@/lib/proposal-sources";
 import { currentUser } from "@clerk/nextjs/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { resolveClientRoomProject } from "@/lib/client-room";
 import { capabilitiesFor, listRoomsForActor, resolveRoomActor } from "@/lib/project-roles";
 import { loadRoomContext, loadRoomEvidence, loadRoomMeetings } from "@/lib/room-context";
 import { suggestRoomStructure } from "@/lib/room-structure";
+import { clientStageLabel } from "@/lib/client-stage";
 import { RoomClient } from "./RoomClient";
 
 export const dynamic = "force-dynamic";
@@ -28,7 +30,7 @@ export default async function RoomPage({ params }: { params: Promise<{ projectId
   const caps = capabilitiesFor(actor.role);
   const db = supabaseAdmin();
   const [proj, phases, deliverables, tasks, decisions, materials] = await Promise.all([
-    db.from("projects").select("id, name, current_stage, room_language, notion_id, hall_draft, hall_welcome_note").eq("id", project.id).single(),
+    db.from("projects").select("id, name, current_stage, client_stage_label, room_language, notion_id, hall_draft, hall_welcome_note").eq("id", project.id).single(),
     db.from("project_phases").select("*").eq("project_id", project.id).order("position", { ascending: true }),
     db.from("project_deliverables").select("*").eq("project_id", project.id).order("position", { ascending: true }),
     db.from("project_tasks").select("*").eq("project_id", project.id).order("position", { ascending: true }),
@@ -63,7 +65,13 @@ export default async function RoomPage({ params }: { params: Promise<{ projectId
       ? db.from("project_state_proposals").select("id, proposal_kind, item_type, summary, rationale, source_refs, created_at").eq("project_id", project.id).eq("status", "pending").order("created_at", { ascending: false }).limit(20)
       : Promise.resolve({ data: [] }),
   ]);
-  const suggestions = (suggRes.data ?? []) as { id: string; proposal_kind: string | null; item_type: string | null; summary: string | null; rationale: string | null; source_refs: string[] | null; created_at: string }[];
+  // notion_id sale del select explícito de arriba, no de un cast: si llegara
+  // undefined, TODA la evidencia se marcaría como ajena al proyecto — una
+  // alarma falsa en cada propuesta.
+  const suggestions = await attachSources(
+    (suggRes.data ?? []) as SuggestionRow[],
+    (proj.data?.notion_id as string | null) ?? null,
+  );
 
   // Empty-state: la sala no parte de cero; si no tiene estructura, se sugiere una
   // (heredando personas/Drive/reuniones de la preventa) para que el PM la apruebe.
@@ -81,7 +89,16 @@ export default async function RoomPage({ params }: { params: Promise<{ projectId
       defaultLang={lang}
       emptyRoom={emptyRoom}
       suggestion={suggestion}
-      project={proj.data ?? { id: project.id, name: null, current_stage: null }}
+      /* El estado interno NO cruza al componente cliente: se traduce acá, así el
+         pill de la sala no puede mostrar lenguaje de pipeline aunque alguien
+         escriba "Ganada" en current_stage. Ver src/lib/client-stage.ts. */
+      project={{
+        id: proj.data?.id ?? project.id,
+        name: proj.data?.name ?? null,
+        current_stage: proj.data
+          ? clientStageLabel(proj.data.current_stage as string | null, proj.data.client_stage_label as string | null)
+          : null,
+      }}
       rooms={rooms}
       meta={context.meta}
       team={context.team}

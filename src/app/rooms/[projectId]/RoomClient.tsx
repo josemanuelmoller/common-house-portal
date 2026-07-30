@@ -21,7 +21,8 @@ type RoomTeamMember = { id: string; name: string; email: string | null; role: st
 type RoomBilling = { company: { legalName: string | null; taxId: string | null; vatNumber: string | null; address: string | null; billingEmail: string | null; publicNote: string | null } | null; client: { legalName: string | null; taxId: string | null; address: string | null; billingEmail: string | null; billingContact: string | null; poReference: string | null } | null };
 type Meeting = { id: string; title: string; date: string | null; summary: string | null; url: string | null; platform: string | null; kind: string; durationMinutes: number | null; attendees: string[] };
 type EvidenceItem = { id: string; sourceId: string; statement: string | null; type: string | null; workstream: string | null; people: string[] };
-type Suggestion = { id: string; proposal_kind: string | null; item_type: string | null; summary: string | null; rationale: string | null; source_refs: string[] | null; created_at: string };
+type ProposalSource = { id: string; title: string; type: string | null; date: string | null; belongsToProject: boolean | null };
+type Suggestion = { id: string; proposal_kind: string | null; item_type: string | null; summary: string | null; rationale: string | null; source_refs: string[] | null; created_at: string; sources?: ProposalSource[] };
 /* fila de project_members (la que devuelve /members) — distinta de RoomTeamMember */
 type MemberRow = { id: string; person_id: string | null; user_email: string; role: string; revoked_at: string | null; created_at: string };
 
@@ -768,7 +769,27 @@ export function RoomClient({ projectId, role, capabilities, isSuperAdmin, person
                     return (
                       <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 16px", borderTop: `1px solid ${C.lineSoft}` }}>
                         <span style={{ fontSize: 8, fontWeight: 800, letterSpacing: ".8px", textTransform: "uppercase", padding: "3px 8px", borderRadius: 6, whiteSpace: "nowrap", background: k.warm ? C.warnSoft : "rgba(0,0,0,.07)", color: k.warm ? "#7a5800" : "#555" }}>{k.label}</span>
-                        <div style={{ flex: 1, fontSize: 12.5, minWidth: 0 }}>{s.summary}{s.rationale && <small style={{ display: "block", color: C.muted, fontSize: 10.5, marginTop: 1 }}>{s.rationale}</small>}</div>
+                        <div style={{ flex: 1, fontSize: 12.5, minWidth: 0 }}>
+                          {s.summary}
+                          {s.rationale && <small style={{ display: "block", color: C.muted, fontSize: 10.5, marginTop: 1 }}>{s.rationale}</small>}
+                          {/* De dónde salió. Sin esto, aceptar avala la atribución sin verla. */}
+                          {(s.sources ?? []).length > 0 && (
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 5 }}>
+                              {(s.sources ?? []).map((src) => {
+                                const ajena = src.belongsToProject === false;
+                                const huerfana = src.belongsToProject === null;
+                                const tone = ajena ? { bg: C.dangerSoft, fg: C.danger } : huerfana ? { bg: C.warnSoft, fg: "#7a5800" } : { bg: "rgba(0,0,0,.05)", fg: C.muted2 };
+                                const nota = ajena ? " · de otro proyecto" : huerfana ? " · sin proyecto" : "";
+                                return (
+                                  <span key={src.id} title={`${src.type ?? "evidencia"}${src.date ? ` · ${src.date}` : ""}${nota}`}
+                                    style={{ fontSize: 9.5, fontWeight: 600, background: tone.bg, color: tone.fg, padding: "2px 7px", borderRadius: 6, maxWidth: 260, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                    {src.date ? `${src.date.slice(5)} · ` : ""}{src.title}{nota}
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
                         {can("suggestion.confirm")
                           ? (<div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
                               <button onClick={() => resolveSugg(s.id, "confirm")} style={{ fontFamily: "inherit", fontSize: 9.5, fontWeight: 800, letterSpacing: ".4px", textTransform: "uppercase", cursor: "pointer", borderRadius: 6, padding: "5px 10px", border: 0, background: C.lime, color: "#000" }}>{lang === "es" ? "Confirmar" : "Confirm"}</button>

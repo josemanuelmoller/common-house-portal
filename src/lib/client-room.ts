@@ -1,6 +1,7 @@
 import "server-only";
 
 import { supabaseAdmin } from "@/lib/supabase";
+import { clientStageLabel } from "@/lib/client-stage";
 import {
   withDraftDefaults,
   type HallDraft,
@@ -148,6 +149,7 @@ type ProjectRow = {
   client_room_enabled: boolean | null;
   project_status: string | null;
   current_stage: string | null;
+  client_stage_label: string | null;
   geography: string | null;
   themes: string | null;
   client_logo_url: string | null;
@@ -166,7 +168,7 @@ type ProjectRow = {
 const PROJECT_SELECT = [
   "id", "notion_id", "hall_slug", "name", "organization_id",
   "client_room_label", "client_room_status", "client_room_enabled",
-  "project_status", "current_stage", "geography", "themes", "client_logo_url", "hall_hero",
+  "project_status", "current_stage", "client_stage_label", "geography", "themes", "client_logo_url", "hall_hero",
   "hall_welcome_note", "hall_current_focus", "hall_next_milestone",
   "hall_challenge", "hall_matters_most", "hall_obstacles", "hall_success",
   "drive_folder_id", "drive_folder_url",
@@ -440,7 +442,8 @@ async function assembleRoom(row: ProjectRow, includeInternal: boolean, canSeeBan
     roomStatus: row.client_room_status ?? "preparing",
     roomEnabled: row.client_room_enabled ?? false,
     projectStatus: row.project_status,
-    currentStage: row.current_stage,
+    // Traducido: current_stage es interno y no se muestra crudo (ver client-stage.ts).
+    currentStage: clientStageLabel(row.current_stage, row.client_stage_label),
     geography: row.geography,
     themes: row.themes,
     clientLogoUrl: row.client_logo_url,
