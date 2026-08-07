@@ -447,6 +447,9 @@ export interface StatusReport {
   eligible_minutes: number;
   already_deleted: number;
   cutoff_date: string;
+  /** EVERY eligible id, oldest first — the full worklist the prune loop drains. */
+  eligible_ids: string[];
+  /** First 25 only, for the panel table. Never use this as the prune worklist. */
   eligible_sample: { id: string; title: string | null; date: string | null; minutes: number }[];
 }
 
@@ -472,7 +475,11 @@ export async function statusReport(retentionDays = RETENTION_DAYS): Promise<Stat
   }[];
 
   const live = rows.filter((r) => !r.deleted_from_fireflies_at);
-  const eligible = live.filter((r) => r.meeting_date && r.meeting_date < cutoff);
+  const eligible = live
+    .filter((r) => r.meeting_date && r.meeting_date < cutoff)
+    // Oldest first: the prune loop drains in this order, and the oldest
+    // recordings are both the least useful and the ones freeing storage soonest.
+    .sort((a, b) => (a.meeting_date ?? "").localeCompare(b.meeting_date ?? ""));
   const eligibleMinutes = eligible.reduce((s, r) => s + (r.duration_min ?? 0), 0);
 
   return {
@@ -482,8 +489,8 @@ export async function statusReport(retentionDays = RETENTION_DAYS): Promise<Stat
     eligible_minutes: Math.round(eligibleMinutes),
     already_deleted: rows.filter((r) => r.deleted_from_fireflies_at).length,
     cutoff_date: cutoff,
+    eligible_ids: eligible.map((r) => r.fireflies_id),
     eligible_sample: eligible
-      .sort((a, b) => (a.meeting_date ?? "").localeCompare(b.meeting_date ?? ""))
       .slice(0, 25)
       .map((r) => ({ id: r.fireflies_id, title: r.title, date: r.meeting_date, minutes: Math.round(r.duration_min ?? 0) })),
   };
@@ -646,10 +653,18 @@ export interface PruneResult {
   execute: boolean;
   requested: number;
   processed: { id: string; title: string | null; minutes: number }[];
-  skipped: { id: string; reason: string }[];
+  /** `retryable` tells the caller's drain loop whether to keep this id in the
+   *  worklist. A gate skip or a hard API error is final; a rate limit is not. */
+  skipped: { id: string; reason: string; retryable: boolean }[];
   minutes_freed: number;
+  /** Eligible ids this call did NOT delete — the caller still has work to do. */
   remaining: number;
+  /** We stopped at our own per-call cap. More are deletable right after the wait. */
   rate_capped: boolean;
+  /** Fireflies itself refused. Distinct from rate_capped: nothing got through. */
+  rate_limited: boolean;
+  /** How long to wait before calling again, 0 when there is nothing left to do. */
+  retry_after_ms: number;
 }
 
 /**
@@ -660,13 +675,18 @@ export interface PruneResult {
  */
 export async function pruneMeetings(opts: { ids: string[]; execute?: boolean }): Promise<PruneResult> {
   const execute = opts.execute ?? false;
-  const ids = Array.from(new Set(opts.ids ?? [])).slice(0, 200);
+  const ids = Array.from(new Set(opts.ids ?? [])).slice(0, 500);
   const cutoff = new Date(Date.now() - RETENTION_DAYS * 86_400_000).toISOString().slice(0, 10);
   const DELETE_CAP = 8; // Fireflies deleteTranscript: 10/min — stay under it.
+  // One rate-limit window plus margin. The caller drains the backlog by calling
+  // again after this wait; we deliberately do NOT sleep server-side, because a
+  // multi-batch run would blow the serverless timeout and lose its progress.
+  const RETRY_AFTER_MS = 62_000;
 
   const sb = getSupabaseServerClient();
   const result: PruneResult = {
-    execute, requested: ids.length, processed: [], skipped: [], minutes_freed: 0, remaining: 0, rate_capped: false,
+    execute, requested: ids.length, processed: [], skipped: [], minutes_freed: 0,
+    remaining: 0, rate_capped: false, rate_limited: false, retry_after_ms: 0,
   };
   if (ids.length === 0) return result;
 
@@ -683,19 +703,22 @@ export async function pruneMeetings(opts: { ids: string[]; execute?: boolean }):
   const eligible: typeof rows = [];
   for (const id of ids) {
     const r = byId.get(id);
-    if (!r) { result.skipped.push({ id, reason: "not in backup manifest" }); continue; }
-    if (!r.backed_up_at) { result.skipped.push({ id, reason: "not backed up to Drive" }); continue; }
-    if (!r.meeting_date || r.meeting_date >= cutoff) { result.skipped.push({ id, reason: `newer than retention (${cutoff})` }); continue; }
-    if (r.deleted_from_fireflies_at) { result.skipped.push({ id, reason: "already deleted" }); continue; }
+    // Gate failures are final for this id: retrying changes nothing.
+    if (!r) { result.skipped.push({ id, reason: "no está en el manifiesto de respaldo", retryable: false }); continue; }
+    if (!r.backed_up_at) { result.skipped.push({ id, reason: "sin respaldo en Drive", retryable: false }); continue; }
+    if (!r.meeting_date || r.meeting_date >= cutoff) { result.skipped.push({ id, reason: `dentro de retención (corte ${cutoff})`, retryable: false }); continue; }
+    if (r.deleted_from_fireflies_at) { result.skipped.push({ id, reason: "ya borrada", retryable: false }); continue; }
     eligible.push(r);
   }
 
   if (!execute) {
     result.processed = eligible.map((r) => ({ id: r.fireflies_id, title: r.title, minutes: Math.round(r.duration_min ?? 0) }));
     result.minutes_freed = eligible.reduce((s, r) => s + Math.round(r.duration_min ?? 0), 0);
+    result.remaining = eligible.length;
     return result;
   }
 
+  let hardFailed = 0; // eligible but permanently un-deletable — not "remaining work"
   for (const r of eligible) {
     if (result.processed.length >= DELETE_CAP) { result.rate_capped = true; break; }
     try {
@@ -709,11 +732,21 @@ export async function pruneMeetings(opts: { ids: string[]; execute?: boolean }):
       result.minutes_freed += Math.round(r.duration_min ?? 0);
     } catch (e) {
       const fe = e as FirefliesError;
-      if (fe.rateLimited) { result.rate_capped = true; break; }
-      result.skipped.push({ id: r.fireflies_id, reason: fe.message });
+      if (fe.rateLimited) {
+        // Fireflies refused. Keep the id in play — it is deletable after the
+        // window, and reporting it as a plain error would hide that.
+        result.rate_limited = true;
+        result.skipped.push({ id: r.fireflies_id, reason: "Fireflies rechazó por límite de tasa", retryable: true });
+        break;
+      }
+      hardFailed++;
+      result.skipped.push({ id: r.fireflies_id, reason: fe.message, retryable: false });
     }
   }
-  result.remaining = eligible.length - result.processed.length;
+  result.remaining = eligible.length - result.processed.length - hardFailed;
+  // Only promise a retry when one would actually do something.
+  const retryable = result.remaining > 0 && (result.rate_capped || result.rate_limited);
+  result.retry_after_ms = retryable ? RETRY_AFTER_MS : 0;
   return result;
 }
 

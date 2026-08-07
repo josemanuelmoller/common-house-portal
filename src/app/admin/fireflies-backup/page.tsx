@@ -29,7 +29,8 @@ export default async function FirefliesBackupPage() {
   await requireAdmin();
   const snap = await getOpsSnapshot();
   const cap = snap.capture;
-  const eligibleIds = snap.prune.eligible_sample.map((e) => e.id);
+  // Every eligible id, not the 25-row table sample — the sample is for display.
+  const eligibleIds = snap.prune.eligible_ids;
 
   return (
     <div className="flex min-h-screen">
@@ -91,6 +92,8 @@ export default async function FirefliesBackupPage() {
             empty="Nada elegible aún. Se libera storage cuando las reus pasen la retención.">
             <p className="text-[11px] mb-2" style={{ color: "var(--hall-muted-2)" }}>
               Liberarían ~{snap.prune.eligible_minutes} min · corte {snap.prune.cutoff_date} · ya borradas: {snap.prune.already_deleted}
+              {snap.prune.eligible_to_delete > snap.prune.eligible_sample.length &&
+                ` · abajo se listan las ${snap.prune.eligible_sample.length} más antiguas`}
             </p>
             {snap.prune.eligible_sample.map((e) => (
               <Row key={e.id} title={e.title ?? e.id} sub={`${e.date ?? ""} · ${e.minutes}m`} />
